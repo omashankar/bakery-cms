@@ -1,0 +1,76 @@
+import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+
+const placedAt = "2026-07-09T10:30:00.000Z";
+const estimatedDelivery = "2026-07-11T14:00:00.000Z";
+
+export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
+  id: "invoice-preview-order",
+  orderNumber: "BK-20260709-1042",
+  placedAt,
+  status: "delivered",
+  paymentMethod: "upi",
+  paymentStatus: "paid",
+  paymentReference: "UPI-8839201",
+  estimatedDelivery,
+  statusHistory: [
+    { status: "pending", at: placedAt },
+    { status: "confirmed", at: "2026-07-09T10:35:00.000Z" },
+    { status: "preparing", at: "2026-07-09T12:00:00.000Z" },
+    { status: "ready", at: "2026-07-10T09:00:00.000Z" },
+    { status: "out_for_delivery", at: "2026-07-11T11:00:00.000Z" },
+    { status: "delivered", at: estimatedDelivery },
+  ],
+  address: {
+    fullName: "Priya Sharma",
+    email: "priya@example.com",
+    phone: "+91 98765 43210",
+    addressLine1: "12 MG Road, Indiranagar",
+    addressLine2: "Near Metro Station",
+    city: "Bengaluru",
+    state: "Karnataka",
+    pincode: "560038",
+  },
+  items: [
+    {
+      id: "preview-item-1",
+      cakeSlug: "chocolate-truffle",
+      name: "Chocolate Truffle Cake",
+      image: "/images/cakes/chocolate-truffle.jpg",
+      price: 850,
+      quantity: 1,
+      weight: "1 kg",
+      shape: "Round",
+      flavour: "Chocolate",
+      message: "Happy Birthday Ananya!",
+    },
+    {
+      id: "preview-item-2",
+      cakeSlug: "red-velvet",
+      name: "Red Velvet Cupcakes (6 pcs)",
+      image: "/images/cakes/red-velvet.jpg",
+      price: 420,
+      quantity: 1,
+      weight: "6 pcs",
+      flavour: "Red Velvet",
+    },
+  ],
+  totals: {
+    subtotal: 1270,
+    delivery: 99,
+    tax: 63.5,
+    discount: 50,
+    platformCharge: 0,
+    giftWrapFee: 49,
+    taxableAmount: 1220,
+    total: 1431.5,
+    itemCount: 2,
+    deliveryZoneName: "Bengaluru Central",
+    estimatedDeliveryDays: 2,
+  },
+  coupon: {
+    code: "WELCOME10",
+    label: "Welcome offer",
+    discountAmount: 50,
+  },
+  orderNotes: "Please include candles.",
+};

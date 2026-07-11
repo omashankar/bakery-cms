@@ -1,0 +1,15 @@
+---
+description: When polishing an admin side-menu page, also check nested pages and modals
+alwaysApply: true
+---
+
+# Admin page polish scope
+
+When the user names a **side-menu admin page** (e.g. Invoices, Delivery, Payments, Orders):
+
+1. Polish the **main list/settings page** (KPIs, filters without Advanced clutter, table/mobile, SSR-safe load).
+2. Also find and polish **related inner pages** (detail routes, child nav pages like Delivery → Zones/Slots/Shipping).
+3. Also find and polish **modals/dialogs/drawers** opened from that page (create/edit forms, confirm dialogs, preview sheets).
+4. Verify **print / export / deep-links** that leave the page (e.g. Print invoice → order detail print layout).
+
+Do not stop at the top-level route only. Search the feature folder for `*dialog*`, `*drawer*`, `*sheet*`, and nested `app/(admin)/**` routes before finishing.

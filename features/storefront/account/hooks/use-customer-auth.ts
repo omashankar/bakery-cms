@@ -1,0 +1,33 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getCustomerSession,
+  type CustomerSession,
+} from "@/features/storefront/account/lib/customer-session";
+import { routes } from "@/constants/routes";
+
+export function useCustomerAuth() {
+  const router = useRouter();
+  const [session, setSession] = useState<CustomerSession | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const load = () => {
+      const current = getCustomerSession();
+      if (!current) {
+        router.replace(routes.account.login);
+        return;
+      }
+      setSession(current);
+      setReady(true);
+    };
+
+    load();
+    window.addEventListener("bakery-customer-session-updated", load);
+    return () => window.removeEventListener("bakery-customer-session-updated", load);
+  }, [router]);
+
+  return { session, ready };
+}

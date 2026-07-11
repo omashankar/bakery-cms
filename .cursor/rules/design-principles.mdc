@@ -1,0 +1,20 @@
+---
+description: Bakery CMS visual design principles — no gradients
+alwaysApply: true
+---
+
+# Design principles
+
+Source of truth: `constants/design-principles.ts` and `/design-system#principles`.
+
+## Hard rules
+
+- **No gradients** — never use linear, radial, or mesh gradients on backgrounds, buttons, borders, text, or decorative layers. Solid brand tokens only.
+- **No glassmorphism** on content surfaces. Modal overlays may use a solid dim scrim (`bg-black/40`+) without blur.
+- **Admin theme:** light / dark via ThemeToggle. Instant snap (no color fade/flicker). Use semantic tokens (`bg-background`, `bg-card`, `bg-muted`, `text-foreground`, `border-border`). Never hardcode `bg-white` / `bg-cream-*` on **admin** layout chrome.
+- **Website is light-only** — `/store`, `/account`, `/landing` never use dark mode. Follow the light design system only.
+- **Appearance** brands the **website** (primary, accent, cream, radius). It does not enable website dark mode. Admin light/dark stays separate.
+- **Primary button:** `bg-primary` (admin: brown in light, gold in dark; website: Appearance primary).
+- **Bakery button:** `variant="bakery"` when you need solid brown in both admin themes.
+- Soft borders over heavy shadows. Gold is accent/ring. Radius 12–16px. 8px spacing grid.
+- Avoid tip cards, Related sidebar duplicates, and echo KPI descriptions.

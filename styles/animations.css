@@ -1,0 +1,126 @@
+/* Bakery CMS — Motion Tokens (Phase 3) */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@utility animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out) both;
+}
+
+@utility animate-fade-up {
+  animation: fade-up var(--duration-slow) var(--ease-out) both;
+}
+
+@utility animate-fade-down {
+  animation: fade-down var(--duration-normal) var(--ease-out) both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-out) both;
+}
+
+@utility animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
+@utility animate-pulse-soft {
+  animation: pulse-soft 2s var(--ease-in-out) infinite;
+}
+
+@utility transition-premium {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+@utility hover-border {
+  @apply transition-premium border border-border;
+
+  &:hover {
+    border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
+  }
+}
+
+/* Deprecated aliases — solid fallbacks until Phase 5 landing redesign */
+@utility gradient-bakery {
+  background-color: var(--bakery-700);
+}
+
+@utility gradient-cream {
+  background-color: var(--cream-100);
+}
+
+@utility text-gradient-gold {
+  color: var(--brand-accent);
+}
+
+@utility glass-panel {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+}
+
+@utility hover-lift {
+  @apply transition-premium border border-border;
+
+  &:hover {
+    border-color: color-mix(in oklch, var(--primary) 25%, var(--border));
+  }
+}
