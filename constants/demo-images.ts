@@ -14,8 +14,13 @@ export const demoPhotoIds = {
   cupcakes: "photo-1535254973040-607b474cb50d",
   cookies: "photo-1558961363-fa8fdf82db35",
   stackCake: "photo-1542826438-bd32f43d626f",
-  dessertPlate: "photo-1626082927389-6cd097cdc6ec",
-  decoratedCake: "photo-1505253758473-96b7015fcd40",
+  // Previous ids for these two returned non-bakery photos (fried chicken / curry).
+  dessertPlate: "photo-1562440499-64c9a111f713",
+  decoratedCake: "photo-1464349153735-7db50ed83c84",
+  berryCake: "photo-1535141192574-5d4897c12636",
+  blushCake: "photo-1621303837174-89787a7d4729",
+  iceCreamCake: "photo-1557925923-cd4648e211a0",
+  pinkCupcakes: "photo-1563729784474-d77dbb933a9e",
 } as const;
 
 /** Build a sized Unsplash URL from a photo id */

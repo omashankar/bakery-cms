@@ -11,13 +11,18 @@ const DRAFT_KEY = "bakery-cms-wedding-draft";
 const PUBLISHED_KEY = "bakery-cms-wedding-published";
 const REVISIONS_KEY = "bakery-cms-wedding-revisions";
 const WEDDING_VERSION_KEY = "bakery-cms-wedding-version";
-const WEDDING_VERSION = 3;
+const WEDDING_VERSION = 4;
 
 function mergeSectionsWithRegistry(
   sections: WeddingSectionInstance[]
 ): WeddingSectionInstance[] {
-  const existingTypes = new Set(sections.map((section) => section.type));
   const defaults = createDefaultWeddingSections();
+  const registryTypes = new Set(defaults.map((section) => section.type));
+  // Drop persisted sections whose type was removed from the registry (e.g. Wedding
+  // FAQ — FAQs now live only on the dedicated FAQ page).
+  sections = sections.filter((section) => registryTypes.has(section.type));
+
+  const existingTypes = new Set(sections.map((section) => section.type));
   const missing = defaults.filter((section) => !existingTypes.has(section.type));
 
   if (missing.length === 0) {
@@ -64,10 +69,18 @@ function readSnapshot(key: string): WeddingBuilderSnapshot | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as WeddingBuilderSnapshot;
-    const storedVersion = Number(localStorage.getItem(WEDDING_VERSION_KEY) ?? 1);
+    // Per-key version so draft AND published each migrate (a shared key let the
+    // second read skip migration once the first bumped it).
+    const versionKey = `${key}-version`;
+    const storedVersion = Number(
+      localStorage.getItem(versionKey) ??
+        localStorage.getItem(WEDDING_VERSION_KEY) ??
+        1
+    );
     if (storedVersion < WEDDING_VERSION) {
       const normalized = normalizeSnapshot(parsed);
       writeSnapshot(key, normalized);
+      localStorage.setItem(versionKey, String(WEDDING_VERSION));
       localStorage.setItem(WEDDING_VERSION_KEY, String(WEDDING_VERSION));
       return normalized;
     }

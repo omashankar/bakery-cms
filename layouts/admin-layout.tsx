@@ -217,17 +217,23 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
             "min-h-0 flex-1",
             // Builders fill the viewport; list/settings pages scroll by content height only.
             // flex-1 + overflow-y-auto on the same node inflates scrollHeight (empty gap on SEO etc.).
+            // Builder pages full-bleed via -my-* on their root; that padding must live on the SAME
+            // element as overflow-hidden (contentWrap), else the negative margin overshoots the clip
+            // box and the toolbar title gets cut off. So keep vertical padding off <main> for builders.
             isBuilder
               ? "flex flex-col overflow-hidden"
-              : "overflow-y-auto panel-scroll",
-            adminShell.mainPadding,
+              : cn("overflow-y-auto panel-scroll", adminShell.mainPadding),
             "print:overflow-visible print:p-0"
           )}
         >
           <div
             className={cn(
               adminShell.contentWrap,
-              isBuilder && "flex min-h-0 flex-1 flex-col overflow-hidden",
+              isBuilder &&
+                cn(
+                  "flex min-h-0 flex-1 flex-col overflow-hidden",
+                  adminShell.mainPadding
+                ),
               "print:max-w-none print:overflow-visible print:px-0"
             )}
           >

@@ -52,7 +52,10 @@ export function BuilderToolbar({
   return (
     <div
       className={cn(
-        "shrink-0 space-y-3 border-b border-border bg-card py-3 sm:py-4",
+        "shrink-0 space-y-3 border-b border-border bg-card",
+        // Match the vertical + horizontal insets of standard admin pages so the
+        // builder title lines up exactly with every other page's AdminPageHeader.
+        adminShell.mainPadding,
         adminShell.contentWrap
       )}
     >

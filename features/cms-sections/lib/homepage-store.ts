@@ -11,29 +11,43 @@ const DRAFT_KEY = "bakery-cms-homepage-draft";
 const PUBLISHED_KEY = "bakery-cms-homepage-published";
 const REVISIONS_KEY = "bakery-cms-homepage-revisions";
 const HOMEPAGE_VERSION_KEY = "bakery-cms-homepage-version";
-const HOMEPAGE_VERSION = 4;
+const HOMEPAGE_VERSION = 6;
 
 function mergeSectionsWithRegistry(
   sections: HomepageSectionInstance[]
 ): HomepageSectionInstance[] {
-  const existingTypes = new Set(sections.map((section) => section.type));
   const defaults = createDefaultHomepageSections();
+  const registryTypes = new Set(defaults.map((section) => section.type));
+  // Drop persisted sections whose type was removed from the registry (e.g. FAQ,
+  // which now lives only on the dedicated FAQ page).
+  sections = sections.filter((section) => registryTypes.has(section.type));
+
+  const existingTypes = new Set(sections.map((section) => section.type));
   const missing = defaults.filter((section) => !existingTypes.has(section.type));
 
   if (missing.length === 0) {
     return sortSections(sections);
   }
 
-  const maxOrder = Math.max(...sections.map((section) => section.order), -1);
+  // Registry order lets us slot new sections beside their neighbours (not just at the end).
+  const registryIndex = new Map(defaults.map((section, index) => [section.type, index]));
+  const result = [...sortSections(sections)];
 
-  return sortSections([
-    ...sections,
-    ...missing.map((section, index) => ({
+  missing.forEach((section, index) => {
+    const target = registryIndex.get(section.type) ?? result.length;
+    let insertAt = 0;
+    for (let i = 0; i < result.length; i += 1) {
+      const currentIndex = registryIndex.get(result[i].type);
+      if (currentIndex !== undefined && currentIndex < target) insertAt = i + 1;
+    }
+    result.splice(insertAt, 0, {
       ...section,
       instanceId: `${section.type}-merged-${index}`,
-      order: maxOrder + 1 + index,
-    })),
-  ]);
+      order: 0,
+    });
+  });
+
+  return sortSections(result.map((section, index) => ({ ...section, order: index })));
 }
 
 function normalizeSnapshot(snapshot: HomepageBuilderSnapshot): HomepageBuilderSnapshot {
@@ -64,10 +78,18 @@ function readSnapshot(key: string): HomepageBuilderSnapshot | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as HomepageBuilderSnapshot;
-    const storedVersion = Number(localStorage.getItem(HOMEPAGE_VERSION_KEY) ?? 1);
+    // Per-key version so draft AND published each migrate (a shared key let the
+    // second read skip migration once the first bumped it).
+    const versionKey = `${key}-version`;
+    const storedVersion = Number(
+      localStorage.getItem(versionKey) ??
+        localStorage.getItem(HOMEPAGE_VERSION_KEY) ??
+        1
+    );
     if (storedVersion < HOMEPAGE_VERSION) {
       const normalized = normalizeSnapshot(parsed);
       writeSnapshot(key, normalized);
+      localStorage.setItem(versionKey, String(HOMEPAGE_VERSION));
       localStorage.setItem(HOMEPAGE_VERSION_KEY, String(HOMEPAGE_VERSION));
       return normalized;
     }
