@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
@@ -56,7 +57,7 @@ export function FaqPage() {
         <div className={layoutSpacing.container}>
           <div className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:gap-12">
             {/* FAQ list */}
-            <div>
+            <ScrollReveal>
               <div className="relative mb-6">
                 <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -117,11 +118,11 @@ export function FaqPage() {
                   Showing {formatFaqCategory(category)} questions
                 </p>
               ) : null}
-            </div>
+            </ScrollReveal>
 
             {/* Help sidebar */}
-            <aside className="lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-3xl border border-border bg-cream-100 p-6 sm:p-8">
+            <ScrollReveal delay={120} className="lg:sticky lg:top-24 lg:self-start">
+              <aside className="rounded-3xl border border-border bg-cream-100 p-6 sm:p-8">
                 <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-bakery-700 shadow-sm">
                   <MessageCircle className="size-6" />
                 </span>
@@ -167,8 +168,8 @@ export function FaqPage() {
                   Contact Support
                   <ArrowRight className="size-4" />
                 </Button>
-              </div>
-            </aside>
+              </aside>
+            </ScrollReveal>
           </div>
         </div>
       </section>

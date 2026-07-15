@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { InquiriesListPage } from "@/features/admin/inquiries";
+import { InquiriesHubPage } from "@/features/admin/inquiries";
 
 export const metadata: Metadata = {
   title: "Inquiries",
-  description: "All customer inquiries overview.",
+  description: "Customer inquiries — wedding, contact, and newsletter.",
 };
 
 export default function Page() {
-  return <InquiriesListPage />;
+  return <InquiriesHubPage />;
 }

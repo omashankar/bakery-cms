@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
+import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { filterCakesByCategory, getAllCakes } from "@/features/storefront/lib/catalog";
 import {
@@ -49,11 +50,21 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
   const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_COLLECTION_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  // Cakes are merged with localStorage-backed admin data, which is absent during
+  // SSR — defer the catalogue-driven UI to the client to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
-    const byCategory = filterCakesByCategory(getAllCakes(), categorySlug || undefined);
+    if (!mounted) return [];
+    const all = getAllCakes();
+    let byCategory = filterCakesByCategory(all, categorySlug || undefined);
+    // Never dead-end a valid category page — fall back to the full catalogue.
+    if (categorySlug && byCategory.length === 0) byCategory = all;
     return applyCollectionFilters(byCategory, filters);
-  }, [categorySlug, filters]);
+  }, [categorySlug, filters, mounted]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -149,7 +160,7 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
               </div>
 
               <p className="mb-4 text-sm text-muted-foreground">
-                Showing {paginated.length} of {filtered.length} cakes
+                {mounted ? `Showing ${paginated.length} of ${filtered.length} cakes` : "Loading cakes…"}
               </p>
 
               <div className="mb-8 flex flex-wrap gap-2">
@@ -168,7 +179,16 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
                 ))}
               </div>
 
-              {paginated.length === 0 ? (
+              {!mounted ? (
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-80 animate-pulse rounded-xl border border-border bg-cream-100"
+                    />
+                  ))}
+                </div>
+              ) : paginated.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-cream-50 py-16 text-center">
                   <p className="font-medium">No cakes found</p>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -183,11 +203,14 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                <StaggerReveal
+                  key={`${categorySlug}-${currentPage}`}
+                  className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
+                >
                   {paginated.map((cake) => (
                     <ProductCard key={cake.id} cake={cake} />
                   ))}
-                </div>
+                </StaggerReveal>
               )}
 
               {filtered.length > PAGE_SIZE ? (
@@ -249,10 +272,10 @@ function CategoryPill({
     <Link
       href={href}
       className={cn(
-        "rounded-lg border px-3 py-1.5 text-sm font-medium transition-premium",
+        "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",
         active
-          ? "border-bakery-700 bg-bakery-700 text-white"
-          : "border-border bg-white text-muted-foreground hover:border-bakery-300"
+          ? "border-bakery-700 bg-bakery-700 text-white shadow-sm"
+          : "border-border bg-white text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
       )}
     >
       {label}

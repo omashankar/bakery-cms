@@ -124,7 +124,21 @@ function RefundCaseDetail({
 
           {order.refundRecord ? (
             <div className="rounded-lg border border-border bg-muted/80 px-3 py-2.5">
-              <p className="text-[11px] text-muted-foreground">Refund details</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-foreground">
+                  {formatCurrency(order.refundRecord.amount)} refunded
+                </p>
+                <Badge variant={order.refundRecord.amount < order.totals.total ? "outline" : "accent"}>
+                  {order.refundRecord.amount < order.totals.total ? "Partial" : "Full"}
+                </Badge>
+              </div>
+              {order.refundRecord.amount < order.totals.total ? (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Remaining {formatCurrency(order.totals.total - order.refundRecord.amount)} of{" "}
+                  {formatCurrency(order.totals.total)}
+                </p>
+              ) : null}
+              <p className="mt-2 text-[11px] text-muted-foreground">Reason</p>
               <p className="mt-0.5 font-medium">
                 {formatRefundReason(order.refundRecord.reason)}
               </p>
@@ -486,6 +500,7 @@ export function RefundCenterAdminPage() {
         open={Boolean(refundTarget)}
         orderNumber={refundTarget?.orderNumber}
         totalLabel={refundTarget ? formatCurrency(refundTarget.totals.total) : undefined}
+        orderTotal={refundTarget?.totals.total}
         onOpenChange={(open) => {
           if (!open) setRefundTarget(null);
         }}

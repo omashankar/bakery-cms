@@ -11,6 +11,10 @@ export { BackupSettingsPage } from "./components/backup-settings-page";
 export { ActivitySettingsPage } from "./components/activity-settings-page";
 export { PermissionsSettingsPage } from "./components/permissions-settings-page";
 export { CommerceSettingsPage } from "./components/commerce-settings-page";
+export { CustomCodeSettingsPage } from "./components/custom-code-settings-page";
+export { NavigationSettingsPage } from "./components/navigation-settings-page";
+export { SeoFilesSettingsPage } from "./components/seo-files-settings-page";
+export { SmsSettingsPage } from "./components/sms-settings-page";
 export {
   loadSettings,
   saveSettings,

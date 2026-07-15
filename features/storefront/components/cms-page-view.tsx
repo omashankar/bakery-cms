@@ -10,6 +10,7 @@ import {
   getPageForStorefront,
   processScheduledPagePublishes,
 } from "@/features/admin/pages/lib/pages-repository";
+import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
@@ -147,7 +148,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
         <div className={layoutSpacing.container}>
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             {page.heroImage ? (
-              <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+              <ScrollReveal className="relative mx-auto w-full max-w-lg lg:max-w-none">
                 <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] bg-muted">
                     <Image
@@ -163,15 +164,15 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                   <p className="font-heading text-2xl font-bold text-bakery-700">Since 1956</p>
                   <p className="text-[11px] text-muted-foreground">Baking joy for generations</p>
                 </div>
-              </div>
+              </ScrollReveal>
             ) : null}
-            <div className="space-y-5 text-muted-foreground">
+            <ScrollReveal delay={120} className="space-y-5 text-muted-foreground">
               <Badge variant="accent" className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]">
                 <Heart className="size-3.5" />
                 Our Story
               </Badge>
               {renderBlocks(page.blocks)}
-            </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
@@ -179,7 +180,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
       {/* Stats band */}
       <section className="surface-cream border-y border-border py-12 lg:py-14">
         <div className={layoutSpacing.container}>
-          <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          <StaggerReveal className="grid grid-cols-2 gap-6 lg:grid-cols-4">
             {aboutStats.map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className="font-heading text-3xl font-bold text-bakery-800 sm:text-4xl">
@@ -188,26 +189,26 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                 <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
               </div>
             ))}
-          </div>
+          </StaggerReveal>
         </div>
       </section>
 
       {/* Why Choose Us */}
       <section className={cn("bg-white", layoutSpacing.sectionY)}>
         <div className={layoutSpacing.container}>
-          <div className="max-w-2xl">
+          <ScrollReveal className="max-w-2xl">
             <h2 className="font-heading text-2xl font-bold sm:text-3xl">Why Choose Us</h2>
             <p className="mt-2 text-muted-foreground">
               Six decades of craft, quality, and care in every celebration we bake for.
             </p>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          </ScrollReveal>
+          <StaggerReveal className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {whyChooseUs.map((item) => {
               const Icon = aboutWhyIcons[item.icon as keyof typeof aboutWhyIcons] ?? Award;
               return (
                 <div
                   key={item.title}
-                  className="rounded-2xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                  className="h-full rounded-2xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
                 >
                   <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                     <Icon className="size-5" />
@@ -219,14 +220,14 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                 </div>
               );
             })}
-          </div>
+          </StaggerReveal>
         </div>
       </section>
 
       {/* CTA */}
       <section className={cn("bg-white pb-16 lg:pb-20")}>
         <div className={layoutSpacing.container}>
-          <div className="rounded-3xl border border-border bg-cream-100 px-6 py-12 text-center sm:px-10 lg:py-14">
+          <ScrollReveal className="rounded-3xl border border-border bg-cream-100 px-6 py-12 text-center sm:px-10 lg:py-14">
             <h2 className="font-heading text-2xl font-bold sm:text-3xl">
               Ready to make your celebration sweeter?
             </h2>
@@ -248,7 +249,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                 Contact Us
               </Button>
             </div>
-          </div>
+          </ScrollReveal>
         </div>
       </section>
     </>

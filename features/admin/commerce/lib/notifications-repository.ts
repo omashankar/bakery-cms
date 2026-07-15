@@ -199,6 +199,44 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
           createdAt: order.placedAt,
         });
       }
+
+      if (
+        settings.paymentAlerts &&
+        order.refundRecord &&
+        !dismissed.has(`refund:${order.id}`)
+      ) {
+        const completed = order.refundRecord.status === "completed";
+        generated.push({
+          id: `refund:${order.id}`,
+          type: "refund_request",
+          title: `Refund ${completed ? "completed" : order.refundRecord.status} · ${order.orderNumber}`,
+          message: `${formatCurrency(order.refundRecord.amount)} · ${order.address.fullName}`,
+          href: routes.admin.commerce.refunds,
+          entityId: order.id,
+          entityKind: "order",
+          read: false,
+          createdAt: order.refundRecord.requestedAt ?? order.placedAt,
+        });
+      }
+
+      if (
+        settings.paymentAlerts &&
+        order.paymentMethod === "cod" &&
+        order.status === "delivered" &&
+        !dismissed.has(`cod:${order.id}`)
+      ) {
+        generated.push({
+          id: `cod:${order.id}`,
+          type: "cod_confirmation",
+          title: `COD collected · ${order.orderNumber}`,
+          message: `${formatCurrency(order.totals.total)} collected on delivery`,
+          href: routes.admin.orders.detail(order.id),
+          entityId: order.id,
+          entityKind: "order",
+          read: false,
+          createdAt: order.placedAt,
+        });
+      }
     }
   }
 

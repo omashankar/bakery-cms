@@ -29,7 +29,7 @@ export function AccountShell({
       <StorePageHeader
         title={title}
         description={description}
-        breadcrumbs={[{ label: "My Account", href: routes.account.dashboard }, ...breadcrumbs]}
+        breadcrumbs={[{ label: "My Profile", href: routes.account.dashboard }, ...breadcrumbs]}
       />
 
       <section className={layoutSpacing.sectionY}>
@@ -52,15 +52,15 @@ export function AccountShell({
           {mobileOpen ? (
             <div
               id="account-mobile-nav"
-              className="mb-6 rounded-xl border border-border bg-white p-4 lg:hidden"
+              className="mb-6 overflow-hidden rounded-2xl border border-border bg-white shadow-sm lg:hidden"
             >
               <AccountNav onNavigate={() => setMobileOpen(false)} />
             </div>
           ) : null}
 
-          <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
+          <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
             <aside className="hidden lg:block">
-              <div className="sticky top-24 rounded-xl border border-border bg-white p-4 shadow-sm">
+              <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
                 <AccountNav />
               </div>
             </aside>

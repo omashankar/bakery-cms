@@ -48,12 +48,15 @@ interface InquiriesListPageProps {
   fixedType?: InquiryType;
   title?: string;
   description?: string;
+  /** When rendered inside the Inquiries hub tabs — skips the page header/shell. */
+  embedded?: boolean;
 }
 
 export function InquiriesListPage({
   fixedType,
   title = "Inquiries",
   description = "Customer messages and follow-ups",
+  embedded = false,
 }: InquiriesListPageProps) {
   const [mounted, setMounted] = useState(false);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -156,10 +159,8 @@ export function InquiriesListPage({
     setDeleteTarget(null);
   }
 
-  return (
-    <AdminPage className="space-y-4 sm:space-y-5">
-      <AdminPageHeader title={title} description={description} className="gap-3" />
-
+  const body = (
+    <>
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <button
           type="button"
@@ -232,7 +233,7 @@ export function InquiriesListPage({
               fixedType ? "grid-cols-2 sm:grid-cols-none" : "grid-cols-2 lg:grid-cols-4"
             )}
           >
-            {!fixedType ? (
+            {!fixedType && !embedded ? (
               <AdminSelect
                 className="w-full sm:w-36"
                 value={filters.type}
@@ -487,6 +488,17 @@ export function InquiriesListPage({
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4 sm:space-y-5">{body}</div>;
+  }
+
+  return (
+    <AdminPage className="space-y-4 sm:space-y-5">
+      <AdminPageHeader title={title} description={description} className="gap-3" />
+      {body}
     </AdminPage>
   );
 }

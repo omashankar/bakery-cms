@@ -1,4 +1,5 @@
 import { routes } from "@/constants/routes";
+import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
 
 export interface AdminBreadcrumb {
   label: string;
@@ -88,6 +89,12 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
     { label: "Dashboard", href: routes.admin.dashboard },
   ];
 
+  // Config pages moved into Settings show a "Settings" crumb (their routes are unchanged).
+  const settingsOwned = isSettingsOwnedPath(pathname);
+  if (settingsOwned) {
+    crumbs.push({ label: "Settings", href: routes.admin.settings.overview });
+  }
+
   let href = "/admin";
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
@@ -95,6 +102,10 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
     if (part === "dashboard") continue;
 
     href += `/${part}`;
+    // "commerce" and "builders" are legacy URL groups — they are NOT sidebar sections
+    // in the current IA, so they never render as crumbs (Settings is injected above
+    // for the config pages that need it).
+    if (part === "commerce" || part === "builders") continue;
     const prev = parts[i - 1];
     const next = parts[i + 1];
 

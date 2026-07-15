@@ -2,7 +2,7 @@ import type { AppliedCoupon } from "./coupons";
 
 const CHECKOUT_DRAFT_KEY = "bakery-cms-checkout-draft";
 
-export type PaymentMethod = "cod" | "upi" | "card";
+export type PaymentMethod = "cod" | "upi" | "card" | "razorpay";
 
 export interface CheckoutAddress {
   fullName: string;

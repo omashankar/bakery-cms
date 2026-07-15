@@ -50,6 +50,8 @@ export interface RefundOrderInput {
   reason?: RefundReasonCode;
   reasonDetail?: string;
   notes?: string;
+  /** Partial refund amount. Omitted or >= total means a full refund. */
+  amount?: number;
 }
 
 function normalizeOrder(order: PlacedOrder): PlacedOrder {
@@ -181,8 +183,10 @@ export function placeOrder(input: {
 
 export function getOrdersForCustomer(email: string): PlacedOrder[] {
   const normalized = email.trim().toLowerCase();
+  // Guard against malformed/legacy orders missing an address — one bad record
+  // must not crash the whole account dashboard.
   return readOrders().filter(
-    (order) => order.address.email.toLowerCase() === normalized
+    (order) => order.address?.email?.toLowerCase() === normalized
   );
 }
 
@@ -324,11 +328,17 @@ export function refundOrder(
   const refundReference = `REF-${current.orderNumber.replace(/^BK-/, "")}`;
   const reason = input.reason ?? "customer_request";
 
+  // Partial when a valid amount below the order total is supplied; else full.
+  const orderTotal = current.totals.total;
+  const requested = Number.isFinite(input.amount) ? Number(input.amount) : orderTotal;
+  const refundAmount = Math.min(Math.max(0, requested), orderTotal);
+  const isPartial = refundAmount < orderTotal;
+
   const refundRecord: RefundRecord = {
     status: "completed",
     reason,
     reasonDetail: input.reasonDetail?.trim() || undefined,
-    amount: current.totals.total,
+    amount: refundAmount,
     reference: refundReference,
     notes: input.notes?.trim() || undefined,
     requestedAt: current.refundRecord?.requestedAt ?? now,
@@ -339,7 +349,9 @@ export function refundOrder(
       {
         status: "completed",
         at: now,
-        note: input.notes?.trim() || "Refund completed",
+        note:
+          input.notes?.trim() ||
+          `${isPartial ? "Partial" : "Full"} refund completed`,
       },
     ],
   };

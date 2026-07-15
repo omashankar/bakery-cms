@@ -21,6 +21,7 @@ export const demoPhotoIds = {
   blushCake: "photo-1621303837174-89787a7d4729",
   iceCreamCake: "photo-1557925923-cd4648e211a0",
   pinkCupcakes: "photo-1563729784474-d77dbb933a9e",
+  redVelvet: "photo-1586985289906-406988974504",
 } as const;
 
 /** Build a sized Unsplash URL from a photo id */

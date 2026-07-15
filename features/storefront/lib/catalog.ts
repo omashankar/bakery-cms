@@ -74,31 +74,36 @@ export function filterCakesByCategory(
   if (!categorySlug) return cakes;
   const slug = categorySlug.toLowerCase();
 
+  const cat = (cake: LandingCake) => cake.category.toLowerCase();
+  const text = (cake: LandingCake) => `${cake.name} ${cake.slug}`.toLowerCase();
+  // Occasion categories aren't stored on cakes directly (cakes are tagged by
+  // flavour), so map each occasion to the relevant flavour sets / keywords.
+  const CELEBRATION = ["chocolate", "classic", "premium", "fruit", "international"];
+
   const slugMatchers: Record<string, (cake: LandingCake) => boolean> = {
-    "photo-cakes": (cake) =>
-      cake.category.toLowerCase().includes("photo") ||
-      cake.allowsPhotoUpload === true,
-    eggless: (cake) =>
-      cake.isEggless === true || cake.category.toLowerCase().includes("eggless"),
-    seasonal: (cake) => cake.category.toLowerCase().includes("seasonal"),
-    birthday: (cake) =>
-      cake.category.toLowerCase().includes("birthday") ||
-      cake.slug.includes("birthday"),
-    wedding: (cake) => cake.category.toLowerCase().includes("wedding"),
-    anniversary: (cake) => cake.category.toLowerCase().includes("anniversary"),
-    pastries: (cake) => cake.category.toLowerCase().includes("pastry"),
-    cupcakes: (cake) => cake.category.toLowerCase().includes("cupcake"),
-    custom: (cake) => cake.category.toLowerCase().includes("custom"),
+    "photo-cakes": (cake) => cat(cake).includes("photo") || cake.allowsPhotoUpload === true,
+    eggless: (cake) => cake.isEggless === true || cat(cake).includes("eggless"),
+    seasonal: (cake) => cat(cake).includes("seasonal"),
+    wedding: (cake) => cat(cake).includes("wedding"),
+    birthday: (cake) => CELEBRATION.includes(cat(cake)) || /birthday/.test(text(cake)),
+    anniversary: (cake) =>
+      ["premium", "classic", "international", "fruit"].includes(cat(cake)) ||
+      /anniversary/.test(text(cake)),
+    pastries: (cake) =>
+      /pastry|brownie|tiramisu|mousse|gateau|gâteau/.test(text(cake)) ||
+      cat(cake) === "international",
+    cupcakes: (cake) => /cupcake|muffin|brownie/.test(text(cake)),
+    custom: (cake) =>
+      cake.allowsPhotoUpload === true ||
+      cake.allowsMessage === true ||
+      cat(cake).includes("photo") ||
+      cat(cake).includes("custom"),
   };
 
   const matcher = slugMatchers[slug];
   if (matcher) return cakes.filter(matcher);
 
-  return cakes.filter(
-    (cake) =>
-      cake.category.toLowerCase().includes(slug) ||
-      cake.slug.includes(slug)
-  );
+  return cakes.filter((cake) => cat(cake).includes(slug) || cake.slug.includes(slug));
 }
 
 /** Weight options from catalog admin (falls back to defaults on server) */

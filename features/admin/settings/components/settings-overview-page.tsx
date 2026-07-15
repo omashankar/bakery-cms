@@ -5,15 +5,29 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Bell,
   ChevronRight,
+  Code2,
+  CreditCard,
   Database,
+  FileCode2,
+  FileText,
   Globe,
   Mail,
+  Menu,
+  MessageCircle,
+  Palette,
+  Smartphone,
+  PanelBottom,
+  PanelTop,
   Phone,
+  Receipt,
+  Search,
   Settings,
   Share2,
   Shield,
   ShoppingBag,
+  Truck,
   UserCog,
   Wrench,
   type LucideIcon,
@@ -48,32 +62,36 @@ type SettingsGroup = {
   items: SettingsItem[];
 };
 
-/** Only pages owned by Settings — no sidebar duplicates (Appearance, SEO, Taxes, Payments, Delivery). */
+/**
+ * Settings is the CMS control center — every configuration page is reachable here.
+ * Routes are unchanged; Settings simply links to the existing pages (some live under
+ * /admin/commerce or /admin/header etc.) so the sidebar can stay short.
+ */
 const groups: SettingsGroup[] = [
   {
-    title: "Storefront",
+    title: "Store",
     items: [
       {
         title: "General",
-        description: "Site name, branding, timezone, and currency.",
+        description: "Store name, logo, timezone, currency, and language.",
         href: routes.admin.settings.general,
         icon: Settings,
       },
       {
-        title: "Contact",
-        description: "Business address, phone, email, and opening hours.",
+        title: "Contact Information",
+        description: "Business address, phone, email, and business hours.",
         href: routes.admin.settings.contact,
         icon: Phone,
       },
       {
-        title: "Social",
+        title: "Social Media",
         description: "Social profile links shown in the footer.",
         href: routes.admin.settings.social,
         icon: Share2,
       },
       {
-        title: "Maintenance",
-        description: "Put the storefront in maintenance mode.",
+        title: "Maintenance Mode",
+        description: "Pause the storefront for updates.",
         href: routes.admin.settings.maintenance,
         icon: Wrench,
       },
@@ -83,15 +101,39 @@ const groups: SettingsGroup[] = [
     title: "Commerce",
     items: [
       {
-        title: "Commerce",
-        description: "Delivery fees, free-shipping threshold, and gift wrap.",
+        title: "Payments",
+        description: "Gateways, transactions, refunds, and payment analytics.",
+        href: routes.admin.commerce.payments,
+        icon: CreditCard,
+      },
+      {
+        title: "Delivery",
+        description: "Delivery zones, time slots, and shipping rules.",
+        href: routes.admin.commerce.deliveryZones,
+        icon: Truck,
+      },
+      {
+        title: "Taxes",
+        description: "GST / tax rates applied at checkout.",
+        href: routes.admin.commerce.taxes,
+        icon: Receipt,
+      },
+      {
+        title: "Invoices",
+        description: "Invoice designer, numbering, and branding.",
+        href: routes.admin.commerce.invoices,
+        icon: FileText,
+      },
+      {
+        title: "Order Settings",
+        description: "Gift wrap, minimum order, and free-delivery rules.",
         href: routes.admin.settings.commerce,
         icon: ShoppingBag,
       },
     ],
   },
   {
-    title: "Communications",
+    title: "Communication",
     items: [
       {
         title: "SMTP",
@@ -100,33 +142,101 @@ const groups: SettingsGroup[] = [
         icon: Mail,
       },
       {
+        title: "Email Templates",
+        description: "Transactional email content and branding.",
+        href: routes.admin.commerce.emails,
+        icon: Mail,
+      },
+      {
+        title: "WhatsApp Templates",
+        description: "WhatsApp message templates for order updates.",
+        href: routes.admin.commerce.whatsapp,
+        icon: MessageCircle,
+      },
+      {
+        title: "Notification Settings",
+        description: "In-app alert preferences and channels.",
+        href: routes.admin.commerce.notifications,
+        icon: Bell,
+      },
+      {
+        title: "SMS Notifications",
+        description: "Send order updates over SMS — coming soon.",
+        href: routes.admin.settings.sms,
+        icon: Smartphone,
+        future: true,
+      },
+    ],
+  },
+  {
+    title: "Website",
+    items: [
+      {
+        title: "Appearance",
+        description: "Theme colours, fonts, and storefront styling.",
+        href: routes.admin.appearance,
+        icon: Palette,
+      },
+      {
+        title: "Header",
+        description: "Storefront navigation, logo, and top bar.",
+        href: routes.admin.header,
+        icon: PanelTop,
+      },
+      {
+        title: "Footer",
+        description: "Footer links, contact block, and social row.",
+        href: routes.admin.footer,
+        icon: PanelBottom,
+      },
+      {
+        title: "SEO",
+        description: "Meta tags, titles, and search visibility.",
+        href: routes.admin.seo,
+        icon: Search,
+      },
+      {
         title: "Analytics",
         description: "Google Analytics, GTM, and tracking pixels.",
         href: routes.admin.settings.analytics,
         icon: BarChart3,
       },
+      {
+        title: "Navigation Menus",
+        description: "Build storefront navigation menus — coming soon.",
+        href: routes.admin.settings.navigation,
+        icon: Menu,
+        future: true,
+      },
+      {
+        title: "Custom Code",
+        description: "Inject custom CSS and JavaScript.",
+        href: routes.admin.settings.customCode,
+        icon: Code2,
+      },
+      {
+        title: "Robots.txt & Sitemap",
+        description: "Search-engine crawling and indexing — coming soon.",
+        href: routes.admin.settings.seoFiles,
+        icon: FileCode2,
+        future: true,
+      },
     ],
   },
   {
-    title: "System",
+    title: "Security",
     items: [
       {
-        title: "Security",
+        title: "Login Security",
         description: "Session timeout, password policy, and login alerts.",
         href: routes.admin.settings.security,
         icon: Shield,
       },
       {
-        title: "Activity",
+        title: "Activity Logs",
         description: "Recent admin actions across the CMS.",
         href: routes.admin.settings.activity,
         icon: Activity,
-      },
-      {
-        title: "Backup",
-        description: "Export or import local CMS data.",
-        href: routes.admin.settings.backup,
-        icon: Database,
       },
       {
         title: "Permissions",
@@ -134,6 +244,17 @@ const groups: SettingsGroup[] = [
         href: routes.admin.settings.permissions,
         icon: UserCog,
         future: true,
+      },
+    ],
+  },
+  {
+    title: "Backup",
+    items: [
+      {
+        title: "Backup & Restore",
+        description: "Export, import, and restore local CMS data.",
+        href: routes.admin.settings.backup,
+        icon: Database,
       },
     ],
   },
@@ -158,8 +279,8 @@ export function SettingsOverviewPage() {
         title="Settings"
         description={
           mounted
-            ? `Site preferences for ${siteName}. Appearance, SEO, and Store Setup stay in the sidebar.`
-            : "Site preferences for this bakery."
+            ? `The control center for ${siteName} — store, commerce, communication, website, and security.`
+            : "The control center for this bakery."
         }
         actions={
           <Button

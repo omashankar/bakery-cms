@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ContactForm } from "@/features/storefront/components/contact-form";
 import { SectionHeader } from "@/components/shared/section-header";
+import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
   AccordionContent,
@@ -81,12 +82,17 @@ function SectionShell({
   children,
   className,
   id,
+  noReveal,
 }: WeddingSectionRendererProps & {
   children: React.ReactNode;
   className?: string;
   id?: string;
+  noReveal?: boolean;
 }) {
   const bgClass = section.background === "cream" ? "surface-cream" : "bg-white";
+  // Grid sections opt out (noReveal) and animate their own cards via StaggerReveal;
+  // the hero has its own entrance. Everything else fades up as one block on scroll.
+  const revealOnScroll = !interactive && section.type !== "wedding-hero" && !noReveal;
 
   return (
     <section
@@ -102,7 +108,9 @@ function SectionShell({
         className
       )}
     >
-      <div className={layoutSpacing.container}>{children}</div>
+      <div className={layoutSpacing.container}>
+        {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
+      </div>
     </section>
   );
 }
@@ -209,20 +217,22 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
 function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   return (
-    <SectionShell {...props}>
-      <h2 className="font-heading mb-2 text-2xl font-bold sm:text-3xl">
-        {contentString(c, "title", "Why Choose Us")}
-      </h2>
-      <p className="mb-8 max-w-2xl text-muted-foreground">
-        {contentString(c, "description")}
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <h2 className="font-heading mb-2 text-2xl font-bold sm:text-3xl">
+          {contentString(c, "title", "Why Choose Us")}
+        </h2>
+        <p className="mb-8 max-w-2xl text-muted-foreground">
+          {contentString(c, "description")}
+        </p>
+      </ScrollReveal>
+      <StaggerReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {whyChooseUs.map((item) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
             <div
               key={item.title}
-              className="rounded-xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
+              className="h-full rounded-xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
@@ -232,7 +242,7 @@ function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
             </div>
           );
         })}
-      </div>
+      </StaggerReveal>
     </SectionShell>
   );
 }
@@ -243,14 +253,16 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
   const offers = getWeddingOffers(maxCount);
 
   return (
-    <SectionShell {...props}>
-      <SectionHeader
-        title={contentString(c, "title", "Wedding Offers")}
-        description={contentString(c, "description")}
-      />
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <SectionHeader
+          title={contentString(c, "title", "Wedding Offers")}
+          description={contentString(c, "description")}
+        />
+      </ScrollReveal>
+      <StaggerReveal className="mt-8 grid gap-4 md:grid-cols-3">
         {offers.map((offer) => (
-          <article key={offer.id} className="overflow-hidden rounded-xl border border-border bg-white">
+          <article key={offer.id} className="h-full overflow-hidden rounded-xl border border-border bg-white">
             <div className="relative aspect-[16/10] bg-muted">
               <Image src={offer.image} alt={offer.title} fill className="object-cover" sizes="300px" />
               <Badge className="absolute top-3 left-3" variant="gold">
@@ -263,7 +275,7 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
             </div>
           </article>
         ))}
-      </div>
+      </StaggerReveal>
     </SectionShell>
   );
 }
@@ -274,17 +286,19 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
   const cakes = getWeddingCollectionCakes(maxCount);
 
   return (
-    <SectionShell {...props}>
-      <h2 className="font-heading mb-2 text-2xl font-bold">
-        {contentString(c, "title", "Wedding Collections")}
-      </h2>
-      <p className="mb-8 text-muted-foreground">{contentString(c, "description")}</p>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <h2 className="font-heading mb-2 text-2xl font-bold">
+          {contentString(c, "title", "Wedding Collections")}
+        </h2>
+        <p className="mb-8 text-muted-foreground">{contentString(c, "description")}</p>
+      </ScrollReveal>
+      <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {cakes.map((cake) => (
           <Link
             key={cake.id}
             href={routes.store.cake(cake.slug)}
-            className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-white transition-all hover:border-bakery-300 hover:shadow-md"
+            className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-white transition-all hover:border-bakery-300 hover:shadow-md"
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-cream-100">
               <Image
@@ -314,7 +328,7 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
             </div>
           </Link>
         ))}
-      </div>
+      </StaggerReveal>
     </SectionShell>
   );
 }
@@ -325,13 +339,15 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
   const images = getWeddingGalleryImages(maxCount);
 
   return (
-    <SectionShell {...props}>
-      <SectionHeader
-        overline={contentString(c, "overline")}
-        title={contentString(c, "title")}
-        description={contentString(c, "description")}
-      />
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+      </ScrollReveal>
+      <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
         {images.map((src, index) => {
           const caption = galleryCaptions[index];
           return (
@@ -359,13 +375,13 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
             </figure>
           );
         })}
-      </div>
-      <div className="mt-8 text-center">
+      </StaggerReveal>
+      <ScrollReveal className="mt-8 text-center">
         <Button variant="outline" render={<Link href={contentString(c, "ctaHref", routes.store.gallery)} />}>
           {contentString(c, "ctaLabel", "View Gallery")}
           <ArrowRight className="size-4" />
         </Button>
-      </div>
+      </ScrollReveal>
     </SectionShell>
   );
 }
@@ -377,20 +393,28 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
   const weddingTestimonials = allTestimonials.filter((item) =>
     item.role.toLowerCase().includes("wedding")
   );
-  const items = weddingTestimonials.length > 0 ? weddingTestimonials : allTestimonials;
+  // Wedding-specific first, then top up from all reviews so the row never shows a
+  // single lonely card in a two-column grid.
+  const seen = new Set(weddingTestimonials.map((item) => item.id));
+  const items = [
+    ...weddingTestimonials,
+    ...allTestimonials.filter((item) => !seen.has(item.id)),
+  ];
 
   return (
-    <SectionShell {...props}>
-      <SectionHeader
-        overline={contentString(c, "overline")}
-        title={contentString(c, "title")}
-        description={contentString(c, "description")}
-      />
-      <div className="mt-8 grid gap-5 md:grid-cols-2">
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+      </ScrollReveal>
+      <StaggerReveal className="mt-8 grid gap-5 md:grid-cols-2">
         {items.slice(0, maxCount).map((item) => (
           <article
             key={item.id}
-            className="flex flex-col rounded-2xl border border-border bg-white p-6 transition-all hover:border-bakery-300 hover:shadow-sm"
+            className="flex h-full flex-col rounded-2xl border border-border bg-white p-6 transition-all hover:border-bakery-300 hover:shadow-sm"
           >
             <div className="flex items-center justify-between">
               <div className="flex gap-0.5 text-gold-500">
@@ -412,7 +436,7 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
             </div>
           </article>
         ))}
-      </div>
+      </StaggerReveal>
     </SectionShell>
   );
 }

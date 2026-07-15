@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Palette,
   Pencil,
   Plus,
   RotateCcw,
@@ -44,14 +45,24 @@ const tabs: Array<{
   singular: string;
 }> = [
   { id: "categories", label: "Categories", singular: "Category" },
-  { id: "flavours", label: "Flavours", singular: "Flavour" },
   { id: "occasions", label: "Occasions", singular: "Occasion" },
+  { id: "flavours", label: "Flavours", singular: "Flavour" },
   { id: "weights", label: "Weights", singular: "Weight" },
+];
+
+// Tab bar order — includes a Themes placeholder (design-theme data model comes later).
+const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> = [
+  { id: "categories", label: "Categories" },
+  { id: "occasions", label: "Occasions" },
+  { id: "themes", label: "Themes", soon: true },
+  { id: "flavours", label: "Flavours" },
+  { id: "weights", label: "Weights" },
 ];
 
 export function CatalogAdminPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
+  const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
@@ -105,6 +116,7 @@ export function CatalogAdminPage() {
   }
 
   function switchTab(tab: CatalogTab) {
+    setShowThemes(false);
     setActiveTab(tab);
     setSearch("");
     setSelectedIds([]);
@@ -172,29 +184,40 @@ export function CatalogAdminPage() {
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset defaults</span>
             </Button>
-            <Button
-              variant="bakery"
-              className="min-w-0 flex-1 sm:flex-none"
-              onClick={openCreate}
-            >
-              <Plus className="size-4" />
-              <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add {activeTabMeta.singular}</span>
-            </Button>
+            {!showThemes ? (
+              <Button
+                variant="bakery"
+                className="min-w-0 flex-1 sm:flex-none"
+                onClick={openCreate}
+              >
+                <Plus className="size-4" />
+                <span className="sm:hidden">Add</span>
+                <span className="hidden sm:inline">Add {activeTabMeta.singular}</span>
+              </Button>
+            ) : null}
           </div>
         }
       />
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
+          {tabBar.map((tab) => {
+            const isThemes = tab.id === "themes";
+            const active = isThemes ? showThemes : !showThemes && activeTab === tab.id;
             return (
               <Button
                 key={tab.id}
                 size="sm"
                 variant={active ? "bakery" : "outline"}
-                onClick={() => switchTab(tab.id)}
+                onClick={() => {
+                  if (isThemes) {
+                    setShowThemes(true);
+                    setSearch("");
+                    setSelectedIds([]);
+                  } else {
+                    switchTab(tab.id as CatalogTab);
+                  }
+                }}
                 className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
               >
                 {tab.label}
@@ -205,7 +228,7 @@ export function CatalogAdminPage() {
                     active && "border-transparent bg-primary-foreground/20 text-primary-foreground"
                   )}
                 >
-                  {counts[tab.id]}
+                  {isThemes ? "Soon" : counts[tab.id as CatalogTab]}
                 </Badge>
               </Button>
             );
@@ -213,6 +236,17 @@ export function CatalogAdminPage() {
         </div>
       </div>
 
+      {showThemes ? (
+        <section className={adminShell.tableCard}>
+          <EmptyState
+            icon={Palette}
+            title="Themes coming soon"
+            description="Cake design themes (e.g. Cartoon, Floral, Minimal, Elegant) will be manageable here."
+            className="py-16"
+          />
+        </section>
+      ) : (
+        <>
       <FilterPanel>
         <FilterPanelSearch
           value={search}
@@ -370,6 +404,8 @@ export function CatalogAdminPage() {
           </>
         )}
       </section>
+        </>
+      )}
 
       <CatalogFormDialog
         open={formOpen}

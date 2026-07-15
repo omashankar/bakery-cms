@@ -1,5 +1,6 @@
 /** Inquiry management feature module — Phase 14 */
 export { InquiriesListPage } from "./components/inquiries-list-page";
+export { InquiriesHubPage } from "./components/inquiries-hub-page";
 export { NewsletterSubscribersPage } from "./components/newsletter-subscribers-page";
 export {
   loadInquiries,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
+import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -8,7 +9,7 @@ export function ThankYouPage() {
   return (
     <section className={layoutSpacing.sectionY}>
       <div className={layoutSpacing.containerNarrow}>
-        <div className="rounded-2xl border border-border bg-white p-8 text-center sm:p-12">
+        <ScrollReveal className="rounded-2xl border border-border bg-white p-8 text-center sm:p-12">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl bg-green-50">
             <CheckCircle2 className="size-8 text-green-600" />
           </div>
@@ -28,7 +29,7 @@ export function ThankYouPage() {
               Browse Cakes
             </Button>
           </div>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );

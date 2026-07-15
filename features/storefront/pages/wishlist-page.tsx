@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Heart } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { getCakeBySlug } from "@/features/storefront/lib/catalog";
@@ -41,6 +42,7 @@ export function WishlistPage() {
             <div className="h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
           ) : cakes.length === 0 ? (
             <EmptyState
+              className="border-border bg-cream-50"
               icon={Heart}
               title="Your wishlist is empty"
               description="Tap the heart on any cake to save it here."
@@ -51,11 +53,22 @@ export function WishlistPage() {
               }
             />
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {cakes.map((cake) => (
-                <ProductCard key={cake.id} cake={cake} />
-              ))}
-            </div>
+            <>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{cakes.length}</span>{" "}
+                  {cakes.length === 1 ? "cake" : "cakes"} saved
+                </p>
+                <Button variant="outline" size="sm" render={<Link href={routes.store.collections} />}>
+                  Continue Shopping
+                </Button>
+              </div>
+              <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {cakes.map((cake) => (
+                  <ProductCard key={cake.id} cake={cake} />
+                ))}
+              </StaggerReveal>
+            </>
           )}
         </div>
       </section>

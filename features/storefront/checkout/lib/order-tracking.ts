@@ -73,8 +73,8 @@ export function verifyOrderLookup(
   const email = lookup.email?.trim().toLowerCase();
   const phone = lookup.phone?.replace(/\D/g, "");
 
-  if (email && order.address.email.toLowerCase() === email) return true;
-  if (phone && order.address.phone.replace(/\D/g, "").endsWith(phone.slice(-10))) {
+  if (email && order.address?.email?.toLowerCase() === email) return true;
+  if (phone && order.address?.phone?.replace(/\D/g, "").endsWith(phone.slice(-10))) {
     return true;
   }
 

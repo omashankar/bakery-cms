@@ -17,6 +17,7 @@
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "postcss": "^8.5.16",
+    "razorpay": "^2.9.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.81.0",
