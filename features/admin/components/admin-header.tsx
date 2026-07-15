@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState, type Ref } from "react";
-import { Menu, PanelLeft, PanelLeftClose, Search, X } from "lucide-react";
-import { AuthLogoutMenuItem } from "@/features/auth/components/auth-logout-menu-item";
+import { KeyRound, LogOut, Menu, PanelLeft, PanelLeftClose, Search, User, X } from "lucide-react";
+import { LogoutConfirmDialog } from "@/features/admin/profile/components/logout-confirm-dialog";
+import { getAdminProfile } from "@/features/admin/profile/lib/admin-profile";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -52,11 +53,17 @@ export function AdminHeader({
   onSidebarToggle,
 }: AdminHeaderProps) {
   const [commandOpen, setCommandOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [initials, setInitials] = useState("AU");
+  const [displayName, setDisplayName] = useState("Administrator");
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     const session = getDemoSession();
     if (session?.email) setInitials(initialsFromEmail(session.email));
+    const profile = getAdminProfile();
+    setDisplayName(profile.fullName);
+    setEmail(profile.email);
   }, []);
 
   return (
@@ -138,15 +145,34 @@ export function AdminHeader({
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem render={<Link href={routes.admin.settings.overview} />}>
-                  Settings
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="flex items-center gap-3 px-2 py-1.5">
+                  <Avatar className="size-9 ring-1 ring-sidebar-border">
+                    <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                    {email ? (
+                      <p className="truncate text-xs text-muted-foreground">{email}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href={routes.admin.profile} />}>
+                  <User className="size-4" />
+                  My Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem render={<Link href={routes.admin.appearance} />}>
-                  Appearance
+                <DropdownMenuItem render={<Link href={routes.admin.changePassword} />}>
+                  <KeyRound className="size-4" />
+                  Change Password
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <AuthLogoutMenuItem />
+                <DropdownMenuItem variant="destructive" onClick={() => setLogoutOpen(true)}>
+                  <LogOut className="size-4" />
+                  Logout
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -158,6 +184,8 @@ export function AdminHeader({
           <AdminBreadcrumbs className="text-xs" />
         </div>
       </header>
+
+      <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
     </>
   );
 }

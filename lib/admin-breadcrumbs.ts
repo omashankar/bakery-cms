@@ -8,6 +8,8 @@ export interface AdminBreadcrumb {
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  profile: "My Profile",
+  password: "Change Password",
   cakes: "Cakes",
   add: "Add Cake",
   edit: "Edit Cake",

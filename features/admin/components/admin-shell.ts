@@ -29,6 +29,9 @@ export const adminShell = {
   navRow:
     "flex h-9 w-full items-center rounded-md text-[13px] font-medium transition-premium",
   navActive: "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm",
+  /** Idle nav row — dark label, subtle accent hover matching brand */
+  navIdle:
+    "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
   /** Table / list row hover */
   rowHover: "hover:bg-muted",
   /** Primary text link in tables */

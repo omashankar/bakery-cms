@@ -62,6 +62,8 @@ export const routes = {
   admin: {
     root: "/admin",
     dashboard: "/admin/dashboard",
+    profile: "/admin/profile",
+    changePassword: "/admin/profile/password",
 
     cakes: {
       list: "/admin/cakes",

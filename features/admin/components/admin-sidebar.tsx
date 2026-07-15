@@ -187,7 +187,9 @@ function NavIcon({
     <Icon
       className={cn(
         "size-4 shrink-0",
-        active ? "text-current" : "text-muted-foreground",
+        active
+          ? "text-current"
+          : "text-muted-foreground group-hover/navrow:text-sidebar-accent-foreground",
         className
       )}
       strokeWidth={1.75}
@@ -215,7 +217,7 @@ function SubNavLink({
       href={sub.href}
       onClick={onNavigate}
       aria-current={subActive ? "page" : undefined}
-      className={cn(navRow, "gap-2.5 px-3", subActive ? navActive : navIdle)}
+      className={cn(navRow, "group/navrow gap-2.5 px-3", subActive ? navActive : navIdle)}
     >
       <NavIcon icon={SubIcon} active={subActive} />
       <span className="min-w-0 flex-1 truncate">{sub.label}</span>
@@ -305,7 +307,7 @@ function NavItem({
         href={item.href}
         onClick={onNavigate}
         aria-current={isLeafActive ? "page" : undefined}
-        className={cn(navRow, "gap-3 px-3", isLeafActive ? navActive : navIdle)}
+        className={cn(navRow, "group/navrow gap-3 px-3", isLeafActive ? navActive : navIdle)}
       >
         <NavIcon icon={Icon} active={isLeafActive} className="size-[18px]" />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -341,7 +343,7 @@ function NavItem({
           href={item.href}
           onClick={onNavigate}
           aria-current={parentActive ? "true" : undefined}
-          className="flex h-9 min-w-0 flex-1 items-center gap-3 px-3"
+          className="group/navrow flex h-9 min-w-0 flex-1 items-center gap-3 px-3"
         >
           <NavIcon icon={Icon} className="size-[18px]" />
           <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>

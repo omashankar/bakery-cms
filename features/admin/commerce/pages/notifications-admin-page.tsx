@@ -271,7 +271,7 @@ export function NotificationsAdminPage() {
         </button>
       </section>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
         <div className="min-w-0 space-y-4">
           <FilterPanel>
             <FilterPanelToolbar className="gap-2.5 sm:flex-row sm:items-center">
@@ -357,7 +357,7 @@ export function NotificationsAdminPage() {
           )}
         </div>
 
-        <Card className="h-fit shadow-sm xl:sticky xl:top-24">
+        <Card className="h-fit shadow-sm lg:sticky lg:top-24">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Alert preferences</CardTitle>
           </CardHeader>

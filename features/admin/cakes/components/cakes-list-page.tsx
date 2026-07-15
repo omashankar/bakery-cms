@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Cake,
+  CheckCircle2,
   ExternalLink,
   FileText,
   MoreHorizontal,
@@ -55,6 +56,8 @@ import { DeleteCakeDialog } from "./delete-cake-dialog";
 const PAGE_SIZE = 10;
 
 const EMPTY_STATS = {
+  total: 0,
+  published: 0,
   draft: 0,
   lowStock: 0,
 };
@@ -134,6 +137,8 @@ export function CakesListPage() {
     if (!mounted) return EMPTY_STATS;
     const settings = getInventorySettings();
     return {
+      total: cakes.length,
+      published: cakes.filter((cake) => cake.status === "published").length,
       draft: cakes.filter((cake) => cake.status === "draft").length,
       lowStock: cakes.filter((cake) => deriveStockStatus(cake, settings) === "low_stock")
         .length,
@@ -209,7 +214,35 @@ export function CakesListPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <button
+          type="button"
+          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => updateFilters({ status: "all", stock: "all", search: "" })}
+        >
+          <DashboardStatCard
+            title="Total"
+            value={stats.total}
+            change="All cakes"
+            changeTone="neutral"
+            icon={Cake}
+            tone="bakery"
+          />
+        </button>
+        <button
+          type="button"
+          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => updateFilters({ status: "published" })}
+        >
+          <DashboardStatCard
+            title="Published"
+            value={stats.published}
+            change="Live on storefront"
+            changeTone="positive"
+            icon={CheckCircle2}
+            tone="gold"
+          />
+        </button>
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -255,7 +288,7 @@ export function CakesListPage() {
               aria-label="Category"
             >
               <option value="all">All categories</option>
-              {adminCategories().map((category) => (
+              {(mounted ? adminCategories() : []).map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>

@@ -162,7 +162,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         ))}
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Lifetime value", value: formatCurrency(profile.totalSpent) },
           { label: "Orders", value: String(profile.orderCount) },
@@ -178,7 +178,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         ))}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
         <div className="space-y-6">
           <Card className="shadow-sm">
             <CardHeader>

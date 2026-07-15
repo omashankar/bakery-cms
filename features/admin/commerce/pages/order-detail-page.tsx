@@ -165,7 +165,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           ) : null}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]">
           <section className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="font-heading text-lg font-semibold">Items</h2>
