@@ -60,10 +60,15 @@ export function getWeddingOffers(maxCount = 3): LandingOffer[] {
     .map(couponToOffer);
 
   const landingOffers = specialOffers.filter(isWeddingOffer);
-  const merged = couponOffers.length > 0 ? couponOffers : landingOffers;
+  const relevant = [...couponOffers, ...landingOffers];
 
-  if (merged.length > 0) return merged.slice(0, maxCount);
-  return specialOffers.slice(0, maxCount);
+  // De-dupe and keep the grid full — top up with general offers so the row never
+  // shows a single lonely card in an otherwise empty three-column grid.
+  const seen = new Set(relevant.map((offer) => offer.id));
+  const extras = specialOffers.filter((offer) => !seen.has(offer.id));
+  const merged = [...relevant, ...extras];
+
+  return merged.slice(0, maxCount);
 }
 
 export function getWeddingGalleryImages(maxCount = 8): string[] {

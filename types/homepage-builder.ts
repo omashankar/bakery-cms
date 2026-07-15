@@ -2,8 +2,10 @@ export type SectionBackground = "white" | "cream";
 
 export type HomepageSectionType =
   | "hero"
+  | "our-menu"
   | "promo-banner"
   | "categories"
+  | "store-locator"
   | "featured-cakes"
   | "trending"
   | "best-sellers"

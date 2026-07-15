@@ -120,6 +120,7 @@ export const defaultCommerceSettings: CommerceSettings = {
     cod: true,
     upi: true,
     card: true,
+    razorpay: true,
   },
 };
 

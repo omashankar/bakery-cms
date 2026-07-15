@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, Heart, ShoppingBag, Trash2 } from "lucide-react";
+import { Bookmark, Heart, Lock, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
@@ -38,6 +38,8 @@ import {
 } from "@/features/storefront/lib/saved-for-later";
 import { getRecentlyViewedCakes } from "@/features/storefront/lib/recently-viewed";
 import { addToWishlist } from "@/features/storefront/lib/wishlist";
+import { hasCustomerSession } from "@/features/storefront/account/lib/customer-session";
+import { openCustomerAuthModal } from "@/features/storefront/account/components/customer-auth-modal";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
@@ -51,12 +53,14 @@ export function CartPage() {
   });
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
   const [loaded, setLoaded] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
 
   function refresh() {
     setItems(getCartItems());
     setSavedItems(getSavedForLaterItems());
     setPreferences(getCartPreferences());
     setCommerce(getCommerceSettings());
+    setSignedIn(hasCustomerSession());
   }
 
   useEffect(() => {
@@ -67,14 +71,25 @@ export function CartPage() {
     window.addEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
     window.addEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
+    window.addEventListener("bakery-customer-session-updated", refresh);
 
     return () => {
       window.removeEventListener("bakery-cart-updated", refresh);
       window.removeEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
       window.removeEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
+      window.removeEventListener("bakery-customer-session-updated", refresh);
     };
   }, []);
+
+  const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Cart requires login — pop the login modal open automatically for guests.
+  useEffect(() => {
+    if (loaded && !signedIn) {
+      openCustomerAuthModal("phone");
+    }
+  }, [loaded, signedIn]);
 
   const totals = useMemo(
     () =>
@@ -118,9 +133,32 @@ export function CartPage() {
         <div className={layoutSpacing.container}>
           {!loaded ? (
             <div className="h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
+          ) : !signedIn ? (
+            <div className="mx-auto max-w-sm py-12 text-center">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-cream-100">
+                <Lock className="size-5 text-bakery-700" />
+              </div>
+              <p className="mt-4 font-heading text-lg font-bold text-foreground">
+                Login to view your cart
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {cartItemCount > 0
+                  ? `Your ${cartItemCount} item${cartItemCount === 1 ? "" : "s"} ${cartItemCount === 1 ? "is" : "are"} saved — sign in to continue.`
+                  : "Sign in to see your saved items."}
+              </p>
+              <Button
+                variant="bakery"
+                className="mt-4"
+                onClick={() => openCustomerAuthModal("phone")}
+              >
+                <Lock className="size-4" />
+                Login to continue
+              </Button>
+            </div>
           ) : items.length === 0 ? (
             <div className="space-y-10">
               <EmptyState
+                className="border-border bg-cream-50"
                 icon={ShoppingBag}
                 title="Your cart is empty"
                 description="Browse our delicious cakes and add your favourites."
@@ -155,7 +193,22 @@ export function CartPage() {
                       className="rounded-xl border border-border bg-white p-4"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0 space-y-1">
+                        <div className="flex min-w-0 gap-4">
+                          <Link
+                            href={routes.store.cake(item.cakeSlug)}
+                            className="size-20 shrink-0 overflow-hidden rounded-lg border border-border bg-cream-100"
+                          >
+                            {item.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="size-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : null}
+                          </Link>
+                          <div className="min-w-0 space-y-1">
                           <Link
                             href={routes.store.cake(item.cakeSlug)}
                             className="font-medium hover:text-bakery-700"
@@ -181,6 +234,7 @@ export function CartPage() {
                               {item.deliveryTime ? ` · ${item.deliveryTime}` : ""}
                             </p>
                           ) : null}
+                          </div>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end sm:gap-4">
                           <QuantityStepper

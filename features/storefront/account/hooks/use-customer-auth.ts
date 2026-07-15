@@ -17,7 +17,8 @@ export function useCustomerAuth() {
     const load = () => {
       const current = getCustomerSession();
       if (!current) {
-        router.replace(routes.account.login);
+        // No dedicated login page — send them home and open the login modal.
+        router.replace(`${routes.store.home}?login=1`);
         return;
       }
       setSession(current);

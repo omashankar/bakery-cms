@@ -73,35 +73,54 @@ export function AccountOrdersPage() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {paginated.map((order) => (
             <div
               key={order.id}
-              className="rounded-xl border border-border bg-white p-5 shadow-sm"
+              className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
             >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-heading text-lg font-semibold">{order.orderNumber}</h2>
-                    <AccountOrderStatusBadge status={order.status} />
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bakery-700 text-white">
+                    <Package className="size-4" />
+                  </span>
+                  <div>
+                    <h2 className="font-heading text-base font-bold text-foreground">
+                      {order.orderNumber}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Placed on {formatDate(order.placedAt)}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Placed on {formatDate(order.placedAt)}
-                  </p>
-                  <ul className="text-sm text-muted-foreground">
-                    {order.items.slice(0, 2).map((item) => (
-                      <li key={item.id}>
-                        {item.quantity} × {item.name}
-                      </li>
-                    ))}
-                    {order.items.length > 2 ? (
-                      <li>+{order.items.length - 2} more items</li>
-                    ) : null}
-                  </ul>
                 </div>
+                <AccountOrderStatusBadge status={order.status} />
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {order.items.slice(0, 3).map((item) => (
+                    <li key={item.id}>
+                      <span className="font-medium text-foreground">{item.quantity} ×</span>{" "}
+                      {item.name}
+                    </li>
+                  ))}
+                  {order.items.length > 3 ? (
+                    <li className="text-bakery-700">
+                      +{order.items.length - 3} more item
+                      {order.items.length - 3 === 1 ? "" : "s"}
+                    </li>
+                  ) : null}
+                </ul>
 
                 <div className="flex flex-col items-start gap-3 lg:items-end">
-                  <p className="text-lg font-semibold">{formatCurrency(order.totals.total)}</p>
+                  <div className="text-left lg:text-right">
+                    <p className="text-xs text-muted-foreground">Order total</p>
+                    <p className="text-lg font-bold text-foreground">
+                      {formatCurrency(order.totals.total)}
+                    </p>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"

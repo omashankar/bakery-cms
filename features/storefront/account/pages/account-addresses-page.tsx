@@ -134,9 +134,11 @@ export function AccountAddressesPage() {
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           {addresses.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-cream-50 p-8 text-center">
-              <MapPin className="mx-auto size-8 text-muted-foreground" />
-              <p className="mt-3 font-medium">No saved addresses</p>
+            <div className="rounded-2xl border border-dashed border-border bg-cream-50 p-8 text-center">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-cream-100">
+                <MapPin className="size-6 text-bakery-700" />
+              </div>
+              <p className="mt-4 font-heading font-bold text-foreground">No saved addresses</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Add your first delivery address using the form.
               </p>
@@ -146,8 +148,8 @@ export function AccountAddressesPage() {
               <div
                 key={address.id}
                 className={cn(
-                  "rounded-xl border bg-white p-5 shadow-sm",
-                  address.isDefault ? "border-bakery-700" : "border-border"
+                  "rounded-2xl border bg-white p-5 shadow-sm sm:p-6",
+                  address.isDefault ? "border-bakery-700 ring-1 ring-bakery-700/20" : "border-border"
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -216,11 +218,12 @@ export function AccountAddressesPage() {
           )}
         </div>
 
-        <div className="h-fit rounded-xl border border-border bg-white p-6 shadow-sm">
-          <h2 className="font-heading text-lg font-semibold">
+        <div className="h-fit rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="font-heading text-lg font-bold text-foreground">
             {editingId ? "Edit address" : "Add new address"}
           </h2>
-          <form className="mt-4 space-y-3" onSubmit={handleSubmit(onSubmit)}>
+          <div className="mt-1 h-px bg-border" />
+          <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="label">Label</Label>
               <Input id="label" placeholder="Home, Office..." {...register("label", { required: true })} />

@@ -35,24 +35,16 @@ export const routes = {
     orderSuccess: "/store/order/success",
     orderTrack: "/store/order/track",
     orderDetail: (orderNumber: string) => `/store/order/${encodeURIComponent(orderNumber)}`,
+    orderInvoice: (orderNumber: string) => `/store/order/${encodeURIComponent(orderNumber)}/invoice`,
     wishlist: "/store/wishlist",
     page: (slug: string) => `/store/pages/${slug}`,
   },
 
-  /** Customer account (UI only) */
+  /** Customer account (UI only) — auth is handled by the login modal, not pages */
   account: {
-    login: "/account/login",
-    register: "/account/register",
     dashboard: "/account",
-    forgotPassword: "/account/forgot-password",
-    otp: "/account/otp",
-    resetPassword: "/account/reset-password",
-    success: "/account/auth/success",
-    error: "/account/auth/error",
-    sessionExpired: "/account/auth/session-expired",
     orders: "/account/orders",
     addresses: "/account/addresses",
-    profile: "/account/profile",
   },
 
   /** Admin authentication (UI only) */
@@ -121,6 +113,10 @@ export const routes = {
       activity: "/admin/settings/activity",
       commerce: "/admin/settings/commerce",
       permissions: "/admin/settings/permissions",
+      customCode: "/admin/settings/custom-code",
+      navigation: "/admin/settings/navigation",
+      seoFiles: "/admin/settings/seo-files",
+      sms: "/admin/settings/sms",
     },
 
     /** Commerce operations — orders, inventory, delivery, tax, notifications */
@@ -128,6 +124,10 @@ export const routes = {
       coupons: "/admin/commerce/coupons",
       inventory: "/admin/commerce/inventory",
       payments: "/admin/commerce/payments",
+      gateways: "/admin/commerce/payments/gateways",
+      gateway: (id: string) => `/admin/commerce/payments/gateways/${id}`,
+      transactions: "/admin/commerce/payments/transactions",
+      paymentNotifications: "/admin/commerce/payments/notifications",
       deliveryZones: "/admin/commerce/delivery-zones",
       deliverySlots: "/admin/commerce/delivery-slots",
       taxes: "/admin/commerce/taxes",

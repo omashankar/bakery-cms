@@ -37,7 +37,7 @@ import {
 
 const PAGE_SIZE = 12;
 
-export function NewsletterSubscribersPage() {
+export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [mounted, setMounted] = useState(false);
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [filters, setFilters] = useState<NewsletterFilters>(defaultNewsletterFilters);
@@ -112,21 +112,16 @@ export function NewsletterSubscribersPage() {
     setDeleteOpen(false);
   }
 
-  return (
-    <AdminPage className="space-y-4 sm:space-y-5">
-      <AdminPageHeader
-        title="Newsletter"
-        description="Email signups from the website."
-        className="gap-3"
-        actions={
-          <Button variant="bakery" className="w-full sm:w-auto" onClick={copyEmails}>
-            <Copy className="size-4" />
-            <span className="sm:hidden">Copy</span>
-            <span className="hidden sm:inline">Copy emails</span>
-          </Button>
-        }
-      />
+  const copyButton = (
+    <Button variant="bakery" className="w-full sm:w-auto" onClick={copyEmails}>
+      <Copy className="size-4" />
+      <span className="sm:hidden">Copy</span>
+      <span className="hidden sm:inline">Copy emails</span>
+    </Button>
+  );
 
+  const body = (
+    <>
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-3">
         <button
           type="button"
@@ -299,6 +294,27 @@ export function NewsletterSubscribersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4 sm:space-y-5">
+        <div className="flex justify-end">{copyButton}</div>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <AdminPage className="space-y-4 sm:space-y-5">
+      <AdminPageHeader
+        title="Newsletter"
+        description="Email signups from the website."
+        className="gap-3"
+        actions={copyButton}
+      />
+      {body}
     </AdminPage>
   );
 }

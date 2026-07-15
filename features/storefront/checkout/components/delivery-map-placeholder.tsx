@@ -27,7 +27,7 @@ export function DeliveryMapPlaceholder({
           backgroundSize: "24px 24px",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-cream-100/80" />
+      <div className="absolute inset-0 bg-cream-100/30" />
 
       <div className="relative flex min-h-[220px] flex-col justify-between p-4 sm:min-h-[260px] sm:p-5">
         <div className="flex items-start justify-between gap-3">

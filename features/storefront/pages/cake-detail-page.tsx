@@ -12,6 +12,7 @@ import {
   Truck,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
+import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
@@ -86,6 +87,12 @@ export function CakeDetailPage({ cake }: CakeDetailPageProps) {
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
+  // Related/recommended lists merge localStorage-backed admin cakes (absent during
+  // SSR) — gate them behind mount to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
   const weightPrice =
@@ -140,12 +147,22 @@ export function CakeDetailPage({ cake }: CakeDetailPageProps) {
     setSelectedWeight(0);
   }, [cake.slug]);
 
-  const related = getAllCakes()
-    .filter((item) => item.slug !== cake.slug && item.category === cake.category)
-    .slice(0, 4);
+  // Same-category first, then top up from the wider catalogue so this row always
+  // shows a full set of 4 — never a lone card floating in an empty grid.
+  const related = useMemo(() => {
+    const all = getAllCakes().filter((item) => item.slug !== cake.slug);
+    const sameCategory = all.filter((item) => item.category === cake.category);
+    const seen = new Set(sameCategory.map((item) => item.slug));
+    const others = all.filter((item) => !seen.has(item.slug));
+    return [...sameCategory, ...others].slice(0, 4);
+  }, [cake.slug, cake.category]);
   const recommended = useMemo(
-    () => getRecommendedCakes({ limit: 4, excludeSlug: cake.slug }),
-    [cake.slug]
+    () =>
+      getRecommendedCakes({
+        limit: 4,
+        excludeSlugs: [cake.slug, ...related.map((item) => item.slug)],
+      }),
+    [cake.slug, related]
   );
 
   useEffect(() => {
@@ -559,23 +576,23 @@ export function CakeDetailPage({ cake }: CakeDetailPageProps) {
             </div>
           </div>
 
-          {related.length > 0 ? (
+          {mounted && related.length > 0 ? (
             <div className="mt-16 border-t border-border pt-16">
-              <div className="mb-8 flex items-end justify-between gap-4">
+              <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
                 <h2 className="font-heading text-2xl font-bold">You May Also Like</h2>
                 <Button variant="ghost" render={<Link href={routes.store.collections} />}>
                   View all
                 </Button>
-              </div>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              </ScrollReveal>
+              <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {related.map((item) => (
                   <ProductCard key={item.id} cake={item} />
                 ))}
-              </div>
+              </StaggerReveal>
             </div>
           ) : null}
 
-          {recommended.length > 0 ? (
+          {mounted && recommended.length > 0 ? (
             <div className="mt-16 border-t border-border pt-16">
               <ProductRailSection
                 title="Recommended for you"

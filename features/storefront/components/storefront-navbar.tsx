@@ -6,12 +6,19 @@ import { useEffect, useState } from "react";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MegaMenu, MobileShopLinks } from "@/components/storefront/mega-menu";
+import {
+  CustomerAuthModal,
+  OPEN_AUTH_MODAL_EVENT,
+} from "@/features/storefront/account/components/customer-auth-modal";
+import { AccountMenu } from "@/features/storefront/account/components/account-menu";
+import { GuestMenu } from "@/features/storefront/account/components/guest-menu";
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/storefront/lib/cart";
 import { getWishlistCount } from "@/features/storefront/lib/wishlist";
 import {
   getCustomerDisplayName,
+  getCustomerSession,
   hasCustomerSession,
 } from "@/features/storefront/account/lib/customer-session";
 import { getStorefrontBrandInfo } from "@/features/storefront/lib/settings";
@@ -27,16 +34,16 @@ export function StorefrontNavbar() {
   const [logoLetter, setLogoLetter] = useState("M");
   const [navItems, setNavItems] = useState(() => getStorefrontNavItems());
   const [showSearch, setShowSearch] = useState(true);
-  const [showCta, setShowCta] = useState(true);
-  const [ctaLabel, setCtaLabel] = useState("Order Inquiry");
-  const [ctaHref, setCtaHref] = useState<string>(routes.store.contact);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
 
   useEffect(() => {
     const header = getStorefrontHeaderSettings();
@@ -44,13 +51,11 @@ export function StorefrontNavbar() {
     setLogoLetter(header.logoLetter || "M");
     setNavItems(getStorefrontNavItems());
     setShowSearch(header.showSearch);
-    setShowCta(header.showCta);
-    setCtaLabel(header.ctaLabel);
-    setCtaHref(header.ctaHref);
     setCartCount(getCartItemCount());
     setWishlistCount(getWishlistCount());
     setSignedIn(hasCustomerSession());
     setCustomerName(getCustomerDisplayName());
+    setCustomerPhone(getCustomerSession()?.phone ?? "");
   }, []);
 
   useEffect(() => {
@@ -59,6 +64,7 @@ export function StorefrontNavbar() {
       setWishlistCount(getWishlistCount());
       setSignedIn(hasCustomerSession());
       setCustomerName(getCustomerDisplayName());
+      setCustomerPhone(getCustomerSession()?.phone ?? "");
     };
     window.addEventListener("storage", refreshCounts);
     window.addEventListener("bakery-cart-updated", refreshCounts);
@@ -72,8 +78,31 @@ export function StorefrontNavbar() {
     };
   }, [pathname]);
 
-  const accountHref = signedIn ? routes.account.dashboard : routes.account.login;
-  const accountLabel = signedIn ? `${customerName}'s account` : "Account";
+  // Any page can request the login modal via openCustomerAuthModal().
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const step = (event as CustomEvent<{ step?: "phone" | "signup" }>).detail?.step ?? "phone";
+      setAuthStep(step);
+      setAuthOpen(true);
+    };
+    window.addEventListener(OPEN_AUTH_MODAL_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_AUTH_MODAL_EVENT, onOpen);
+  }, []);
+
+  // Protected pages redirect here with ?login=1 when there's no session.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("login") === "1") {
+      setAuthStep("phone");
+      setAuthOpen(true);
+      params.delete("login");
+      const query = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+    }
+  }, [pathname]);
+
+  const accountHref = signedIn ? routes.account.dashboard : routes.store.home;
 
   useBodyScrollLock(mobileOpen);
 
@@ -107,6 +136,7 @@ export function StorefrontNavbar() {
   }, []);
 
   return (
+    <>
     <header
       className={cn(
         "sticky top-0 z-50 w-full border-b bg-white transition-colors",
@@ -154,64 +184,64 @@ export function StorefrontNavbar() {
           })}
         </nav>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           {showSearch ? (
             <Button
               variant="ghost"
-              size="icon"
-              className="hidden sm:flex"
+              size="icon-lg"
+              className="hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex"
               render={<Link href={routes.store.search} aria-label="Search" />}
             >
-              <Search className="size-4" />
+              <Search className="size-5" />
             </Button>
           ) : null}
           <Button
             variant="ghost"
-            size="icon"
-            className="relative hidden sm:flex"
+            size="icon-lg"
+            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex"
             render={<Link href={routes.store.wishlist} aria-label="Wishlist" />}
           >
-            <Heart className="size-4" />
+            <Heart className="size-5" />
             {wishlistCount > 0 ? (
-              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-bakery-700 text-[10px] font-bold text-white">
+              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bakery-700 px-1 text-[10px] font-bold text-white ring-2 ring-white">
                 {wishlistCount > 9 ? "9+" : wishlistCount}
               </span>
             ) : null}
           </Button>
           <Button
             variant="ghost"
-            size="icon"
-            className="relative"
+            size="icon-lg"
+            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700"
             render={<Link href={routes.store.cart} aria-label="Shopping cart" />}
           >
-            <ShoppingBag className="size-4" />
+            <ShoppingBag className="size-5" />
             {cartCount > 0 ? (
-              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-bakery-700 text-[10px] font-bold text-white">
+              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bakery-700 px-1 text-[10px] font-bold text-white ring-2 ring-white">
                 {cartCount > 9 ? "9+" : cartCount}
               </span>
             ) : null}
           </Button>
+          {signedIn ? (
+            <div className="ml-1 hidden sm:flex">
+              <AccountMenu
+                name={customerName}
+                phone={customerPhone}
+                onSignOut={() => {
+                  setSignedIn(false);
+                  setCustomerName("");
+                  setCustomerPhone("");
+                }}
+              />
+            </div>
+          ) : (
+            <div className="ml-0.5 hidden sm:flex">
+              <GuestMenu />
+            </div>
+          )}
           <Button
             variant="ghost"
-            size="icon"
-            className="hidden sm:flex"
-            render={<Link href={accountHref} aria-label={accountLabel} />}
-          >
-            <User className="size-4" />
-          </Button>
-          {showCta ? (
-            <Button
-              size="sm"
-              className="hidden md:inline-flex"
-              render={<Link href={ctaHref} />}
-            >
-              {ctaLabel}
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
+            size="icon-lg"
+            className="ml-0.5 text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:hidden"
             onClick={() => setMobileOpen((open) => !open)}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
@@ -274,14 +304,29 @@ export function StorefrontNavbar() {
                 <ShoppingBag className="size-4" />
                 Cart{cartCount > 0 ? ` (${cartCount})` : ""}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href={accountHref} onClick={() => setMobileOpen(false)} />}
-              >
-                <User className="size-4" />
-                {signedIn ? "My Account" : "Account"}
-              </Button>
+              {signedIn ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  render={<Link href={accountHref} onClick={() => setMobileOpen(false)} />}
+                >
+                  <User className="size-4" />
+                  My Account
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setAuthStep("phone");
+                    setAuthOpen(true);
+                  }}
+                >
+                  <User className="size-4" />
+                  Account
+                </Button>
+              )}
             </div>
             {showSearch ? (
               <Link
@@ -293,17 +338,19 @@ export function StorefrontNavbar() {
                 Search
               </Link>
             ) : null}
-            {showCta ? (
-              <Button
-                className="mt-2"
-                render={<Link href={ctaHref} onClick={() => setMobileOpen(false)} />}
-              >
-                {ctaLabel}
-              </Button>
-            ) : null}
           </nav>
         </div>
       ) : null}
     </header>
+    <CustomerAuthModal
+      open={authOpen}
+      onOpenChange={setAuthOpen}
+      initialStep={authStep}
+      onAuthenticated={() => {
+        setSignedIn(true);
+        setCustomerName(getCustomerDisplayName());
+      }}
+    />
+    </>
   );
 }

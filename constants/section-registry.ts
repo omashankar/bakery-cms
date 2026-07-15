@@ -45,6 +45,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    type: "our-menu",
+    label: "Menu Strip",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "Explore",
+      title: "Our Menu",
+      description: "Shop by category — cakes, pastries, chocolates, and more.",
+      maxCount: 8,
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "maxCount", label: "Max categories shown", type: "number" },
+    ],
+  },
+  {
     type: "promo-banner",
     label: "Promo Banner",
     icon: "Tag",
@@ -324,22 +342,22 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
-    type: "faq",
-    label: "FAQ",
-    icon: "HelpCircle",
+    type: "store-locator",
+    label: "Store Locator",
+    icon: "MapPin",
     defaultBackground: "cream",
     defaultContent: {
-      overline: "Got Questions?",
-      title: "Frequently Asked Questions",
+      overline: "Visit Us",
+      title: "Find a Store Near You",
       description:
-        "Everything you need to know about ordering, delivery, and our cakes.",
-      maxItems: 6,
+        "Over 300 outlets across India — freshly baked treats, always close by.",
+      buttonLabel: "Find Stores",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxItems", label: "Max FAQ items", type: "number" },
+      { key: "buttonLabel", label: "Button label", type: "text" },
     ],
   },
   {

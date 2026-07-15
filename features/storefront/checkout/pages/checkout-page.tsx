@@ -8,10 +8,18 @@ import {
   Banknote,
   CreditCard,
   Loader2,
-  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCustomerSession } from "@/features/storefront/account/lib/customer-session";
+import { openRazorpayCheckout } from "@/features/storefront/checkout/lib/razorpay";
+import { getEnabledCheckoutMethods } from "@/features/payments/lib/resolve-methods";
+import { PaymentMethodList } from "@/features/storefront/checkout/payments/payment-method-list";
+import { SecurityBadges } from "@/features/payments/components/security-badges";
+import {
+  ProcessingState,
+  type PaymentUIState,
+} from "@/features/payments/components/processing-state";
+import { openCustomerAuthModal } from "@/features/storefront/account/components/customer-auth-modal";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
@@ -38,12 +46,10 @@ import type { CartLineItem } from "@/features/storefront/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
-import { cn } from "@/lib/utils";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -52,22 +58,16 @@ const paymentOptions: {
   icon: typeof Banknote;
 }[] = [
   {
+    value: "razorpay",
+    label: "Pay Online",
+    description: "UPI, Cards, Netbanking & Wallets — secured by Razorpay",
+    icon: CreditCard,
+  },
+  {
     value: "cod",
     label: "Cash on Delivery",
     description: "Pay when your order is delivered",
     icon: Banknote,
-  },
-  {
-    value: "upi",
-    label: "UPI",
-    description: "Google Pay, PhonePe, Paytm (demo)",
-    icon: Smartphone,
-  },
-  {
-    value: "card",
-    label: "Credit / Debit Card",
-    description: "Visa, Mastercard, RuPay (demo)",
-    icon: CreditCard,
   },
 ];
 
@@ -90,6 +90,16 @@ export function CheckoutPage() {
     [commerce.paymentMethods]
   );
 
+  // Registry-driven method cards shown at the payment step.
+  const enabledMethods = useMemo(
+    () => (ready ? getEnabledCheckoutMethods() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ready, commerce.paymentMethods]
+  );
+
+  // Online payment processing / failure overlay state.
+  const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
+
   const {
     register,
     control,
@@ -102,6 +112,12 @@ export function CheckoutPage() {
   });
 
   useEffect(() => {
+    // Cart & checkout require login — guests are sent back to the cart's login gate.
+    if (!getCustomerSession()) {
+      router.replace(routes.store.cart);
+      return;
+    }
+
     const cartItems = getCartItems();
     if (cartItems.length === 0) {
       router.replace(routes.store.cart);
@@ -206,49 +222,22 @@ export function CheckoutPage() {
   };
 
   const onPaymentContinue = () => {
-    persistDraft({ paymentMethod, orderNotes });
-
-    if (
-      (paymentMethod === "upi" || paymentMethod === "card") &&
-      !getCheckoutDraft().paymentVerified
-    ) {
-      router.push(`${routes.store.checkoutPayment}?method=${paymentMethod}`);
-      return;
-    }
-
     persistDraft({ step: 3, paymentMethod, orderNotes });
     setStep(3);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const onPlaceOrder = async () => {
-    const draft = getCheckoutDraft();
-
-    if (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue) {
-      toast.error(`Minimum order value is ${formatCurrency(commerce.minOrderValue)}`);
-      return;
-    }
-
-    if (
-      (paymentMethod === "upi" || paymentMethod === "card") &&
-      !draft.paymentVerified
-    ) {
-      toast.error("Complete payment first");
-      router.push(`${routes.store.checkoutPayment}?method=${paymentMethod}`);
-      return;
-    }
-
-    const address = draft.address;
-    setPlacing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
+  const finalizeOrder = (
+    paymentStatus: "paid" | "cod",
+    paymentReference?: string
+  ) => {
     const order = placeOrder({
       items,
       totals,
-      address,
+      address: getCheckoutDraft().address,
       paymentMethod,
-      paymentStatus: paymentMethod === "cod" ? "cod" : "paid",
-      paymentReference: draft.paymentReference,
+      paymentStatus,
+      paymentReference,
       coupon,
       orderNotes: orderNotes.trim() || undefined,
     });
@@ -269,6 +258,48 @@ export function CheckoutPage() {
     router.push(`${routes.store.orderSuccess}?order=${order.orderNumber}`);
   };
 
+  const onPlaceOrder = async () => {
+    if (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue) {
+      toast.error(`Minimum order value is ${formatCurrency(commerce.minOrderValue)}`);
+      return;
+    }
+
+    const address = getCheckoutDraft().address;
+
+    // Online payment — open the Razorpay modal, place the order only once verified.
+    if (paymentMethod === "razorpay") {
+      setPlacing(true);
+      setPayUI({ state: "redirecting" });
+      try {
+        const result = await openRazorpayCheckout({
+          amount: totals.total,
+          receipt: `bk-${Date.now()}`,
+          name: address.fullName,
+          email: address.email,
+          phone: address.phone,
+        });
+        setPayUI({ state: "processing" });
+        finalizeOrder("paid", result.paymentId);
+      } catch (error) {
+        setPlacing(false);
+        const msg = error instanceof Error ? error.message : "Payment failed";
+        setPayUI({ state: /cancel/i.test(msg) ? "cancelled" : "failed", reason: msg });
+      }
+      return;
+    }
+
+    // Cash on Delivery
+    setPlacing(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    finalizeOrder("cod", undefined);
+  };
+
+  const retryPayment = () => {
+    setPayUI(null);
+    setStep(3);
+    void onPlaceOrder();
+  };
+
   if (!ready) {
     return (
       <div className={layoutSpacing.container}>
@@ -279,6 +310,42 @@ export function CheckoutPage() {
 
   return (
     <>
+      {/* Payment processing / failure overlay (solid backdrop — no glassmorphism) */}
+      {payUI ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <ProcessingState
+            state={payUI.state}
+            reason={payUI.reason}
+            className="w-full max-w-md"
+            actions={
+              payUI.state === "failed" || payUI.state === "cancelled"
+                ? [
+                    {
+                      label: "Retry payment",
+                      onClick: retryPayment,
+                      variant: "bakery",
+                      icon: "retry",
+                    },
+                    {
+                      label: "Change method",
+                      onClick: () => {
+                        setPayUI(null);
+                        setStep(2);
+                      },
+                      variant: "outline",
+                    },
+                    {
+                      label: "Contact support",
+                      onClick: () => router.push(routes.store.contact),
+                      variant: "ghost",
+                    },
+                  ]
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
+
       <StorePageHeader
         title="Checkout"
         description="Complete your delivery details and place your order."
@@ -425,19 +492,15 @@ export function CheckoutPage() {
                   <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Choose how you would like to pay. UI-only — no real charges.
+                      Pay securely online, or choose Cash on Delivery.
                     </p>
 
-                    {availablePaymentOptions.length === 0 ? (
-                      <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        No payment methods are enabled. Ask the bakery to turn on COD, UPI, or
-                        Card in admin Payments settings.
-                      </div>
-                    ) : (
-                      <RadioGroup
-                        value={paymentMethod}
-                        onValueChange={(value) => {
-                          const method = value as PaymentMethod;
+                    <div className="mt-5">
+                      <PaymentMethodList
+                        methods={enabledMethods}
+                        selected={paymentMethod}
+                        onSelect={(id) => {
+                          const method = id as PaymentMethod;
                           setPaymentMethod(method);
                           persistDraft({
                             paymentMethod: method,
@@ -445,41 +508,12 @@ export function CheckoutPage() {
                             paymentReference: undefined,
                           });
                         }}
-                        className="mt-6"
-                      >
-                        {availablePaymentOptions.map((option) => (
-                          <label
-                            key={option.value}
-                            className={cn(
-                              "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors",
-                              paymentMethod === option.value
-                                ? "border-bakery-700 bg-cream-50"
-                                : "border-border hover:bg-cream-50"
-                            )}
-                          >
-                            <RadioGroupItem value={option.value} className="mt-0.5" />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 font-medium">
-                                <option.icon className="size-4 text-bakery-700" />
-                                {option.label}
-                              </div>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {option.description}
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-                      </RadioGroup>
-                    )}
+                      />
+                    </div>
 
-                    {paymentMethod !== "cod" && getCheckoutDraft().paymentVerified ? (
-                      <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-                        Payment verified
-                        {getCheckoutDraft().paymentReference
-                          ? ` · ${getCheckoutDraft().paymentReference}`
-                          : ""}
-                      </div>
-                    ) : null}
+                    <div className="mt-5 border-t border-border pt-5">
+                      <SecurityBadges />
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
@@ -502,11 +536,7 @@ export function CheckoutPage() {
                       onClick={onPaymentContinue}
                       disabled={availablePaymentOptions.length === 0}
                     >
-                      {paymentMethod === "cod"
-                        ? "Review order"
-                        : getCheckoutDraft().paymentVerified
-                          ? "Review order"
-                          : "Continue to payment"}
+                      Review order
                     </Button>
                   </div>
                 </div>
@@ -566,7 +596,14 @@ export function CheckoutPage() {
                       >
                         {placing ? <Loader2 className="size-4 animate-spin" /> : null}
                         {placing ? (
-                          "Placing order…"
+                          paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
+                        ) : paymentMethod === "razorpay" ? (
+                          <>
+                            <span className="sm:hidden">Pay now</span>
+                            <span className="hidden sm:inline">
+                              Pay {formatCurrency(totals.total)}
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span className="sm:hidden">Place order</span>
@@ -626,9 +663,13 @@ export function CheckoutPage() {
               {!getCustomerSession() ? (
                 <p className="text-center text-xs text-muted-foreground">
                   Have an account?{" "}
-                  <Link href={routes.account.login} className="text-bakery-700 hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => openCustomerAuthModal("phone")}
+                    className="font-medium text-bakery-700 hover:underline"
+                  >
                     Sign in
-                  </Link>{" "}
+                  </button>{" "}
                   for faster checkout next time.
                 </p>
               ) : null}

@@ -24,6 +24,7 @@ const paymentLabels = {
   cod: "Cash on Delivery",
   upi: "UPI",
   card: "Card",
+  razorpay: "Online (Razorpay)",
   paid: "Paid online",
   pending: "Pending",
   failed: "Failed",

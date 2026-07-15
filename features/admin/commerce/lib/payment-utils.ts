@@ -26,6 +26,7 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
   cod: "Cash on Delivery",
   upi: "UPI",
   card: "Card",
+  razorpay: "Online (Razorpay)",
 };
 
 function matchesDateRange(placedAt: string, range: PaymentDateRange): boolean {

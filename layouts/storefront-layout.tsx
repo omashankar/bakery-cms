@@ -20,11 +20,15 @@ export function StorefrontLayoutShell({
       data-storefront-theme="light"
       style={{ colorScheme: "light" }}
     >
-      <MaintenanceBanner />
-      <StorefrontBannerStrip />
-      <StorefrontNavbar />
+      <div className="contents print:hidden">
+        <MaintenanceBanner />
+        <StorefrontBannerStrip />
+        <StorefrontNavbar />
+      </div>
       <main className="flex-1">{children}</main>
-      <LandingFooter />
+      <div className="print:hidden">
+        <LandingFooter />
+      </div>
     </div>
   );
 }

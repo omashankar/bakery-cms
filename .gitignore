@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Razorpay admin-saved keys (server-side secret — never commit)
+.razorpay-config.json

@@ -17,6 +17,8 @@ import {
   Flag,
   FolderOpen,
   Heart,
+  Layers,
+  LayoutGrid,
   HelpCircle,
   Home,
   Inbox,
@@ -48,6 +50,7 @@ import {
 import { BakeryCmsBrand } from "@/components/shared/bakery-cms-brand";
 import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
+import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
 import { countNewInquiries } from "@/features/admin/inquiries";
 import {
   countInventoryAlerts,
@@ -104,6 +107,8 @@ const iconMap: Record<string, LucideIcon> = {
   Truck,
   Bell,
   Undo2,
+  Layers,
+  LayoutGrid,
 };
 
 interface AdminSidebarProps {
@@ -155,10 +160,14 @@ function useNavActiveState(item: AdminNavItem) {
     const childActive = item.children?.some((child) =>
       isChildLinkActive(pathname, child.href, item.children ?? [])
     );
+    // Config pages that moved into Settings keep the "Settings" item highlighted.
+    const settingsActive =
+      item.href === routes.admin.settings.overview && isSettingsOwnedPath(pathname);
     const parentActive =
       pathname === item.href ||
       pathname.startsWith(`${item.href}/`) ||
-      Boolean(childActive);
+      Boolean(childActive) ||
+      settingsActive;
 
     return { pathname, parentActive, childActive };
   }, [item, pathname]);
@@ -197,7 +206,8 @@ function SubNavLink({
   siblings: NavItem[];
   onNavigate?: () => void;
 }) {
-  const SubIcon = sub.icon ? (iconMap[sub.icon] ?? ChevronRight) : ChevronRight;
+  // All submenu items use a consistent chevron-right indicator.
+  const SubIcon = ChevronRight;
   const subActive = isChildLinkActive(pathname, sub.href, siblings);
 
   return (

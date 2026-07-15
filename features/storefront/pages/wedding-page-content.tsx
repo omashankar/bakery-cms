@@ -20,7 +20,9 @@ export function WeddingPageContent() {
   useEffect(() => {
     processScheduledWeddingPublish();
     const source = isPreview ? getDraftWeddingSections() : getPublishedWeddingSections();
-    setSections(getVisibleSections(source));
+    // FAQs live only on the dedicated FAQ page — never render a wedding FAQ section
+    // here, even if an older saved snapshot still contains one.
+    setSections(getVisibleSections(source).filter((section) => section.type !== "wedding-faq"));
     setMounted(true);
   }, [isPreview]);
 

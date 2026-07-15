@@ -1,156 +1,101 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
+  ArrowRight,
+  Banknote,
   CreditCard,
-  Download,
   IndianRupee,
+  Layers,
+  Receipt,
+  RotateCcw,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
-import { AdminPaymentStatusBadge } from "@/features/admin/commerce/components/admin-payment-status-badge";
-import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
-import {
-  defaultPaymentFilters,
-  EMPTY_PAYMENT_OVERVIEW,
-  exportPaymentsToCsv,
-  filterPaymentOrders,
-  getPaymentOverview,
-  paymentMethodLabels,
-  type PaymentListFilters,
-} from "@/features/admin/commerce/lib/payment-utils";
-import { useCommerceSettingsForm } from "@/features/admin/commerce/lib/use-commerce-settings-form";
+import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
-import {
-  FilterPanel,
-  FilterPanelSearch,
-} from "@/components/shared/filter-panel";
-import { EmptyState } from "@/components/shared/empty-state";
-import { ListPagination } from "@/components/shared/list-pagination";
+import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
+import { getOrders, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";
+import { RevenueChart } from "@/features/payments/components/revenue-chart";
+import { PaymentMethodBreakdown } from "@/features/payments/components/payment-method-breakdown";
+import { useCommerceSettingsForm } from "@/features/admin/commerce/lib/use-commerce-settings-form";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
-import {
-  bulkUpdatePaymentStatus,
-  getOrders,
-  type PaymentStatus,
-  type PlacedOrder,
-} from "@/features/storefront/checkout/lib/orders";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 
-const PAGE_SIZE = 10;
+type GatewayStatus = {
+  configured: boolean;
+  keyId: string;
+  source: "env" | "admin" | null;
+  envLocked: boolean;
+  testMode: boolean | null;
+};
 
 const methodOptions = [
+  {
+    key: "razorpay" as const,
+    label: "Online Payment (Razorpay)",
+    description: "Unified UPI, Cards, Netbanking & Wallets via Razorpay checkout.",
+    icon: CreditCard,
+  },
   {
     key: "cod" as const,
     label: "Cash on Delivery",
     description: "Customer pays when the order is delivered.",
     icon: Wallet,
   },
-  {
-    key: "upi" as const,
-    label: "UPI",
-    description: "Demo UPI checkout screen with QR placeholder.",
-    icon: IndianRupee,
-  },
-  {
-    key: "card" as const,
-    label: "Card",
-    description: "Demo card form for credit and debit payments.",
-    icon: CreditCard,
-  },
+];
+
+const quickLinks = [
+  { href: routes.admin.commerce.gateways, label: "Gateways", icon: Layers },
+  { href: routes.admin.commerce.transactions, label: "Transactions", icon: Receipt },
+  { href: routes.admin.commerce.refunds, label: "Refunds", icon: RotateCcw },
 ];
 
 export function PaymentsAdminPage() {
-  const router = useRouter();
-  const { settings, setSettings, isDirty, save } = useCommerceSettingsForm();
-  const [mounted, setMounted] = useState(false);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [filters, setFilters] = useState<PaymentListFilters>(defaultPaymentFilters);
-  const [page, setPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkStatus, setBulkStatus] = useState<PaymentStatus>("paid");
+  const [mounted, setMounted] = useState(false);
+  const { settings, setSettings, isDirty, save } = useCommerceSettingsForm();
+
+  // Razorpay connection (keys live on the server, never the browser).
+  const [gateway, setGateway] = useState<GatewayStatus | null>(null);
+  const [gwKeyId, setGwKeyId] = useState("");
+  const [gwSecret, setGwSecret] = useState("");
+  const [gwSaving, setGwSaving] = useState(false);
 
   useEffect(() => {
     ensureDemoOrders();
     setOrders(getOrders());
     setMounted(true);
-
-    function refresh() {
-      setOrders(getOrders());
-    }
-
+    const refresh = () => setOrders(getOrders());
     window.addEventListener("bakery-orders-updated", refresh);
+
+    fetch("/api/razorpay/config")
+      .then((res) => res.json())
+      .then((status: GatewayStatus) => {
+        setGateway(status);
+        setGwKeyId(status.keyId || "");
+      })
+      .catch(() => setGateway(null));
+
     return () => window.removeEventListener("bakery-orders-updated", refresh);
   }, []);
 
-  const filtered = useMemo(() => filterPaymentOrders(orders, filters), [orders, filters]);
-  const overview = useMemo(
-    () => (mounted ? getPaymentOverview(orders) : EMPTY_PAYMENT_OVERVIEW),
-    [orders, mounted]
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const a = useMemo(() => getPaymentAnalytics(orders), [orders]);
 
-  const pageIds = paginated.map((order) => order.id);
-  const allPageSelected =
-    pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+  const enabledCount = [settings.paymentMethods.razorpay, settings.paymentMethods.cod].filter(
+    Boolean
+  ).length;
 
-  const enabledCount = [
-    settings.paymentMethods.cod,
-    settings.paymentMethods.upi,
-    settings.paymentMethods.card,
-  ].filter(Boolean).length;
-
-  function updateFilters(patch: Partial<PaymentListFilters>) {
-    setFilters((prev) => ({ ...prev, ...patch }));
-    setPage(1);
-    setSelectedIds([]);
-  }
-
-  function toggleSelect(id: string) {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  }
-
-  function toggleSelectPage() {
-    if (allPageSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
-      return;
-    }
-    setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
-  }
-
-  function handleBulkStatusUpdate() {
-    if (selectedIds.length === 0) return;
-    const count = bulkUpdatePaymentStatus(selectedIds, bulkStatus);
-    setSelectedIds([]);
-    setOrders(getOrders());
-    toast.success(`Updated ${count} payment${count === 1 ? "" : "s"}`);
-  }
-
-  function handleExport() {
-    const target =
-      selectedIds.length > 0
-        ? orders.filter((order) => selectedIds.includes(order.id))
-        : filtered;
-    if (target.length === 0) {
-      toast.error("No payments to export");
-      return;
-    }
-    exportPaymentsToCsv(target);
-    toast.success(`Exported ${target.length} payment${target.length === 1 ? "" : "s"}`);
-  }
-
-  function toggleMethod(key: "cod" | "upi" | "card", checked: boolean) {
+  function toggleMethod(key: "cod" | "razorpay", checked: boolean) {
     if (!checked && enabledCount <= 1 && settings.paymentMethods[key]) {
       toast.error("Keep at least one payment method enabled");
       return;
@@ -161,325 +106,243 @@ export function PaymentsAdminPage() {
     }));
   }
 
+  async function saveGateway() {
+    if (!gwKeyId.trim() || !gwSecret.trim()) {
+      toast.error("Enter both Key ID and Key Secret");
+      return;
+    }
+    setGwSaving(true);
+    try {
+      const res = await fetch("/api/razorpay/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyId: gwKeyId.trim(), keySecret: gwSecret.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Could not save keys");
+        return;
+      }
+      setGateway(data);
+      setGwSecret("");
+      toast.success("Razorpay connected", { description: "Online payments are now live." });
+    } catch {
+      toast.error("Could not reach the server");
+    } finally {
+      setGwSaving(false);
+    }
+  }
+
+  async function disconnectGateway() {
+    try {
+      const res = await fetch("/api/razorpay/config", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Could not disconnect");
+        return;
+      }
+      setGateway(data);
+      setGwKeyId("");
+      setGwSecret("");
+      toast.success("Razorpay disconnected");
+    } catch {
+      toast.error("Could not reach the server");
+    }
+  }
+
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Payments"
-        description="Checkout payments and method settings."
-        className="gap-3"
+        description="Collection, gateways and payment health at a glance."
         actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button variant="bakery" className="w-full sm:w-auto" onClick={handleExport}>
-              <Download className="size-4" />
-              <span className="sm:hidden">Export</span>
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            render={<Link href={routes.admin.commerce.transactions} />}
+          >
+            <Receipt className="size-4" />
+            View transactions
+          </Button>
         }
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
-        <button
-          type="button"
-          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "all", method: "all", search: "" })}
-        >
-          <DashboardStatCard
-            title="Collected"
-            value={formatCurrency(overview.collected)}
-            change={
-              overview.outstanding > 0
-                ? `${formatCurrency(overview.outstanding)} outstanding`
-                : "Paid + delivered COD"
-            }
-            changeTone={overview.outstanding > 0 ? "warning" : "positive"}
-            icon={IndianRupee}
-            tone="bakery"
-          />
-        </button>
-        <button
-          type="button"
-          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "pending" })}
-        >
-          <DashboardStatCard
-            title="Pending"
-            value={overview.pending}
-            change={overview.pending > 0 ? "Awaiting payment" : "All clear"}
-            changeTone={overview.pending > 0 ? "warning" : "positive"}
-            icon={AlertTriangle}
-            tone="gold"
-          />
-        </button>
-        <button
-          type="button"
-          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "failed" })}
-        >
-          <DashboardStatCard
-            title="Failed"
-            value={overview.failed}
-            change={overview.failed > 0 ? "Needs follow-up" : "None"}
-            changeTone={overview.failed > 0 ? "warning" : "positive"}
-            icon={AlertTriangle}
-            tone="neutral"
-          />
-        </button>
+      {/* Primary metrics */}
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <DashboardStatCard
+          title="Today's collection"
+          value={formatCurrency(mounted ? a.todayCollection : 0)}
+          change={`${mounted ? a.collectedOrders : 0} orders collected`}
+          icon={IndianRupee}
+          tone="bakery"
+        />
+        <DashboardStatCard
+          title="Total collection"
+          value={formatCurrency(mounted ? a.totalCollection : 0)}
+          change="all time"
+          icon={TrendingUp}
+          tone="gold"
+        />
+        <DashboardStatCard
+          title="Success rate"
+          value={`${mounted ? a.successRate : 0}%`}
+          change={mounted ? `${a.failedCount} failed` : ""}
+          changeTone={mounted && a.failedCount > 0 ? "warning" : "positive"}
+          icon={TrendingUp}
+          tone="bakery"
+        />
+        <DashboardStatCard
+          title="Avg order value"
+          value={formatCurrency(mounted ? a.aov : 0)}
+          change={`top: ${mounted ? a.topMethodLabel : "—"}`}
+          icon={Receipt}
+          tone="neutral"
+        />
       </section>
 
-      <FilterPanel>
-        <div className="space-y-3">
-          <FilterPanelSearch
-            value={filters.search}
-            onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search order, customer, reference…"
-          />
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-            <AdminSelect
-              value={filters.status}
-              onChange={(event) =>
-                updateFilters({
-                  status: event.target.value as PaymentListFilters["status"],
-                })
-              }
-              aria-label="Payment status"
-            >
-              <option value="all">All statuses</option>
-              <option value="paid">Paid</option>
-              <option value="cod">COD</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </AdminSelect>
-            <AdminSelect
-              value={filters.method}
-              onChange={(event) =>
-                updateFilters({
-                  method: event.target.value as PaymentListFilters["method"],
-                })
-              }
-              aria-label="Payment method"
-            >
-              <option value="all">All methods</option>
-              <option value="upi">UPI</option>
-              <option value="card">Card</option>
-              <option value="cod">COD</option>
-            </AdminSelect>
-            <AdminSelect
-              className="col-span-2 md:col-span-1"
-              value={filters.dateRange}
-              onChange={(event) =>
-                updateFilters({
-                  dateRange: event.target.value as PaymentListFilters["dateRange"],
-                })
-              }
-              aria-label="Date range"
-            >
-              <option value="all">All dates</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </AdminSelect>
-          </div>
-        </div>
-      </FilterPanel>
+      {/* Secondary metrics */}
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <DashboardStatCard title="Online" value={formatCurrency(mounted ? a.onlineAmount : 0)} change="card / UPI / wallet" icon={CreditCard} tone="gold" />
+        <DashboardStatCard title="Offline (COD)" value={formatCurrency(mounted ? a.offlineAmount : 0)} change="cash on delivery" icon={Banknote} tone="neutral" />
+        <DashboardStatCard title="Pending" value={String(mounted ? a.pendingCount : 0)} change={formatCurrency(mounted ? a.pendingAmount : 0)} changeTone={mounted && a.pendingCount > 0 ? "warning" : "positive"} icon={Wallet} tone="gold" />
+        <DashboardStatCard title="Refunds" value={String(mounted ? a.refundCount : 0)} change={`${mounted ? a.refundRate : 0}% · ${formatCurrency(mounted ? a.refundAmount : 0)}`} icon={RotateCcw} tone="neutral" />
+      </section>
 
-      <section className={adminShell.tableCard}>
-        {selectedIds.length > 0 ? (
-          <div className="flex flex-col gap-2 border-b border-border px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:px-4">
-            <span className="text-sm text-muted-foreground">
-              {selectedIds.length} selected
+      {/* Charts */}
+      <section className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Revenue — last 7 days</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RevenueChart data={a.revenueSeries} />
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Payment method breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PaymentMethodBreakdown methods={a.methodBreakdown} />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Quick links */}
+      <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        {quickLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="group flex items-center justify-between gap-2 rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-bakery-700/40"
+          >
+            <span className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-cream-100 text-bakery-700">
+                <link.icon className="size-4" />
+              </span>
+              <span className="text-sm font-medium text-foreground">{link.label}</span>
             </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <AdminSelect
-                className="w-full sm:w-40"
-                value={bulkStatus}
-                onChange={(event) => setBulkStatus(event.target.value as PaymentStatus)}
-                aria-label="Bulk payment status"
-              >
-                <option value="paid">Mark paid</option>
-                <option value="pending">Mark pending</option>
-                <option value="failed">Mark failed</option>
-                <option value="cod">Mark COD</option>
-              </AdminSelect>
-              <Button size="sm" variant="outline" onClick={handleBulkStatusUpdate}>
-                Apply
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleExport}>
-                Export
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
-                Clear
-              </Button>
-            </div>
+            <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        ))}
+      </section>
+
+      {/* Razorpay connection */}
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-base">Payment Gateway — Razorpay</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter your Razorpay API keys to accept online payments (UPI, Cards, Netbanking, Wallets).
+            </p>
           </div>
-        ) : null}
-
-        {paginated.length === 0 ? (
-          <EmptyState
-            icon={IndianRupee}
-            title="No payments found"
-            description="Try another filter, or place a checkout order."
-            className="py-14"
-          />
-        ) : (
-          <>
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[880px] text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">
-                      <Checkbox
-                        checked={allPageSelected}
-                        onCheckedChange={toggleSelectPage}
-                        aria-label="Select all on page"
-                      />
-                    </th>
-                    <th className="px-4 py-3 font-medium">Order</th>
-                    <th className="px-4 py-3 font-medium">Customer</th>
-                    <th className="px-4 py-3 font-medium">Method</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Reference</th>
-                    <th className="px-4 py-3 font-medium">Amount</th>
-                    <th className="px-4 py-3 font-medium">Placed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-border/70 transition-colors hover:bg-muted"
-                    >
-                      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.includes(order.id)}
-                          onCheckedChange={() => toggleSelect(order.id)}
-                          aria-label={`Select ${order.orderNumber}`}
-                        />
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3 font-medium text-foreground"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        {order.orderNumber}
-                      </td>
-                      <td
-                        className="max-w-[180px] cursor-pointer px-4 py-3"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        <p className="truncate">{order.address.fullName}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {order.address.email}
-                        </p>
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        {paymentMethodLabels[order.paymentMethod]}
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        <AdminPaymentStatusBadge status={order.paymentStatus} />
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3 text-muted-foreground"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        {order.paymentReference ?? "—"}
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3 font-semibold"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        {formatCurrency(order.totals.total)}
-                      </td>
-                      <td
-                        className="cursor-pointer px-4 py-3 text-muted-foreground"
-                        onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                      >
-                        {formatRelativeTime(order.placedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {gateway ? (
+            gateway.configured ? (
+              <Badge variant="accent" className="shrink-0">
+                Connected{gateway.testMode === true ? " · Test" : gateway.testMode === false ? " · Live" : ""}
+              </Badge>
+            ) : (
+              <Badge className="shrink-0 bg-amber-100 text-amber-800">Not connected</Badge>
+            )
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {gateway?.envLocked ? (
+            <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm text-muted-foreground">
+              Keys are set via environment variables (<code>.env.local</code>). To change them, edit
+              that file and restart the server.
             </div>
+          ) : null}
 
-            <ul className="divide-y divide-border lg:hidden">
-              {paginated.map((order) => (
-                <li key={order.id} className="p-3 sm:p-4">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={selectedIds.includes(order.id)}
-                      onCheckedChange={() => toggleSelect(order.id)}
-                      aria-label={`Select ${order.orderNumber}`}
-                    />
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => router.push(routes.admin.orders.detail(order.id))}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {order.orderNumber}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {order.address.fullName} · {formatRelativeTime(order.placedAt)}
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-sm font-semibold">
-                          {formatCurrency(order.totals.total)}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <AdminPaymentStatusBadge status={order.paymentStatus} />
-                        <span className="text-xs text-muted-foreground">
-                          {paymentMethodLabels[order.paymentMethod]}
-                        </span>
-                        {order.paymentReference ? (
-                          <span className="text-xs text-muted-foreground">
-                            · {order.paymentReference}
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="border-t border-border px-3 py-3 sm:px-4">
-              <ListPagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setPage}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="gwKeyId">Key ID</Label>
+              <Input
+                id="gwKeyId"
+                placeholder="rzp_test_xxxxxxxxxxxx"
+                value={gwKeyId}
+                onChange={(e) => setGwKeyId(e.target.value)}
+                disabled={gateway?.envLocked}
+                autoComplete="off"
               />
             </div>
-          </>
-        )}
-      </section>
+            <div className="space-y-2">
+              <Label htmlFor="gwSecret">Key Secret</Label>
+              <Input
+                id="gwSecret"
+                type="password"
+                placeholder={gateway?.configured ? "•••••••• (hidden — enter to replace)" : "Enter your secret key"}
+                value={gwSecret}
+                onChange={(e) => setGwSecret(e.target.value)}
+                disabled={gateway?.envLocked}
+                autoComplete="off"
+              />
+            </div>
+          </div>
 
+          <div className="flex flex-wrap gap-2">
+            <Button variant="bakery" onClick={saveGateway} disabled={gwSaving || gateway?.envLocked}>
+              {gwSaving ? "Saving…" : gateway?.configured ? "Update keys" : "Save & Connect"}
+            </Button>
+            {gateway?.configured && !gateway.envLocked ? (
+              <Button variant="outline" onClick={disconnectGateway}>
+                Disconnect
+              </Button>
+            ) : null}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Get keys from{" "}
+            <a href="https://dashboard.razorpay.com" target="_blank" rel="noopener noreferrer" className="font-medium text-bakery-700 hover:underline">
+              dashboard.razorpay.com
+            </a>{" "}
+            → Settings → API Keys. Use <code>rzp_test_</code> keys for testing. Your secret is stored
+            on the server and never shown again.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Quick methods */}
       <Card className="shadow-sm">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-base">Checkout methods</CardTitle>
+            <CardTitle className="text-base">Quick methods</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              {enabledCount} enabled · demo UI only (no real gateway)
+              {enabledCount} enabled · manage all{" "}
+              <Link href={routes.admin.commerce.gateways} className="font-medium text-bakery-700 hover:underline">
+                payment gateways
+              </Link>
             </p>
           </div>
-          <Button
-            variant="bakery"
-            className="w-full sm:w-auto"
-            disabled={!isDirty}
-            onClick={() => save("Payment methods saved")}
-          >
-            Save methods
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button variant="outline" className="w-full sm:w-auto" render={<Link href={routes.admin.commerce.gateways} />}>
+              <Layers className="size-4" />
+              All gateways
+            </Button>
+            <Button variant="bakery" className="w-full sm:w-auto" disabled={!isDirty} onClick={() => save("Payment methods saved")}>
+              Save methods
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {methodOptions.map((method) => {
@@ -487,10 +350,7 @@ export function PaymentsAdminPage() {
             const checked = settings.paymentMethods[method.key];
             const isLastEnabled = checked && enabledCount <= 1;
             return (
-              <div
-                key={method.key}
-                className="flex items-center justify-between gap-4 rounded-xl border border-border p-4"
-              >
+              <div key={method.key} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4">
                 <div className="flex items-start gap-3">
                   <div className="rounded-lg bg-muted p-2 text-primary">
                     <Icon className="size-4" />
@@ -500,11 +360,7 @@ export function PaymentsAdminPage() {
                     <p className="text-sm text-muted-foreground">{method.description}</p>
                   </div>
                 </div>
-                <Switch
-                  checked={checked}
-                  disabled={isLastEnabled}
-                  onCheckedChange={(next) => toggleMethod(method.key, next)}
-                />
+                <Switch checked={checked} disabled={isLastEnabled} onCheckedChange={(next) => toggleMethod(method.key, next)} />
               </div>
             );
           })}

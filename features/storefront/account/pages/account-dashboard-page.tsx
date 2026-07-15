@@ -1,57 +1,78 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { MapPin, Package, ShoppingBag } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { ChevronRight, Heart, LifeBuoy, Loader2, MapPin, Package } from "lucide-react";
 import { toast } from "sonner";
-import { AccountOrderStatusBadge } from "@/features/storefront/account/components/account-order-status-badge";
 import { AccountShell } from "@/features/storefront/account/components/account-shell";
 import { useCustomerAuth } from "@/features/storefront/account/hooks/use-customer-auth";
-import { getSavedAddresses } from "@/features/storefront/account/lib/customer-addresses";
-import { getOrdersForCustomer } from "@/features/storefront/checkout/lib/orders";
-import { ProductRailSection } from "@/features/storefront/components/product-rail-section";
-import { getRecommendedCakes } from "@/features/storefront/lib/recommended-cakes";
-import { getRecentlyViewedCakes } from "@/features/storefront/lib/recently-viewed";
-import { reorderFromOrder } from "@/features/storefront/lib/reorder";
-import { EmptyState } from "@/components/shared/empty-state";
+import { updateCustomerProfile } from "@/features/storefront/account/lib/customer-session";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
-import { formatCurrency, formatDate } from "@/utils/format";
+
+type ProfileForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+const quickLinks = [
+  {
+    href: routes.account.orders,
+    label: "My Orders",
+    description: "View your order history",
+    icon: Package,
+  },
+  {
+    href: routes.account.addresses,
+    label: "My Addresses",
+    description: "Manage your saved addresses",
+    icon: MapPin,
+  },
+  {
+    href: routes.store.wishlist,
+    label: "Wishlist",
+    description: "View your favorite items",
+    icon: Heart,
+  },
+  {
+    href: routes.store.contact,
+    label: "Help & Support",
+    description: "Get help with your orders",
+    icon: LifeBuoy,
+  },
+] as const;
+
+function splitName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return { firstName: parts[0] ?? "", lastName: parts.slice(1).join(" ") };
+}
 
 export function AccountDashboardPage() {
-  const router = useRouter();
   const { session, ready } = useCustomerAuth();
-  const [addressCount, setAddressCount] = useState(0);
-
-  const orders = useMemo(
-    () => (session ? getOrdersForCustomer(session.email) : []),
-    [session]
-  );
-
-  const recentOrders = orders.slice(0, 3);
-  const activeOrders = orders.filter((order) => order.status !== "delivered").length;
-  const recentlyViewed = useMemo(() => getRecentlyViewedCakes().slice(0, 4), []);
-  const recommended = useMemo(() => getRecommendedCakes({ limit: 4 }), []);
+  const { register, handleSubmit, formState, reset } = useForm<ProfileForm>();
 
   useEffect(() => {
-    const refresh = () => setAddressCount(getSavedAddresses().length);
-    refresh();
-    window.addEventListener("bakery-addresses-updated", refresh);
-    return () => window.removeEventListener("bakery-addresses-updated", refresh);
-  }, []);
+    if (!session) return;
+    const { firstName, lastName } = splitName(session.name);
+    reset({ firstName, lastName, email: session.email });
+  }, [session, reset]);
 
-  function handleReorder(orderNumber: string) {
-    const order = orders.find((entry) => entry.orderNumber === orderNumber);
-    if (!order) return;
-    const result = reorderFromOrder(order);
-    if (result.added === 0) {
-      toast.error("Could not reorder — items may be unavailable");
-      return;
-    }
-    toast.success(`Added ${result.added} item${result.added === 1 ? "" : "s"} to cart`);
-    router.push(routes.store.cart);
-  }
+  const resetForm = () => {
+    if (!session) return;
+    const { firstName, lastName } = splitName(session.name);
+    reset({ firstName, lastName, email: session.email });
+  };
+
+  const onSubmit = async (data: ProfileForm) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const name = `${data.firstName} ${data.lastName}`.trim();
+    updateCustomerProfile({ name, email: data.email });
+    toast.success("Profile updated");
+  };
 
   if (!ready || !session) {
     return null;
@@ -59,105 +80,105 @@ export function AccountDashboardPage() {
 
   return (
     <AccountShell
-      title={`Hello, ${session.name}`}
-      description="Your account overview, recent orders, and quick links."
+      title="My Profile"
+      description="Manage your personal details and quick access to your activity."
     >
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { icon: Package, label: "Total orders", value: String(orders.length) },
-          { icon: ShoppingBag, label: "Active orders", value: String(activeOrders) },
-          { icon: MapPin, label: "Saved addresses", value: String(addressCount) },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl border border-border bg-white p-5 shadow-sm"
-          >
-            <stat.icon className="size-5 text-bakery-700" />
-            <p className="mt-3 text-2xl font-semibold">{stat.value}</p>
-            <p className="text-sm text-muted-foreground">{stat.label}</p>
+      {/* Personal Information */}
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+        <h2 className="font-heading text-lg font-bold text-foreground">
+          Personal Information
+        </h2>
+        <div className="mt-1 h-px bg-border" />
+
+        <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input id="firstName" {...register("firstName", { required: true })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input id="lastName" {...register("lastName")} />
+            </div>
           </div>
-        ))}
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                {...register("email", { required: true })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Mobile Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={session.phone ?? ""}
+                readOnly
+                disabled
+                className="cursor-not-allowed bg-cream-50 text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">
+                Mobile number cannot be changed
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="sm:flex-1"
+              onClick={resetForm}
+              disabled={formState.isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="bakery"
+              className="sm:flex-1"
+              disabled={formState.isSubmitting}
+            >
+              {formState.isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {formState.isSubmitting ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </form>
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading text-lg font-semibold">Recent orders</h2>
-          <Button variant="outline" size="sm" render={<Link href={routes.account.orders} />}>
-            View all orders
-          </Button>
+      {/* Quick Links */}
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+        <h2 className="font-heading text-lg font-bold text-foreground">Quick Links</h2>
+        <div className="mt-1 h-px bg-border" />
+
+        <div className="mt-4 divide-y divide-border">
+          {quickLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="group flex items-center gap-4 py-4 transition-colors"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-cream-100 text-bakery-700 transition-colors group-hover:bg-bakery-700 group-hover:text-white">
+                <link.icon className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">
+                  {link.label}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {link.description}
+                </span>
+              </span>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-bakery-700" />
+            </Link>
+          ))}
         </div>
-
-        {recentOrders.length === 0 ? (
-          <EmptyState
-            icon={Package}
-            title="No orders yet"
-            description="Browse our cakes and place your first order."
-            action={
-              <Button variant="bakery" render={<Link href={routes.store.collections} />}>
-                Shop cakes
-              </Button>
-            }
-            className="mt-6"
-          />
-        ) : (
-          <div className="mt-4 space-y-3">
-            {recentOrders.map((order) => (
-              <div
-                key={order.id}
-                className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-medium">{order.orderNumber}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(order.placedAt)} · {order.totals.itemCount} items
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <AccountOrderStatusBadge status={order.status} />
-                  <span className="font-semibold">{formatCurrency(order.totals.total)}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
-                  >
-                    Track
-                  </Button>
-                  <Button
-                    variant="bakery"
-                    size="sm"
-                    onClick={() => handleReorder(order.orderNumber)}
-                  >
-                    Reorder
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {recentlyViewed.length > 0 ? (
-        <ProductRailSection
-          title="Recently viewed"
-          description="Cakes you looked at recently."
-          cakes={recentlyViewed}
-        />
-      ) : null}
-
-      {recommended.length > 0 ? (
-        <ProductRailSection
-          title="Recommended for you"
-          description="Popular picks based on your activity."
-          cakes={recommended}
-        />
-      ) : null}
-
-      <div className="rounded-xl border border-border bg-cream-50 p-6">
-        <p className="text-sm text-muted-foreground">Signed in as</p>
-        <p className="mt-1 font-medium">{session.email}</p>
-        {session.phone ? (
-          <p className="text-sm text-muted-foreground">{session.phone}</p>
-        ) : null}
       </div>
     </AccountShell>
   );

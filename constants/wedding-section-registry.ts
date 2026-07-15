@@ -134,24 +134,6 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
     ],
   },
   {
-    type: "wedding-faq",
-    label: "FAQ",
-    icon: "HelpCircle",
-    defaultBackground: "cream",
-    defaultContent: {
-      overline: "Planning Help",
-      title: "Wedding FAQ",
-      description: "Common questions about tasting, delivery, and custom designs.",
-      maxItems: 5,
-    },
-    fields: [
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
-      { key: "maxItems", label: "Max FAQ items", type: "number" },
-    ],
-  },
-  {
     type: "wedding-cta",
     label: "Call to Action",
     icon: "Megaphone",

@@ -72,7 +72,29 @@ export function getHomepageCakes(source: HomepageCakeSource, maxCount = 8): Land
     },
   };
 
-  return sourceMatchers[source]().slice(0, maxCount);
+  const matched = sourceMatchers[source]();
+  if (matched.length >= maxCount) return matched.slice(0, maxCount);
+
+  // Keep grids full even when few cakes carry a given flag — relevant ones first,
+  // then top up from the wider catalogue so a section never shows a lone card.
+  const seen = new Set(matched.map((cake) => cake.slug));
+  const extras = all.filter((cake) => !seen.has(cake.slug));
+
+  // Rotate the top-up pool per source so adjacent sections don't repeat the same cakes.
+  const sourceOrder: HomepageCakeSource[] = [
+    "featured",
+    "trending",
+    "best-sellers",
+    "photo-cakes",
+    "eggless",
+    "seasonal",
+  ];
+  const offset = extras.length
+    ? (Math.max(0, sourceOrder.indexOf(source)) * 4) % extras.length
+    : 0;
+  const rotated = [...extras.slice(offset), ...extras.slice(0, offset)];
+
+  return [...matched, ...rotated].slice(0, maxCount);
 }
 
 export function getHomepageCategories(maxCount = 6): LandingCategory[] {

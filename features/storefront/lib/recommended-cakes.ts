@@ -7,15 +7,17 @@ import { getRecentlyViewedSlugs } from "@/features/storefront/lib/recently-viewe
 export function getRecommendedCakes(options?: {
   limit?: number;
   excludeSlug?: string;
+  excludeSlugs?: string[];
 }): LandingCake[] {
   const limit = options?.limit ?? 4;
-  const excludeSlug = options?.excludeSlug;
+  const excluded = new Set(options?.excludeSlugs ?? []);
+  if (options?.excludeSlug) excluded.add(options.excludeSlug);
   const cakesBySlug = new Map(getAllCakes().map((cake) => [cake.slug, cake]));
   const seen = new Set<string>();
   const recommended: LandingCake[] = [];
 
   function pushSlug(slug: string) {
-    if (excludeSlug && slug === excludeSlug) return;
+    if (excluded.has(slug)) return;
     if (seen.has(slug)) return;
     const cake = cakesBySlug.get(slug);
     if (!cake || cake.inStock === false) return;

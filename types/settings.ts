@@ -84,6 +84,8 @@ export interface PaymentMethodSettings {
   cod: boolean;
   upi: boolean;
   card: boolean;
+  /** Online payment via Razorpay (unified UPI/Card/Netbanking/Wallet checkout). */
+  razorpay: boolean;
 }
 
 export interface CommerceSettings {

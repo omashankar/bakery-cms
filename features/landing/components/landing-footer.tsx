@@ -127,18 +127,7 @@ export function LandingFooter() {
           ) : null}
         </div>
 
-        {footerSettings.showMap ? (
-          <div className="mt-10 aspect-video overflow-hidden rounded-xl border border-border bg-white sm:aspect-[21/9]">
-            <iframe
-              title="Bakery location map"
-              src={contactInfo.mapEmbedUrl}
-              className="h-full w-full border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-            />
-          </div>
-        ) : null}
+        {/* Location map intentionally omitted here — it lives on the Contact page. */}
 
         <Separator className="my-8" />
 

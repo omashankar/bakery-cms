@@ -64,8 +64,19 @@ export function OrderSummaryPanel({
 
       <ul className="mt-4 space-y-3 border-b border-border pb-4">
         {items.map((item) => (
-          <li key={item.id} className="flex justify-between gap-3 text-sm">
-            <div className="min-w-0">
+          <li key={item.id} className="flex items-center gap-3 text-sm">
+            <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-white">
+              {item.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="size-full object-cover"
+                  loading="lazy"
+                />
+              ) : null}
+            </span>
+            <div className="min-w-0 flex-1">
               <p className="truncate font-medium">
                 {item.quantity} × {item.name}
               </p>
