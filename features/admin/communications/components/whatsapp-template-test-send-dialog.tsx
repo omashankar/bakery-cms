@@ -79,6 +79,7 @@ export function WhatsAppTemplateTestSendDialog({
             <Label htmlFor="test-wa-phone">Send to</Label>
             <Input
               id="test-wa-phone"
+              type="tel"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               placeholder="+91 98765 43210"

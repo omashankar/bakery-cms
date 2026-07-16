@@ -390,7 +390,7 @@ export function InvoicesAdminPage() {
                           <td className="px-4 py-3 font-semibold">
                             {formatCurrency(order.totals.total)}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                             {formatRelativeTime(order.placedAt)}
                           </td>
                           <td className="px-4 py-3">

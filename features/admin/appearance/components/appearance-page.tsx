@@ -292,6 +292,7 @@ export function AppearancePage() {
                           value={settings[field.key]}
                           onChange={(e) => updateColor(field.key, e.target.value)}
                           className="font-mono text-xs uppercase"
+                          aria-label={`${field.label} hex value`}
                           aria-invalid={!valid}
                         />
                       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,14 @@ export function DashboardRevenueChart({ range }: DashboardRevenueChartProps) {
   const latest = trend[trend.length - 1];
   const hasData = trend.some((item) => item.revenue > 0 || item.orders > 0);
 
+  // The bar grid is wider than the card at every breakpoint, so it scrolls.
+  // Start at the right — the latest day matters most on a trend chart.
+  const trendScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = trendScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [trend]);
+
   return (
     <Card className="flex h-full flex-col shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -48,7 +56,10 @@ export function DashboardRevenueChart({ range }: DashboardRevenueChartProps) {
         </Button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col space-y-3 pt-0">
-        <div className="overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4">
+        <div
+          ref={trendScrollRef}
+          className="overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
+        >
           {!hasData ? (
             <div className="flex h-36 items-center justify-center sm:h-44">
               <p className="text-sm text-muted-foreground">No sales data yet</p>

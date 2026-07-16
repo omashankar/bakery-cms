@@ -132,8 +132,9 @@ export function SocialSettingsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Platform</Label>
+                  <Label htmlFor={`platform-${link.id}`}>Platform</Label>
                   <AdminSelect
+                    id={`platform-${link.id}`}
                     value={link.platform}
                     onChange={(e) => updateLink(link.id, { platform: e.target.value })}
                   >
@@ -145,16 +146,18 @@ export function SocialSettingsPage() {
                   </AdminSelect>
                 </div>
                 <div className="space-y-2">
-                  <Label>Label</Label>
+                  <Label htmlFor={`label-${link.id}`}>Label</Label>
                   <Input
+                    id={`label-${link.id}`}
                     value={link.label}
                     onChange={(e) => updateLink(link.id, { label: e.target.value })}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>URL</Label>
+                <Label htmlFor={`url-${link.id}`}>URL</Label>
                 <Input
+                  id={`url-${link.id}`}
                   value={link.href}
                   onChange={(e) => updateLink(link.id, { href: e.target.value })}
                   placeholder="https://"

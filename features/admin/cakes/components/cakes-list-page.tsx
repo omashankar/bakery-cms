@@ -497,7 +497,7 @@ export function CakesListPage() {
                         {formatStatusLabel(cake.status)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatRelativeTime(cake.updatedAt)}
                     </td>
                     <td className="px-4 py-3">

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -60,7 +61,7 @@ export function CouponFormDialog({
     [editingId, open]
   );
 
-  const { register, handleSubmit, reset, watch, formState } = useForm<CouponFormValues>({
+  const { register, control, handleSubmit, reset, watch, formState } = useForm<CouponFormValues>({
     defaultValues: emptyValues,
   });
 
@@ -174,10 +175,19 @@ export function CouponFormDialog({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register("isActive")} />
-            Active on storefront
-          </label>
+          <Controller
+            control={control}
+            name="isActive"
+            render={({ field }) => (
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+                Active on storefront
+              </label>
+            )}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

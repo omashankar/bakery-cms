@@ -90,7 +90,7 @@ function TemplateRow({ template }: { template: NotificationTemplate }) {
                 "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50",
                 active
                   ? "border-bakery-700 bg-cream-50 text-bakery-700"
-                  : "border-border bg-white text-muted-foreground hover:bg-cream-50"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
               )}
             >
               {CHANNEL_LABELS[channel]}

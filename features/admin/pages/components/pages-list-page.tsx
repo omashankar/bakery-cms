@@ -204,10 +204,16 @@ export function PagesListPage() {
       <AdminPageHeader
         title="Pages"
         description="Manage CMS pages and templates."
+        className="gap-3"
         actions={
-          <Button variant="bakery" render={<Link href={routes.admin.pages.add} />}>
+          <Button
+            variant="bakery"
+            className="w-full sm:w-auto"
+            render={<Link href={routes.admin.pages.add} />}
+          >
             <Plus className="size-4" />
-            Add Page
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add Page</span>
           </Button>
         }
       />
@@ -427,7 +433,7 @@ export function PagesListPage() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(item.updatedAt)}
                       </td>
                       <td className="px-4 py-3">

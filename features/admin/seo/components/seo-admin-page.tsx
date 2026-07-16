@@ -549,6 +549,7 @@ export function SeoAdminPage() {
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:w-auto">
                   <AdminSelect
                     value={filters.status}
+                    aria-label="SEO status"
                     onChange={(e) =>
                       updateFilters({
                         status: e.target.value as SeoRouteListFilters["status"],
@@ -562,6 +563,7 @@ export function SeoAdminPage() {
                   </AdminSelect>
                   <AdminSelect
                     value={filters.sort}
+                    aria-label="Sort order"
                     onChange={(e) =>
                       updateFilters({
                         sort: e.target.value as SeoRouteListFilters["sort"],
@@ -652,7 +654,7 @@ export function SeoAdminPage() {
                                     : "Indexable"}
                               </Badge>
                             </td>
-                            <td className="px-4 py-3 text-muted-foreground">
+                            <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                               {formatRelativeTime(entry.updatedAt)}
                             </td>
                             <td className="px-4 py-3">

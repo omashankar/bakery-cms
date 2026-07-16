@@ -139,7 +139,7 @@ export const routes = {
       emails: "/admin/commerce/emails",
       whatsapp: "/admin/commerce/whatsapp",
       invoices: "/admin/commerce/invoices",
-      refunds: "/admin/commerce/refunds",
+      refunds: "/admin/commerce/payments/refunds",
     },
 
     orders: {

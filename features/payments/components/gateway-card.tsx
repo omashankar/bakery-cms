@@ -43,7 +43,7 @@ export function GatewayCard({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-colors",
+        "flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-colors",
         runtime.enabled ? "border-bakery-700/40" : "border-border"
       )}
     >
@@ -95,7 +95,7 @@ export function GatewayCard({
                   "px-2.5 py-1 font-medium capitalize transition-colors",
                   runtime.mode === mode
                     ? "bg-bakery-700 text-white"
-                    : "bg-white text-muted-foreground hover:bg-cream-100"
+                    : "bg-card text-muted-foreground hover:bg-muted"
                 )}
               >
                 {mode}
@@ -109,28 +109,33 @@ export function GatewayCard({
         {config.supportedCurrencies.slice(0, 4).map((cur) => (
           <span
             key={cur}
-            className="rounded-md border border-border bg-white px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+            className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
           >
             {cur}
           </span>
         ))}
-        <span className="rounded-md border border-border bg-white px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
           {config.supportedCountries.slice(0, 3).join(" · ")}
         </span>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-        <span className="text-xs text-muted-foreground">
-          Priority {runtime.priority} · {config.processingTime}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          render={<Link href={routes.admin.commerce.gateway(config.id)} />}
-        >
-          <Settings2 className="size-4" />
-          Configure
-        </Button>
+      {/* mt-auto pins the footer to the bottom of the stretched card so the
+          Configure row lines up across every card in a grid row. */}
+      <div className="mt-auto pt-4">
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+          <span className="text-xs text-muted-foreground">
+            Priority {runtime.priority} · {config.processingTime}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            render={<Link href={routes.admin.commerce.gateway(config.id)} />}
+          >
+            <Settings2 className="size-4" />
+            Configure
+          </Button>
+        </div>
       </div>
     </div>
   );

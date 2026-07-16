@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -168,11 +169,10 @@ export function ReviewFormDialog({
               onChange={(event) => setBody(event.target.value)}
             />
           </div>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm sm:col-span-2">
+            <Checkbox
               checked={isFeatured}
-              onChange={(event) => setIsFeatured(event.target.checked)}
+              onCheckedChange={(checked) => setIsFeatured(checked === true)}
             />
             Feature this review on the product page
           </label>

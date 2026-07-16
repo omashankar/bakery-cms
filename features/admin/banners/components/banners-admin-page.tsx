@@ -223,15 +223,25 @@ export function BannersAdminPage() {
       <AdminPageHeader
         title="Banners"
         description="Manage promotional banners and hero slides"
+        className="gap-3"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setResetOpen(true)}>
+          <div className="flex w-full gap-2">
+            <Button
+              variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
+              onClick={() => setResetOpen(true)}
+            >
               <RotateCcw className="size-4" />
               Reset
             </Button>
-            <Button variant="bakery" onClick={openCreate}>
+            <Button
+              variant="bakery"
+              className="min-w-0 flex-1 sm:flex-none"
+              onClick={openCreate}
+            >
               <Plus className="size-4" />
-              Add banner
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add banner</span>
             </Button>
           </div>
         }
@@ -497,7 +507,7 @@ export function BannersAdminPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{banner.priority}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                           {formatRelativeTime(banner.updatedAt)}
                         </td>
                         <td className="px-4 py-3">

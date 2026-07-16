@@ -234,7 +234,7 @@ export function TransactionsPage() {
                         <td className="px-4 py-3">
                           <PaymentStatusBadge status={t.status} />
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                           {formatRelativeTime(t.createdAt)}
                         </td>
                       </tr>

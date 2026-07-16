@@ -360,7 +360,7 @@ export function InventoryAdminPage() {
                           {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(item.updatedAt)}
                       </td>
                       <td className="px-4 py-3">

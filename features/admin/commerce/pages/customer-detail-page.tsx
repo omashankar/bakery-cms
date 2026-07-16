@@ -132,15 +132,20 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         title={profile.name}
         description={`${profile.orderCount} order${profile.orderCount === 1 ? "" : "s"} · ${formatCurrency(profile.totalSpent)} lifetime`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full gap-2">
             <Button
               variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
               render={<Link href={routes.admin.orders.detail(orders[0]!.id)} />}
               disabled={orders.length === 0}
             >
               Latest order
             </Button>
-            <Button variant="outline" render={<Link href={routes.admin.customers.list} />}>
+            <Button
+              variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
+              render={<Link href={routes.admin.customers.list} />}
+            >
               <ArrowLeft className="size-4" />
               All customers
             </Button>

@@ -106,7 +106,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
                           "px-3 py-1.5 font-medium capitalize transition-colors",
                           mode === m
                             ? "bg-bakery-700 text-white"
-                            : "bg-white text-muted-foreground hover:bg-cream-100"
+                            : "bg-card text-muted-foreground hover:bg-muted"
                         )}
                       >
                         {m} mode

@@ -69,16 +69,16 @@ export function CouponsAdminPage() {
       : "Manage discount codes used at storefront checkout.";
 
   return (
-    <AdminPage>
+    <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Coupons"
         description={description}
+        className="gap-3"
         actions={
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <div className="flex w-full gap-2">
             <Button
               variant="outline"
-              size="sm"
-              className="w-full sm:w-auto sm:size-default"
+              className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
                 resetCoupons();
                 refresh();
@@ -91,15 +91,15 @@ export function CouponsAdminPage() {
             </Button>
             <Button
               variant="bakery"
-              size="sm"
-              className="w-full sm:w-auto sm:size-default"
+              className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
                 setEditingId(null);
                 setFormOpen(true);
               }}
             >
               <Plus className="size-4" />
-              Add coupon
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add coupon</span>
             </Button>
           </div>
         }

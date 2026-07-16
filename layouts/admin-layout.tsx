@@ -26,14 +26,10 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
     pathname === routes.admin.builders.homepage ||
     pathname === routes.admin.builders.wedding;
   const mobileNavId = useId();
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  // Must match the server render. The persisted preference is applied after
+  // mount (below) — reading localStorage during the first render would disagree
+  // with the server HTML and force React to discard the whole tree.
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -60,6 +56,11 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   }, []);
 
   useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
+    } catch {
+      // ignore storage errors
+    }
     setHydrated(true);
   }, []);
 
@@ -141,7 +142,10 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
     >
       <aside
         className={cn(
-          "hidden min-h-0 shrink-0 overflow-hidden border-r transition-[width] duration-200 ease-out lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col print:hidden",
+          "hidden min-h-0 shrink-0 overflow-hidden border-r lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col print:hidden",
+          // Only animate user-driven toggles — restoring the saved state on load
+          // should snap, not play a collapse animation on every page view.
+          hydrated && "transition-[width] duration-200 ease-out",
           adminShell.border,
           adminShell.sidebarBg,
           collapsed ? adminShell.sidebarCollapsedWidth : adminShell.sidebarWidth

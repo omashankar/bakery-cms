@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -127,6 +127,14 @@ export function ReportsPage() {
     () => (mounted ? getRevenueTrend(orders, range) : []),
     [orders, range, mounted]
   );
+
+  // The bar grid is wider than the card at every breakpoint, so it scrolls.
+  // Start at the right — the latest day matters most on a trend chart.
+  const trendScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = trendScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [trend]);
   const statusBreakdown = useMemo(
     () => (mounted ? getStatusBreakdown(filteredOrders) : []),
     [filteredOrders, mounted]
@@ -247,21 +255,28 @@ export function ReportsPage() {
               <CardTitle className="text-base">Revenue trend</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-0">
-              <div className="flex flex-1 flex-col overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4">
+              <div
+                ref={trendScrollRef}
+                className="flex flex-1 flex-col overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
+              >
                 {!hasTrendData ? (
                   <div className="flex flex-1 items-center justify-center py-10">
                     <p className="text-sm text-muted-foreground">No sales data yet</p>
                   </div>
                 ) : (
                   <div
-                    className="grid h-36 gap-1 sm:h-44 sm:gap-1.5"
+                    className="grid h-36 gap-1 border-b border-border/70 sm:h-44 sm:gap-1.5"
                     style={{
                       gridTemplateColumns: `repeat(${Math.max(trend.length, 1)}, minmax(${trend.length > 14 ? "18px" : "0"}, 1fr))`,
                       minWidth: trend.length > 14 ? `${trend.length * 22}px` : undefined,
                     }}
                   >
                     {trend.map((item, index) => {
-                      const height = Math.max(8, Math.round((item.revenue / maxRevenue) * 100));
+                      const hasRevenue = item.revenue > 0;
+                      // Leave headroom at 92% so the tallest bar doesn't touch the top.
+                      const height = hasRevenue
+                        ? Math.max(12, Math.round((item.revenue / maxRevenue) * 92))
+                        : 3;
                       const isLatest = index === trend.length - 1;
                       const showLabel =
                         trend.length <= 8 ||
@@ -276,10 +291,11 @@ export function ReportsPage() {
                         >
                           <div className="flex h-full w-full items-end">
                             <div
-                              className="w-full rounded-sm bg-gold-200 data-[active=true]:bg-gold-500"
+                              className="w-full rounded-t-sm bg-gold-300 transition-colors hover:bg-gold-400 data-[active=true]:bg-bakery-500 data-[empty=true]:bg-border"
                               data-active={isLatest}
+                              data-empty={!hasRevenue}
                               style={{ height: `${height}%` }}
-                              title={`${item.label}: ${formatCurrency(item.revenue)} · ${item.orders} orders`}
+                              title={`${item.label}: ${formatCurrency(item.revenue)} · ${item.orders} ${item.orders === 1 ? "order" : "orders"}`}
                             />
                           </div>
                           {showLabel ? (
@@ -553,7 +569,7 @@ export function ReportsPage() {
                           <td className="py-2.5 pr-3 text-xs capitalize text-muted-foreground">
                             {order.paymentMethod}
                           </td>
-                          <td className="py-2.5 pr-3 text-muted-foreground">
+                          <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground">
                             {formatRelativeTime(order.placedAt)}
                           </td>
                           <td className="py-2.5 text-right font-semibold">

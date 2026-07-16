@@ -42,6 +42,11 @@ export function MaintenanceSettingsPage() {
     .map((ip) => ip.trim())
     .filter(Boolean).length;
 
+  // The banner and status line describe the LIVE storefront, so they must read the
+  // saved value — the unsaved toggle hasn't taken the store down (or brought it back) yet.
+  const liveEnabled = savedSettings.isEnabled;
+  const togglePending = settings.isEnabled !== savedSettings.isEnabled;
+
   function handleSave() {
     const allowedIps = allowedIpsInput
       .split(",")
@@ -76,7 +81,7 @@ export function MaintenanceSettingsPage() {
       title="Maintenance"
       description={
         mounted
-          ? `${settings.isEnabled ? "Enabled" : "Disabled"} · ${allowedIpCount} allowed IP${allowedIpCount === 1 ? "" : "s"}`
+          ? `${liveEnabled ? "Enabled" : "Disabled"} · ${allowedIpCount} allowed IP${allowedIpCount === 1 ? "" : "s"}`
           : "Show a maintenance notice on the public storefront while you make updates."
       }
       isDirty={isDirty}
@@ -85,13 +90,13 @@ export function MaintenanceSettingsPage() {
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
-      {settings.isEnabled ? (
+      {liveEnabled ? (
         <div className="flex gap-3 rounded-xl border border-amber-200/80 bg-amber-50 p-4 text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
             <p className="font-medium">Maintenance mode is active</p>
             <p className="text-sm text-amber-800 dark:text-amber-200/90">
-              Visitors will see the maintenance banner on the storefront. Allowed IPs can still
+              Visitors see the maintenance banner on the storefront. Allowed IPs can still
               browse normally in a future backend integration.
             </p>
           </div>
@@ -118,6 +123,13 @@ export function MaintenanceSettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {togglePending ? (
+            <p className="text-xs text-muted-foreground">
+              {settings.isEnabled
+                ? "Not applied yet — save changes to take the storefront offline."
+                : "Not applied yet — save changes to bring the storefront back online."}
+            </p>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="message">Visitor message</Label>
             <textarea

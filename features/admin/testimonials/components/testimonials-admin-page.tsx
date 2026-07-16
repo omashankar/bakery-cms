@@ -189,10 +189,12 @@ export function TestimonialsAdminPage() {
       <AdminPageHeader
         title="Testimonials"
         description="Manage customer reviews for the storefront."
+        className="gap-3"
         actions={
-          <Button variant="bakery" onClick={openCreate}>
+          <Button variant="bakery" className="w-full sm:w-auto" onClick={openCreate}>
             <Plus className="size-4" />
-            Add Testimonial
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add Testimonial</span>
           </Button>
         }
       />
@@ -447,7 +449,7 @@ export function TestimonialsAdminPage() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(item.updatedAt)}
                       </td>
                       <td className="px-4 py-3">
