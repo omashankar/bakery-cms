@@ -44,6 +44,9 @@ export function InvoiceDocument({
   return (
     <article
       className={cn(
+        // The invoice is white paper, but every text/border below uses theme tokens.
+        // Without this light island they inherit html.dark and render near-white on white.
+        "storefront-light",
         "mx-auto max-w-3xl bg-white text-sm text-foreground",
         variant === "screen" && "rounded-xl border border-border shadow-sm",
         variant === "print" && "invoice-print-document p-0 sm:p-0",

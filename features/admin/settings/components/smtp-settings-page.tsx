@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export function SmtpSettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<SmtpSettings>(defaultSmtpSettings);
   const [savedSettings, setSavedSettings] = useState<SmtpSettings>(defaultSmtpSettings);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const loaded = getSmtpSettings();
@@ -30,9 +32,12 @@ export function SmtpSettingsPage() {
   }, []);
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
-  const hostSet = Boolean(settings.host.trim());
+
+  // The header status line describes what outbound email actually does, so it reads the
+  // saved values — an unsaved toggle hasn't changed live behaviour yet.
+  const hostSet = Boolean(savedSettings.host.trim());
   const encryptionLabel =
-    settings.encryption === "none" ? "None" : settings.encryption.toUpperCase();
+    savedSettings.encryption === "none" ? "None" : savedSettings.encryption.toUpperCase();
 
   function handleSave() {
     const saved = saveSmtpSettings(settings);
@@ -66,7 +71,7 @@ export function SmtpSettingsPage() {
       title="SMTP"
       description={
         mounted
-          ? `${settings.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${settings.host}` : ""}`
+          ? `${savedSettings.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${savedSettings.host}` : ""}`
           : "Configure outbound email for inquiry notifications and newsletters."
       }
       isDirty={isDirty}
@@ -125,17 +130,32 @@ export function SmtpSettingsPage() {
               id="username"
               value={settings.username}
               onChange={(e) => setSettings((prev) => ({ ...prev, username: e.target.value }))}
+              autoComplete="off"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={settings.password}
-              onChange={(e) => setSettings((prev) => ({ ...prev, password: e.target.value }))}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={settings.password}
+                onChange={(e) => setSettings((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="••••••••"
+                // new-password is the reliable signal that stops the browser autofilling
+                // the admin's own saved login password into the SMTP field.
+                autoComplete="new-password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromEmail">From email</Label>

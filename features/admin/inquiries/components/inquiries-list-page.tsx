@@ -289,7 +289,7 @@ export function InquiriesListPage({
         </FilterPanelToolbar>
       </FilterPanel>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,24rem)]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,20rem)]">
         <div className="min-w-0 space-y-4">
           {filtered.length === 0 ? (
             <EmptyState
@@ -320,7 +320,7 @@ export function InquiriesListPage({
                 ) : null}
 
                 <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="w-full min-w-[600px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">
                         <th className="px-4 py-3 font-medium">
@@ -380,7 +380,7 @@ export function InquiriesListPage({
                           <td className="px-4 py-3">
                             <InquiryStatusBadge status={inquiry.status} />
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                             <span title={formatDate(inquiry.createdAt)}>
                               {formatRelativeTime(inquiry.createdAt)}
                             </span>

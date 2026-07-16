@@ -10,8 +10,9 @@ import {
   getInventoryOverview,
   INVENTORY_UPDATED_EVENT,
 } from "@/features/admin/commerce/lib/inventory-repository";
+import type { InventoryOverview } from "@/types/inventory";
 
-const EMPTY_INVENTORY_OVERVIEW = {
+const EMPTY_INVENTORY_OVERVIEW: InventoryOverview = {
   totalSkus: 0,
   inStock: 0,
   lowStock: 0,
@@ -19,7 +20,7 @@ const EMPTY_INVENTORY_OVERVIEW = {
   unlimited: 0,
   alertCount: 0,
   totalUnits: 0,
-} as const;
+};
 
 export function DashboardInventoryWidget() {
   const [overview, setOverview] = useState(EMPTY_INVENTORY_OVERVIEW);

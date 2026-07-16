@@ -8,6 +8,8 @@ export interface AdminBreadcrumb {
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  profile: "My Profile",
+  password: "Change Password",
   cakes: "Cakes",
   add: "Add Cake",
   edit: "Edit Cake",
@@ -102,10 +104,10 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
     if (part === "dashboard") continue;
 
     href += `/${part}`;
-    // "commerce" and "builders" are legacy URL groups — they are NOT sidebar sections
-    // in the current IA, so they never render as crumbs (Settings is injected above
-    // for the config pages that need it).
-    if (part === "commerce" || part === "builders") continue;
+    // "commerce" and "builders" are legacy URL groups (/admin/commerce/*, /admin/builders/*)
+    // — they are NOT sidebar sections, so they never render as crumbs. Only skip the
+    // top-level group segment: "/admin/settings/commerce" has a real "Commerce" page.
+    if ((part === "commerce" || part === "builders") && parts[i - 1] === "admin") continue;
     const prev = parts[i - 1];
     const next = parts[i + 1];
 

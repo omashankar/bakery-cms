@@ -53,6 +53,11 @@ export function TaxesAdminPage() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
+  // The banner and status line describe what checkout actually charges, so they read
+  // the saved value — an unsaved toggle hasn't changed any customer's total yet.
+  const liveTaxEnabled = savedSettings.taxEnabled;
+  const taxTogglePending = settings.taxEnabled !== savedSettings.taxEnabled;
+
   const previewTotals = useMemo(
     () =>
       calculateCartTotals({
@@ -92,10 +97,10 @@ export function TaxesAdminPage() {
       <AdminPageHeader
         title="Taxes"
         description={
-          settings.taxEnabled
-            ? `${settings.taxLabel} · ${formatTaxRatePercent(settings.taxRate)}${
-                settings.platformChargeEnabled
-                  ? ` · ${settings.platformChargeLabel} ${formatCurrency(settings.platformChargeAmount)}`
+          liveTaxEnabled
+            ? `${savedSettings.taxLabel} · ${formatTaxRatePercent(savedSettings.taxRate)}${
+                savedSettings.platformChargeEnabled
+                  ? ` · ${savedSettings.platformChargeLabel} ${formatCurrency(savedSettings.platformChargeAmount)}`
                   : ""
               }`
             : "Tax disabled at checkout"
@@ -120,9 +125,9 @@ export function TaxesAdminPage() {
         }
       />
 
-      {!settings.taxEnabled ? (
+      {!liveTaxEnabled ? (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
-          Tax is off. Checkout, invoices, and order summaries will not show a tax line until you
+          Tax is off. Checkout, invoices, and order summaries do not show a tax line until you
           enable it below.
         </div>
       ) : null}
@@ -152,6 +157,14 @@ export function TaxesAdminPage() {
                   }
                 />
               </label>
+
+              {taxTogglePending ? (
+                <p className="text-xs text-muted-foreground">
+                  {settings.taxEnabled
+                    ? "Not applied yet — save to start charging tax at checkout."
+                    : "Not applied yet — save to stop charging tax at checkout."}
+                </p>
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

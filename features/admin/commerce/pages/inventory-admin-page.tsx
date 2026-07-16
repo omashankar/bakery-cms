@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  Infinity as InfinityIcon,
   Package,
   PackageX,
   Pencil,
@@ -131,7 +132,7 @@ export function InventoryAdminPage() {
         className="gap-3"
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -176,7 +177,7 @@ export function InventoryAdminPage() {
         </button>
       </section>
 
-      <div className="grid items-stretch gap-4 xl:grid-cols-2">
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <Card className="flex h-full flex-col shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Settings</CardTitle>
@@ -220,7 +221,7 @@ export function InventoryAdminPage() {
           </CardContent>
         </Card>
 
-        <Card className="flex h-full flex-col shadow-sm xl:max-h-[22rem]">
+        <Card className="flex h-full flex-col shadow-sm lg:max-h-[22rem]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent history</CardTitle>
           </CardHeader>
@@ -359,7 +360,7 @@ export function InventoryAdminPage() {
                           {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(item.updatedAt)}
                       </td>
                       <td className="px-4 py-3">
@@ -374,16 +375,28 @@ export function InventoryAdminPage() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant={item.unlimitedStock ? "bakery" : "outline"}
                             className="h-8"
                             onClick={() => handleToggleUnlimited(item)}
+                            aria-label={
+                              item.unlimitedStock
+                                ? "Unlimited stock on — click to set a limit"
+                                : "Enable unlimited stock"
+                            }
+                            title={
+                              item.unlimitedStock
+                                ? "Unlimited stock on — click to set a limit"
+                                : "Enable unlimited stock"
+                            }
                           >
-                            {item.unlimitedStock ? "Limited" : "∞"}
+                            <InfinityIcon className="size-3.5" />
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-8"
+                            aria-label="Edit product"
+                            title="Edit product"
                             render={<Link href={routes.admin.cakes.edit(item.cakeId)} />}
                           >
                             <Pencil className="size-3.5" />
@@ -436,16 +449,24 @@ export function InventoryAdminPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant={item.unlimitedStock ? "bakery" : "outline"}
                           className="h-8 flex-1"
                           onClick={() => handleToggleUnlimited(item)}
+                          aria-label={
+                            item.unlimitedStock
+                              ? "Unlimited stock on — click to set a limit"
+                              : "Enable unlimited stock"
+                          }
                         >
-                          {item.unlimitedStock ? "Limited" : "∞"}
+                          <InfinityIcon className="size-3.5" />
+                          Unlimited
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-8"
+                          aria-label="Edit product"
+                          title="Edit product"
                           render={<Link href={routes.admin.cakes.edit(item.cakeId)} />}
                         >
                           <Pencil className="size-3.5" />

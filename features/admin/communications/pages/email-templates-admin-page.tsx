@@ -344,7 +344,8 @@ export function EmailTemplatesAdminPage() {
       </FilterPanel>
 
       <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
-        <Card className="shadow-sm xl:col-span-4">
+        {/* Keep the template list in view while scrolling the long editor + preview. */}
+        <Card className="shadow-sm xl:sticky xl:top-24 xl:col-span-4 xl:self-start">
           <CardHeader>
             <CardTitle className="text-base">Templates</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">

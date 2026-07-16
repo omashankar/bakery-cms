@@ -363,7 +363,7 @@ export function WeddingBuilderPage() {
 
       <div
         className={cn(
-          "shrink-0 border-b border-border bg-card py-2 lg:hidden",
+          "shrink-0 border-b border-border bg-card py-2 xl:hidden",
           adminShell.contentWrap
         )}
       >
@@ -384,11 +384,11 @@ export function WeddingBuilderPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)_260px] xl:grid-cols-[260px_minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 flex-1 overflow-hidden xl:grid-cols-[260px_minmax(0,1fr)_300px]">
         <aside
           className={cn(
             "min-h-0 overflow-hidden border-r border-border bg-card",
-            mobilePanel === "sections" ? "flex flex-col" : "hidden lg:flex lg:flex-col"
+            mobilePanel === "sections" ? "flex flex-col" : "hidden xl:flex xl:flex-col"
           )}
         >
           <SectionListPanel
@@ -444,7 +444,7 @@ export function WeddingBuilderPage() {
         <main
           className={cn(
             "min-h-0 overflow-hidden bg-muted",
-            mobilePanel === "preview" ? "flex flex-col" : "hidden lg:flex lg:flex-col"
+            mobilePanel === "preview" ? "flex flex-col" : "hidden xl:flex xl:flex-col"
           )}
         >
           <BuilderPreviewPanel
@@ -469,7 +469,7 @@ export function WeddingBuilderPage() {
         <aside
           className={cn(
             "min-h-0 overflow-hidden border-l border-border bg-card",
-            mobilePanel === "editor" ? "flex flex-col" : "hidden lg:flex lg:flex-col"
+            mobilePanel === "editor" ? "flex flex-col" : "hidden xl:flex xl:flex-col"
           )}
         >
           <SectionEditorPanel

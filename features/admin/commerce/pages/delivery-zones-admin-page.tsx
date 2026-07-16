@@ -342,7 +342,9 @@ export function DeliveryZonesAdminPage() {
                     </th>
                     <th className="px-4 py-3 font-medium">Zone</th>
                     <th className="px-4 py-3 font-medium">City</th>
-                    <th className="px-4 py-3 font-medium">Pincode</th>
+                    {/* Zones match a full 6-digit pincode or a prefix — say so, or a
+                        short value like "411" reads as broken data next to "400001". */}
+                    <th className="px-4 py-3 font-medium">Pincode / prefix</th>
                     <th className="px-4 py-3 font-medium">Radius</th>
                     <th className="px-4 py-3 font-medium">Charge</th>
                     <th className="px-4 py-3 font-medium">Delivery time</th>
@@ -386,7 +388,7 @@ export function DeliveryZonesAdminPage() {
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(zone.updatedAt)}
                       </td>
                       <td className="px-4 py-3">

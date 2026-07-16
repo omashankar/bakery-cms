@@ -191,10 +191,12 @@ export function FaqAdminPage() {
       <AdminPageHeader
         title="FAQ"
         description="Manage frequently asked questions for the storefront."
+        className="gap-3"
         actions={
-          <Button variant="bakery" onClick={openCreate}>
+          <Button variant="bakery" className="w-full sm:w-auto" onClick={openCreate}>
             <Plus className="size-4" />
-            Add FAQ
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add FAQ</span>
           </Button>
         }
       />
@@ -418,7 +420,7 @@ export function FaqAdminPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{item.sortOrder}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(item.updatedAt)}
                       </td>
                       <td className="px-4 py-3">

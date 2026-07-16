@@ -132,15 +132,20 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         title={profile.name}
         description={`${profile.orderCount} order${profile.orderCount === 1 ? "" : "s"} · ${formatCurrency(profile.totalSpent)} lifetime`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full gap-2">
             <Button
               variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
               render={<Link href={routes.admin.orders.detail(orders[0]!.id)} />}
               disabled={orders.length === 0}
             >
               Latest order
             </Button>
-            <Button variant="outline" render={<Link href={routes.admin.customers.list} />}>
+            <Button
+              variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
+              render={<Link href={routes.admin.customers.list} />}
+            >
               <ArrowLeft className="size-4" />
               All customers
             </Button>
@@ -162,7 +167,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         ))}
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Lifetime value", value: formatCurrency(profile.totalSpent) },
           { label: "Orders", value: String(profile.orderCount) },
@@ -178,7 +183,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         ))}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
         <div className="space-y-6">
           <Card className="shadow-sm">
             <CardHeader>

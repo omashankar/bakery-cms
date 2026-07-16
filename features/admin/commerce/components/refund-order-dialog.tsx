@@ -101,7 +101,7 @@ export function RefundOrderDialog({
                     "rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors " +
                     (refundType === type
                       ? "border-bakery-700 bg-cream-50 text-bakery-700"
-                      : "border-border bg-white text-muted-foreground hover:bg-cream-50")
+                      : "border-border bg-card text-muted-foreground hover:bg-muted")
                   }
                 >
                   {type} refund

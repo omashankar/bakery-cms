@@ -168,9 +168,11 @@ export function CatalogAdminPage() {
       <AdminPageHeader
         title="Catalog"
         description={
-          totalItems > 0
-            ? `${counts[activeTab]} ${activeTabMeta.label.toLowerCase()} · ${totalItems} total`
-            : "Categories, flavours, occasions, and weights"
+          showThemes
+            ? "Cake design themes — coming soon"
+            : totalItems > 0
+              ? `${counts[activeTab]} ${activeTabMeta.label.toLowerCase()} · ${totalItems} total`
+              : "Categories, flavours, occasions, and weights"
         }
         className="gap-3"
         actions={

@@ -80,7 +80,7 @@ export function ContactSettingsPage() {
       title="Contact"
       description={
         mounted
-          ? `${emailSet ? settings.email : "No email"} · ${hoursCount} hour${hoursCount === 1 ? "" : "s"} row${hoursCount === 1 ? "" : "s"}`
+          ? `${emailSet ? settings.email : "No email"} · ${hoursCount} hour row${hoursCount === 1 ? "" : "s"}`
           : "Business contact details shown on the contact page and footer."
       }
       isDirty={isDirty}
@@ -109,6 +109,7 @@ export function ContactSettingsPage() {
               <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
+                type="tel"
                 value={settings.phone}
                 onChange={(e) => setSettings((prev) => ({ ...prev, phone: e.target.value }))}
               />
@@ -150,7 +151,9 @@ export function ContactSettingsPage() {
           <CardContent className="space-y-3">
             {settings.businessHours.map((item, index) => (
               <div
-                key={`${item.day}-${index}`}
+                // Key must not depend on the edited text — a changing key remounts
+                // the row on every keystroke and the input loses focus.
+                key={index}
                 className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[1fr_1fr_auto]"
               >
                 <Input

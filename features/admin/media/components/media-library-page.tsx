@@ -179,9 +179,14 @@ export function MediaLibraryPage() {
       <AdminPageHeader
         title="Media Library"
         description="Upload and organize images for cakes, banners, and builders."
+        className="gap-3"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setToolsOpen(true)}>
+          <div className="flex w-full gap-2">
+            <Button
+              variant="outline"
+              className="min-w-0 flex-1 sm:flex-none"
+              onClick={() => setToolsOpen(true)}
+            >
               <Wrench className="size-4" />
               Tools
               {duplicateGroups.length > 0 ? (
@@ -190,7 +195,11 @@ export function MediaLibraryPage() {
                 </Badge>
               ) : null}
             </Button>
-            <Button variant="bakery" onClick={() => setUploadOpen(true)}>
+            <Button
+              variant="bakery"
+              className="min-w-0 flex-1 sm:flex-none"
+              onClick={() => setUploadOpen(true)}
+            >
               <Upload className="size-4" />
               Upload
             </Button>

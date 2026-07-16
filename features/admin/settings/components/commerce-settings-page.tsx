@@ -32,10 +32,12 @@ export function CommerceSettingsPage() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  const paymentMethodsOn = [
-    settings.paymentMethods.cod,
-    settings.paymentMethods.upi,
-    settings.paymentMethods.card,
+  // The header status line describes what cart/checkout actually use, so it reads the
+  // saved values — the Live preview below intentionally reflects the unsaved draft.
+  const livePaymentMethodsOn = [
+    savedSettings.paymentMethods.cod,
+    savedSettings.paymentMethods.upi,
+    savedSettings.paymentMethods.card,
   ].filter(Boolean).length;
 
   const previewTotals = useMemo(() => {
@@ -81,7 +83,7 @@ export function CommerceSettingsPage() {
       title="Commerce"
       description={
         mounted
-          ? `Delivery ${formatCurrency(settings.deliveryFee)} · free above ${formatCurrency(settings.freeDeliveryThreshold)} · ${paymentMethodsOn} payment method${paymentMethodsOn === 1 ? "" : "s"}`
+          ? `Delivery ${formatCurrency(savedSettings.deliveryFee)} · free above ${formatCurrency(savedSettings.freeDeliveryThreshold)} · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
           : "Shipping, tax, payments, and delivery rules used across cart and checkout."
       }
       isDirty={isDirty}

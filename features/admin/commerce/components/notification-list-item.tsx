@@ -66,7 +66,7 @@ export function NotificationListItem({
     <div
       className={cn(
         "rounded-xl border border-border bg-card p-3 transition-premium sm:p-3.5",
-        !notification.read && "border-border bg-muted",
+        !notification.read && "border-l-[3px] border-l-primary bg-muted",
         notification.href && "hover:border-primary/40"
       )}
     >

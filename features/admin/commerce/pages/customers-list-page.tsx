@@ -125,7 +125,7 @@ export function CustomersListPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -248,7 +248,7 @@ export function CustomersListPage() {
                       <td className="px-4 py-3 font-semibold">
                         {formatCurrency(customer.totalSpent)}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {formatRelativeTime(customer.lastOrderAt)}
                       </td>
                     </tr>

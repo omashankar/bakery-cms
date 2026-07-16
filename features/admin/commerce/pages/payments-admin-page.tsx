@@ -229,20 +229,21 @@ export function PaymentsAdminPage() {
       </section>
 
       {/* Quick links */}
-      <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      {/* Stack on mobile — three across at 390px clips the labels. */}
+      <section className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
         {quickLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            className="group flex items-center justify-between gap-2 rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-bakery-700/40"
+            className="group flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-bakery-700/40"
           >
-            <span className="flex items-center gap-2.5">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-cream-100 text-bakery-700">
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-cream-100 text-bakery-700">
                 <link.icon className="size-4" />
               </span>
-              <span className="text-sm font-medium text-foreground">{link.label}</span>
+              <span className="truncate text-sm font-medium text-foreground">{link.label}</span>
             </span>
-            <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         ))}
       </section>

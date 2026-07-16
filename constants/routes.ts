@@ -62,6 +62,8 @@ export const routes = {
   admin: {
     root: "/admin",
     dashboard: "/admin/dashboard",
+    profile: "/admin/profile",
+    changePassword: "/admin/profile/password",
 
     cakes: {
       list: "/admin/cakes",
@@ -137,7 +139,7 @@ export const routes = {
       emails: "/admin/commerce/emails",
       whatsapp: "/admin/commerce/whatsapp",
       invoices: "/admin/commerce/invoices",
-      refunds: "/admin/commerce/refunds",
+      refunds: "/admin/commerce/payments/refunds",
     },
 
     orders: {

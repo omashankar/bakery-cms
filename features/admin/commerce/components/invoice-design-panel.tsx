@@ -277,6 +277,7 @@ export function InvoiceDesignPanel() {
                   <Label htmlFor="invoice-phone">Phone</Label>
                   <Input
                     id="invoice-phone"
+                    type="tel"
                     value={settings.phone}
                     onChange={(event) => patch({ phone: event.target.value })}
                   />
