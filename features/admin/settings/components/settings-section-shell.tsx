@@ -26,6 +26,10 @@ interface SettingsSectionShellProps {
   mounted?: boolean;
   resetTitle?: string;
   resetDescription?: string;
+  /** Block saving even when dirty — e.g. the section holds invalid input. */
+  saveDisabled?: boolean;
+  /** Override the desktop save label when "Save changes" is ambiguous. */
+  saveLabel?: string;
 }
 
 /** Calm settings chrome: title, status line, Reset / Discard / Save — no KPI farm. */
@@ -41,6 +45,8 @@ export function SettingsSectionShell({
   mounted = true,
   resetTitle = "Reset to defaults?",
   resetDescription = "Replace this section with the demo defaults. Other settings sections are not changed.",
+  saveDisabled = false,
+  saveLabel = "Save changes",
 }: SettingsSectionShellProps) {
   const [resetOpen, setResetOpen] = useState(false);
 
@@ -77,18 +83,18 @@ export function SettingsSectionShell({
               Reset
             </Button>
             {isDirty ? (
-              <Button variant="outline" className="hidden sm:inline-flex" onClick={onDiscard}>
+              <Button variant="outline" className="hidden md:inline-flex" onClick={onDiscard}>
                 Discard
               </Button>
             ) : null}
             <Button
               variant="bakery"
-              className="hidden sm:inline-flex"
+              className="hidden md:inline-flex"
               onClick={onSave}
-              disabled={!isDirty}
+              disabled={!isDirty || saveDisabled}
             >
               <Save className="size-4" />
-              Save changes
+              {saveLabel}
             </Button>
           </div>
         }
@@ -105,7 +111,7 @@ export function SettingsSectionShell({
           <Button variant="outline" className="flex-1" onClick={onDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" className="flex-1" onClick={onSave}>
+          <Button variant="bakery" className="flex-1" onClick={onSave} disabled={saveDisabled}>
             <Save className="size-4" />
             Save
           </Button>

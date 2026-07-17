@@ -34,6 +34,8 @@ interface FilterPanelSearchProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Accessible name. Defaults to the placeholder, which a screen reader cannot rely on. */
+  label?: string;
 }
 
 export function FilterPanelSearch({
@@ -41,15 +43,20 @@ export function FilterPanelSearch({
   onChange,
   placeholder = "Search…",
   className,
+  label,
 }: FilterPanelSearchProps) {
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Search
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+      />
       <Input
         className="pl-9"
         placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        aria-label={label ?? placeholder}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { routes } from "@/constants/routes";
 import { ColorSwatch } from "@/components/design-system/color-swatch";
 import {
   DemoLabel,
@@ -1160,10 +1161,10 @@ export function DesignSystemPage() {
                   and dark. Use this page as the visual source of truth.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Button render={<a href="/admin/dashboard" />}>
+                  <Button render={<a href={routes.admin.dashboard} />}>
                     View Admin
                   </Button>
-                  <Button variant="outline" render={<a href="/" />}>
+                  <Button variant="outline" render={<a href={routes.home} />}>
                     <Home className="size-4" />
                     Home
                   </Button>

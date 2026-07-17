@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Eye, EyeOff, KeyRound, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader } from "@/features/admin/components";
+import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -161,7 +161,7 @@ export function ChangePasswordPage() {
               {mismatch ? (
                 <p className="text-xs text-destructive">Passwords do not match.</p>
               ) : confirm && confirm === next ? (
-                <p className="flex items-center gap-1 text-xs text-green-700">
+                <p className={cn("flex items-center gap-1 text-xs", adminShell.textPositive)}>
                   <Check className="size-3" /> Passwords match
                 </p>
               ) : null}
@@ -189,7 +189,9 @@ export function ChangePasswordPage() {
                   <span
                     className={cn(
                       "flex size-5 shrink-0 items-center justify-center rounded-full",
-                      ok ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
+                      ok
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                        : "bg-muted text-muted-foreground"
                     )}
                   >
                     {ok ? <Check className="size-3" /> : <X className="size-3" />}

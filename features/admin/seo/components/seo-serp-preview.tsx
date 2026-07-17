@@ -27,7 +27,12 @@ export function SeoSerpPreview({ entry, global, noIndex = false }: SeoSerpPrevie
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      {/* Light island — a SERP mockup is always light, never admin dark tokens. */}
+      <div
+        className="storefront-light rounded-xl border border-border bg-background p-4 text-foreground shadow-sm"
+        data-storefront-theme="light"
+        style={{ colorScheme: "light" }}
+      >
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground">Google preview</p>
           {noIndex || !global.allowIndexing ? (

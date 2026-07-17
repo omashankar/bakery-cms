@@ -45,6 +45,23 @@ export function AdminProfilePage() {
     setForm({ fullName: p.fullName, mobile: p.mobile, username: p.username, photoUrl: p.photoUrl });
   }, []);
 
+  const isDirty = profile
+    ? form.fullName !== profile.fullName ||
+      form.mobile !== profile.mobile ||
+      form.username !== profile.username ||
+      form.photoUrl !== profile.photoUrl
+    : false;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
   function resetForm() {
     if (!profile) return;
     setForm({
@@ -63,6 +80,7 @@ export function AdminProfilePage() {
       return;
     }
     const reader = new FileReader();
+    reader.onerror = () => toast.error("Could not read that image");
     reader.onload = () => setForm((f) => ({ ...f, photoUrl: String(reader.result) }));
     reader.readAsDataURL(file);
   }
@@ -74,8 +92,22 @@ export function AdminProfilePage() {
     }
     setSaving(true);
     await new Promise((r) => setTimeout(r, 500));
-    saveAdminProfile(form);
-    setProfile(getAdminProfile());
+
+    if (!saveAdminProfile(form)) {
+      setSaving(false);
+      toast.error("Could not save — the photo may be too large for browser storage");
+      return;
+    }
+
+    // Re-seed the form from the saved profile so trimmed values clear the dirty state.
+    const fresh = getAdminProfile();
+    setProfile(fresh);
+    setForm({
+      fullName: fresh.fullName,
+      mobile: fresh.mobile,
+      username: fresh.username,
+      photoUrl: fresh.photoUrl,
+    });
     setSaving(false);
     toast.success("Profile updated");
   }
@@ -145,7 +177,7 @@ export function AdminProfilePage() {
                 <ShieldCheck className="size-3" />
                 {profile.role}
               </Badge>
-              <Badge className="gap-1 bg-green-100 text-green-800">
+              <Badge variant="success" className="gap-1">
                 <BadgeCheck className="size-3" />
                 {profile.status}
               </Badge>
@@ -189,7 +221,7 @@ export function AdminProfilePage() {
                       value={profile.email}
                       readOnly
                       disabled
-                      className="cursor-not-allowed bg-cream-50 pl-9 text-muted-foreground"
+                      className="cursor-not-allowed bg-muted pl-9 text-muted-foreground"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
@@ -218,10 +250,10 @@ export function AdminProfilePage() {
               </div>
 
               <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
-                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                <Button variant="outline" onClick={resetForm} disabled={saving || !isDirty}>
                   Cancel
                 </Button>
-                <Button variant="bakery" onClick={handleSave} disabled={saving}>
+                <Button variant="bakery" onClick={handleSave} disabled={saving || !isDirty}>
                   {saving ? <Loader2 className="size-4 animate-spin" /> : null}
                   {saving ? "Saving…" : "Save changes"}
                 </Button>

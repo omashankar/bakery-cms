@@ -67,13 +67,6 @@ export interface SmtpSettings {
   enabled: boolean;
 }
 
-export interface SeoSettings {
-  defaultTitle: string;
-  defaultDescription: string;
-  googleAnalyticsId?: string;
-  facebookPixelId?: string;
-}
-
 export interface MaintenanceSettings {
   isEnabled: boolean;
   message: string;

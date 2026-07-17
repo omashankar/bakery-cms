@@ -37,6 +37,11 @@ export function BackupSettingsPage() {
   const [backupLabel, setBackupLabel] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<BackupSnapshot | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BackupSnapshot | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    fileName: string;
+    data: Record<string, string | null>;
+    keyCount: number;
+  } | null>(null);
 
   function refresh() {
     setHistory(loadBackupHistory());
@@ -70,20 +75,48 @@ export function BackupSettingsPage() {
     toast.success(`Exported and archived ${snapshot.keyCount} data keys`);
   }
 
+  /** Parses and validates only — the write happens in confirmImport. */
   function handleImportFile(file: File) {
     const reader = new FileReader();
+    reader.onerror = () => toast.error("Could not read that file");
     reader.onload = () => {
+      let parsed: unknown;
       try {
-        const parsed = JSON.parse(String(reader.result)) as Record<string, string | null>;
-        const count = importLocalStorageBackup(parsed);
-        exportAndArchiveBackup(`Before import — ${new Date().toLocaleString()}`);
-        refresh();
-        toast.success(`Restored ${count} data keys — reload pages to see changes`);
+        parsed = JSON.parse(String(reader.result));
       } catch {
-        toast.error("Invalid backup file");
+        toast.error("Invalid backup file — not valid JSON");
+        return;
       }
+
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        toast.error("Invalid backup file — expected a backup object");
+        return;
+      }
+
+      const data = parsed as Record<string, string | null>;
+      // Mirror importLocalStorageBackup's own filter so the count we show is the count it writes.
+      const keyCount = Object.keys(data).filter(
+        (key) => key.startsWith("bakery-cms") && data[key] !== null
+      ).length;
+
+      if (keyCount === 0) {
+        toast.error("No CMS data found in that file");
+        return;
+      }
+
+      setPendingImport({ fileName: file.name, data, keyCount });
     };
     reader.readAsText(file);
+  }
+
+  function confirmImport() {
+    if (!pendingImport) return;
+    // Snapshot BEFORE the write — afterwards there is nothing left to roll back to.
+    exportAndArchiveBackup(`Before import — ${new Date().toLocaleString()}`);
+    const count = importLocalStorageBackup(pendingImport.data);
+    setPendingImport(null);
+    refresh();
+    toast.success(`Restored ${count} data keys — reload pages to see changes`);
   }
 
   function confirmRestore() {
@@ -189,7 +222,7 @@ export function BackupSettingsPage() {
                       key={snapshot.id}
                       className="flex flex-wrap items-center justify-between gap-3 p-4"
                     >
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium">{snapshot.label}</p>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span>{formatRelativeTime(snapshot.createdAt)}</span>
@@ -212,6 +245,7 @@ export function BackupSettingsPage() {
                           size="sm"
                           variant="ghost"
                           onClick={() => setDeleteTarget(snapshot)}
+                          aria-label={`Delete ${snapshot.label}`}
                         >
                           <Trash2 className="size-4" />
                         </Button>
@@ -243,6 +277,31 @@ export function BackupSettingsPage() {
           </Card>
         </>
       )}
+
+      <Dialog
+        open={Boolean(pendingImport)}
+        onOpenChange={(open) => !open && setPendingImport(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import this backup?</DialogTitle>
+            <DialogDescription>
+              <strong>{pendingImport?.fileName}</strong> contains {pendingImport?.keyCount} CMS
+              data {pendingImport?.keyCount === 1 ? "key" : "keys"}. Importing overwrites the
+              matching keys in this browser. A snapshot of your current data is archived first, so
+              you can roll back from history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setPendingImport(null)}>
+              Cancel
+            </Button>
+            <Button variant="bakery" onClick={confirmImport}>
+              Import backup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(restoreTarget)} onOpenChange={(open) => !open && setRestoreTarget(null)}>
         <DialogContent>

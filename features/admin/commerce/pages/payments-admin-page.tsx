@@ -269,7 +269,7 @@ export function PaymentsAdminPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {gateway?.envLocked ? (
-            <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
               Keys are set via environment variables (<code>.env.local</code>). To change them, edit
               that file and restart the server.
             </div>

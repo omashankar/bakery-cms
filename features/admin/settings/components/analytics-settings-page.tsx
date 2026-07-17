@@ -14,6 +14,13 @@ import {
 } from "../lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
+/** Tracking IDs are machine values — mobile keyboards must not capitalize or correct them. */
+const trackingIdProps = {
+  spellCheck: false,
+  autoCapitalize: "none",
+  autoCorrect: "off",
+} as const;
+
 export function AnalyticsSettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<AnalyticsSettings>(defaultAnalyticsSettings);
@@ -32,10 +39,15 @@ export function AnalyticsSettingsPage() {
     settings.googleTagManagerId,
     settings.facebookPixelId,
     settings.hotjarId,
-  ].filter(Boolean).length;
+  ].filter((id) => id.trim()).length;
 
   function handleSave() {
-    const saved = saveAnalyticsSettings(settings);
+    const saved = saveAnalyticsSettings({
+      googleAnalyticsId: settings.googleAnalyticsId.trim(),
+      googleTagManagerId: settings.googleTagManagerId.trim(),
+      facebookPixelId: settings.facebookPixelId.trim(),
+      hotjarId: settings.hotjarId.trim(),
+    });
     setSavedSettings(saved);
     setSettings(saved);
     toast.success("Analytics settings saved");
@@ -84,6 +96,7 @@ export function AnalyticsSettingsPage() {
                 setSettings((prev) => ({ ...prev, googleAnalyticsId: e.target.value }))
               }
               placeholder="G-XXXXXXXXXX"
+              {...trackingIdProps}
             />
           </div>
           <div className="space-y-2">
@@ -95,6 +108,7 @@ export function AnalyticsSettingsPage() {
                 setSettings((prev) => ({ ...prev, googleTagManagerId: e.target.value }))
               }
               placeholder="GTM-XXXXXXX"
+              {...trackingIdProps}
             />
           </div>
           <div className="space-y-2">
@@ -106,6 +120,8 @@ export function AnalyticsSettingsPage() {
                 setSettings((prev) => ({ ...prev, facebookPixelId: e.target.value }))
               }
               placeholder="1234567890"
+              inputMode="numeric"
+              {...trackingIdProps}
             />
           </div>
           <div className="space-y-2">
@@ -115,6 +131,8 @@ export function AnalyticsSettingsPage() {
               value={settings.hotjarId}
               onChange={(e) => setSettings((prev) => ({ ...prev, hotjarId: e.target.value }))}
               placeholder="1234567"
+              inputMode="numeric"
+              {...trackingIdProps}
             />
           </div>
         </CardContent>

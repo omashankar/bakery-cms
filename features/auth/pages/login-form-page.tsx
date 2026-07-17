@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
@@ -80,23 +80,29 @@ export function LoginFormPage() {
           <Label htmlFor="email" className="text-[13px] font-semibold text-foreground">
             Email
           </Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            placeholder="you@bakery.com"
-            className={fieldClass}
-            aria-invalid={!!formState.errors.email}
-            aria-describedby={formState.errors.email ? "email-error" : undefined}
-            {...register("email", {
-              required: "Email is required",
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: "Enter a valid email address",
-              },
-            })}
-          />
+          <div className="relative">
+            <Mail
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              placeholder="you@bakery.com"
+              className={cn(fieldClass, "pl-11")}
+              aria-invalid={!!formState.errors.email}
+              aria-describedby={formState.errors.email ? "email-error" : undefined}
+              {...register("email", {
+                required: "Email is required",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Enter a valid email address",
+                },
+              })}
+            />
+          </div>
           {formState.errors.email ? (
             <p id="email-error" className="text-xs text-destructive">
               {formState.errors.email.message}
@@ -105,24 +111,20 @@ export function LoginFormPage() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="password" className="text-[13px] font-semibold text-foreground">
-              Password
-            </Label>
-            <Link
-              href={routes.auth.forgotPassword}
-              className="text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <Label htmlFor="password" className="text-[13px] font-semibold text-foreground">
+            Password
+          </Label>
           <div className="relative">
+            <Lock
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="Enter your password"
-              className={cn(fieldClass, "pr-12")}
+              className={cn(fieldClass, "pl-11 pr-12")}
               aria-invalid={!!formState.errors.password}
               aria-describedby={
                 formState.errors.password ? "password-error" : undefined
@@ -149,21 +151,29 @@ export function LoginFormPage() {
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Controller
-            name="rememberMe"
-            control={control}
-            render={({ field }) => (
-              <Checkbox
-                id="rememberMe"
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-            )}
-          />
-          <Label htmlFor="rememberMe" className="text-sm font-normal text-muted-foreground">
-            Keep me signed in
-          </Label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Controller
+              name="rememberMe"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="rememberMe"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              )}
+            />
+            <Label htmlFor="rememberMe" className="text-sm font-normal text-muted-foreground">
+              Keep me signed in
+            </Label>
+          </div>
+          <Link
+            href={routes.auth.forgotPassword}
+            className="text-[13px] font-medium text-bakery-700 underline-offset-4 transition-colors hover:underline"
+          >
+            Forgot password?
+          </Link>
         </div>
 
         <Button

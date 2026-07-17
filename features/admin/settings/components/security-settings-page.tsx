@@ -58,6 +58,14 @@ import { SettingsSectionShell } from "./settings-section-shell";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
+/** Shared by the number inputs and the save-time clamp so the two cannot drift apart. */
+const SESSION_TIMEOUT = { min: 15, max: 480 } as const;
+const LOGIN_ATTEMPTS = { min: 3, max: 10 } as const;
+
+function clamp(value: number, { min, max }: { min: number; max: number }): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function SecuritySettingsPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -96,7 +104,11 @@ export function SecuritySettingsPage() {
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   function handleSave() {
-    const saved = saveSecuritySettings(settings);
+    const saved = saveSecuritySettings({
+      ...settings,
+      sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
+      maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
+    });
     setSavedSettings(saved);
     setSettings(saved);
     toast.success("Security settings saved");
@@ -193,8 +205,8 @@ export function SecuritySettingsPage() {
                   <Input
                     id="sessionTimeout"
                     type="number"
-                    min={15}
-                    max={480}
+                    min={SESSION_TIMEOUT.min}
+                    max={SESSION_TIMEOUT.max}
                     value={settings.sessionTimeoutMinutes}
                     onChange={(e) =>
                       setSettings((prev) => ({
@@ -209,8 +221,8 @@ export function SecuritySettingsPage() {
                   <Input
                     id="maxAttempts"
                     type="number"
-                    min={3}
-                    max={10}
+                    min={LOGIN_ATTEMPTS.min}
+                    max={LOGIN_ATTEMPTS.max}
                     value={settings.maxLoginAttempts}
                     onChange={(e) =>
                       setSettings((prev) => ({
@@ -369,36 +381,42 @@ export function SecuritySettingsPage() {
               <CardDescription>Devices currently signed in to the admin panel.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{session.deviceLabel}</p>
-                      {session.isCurrent ? (
-                        <Badge variant="success">This device</Badge>
-                      ) : null}
+              {sessions.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  No active sessions.
+                </p>
+              ) : (
+                sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">{session.deviceLabel}</p>
+                        {session.isCurrent ? (
+                          <Badge variant="success">This device</Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {session.email} · IP {session.ipAddress}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Last active {formatRelativeTime(session.lastActiveAt)}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {session.email} · IP {session.ipAddress}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Last active {formatRelativeTime(session.lastActiveAt)}
-                    </p>
+                    {!session.isCurrent ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRevokeSession(session.id)}
+                      >
+                        Revoke
+                      </Button>
+                    ) : null}
                   </div>
-                  {!session.isCurrent ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRevokeSession(session.id)}
-                    >
-                      Revoke
-                    </Button>
-                  ) : null}
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -415,40 +433,46 @@ export function SecuritySettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {devices.map((device) => (
-                <div
-                  key={device.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{device.label}</p>
-                      {device.trusted ? (
-                        <Badge variant="success">
-                          <ShieldCheck className="mr-1 size-3" />
-                          Trusted
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Untrusted</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      IP {device.ipAddress} · Last seen {formatRelativeTime(device.lastSeenAt)}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      toggleDeviceTrust(device.id);
-                      refreshCenter();
-                      toast.success("Device trust updated");
-                    }}
+              {devices.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  No registered devices.
+                </p>
+              ) : (
+                devices.map((device) => (
+                  <div
+                    key={device.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
                   >
-                    {device.trusted ? "Mark untrusted" : "Mark trusted"}
-                  </Button>
-                </div>
-              ))}
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">{device.label}</p>
+                        {device.trusted ? (
+                          <Badge variant="success">
+                            <ShieldCheck className="mr-1 size-3" />
+                            Trusted
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Untrusted</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        IP {device.ipAddress} · Last seen {formatRelativeTime(device.lastSeenAt)}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        toggleDeviceTrust(device.id);
+                        refreshCenter();
+                        toast.success("Device trust updated");
+                      }}
+                    >
+                      {device.trusted ? "Mark untrusted" : "Mark trusted"}
+                    </Button>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -509,11 +533,11 @@ function PolicySwitch({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={title} />
     </div>
   );
 }

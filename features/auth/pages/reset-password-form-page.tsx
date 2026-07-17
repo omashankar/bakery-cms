@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
+import { clearResetFlow, getResetFlow } from "@/features/auth/lib/reset-flow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,13 +23,27 @@ export function ResetPasswordFormPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [allowed, setAllowed] = useState(false);
   const { register, handleSubmit, watch, formState } = useForm<ResetPasswordForm>();
+
+  // Only reachable once the OTP step passed — otherwise restart the flow.
+  useEffect(() => {
+    const flow = getResetFlow();
+    if (!flow?.verified) {
+      router.replace(routes.auth.forgotPassword);
+      return;
+    }
+    setAllowed(true);
+  }, [router]);
 
   const onSubmit = async () => {
     await new Promise((resolve) => setTimeout(resolve, 900));
+    clearResetFlow();
     toast.success("Password updated");
     router.push(routes.auth.success);
   };
+
+  if (!allowed) return null;
 
   return (
     <AuthCard

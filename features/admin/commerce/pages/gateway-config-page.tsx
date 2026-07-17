@@ -117,7 +117,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
               ) : null}
 
               {isRazorpay ? (
-                <div className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-4 text-sm text-muted-foreground">
+                <div className="flex items-start gap-2 rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
                   <Info className="mt-0.5 size-4 shrink-0 text-bakery-700" />
                   <p>
                     Razorpay keys are managed securely on the server. Add or update them from{" "}
