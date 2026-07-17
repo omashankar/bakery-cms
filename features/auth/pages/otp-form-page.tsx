@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { OtpInput } from "@/features/auth/components/otp-input";
+import { getResetFlow, markResetVerified } from "@/features/auth/lib/reset-flow";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
@@ -16,6 +17,17 @@ export function OtpFormPage() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState<string | null>(null);
+
+  // Reached without asking for a code? Send them back to step one.
+  useEffect(() => {
+    const flow = getResetFlow();
+    if (!flow) {
+      router.replace(routes.auth.forgotPassword);
+      return;
+    }
+    setEmail(flow.email);
+  }, [router]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -29,14 +41,17 @@ export function OtpFormPage() {
     setLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
     setLoading(false);
+    markResetVerified();
     toast.success("Code verified");
     router.push(routes.auth.resetPassword);
   }
 
+  if (!email) return null;
+
   return (
     <AuthCard
       title="Verify your email"
-      description="Enter the 6-digit code sent to your email address."
+      description={`Enter the 6-digit code sent to ${email}.`}
       footer={
         <Link
           href={routes.auth.login}

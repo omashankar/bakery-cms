@@ -47,6 +47,7 @@ export function ActivitySettingsPage() {
       (entry) =>
         entry.action.toLowerCase().includes(query) ||
         entry.entity.toLowerCase().includes(query) ||
+        entry.userId.toLowerCase().includes(query) ||
         entry.details?.toLowerCase().includes(query)
     );
   }, [entries, search]);
@@ -81,13 +82,14 @@ export function ActivitySettingsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Search activity</CardTitle>
-            <CardDescription>Filter by action, entity, or details.</CardDescription>
+            <CardDescription>Filter by action, entity, user, or details.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search activity..."
+              aria-label="Search activity"
             />
             <div className="divide-y divide-border rounded-xl border border-border">
               {filtered.length === 0 ? (
@@ -100,7 +102,7 @@ export function ActivitySettingsPage() {
                     key={entry.id}
                     className="flex flex-wrap items-start justify-between gap-3 p-4"
                   >
-                    <div className="space-y-1">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge className={actionTone[entry.action] ?? "bg-muted text-foreground"}>
                           {entry.action}

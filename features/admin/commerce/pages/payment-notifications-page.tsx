@@ -115,7 +115,7 @@ export function PaymentNotificationsPage() {
         description="Choose which payment events notify customers and your team, and how."
       />
 
-      <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
         These are delivery preferences. Actual sending (email / SMS) is wired when the backend is
         added — in-app notifications already appear in the bell menu.
       </div>

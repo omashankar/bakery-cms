@@ -14,7 +14,8 @@ interface SettingsPlaceholderProps {
   icon: LucideIcon;
   /** What this page will manage once the backend is wired. */
   features: string[];
-  note?: string;
+  /** ReactNode so a placeholder can point at the page that covers it today. */
+  note?: React.ReactNode;
 }
 
 /**
@@ -62,7 +63,7 @@ export function SettingsPlaceholder({
 
           <div className="mt-6 border-t border-border pt-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              What you'll manage here
+              What you&apos;ll manage here
             </p>
             <ul className="mt-3 space-y-2.5">
               {features.map((feature) => (
@@ -74,9 +75,9 @@ export function SettingsPlaceholder({
             </ul>
           </div>
 
-          <p className="mt-6 rounded-xl border border-border bg-cream-50 p-4 text-xs text-muted-foreground">
+          <div className="mt-6 rounded-xl border border-border bg-muted p-4 text-xs text-muted-foreground">
             {note}
-          </p>
+          </div>
         </CardContent>
       </Card>
     </AdminPage>

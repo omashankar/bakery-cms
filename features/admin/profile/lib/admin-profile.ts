@@ -42,10 +42,16 @@ function read(): StoredProfile {
   }
 }
 
-function write(data: StoredProfile) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+/** Returns false when the browser refuses the write — a base64 photo can exceed the quota. */
+function write(data: StoredProfile): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    return false;
+  }
   window.dispatchEvent(new Event(ADMIN_PROFILE_UPDATED_EVENT));
+  return true;
 }
 
 /** Fully-resolved profile (session email + saved fields + sensible defaults). */
@@ -78,11 +84,12 @@ export function getAdminProfile(): AdminProfile {
   };
 }
 
+/** Returns false when the write was refused (e.g. photo too large for the quota). */
 export function saveAdminProfile(
   patch: Pick<AdminProfile, "fullName" | "mobile" | "username" | "photoUrl">
-) {
+): boolean {
   const saved = read();
-  write({
+  return write({
     ...saved,
     fullName: patch.fullName.trim(),
     mobile: patch.mobile.trim(),

@@ -12,15 +12,18 @@ export function setCustomerSession(
   session: Omit<CustomerSession, "signedInAt">,
   remember = true
 ) {
+  if (typeof window === "undefined") return;
   const payload: CustomerSession = {
     ...session,
     signedInAt: new Date().toISOString(),
   };
+  // Clear both first. getCustomerSession prefers localStorage, so a leftover "remember me"
+  // session would shadow a session-only sign-in — surviving restart and keeping the old email.
+  localStorage.removeItem(CUSTOMER_SESSION_KEY);
+  sessionStorage.removeItem(CUSTOMER_SESSION_KEY);
   const storage = remember ? localStorage : sessionStorage;
   storage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(payload));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("bakery-customer-session-updated"));
-  }
+  window.dispatchEvent(new Event("bakery-customer-session-updated"));
 }
 
 export function getCustomerSession(): CustomerSession | null {

@@ -1,26 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, RotateCcw, Save } from "lucide-react";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { AppearanceSettings } from "@/types/appearance";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/features/admin/components";
+import { SettingsSectionShell } from "@/features/admin/settings/components/settings-section-shell";
 import {
   loadAppearanceSettings,
   resetAppearanceSettings,
@@ -60,7 +51,6 @@ export function AppearancePage() {
   const [settings, setSettings] = useState<AppearanceSettings>(defaultAppearanceSettings);
   const [savedSettings, setSavedSettings] =
     useState<AppearanceSettings>(defaultAppearanceSettings);
-  const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
     const loaded = loadAppearanceSettings();
@@ -90,16 +80,6 @@ export function AppearancePage() {
 
   const activePresetId = resolvePresetFromColors(settings);
   const activePreset = getPresetById(activePresetId);
-
-  useEffect(() => {
-    if (!isDirty) return;
-    function onBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [isDirty]);
 
   function updateColor(
     key: "primaryColor" | "accentColor" | "surfaceColor",
@@ -157,252 +137,186 @@ export function AppearancePage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function confirmReset() {
+  function handleReset() {
     const reset = resetAppearanceSettings();
     setSettings(reset);
     setSavedSettings(reset);
-    setResetOpen(false);
     toast.success("Appearance reset to defaults");
   }
 
   return (
-    <AdminPage className={cn("space-y-4 sm:space-y-5", isDirty && "pb-20 md:pb-0")}>
-      <AdminPageHeader
-        title="Appearance"
-        description={
-          mounted
-            ? `Storefront brand (light only) · ${overview.presetLabel} · ${overview.borderRadius}px radius · ${overview.isCustom ? "custom colors" : "preset palette"}`
-            : "Storefront brand colors and shape — light mode only, never dark"
-        }
-        className="gap-3"
-        actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => setResetOpen(true)}
-            >
-              <RotateCcw className="size-4" />
-              Reset
-            </Button>
-            {isDirty ? (
-              <Button variant="outline" className="w-full sm:w-auto" onClick={handleDiscard}>
-                Discard
-              </Button>
-            ) : null}
-            <Button
-              variant="bakery"
-              className="w-full sm:w-auto"
-              onClick={handleSave}
-              disabled={!isDirty || !hasValidAppearanceColors(settings)}
-            >
-              <Save className="size-4" />
-              Save changes
-            </Button>
-          </div>
-        }
-      />
+    <SettingsSectionShell
+      title="Appearance"
+      description={
+        mounted
+          ? `Storefront brand (light only) · ${overview.presetLabel} · ${overview.borderRadius}px radius · ${overview.isCustom ? "custom colors" : "preset palette"}`
+          : "Storefront brand colors and shape — light mode only, never dark"
+      }
+      isDirty={isDirty}
+      mounted={mounted}
+      onSave={handleSave}
+      onDiscard={handleDiscard}
+      onReset={handleReset}
+      saveDisabled={!hasValidAppearanceColors(settings)}
+      resetTitle="Reset appearance?"
+      resetDescription="Restore the Monginis Classic preset and default radius. Custom colors will be lost."
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
+        <div className="space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">Theme presets</CardTitle>
+              <CardDescription>
+                Storefront palettes only — the public website stays light. Admin light/dark is
+                separate (header toggle).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              {appearancePresets.map((preset) => {
+                const isActive = activePresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => selectPreset(preset.id)}
+                    aria-pressed={isActive}
+                    className={cn(
+                      "rounded-xl border p-4 text-left transition-premium",
+                      isActive
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                        : "border-border bg-card hover:border-primary/40"
+                    )}
+                  >
+                    <div className="mb-3 flex gap-1">
+                      {preset.swatches.map((color) => (
+                        <span
+                          key={color}
+                          className="size-5 rounded-full border border-border"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">{preset.name}</p>
+                      {isActive ? <Check className="size-4 shrink-0 text-primary" /> : null}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p>
+                  </button>
+                );
+              })}
+            </CardContent>
+          </Card>
 
-      {!mounted ? (
-        <div className="min-h-64 animate-pulse rounded-xl border border-border bg-muted" />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
-          <div className="space-y-4">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Theme presets</CardTitle>
-                <CardDescription>
-                  Storefront palettes only — the public website stays light. Admin light/dark is
-                  separate (header toggle).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                {appearancePresets.map((preset) => {
-                  const isActive = activePresetId === preset.id;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => selectPreset(preset.id)}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <CardTitle className="text-base">Brand colors</CardTitle>
+                  <CardDescription>
+                    Fine-tune primary, accent, and cream surfaces for the light storefront.
+                  </CardDescription>
+                </div>
+                <Badge variant={activePresetId === "custom" ? "warning" : "outline"}>
+                  {activePresetId === "custom" ? "Custom" : activePreset?.name ?? "Custom"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-3">
+              {COLOR_FIELDS.map((field) => {
+                const valid =
+                  settings[field.key] === "" || isValidHexColor(settings[field.key]);
+                return (
+                  <div key={field.key} className="space-y-2">
+                    <Label htmlFor={field.key}>{field.label}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id={field.key}
+                        type="color"
+                        value={
+                          isValidHexColor(settings[field.key])
+                            ? normalizeHexColor(settings[field.key])
+                            : "#000000"
+                        }
+                        onChange={(e) => updateColor(field.key, e.target.value)}
+                        className="h-10 w-14 shrink-0 cursor-pointer px-1 py-1"
+                        aria-label={`${field.label} color picker`}
+                      />
+                      <Input
+                        value={settings[field.key]}
+                        onChange={(e) => updateColor(field.key, e.target.value)}
+                        className="min-w-0 font-mono text-xs uppercase"
+                        aria-label={`${field.label} hex value`}
+                        aria-invalid={!valid}
+                      />
+                    </div>
+                    <p
                       className={cn(
-                        "rounded-xl border p-4 text-left transition-premium",
-                        isActive
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                          : "border-border bg-card hover:border-primary/40"
+                        "text-xs",
+                        valid ? "text-muted-foreground" : "text-destructive"
                       )}
                     >
-                      <div className="mb-3 flex gap-1">
-                        {preset.swatches.map((color) => (
-                          <span
-                            key={color}
-                            className="size-5 rounded-full border border-border"
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium">{preset.name}</p>
-                        {isActive ? <Check className="size-4 text-primary" /> : null}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {preset.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">Brand colors</CardTitle>
-                    <CardDescription>
-                      Fine-tune primary, accent, and cream surfaces for the light storefront.
-                    </CardDescription>
-                  </div>
-                  <Badge variant={activePresetId === "custom" ? "warning" : "outline"}>
-                    {activePresetId === "custom"
-                      ? "Custom"
-                      : activePreset?.name ?? "Custom"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
-                {COLOR_FIELDS.map((field) => {
-                  const valid =
-                    settings[field.key] === "" || isValidHexColor(settings[field.key]);
-                  return (
-                    <div key={field.key} className="space-y-2">
-                      <Label htmlFor={field.key}>{field.label}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id={field.key}
-                          type="color"
-                          value={
-                            isValidHexColor(settings[field.key])
-                              ? normalizeHexColor(settings[field.key])
-                              : "#000000"
-                          }
-                          onChange={(e) => updateColor(field.key, e.target.value)}
-                          className="h-10 w-14 cursor-pointer px-1 py-1"
-                        />
-                        <Input
-                          value={settings[field.key]}
-                          onChange={(e) => updateColor(field.key, e.target.value)}
-                          className="font-mono text-xs uppercase"
-                          aria-label={`${field.label} hex value`}
-                          aria-invalid={!valid}
-                        />
-                      </div>
-                      <p
-                        className={cn(
-                          "text-xs",
-                          valid ? "text-muted-foreground" : "text-destructive"
-                        )}
-                      >
-                        {valid ? field.hint : "Enter a hex color like #6f4e37"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Shape & typography</CardTitle>
-                <CardDescription>
-                  Border radius applies to the storefront. Typography uses Plus Jakarta Sans +
-                  Inter.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="border-radius">Border radius</Label>
-                  <AdminSelect
-                    id="border-radius"
-                    value={String(settings.borderRadius)}
-                    onChange={(e) =>
-                      updateBorderRadius(
-                        Number(e.target.value) as AppearanceSettings["borderRadius"]
-                      )
-                    }
-                  >
-                    <option value="12">12px — default cards & buttons</option>
-                    <option value="16">16px — softer large surfaces</option>
-                  </AdminSelect>
-                </div>
-
-                <Separator />
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border bg-muted p-4">
-                    <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                      Heading
+                      {valid ? field.hint : "Enter a hex color like #6f4e37"}
                     </p>
-                    <p className="mt-2 font-heading text-2xl font-bold">Celebration Cakes</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
                   </div>
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                      Body
-                    </p>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      Freshly baked cakes, pastries, and confections made with premium
-                      ingredients.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Inter</p>
-                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">Shape &amp; typography</CardTitle>
+              <CardDescription>
+                Border radius applies to the storefront. Typography uses Plus Jakarta Sans +
+                Inter.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="border-radius">Border radius</Label>
+                <AdminSelect
+                  id="border-radius"
+                  value={String(settings.borderRadius)}
+                  onChange={(e) =>
+                    updateBorderRadius(
+                      Number(e.target.value) as AppearanceSettings["borderRadius"]
+                    )
+                  }
+                >
+                  <option value="12">12px — default cards &amp; buttons</option>
+                  <option value="16">16px — softer large surfaces</option>
+                </AdminSelect>
+              </div>
+
+              <Separator />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-border bg-muted p-4">
+                  <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                    Heading
+                  </p>
+                  <p className="mt-2 font-heading text-2xl font-bold">Celebration Cakes</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
                 </div>
-              </CardContent>
-            </Card>
-
-          </div>
-
-          <div className="xl:sticky xl:top-20 xl:self-start">
-            <AppearancePreview settings={settings} isDirty={isDirty} />
-          </div>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                    Body
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    Freshly baked cakes, pastries, and confections made with premium
+                    ingredients.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Inter</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
 
-      {isDirty ? (
-        <AdminMobileActionBar className="md:hidden">
-          <Button variant="outline" className="flex-1" onClick={handleDiscard}>
-            Discard
-          </Button>
-          <Button
-            variant="bakery"
-            className="flex-1"
-            onClick={handleSave}
-            disabled={!hasValidAppearanceColors(settings)}
-          >
-            <Save className="size-4" />
-            Save
-          </Button>
-        </AdminMobileActionBar>
-      ) : null}
-
-      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reset appearance?</DialogTitle>
-            <DialogDescription>
-              Restore the Monginis Classic preset and default radius. Custom colors will be
-              lost.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setResetOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmReset}>
-              Reset defaults
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </AdminPage>
+        <div className="xl:sticky xl:top-20 xl:self-start">
+          <AppearancePreview settings={settings} isDirty={isDirty} />
+        </div>
+      </div>
+    </SettingsSectionShell>
   );
 }

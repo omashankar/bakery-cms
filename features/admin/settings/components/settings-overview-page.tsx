@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
-  Bell,
   ChevronRight,
   Code2,
   CreditCard,
@@ -152,12 +151,6 @@ const groups: SettingsGroup[] = [
         description: "WhatsApp message templates for order updates.",
         href: routes.admin.commerce.whatsapp,
         icon: MessageCircle,
-      },
-      {
-        title: "Notification Settings",
-        description: "In-app alert preferences and channels.",
-        href: routes.admin.commerce.notifications,
-        icon: Bell,
       },
       {
         title: "SMS Notifications",

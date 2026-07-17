@@ -10,12 +10,12 @@ export function SeoFilesSettingsPage() {
       description="Control how search engines crawl and index your store."
       icon={FileCode2}
       features={[
-        "Edit robots.txt rules (allow / disallow paths)",
-        "Auto-generated XML sitemap for pages and products",
-        "Submit sitemap URL to search consoles",
-        "Toggle indexing for staging vs live",
+        "Edit robots.txt rules (allow / disallow specific paths)",
+        "Tune sitemap priority and change frequency per route",
+        "Submit the sitemap URL to search consoles",
+        "Separate crawl rules for staging and live",
       ]}
-      note="Meta titles and descriptions are already editable in Settings → Website → SEO."
+      note="robots.txt and sitemap.xml are already generated and live — open them from Settings → Website → SEO, where global indexing and per-page meta are managed too."
     />
   );
 }

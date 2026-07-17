@@ -7,10 +7,15 @@ export interface DemoSession {
 
 /** UI-only session helpers — replaced by real auth later */
 export function setDemoSession(email: string, remember = true) {
+  if (typeof window === "undefined") return;
   const payload: DemoSession = {
     email,
     signedInAt: new Date().toISOString(),
   };
+  // Clear both first. getDemoSession prefers localStorage, so a leftover "remember me"
+  // session would shadow a session-only sign-in — surviving restart and keeping the old email.
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   const storage = remember ? localStorage : sessionStorage;
   storage.setItem(SESSION_KEY, JSON.stringify(payload));
 }
