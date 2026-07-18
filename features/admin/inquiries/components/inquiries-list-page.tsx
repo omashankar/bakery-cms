@@ -442,6 +442,7 @@ export function InquiriesListPage({
         <aside className="hidden xl:sticky xl:top-24 xl:block xl:max-h-[calc(100vh-7rem)] xl:self-start">
           <div className="flex h-full max-h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <InquiryDetailPanel
+              key={selectedInquiry?.id ?? "empty"}
               inquiry={selectedInquiry}
               onUpdate={(item) => {
                 refresh();
@@ -465,6 +466,7 @@ export function InquiriesListPage({
       >
         {selectedInquiry ? (
           <InquiryDetailPanel
+            key={selectedInquiry.id}
             inquiry={selectedInquiry}
             onUpdate={(item) => {
               refresh();
