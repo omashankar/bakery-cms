@@ -2,7 +2,7 @@ import {
   CHECKOUT_METHODS,
   type CheckoutMethod,
 } from "@/features/payments/registry/methods";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import type { PaymentMethodSettings } from "@/types/settings";
 
 /**

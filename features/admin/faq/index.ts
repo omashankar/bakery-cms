@@ -7,5 +7,5 @@ export {
   createFaq,
   updateFaq,
   deleteFaqs,
-} from "./lib/faq-repository";
-export { faqCategoryOptions, formatFaqCategory } from "./lib/faq-utils";
+} from "@/features/content/lib/faq-repository";
+export { faqCategoryOptions, formatFaqCategory } from "@/features/content/lib/faq-utils";

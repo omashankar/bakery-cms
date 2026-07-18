@@ -2,13 +2,13 @@
 
 import { Copy, Mail, Phone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { formatDate, formatRelativeTime } from "@/utils/format";
 import type { Inquiry, InquiryStatus } from "@/types/inquiry";
-import { updateInquiry } from "../lib/inquiries-repository";
-import { formatInquiryType } from "../lib/inquiry-utils";
+import { updateInquiry } from "@/features/inquiries/lib/inquiries-repository";
+import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "./inquiry-status-badge";
 
 interface InquiryDetailPanelProps {

@@ -1,4 +1,4 @@
-import type { Cake, StockStatus } from "@/types/cake";
+import type { Product, StockStatus } from "@/types/product";
 import type {
   InventoryItem,
   InventoryOverview,
@@ -8,11 +8,11 @@ import type {
   StockHistoryReason,
 } from "@/types/inventory";
 import {
-  getCakeById,
-  loadCakes,
-  updateCake,
-} from "@/features/admin/cakes/lib/cakes-repository";
-import { adminCategories } from "@/features/admin/cakes/lib/catalog-options";
+  getProductById,
+  loadProducts,
+  updateProduct,
+} from "@/features/products/lib/products-repository";
+import { adminCategories } from "@/features/products/lib/catalog-options";
 import {
   deriveStockStatus,
   getLowStockThreshold,
@@ -99,7 +99,7 @@ function appendStockHistory(entry: StockHistoryEntry): void {
 export function getInventoryItems(): InventoryItem[] {
   const categories = adminCategories();
 
-  return loadCakes().map((cake) => {
+  return loadProducts().map((cake) => {
     const stockStatus = deriveStockStatus(cake, getInventorySettings());
     const categoryName =
       categories.find((category) => category.id === cake.categoryId)?.name ?? "—";
@@ -163,7 +163,7 @@ export function adjustStock({
   reason = "manual_adjustment",
   note,
 }: AdjustStockInput): InventoryItem | null {
-  const cake = getCakeById(cakeId);
+  const cake = getProductById(cakeId);
   if (!cake) return null;
 
   const quantityBefore = cake.stockQuantity;
@@ -183,7 +183,7 @@ export function adjustStock({
     unlimitedStock: false,
   });
 
-  const updated = updateCake(cakeId, {
+  const updated = updateProduct(cakeId, {
     ...cake,
     ...stockFields,
   });
@@ -208,7 +208,7 @@ export function adjustStock({
 }
 
 export function setUnlimitedStock(cakeId: string, unlimited: boolean): InventoryItem | null {
-  const cake = getCakeById(cakeId);
+  const cake = getProductById(cakeId);
   if (!cake) return null;
 
   const stockFields = resolveStockFields({
@@ -216,7 +216,7 @@ export function setUnlimitedStock(cakeId: string, unlimited: boolean): Inventory
     unlimitedStock: unlimited,
   });
 
-  updateCake(cakeId, {
+  updateProduct(cakeId, {
     ...cake,
     ...stockFields,
   });
@@ -230,7 +230,7 @@ export type InventoryStockFilter = "all" | StockStatus | "unlimited";
 export interface InventoryListFilters {
   search: string;
   stock: InventoryStockFilter;
-  status: "all" | Cake["status"];
+  status: "all" | Product["status"];
 }
 
 export const defaultInventoryFilters: InventoryListFilters = {

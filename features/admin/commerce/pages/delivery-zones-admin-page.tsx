@@ -11,9 +11,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { DeliveryZoneFormDialog } from "@/features/admin/commerce/components/delivery-zone-form-dialog";
-import { formatZoneDeliveryTime } from "@/features/admin/commerce/lib/delivery-zone-utils";
+import { formatZoneDeliveryTime } from "@/features/commerce/lib/delivery-zone-utils";
 import {
   defaultDeliveryZoneFilters,
   type DeliveryZone,
@@ -28,7 +28,7 @@ import {
   loadDeliveryZones,
   resetDeliveryZones,
   toggleDeliveryZoneActive,
-} from "@/features/admin/commerce/lib/delivery-zones-repository";
+} from "@/features/commerce/lib/delivery-zones-repository";
 import {
   FilterPanel,
   FilterPanelSearch,

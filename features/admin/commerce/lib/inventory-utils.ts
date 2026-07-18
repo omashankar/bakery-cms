@@ -1,5 +1,5 @@
-import type { CakeFormData } from "@/types";
-import type { StockStatus } from "@/types/cake";
+import type { ProductFormData } from "@/types";
+import type { StockStatus } from "@/types/product";
 import type { InventorySettings } from "@/types/inventory";
 
 const FALLBACK_SETTINGS: InventorySettings = {
@@ -8,14 +8,14 @@ const FALLBACK_SETTINGS: InventorySettings = {
 };
 
 export function getLowStockThreshold(
-  cake: Pick<CakeFormData, "lowStockThreshold">,
+  cake: Pick<ProductFormData, "lowStockThreshold">,
   settings: InventorySettings = FALLBACK_SETTINGS
 ): number {
   return cake.lowStockThreshold ?? settings.defaultLowStockThreshold;
 }
 
 export function deriveStockStatus(
-  cake: Pick<CakeFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold">,
+  cake: Pick<ProductFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold">,
   settings: InventorySettings = FALLBACK_SETTINGS
 ): StockStatus {
   if (cake.unlimitedStock) return "in_stock";
@@ -26,8 +26,8 @@ export function deriveStockStatus(
 }
 
 export function resolveStockFields(
-  data: Pick<CakeFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold" | "stockStatus">
-): Pick<CakeFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold" | "stockStatus"> {
+  data: Pick<ProductFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold" | "stockStatus">
+): Pick<ProductFormData, "stockQuantity" | "unlimitedStock" | "lowStockThreshold" | "stockStatus"> {
   const unlimitedStock = data.unlimitedStock ?? false;
   const stockQuantity = Math.max(data.stockQuantity ?? 0, 0);
   const stockStatus = deriveStockStatus({

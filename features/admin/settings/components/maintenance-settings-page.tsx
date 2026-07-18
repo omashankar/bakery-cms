@@ -3,18 +3,18 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { MaintenanceSettings } from "@/types/settings";
-import { defaultMaintenanceSettings } from "../lib/settings-utils";
+import { defaultMaintenanceSettings } from "@/features/settings/lib/settings-utils";
 import {
   getMaintenanceSettings,
   resetMaintenanceSettings,
   saveMaintenanceSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 export function MaintenanceSettingsPage() {

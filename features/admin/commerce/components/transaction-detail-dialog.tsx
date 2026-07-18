@@ -1,6 +1,6 @@
 "use client";
 
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { deriveTransactionStatus } from "@/features/payments/lib/payment-status";
 import { PaymentStatusBadge } from "@/features/payments/components/payment-status-badge";
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";

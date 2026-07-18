@@ -17,7 +17,7 @@ import {
   createDeliveryZone,
   createEmptyDeliveryZone,
   updateDeliveryZone,
-} from "../lib/delivery-zones-repository";
+} from "@/features/commerce/lib/delivery-zones-repository";
 import type { DeliveryZone, DeliveryZoneFormData } from "@/types/delivery";
 
 interface DeliveryZoneFormDialogProps {

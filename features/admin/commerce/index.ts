@@ -5,7 +5,7 @@ export { RefundOrderDialog } from "./components/refund-order-dialog";
 export { RefundStatusBadge } from "./components/refund-status-badge";
 export { RefundTimeline } from "./components/refund-timeline";
 export { OrderInvoice } from "./components/order-invoice";
-export { InvoiceDocument } from "./components/invoice-document";
+export { InvoiceDocument } from "@/components/shared/invoice-document";
 export { CustomerSegmentBadge } from "./components/customer-segment-badge";
 export { OrdersListPage } from "./pages/orders-list-page";
 export { OrderDetailPage } from "./pages/order-detail-page";
@@ -22,8 +22,8 @@ export {
   deleteCoupons,
   toggleCouponActive,
   resetCoupons,
-} from "./lib/coupons-repository";
-export type { StoredCoupon } from "./lib/coupons-repository";
+} from "@/features/commerce/lib/coupons-repository";
+export type { StoredCoupon } from "@/features/commerce/lib/coupons-repository";
 export {
   filterOrders,
   getOrderStats,

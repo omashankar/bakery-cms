@@ -11,6 +11,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCustomerSession } from "@/features/storefront/account/lib/customer-session";
+import {
+  createSavedAddress,
+  getDefaultAddress,
+  getSavedAddresses,
+  updateSavedAddress,
+  type SavedAddress,
+} from "@/features/storefront/account/lib/customer-addresses";
 import { openRazorpayCheckout } from "@/features/storefront/checkout/lib/razorpay";
 import { getEnabledCheckoutMethods } from "@/features/payments/lib/resolve-methods";
 import { PaymentMethodList } from "@/features/storefront/checkout/payments/payment-method-list";
@@ -23,33 +30,58 @@ import { openCustomerAuthModal } from "@/features/storefront/account/components/
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/admin/commerce/lib/delivery-zones-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+} from "@/features/settings/lib/settings-repository";
+import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/commerce/lib/delivery-zones-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { CartIssuesAlert } from "@/features/storefront/checkout/components/cart-issues-alert";
+import { DeliveryAddressPicker } from "@/features/storefront/checkout/components/delivery-address-picker";
 import { CheckoutProgress } from "@/features/storefront/checkout/components/checkout-progress";
 import { CouponInput } from "@/features/storefront/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/features/storefront/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import {
   clearCheckoutDraft,
+  EMPTY_CHECKOUT_ADDRESS,
+  EMPTY_DELIVERY_SLOT,
   getCheckoutDraft,
+  hasDeliverySlot,
   saveCheckoutDraft,
   type CheckoutAddress,
+  type DeliverySlot,
   type PaymentMethod,
-} from "@/features/storefront/checkout/lib/checkout-draft";
-import type { AppliedCoupon } from "@/features/storefront/checkout/lib/coupons";
-import { recordCouponUsage } from "@/features/storefront/checkout/lib/coupons";
-import { placeOrder } from "@/features/storefront/checkout/lib/orders";
+} from "@/features/orders/lib/checkout-draft";
+import {
+  getDeliveryTimeSlots,
+  getMinDeliveryDate,
+} from "@/features/storefront/lib/product-details";
+import type { AppliedCoupon } from "@/features/orders/lib/coupons";
+import { recordCouponUsage, revalidateCoupon } from "@/features/orders/lib/coupons";
+import {
+  hasBlockingCartIssues,
+  validateCartAgainstCatalog,
+} from "@/features/orders/lib/cart-validation";
+import type { LandingProduct } from "@/constants/landing-data";
+import { placeOrder } from "@/features/orders/lib/orders";
+import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { clearCart, clearCartPreferences, getCartItems, getCartPreferences } from "@/features/storefront/lib/cart";
-import type { CartLineItem } from "@/features/storefront/lib/cart";
+import {
+  clearCart,
+  clearCartPreferences,
+  getCartItems,
+  getCartPreferences,
+  subscribeToCart,
+  updateCartPreferences,
+} from "@/features/cart/lib/cart";
+import type { CartLineItem } from "@/features/cart/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
+import { cn } from "@/lib/utils";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -71,7 +103,51 @@ const paymentOptions: {
   },
 ];
 
-export function CheckoutPage() {
+/** Strip the address-book fields the checkout form does not carry. */
+function toCheckoutAddress(saved: SavedAddress): CheckoutAddress {
+  return {
+    fullName: saved.fullName,
+    email: saved.email,
+    phone: saved.phone,
+    addressLine1: saved.addressLine1,
+    addressLine2: saved.addressLine2 ?? "",
+    city: saved.city,
+    state: saved.state,
+    pincode: saved.pincode,
+  };
+}
+
+/** Same delivery destination, ignoring formatting differences. */
+function isSameAddress(a: Partial<CheckoutAddress>, b: Partial<CheckoutAddress>): boolean {
+  const norm = (value?: string) => (value ?? "").trim().toLowerCase();
+  return (
+    norm(a.addressLine1) === norm(b.addressLine1) &&
+    norm(a.addressLine2) === norm(b.addressLine2) &&
+    norm(a.city) === norm(b.city) &&
+    norm(a.state) === norm(b.state) &&
+    norm(a.pincode) === norm(b.pincode)
+  );
+}
+
+/** The fields an order genuinely cannot be delivered without. */
+function hasDeliverableAddress(address?: Partial<CheckoutAddress>): boolean {
+  if (!address) return false;
+  return Boolean(
+    address.fullName?.trim() &&
+      address.phone?.trim() &&
+      address.addressLine1?.trim() &&
+      address.city?.trim() &&
+      address.state?.trim() &&
+      address.pincode?.trim()
+  );
+}
+
+interface CheckoutPageProps {
+  /** Live published catalogue, fetched on the server. */
+  catalog: LandingProduct[];
+}
+
+export function CheckoutPage({ catalog }: CheckoutPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
@@ -81,21 +157,72 @@ export function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [orderNotes, setOrderNotes] = useState("");
   const [giftWrap, setGiftWrap] = useState(false);
+  const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(EMPTY_DELIVERY_SLOT);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [slotOptions, setSlotOptions] = useState<string[]>([]);
+  const [minDeliveryDate, setMinDeliveryDate] = useState("");
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  /** A saved address id, or "new" while entering one by hand. */
+  const [addressChoice, setAddressChoice] = useState<string>("new");
+  const [saveNewAddress, setSaveNewAddress] = useState(true);
+  /** Set when editing an existing saved address rather than adding one. */
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  /** The form is only shown when adding or editing — otherwise the cards are enough. */
+  const [showAddressForm, setShowAddressForm] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
+  // Null while unknown — do not hide a method on a guess.
+  const [onlinePaymentReady, setOnlinePaymentReady] = useState<boolean | null>(null);
 
   const availablePaymentOptions = useMemo(
     () =>
-      paymentOptions.filter((option) => commerce.paymentMethods[option.value]),
-    [commerce.paymentMethods]
+      paymentOptions.filter(
+        (option) =>
+          commerce.paymentMethods[option.value] &&
+          (option.value !== "razorpay" || onlinePaymentReady !== false)
+      ),
+    [commerce.paymentMethods, onlinePaymentReady]
   );
+
+  // Offering "Pay Online" when the gateway has no keys means the customer
+  // completes the entire checkout and only discovers it at the final click.
+  // Ask the server up front instead.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkGateway() {
+      try {
+        const response = await fetch("/api/razorpay/config");
+        const status = await response.json();
+        if (!cancelled) setOnlinePaymentReady(Boolean(status?.configured));
+      } catch {
+        if (!cancelled) setOnlinePaymentReady(null);
+      }
+    }
+
+    void checkGateway();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Registry-driven method cards shown at the payment step.
   const enabledMethods = useMemo(
-    () => (ready ? getEnabledCheckoutMethods() : []),
+    () =>
+      ready
+        ? getEnabledCheckoutMethods().filter(
+            (method) => method.id !== "razorpay" || onlinePaymentReady !== false
+          )
+        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, commerce.paymentMethods]
+    [ready, commerce.paymentMethods, onlinePaymentReady]
   );
+
+  useEffect(() => {
+    if (onlinePaymentReady !== false || paymentMethod !== "razorpay") return;
+    const fallback = availablePaymentOptions[0]?.value ?? "cod";
+    setPaymentMethod(fallback);
+  }, [onlinePaymentReady, paymentMethod, availablePaymentOptions]);
 
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
@@ -112,14 +239,17 @@ export function CheckoutPage() {
   });
 
   useEffect(() => {
-    // Cart & checkout require login — guests are sent back to the cart's login gate.
+    // Being bounced back to the cart with no explanation reads as a broken
+    // button, so say why before moving them.
     if (!getCustomerSession()) {
+      toast.info("Please sign in to continue to checkout");
       router.replace(routes.store.cart);
       return;
     }
 
     const cartItems = getCartItems();
     if (cartItems.length === 0) {
+      toast.info("Your cart is empty — add a cake to check out");
       router.replace(routes.store.cart);
       return;
     }
@@ -141,7 +271,29 @@ export function CheckoutPage() {
       pincode: draft.address.pincode,
     });
 
+    const addresses = getSavedAddresses();
+    setSavedAddresses(addresses);
+
+    // A customer who has already given us an address should not retype it.
+    // A draft in progress still wins — they may have edited it this session.
+    const draftHasAddress = Boolean(draft.address.addressLine1?.trim());
+    const preferred = draftHasAddress ? null : getDefaultAddress();
+    if (preferred) {
+      setAddressChoice(preferred.id);
+      reset(toCheckoutAddress(preferred));
+    } else if (draftHasAddress) {
+      const matching = addresses.find((entry) => isSameAddress(entry, draft.address));
+      setAddressChoice(matching?.id ?? "new");
+      // A typed-but-unsaved address must stay editable on return.
+      if (!matching) setShowAddressForm(true);
+    }
+    // Nothing to choose from: go straight to the form.
+    if (addresses.length === 0) setShowAddressForm(true);
+
     setItems(cartItems);
+    setDeliverySlot(draft.deliverySlot ?? EMPTY_DELIVERY_SLOT);
+    setSlotOptions(getDeliveryTimeSlots());
+    setMinDeliveryDate(getMinDeliveryDate());
     setStep(draft.step);
     setCoupon(draft.coupon);
     const cartPreferences = getCartPreferences();
@@ -160,13 +312,53 @@ export function CheckoutPage() {
       : enabledMethods[0]?.value ?? "cod";
     setPaymentMethod(initialMethod);
 
+    // ?step=3 is a deep link back into Review. Only honour it when the draft
+    // already holds a deliverable address — otherwise the URL alone would skip
+    // the address form and place an order with nowhere to send it.
     const stepParam = searchParams.get("step");
-    if (stepParam === "3") {
+    if (stepParam === "3" && hasDeliverableAddress(draft.address)) {
       setStep(3);
     }
 
     setReady(true);
   }, [reset, router, searchParams]);
+
+  /** Moves between steps and records it in history, so Back walks the flow. */
+  function goToStep(next: 1 | 2 | 3) {
+    setStep(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 1) params.delete("step");
+    else params.set("step", String(next));
+    const query = params.toString();
+    router.push(query ? `?${query}` : routes.store.checkout, { scroll: false });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Browser Back/Forward changes the URL; follow it back into the right step.
+  useEffect(() => {
+    if (!ready) return;
+    const param = Number(searchParams.get("step"));
+    const target: 1 | 2 | 3 = param === 2 || param === 3 ? param : 1;
+    if (target === step) return;
+    // Never land on a later step without an address to deliver to.
+    if (target > 1 && !hasDeliverableAddress(getCheckoutDraft().address)) return;
+    setStep(target);
+  }, [searchParams, ready, step]);
+
+  // The cart is read once on mount. Keep it in step with edits made anywhere
+  // else — including another tab — so the summary, the totals and the order
+  // that gets placed all describe the same cart.
+  useEffect(() => {
+    return subscribeToCart(() => {
+      const next = getCartItems();
+      if (next.length === 0) {
+        toast.info("Your cart is now empty — add a cake to check out");
+        router.replace(routes.store.cart);
+        return;
+      }
+      setItems(next);
+    });
+  }, [router]);
 
   useEffect(() => {
     const refreshCommerce = () => setCommerce(getCommerceSettings());
@@ -178,14 +370,32 @@ export function CheckoutPage() {
     };
   }, []);
 
+  // A cart can sit in localStorage for weeks. Re-check it against the live
+  // catalogue so an unpublished, deleted or out-of-stock product cannot be paid
+  // for — nothing downstream re-validates it.
+  const cartIssues = useMemo(
+    () => validateCartAgainstCatalog(items, catalog),
+    [items, catalog]
+  );
+  const cartBlocked = hasBlockingCartIssues(cartIssues);
+
   const watchedCity = watch("city");
   const watchedPincode = watch("pincode");
+
+  // The coupon was validated against whatever the cart held when it was
+  // applied. Re-check it against the cart being paid for, so an edited cart
+  // cannot keep a discount it no longer qualifies for.
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [items]
+  );
+  const validCoupon = useMemo(() => revalidateCoupon(coupon, subtotal), [coupon, subtotal]);
 
   const totals = useMemo(
     () =>
       calculateCartTotals({
         items,
-        discount: coupon?.discountAmount ?? 0,
+        discount: validCoupon?.discountAmount ?? 0,
         giftWrap,
         deliveryAddress: {
           city: watchedCity,
@@ -193,13 +403,14 @@ export function CheckoutPage() {
         },
         commerceOverride: commerce,
       }),
-    [items, coupon, giftWrap, watchedCity, watchedPincode, commerce]
+    [items, validCoupon, giftWrap, watchedCity, watchedPincode, commerce]
   );
 
   function persistDraft(
     patch: Partial<{
       step: 1 | 2 | 3;
       address: CheckoutAddress;
+      deliverySlot: DeliverySlot;
       paymentMethod: PaymentMethod;
       coupon?: AppliedCoupon;
       orderNotes?: string;
@@ -216,14 +427,46 @@ export function CheckoutPage() {
   }
 
   const onDeliverySubmit = (address: CheckoutAddress) => {
-    persistDraft({ step: 2, address });
-    setStep(2);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!hasDeliverySlot(deliverySlot)) {
+      setSlotError("Choose a delivery date and time");
+      return;
+    }
+    setSlotError(null);
+
+    // Keeping the address book current is a convenience — it must never block
+    // the order, so every path here is best-effort.
+    try {
+      if (editingAddressId) {
+        updateSavedAddress(editingAddressId, address);
+        setSavedAddresses(getSavedAddresses());
+        toast.success("Address updated");
+      } else {
+        const alreadySaved = savedAddresses.some((entry) => isSameAddress(entry, address));
+        if (saveNewAddress && !alreadySaved) {
+          const created = createSavedAddress({
+            ...address,
+            label: address.city?.trim() || "Address",
+            isDefault: savedAddresses.length === 0,
+          });
+          setSavedAddresses(getSavedAddresses());
+          setAddressChoice(created.id);
+          toast.success("Address saved for next time");
+        }
+      }
+    } catch {
+      // Ignore — the order still goes through with the address as typed.
+    }
+
+    setShowAddressForm(false);
+    setEditingAddressId(null);
+
+    persistDraft({ step: 2, address, deliverySlot });
+    goToStep(2);
   };
 
   const onPaymentContinue = () => {
     persistDraft({ step: 3, paymentMethod, orderNotes });
-    setStep(3);
+    goToStep(3);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -238,12 +481,15 @@ export function CheckoutPage() {
       paymentMethod,
       paymentStatus,
       paymentReference,
-      coupon,
+      // The revalidated coupon, so the order records the discount that was
+      // actually charged rather than a stale one from an earlier cart.
+      coupon: validCoupon ?? undefined,
+      deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
     });
 
-    if (coupon) {
-      recordCouponUsage(coupon.code);
+    if (validCoupon) {
+      recordCouponUsage(validCoupon.code);
     }
 
     clearCart();
@@ -255,6 +501,9 @@ export function CheckoutPage() {
       description: `Order ${order.orderNumber} confirmed`,
     });
 
+    // The customer who just placed this order can view it without going
+    // through the track-order lookup.
+    grantOrderAccess(order.orderNumber);
     router.push(`${routes.store.orderSuccess}?order=${order.orderNumber}`);
   };
 
@@ -296,7 +545,7 @@ export function CheckoutPage() {
 
   const retryPayment = () => {
     setPayUI(null);
-    setStep(3);
+    goToStep(3);
     void onPlaceOrder();
   };
 
@@ -330,7 +579,7 @@ export function CheckoutPage() {
                       label: "Change method",
                       onClick: () => {
                         setPayUI(null);
-                        setStep(2);
+                        goToStep(2);
                       },
                       variant: "outline",
                     },
@@ -357,10 +606,16 @@ export function CheckoutPage() {
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
-          <CheckoutProgress currentStep={step} className="mb-8" />
+          <CheckoutProgress
+            currentStep={step}
+            onStepSelect={(target) => {
+              goToStep(target);
+            }}
+            className="mb-8"
+          />
 
           <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-            <div className="order-2 space-y-6 lg:order-none lg:col-start-1">
+            <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
               {step === 1 ? (
                 <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
                   <h2 className="font-heading text-lg font-semibold">Delivery details</h2>
@@ -372,6 +627,64 @@ export function CheckoutPage() {
                     className="mt-6 space-y-4"
                     onSubmit={handleSubmit(onDeliverySubmit)}
                   >
+                    <DeliveryAddressPicker
+                      addresses={savedAddresses}
+                      selectedId={addressChoice === "new" ? null : addressChoice}
+                      onSelect={(address) => {
+                        setAddressChoice(address.id);
+                        setEditingAddressId(null);
+                        setShowAddressForm(false);
+                        reset(toCheckoutAddress(address));
+                      }}
+                      onEdit={(address) => {
+                        setAddressChoice(address.id);
+                        setEditingAddressId(address.id);
+                        setShowAddressForm(true);
+                        reset(toCheckoutAddress(address));
+                      }}
+                      onAddNew={() => {
+                        setAddressChoice("new");
+                        setEditingAddressId(null);
+                        setShowAddressForm(true);
+                        const session = getCustomerSession();
+                        reset({
+                          ...EMPTY_CHECKOUT_ADDRESS,
+                          // Keep who they are; only the destination changes.
+                          fullName: session?.name ?? "",
+                          email: session?.email ?? "",
+                          phone: session?.phone ?? "",
+                        });
+                      }}
+                    />
+
+
+                    {showAddressForm ? (
+                      <div className="space-y-4 rounded-xl border border-border bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">
+                            {editingAddressId ? "Edit address" : "New delivery address"}
+                          </p>
+                          {savedAddresses.length > 0 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setShowAddressForm(false);
+                                setEditingAddressId(null);
+                                const fallback =
+                                  savedAddresses.find((entry) => entry.id === addressChoice) ??
+                                  savedAddresses[0];
+                                if (fallback) {
+                                  setAddressChoice(fallback.id);
+                                  reset(toCheckoutAddress(fallback));
+                                }
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="fullName">Full name</Label>
@@ -380,7 +693,7 @@ export function CheckoutPage() {
                           {...register("fullName", { required: "Name is required" })}
                         />
                         {formState.errors.fullName ? (
-                          <p className="text-xs text-destructive">
+                          <p role="alert" className="text-xs text-destructive">
                             {formState.errors.fullName.message}
                           </p>
                         ) : null}
@@ -399,7 +712,7 @@ export function CheckoutPage() {
                           })}
                         />
                         {formState.errors.email ? (
-                          <p className="text-xs text-destructive">
+                          <p role="alert" className="text-xs text-destructive">
                             {formState.errors.email.message}
                           </p>
                         ) : null}
@@ -415,7 +728,7 @@ export function CheckoutPage() {
                           })}
                         />
                         {formState.errors.phone ? (
-                          <p className="text-xs text-destructive">
+                          <p role="alert" className="text-xs text-destructive">
                             {formState.errors.phone.message}
                           </p>
                         ) : null}
@@ -427,7 +740,7 @@ export function CheckoutPage() {
                           {...register("addressLine1", { required: "Address is required" })}
                         />
                         {formState.errors.addressLine1 ? (
-                          <p className="text-xs text-destructive">
+                          <p role="alert" className="text-xs text-destructive">
                             {formState.errors.addressLine1.message}
                           </p>
                         ) : null}
@@ -442,6 +755,11 @@ export function CheckoutPage() {
                           id="city"
                           {...register("city", { required: "City is required" })}
                         />
+                        {formState.errors.city ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {formState.errors.city.message}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="state">State</Label>
@@ -449,6 +767,11 @@ export function CheckoutPage() {
                           id="state"
                           {...register("state", { required: "State is required" })}
                         />
+                        {formState.errors.state ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {formState.errors.state.message}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pincode">PIN code</Label>
@@ -460,7 +783,7 @@ export function CheckoutPage() {
                           })}
                         />
                         {formState.errors.pincode ? (
-                          <p className="text-xs text-destructive">
+                          <p role="alert" className="text-xs text-destructive">
                             {formState.errors.pincode.message}
                           </p>
                         ) : null}
@@ -475,11 +798,82 @@ export function CheckoutPage() {
                       </div>
                     </div>
 
+                        {/* Only offered for a genuinely new destination —
+                            editing an existing one already updates it. */}
+                        {!editingAddressId ? (
+                          <label className="flex cursor-pointer items-center gap-3 text-sm">
+                            <Checkbox
+                              checked={saveNewAddress}
+                              onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
+                            />
+                            Save this address for next time
+                          </label>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {/* One slot for the whole order — an order is delivered
+                        once, even when each cake was added separately. */}
+                    <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
+                      <div>
+                        <p className="text-sm font-medium">When should we deliver?</p>
+                        <p className="text-xs text-muted-foreground">
+                          We bake fresh, so the earliest date depends on preparation time.
+                        </p>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="deliveryDate">Delivery date</Label>
+                          <Input
+                            id="deliveryDate"
+                            type="date"
+                            min={minDeliveryDate}
+                            value={deliverySlot.date}
+                            aria-invalid={Boolean(slotError) && !deliverySlot.date}
+                            onChange={(event) => {
+                              setSlotError(null);
+                              setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="deliveryTime">Delivery time</Label>
+                          <select
+                            id="deliveryTime"
+                            value={deliverySlot.timeSlot}
+                            aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
+                            onChange={(event) => {
+                              setSlotError(null);
+                              setDeliverySlot((prev) => ({
+                                ...prev,
+                                timeSlot: event.target.value,
+                              }));
+                            }}
+                            className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm"
+                          >
+                            <option value="">Select a time</option>
+                            {slotOptions.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {slotError ? (
+                        <p role="alert" className="text-xs text-destructive">
+                          {slotError}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <CartIssuesAlert issues={cartIssues} />
+
                     <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
                       <Button variant="outline" render={<Link href={routes.store.cart} />}>
                         Back to cart
                       </Button>
-                      <Button type="submit" variant="bakery">
+                      <Button type="submit" variant="bakery" disabled={cartBlocked}>
                         Continue to payment
                       </Button>
                     </div>
@@ -517,7 +911,7 @@ export function CheckoutPage() {
                   </div>
 
                   <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-                    <Label htmlFor="orderNotes">Order notes (optional)</Label>
+                    <Label htmlFor="orderNotes">Special instructions (optional)</Label>
                     <Textarea
                       id="orderNotes"
                       className="mt-2"
@@ -528,7 +922,7 @@ export function CheckoutPage() {
                   </div>
 
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                    <Button variant="outline" onClick={() => setStep(1)}>
+                    <Button variant="outline" onClick={() => goToStep(1)}>
                       Back
                     </Button>
                     <Button
@@ -568,6 +962,19 @@ export function CheckoutPage() {
                         </p>
                       </ReviewBlock>
 
+                      {hasDeliverySlot(deliverySlot) ? (
+                        <ReviewBlock title="Delivery slot">
+                          <p className="font-medium">
+                            {new Date(deliverySlot.date).toLocaleDateString("en-IN", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                            })}
+                          </p>
+                          <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
+                        </ReviewBlock>
+                      ) : null}
+
                       <ReviewBlock title="Payment">
                         <p className="font-medium">
                           {availablePaymentOptions.find((option) => option.value === paymentMethod)?.label ??
@@ -582,15 +989,28 @@ export function CheckoutPage() {
                       ) : null}
                     </div>
 
+                    <CartIssuesAlert issues={cartIssues} className="mt-6" />
+
+                    {commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue ? (
+                      <p
+                        role="alert"
+                        className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800"
+                      >
+                        Minimum order value is {formatCurrency(commerce.minOrderValue)}. Add
+                        more items to continue.
+                      </p>
+                    ) : null}
+
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                      <Button variant="outline" onClick={() => setStep(2)}>
-                        Back
+                      <Button variant="outline" onClick={() => goToStep(2)}>
+                        Back to payment
                       </Button>
                       <Button
                         variant="bakery"
                         onClick={onPlaceOrder}
                         disabled={
                           placing ||
+                          cartBlocked ||
                           (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
                         }
                       >
@@ -598,29 +1018,13 @@ export function CheckoutPage() {
                         {placing ? (
                           paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
                         ) : paymentMethod === "razorpay" ? (
-                          <>
-                            <span className="sm:hidden">Pay now</span>
-                            <span className="hidden sm:inline">
-                              Pay {formatCurrency(totals.total)}
-                            </span>
-                          </>
+                          <>Pay {formatCurrency(totals.total)}</>
                         ) : (
-                          <>
-                            <span className="sm:hidden">Place order</span>
-                            <span className="hidden sm:inline">
-                              Place order · {formatCurrency(totals.total)}
-                            </span>
-                          </>
+                          <>Place order · {formatCurrency(totals.total)}</>
                         )}
                       </Button>
                     </div>
                   </div>
-
-                  {commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue ? (
-                    <p className="text-sm text-amber-700">
-                      Minimum order value is {formatCurrency(commerce.minOrderValue)}. Add more items to continue.
-                    </p>
-                  ) : null}
 
                   <p className="text-center text-xs text-muted-foreground">
                     {commerce.checkoutTerms || (
@@ -637,14 +1041,32 @@ export function CheckoutPage() {
               ) : null}
             </div>
 
-            <div className="order-1 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+            <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
               <OrderSummaryPanel
                 items={items}
                 totals={totals}
                 giftWrapLabel={commerce.giftWrapLabel}
               />
-              {step < 3 ? (
-                <div className="rounded-xl border border-border bg-white p-4">
+              {commerce.giftWrapEnabled ? (
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-white p-4">
+                  <Checkbox
+                    checked={giftWrap}
+                    onCheckedChange={(checked) => {
+                      const next = checked === true;
+                      setGiftWrap(next);
+                      updateCartPreferences({ giftWrap: next });
+                    }}
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">{commerce.giftWrapLabel}</span>
+                    <span className="block text-muted-foreground">
+                      Adds {formatCurrency(commerce.giftWrapFee)} to your order
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+
+              <div className="rounded-xl border border-border bg-white p-4">
                   <p className="mb-3 text-sm font-medium">Have a coupon?</p>
                   <CouponInput
                     subtotal={totals.subtotal}
@@ -658,8 +1080,7 @@ export function CheckoutPage() {
                       persistDraft({ coupon: undefined });
                     }}
                   />
-                </div>
-              ) : null}
+              </div>
               {!getCustomerSession() ? (
                 <p className="text-center text-xs text-muted-foreground">
                   Have an account?{" "}

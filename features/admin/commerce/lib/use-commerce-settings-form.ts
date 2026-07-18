@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { CommerceSettings } from "@/types/settings";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
   getCommerceSettings,
   saveCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 
 export function useCommerceSettingsForm() {
   const [settings, setSettings] = useState<CommerceSettings>(defaultCommerceSettings);

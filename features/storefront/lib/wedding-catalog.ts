@@ -1,10 +1,10 @@
-import type { LandingCake, LandingOffer } from "@/constants/landing-data";
+import type { LandingProduct, LandingOffer } from "@/constants/landing-data";
 import { galleryImages, specialOffers, weddingCakes } from "@/constants/landing-data";
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
-import { getActiveCoupons } from "@/features/admin/commerce/lib/coupons-repository";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
-import { getPublishedStorefrontCakes } from "@/features/admin/cakes/lib/cake-mapper";
-import { filterCakesByCategory, getAllCakes } from "./catalog";
+import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
+import { loadProducts } from "@/features/products/lib/products-repository";
+import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
+import { filterProductsByCategory, getAllProducts } from "@/features/products/lib/product-catalog";
 
 function couponToOffer(coupon: ReturnType<typeof getActiveCoupons>[number]): LandingOffer {
   const discount = coupon.percentOff
@@ -29,8 +29,8 @@ function isWeddingOffer(offer: LandingOffer): boolean {
   return haystack.includes("wedding") || haystack.includes("wed");
 }
 
-export function getWeddingCollectionCakes(maxCount = 6): LandingCake[] {
-  const published = getPublishedStorefrontCakes(loadCakes());
+export function getWeddingCollectionProducts(maxCount = 6): LandingProduct[] {
+  const published = getPublishedStorefrontProducts(loadProducts());
   const weddingFromAdmin = published.filter(
     (cake) =>
       cake.category.toLowerCase().includes("wedding") ||
@@ -40,7 +40,7 @@ export function getWeddingCollectionCakes(maxCount = 6): LandingCake[] {
   const merged =
     weddingFromAdmin.length > 0
       ? weddingFromAdmin
-      : filterCakesByCategory(getAllCakes(), "wedding");
+      : filterProductsByCategory(getAllProducts(), "wedding");
 
   const fallback = weddingCakes;
   const slugs = new Set(merged.map((cake) => cake.slug));

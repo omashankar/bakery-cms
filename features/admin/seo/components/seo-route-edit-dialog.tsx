@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { CakeMediaPicker } from "@/features/admin/cakes/components/cake-media-picker";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { MediaPicker } from "@/features/admin/products/components/media-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -18,14 +18,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
-import { updateSeoRoute } from "../lib/seo-repository";
+import { updateSeoRoute } from "@/features/seo/lib/seo-repository";
 import {
   DESCRIPTION_IDEAL_MAX,
   TITLE_IDEAL_MAX,
   charCountTone,
   countChars,
   parseKeywords,
-} from "../lib/seo-metadata";
+} from "@/features/seo/lib/seo-metadata";
 import { SeoSerpPreview } from "./seo-serp-preview";
 
 interface SeoRouteEditDialogProps {
@@ -300,7 +300,7 @@ export function SeoRouteEditDialog({
         </DialogContent>
       </Dialog>
 
-      <CakeMediaPicker
+      <MediaPicker
         open={mediaOpen}
         onOpenChange={setMediaOpen}
         onSelect={(url) => {

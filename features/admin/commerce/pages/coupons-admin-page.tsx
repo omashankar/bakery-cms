@@ -17,7 +17,7 @@ import {
   resetCoupons,
   toggleCouponActive,
   type StoredCoupon,
-} from "../lib/coupons-repository";
+} from "@/features/commerce/lib/coupons-repository";
 import { CouponFormDialog } from "../components/coupon-form-dialog";
 
 const PAGE_SIZE = 10;

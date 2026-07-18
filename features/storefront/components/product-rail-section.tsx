@@ -4,13 +4,13 @@ import Link from "next/link";
 import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
-import type { LandingCake } from "@/constants/landing-data";
+import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 
 interface ProductRailSectionProps {
   title: string;
   description?: string;
-  cakes: LandingCake[];
+  cakes: LandingProduct[];
   viewAllHref?: string;
   viewAllLabel?: string;
   className?: string;

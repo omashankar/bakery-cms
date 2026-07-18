@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CakePreviewPage } from "@/features/admin/cakes";
+import { ProductPreviewPage } from "@/features/admin/products";
 
 export const metadata: Metadata = {
   title: "Preview Cake",
@@ -12,5 +12,5 @@ interface PageProps {
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  return <CakePreviewPage cakeId={id} />;
+  return <ProductPreviewPage cakeId={id} />;
 }

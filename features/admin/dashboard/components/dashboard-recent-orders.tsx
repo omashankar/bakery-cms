@@ -7,7 +7,7 @@ import { AdminOrderStatusBadge } from "@/features/admin/commerce/components/admi
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { getRecentOrders } from "../lib/dashboard-data";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Printer } from "lucide-react";
-import { InvoiceDocument } from "@/features/admin/commerce/components/invoice-document";
+import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import type { InvoiceSettings } from "@/types/invoice";
 
 interface InvoicePreviewDialogProps {

@@ -2,7 +2,7 @@
 
 import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

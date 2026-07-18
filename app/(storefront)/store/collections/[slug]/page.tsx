@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CollectionsPage } from "@/features/storefront/pages/collections-page";
 import { categories } from "@/constants/landing-data";
+import { getStorefrontProductCards } from "@/features/products/data/products-service";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -18,6 +19,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function Page({ params }: PageProps) {
-  const { slug } = await params;
-  return <CollectionsPage categorySlug={slug} />;
+  const [{ slug }, catalog] = await Promise.all([params, getStorefrontProductCards()]);
+  return <CollectionsPage categorySlug={slug} catalog={catalog} />;
 }

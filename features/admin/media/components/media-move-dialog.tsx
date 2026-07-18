@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -3,20 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  getDraftHomepageSections,
-  getHomepagePublishMeta,
   HOMEPAGE_REVISIONS_KEY,
-  processScheduledHomepagePublish,
-  publishHomepageSections,
-  resetHomepageToDefaults,
-  saveDraftHomepageSections,
-  scheduleHomepagePublish,
   sortSections,
 } from "@/features/cms-sections/lib/homepage-store";
 import {
+  deriveHomepageMeta,
+  fetchHomepageState,
+  publishHomepage,
+  resetHomepage,
+  saveHomepageDraft,
+} from "@/features/cms-sections/data/homepage-sections-client";
+import {
   listBuilderRevisions,
   restoreBuilderRevision,
-} from "@/features/admin/builders/shared/builder-revisions";
+} from "@/features/builders/lib/builder-revisions";
 import { BuilderVersionHistoryPanel } from "@/features/admin/builders/shared/builder-version-history-panel";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {
@@ -80,25 +80,43 @@ export function HomepageBuilderPage() {
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
 
-  const refreshMeta = useCallback(() => {
-    processScheduledHomepagePublish();
-    const meta = getHomepagePublishMeta();
-    setPublishMeta(meta);
-    setScheduledPublishAt(
-      meta.scheduledPublishAt
-        ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
-        : ""
-    );
+  const refreshMeta = useCallback(async () => {
+    try {
+      const meta = deriveHomepageMeta(await fetchHomepageState());
+      setPublishMeta(meta);
+      setScheduledPublishAt(
+        meta.scheduledPublishAt
+          ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
+          : ""
+      );
+    } catch {
+      // Leave the last known status on screen rather than blanking it.
+    }
     setRevisions(listBuilderRevisions(HOMEPAGE_REVISIONS_KEY));
   }, []);
 
   useEffect(() => {
-    const draft = getDraftHomepageSections();
-    setSections(draft);
-    setSelectedId(draft[0]?.instanceId ?? null);
-    refreshMeta();
-    setMounted(true);
-  }, [refreshMeta]);
+    async function load() {
+      try {
+        const state = await fetchHomepageState();
+        const draft = sortSections(state.draft.sections);
+        setSections(draft);
+        setSelectedId(draft[0]?.instanceId ?? null);
+        setPublishMeta(deriveHomepageMeta(state));
+        setScheduledPublishAt(
+          state.draft.scheduledPublishAt
+            ? new Date(state.draft.scheduledPublishAt).toISOString().slice(0, 16)
+            : ""
+        );
+      } catch {
+        toast.error("Could not load the homepage builder");
+      }
+      setRevisions(listBuilderRevisions(HOMEPAGE_REVISIONS_KEY));
+      setMounted(true);
+    }
+
+    void load();
+  }, []);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -218,53 +236,69 @@ export function HomepageBuilderPage() {
 
   async function handleSaveDraft() {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    saveDraftHomepageSections(
-      sections,
-      scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-    );
-    setIsDirty(false);
-    setIsSaving(false);
-    refreshMeta();
-    toast.success("Homepage draft saved");
+    try {
+      await saveHomepageDraft(
+        sections,
+        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+      toast.success("Homepage draft saved");
+    } catch (error) {
+      // Keep isDirty set so the unsaved-changes guard still protects the work.
+      toast.error(error instanceof Error ? error.message : "Could not save the draft");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function confirmPublish() {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    publishHomepageSections(sections);
-    setScheduledPublishAt("");
-    setIsDirty(false);
-    setIsSaving(false);
-    setConfirm(null);
-    refreshMeta();
-    toast.success("Homepage published to storefront");
+    try {
+      await publishHomepage(sections);
+      setScheduledPublishAt("");
+      setIsDirty(false);
+      setConfirm(null);
+      await refreshMeta();
+      toast.success("Homepage published to storefront");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not publish");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function handleScheduleChange(value: string) {
+  async function handleScheduleChange(value: string) {
     setScheduledPublishAt(value);
     setIsDirty(true);
-    if (value) {
-      scheduleHomepagePublish(sections, new Date(value).toISOString());
-      toast.message("Publish scheduled", {
-        description: new Date(value).toLocaleString(),
-      });
-      refreshMeta();
-      return;
+    try {
+      await saveHomepageDraft(sections, value ? new Date(value).toISOString() : null);
+      await refreshMeta();
+      if (value) {
+        toast.message("Publish scheduled", {
+          description: new Date(value).toLocaleString(),
+        });
+      } else {
+        toast.message("Schedule cleared");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the schedule");
     }
-    saveDraftHomepageSections(sections, null);
-    refreshMeta();
-    toast.message("Schedule cleared");
   }
 
-  function handlePreview() {
-    saveDraftHomepageSections(
-      sections,
-      scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-    );
-    setIsDirty(false);
-    refreshMeta();
-    window.open(`${routes.store.home}?cmsPreview=1`, "_blank", "noopener,noreferrer");
+  async function handlePreview() {
+    try {
+      // Preview reads the draft from the server, so it has to be saved first.
+      await saveHomepageDraft(
+        sections,
+        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+      window.open(`${routes.store.home}?cmsPreview=1`, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not open preview");
+    }
   }
 
   function handleRestoreRevision(revisionId: string) {
@@ -276,27 +310,37 @@ export function HomepageBuilderPage() {
     toast.success("Revision restored into draft");
   }
 
-  function confirmReset() {
-    const state = resetHomepageToDefaults();
-    setSections(state.draft.sections);
-    setSelectedId(state.draft.sections[0]?.instanceId ?? null);
-    setIsDirty(false);
-    setConfirm(null);
-    refreshMeta();
-    toast.message("Homepage reset to defaults");
+  async function confirmReset() {
+    try {
+      const state = await resetHomepage();
+      setSections(state.draft.sections);
+      setSelectedId(state.draft.sections[0]?.instanceId ?? null);
+      setIsDirty(false);
+      setConfirm(null);
+      await refreshMeta();
+      toast.message("Homepage reset to defaults");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not reset the homepage");
+    }
   }
 
-  function handleDiscard() {
-    const draft = getDraftHomepageSections();
-    setSections(draft);
-    setSelectedId((current) =>
-      current && draft.some((section) => section.instanceId === current)
-        ? current
-        : draft[0]?.instanceId ?? null
-    );
-    setIsDirty(false);
-    refreshMeta();
-    toast.message("Discarded unsaved changes");
+  async function handleDiscard() {
+    try {
+      // Re-read the saved draft from the server and throw away local edits.
+      const state = await fetchHomepageState();
+      const draft = sortSections(state.draft.sections);
+      setSections(draft);
+      setSelectedId((current) =>
+        current && draft.some((section) => section.instanceId === current)
+          ? current
+          : draft[0]?.instanceId ?? null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+      toast.message("Discarded unsaved changes");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not discard changes");
+    }
   }
 
   function runConfirm() {

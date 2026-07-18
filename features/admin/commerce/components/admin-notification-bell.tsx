@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { routes } from "@/constants/routes";
 import { INVENTORY_UPDATED_EVENT } from "@/features/admin/commerce/lib/inventory-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/admin/inquiries/lib/inquiries-repository";
+import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
 import {
   countUnreadNotifications,
   getRecentNotifications,

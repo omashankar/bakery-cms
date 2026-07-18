@@ -61,7 +61,7 @@ import {
   NOTIFICATIONS_UPDATED_EVENT,
   syncNotifications,
 } from "@/features/admin/commerce/lib/notifications-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/admin/inquiries/lib/inquiries-repository";
+import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
 import { cn } from "@/lib/utils";
 import { adminShell } from "./admin-shell";
 

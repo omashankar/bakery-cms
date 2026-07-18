@@ -1,5 +1,5 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import type { PaymentMethod } from "@/features/storefront/checkout/lib/checkout-draft";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import type { PaymentMethod } from "@/features/orders/lib/checkout-draft";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
   deriveTransactionStatus,

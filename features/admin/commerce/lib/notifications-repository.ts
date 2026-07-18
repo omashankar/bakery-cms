@@ -1,6 +1,6 @@
-import { loadInquiries } from "@/features/admin/inquiries/lib/inquiries-repository";
+import { loadInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { getInventoryItems } from "@/features/admin/commerce/lib/inventory-repository";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import { getOrders } from "@/features/orders/lib/orders";
 import { routes } from "@/constants/routes";
 import type {
   AdminNotification,

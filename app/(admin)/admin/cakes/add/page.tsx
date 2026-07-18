@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CakeFormPage } from "@/features/admin/cakes";
+import { ProductFormPage } from "@/features/admin/products";
 
 export const metadata: Metadata = {
   title: "Add Cake",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <CakeFormPage mode="add" />;
+  return <ProductFormPage mode="add" />;
 }

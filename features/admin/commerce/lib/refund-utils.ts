@@ -1,4 +1,4 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import type { RefundReasonCode, RefundStatus } from "@/types/refund";
 
 export type RefundCaseType = "all" | "cancelled" | "refunded" | "requested" | "processing";

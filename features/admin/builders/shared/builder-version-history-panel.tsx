@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { BuilderRevision } from "./builder-revisions";
+import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import { formatDate } from "@/utils/format";
 
 interface BuilderVersionHistoryPanelProps<TSection> {

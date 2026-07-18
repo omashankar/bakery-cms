@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { InquiryStatus } from "@/types/inquiry";
-import { formatInquiryStatus, getInquiryStatusVariant } from "../lib/inquiry-utils";
+import { formatInquiryStatus, getInquiryStatusVariant } from "@/features/inquiries/lib/inquiry-utils";
 
 interface InquiryStatusBadgeProps {
   status: InquiryStatus;

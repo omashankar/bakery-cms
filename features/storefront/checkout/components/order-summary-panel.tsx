@@ -1,9 +1,9 @@
 import Link from "next/link";
-import type { CartLineItem } from "@/features/storefront/lib/cart";
-import type { CartTotals } from "@/features/storefront/checkout/lib/cart-totals";
-import { getFreeDeliveryThreshold } from "@/features/storefront/checkout/lib/cart-totals";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+import type { CartLineItem } from "@/features/cart/lib/cart";
+import type { CartTotals } from "@/features/orders/lib/cart-totals";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
@@ -62,7 +62,7 @@ export function OrderSummaryPanel({
         ) : null}
       </div>
 
-      <ul className="mt-4 space-y-3 border-b border-border pb-4">
+      <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto border-b border-border pb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 text-sm">
             <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-white">

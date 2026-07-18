@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -35,7 +35,7 @@ import {
 import { formatRelativeTime } from "@/utils/format";
 import type { FaqItem } from "@/types/content";
 import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
-import { bulkUpdateFaqStatus, deleteFaqs, loadFaqs } from "../lib/faq-repository";
+import { bulkUpdateFaqStatus, deleteFaqs, loadFaqs } from "@/features/content/lib/faq-repository";
 import {
   defaultFaqFilters,
   faqCategoryOptions,
@@ -46,7 +46,7 @@ import {
   getFaqStatusVariant,
   type FaqListFilters,
   type FaqOverview,
-} from "../lib/faq-utils";
+} from "@/features/content/lib/faq-utils";
 import { DeleteFaqDialog } from "./delete-faq-dialog";
 import { FaqFormDialog } from "./faq-form-dialog";
 

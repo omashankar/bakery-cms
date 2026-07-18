@@ -1,5 +1,5 @@
-import type { OrderStatus } from "@/features/storefront/checkout/lib/orders";
-import { formatOrderStatus } from "@/features/storefront/checkout/lib/order-status-meta";
+import type { OrderStatus } from "@/features/orders/lib/orders";
+import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
 import { Badge } from "@/components/ui/badge";
 
 const variants: Record<

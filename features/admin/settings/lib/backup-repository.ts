@@ -1,5 +1,5 @@
 import type { BackupSnapshot } from "@/types/backup";
-import { exportLocalStorageBackup, importLocalStorageBackup } from "./settings-repository";
+import { exportLocalStorageBackup, importLocalStorageBackup } from "@/features/settings/lib/settings-repository";
 
 const STORAGE_KEY = "bakery-cms-backup-history";
 const MAX_SNAPSHOTS = 8;

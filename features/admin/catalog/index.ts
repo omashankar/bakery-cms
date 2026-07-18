@@ -9,4 +9,4 @@ export {
   getCategoryById,
   getCategoryByName,
   getFlavourByName,
-} from "./lib/catalog-repository";
+} from "@/features/catalog/lib/catalog-repository";

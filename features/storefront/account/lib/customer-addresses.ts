@@ -1,4 +1,4 @@
-import type { CheckoutAddress } from "@/features/storefront/checkout/lib/checkout-draft";
+import type { CheckoutAddress } from "@/features/orders/lib/checkout-draft";
 
 const ADDRESSES_STORAGE_KEY = "bakery-cms-customer-addresses";
 

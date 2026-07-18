@@ -3,7 +3,7 @@ export { StorePageHeader } from "./components/store-page-header";
 export { ContactForm } from "./components/contact-form";
 export { StoreHomePage } from "./pages/store-home-page";
 export { CollectionsPage } from "./pages/collections-page";
-export { CakeDetailPage } from "./pages/cake-detail-page";
+export { ProductDetailPage } from "./pages/product-detail-page";
 export { WeddingPage } from "./pages/wedding-page";
 export { AboutPage } from "./pages/about-page";
 export { ContactPage } from "./pages/contact-page";

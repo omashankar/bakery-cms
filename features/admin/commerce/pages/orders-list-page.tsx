@@ -11,7 +11,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -34,8 +34,8 @@ import {
   getOrders,
   type OrderStatus,
   type PlacedOrder,
-} from "@/features/storefront/checkout/lib/orders";
-import { getActiveFulfillmentStatuses } from "@/features/storefront/checkout/lib/order-tracking";
+} from "@/features/orders/lib/orders";
+import { getActiveFulfillmentStatuses } from "@/features/orders/lib/order-tracking";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

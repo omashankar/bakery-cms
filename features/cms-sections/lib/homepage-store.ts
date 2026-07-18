@@ -1,5 +1,5 @@
 import { createDefaultHomepageSections } from "@/constants/section-registry";
-import { pushBuilderRevision } from "@/features/admin/builders/shared/builder-revisions";
+import { pushBuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   HomepageBuilderSnapshot,
   HomepageBuilderState,

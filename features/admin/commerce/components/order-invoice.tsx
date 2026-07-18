@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import { InvoiceDocument } from "@/features/admin/commerce/components/invoice-document";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { InvoiceDocument } from "@/components/shared/invoice-document";
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
-} from "@/features/admin/commerce/lib/invoice-settings-repository";
+} from "@/features/commerce/lib/invoice-settings-repository";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { InvoiceSettings } from "@/types/invoice";
-import { defaultInvoiceSettings } from "@/features/admin/commerce/lib/invoice-defaults";
+import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 
 interface OrderInvoiceProps {
   order: PlacedOrder;

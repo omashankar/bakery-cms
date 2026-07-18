@@ -9,12 +9,18 @@ import { getRazorpayCredentials } from "@/features/admin/settings/lib/razorpay-c
 export async function POST(request: Request) {
   const credentials = getRazorpayCredentials();
   if (!credentials) {
+    // The customer sees this verbatim in the payment-failed dialog, so it must
+    // read as help, not as a task for whoever runs the shop. The setup detail
+    // belongs in the server log, where an operator will actually look.
+    console.error(
+      "[razorpay] No credentials. Set them in Admin → Payments → Payment Gateway, or via RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET."
+    );
     return Response.json(
       {
         error:
-          "Razorpay is not connected. Add your keys in Admin → Payments → Payment Gateway (or .env.local).",
+          "Online payment is unavailable right now. Please choose Cash on Delivery, or try again shortly.",
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
   const { keyId, keySecret } = credentials;

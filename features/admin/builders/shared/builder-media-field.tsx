@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { CakeMediaPicker } from "@/features/admin/cakes/components/cake-media-picker";
+import { MediaPicker } from "@/features/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,7 @@ export function BuilderMediaField({
           </Button>
         </div>
       ) : null}
-      <CakeMediaPicker
+      <MediaPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onSelect={(url) => onChange(url)}

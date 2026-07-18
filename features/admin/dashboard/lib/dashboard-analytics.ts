@@ -18,7 +18,7 @@ import {
   type TopProductItem,
 } from "@/features/admin/reports/lib/reports-data";
 import { routes } from "@/constants/routes";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency } from "@/utils/format";
 
 export type DashboardDateRange = ReportDateRange;

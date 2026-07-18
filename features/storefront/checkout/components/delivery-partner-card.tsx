@@ -1,5 +1,5 @@
 import { Phone, Star, Truck } from "lucide-react";
-import type { DeliveryPartnerInfo } from "@/features/storefront/checkout/lib/delivery-tracking";
+import type { DeliveryPartnerInfo } from "@/features/orders/lib/delivery-tracking";
 import { cn } from "@/lib/utils";
 
 interface DeliveryPartnerCardProps {

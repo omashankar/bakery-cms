@@ -7,15 +7,15 @@ import { Heart, ShoppingBag, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PriceDisplay } from "@/components/storefront/price-display";
-import type { LandingCake } from "@/constants/landing-data";
+import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { addToCart } from "@/features/storefront/lib/cart";
+import { addToCart } from "@/features/cart/lib/cart";
 import { isInWishlist, toggleWishlist } from "@/features/storefront/lib/wishlist";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ProductCardProps {
-  cake: LandingCake;
+  cake: LandingProduct;
   variant?: "default" | "tall";
   className?: string;
 }
@@ -39,7 +39,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
     event.preventDefault();
     event.stopPropagation();
     addToCart({
-      cakeSlug: cake.slug,
+      productSlug: cake.slug,
       name: cake.name,
       image: cake.image,
       price: cake.price,

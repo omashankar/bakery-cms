@@ -1,5 +1,5 @@
-import { getAllCakes } from "@/features/storefront/lib/catalog";
-import type { LandingCake } from "@/constants/landing-data";
+import { getAllProducts } from "@/features/products/lib/product-catalog";
+import type { LandingProduct } from "@/constants/landing-data";
 
 const STORAGE_KEY = "bakery-cms-recently-viewed";
 const MAX_ITEMS = 8;
@@ -30,7 +30,7 @@ function writeSlugs(slugs: string[]): void {
   notifyUpdated();
 }
 
-export function recordRecentlyViewedCake(slug: string): void {
+export function recordRecentlyViewedProduct(slug: string): void {
   const normalized = slug.trim();
   if (!normalized) return;
 
@@ -42,12 +42,12 @@ export function getRecentlyViewedSlugs(): string[] {
   return readSlugs();
 }
 
-export function getRecentlyViewedCakes(excludeSlug?: string): LandingCake[] {
-  const cakesBySlug = new Map(getAllCakes().map((cake) => [cake.slug, cake]));
+export function getRecentlyViewedProducts(excludeSlug?: string): LandingProduct[] {
+  const productsBySlug = new Map(getAllProducts().map((cake) => [cake.slug, cake]));
 
   return readSlugs()
     .filter((slug) => slug !== excludeSlug)
-    .map((slug) => cakesBySlug.get(slug))
-    .filter((cake): cake is LandingCake => Boolean(cake))
+    .map((slug) => productsBySlug.get(slug))
+    .filter((cake): cake is LandingProduct => Boolean(cake))
     .slice(0, MAX_ITEMS);
 }
