@@ -1,0 +1,224 @@
+{
+  "draft": {
+    "sections": [
+      {
+        "instanceId": "wedding-hero-0",
+        "type": "wedding-hero",
+        "order": 0,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Forever Starts Here",
+          "title": "Celebrate Your Love Story",
+          "description": "From intimate ceremonies to grand receptions, our wedding cake studio creates bespoke designs tailored to your theme, colours, and guest count.",
+          "ctaLabel": "Request a Quote",
+          "ctaHref": "#inquiry",
+          "imageUrl": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+        }
+      },
+      {
+        "instanceId": "wedding-why-us-1",
+        "type": "wedding-why-us",
+        "order": 1,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Why Choose Us",
+          "description": "Trusted by couples across India for unforgettable wedding celebrations."
+        }
+      },
+      {
+        "instanceId": "wedding-offers-2",
+        "type": "wedding-offers",
+        "order": 2,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "title": "Wedding Offers",
+          "description": "Limited-time packages for couples planning their big day.",
+          "maxCount": 3
+        }
+      },
+      {
+        "instanceId": "wedding-collections-3",
+        "type": "wedding-collections",
+        "order": 3,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "title": "Wedding Collections",
+          "description": "Explore signature tiers, flavours, and finishes for your celebration.",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "wedding-gallery-4",
+        "type": "wedding-gallery",
+        "order": 4,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Our Work",
+          "title": "Wedding Gallery",
+          "description": "A glimpse of celebrations we have been honoured to sweeten.",
+          "maxCount": 8,
+          "ctaLabel": "View Full Gallery",
+          "ctaHref": "/store/gallery"
+        }
+      },
+      {
+        "instanceId": "wedding-testimonials-5",
+        "type": "wedding-testimonials",
+        "order": 5,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Love Letters",
+          "title": "What Couples Say",
+          "description": "Stories from weddings we were honoured to be part of.",
+          "maxCount": 2
+        }
+      },
+      {
+        "instanceId": "wedding-inquiry-6",
+        "type": "wedding-inquiry",
+        "order": 6,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Wedding Inquiry",
+          "description": "Share your wedding date, venue, and vision. Our team will reach out within 24 hours.",
+          "note": "Complimentary tasting for orders above ₹15,000",
+          "submitLabel": "Submit Wedding Inquiry",
+          "defaultSubject": "Wedding cake inquiry"
+        }
+      },
+      {
+        "instanceId": "wedding-cta-7",
+        "type": "wedding-cta",
+        "order": 7,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Ready to Design Your Dream Cake?",
+          "description": "Book a consultation with our wedding specialists today.",
+          "ctaLabel": "Contact Us",
+          "ctaHref": "/store/contact",
+          "showGalleryLink": true
+        }
+      }
+    ],
+    "updatedAt": "2026-07-18T07:05:37.347Z"
+  },
+  "published": {
+    "sections": [
+      {
+        "instanceId": "wedding-hero-0",
+        "type": "wedding-hero",
+        "order": 0,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Forever Starts Here",
+          "title": "Celebrate Your Love Story",
+          "description": "From intimate ceremonies to grand receptions, our wedding cake studio creates bespoke designs tailored to your theme, colours, and guest count.",
+          "ctaLabel": "Request a Quote",
+          "ctaHref": "#inquiry",
+          "imageUrl": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+        }
+      },
+      {
+        "instanceId": "wedding-why-us-1",
+        "type": "wedding-why-us",
+        "order": 1,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Why Choose Us",
+          "description": "Trusted by couples across India for unforgettable wedding celebrations."
+        }
+      },
+      {
+        "instanceId": "wedding-offers-2",
+        "type": "wedding-offers",
+        "order": 2,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "title": "Wedding Offers",
+          "description": "Limited-time packages for couples planning their big day.",
+          "maxCount": 3
+        }
+      },
+      {
+        "instanceId": "wedding-collections-3",
+        "type": "wedding-collections",
+        "order": 3,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "title": "Wedding Collections",
+          "description": "Explore signature tiers, flavours, and finishes for your celebration.",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "wedding-gallery-4",
+        "type": "wedding-gallery",
+        "order": 4,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Our Work",
+          "title": "Wedding Gallery",
+          "description": "A glimpse of celebrations we have been honoured to sweeten.",
+          "maxCount": 8,
+          "ctaLabel": "View Full Gallery",
+          "ctaHref": "/store/gallery"
+        }
+      },
+      {
+        "instanceId": "wedding-testimonials-5",
+        "type": "wedding-testimonials",
+        "order": 5,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Love Letters",
+          "title": "What Couples Say",
+          "description": "Stories from weddings we were honoured to be part of.",
+          "maxCount": 2
+        }
+      },
+      {
+        "instanceId": "wedding-inquiry-6",
+        "type": "wedding-inquiry",
+        "order": 6,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Wedding Inquiry",
+          "description": "Share your wedding date, venue, and vision. Our team will reach out within 24 hours.",
+          "note": "Complimentary tasting for orders above ₹15,000",
+          "submitLabel": "Submit Wedding Inquiry",
+          "defaultSubject": "Wedding cake inquiry"
+        }
+      },
+      {
+        "instanceId": "wedding-cta-7",
+        "type": "wedding-cta",
+        "order": 7,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Ready to Design Your Dream Cake?",
+          "description": "Book a consultation with our wedding specialists today.",
+          "ctaLabel": "Contact Us",
+          "ctaHref": "/store/contact",
+          "showGalleryLink": true
+        }
+      }
+    ],
+    "updatedAt": "2026-07-18T07:05:37.348Z"
+  }
+}

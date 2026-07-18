@@ -1,0 +1,146 @@
+[
+  {
+    "id": "page-about",
+    "title": "About Us",
+    "slug": "about",
+    "description": "India's beloved bakery brand — premium cakes, pastries, and confections made with love for every celebration.",
+    "template": "about",
+    "heroImage": "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?w=1200&h=900&fit=crop",
+    "blocks": [
+      {
+        "id": "about-1",
+        "type": "heading",
+        "content": "Crafting Sweet Memories Since 1956"
+      },
+      {
+        "id": "about-2",
+        "type": "paragraph",
+        "content": "From a single neighborhood store to a household name, Monginis has been part of celebrations for generations across India."
+      },
+      {
+        "id": "about-3",
+        "type": "paragraph",
+        "content": "Our bakers combine timeless recipes with modern craftsmanship to deliver cakes that look premium and taste unforgettable."
+      },
+      {
+        "id": "about-4",
+        "type": "paragraph",
+        "content": "We remain committed to consistent quality, hygienic kitchens, and delight in every bite — whether it's a birthday, wedding, or corporate event."
+      }
+    ],
+    "status": "published",
+    "isSystem": true,
+    "sortOrder": 1,
+    "seo": {
+      "metaTitle": "About Us | Monginis",
+      "metaDescription": "India's beloved bakery brand — premium cakes, pastries, and confections made with love for every celebration."
+    },
+    "createdAt": "2026-07-18T07:11:01.351Z",
+    "updatedAt": "2026-07-18T07:11:01.351Z"
+  },
+  {
+    "id": "page-privacy",
+    "title": "Privacy Policy",
+    "slug": "privacy",
+    "description": "How we collect, use, and protect your information.",
+    "template": "standard",
+    "blocks": [
+      {
+        "id": "privacy-1",
+        "type": "paragraph",
+        "content": "We collect only essential details required to process orders, deliver cakes, and provide customer support. This may include your name, email address, phone number, and delivery address."
+      },
+      {
+        "id": "privacy-2",
+        "type": "paragraph",
+        "content": "Your contact information is never sold to third parties. Payment processing is handled by secure, PCI-compliant providers. We retain order data only as long as necessary for fulfillment and legal compliance."
+      },
+      {
+        "id": "privacy-3",
+        "type": "paragraph",
+        "content": "By using this website, you consent to data usage for order fulfillment, service updates, and communication related to your inquiries. You may request access to or deletion of your personal data by contacting us."
+      },
+      {
+        "id": "privacy-4",
+        "type": "paragraph",
+        "content": "We use cookies to improve site performance and remember your preferences. You can disable cookies in your browser settings, though some features may not function correctly."
+      }
+    ],
+    "status": "published",
+    "isSystem": true,
+    "sortOrder": 2,
+    "seo": {
+      "metaTitle": "Privacy Policy | Monginis",
+      "metaDescription": "How we collect, use, and protect your information."
+    },
+    "createdAt": "2026-07-18T07:11:01.351Z",
+    "updatedAt": "2026-07-18T07:11:01.351Z"
+  },
+  {
+    "id": "page-terms",
+    "title": "Terms of Service",
+    "slug": "terms",
+    "description": "Terms and conditions for using our bakery services.",
+    "template": "standard",
+    "blocks": [
+      {
+        "id": "terms-1",
+        "type": "paragraph",
+        "content": "Orders are confirmed after we review your inquiry and provide a final quote. Custom cake orders require a deposit before preparation begins. Cancellation policies vary by product type and preparation stage."
+      },
+      {
+        "id": "terms-2",
+        "type": "paragraph",
+        "content": "Customized and wedding cakes are non-refundable once design approval and preparation have started. Delivery times are estimates and may vary due to traffic, weather, or high-demand periods."
+      },
+      {
+        "id": "terms-3",
+        "type": "paragraph",
+        "content": "Product images are representative. Minor variations in decoration may occur while maintaining the agreed design and quality standards. Allergen information is provided on request — please inform us of dietary restrictions when placing an order."
+      },
+      {
+        "id": "terms-4",
+        "type": "paragraph",
+        "content": "Use of this site implies acceptance of all terms listed here and any related policy updates published on this page."
+      }
+    ],
+    "status": "published",
+    "isSystem": true,
+    "sortOrder": 3,
+    "seo": {
+      "metaTitle": "Terms of Service | Monginis",
+      "metaDescription": "Terms and conditions for using our bakery services."
+    },
+    "createdAt": "2026-07-18T07:11:01.351Z",
+    "updatedAt": "2026-07-18T07:11:01.351Z"
+  },
+  {
+    "id": "page-catering",
+    "title": "Corporate Catering",
+    "slug": "corporate-catering",
+    "description": "Premium pastries and celebration cakes for offices and events.",
+    "template": "standard",
+    "blocks": [
+      {
+        "id": "catering-1",
+        "type": "heading",
+        "content": "Celebrations at scale"
+      },
+      {
+        "id": "catering-2",
+        "type": "paragraph",
+        "content": "From boardroom meetings to annual day celebrations, Monginis offers curated dessert spreads, branded cupcakes, and custom cakes for corporate clients."
+      },
+      {
+        "id": "catering-3",
+        "type": "paragraph",
+        "content": "Contact our team for bulk pricing, vegetarian options, and scheduled delivery across metro cities."
+      }
+    ],
+    "status": "draft",
+    "isSystem": false,
+    "sortOrder": 4,
+    "createdAt": "2026-07-18T07:11:01.351Z",
+    "updatedAt": "2026-07-18T07:11:01.351Z"
+  }
+]

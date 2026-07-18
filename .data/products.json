@@ -1,0 +1,2294 @@
+[
+  {
+    "id": "1",
+    "name": "Chocolate Truffle Delight",
+    "slug": "chocolate-truffle-delight",
+    "description": "Rich Belgian chocolate layers with silky truffle ganache",
+    "shortDescription": "Rich Belgian chocolate layers with silky truffle ganache",
+    "price": 1299,
+    "compareAtPrice": 1429,
+    "images": [
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-chocolate",
+    "flavourId": "fl-chocolate",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1299,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1499,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1749,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": true,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [
+      "Chocolate",
+      "Dark Chocolate",
+      "Truffle"
+    ],
+    "stockStatus": "low_stock",
+    "stockQuantity": 6,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-ec73f6ed",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-a0fc8f98",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-246a5a5e",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 124,
+    "seo": {
+      "metaTitle": "Chocolate Truffle Delight | Monginis",
+      "metaDescription": "Rich Belgian chocolate layers with silky truffle ganache",
+      "ogImage": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.716Z",
+    "updatedAt": "2026-07-18T11:19:42.716Z"
+  },
+  {
+    "id": "2",
+    "name": "Red Velvet Classic",
+    "slug": "red-velvet-classic",
+    "description": "Velvety crimson sponge with cream cheese frosting",
+    "shortDescription": "Velvety crimson sponge with cream cheese frosting",
+    "price": 1149,
+    "compareAtPrice": 1264,
+    "images": [
+      "https://images.unsplash.com/photo-1586985289906-406988974504?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-premium",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1149,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1349,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1599,
+        "serves": "12–15"
+      }
+    ],
+    "status": "draft",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-bdfbc41c",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-8aaf566e",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-1ce7c268",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Red Velvet Classic | Monginis",
+      "metaDescription": "Velvety crimson sponge with cream cheese frosting",
+      "ogImage": "https://images.unsplash.com/photo-1586985289906-406988974504?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.717Z",
+    "updatedAt": "2026-07-18T11:19:42.717Z"
+  },
+  {
+    "id": "3",
+    "name": "Black Forest Supreme",
+    "slug": "black-forest-supreme",
+    "description": "Cherry-filled chocolate sponge with whipped cream",
+    "shortDescription": "Cherry-filled chocolate sponge with whipped cream",
+    "price": 999,
+    "images": [
+      "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-classic",
+    "flavourId": "fl-chocolate",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 999,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1199,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1449,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-60d58161",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-a43fe226",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-dafed09c",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Black Forest Supreme | Monginis",
+      "metaDescription": "Cherry-filled chocolate sponge with whipped cream",
+      "ogImage": "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.717Z",
+    "updatedAt": "2026-07-18T11:19:42.717Z"
+  },
+  {
+    "id": "4",
+    "name": "Butterscotch Crunch",
+    "slug": "butterscotch-crunch",
+    "description": "Caramel butterscotch with crunchy praline layers",
+    "shortDescription": "Caramel butterscotch with crunchy praline layers",
+    "price": 899,
+    "images": [
+      "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-classic",
+    "flavourId": "fl-butterscotch",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 899,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1099,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1349,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-e78ea0c9",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-ea298394",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-4f3e3222",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.6,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Butterscotch Crunch | Monginis",
+      "metaDescription": "Caramel butterscotch with crunchy praline layers",
+      "ogImage": "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.717Z",
+    "updatedAt": "2026-07-18T11:19:42.717Z"
+  },
+  {
+    "id": "5",
+    "name": "Mango Mousse Paradise",
+    "slug": "mango-mousse-paradise",
+    "description": "Seasonal Alphonso mango mousse cake",
+    "shortDescription": "Seasonal Alphonso mango mousse cake",
+    "price": 1099,
+    "compareAtPrice": 1209,
+    "images": [
+      "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "9",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1099,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1299,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1549,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": true,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": true,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-0e8b8ad9",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-be22ead1",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-07949039",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Mango Mousse Paradise | Monginis",
+      "metaDescription": "Seasonal Alphonso mango mousse cake",
+      "ogImage": "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.717Z",
+    "updatedAt": "2026-07-18T11:19:42.717Z"
+  },
+  {
+    "id": "6",
+    "name": "Pistachio Rose Cake",
+    "slug": "pistachio-rose-cake",
+    "description": "Persian-inspired pistachio with rose essence",
+    "shortDescription": "Persian-inspired pistachio with rose essence",
+    "price": 1399,
+    "compareAtPrice": 1539,
+    "images": [
+      "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-premium",
+    "flavourId": "fl-pistachio",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1399,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1599,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1849,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "low_stock",
+    "stockQuantity": 6,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-fcccba6b",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-6931b608",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-19a9a202",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Pistachio Rose Cake | Monginis",
+      "metaDescription": "Persian-inspired pistachio with rose essence",
+      "ogImage": "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.718Z",
+    "updatedAt": "2026-07-18T11:19:42.718Z"
+  },
+  {
+    "id": "7",
+    "name": "Tiramisu Elegance",
+    "slug": "tiramisu-elegance",
+    "description": "Italian classic with espresso-soaked layers",
+    "shortDescription": "Italian classic with espresso-soaked layers",
+    "price": 1199,
+    "compareAtPrice": 1319,
+    "images": [
+      "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-international",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1199,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1399,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1649,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-bbe4d885",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-83b0165a",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-ba5c1f97",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Tiramisu Elegance | Monginis",
+      "metaDescription": "Italian classic with espresso-soaked layers",
+      "ogImage": "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.718Z",
+    "updatedAt": "2026-07-18T11:19:42.718Z"
+  },
+  {
+    "id": "8",
+    "name": "Vanilla Dream Cake",
+    "slug": "vanilla-dream-cake",
+    "description": "Classic vanilla sponge with buttercream",
+    "shortDescription": "Classic vanilla sponge with buttercream",
+    "price": 749,
+    "images": [
+      "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-classic",
+    "flavourId": "fl-vanilla",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 749,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 949,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1199,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-a22aeaff",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-9297e53e",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-c5059f09",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Vanilla Dream Cake | Monginis",
+      "metaDescription": "Classic vanilla sponge with buttercream",
+      "ogImage": "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.718Z",
+    "updatedAt": "2026-07-18T11:19:42.718Z"
+  },
+  {
+    "id": "9",
+    "name": "Pineapple Gateau",
+    "slug": "pineapple-gateau",
+    "description": "Fresh pineapple with light whipped cream",
+    "shortDescription": "Fresh pineapple with light whipped cream",
+    "price": 849,
+    "images": [
+      "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-fruit",
+    "flavourId": "fl-fruit",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 849,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1049,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1299,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-e0f5a009",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-f6cddca9",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-29fc1248",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Pineapple Gateau | Monginis",
+      "metaDescription": "Fresh pineapple with light whipped cream",
+      "ogImage": "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.718Z",
+    "updatedAt": "2026-07-18T11:19:42.718Z"
+  },
+  {
+    "id": "10",
+    "name": "Choco Chip Brownie Cake",
+    "slug": "choco-chip-brownie-cake",
+    "description": "Dense brownie base with chocolate chips",
+    "shortDescription": "Dense brownie base with chocolate chips",
+    "price": 799,
+    "images": [
+      "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-chocolate",
+    "flavourId": "fl-chocolate",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 799,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 999,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1249,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-a44eb667",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-5a935a0d",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-641f57aa",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Choco Chip Brownie Cake | Monginis",
+      "metaDescription": "Dense brownie base with chocolate chips",
+      "ogImage": "https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "11",
+    "name": "Fresh Fruit Fantasy",
+    "slug": "fresh-fruit-fantasy",
+    "description": "Seasonal fresh fruits on vanilla sponge",
+    "shortDescription": "Seasonal fresh fruits on vanilla sponge",
+    "price": 949,
+    "images": [
+      "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "cat-fruit",
+    "flavourId": "fl-fruit",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 949,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1149,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1399,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "low_stock",
+    "stockQuantity": 6,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-eeef08c4",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-4421fb86",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-36c9ee5d",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Fresh Fruit Fantasy | Monginis",
+      "metaDescription": "Seasonal fresh fruits on vanilla sponge",
+      "ogImage": "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "12",
+    "name": "Royal Tier Elegance",
+    "slug": "royal-tier-elegance",
+    "description": "5-tier masterpiece with fondant florals",
+    "shortDescription": "5-tier masterpiece with fondant florals",
+    "price": 15999,
+    "compareAtPrice": 17599,
+    "images": [
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+    ],
+    "categoryId": "2",
+    "occasionIds": [
+      "oc-wedding"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 15999,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 16199,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 16449,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-05f4aac7",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-7adda324",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-8b08ee83",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 5,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Royal Tier Elegance | Monginis",
+      "metaDescription": "5-tier masterpiece with fondant florals",
+      "ogImage": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "13",
+    "name": "Blush Rose Wedding",
+    "slug": "blush-rose-wedding",
+    "description": "Romantic blush tones with sugar roses",
+    "shortDescription": "Romantic blush tones with sugar roses",
+    "price": 12499,
+    "compareAtPrice": 13749,
+    "images": [
+      "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&h=800&fit=crop"
+    ],
+    "categoryId": "2",
+    "occasionIds": [
+      "oc-wedding"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 12499,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 12699,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 12949,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-fc735496",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-6e611391",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-0abfdaf2",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Blush Rose Wedding | Monginis",
+      "metaDescription": "Romantic blush tones with sugar roses",
+      "ogImage": "https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&h=800&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "14",
+    "name": "Classic White Cascade",
+    "slug": "classic-white-cascade",
+    "description": "Timeless white fondant with cascading flowers",
+    "shortDescription": "Timeless white fondant with cascading flowers",
+    "price": 18999,
+    "compareAtPrice": 20899,
+    "images": [
+      "https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&h=800&fit=crop"
+    ],
+    "categoryId": "2",
+    "occasionIds": [
+      "oc-wedding"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 18999,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 19199,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 19449,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-4d96f08e",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-56bc64a3",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-742b7794",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Classic White Cascade | Monginis",
+      "metaDescription": "Timeless white fondant with cascading flowers",
+      "ogImage": "https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&h=800&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "pc-1",
+    "name": "Memory Lane Photo Cake",
+    "slug": "memory-lane-photo-cake",
+    "description": "Your favourite photo printed on premium vanilla fondant",
+    "shortDescription": "Your favourite photo printed on premium vanilla fondant",
+    "price": 1499,
+    "compareAtPrice": 1649,
+    "images": [
+      "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "7",
+    "flavourId": "fl-vanilla",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1499,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1699,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1949,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": true,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": true,
+    "preparationTimeMinutes": 180,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-dbc3e7d5",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-f564066a",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-ee12ca44",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      },
+      {
+        "id": "group-7f7e0e91",
+        "name": "Photo cake",
+        "type": "photo",
+        "required": false,
+        "options": [
+          {
+            "id": "opt-52097ee7",
+            "label": "Standard design",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-41097b10",
+            "label": "Custom photo print",
+            "semantic": "photo-print",
+            "priceAdjustment": 250,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Memory Lane Photo Cake | Monginis",
+      "metaDescription": "Your favourite photo printed on premium vanilla fondant",
+      "ogImage": "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "pc-2",
+    "name": "Celebration Portrait Cake",
+    "slug": "celebration-portrait-cake",
+    "description": "High-resolution edible print for birthdays and anniversaries",
+    "shortDescription": "High-resolution edible print for birthdays and anniversaries",
+    "price": 1699,
+    "compareAtPrice": 1869,
+    "images": [
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "7",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1699,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1899,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 2149,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": true,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "low_stock",
+    "stockQuantity": 6,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": true,
+    "preparationTimeMinutes": 180,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-92d3d1c2",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-21980502",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-6bf5965e",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      },
+      {
+        "id": "group-2ab40703",
+        "name": "Photo cake",
+        "type": "photo",
+        "required": false,
+        "options": [
+          {
+            "id": "opt-9fad3731",
+            "label": "Standard design",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-faf6faea",
+            "label": "Custom photo print",
+            "semantic": "photo-print",
+            "priceAdjustment": 250,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Celebration Portrait Cake | Monginis",
+      "metaDescription": "High-resolution edible print for birthdays and anniversaries",
+      "ogImage": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "pc-3",
+    "name": "Kids Photo Surprise",
+    "slug": "kids-photo-surprise",
+    "description": "Fun character frame with your child's photo",
+    "shortDescription": "Fun character frame with your child's photo",
+    "price": 1299,
+    "compareAtPrice": 1429,
+    "images": [
+      "https://images.unsplash.com/photo-1535254973040-607b474cb50d?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "7",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1299,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1499,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1749,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": true,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": true,
+    "preparationTimeMinutes": 180,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-d9004e14",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-beb70619",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-668cb8ad",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      },
+      {
+        "id": "group-7b1ca4d6",
+        "name": "Photo cake",
+        "type": "photo",
+        "required": false,
+        "options": [
+          {
+            "id": "opt-a38cd167",
+            "label": "Standard design",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-c8a102b9",
+            "label": "Custom photo print",
+            "semantic": "photo-print",
+            "priceAdjustment": 250,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Kids Photo Surprise | Monginis",
+      "metaDescription": "Fun character frame with your child's photo",
+      "ogImage": "https://images.unsplash.com/photo-1535254973040-607b474cb50d?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "pc-4",
+    "name": "Couple Moments Cake",
+    "slug": "couple-moments-cake",
+    "description": "Romantic photo cake for anniversaries and proposals",
+    "shortDescription": "Romantic photo cake for anniversaries and proposals",
+    "price": 1899,
+    "compareAtPrice": 2089,
+    "images": [
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "7",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1899,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 2099,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 2349,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": true,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": true,
+    "preparationTimeMinutes": 180,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-00a336ea",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-037cb769",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-0833d53d",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      },
+      {
+        "id": "group-87855e26",
+        "name": "Photo cake",
+        "type": "photo",
+        "required": false,
+        "options": [
+          {
+            "id": "opt-a4582c20",
+            "label": "Standard design",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-0f7d387b",
+            "label": "Custom photo print",
+            "semantic": "photo-print",
+            "priceAdjustment": 250,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Couple Moments Cake | Monginis",
+      "metaDescription": "Romantic photo cake for anniversaries and proposals",
+      "ogImage": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "eg-1",
+    "name": "Eggless Chocolate Fudge",
+    "slug": "eggless-chocolate-fudge",
+    "description": "Rich eggless chocolate layers with silky ganache",
+    "shortDescription": "Rich eggless chocolate layers with silky ganache",
+    "price": 1099,
+    "compareAtPrice": 1209,
+    "images": [
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "8",
+    "flavourId": "fl-chocolate",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1099,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1299,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1549,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": true,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat. Prepared without eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-0182c7cd",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-affa1f4c",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": false
+          },
+          {
+            "id": "opt-4c2b9708",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": true
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Eggless Chocolate Fudge | Monginis",
+      "metaDescription": "Rich eggless chocolate layers with silky ganache",
+      "ogImage": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "eg-2",
+    "name": "Eggless Vanilla Dream",
+    "slug": "eggless-vanilla-dream",
+    "description": "Classic vanilla sponge with buttercream — 100% eggless",
+    "shortDescription": "Classic vanilla sponge with buttercream — 100% eggless",
+    "price": 899,
+    "images": [
+      "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "8",
+    "flavourId": "fl-vanilla",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 899,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1099,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1349,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": true,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat. Prepared without eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-4c4a7e40",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-fab4f8cc",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": false
+          },
+          {
+            "id": "opt-593c2b47",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": true
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Eggless Vanilla Dream | Monginis",
+      "metaDescription": "Classic vanilla sponge with buttercream — 100% eggless",
+      "ogImage": "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "eg-3",
+    "name": "Eggless Red Velvet",
+    "slug": "eggless-red-velvet",
+    "description": "Velvety crumb with cream cheese frosting, no eggs",
+    "shortDescription": "Velvety crumb with cream cheese frosting, no eggs",
+    "price": 1199,
+    "compareAtPrice": 1319,
+    "images": [
+      "https://images.unsplash.com/photo-1557925923-cd4648e211a0?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "8",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1199,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1399,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1649,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": true,
+    "isTrending": false,
+    "isEggless": true,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "low_stock",
+    "stockQuantity": 6,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat. Prepared without eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-c0394c5d",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-98a31f41",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": false
+          },
+          {
+            "id": "opt-14918bc3",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": true
+          }
+        ]
+      }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Eggless Red Velvet | Monginis",
+      "metaDescription": "Velvety crumb with cream cheese frosting, no eggs",
+      "ogImage": "https://images.unsplash.com/photo-1557925923-cd4648e211a0?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "eg-4",
+    "name": "Eggless Fruit Fantasy",
+    "slug": "eggless-fruit-fantasy",
+    "description": "Fresh seasonal fruits on light eggless sponge",
+    "shortDescription": "Fresh seasonal fruits on light eggless sponge",
+    "price": 999,
+    "images": [
+      "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "8",
+    "flavourId": "fl-fruit",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 999,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1199,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1449,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": true,
+    "isPhotoCake": false,
+    "isSeasonal": false,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat. Prepared without eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-62626331",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-eb52b411",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": false
+          },
+          {
+            "id": "opt-935cb1da",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": true
+          }
+        ]
+      }
+    ],
+    "rating": 4.6,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Eggless Fruit Fantasy | Monginis",
+      "metaDescription": "Fresh seasonal fruits on light eggless sponge",
+      "ogImage": "https://images.unsplash.com/photo-1562440499-64c9a111f713?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.719Z",
+    "updatedAt": "2026-07-18T11:19:42.719Z"
+  },
+  {
+    "id": "ss-2",
+    "name": "Strawberry Bliss",
+    "slug": "strawberry-bliss",
+    "description": "Fresh strawberries with whipped cream layers",
+    "shortDescription": "Fresh strawberries with whipped cream layers",
+    "price": 1149,
+    "compareAtPrice": 1264,
+    "images": [
+      "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "9",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1149,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1349,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1599,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": true,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-f951f5f8",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-2dc5068e",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-8bda005d",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.8,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Strawberry Bliss | Monginis",
+      "metaDescription": "Fresh strawberries with whipped cream layers",
+      "ogImage": "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.720Z",
+    "updatedAt": "2026-07-18T11:19:42.720Z"
+  },
+  {
+    "id": "ss-3",
+    "name": "Festive Gulab Jamun Cake",
+    "slug": "festive-gulab-jamun-cake",
+    "description": "Indian festive favourite with gulab jamun topping",
+    "shortDescription": "Indian festive favourite with gulab jamun topping",
+    "price": 1299,
+    "compareAtPrice": 1429,
+    "images": [
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "9",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1299,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1499,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1749,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": true,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-fce127ce",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-65961410",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-68010de6",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.7,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Festive Gulab Jamun Cake | Monginis",
+      "metaDescription": "Indian festive favourite with gulab jamun topping",
+      "ogImage": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.720Z",
+    "updatedAt": "2026-07-18T11:19:42.720Z"
+  },
+  {
+    "id": "ss-4",
+    "name": "Winter Spice Cake",
+    "slug": "winter-spice-cake",
+    "description": "Cinnamon and nutmeg notes with cream cheese frosting",
+    "shortDescription": "Cinnamon and nutmeg notes with cream cheese frosting",
+    "price": 1049,
+    "compareAtPrice": 1154,
+    "images": [
+      "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=600&h=600&fit=crop"
+    ],
+    "categoryId": "9",
+    "occasionIds": [
+      "oc-birthday"
+    ],
+    "weights": [
+      {
+        "label": "0.5 kg",
+        "price": 1049,
+        "serves": "4–6"
+      },
+      {
+        "label": "1 kg",
+        "price": 1249,
+        "serves": "8–10"
+      },
+      {
+        "label": "1.5 kg",
+        "price": 1499,
+        "serves": "12–15"
+      }
+    ],
+    "status": "published",
+    "isFeatured": false,
+    "isBestSeller": false,
+    "isTrending": false,
+    "isEggless": false,
+    "isPhotoCake": false,
+    "isSeasonal": true,
+    "shapes": [
+      "Round",
+      "Square",
+      "Heart"
+    ],
+    "flavourOptions": [],
+    "stockStatus": "in_stock",
+    "stockQuantity": 50,
+    "unlimitedStock": false,
+    "allowsMessage": true,
+    "allowsPhotoUpload": false,
+    "preparationTimeMinutes": 120,
+    "shelfLifeDays": 3,
+    "calories": 320,
+    "allergens": "Contains milk, wheat, eggs.",
+    "careInstructions": "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    "variantGroups": [
+      {
+        "id": "group-d60bac38",
+        "name": "Egg preference",
+        "type": "egg",
+        "required": true,
+        "options": [
+          {
+            "id": "opt-f8133a64",
+            "label": "Regular",
+            "priceAdjustment": 0,
+            "isDefault": true
+          },
+          {
+            "id": "opt-4099d416",
+            "label": "Eggless",
+            "semantic": "eggless",
+            "priceAdjustment": 80,
+            "isDefault": false
+          }
+        ]
+      }
+    ],
+    "rating": 4.6,
+    "reviewCount": 12,
+    "seo": {
+      "metaTitle": "Winter Spice Cake | Monginis",
+      "metaDescription": "Cinnamon and nutmeg notes with cream cheese frosting",
+      "ogImage": "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=600&h=600&fit=crop"
+    },
+    "createdAt": "2026-07-18T11:19:42.720Z",
+    "updatedAt": "2026-07-18T11:19:42.720Z"
+  }
+]

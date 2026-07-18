@@ -1,0 +1,542 @@
+{
+  "draft": {
+    "sections": [
+      {
+        "instanceId": "hero-0",
+        "type": "hero",
+        "order": 0,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "badge": "Since 1956 · India's Favourite Bakery",
+          "headline": "Crafting Sweet Memories Since 1956",
+          "subtext": "India's beloved bakery brand — premium cakes, pastries, and confections made with love for every celebration.",
+          "ctaPrimaryLabel": "Shop Cakes",
+          "ctaPrimaryHref": "/store/collections",
+          "ctaSecondaryLabel": "Wedding Collection",
+          "ctaSecondaryHref": "/store/wedding-cakes",
+          "imageUrl": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=1000&fit=crop"
+        }
+      },
+      {
+        "instanceId": "our-menu-1",
+        "type": "our-menu",
+        "order": 1,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Explore",
+          "title": "Our Menu",
+          "description": "Shop by category — cakes, pastries, chocolates, and more.",
+          "maxCount": 8
+        }
+      },
+      {
+        "instanceId": "promo-banner-2",
+        "type": "promo-banner",
+        "order": 2,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Limited Time",
+          "title": "Summer Celebration Sale",
+          "description": "Up to 20% off on selected celebration cakes this week.",
+          "ctaLabel": "Shop Offers",
+          "ctaHref": "/store/collections",
+          "maxCount": 2
+        }
+      },
+      {
+        "instanceId": "categories-3",
+        "type": "categories",
+        "order": 3,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Browse by Occasion",
+          "title": "Featured Categories",
+          "description": "Find the perfect cake for every celebration — birthdays, weddings, anniversaries, and more.",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "featured-cakes-4",
+        "type": "featured-cakes",
+        "order": 4,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Handpicked Favourites",
+          "title": "Featured Cakes",
+          "description": "Our most loved creations, crafted with premium ingredients and decades of expertise.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "trending-5",
+        "type": "trending",
+        "order": 5,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "What's Hot",
+          "title": "Trending Now",
+          "description": "The cakes everyone is talking about this season.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "best-sellers-6",
+        "type": "best-sellers",
+        "order": 6,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Customer Favourites",
+          "title": "Best Sellers",
+          "description": "Tried, tested, and loved by thousands of happy customers.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "offers-7",
+        "type": "offers",
+        "order": 7,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Limited Time",
+          "title": "Special Offers",
+          "description": "Sweet deals you don't want to miss. Grab them before they're gone!",
+          "maxCount": 3
+        }
+      },
+      {
+        "instanceId": "wedding-8",
+        "type": "wedding",
+        "order": 8,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Forever Starts Here",
+          "title": "Wedding Collection",
+          "description": "Bespoke wedding cakes designed to make your special day unforgettable.",
+          "ctaLabel": "View Wedding Cakes",
+          "ctaHref": "/store/wedding-cakes",
+          "imageUrl": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+        }
+      },
+      {
+        "instanceId": "photo-cakes-9",
+        "type": "photo-cakes",
+        "order": 9,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Personalised",
+          "title": "Photo Cakes",
+          "description": "Turn your favourite memories into delicious edible art.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Photo Cakes",
+          "ctaHref": "/store/collections/photo-cakes"
+        }
+      },
+      {
+        "instanceId": "eggless-10",
+        "type": "eggless",
+        "order": 10,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "100% Eggless",
+          "title": "Eggless Collection",
+          "description": "Every bit as delicious — crafted without eggs for all celebrations.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Eggless",
+          "ctaHref": "/store/collections/eggless"
+        }
+      },
+      {
+        "instanceId": "seasonal-11",
+        "type": "seasonal",
+        "order": 11,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "This Season",
+          "title": "Seasonal Collection",
+          "description": "Limited-edition flavours inspired by the season's finest ingredients.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Seasonal",
+          "ctaHref": "/store/collections/seasonal"
+        }
+      },
+      {
+        "instanceId": "why-us-12",
+        "type": "why-us",
+        "order": 12,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "The Monginis Difference",
+          "title": "Why Choose Us",
+          "description": "Six decades of trust, quality, and the sweetest memories for every celebration."
+        }
+      },
+      {
+        "instanceId": "testimonials-13",
+        "type": "testimonials",
+        "order": 13,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Love Letters",
+          "title": "What Our Customers Say",
+          "description": "Real stories from real celebrations across India."
+        }
+      },
+      {
+        "instanceId": "gallery-14",
+        "type": "gallery",
+        "order": 14,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Sweet Inspiration",
+          "title": "Gallery",
+          "description": "A glimpse into our world of cakes, pastries, and celebrations.",
+          "ctaLabel": "View Full Gallery",
+          "ctaHref": "/store/gallery"
+        }
+      },
+      {
+        "instanceId": "instagram-15",
+        "type": "instagram",
+        "order": 15,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Follow Us",
+          "title": "On Instagram",
+          "description": "@monginisofficial — daily inspiration and behind-the-scenes sweetness.",
+          "instagramHandle": "monginisofficial",
+          "instagramUrl": "https://instagram.com",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "store-locator-16",
+        "type": "store-locator",
+        "order": 16,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Visit Us",
+          "title": "Find a Store Near You",
+          "description": "Over 300 outlets across India — freshly baked treats, always close by.",
+          "buttonLabel": "Find Stores"
+        }
+      },
+      {
+        "instanceId": "newsletter-17",
+        "type": "newsletter",
+        "order": 17,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Stay in the Loop",
+          "description": "Subscribe for exclusive offers, new cake launches, and seasonal specials delivered to your inbox.",
+          "buttonLabel": "Subscribe",
+          "disclaimer": "No spam. Unsubscribe anytime."
+        }
+      },
+      {
+        "instanceId": "cta-18",
+        "type": "cta",
+        "order": 18,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Get in Touch",
+          "title": "Ready to Order Your Perfect Cake?",
+          "description": "Whether it's a birthday surprise, wedding centerpiece, or corporate celebration — our team is here to help.",
+          "ctaLabel": "Contact Us",
+          "ctaHref": "/store/contact",
+          "showPhone": true,
+          "phone": "+91 1800-123-4567"
+        }
+      }
+    ],
+    "updatedAt": "2026-07-18T07:04:28.759Z"
+  },
+  "published": {
+    "sections": [
+      {
+        "instanceId": "hero-0",
+        "type": "hero",
+        "order": 0,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "badge": "Since 1956 · India's Favourite Bakery",
+          "headline": "Crafting Sweet Memories Since 1956",
+          "subtext": "India's beloved bakery brand — premium cakes, pastries, and confections made with love for every celebration.",
+          "ctaPrimaryLabel": "Shop Cakes",
+          "ctaPrimaryHref": "/store/collections",
+          "ctaSecondaryLabel": "Wedding Collection",
+          "ctaSecondaryHref": "/store/wedding-cakes",
+          "imageUrl": "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=1000&fit=crop"
+        }
+      },
+      {
+        "instanceId": "our-menu-1",
+        "type": "our-menu",
+        "order": 1,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Explore",
+          "title": "Our Menu",
+          "description": "Shop by category — cakes, pastries, chocolates, and more.",
+          "maxCount": 8
+        }
+      },
+      {
+        "instanceId": "promo-banner-2",
+        "type": "promo-banner",
+        "order": 2,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Limited Time",
+          "title": "Summer Celebration Sale",
+          "description": "Up to 20% off on selected celebration cakes this week.",
+          "ctaLabel": "Shop Offers",
+          "ctaHref": "/store/collections",
+          "maxCount": 2
+        }
+      },
+      {
+        "instanceId": "categories-3",
+        "type": "categories",
+        "order": 3,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Browse by Occasion",
+          "title": "Featured Categories",
+          "description": "Find the perfect cake for every celebration — birthdays, weddings, anniversaries, and more.",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "featured-cakes-4",
+        "type": "featured-cakes",
+        "order": 4,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Handpicked Favourites",
+          "title": "Featured Cakes",
+          "description": "Our most loved creations, crafted with premium ingredients and decades of expertise.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "trending-5",
+        "type": "trending",
+        "order": 5,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "What's Hot",
+          "title": "Trending Now",
+          "description": "The cakes everyone is talking about this season.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "best-sellers-6",
+        "type": "best-sellers",
+        "order": 6,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Customer Favourites",
+          "title": "Best Sellers",
+          "description": "Tried, tested, and loved by thousands of happy customers.",
+          "maxCount": 4
+        }
+      },
+      {
+        "instanceId": "offers-7",
+        "type": "offers",
+        "order": 7,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Limited Time",
+          "title": "Special Offers",
+          "description": "Sweet deals you don't want to miss. Grab them before they're gone!",
+          "maxCount": 3
+        }
+      },
+      {
+        "instanceId": "wedding-8",
+        "type": "wedding",
+        "order": 8,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Forever Starts Here",
+          "title": "Wedding Collection",
+          "description": "Bespoke wedding cakes designed to make your special day unforgettable.",
+          "ctaLabel": "View Wedding Cakes",
+          "ctaHref": "/store/wedding-cakes",
+          "imageUrl": "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop"
+        }
+      },
+      {
+        "instanceId": "photo-cakes-9",
+        "type": "photo-cakes",
+        "order": 9,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Personalised",
+          "title": "Photo Cakes",
+          "description": "Turn your favourite memories into delicious edible art.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Photo Cakes",
+          "ctaHref": "/store/collections/photo-cakes"
+        }
+      },
+      {
+        "instanceId": "eggless-10",
+        "type": "eggless",
+        "order": 10,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "100% Eggless",
+          "title": "Eggless Collection",
+          "description": "Every bit as delicious — crafted without eggs for all celebrations.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Eggless",
+          "ctaHref": "/store/collections/eggless"
+        }
+      },
+      {
+        "instanceId": "seasonal-11",
+        "type": "seasonal",
+        "order": 11,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "This Season",
+          "title": "Seasonal Collection",
+          "description": "Limited-edition flavours inspired by the season's finest ingredients.",
+          "maxCount": 4,
+          "ctaLabel": "Shop Seasonal",
+          "ctaHref": "/store/collections/seasonal"
+        }
+      },
+      {
+        "instanceId": "why-us-12",
+        "type": "why-us",
+        "order": 12,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "The Monginis Difference",
+          "title": "Why Choose Us",
+          "description": "Six decades of trust, quality, and the sweetest memories for every celebration."
+        }
+      },
+      {
+        "instanceId": "testimonials-13",
+        "type": "testimonials",
+        "order": 13,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Love Letters",
+          "title": "What Our Customers Say",
+          "description": "Real stories from real celebrations across India."
+        }
+      },
+      {
+        "instanceId": "gallery-14",
+        "type": "gallery",
+        "order": 14,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Sweet Inspiration",
+          "title": "Gallery",
+          "description": "A glimpse into our world of cakes, pastries, and celebrations.",
+          "ctaLabel": "View Full Gallery",
+          "ctaHref": "/store/gallery"
+        }
+      },
+      {
+        "instanceId": "instagram-15",
+        "type": "instagram",
+        "order": 15,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Follow Us",
+          "title": "On Instagram",
+          "description": "@monginisofficial — daily inspiration and behind-the-scenes sweetness.",
+          "instagramHandle": "monginisofficial",
+          "instagramUrl": "https://instagram.com",
+          "maxCount": 6
+        }
+      },
+      {
+        "instanceId": "store-locator-16",
+        "type": "store-locator",
+        "order": 16,
+        "isVisible": true,
+        "background": "cream",
+        "content": {
+          "overline": "Visit Us",
+          "title": "Find a Store Near You",
+          "description": "Over 300 outlets across India — freshly baked treats, always close by.",
+          "buttonLabel": "Find Stores"
+        }
+      },
+      {
+        "instanceId": "newsletter-17",
+        "type": "newsletter",
+        "order": 17,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "title": "Stay in the Loop",
+          "description": "Subscribe for exclusive offers, new cake launches, and seasonal specials delivered to your inbox.",
+          "buttonLabel": "Subscribe",
+          "disclaimer": "No spam. Unsubscribe anytime."
+        }
+      },
+      {
+        "instanceId": "cta-18",
+        "type": "cta",
+        "order": 18,
+        "isVisible": true,
+        "background": "white",
+        "content": {
+          "overline": "Get in Touch",
+          "title": "Ready to Order Your Perfect Cake?",
+          "description": "Whether it's a birthday surprise, wedding centerpiece, or corporate celebration — our team is here to help.",
+          "ctaLabel": "Contact Us",
+          "ctaHref": "/store/contact",
+          "showPhone": true,
+          "phone": "+91 1800-123-4567"
+        }
+      }
+    ],
+    "updatedAt": "2026-07-18T07:04:28.759Z"
+  }
+}
