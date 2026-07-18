@@ -80,3 +80,24 @@ export function getCouponHint(): string {
 }
 
 export type { CartTotals };
+
+/**
+ * Re-check an already-applied coupon against the current subtotal.
+ *
+ * A coupon is validated when applied, then carried in the checkout draft. If
+ * the customer goes back and empties the cart, that frozen discount would still
+ * be subtracted — a 20% coupon on a large cart could wipe out a small one
+ * entirely, and `Math.max(total, 0)` would quietly floor the result at zero
+ * rather than flag it. Anything holding a coupon must revalidate it against the
+ * cart it is actually being applied to.
+ *
+ * Returns null when the coupon no longer qualifies.
+ */
+export function revalidateCoupon(
+  coupon: AppliedCoupon | undefined,
+  subtotal: number
+): AppliedCoupon | null {
+  if (!coupon) return null;
+  const result = applyCouponCode(coupon.code, subtotal);
+  return result.ok ? result.coupon : null;
+}

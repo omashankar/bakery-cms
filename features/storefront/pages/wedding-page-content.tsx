@@ -1,35 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { WeddingSectionRenderer } from "@/features/cms-sections/wedding-section-renderer";
-import {
-  getDraftWeddingSections,
-  getPublishedWeddingSections,
-  getVisibleSections,
-  processScheduledWeddingPublish,
-} from "@/features/cms-sections/lib/wedding-store";
 import type { WeddingSectionInstance } from "@/types/wedding-builder";
 
-export function WeddingPageContent() {
-  const searchParams = useSearchParams();
-  const isPreview = searchParams.get("cmsPreview") === "wedding";
-  const [mounted, setMounted] = useState(false);
-  const [sections, setSections] = useState<WeddingSectionInstance[]>([]);
+interface WeddingPageContentProps {
+  /** Sections fetched on the server, so they render into the HTML. */
+  sections: WeddingSectionInstance[];
+  /** Set by the server from ?cmsPreview=wedding — shows the draft banner. */
+  isPreview?: boolean;
+}
 
-  useEffect(() => {
-    processScheduledWeddingPublish();
-    const source = isPreview ? getDraftWeddingSections() : getPublishedWeddingSections();
-    // FAQs live only on the dedicated FAQ page — never render a wedding FAQ section
-    // here, even if an older saved snapshot still contains one.
-    setSections(getVisibleSections(source).filter((section) => section.type !== "wedding-faq"));
-    setMounted(true);
-  }, [isPreview]);
-
-  if (!mounted) {
-    return <div className="min-h-96 animate-pulse bg-cream-50" aria-hidden />;
-  }
-
+export function WeddingPageContent({ sections, isPreview = false }: WeddingPageContentProps) {
   return (
     <>
       {isPreview ? (

@@ -39,11 +39,10 @@ import { formatRelativeTime } from "@/utils/format";
 import type { CmsPage } from "@/types/content";
 import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
 import {
-  bulkUpdatePageStatus,
-  deletePages,
-  loadPages,
-  processScheduledPagePublishes,
-} from "@/features/content/lib/pages-repository";
+  deletePageRequest,
+  fetchPages,
+  updatePageRequest,
+} from "@/features/content/data/pages-client";
 import {
   defaultPageFilters,
   filterPages,
@@ -121,14 +120,19 @@ export function PagesListPage() {
     title?: string;
   } | null>(null);
 
-  function refresh() {
-    processScheduledPagePublishes();
-    setPages(loadPages());
-    setMounted(true);
+  async function refresh() {
+    try {
+      setPages(await fetchPages());
+    } catch {
+      // Leave the previous list on screen rather than blanking the table.
+      toast.error("Could not load pages");
+    } finally {
+      setMounted(true);
+    }
   }
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   const filtered = useMemo(() => filterPages(pages, filters), [pages, filters]);
@@ -174,22 +178,27 @@ export function PagesListPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...selectablePageIds])]);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
     const deletableIds = deleteTarget.ids.filter(
       (id) => !pages.find((item) => item.id === id)?.isSystem
     );
-    const count = deletePages(deletableIds);
-    refresh();
+    const results = await Promise.allSettled(deletableIds.map((id) => deletePageRequest(id)));
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.length - ok;
+
+    await refresh();
     setSelectedIds((prev) => prev.filter((id) => !deletableIds.includes(id)));
-    toast.success(`${count} page${count === 1 ? "" : "s"} deleted`);
     setDeleteTarget(null);
+
+    if (ok > 0) toast.success(`${ok} page${ok === 1 ? "" : "s"} deleted`);
+    if (failed > 0) toast.error(`${failed} page${failed === 1 ? "" : "s"} could not be deleted`);
   }
 
-  function applyBulkStatus(status: CmsPage["status"]) {
+  async function applyBulkStatus(status: CmsPage["status"]) {
     if (selectedIds.length === 0) return;
-    bulkUpdatePageStatus(selectedIds, status);
-    refresh();
+    await Promise.allSettled(selectedIds.map((id) => updatePageRequest(id, { status })));
+    await refresh();
     toast.success(
       status === "published"
         ? "Selected pages published"

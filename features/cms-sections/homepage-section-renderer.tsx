@@ -52,6 +52,7 @@ import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/storefront/lib/content";
 import {
   getHomepageProducts,
+  type HomepageProductSource,
   getHomepageCategories,
 } from "@/features/storefront/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
@@ -63,6 +64,11 @@ import { toast } from "sonner";
 
 interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
+  /**
+   * Product rails built on the server. When absent (admin builder preview) the
+   * renderer falls back to the browser catalogue.
+   */
+  rails?: Partial<Record<HomepageProductSource, LandingProduct[]>>;
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -882,6 +888,9 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
 }
 
 export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
+  const railFor = (source: HomepageProductSource, maxCount: number) =>
+    props.rails?.[source]?.slice(0, maxCount) ?? getHomepageProducts(source, maxCount);
+
   const { section } = props;
 
   switch (section.type) {
@@ -899,21 +908,21 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("featured", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("featured", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "trending":
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("trending", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("trending", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "best-sellers":
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("best-sellers", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("best-sellers", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "offers":
@@ -924,7 +933,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("photo-cakes", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("photo-cakes", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );
@@ -932,7 +941,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("eggless", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("eggless", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );
@@ -940,7 +949,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return (
         <ProductGridSection
           {...props}
-          cakes={getHomepageProducts("seasonal", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("seasonal", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );

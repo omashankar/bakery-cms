@@ -55,11 +55,12 @@ export function getProductBySlug(slug: string): LandingProduct | undefined {
   return getAllProducts().find((cake) => cake.slug === slug);
 }
 
-export function searchProducts(query: string): LandingProduct[] {
+export function searchProducts(query: string, catalog?: LandingProduct[]): LandingProduct[] {
+  const source = catalog ?? getAllProducts();
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return getAllProducts();
+  if (!normalized) return source;
 
-  return getAllProducts().filter(
+  return source.filter(
     (cake) =>
       cake.name.toLowerCase().includes(normalized) ||
       cake.description.toLowerCase().includes(normalized) ||

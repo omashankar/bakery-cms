@@ -210,7 +210,9 @@ export function ProductDetailPage({
       price: displayPrice,
       quantity,
       weight: weight?.label,
-      flavour: selectedFlavour,
+      // Omitted entirely when this cake has no flavour choice, so the order line
+      // never records a flavour the customer did not pick.
+      flavour: selectedFlavour || undefined,
       shape: selectedShape,
       message: message.trim() || undefined,
       deliveryDate,
@@ -305,19 +307,22 @@ export function ProductDetailPage({
                 ) : null}
               </div>
 
-              <OptionGroup label="Flavour">
-                <div className="flex flex-wrap gap-2">
-                  {flavourOptions.map((flavour) => (
-                    <OptionButton
-                      key={flavour}
-                      active={selectedFlavour === flavour}
-                      onClick={() => setSelectedFlavour(flavour)}
-                    >
-                      {flavour}
-                    </OptionButton>
-                  ))}
-                </div>
-              </OptionGroup>
+              {/* Only offered when this cake actually comes in several flavours. */}
+              {flavourOptions.length > 0 ? (
+                <OptionGroup label="Flavour">
+                  <div className="flex flex-wrap gap-2">
+                    {flavourOptions.map((flavour) => (
+                      <OptionButton
+                        key={flavour}
+                        active={selectedFlavour === flavour}
+                        onClick={() => setSelectedFlavour(flavour)}
+                      >
+                        {flavour}
+                      </OptionButton>
+                    ))}
+                  </div>
+                </OptionGroup>
+              ) : null}
 
               <OptionGroup label="Weight">
                 <div className="flex flex-wrap gap-2">

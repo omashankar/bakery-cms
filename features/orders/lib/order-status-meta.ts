@@ -12,8 +12,8 @@ export const FULFILLMENT_STATUSES: OrderStatus[] = [
 export const TERMINAL_STATUSES: OrderStatus[] = ["cancelled", "refunded"];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
+  pending: "Order placed",
+  confirmed: "Accepted",
   preparing: "Preparing",
   ready: "Cake ready",
   out_for_delivery: "Out for delivery",

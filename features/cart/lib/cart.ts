@@ -52,9 +52,35 @@ export interface AddToCartInput {
   variantSummary?: string[];
 }
 
+export const CART_UPDATED_EVENT = "bakery-cart-updated";
+
 function notifyCartUpdated(): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event("bakery-cart-updated"));
+  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+}
+
+/**
+ * Subscribe to cart changes, including changes made in another tab.
+ *
+ * `dispatchEvent` only reaches the tab that made the change; the browser's
+ * `storage` event is what crosses tabs. Without both, a customer who edits
+ * their cart in a second tab can pay for the snapshot the checkout tab loaded
+ * on mount.
+ */
+export function subscribeToCart(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === CART_STORAGE_KEY) onChange();
+  };
+
+  window.addEventListener(CART_UPDATED_EVENT, onChange);
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    window.removeEventListener(CART_UPDATED_EVENT, onChange);
+    window.removeEventListener("storage", handleStorage);
+  };
 }
 
 /**

@@ -8,6 +8,7 @@ import { MapPin, PackageSearch, Truck } from "lucide-react";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
+import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,8 @@ export function TrackOrderPage() {
       return;
     }
 
+    // Ownership proven — let the detail page render for this browser session.
+    grantOrderAccess(order.orderNumber);
     router.push(routes.store.orderDetail(order.orderNumber));
   };
 

@@ -8,12 +8,17 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { getProductBySlug } from "@/features/products/lib/product-catalog";
 import { getWishlistSlugs } from "@/features/storefront/lib/wishlist";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
+import type { LandingProduct } from "@/constants/landing-data";
 
-export function WishlistPage() {
+interface WishlistPageProps {
+  /** Catalogue fetched on the server; the saved slugs themselves are browser-local. */
+  catalog: LandingProduct[];
+}
+
+export function WishlistPage({ catalog }: WishlistPageProps) {
   const [slugs, setSlugs] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -25,9 +30,10 @@ export function WishlistPage() {
     return () => window.removeEventListener("bakery-wishlist-updated", load);
   }, []);
 
+  const bySlug = new Map(catalog.map((cake) => [cake.slug, cake]));
   const cakes = slugs
-    .map((slug) => getProductBySlug(slug))
-    .filter((cake): cake is NonNullable<typeof cake> => Boolean(cake));
+    .map((slug) => bySlug.get(slug))
+    .filter((cake): cake is LandingProduct => Boolean(cake));
 
   return (
     <>

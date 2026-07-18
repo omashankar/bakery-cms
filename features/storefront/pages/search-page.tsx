@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { CakeProductCard } from "@/features/landing/components/cake-product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
+import type { LandingProduct } from "@/constants/landing-data";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { searchProducts } from "@/features/products/lib/product-catalog";
 import { Button } from "@/components/ui/button";
@@ -22,24 +23,24 @@ const POPULAR_SEARCHES = [
   "Butterscotch",
 ];
 
-export function SearchPage() {
+interface SearchPageProps {
+  /** Catalogue fetched on the server, so results render into the HTML. */
+  catalog: LandingProduct[];
+}
+
+export function SearchPage({ catalog }: SearchPageProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialQuery = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(initialQuery);
 
-  // Cakes merge localStorage-backed admin data (absent during SSR) — defer to the
-  // client to avoid a hydration mismatch.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
 
-  const results = useMemo(() => (mounted ? searchProducts(query) : []), [query, mounted]);
+  // Searching stays on the client (it is interactive); the catalogue it searches
+  // now arrives from the server, so the first paint already shows results.
+  const results = useMemo(() => searchProducts(query, catalog), [query, catalog]);
 
   function runSearch(term: string) {
     const params = new URLSearchParams();
@@ -97,21 +98,10 @@ export function SearchPage() {
           </ScrollReveal>
 
           <p className="mt-10 mb-6 text-sm text-muted-foreground">
-            {mounted
-              ? `${results.length} result${results.length === 1 ? "" : "s"}${initialQuery ? ` for "${initialQuery}"` : ""}`
-              : "Loading cakes…"}
+            {`${results.length} result${results.length === 1 ? "" : "s"}${initialQuery ? ` for "${initialQuery}"` : ""}`}
           </p>
 
-          {!mounted ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-80 animate-pulse rounded-xl border border-border bg-cream-100"
-                />
-              ))}
-            </div>
-          ) : results.length === 0 ? (
+          {results.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">
               <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-white text-bakery-400 shadow-sm">
                 <Search className="size-6" />

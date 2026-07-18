@@ -62,7 +62,7 @@ export function OrderSummaryPanel({
         ) : null}
       </div>
 
-      <ul className="mt-4 space-y-3 border-b border-border pb-4">
+      <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto border-b border-border pb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 text-sm">
             <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-white">

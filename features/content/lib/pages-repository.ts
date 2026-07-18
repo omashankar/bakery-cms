@@ -14,7 +14,7 @@ function block(id: string, type: "paragraph" | "heading", content: string) {
   return { id, type, content };
 }
 
-function seedPages(): CmsPage[] {
+export function seedPages(): CmsPage[] {
   const timestamp = nowIso();
 
   return [

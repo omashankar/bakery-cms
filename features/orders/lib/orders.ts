@@ -3,7 +3,7 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
-import type { CheckoutAddress, PaymentMethod } from "./checkout-draft";
+import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
@@ -40,6 +40,8 @@ export interface PlacedOrder {
   status: OrderStatus;
   statusHistory: OrderStatusEvent[];
   estimatedDelivery: string;
+  /** The delivery window agreed at checkout, when one was chosen. */
+  deliverySlot?: DeliverySlot;
   adminNotes?: string;
   cancellationReason?: string;
   refundReference?: string;
@@ -101,8 +103,22 @@ function generateOrderNumber(): string {
     String(now.getMonth() + 1).padStart(2, "0"),
     String(now.getDate()).padStart(2, "0"),
   ].join("");
-  const suffix = String(Math.floor(Math.random() * 9000) + 1000);
-  return `${prefix}-${stamp}-${suffix}`;
+  // A bare random 4-digit suffix collides often: 9,000 slots per day means a
+  // ~43% chance of a duplicate after only 100 orders. A duplicate is not
+  // cosmetic — getOrderByNumber() returns the first match, so the older order
+  // becomes permanently unreachable and its owner sees a stranger's order.
+  // Retry against the orders already on file, then fall back to a wider suffix.
+  const existing = new Set(readOrders().map((order) => order.orderNumber));
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const suffix = String(Math.floor(Math.random() * 9000) + 1000);
+    const candidate = `${prefix}-${stamp}-${suffix}`;
+    if (!existing.has(candidate)) return candidate;
+  }
+
+  // Pathologically unlucky (or a very busy day) — widen the space instead of
+  // handing back a number we know is taken.
+  return `${prefix}-${stamp}-${Date.now().toString(36).toUpperCase()}`;
 }
 
 function getEstimatedDelivery(): string {
@@ -128,8 +144,16 @@ function parseCartDeliveryDate(value: string): Date | null {
 
 function resolveEstimatedDelivery(
   items: CartLineItem[],
-  totals: CartTotals
+  totals: CartTotals,
+  slot?: DeliverySlot
 ): string {
+  // The slot chosen at checkout is the promise made to the customer, so it
+  // takes precedence over dates picked per item on the product page.
+  if (slot?.date) {
+    const chosen = new Date(slot.date);
+    if (!Number.isNaN(chosen.getTime())) return chosen.toISOString();
+  }
+
   const scheduled = items
     .map((item) => (item.deliveryDate ? parseCartDeliveryDate(item.deliveryDate) : null))
     .filter((date): date is Date => date !== null)
@@ -148,6 +172,36 @@ function resolveEstimatedDelivery(
   return getEstimatedDelivery();
 }
 
+/** Two identical submissions this close together are a double-click, not two orders. */
+const DUPLICATE_ORDER_WINDOW_MS = 15_000;
+
+/**
+ * crypto.randomUUID() only exists in secure contexts. Over plain HTTP on a LAN
+ * address it is undefined, and placing an order would throw *after* payment had
+ * already been captured.
+ */
+function newOrderId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `order-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildOrderFingerprint(input: {
+  items: CartLineItem[];
+  totals: CartTotals;
+  address: CheckoutAddress;
+  paymentMethod: PaymentMethod;
+}): string {
+  return JSON.stringify([
+    input.address?.email ?? "",
+    input.address?.phone ?? "",
+    input.paymentMethod,
+    input.totals?.total ?? 0,
+    input.items.map((item) => [item.productSlug, item.quantity, item.price]),
+  ]);
+}
+
 export function placeOrder(input: {
   items: CartLineItem[];
   totals: CartTotals;
@@ -157,14 +211,26 @@ export function placeOrder(input: {
   paymentReference?: string;
   coupon?: AppliedCoupon;
   orderNotes?: string;
+  deliverySlot?: DeliverySlot;
 }): PlacedOrder {
   const placedAt = new Date().toISOString();
   const paymentStatus =
     input.paymentStatus ??
     (input.paymentMethod === "cod" ? "cod" : "paid");
 
+  // Guard against a double-click (or a retry after a successful attempt)
+  // creating a second order. The React `disabled` flag is not enough: it is set
+  // inside the same handler, and COD waits ~800ms before committing.
+  const fingerprint = buildOrderFingerprint(input);
+  const recent = readOrders().find(
+    (existing) =>
+      buildOrderFingerprint(existing) === fingerprint &&
+      Date.now() - new Date(existing.placedAt).getTime() < DUPLICATE_ORDER_WINDOW_MS
+  );
+  if (recent) return recent;
+
   const order: PlacedOrder = {
-    id: crypto.randomUUID(),
+    id: newOrderId(),
     orderNumber: generateOrderNumber(),
     items: input.items,
     totals: input.totals,
@@ -174,10 +240,15 @@ export function placeOrder(input: {
     paymentReference: input.paymentReference,
     coupon: input.coupon,
     orderNotes: input.orderNotes,
+    deliverySlot: input.deliverySlot,
     placedAt,
     status: "confirmed",
     statusHistory: [{ status: "confirmed", at: placedAt }],
-    estimatedDelivery: resolveEstimatedDelivery(input.items, input.totals),
+    estimatedDelivery: resolveEstimatedDelivery(
+      input.items,
+      input.totals,
+      input.deliverySlot
+    ),
   };
 
   writeOrders([order, ...readOrders()]);

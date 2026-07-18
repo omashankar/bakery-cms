@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { filterProductsByCategory, getAllProducts } from "@/features/products/lib/product-catalog";
+import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
+import type { LandingProduct } from "@/constants/landing-data";
 import {
   DEFAULT_COLLECTION_FILTERS,
   applyCollectionFilters,
@@ -41,30 +41,27 @@ const PAGE_SIZE = 8;
 
 interface CollectionsPageProps {
   categorySlug?: string;
+  /** Catalogue fetched on the server, so the grid renders into the HTML. */
+  catalog: LandingProduct[];
 }
 
-export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsPageProps = {}) {
-  const searchParams = useSearchParams();
-  const categorySlug = categorySlugProp ?? searchParams.get("category") ?? "";
+export function CollectionsPage({
+  categorySlug: categorySlugProp,
+  catalog,
+}: CollectionsPageProps) {
+  const categorySlug = categorySlugProp ?? "";
   const activeCategory = categories.find((cat) => cat.slug === categorySlug);
   const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_COLLECTION_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
-  // Cakes are merged with localStorage-backed admin data, which is absent during
-  // SSR — defer the catalogue-driven UI to the client to avoid a hydration mismatch.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  // Filtering stays on the client (it is interactive), but the catalogue it
+  // filters now arrives from the server, so the first paint shows real cakes.
   const filtered = useMemo(() => {
-    if (!mounted) return [];
-    const all = getAllProducts();
-    let byCategory = filterProductsByCategory(all, categorySlug || undefined);
+    let byCategory = filterProductsByCategory(catalog, categorySlug || undefined);
     // Never dead-end a valid category page — fall back to the full catalogue.
-    if (categorySlug && byCategory.length === 0) byCategory = all;
+    if (categorySlug && byCategory.length === 0) byCategory = catalog;
     return applyCollectionFilters(byCategory, filters);
-  }, [categorySlug, filters, mounted]);
+  }, [catalog, categorySlug, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -160,7 +157,7 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
               </div>
 
               <p className="mb-4 text-sm text-muted-foreground">
-                {mounted ? `Showing ${paginated.length} of ${filtered.length} cakes` : "Loading cakes…"}
+                {`Showing ${paginated.length} of ${filtered.length} cakes`}
               </p>
 
               <div className="mb-8 flex flex-wrap gap-2">
@@ -179,16 +176,7 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
                 ))}
               </div>
 
-              {!mounted ? (
-                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-80 animate-pulse rounded-xl border border-border bg-cream-100"
-                    />
-                  ))}
-                </div>
-              ) : paginated.length === 0 ? (
+              {paginated.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-cream-50 py-16 text-center">
                   <p className="font-medium">No cakes found</p>
                   <p className="mt-1 text-sm text-muted-foreground">

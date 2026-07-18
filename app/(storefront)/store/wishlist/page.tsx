@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { WishlistPage } from "@/features/storefront/pages/wishlist-page";
 
 export const metadata: Metadata = {
@@ -6,6 +7,8 @@ export const metadata: Metadata = {
   description: "Your saved cakes.",
 };
 
-export default function Page() {
-  return <WishlistPage />;
+export default async function Page() {
+  const catalog = await getStorefrontProductCards();
+
+  return <WishlistPage catalog={catalog} />;
 }

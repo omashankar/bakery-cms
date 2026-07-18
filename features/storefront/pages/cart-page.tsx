@@ -20,12 +20,14 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
+  addToCart,
   CART_PREFERENCES_UPDATED_EVENT,
   getCartPreferences,
   getCartItems,
   moveCartItemToSavedForLater,
   removeCartItem,
   restoreSavedItemToCart,
+  subscribeToCart,
   updateCartItemQuantity,
   updateCartPreferences,
   type CartLineItem,
@@ -67,14 +69,16 @@ export function CartPage() {
     refresh();
     setLoaded(true);
 
-    window.addEventListener("bakery-cart-updated", refresh);
+    // subscribeToCart also listens for the browser storage event, so a cart
+    // edited in another tab is reflected here too.
+    const unsubscribeCart = subscribeToCart(refresh);
     window.addEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
     window.addEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
     window.addEventListener("bakery-customer-session-updated", refresh);
 
     return () => {
-      window.removeEventListener("bakery-cart-updated", refresh);
+      unsubscribeCart();
       window.removeEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
       window.removeEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
@@ -82,14 +86,6 @@ export function CartPage() {
     };
   }, []);
 
-  const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Cart requires login — pop the login modal open automatically for guests.
-  useEffect(() => {
-    if (loaded && !signedIn) {
-      openCustomerAuthModal("phone");
-    }
-  }, [loaded, signedIn]);
 
   const totals = useMemo(
     () =>
@@ -101,7 +97,7 @@ export function CartPage() {
     [items, preferences.giftWrap, commerce]
   );
 
-  const recentlyViewed = useMemo(() => getRecentlyViewedProducts(), [loaded, items.length]);
+  const recentlyViewed = useMemo(() => getRecentlyViewedProducts(), [loaded, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSaveForLater(item: CartLineItem) {
     if (moveCartItemToSavedForLater(item.id)) {
@@ -112,7 +108,38 @@ export function CartPage() {
   function handleMoveToWishlist(item: CartLineItem) {
     const added = addToWishlist(item.productSlug);
     removeCartItem(item.id);
-    toast.success(added ? "Moved to wishlist" : "Already in wishlist — removed from cart");
+    toast.success(
+      added ? "Moved to wishlist" : "Removed from cart — it was already in your wishlist"
+    );
+  }
+
+  // Removing was the one irreversible action with no feedback at all, while
+  // every reversible one toasted. Confirm it, and offer the way back.
+  function handleRemoveItem(item: CartLineItem) {
+    removeCartItem(item.id);
+    toast.success("Removed " + item.name, {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          addToCart({
+            productSlug: item.productSlug,
+            name: item.name,
+            image: item.image,
+            price: item.price,
+            quantity: item.quantity,
+            weight: item.weight,
+            flavour: item.flavour,
+            shape: item.shape,
+            message: item.message,
+            deliveryDate: item.deliveryDate,
+            deliveryTime: item.deliveryTime,
+            variantSelections: item.variantSelections,
+            variantSummary: item.variantSummary,
+          });
+          toast.success("Item restored");
+        },
+      },
+    });
   }
 
   function handleRestoreSaved(savedId: string) {
@@ -132,28 +159,26 @@ export function CartPage() {
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
           {!loaded ? (
-            <div className="h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
-          ) : !signedIn ? (
-            <div className="mx-auto max-w-sm py-12 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-cream-100">
-                <Lock className="size-5 text-bakery-700" />
+            // The cart lives in this browser, so the server has nothing to
+            // render. Mirror the real layout rather than showing one grey slab,
+            // so the page does not visibly jump when the data arrives.
+            <div className="grid gap-8 lg:grid-cols-[1fr_320px]" aria-hidden>
+              <div className="space-y-4">
+                {[0, 1].map((row) => (
+                  <div
+                    key={row}
+                    className="flex gap-4 rounded-xl border border-border bg-white p-4"
+                  >
+                    <div className="size-20 shrink-0 animate-pulse rounded-lg bg-cream-100" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-4 w-2/5 animate-pulse rounded bg-cream-100" />
+                      <div className="h-3 w-1/4 animate-pulse rounded bg-cream-100" />
+                      <div className="h-8 w-28 animate-pulse rounded-lg bg-cream-100" />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="mt-4 font-heading text-lg font-bold text-foreground">
-                Login to view your cart
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {cartItemCount > 0
-                  ? `Your ${cartItemCount} item${cartItemCount === 1 ? "" : "s"} ${cartItemCount === 1 ? "is" : "are"} saved — sign in to continue.`
-                  : "Sign in to see your saved items."}
-              </p>
-              <Button
-                variant="bakery"
-                className="mt-4"
-                onClick={() => openCustomerAuthModal("phone")}
-              >
-                <Lock className="size-4" />
-                Login to continue
-              </Button>
+              <div className="h-64 animate-pulse rounded-xl border border-border bg-cream-50" />
             </div>
           ) : items.length === 0 ? (
             <div className="space-y-10">
@@ -185,7 +210,7 @@ export function CartPage() {
             </div>
           ) : (
             <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-              <div className="order-2 space-y-6 lg:order-none lg:col-start-1">
+              <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div
@@ -248,7 +273,7 @@ export function CartPage() {
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => removeCartItem(item.id)}
+                            onClick={() => handleRemoveItem(item)}
                             aria-label="Remove item"
                           >
                             <Trash2 className="size-4" />
@@ -328,7 +353,7 @@ export function CartPage() {
                 ) : null}
               </div>
 
-              <div className="order-1 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+              <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
                 <OrderSummaryPanel
                   items={items}
                   totals={totals}
@@ -338,8 +363,11 @@ export function CartPage() {
                 <Button
                   className="w-full"
                   variant="bakery"
-                  render={<Link href={routes.store.checkout} />}
+                  {...(signedIn
+                    ? { render: <Link href={routes.store.checkout} /> }
+                    : { onClick: () => openCustomerAuthModal("phone") })}
                 >
+                  {signedIn ? null : <Lock className="size-4" />}
                   Proceed to checkout
                 </Button>
                 <Button

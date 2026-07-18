@@ -226,7 +226,7 @@ export function loadProducts(): Product[] {
   }
 }
 
-function persistProducts(cakes: Product[]): void {
+export function persistProducts(cakes: Product[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cakes));
 }

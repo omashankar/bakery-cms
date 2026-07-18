@@ -1,6 +1,5 @@
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import type { LandingProduct } from "@/constants/landing-data";
-import { getFlavours } from "@/features/catalog/lib/catalog-repository";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -42,16 +41,19 @@ export function getProductGalleryImages(cake: LandingProduct): string[] {
   return [cake.image, ...alternates].slice(0, 4);
 }
 
+/**
+ * Flavours this product is actually offered in — empty when the merchant has
+ * not configured any.
+ *
+ * This used to fall back to the first four catalogue flavours, which produced
+ * nonsense: a "Red Velvet Classic" was offered in Chocolate/Vanilla/Fruit/
+ * Butterscotch (Red Velvet itself was cut off by the slice), and Chocolate was
+ * preselected — so the order recorded a flavour that contradicted the cake and
+ * that the customer never chose. A global flavour list is a catalogue taxonomy,
+ * not a per-product option set.
+ */
 export function getProductFlavourOptions(cake: LandingProduct): string[] {
-  if (cake.flavours?.length) return cake.flavours;
-
-  const fromCatalog = getFlavours()
-    .slice(0, 4)
-    .map((item) => item.name);
-
-  if (fromCatalog.length > 0) return fromCatalog;
-
-  return ["Chocolate", "Vanilla", "Red Velvet", "Butterscotch"];
+  return cake.flavours ?? [];
 }
 
 export function getProductShapeOptions(cake?: LandingProduct): string[] {

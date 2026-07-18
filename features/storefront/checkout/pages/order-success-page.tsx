@@ -53,9 +53,13 @@ export function OrderSuccessPage() {
                 <CheckCircle2 className="size-9 text-green-600" />
               </span>
             </div>
-            <h2 className="font-heading text-2xl font-bold">Thank you for your order!</h2>
+            <h2 className="font-heading text-2xl font-bold">
+              {order ? "Thank you for your order!" : "We could not find that order"}
+            </h2>
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              Your order has been placed successfully. A confirmation email will be sent shortly.
+              {order
+                ? "Your order has been placed successfully. Save your order number below — you can use it to track this order at any time."
+                : "This link has no order attached, or the order was placed on another device. Look it up with your order number below."}
             </p>
 
             {order ? (
@@ -66,7 +70,9 @@ export function OrderSuccessPage() {
                 </div>
                 <dl className="mt-4 space-y-2">
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Total paid</dt>
+                    <dt className="text-muted-foreground">
+                      {order.paymentMethod === "cod" ? "Amount due on delivery" : "Total paid"}
+                    </dt>
                     <dd className="font-semibold">{formatCurrency(order.totals.total)}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -80,8 +86,17 @@ export function OrderSuccessPage() {
                     </div>
                   ) : null}
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Estimated delivery</dt>
-                    <dd>{formatDate(order.estimatedDelivery)}</dd>
+                    <dt className="text-muted-foreground">
+                      {order.deliverySlot?.timeSlot ? "Delivery" : "Estimated delivery"}
+                    </dt>
+                    <dd className="text-right">
+                      {formatDate(order.estimatedDelivery)}
+                      {order.deliverySlot?.timeSlot ? (
+                        <span className="block text-xs text-muted-foreground">
+                          {order.deliverySlot.timeSlot}
+                        </span>
+                      ) : null}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">Items</dt>
@@ -91,7 +106,9 @@ export function OrderSuccessPage() {
               </div>
             ) : (
               <p className="mt-6 text-sm text-muted-foreground">
-                Order details are saved locally for this demo.
+                We could not load the details for this order here. Use{" "}
+                <span className="font-medium text-foreground">Track order</span> below, or
+                contact us with your order number and we will help.
               </p>
             )}
 
@@ -117,10 +134,17 @@ export function OrderSuccessPage() {
                   render={<Link href={routes.store.orderInvoice(order.orderNumber)} />}
                 >
                   <Download className="size-4" />
-                  Download invoice
+                  View invoice
                 </Button>
               ) : null}
             </div>
+
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Questions about this order?{" "}
+              <Link href={routes.store.contact} className="text-bakery-700 hover:underline">
+                Contact us
+              </Link>
+            </p>
 
             {signedIn ? (
               <p className="mt-6 text-center text-sm text-muted-foreground">

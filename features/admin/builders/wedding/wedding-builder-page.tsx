@@ -9,16 +9,16 @@ import {
 } from "@/constants/wedding-section-registry";
 import { WeddingSectionRenderer } from "@/features/cms-sections/wedding-section-renderer";
 import {
-  getDraftWeddingSections,
-  getWeddingPublishMeta,
-  processScheduledWeddingPublish,
-  publishWeddingSections,
-  resetWeddingToDefaults,
-  saveDraftWeddingSections,
-  scheduleWeddingPublish,
   sortSections,
   WEDDING_REVISIONS_KEY,
 } from "@/features/cms-sections/lib/wedding-store";
+import {
+  deriveWeddingMeta,
+  fetchWeddingState,
+  publishWedding,
+  resetWedding,
+  saveWeddingDraftRequest,
+} from "@/features/cms-sections/data/wedding-sections-client";
 import {
   listBuilderRevisions,
   restoreBuilderRevision,
@@ -77,25 +77,43 @@ export function WeddingBuilderPage() {
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
 
-  const refreshMeta = useCallback(() => {
-    processScheduledWeddingPublish();
-    const meta = getWeddingPublishMeta();
-    setPublishMeta(meta);
-    setScheduledPublishAt(
-      meta.scheduledPublishAt
-        ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
-        : ""
-    );
+  const refreshMeta = useCallback(async () => {
+    try {
+      const meta = deriveWeddingMeta(await fetchWeddingState());
+      setPublishMeta(meta);
+      setScheduledPublishAt(
+        meta.scheduledPublishAt
+          ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
+          : ""
+      );
+    } catch {
+      // Leave the last known status on screen rather than blanking it.
+    }
     setRevisions(listBuilderRevisions(WEDDING_REVISIONS_KEY));
   }, []);
 
   useEffect(() => {
-    const draft = getDraftWeddingSections();
-    setSections(draft);
-    setSelectedId(draft[0]?.instanceId ?? null);
-    refreshMeta();
-    setMounted(true);
-  }, [refreshMeta]);
+    async function load() {
+      try {
+        const state = await fetchWeddingState();
+        const draft = sortSections(state.draft.sections);
+        setSections(draft);
+        setSelectedId(draft[0]?.instanceId ?? null);
+        setPublishMeta(deriveWeddingMeta(state));
+        setScheduledPublishAt(
+          state.draft.scheduledPublishAt
+            ? new Date(state.draft.scheduledPublishAt).toISOString().slice(0, 16)
+            : ""
+        );
+      } catch {
+        toast.error("Could not load the wedding builder");
+      }
+      setRevisions(listBuilderRevisions(WEDDING_REVISIONS_KEY));
+      setMounted(true);
+    }
+
+    void load();
+  }, []);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -215,52 +233,69 @@ export function WeddingBuilderPage() {
 
   async function handleSaveDraft() {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    saveDraftWeddingSections(
-      sections,
-      scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-    );
-    setIsDirty(false);
-    setIsSaving(false);
-    refreshMeta();
-    toast.success("Wedding page draft saved");
+    try {
+      await saveWeddingDraftRequest(
+        sections,
+        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+      toast.success("Wedding page draft saved");
+    } catch (error) {
+      // Keep isDirty set so the unsaved-changes guard still protects the work.
+      toast.error(error instanceof Error ? error.message : "Could not save the draft");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function confirmPublish() {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    publishWeddingSections(sections);
-    setScheduledPublishAt("");
-    setIsDirty(false);
-    setIsSaving(false);
-    setConfirm(null);
-    refreshMeta();
-    toast.success("Wedding page published to storefront");
+    try {
+      await publishWedding(sections);
+      setScheduledPublishAt("");
+      setIsDirty(false);
+      setConfirm(null);
+      await refreshMeta();
+      toast.success("Wedding page published to storefront");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not publish");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function handleScheduleChange(value: string) {
+  async function handleScheduleChange(value: string) {
     setScheduledPublishAt(value);
     setIsDirty(true);
-    if (value) {
-      scheduleWeddingPublish(sections, new Date(value).toISOString());
-      toast.message("Publish scheduled", {
-        description: new Date(value).toLocaleString(),
-      });
-      refreshMeta();
-      return;
+    try {
+      await saveWeddingDraftRequest(sections, value ? new Date(value).toISOString() : null);
+      await refreshMeta();
+      if (value) {
+        toast.message("Publish scheduled", {
+          description: new Date(value).toLocaleString(),
+        });
+      } else {
+        toast.message("Schedule cleared");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the schedule");
     }
-    saveDraftWeddingSections(sections, null);
-    refreshMeta();
-    toast.message("Schedule cleared");
   }
 
-  function handlePreview() {
-    saveDraftWeddingSections(
-      sections,
-      scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-    );
-    setIsDirty(false);
-    refreshMeta();
+  async function handlePreview() {
+    // Preview reads the draft from the server, so it has to be saved first.
+    try {
+      await saveWeddingDraftRequest(
+        sections,
+        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not open preview");
+      return;
+    }
     window.open(
       `${routes.store.weddingCakes}?cmsPreview=wedding`,
       "_blank",
@@ -277,27 +312,37 @@ export function WeddingBuilderPage() {
     toast.success("Revision restored into draft");
   }
 
-  function confirmReset() {
-    const state = resetWeddingToDefaults();
-    setSections(state.draft.sections);
-    setSelectedId(state.draft.sections[0]?.instanceId ?? null);
-    setIsDirty(false);
-    setConfirm(null);
-    refreshMeta();
-    toast.message("Wedding page reset to defaults");
+  async function confirmReset() {
+    try {
+      const state = await resetWedding();
+      setSections(state.draft.sections);
+      setSelectedId(state.draft.sections[0]?.instanceId ?? null);
+      setIsDirty(false);
+      setConfirm(null);
+      await refreshMeta();
+      toast.message("Wedding page reset to defaults");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not reset the wedding page");
+    }
   }
 
-  function handleDiscard() {
-    const draft = getDraftWeddingSections();
-    setSections(draft);
-    setSelectedId((current) =>
-      current && draft.some((section) => section.instanceId === current)
-        ? current
-        : draft[0]?.instanceId ?? null
-    );
-    setIsDirty(false);
-    refreshMeta();
-    toast.message("Discarded unsaved changes");
+  async function handleDiscard() {
+    try {
+      // Re-read the saved draft from the server and throw away local edits.
+      const state = await fetchWeddingState();
+      const draft = sortSections(state.draft.sections);
+      setSections(draft);
+      setSelectedId((current) =>
+        current && draft.some((section) => section.instanceId === current)
+          ? current
+          : draft[0]?.instanceId ?? null
+      );
+      setIsDirty(false);
+      await refreshMeta();
+      toast.message("Discarded unsaved changes");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not discard changes");
+    }
   }
 
   function runConfirm() {

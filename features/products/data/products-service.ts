@@ -2,6 +2,10 @@ import { mapAdminProductToStorefront } from "@/features/products/lib/product-map
 import { mutateProducts, readProducts } from "@/features/products/data/products-store.server";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
+import {
+  buildHomepageProducts,
+  type HomepageProductSource,
+} from "@/features/products/lib/homepage-rails";
 
 /**
  * Async product data access — the API the rest of the app should use on the server.
@@ -124,4 +128,36 @@ export async function deleteProduct(id: string): Promise<boolean> {
     const next = products.filter((product) => product.id !== id);
     return { next, result: next.length !== products.length };
   });
+}
+
+/**
+ * Homepage product rails, built on the server.
+ *
+ * The section renderer used to call the browser catalogue directly during
+ * render, so the server pass produced seed data and the client swapped it after
+ * hydration. Building the rails here keeps both passes identical.
+ */
+export async function getHomepageRails(
+  maxCount = 8
+): Promise<Record<HomepageProductSource, LandingProduct[]>> {
+  const products = await readProducts();
+  const all = products
+    .filter((product) => product.status === "published")
+    .map(mapAdminProductToStorefront);
+
+  const sources: HomepageProductSource[] = [
+    "featured",
+    "trending",
+    "best-sellers",
+    "photo-cakes",
+    "eggless",
+    "seasonal",
+  ];
+
+  return Object.fromEntries(
+    sources.map((source) => [
+      source,
+      buildHomepageProducts(source, maxCount, products, all).map(toCard),
+    ])
+  ) as Record<HomepageProductSource, LandingProduct[]>;
 }

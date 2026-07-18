@@ -1,6 +1,4 @@
 export { CheckoutPage } from "./pages/checkout-page";
-export { CheckoutPaymentPage } from "./pages/checkout-payment-page";
-export { CheckoutPaymentFailedPage } from "./pages/checkout-payment-failed-page";
 export { OrderSuccessPage } from "./pages/order-success-page";
 export { TrackOrderPage } from "./pages/track-order-page";
 export { OrderDetailPage } from "./pages/order-detail-page";
