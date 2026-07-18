@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { StoreHomePage } from "@/features/storefront";
+import { StoreHomePage } from "@/apps/website";
 import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
 
 export const metadata: Metadata = buildRouteMetadata("store-home");

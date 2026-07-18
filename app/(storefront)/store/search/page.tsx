@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { Suspense } from "react";
-import { SearchPage } from "@/features/storefront";
+import { SearchPage } from "@/apps/website";
 import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
 import { Skeleton } from "@/components/ui/skeleton";
 

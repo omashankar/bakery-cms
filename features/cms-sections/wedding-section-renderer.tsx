@@ -13,7 +13,7 @@ import {
   Star,
   Truck,
 } from "lucide-react";
-import { ContactForm } from "@/features/storefront/components/contact-form";
+import { ContactForm } from "@/components/shared/contact-form";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
@@ -26,12 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { galleryCaptions, whyChooseUs } from "@/constants/landing-data";
-import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/storefront/lib/content";
+import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
 import {
   getWeddingCollectionProducts,
   getWeddingGalleryImages,
   getWeddingOffers,
-} from "@/features/storefront/lib/wedding-catalog";
+} from "@/features/products/lib/wedding-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { WeddingSectionInstance } from "@/types/wedding-builder";
 import { cn } from "@/lib/utils";

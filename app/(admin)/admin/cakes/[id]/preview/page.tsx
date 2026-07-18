@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ProductPreviewPage } from "@/features/admin/products";
+import { ProductPreviewPage } from "@/apps/admin/products";
 
 export const metadata: Metadata = {
   title: "Preview Cake",

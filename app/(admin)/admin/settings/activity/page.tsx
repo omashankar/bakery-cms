@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ActivitySettingsPage } from "@/features/admin/settings";
+import { ActivitySettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Activity Log",

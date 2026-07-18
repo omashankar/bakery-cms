@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { HomepageBuilderPage } from "@/features/admin/builders";
+import { HomepageBuilderPage } from "@/apps/admin/builders";
 
 export const metadata: Metadata = {
   title: "Homepage Builder",

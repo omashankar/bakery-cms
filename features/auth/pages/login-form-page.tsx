@@ -12,7 +12,7 @@ import { setDemoSession } from "@/features/auth/lib/session";
 import {
   recordFailedLogin,
   recordLoginSuccess,
-} from "@/features/admin/settings/lib/security-center-repository";
+} from "@/features/settings/lib/security-center-repository";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";

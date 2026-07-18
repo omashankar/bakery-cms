@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CollectionsPage } from "@/features/storefront";
+import { CollectionsPage } from "@/apps/website";
 import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SocialSettingsPage } from "@/features/admin/settings";
+import { SocialSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Social Media",

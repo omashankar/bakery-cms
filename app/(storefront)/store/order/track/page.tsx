@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TrackOrderPage } from "@/features/storefront/checkout/pages/track-order-page";
+import { TrackOrderPage } from "@/apps/website/checkout/pages/track-order-page";
 
 export const metadata: Metadata = {
   title: "Track Order",

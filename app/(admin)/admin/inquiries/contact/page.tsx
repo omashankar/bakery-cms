@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { InquiriesListPage } from "@/features/admin/inquiries";
+import { InquiriesListPage } from "@/apps/admin/inquiries";
 
 export const metadata: Metadata = {
   title: "Contact Inquiries",

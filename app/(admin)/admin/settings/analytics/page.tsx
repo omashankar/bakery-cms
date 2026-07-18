@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AnalyticsSettingsPage } from "@/features/admin/settings";
+import { AnalyticsSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Analytics",

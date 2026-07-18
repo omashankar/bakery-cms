@@ -1,7 +1,7 @@
-import { LandingFooter } from "@/features/landing/components/landing-footer";
-import { MaintenanceBanner } from "@/features/storefront/components/maintenance-banner";
-import { StorefrontBannerStrip } from "@/features/storefront/components/storefront-banner-strip";
-import { StorefrontNavbar } from "@/features/storefront/components/storefront-navbar";
+import { LandingFooter } from "@/apps/website/landing/components/landing-footer";
+import { MaintenanceBanner } from "@/apps/website/components/maintenance-banner";
+import { StorefrontBannerStrip } from "@/apps/website/components/storefront-banner-strip";
+import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import { cn } from "@/lib/utils";
 
 interface StorefrontLayoutShellProps {

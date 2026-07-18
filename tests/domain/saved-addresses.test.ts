@@ -14,7 +14,7 @@ import {
   getSavedAddresses,
   setDefaultSavedAddress,
   updateSavedAddress,
-} from "@/features/storefront/account/lib/customer-addresses";
+} from "@/apps/website/account/lib/customer-addresses";
 
 function input(overrides: Partial<Parameters<typeof createSavedAddress>[0]> = {}) {
   return {

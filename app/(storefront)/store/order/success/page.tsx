@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { OrderSuccessPage } from "@/features/storefront/checkout/pages/order-success-page";
+import { OrderSuccessPage } from "@/apps/website/checkout/pages/order-success-page";
 
 export const metadata: Metadata = {
   title: "Order Confirmed",

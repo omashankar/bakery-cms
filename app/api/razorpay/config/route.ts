@@ -2,7 +2,7 @@ import {
   clearRazorpayConfig,
   getRazorpayStatus,
   saveRazorpayConfig,
-} from "@/features/admin/settings/lib/razorpay-config.server";
+} from "@/apps/admin/settings/lib/razorpay-config.server";
 
 /** Returns connection status only — the secret key is never sent to the client. */
 export async function GET() {

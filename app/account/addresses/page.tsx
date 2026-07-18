@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AccountAddressesPage } from "@/features/storefront/account/pages/account-addresses-page";
+import { AccountAddressesPage } from "@/apps/website/account/pages/account-addresses-page";
 
 export const metadata: Metadata = {
   title: "Saved Addresses",

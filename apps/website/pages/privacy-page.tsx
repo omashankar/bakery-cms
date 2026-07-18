@@ -1,0 +1,13 @@
+import { CmsPageView } from "@/apps/website/components/cms-page-view";
+import { getPageForStorefront } from "@/features/content/data/pages.server";
+
+interface PrivacyPageProps {
+  /** CMS draft preview flag from the URL: ?preview=1 */
+  preview?: boolean;
+}
+
+/** Fetches on the server so the page ships real content in its HTML. */
+export async function PrivacyPage({ preview = false }: PrivacyPageProps) {
+  const page = await getPageForStorefront("privacy", preview);
+  return <CmsPageView page={page} preview={preview} />;
+}

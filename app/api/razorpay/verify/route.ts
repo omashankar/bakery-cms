@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getRazorpayCredentials } from "@/features/admin/settings/lib/razorpay-config.server";
+import { getRazorpayCredentials } from "@/apps/admin/settings/lib/razorpay-config.server";
 
 /**
  * Verifies a Razorpay payment signature server-side (HMAC-SHA256 with the secret

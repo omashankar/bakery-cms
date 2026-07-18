@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CmsPageView } from "@/features/storefront/components/cms-page-view";
+import { CmsPageView } from "@/apps/website/components/cms-page-view";
 import { getPageForStorefront } from "@/features/content/data/pages.server";
 
 interface PageProps {

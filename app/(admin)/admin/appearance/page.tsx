@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AppearancePage } from "@/features/admin/appearance";
+import { AppearancePage } from "@/apps/admin/appearance";
 
 export const metadata: Metadata = {
   title: "Appearance",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PermissionsSettingsPage } from "@/features/admin/settings";
+import { PermissionsSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Roles & Permissions",

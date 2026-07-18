@@ -1,4 +1,3 @@
-import type { WeddingSectionInstance } from "@/types/wedding-builder";
 
 export function sortSections<T extends { order: number }>(sections: T[]): T[] {
   return [...sections]

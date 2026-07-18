@@ -9,7 +9,6 @@ import {
   Camera,
   Clock,
   Heart,
-  Images,
   Leaf,
   Mail,
   MapPin,
@@ -23,7 +22,7 @@ import {
   Truck,
   Palette,
 } from "lucide-react";
-import { CakeProductCard } from "@/features/landing/components/cake-product-card";
+import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
@@ -49,12 +48,12 @@ import {
   getActivePromoBanners,
 } from "@/features/content/lib/banners-repository";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
-import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/storefront/lib/content";
+import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
 import {
   getHomepageProducts,
   type HomepageProductSource,
   getHomepageCategories,
-} from "@/features/storefront/lib/homepage-catalog";
+} from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
@@ -390,7 +389,7 @@ function ProductGridSection(
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {props.cakes.slice(0, maxCount).map((cake) => (
-          <CakeProductCard key={cake.id} cake={cake} className="h-full" />
+          <ProductCard key={cake.id} cake={cake} className="h-full" />
         ))}
       </StaggerReveal>
       {props.showCta && ctaHref && ctaLabel ? (

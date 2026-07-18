@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { InventoryAdminPage } from "@/features/admin/commerce/pages/inventory-admin-page";
+import { InventoryAdminPage } from "@/apps/admin/commerce/pages/inventory-admin-page";
 
 export const metadata: Metadata = {
   title: "Inventory",

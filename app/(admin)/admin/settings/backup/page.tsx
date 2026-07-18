@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BackupSettingsPage } from "@/features/admin/settings";
+import { BackupSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Backup & Restore",
