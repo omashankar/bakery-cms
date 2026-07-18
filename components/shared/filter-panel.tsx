@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { adminShell } from "@/features/admin/components/admin-shell";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
 
 interface FilterPanelProps {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { NavigationSettingsPage } from "@/features/admin/settings";
+import { NavigationSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Navigation Menus",

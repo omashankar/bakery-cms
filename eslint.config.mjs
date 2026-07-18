@@ -5,7 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 /**
  * Architecture boundaries.
  *
- * `features/admin` (the CMS UI) and `features/storefront` (the customer website)
+ * `apps/admin` (the CMS UI) and `apps/website` (the customer website)
  * must never import each other. They used to, in both directions at once, which
  * made them impossible to split into separate apps. Anything both sides need is
  * business logic and belongs in a domain module — features/products, /orders,
@@ -15,16 +15,16 @@ import nextTs from "eslint-config-next/typescript";
  * Keep these rules. They are what stops the cycle growing back.
  */
 const adminImportsStorefront = {
-  files: ["features/admin/**"],
+  files: ["apps/admin/**"],
   rules: {
     "no-restricted-imports": [
       "error",
       {
         patterns: [
           {
-            group: ["@/features/storefront", "@/features/storefront/*", "**/features/storefront/*"],
+            group: ["@/apps/website", "@/apps/website/*", "**/apps/website/*"],
             message:
-              "features/admin must not import from features/storefront. Move the shared logic into a domain module (features/orders, features/products, ...) or, if it is UI, into components/shared.",
+              "apps/admin must not import from apps/website. Move the shared logic into a domain module (features/orders, features/products, ...) or, if it is UI, into components/shared.",
           },
         ],
       },
@@ -34,7 +34,7 @@ const adminImportsStorefront = {
 
 const storefrontImportsAdmin = {
   files: [
-    "features/storefront/**",
+    "apps/website/**",
     "features/landing/**",
     "features/cms-sections/**",
     "components/storefront/**",
@@ -47,9 +47,9 @@ const storefrontImportsAdmin = {
       {
         patterns: [
           {
-            group: ["@/features/admin", "@/features/admin/*", "**/features/admin/*"],
+            group: ["@/apps/admin", "@/apps/admin/*", "**/apps/admin/*"],
             message:
-              "The customer website must not import from features/admin. Move the shared logic into a domain module (features/settings, features/content, ...) or, if it is UI, into components/shared.",
+              "The customer website must not import from apps/admin. Move the shared logic into a domain module (features/settings, features/content, ...) or, if it is UI, into components/shared.",
           },
         ],
       },
@@ -75,6 +75,8 @@ const domainStaysPure = {
     "features/site-layout/**",
     "features/inquiries/**",
     "features/builders/**",
+    "features/cms-sections/**",
+    "features/payments/**",
   ],
   rules: {
     "no-restricted-imports": [
@@ -83,12 +85,12 @@ const domainStaysPure = {
         patterns: [
           {
             group: [
-              "@/features/admin",
-              "@/features/admin/*",
-              "**/features/admin/*",
-              "@/features/storefront",
-              "@/features/storefront/*",
-              "**/features/storefront/*",
+              "@/apps/admin",
+              "@/apps/admin/*",
+              "**/apps/admin/*",
+              "@/apps/website",
+              "@/apps/website/*",
+              "**/apps/website/*",
             ],
             message:
               "Domain modules must not depend on an app's UI layer. Business logic belongs here; the UI depends on it, never the reverse.",
@@ -99,9 +101,30 @@ const domainStaysPure = {
   },
 };
 
+/**
+ * The codebase already marks deliberately-discarded bindings with a leading
+ * underscore — `const { id: _id, ...data } = record` to strip a field. Honour
+ * that convention so the real unused-variable warnings stay visible.
+ */
+const underscoreMeansIntentional = {
+  rules: {
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        destructuredArrayIgnorePattern: "^_",
+        ignoreRestSiblings: true,
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  underscoreMeansIntentional,
   adminImportsStorefront,
   storefrontImportsAdmin,
   domainStaysPure,

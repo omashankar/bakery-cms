@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ProductFormPage } from "@/features/admin/products";
+import { ProductFormPage } from "@/apps/admin/products";
 
 export const metadata: Metadata = {
   title: "Edit Cake",

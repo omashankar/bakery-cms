@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ReportsPage } from "@/features/admin/reports";
+import { ReportsPage } from "@/apps/admin/reports";
 
 export const metadata: Metadata = {
   title: "Reports",

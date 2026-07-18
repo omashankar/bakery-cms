@@ -6,8 +6,8 @@ import { X } from "lucide-react";
 import {
   AdminHeader,
   AdminSidebar,
-} from "@/features/admin/components";
-import { adminShell } from "@/features/admin/components/admin-shell";
+} from "@/apps/admin/components";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
@@ -22,6 +22,10 @@ interface AdminLayoutShellProps {
 }
 
 export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
+  // Refresh the browser product cache from the server, for the admin screens
+  // that still read it synchronously (inventory, dashboard, global search).
+  useProductCacheSync();
+
   const pathname = usePathname();
   const isBuilder =
     pathname === routes.admin.builders.homepage ||

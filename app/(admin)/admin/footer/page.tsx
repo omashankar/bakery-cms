@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FooterAdminPage } from "@/features/admin/footer";
+import { FooterAdminPage } from "@/apps/admin/footer";
 
 export const metadata: Metadata = {
   title: "Footer",

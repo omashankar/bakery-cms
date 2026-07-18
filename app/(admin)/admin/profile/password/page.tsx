@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ChangePasswordPage } from "@/features/admin/profile";
+import { ChangePasswordPage } from "@/apps/admin/profile";
 
 export const metadata: Metadata = {
   title: "Change Password",

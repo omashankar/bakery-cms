@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { OrderDetailPage } from "@/features/storefront/checkout/pages/order-detail-page";
+import { OrderDetailPage } from "@/apps/website/checkout/pages/order-detail-page";
 
 export const metadata: Metadata = {
   title: "Order Details",

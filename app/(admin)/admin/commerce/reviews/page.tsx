@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ReviewsAdminPage } from "@/features/admin/reviews/pages/reviews-admin-page";
+import { ReviewsAdminPage } from "@/apps/admin/reviews/pages/reviews-admin-page";
 
 export const metadata: Metadata = {
   title: "Product Reviews",

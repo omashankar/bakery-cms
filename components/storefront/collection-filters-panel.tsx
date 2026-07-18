@@ -11,7 +11,7 @@ import {
   getFilterFlavourOptions,
   getFilterOccasionOptions,
   getFilterWeightOptions,
-} from "@/features/storefront/lib/collection-filters";
+} from "@/apps/website/lib/collection-filters";
 import { cn } from "@/lib/utils";
 
 interface CollectionFiltersPanelProps {

@@ -10,7 +10,7 @@ import { PriceDisplay } from "@/components/storefront/price-display";
 import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { addToCart } from "@/features/cart/lib/cart";
-import { isInWishlist, toggleWishlist } from "@/features/storefront/lib/wishlist";
+import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 

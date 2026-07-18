@@ -1,5 +1,5 @@
 import Razorpay from "razorpay";
-import { getRazorpayCredentials } from "@/features/admin/settings/lib/razorpay-config.server";
+import { getRazorpayCredentials } from "@/apps/admin/settings/lib/razorpay-config.server";
 
 /**
  * Creates a Razorpay order on the server.

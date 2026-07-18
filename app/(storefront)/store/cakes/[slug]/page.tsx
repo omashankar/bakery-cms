@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ProductDetailPage } from "@/features/storefront";
+import { ProductDetailPage } from "@/apps/website";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   getStorefrontProductBySlug,

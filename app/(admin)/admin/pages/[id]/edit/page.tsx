@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageFormPage } from "@/features/admin/pages";
+import { PageFormPage } from "@/apps/admin/pages";
 
 export const metadata: Metadata = {
   title: "Edit Page",

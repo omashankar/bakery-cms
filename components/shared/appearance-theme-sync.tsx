@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import {
   APPEARANCE_UPDATED_EVENT,
   applyAppearanceSettings,
-} from "@/features/admin/appearance/lib/appearance-utils";
+} from "@/apps/admin/appearance/lib/appearance-utils";
 import {
   APPEARANCE_STORAGE_KEY,
   loadAppearanceSettings,
-} from "@/features/admin/appearance/lib/appearance-repository";
+} from "@/apps/admin/appearance/lib/appearance-repository";
 import { applyThemeToDocument, isLightLockedPath } from "@/lib/theme";
 
 /**

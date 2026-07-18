@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CustomerInvoicePage } from "@/features/storefront/checkout/pages/customer-invoice-page";
+import { CustomerInvoicePage } from "@/apps/website/checkout/pages/customer-invoice-page";
 
 export const metadata: Metadata = {
   title: "Invoice",

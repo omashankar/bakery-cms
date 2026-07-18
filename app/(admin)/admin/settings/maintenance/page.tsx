@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MaintenanceSettingsPage } from "@/features/admin/settings";
+import { MaintenanceSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
   title: "Maintenance Mode",

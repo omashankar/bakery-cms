@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DeliveryZonesAdminPage } from "@/features/admin/commerce/pages/delivery-zones-admin-page";
+import { DeliveryZonesAdminPage } from "@/apps/admin/commerce/pages/delivery-zones-admin-page";
 
 export const metadata: Metadata = {
   title: "Delivery Zones",

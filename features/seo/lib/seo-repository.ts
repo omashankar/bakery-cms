@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import type { GlobalSeoSettings, SeoRouteEntry, SeoStore } from "@/types/seo";

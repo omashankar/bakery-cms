@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PaymentNotificationsPage } from "@/features/admin/commerce/pages/payment-notifications-page";
+import { PaymentNotificationsPage } from "@/apps/admin/commerce/pages/payment-notifications-page";
 
 export const metadata: Metadata = {
   title: "Payment Notifications",

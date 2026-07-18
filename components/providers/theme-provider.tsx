@@ -15,7 +15,7 @@ import { usePathname } from "next/navigation";
 import {
   applyAppearanceSettings,
   loadAppearanceSettings,
-} from "@/features/admin/appearance";
+} from "@/apps/admin/appearance";
 import {
   THEME_STORAGE_KEY,
   THEME_OPTIONS,

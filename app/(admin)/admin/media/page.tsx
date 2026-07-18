@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MediaLibraryPage } from "@/features/admin/media";
+import { MediaLibraryPage } from "@/apps/admin/media";
 
 export const metadata: Metadata = {
   title: "Media Library",

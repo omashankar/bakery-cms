@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GatewayManagerPage } from "@/features/admin/commerce/pages/gateway-manager-page";
+import { GatewayManagerPage } from "@/apps/admin/commerce/pages/gateway-manager-page";
 
 export const metadata: Metadata = {
   title: "Payment Gateways",

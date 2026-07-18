@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GatewayConfigPage } from "@/features/admin/commerce/pages/gateway-config-page";
+import { GatewayConfigPage } from "@/apps/admin/commerce/pages/gateway-config-page";
 
 export const metadata: Metadata = {
   title: "Gateway Settings",

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { CheckoutPage } from "@/features/storefront/checkout/pages/checkout-page";
+import { CheckoutPage } from "@/apps/website/checkout/pages/checkout-page";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 
 export const metadata: Metadata = {
