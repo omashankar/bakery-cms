@@ -1,20 +1,20 @@
 import { adminNavSections } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
-import { loadCoupons } from "@/features/admin/commerce/lib/coupons-repository";
+import { loadProducts } from "@/features/products/lib/products-repository";
+import { loadCoupons } from "@/features/commerce/lib/coupons-repository";
 import {
   getCustomerProfiles,
   formatCustomerSegmentLabel,
 } from "@/features/admin/commerce/lib/customer-profile-utils";
-import { loadDeliveryZones } from "@/features/admin/commerce/lib/delivery-zones-repository";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { getInventoryItems } from "@/features/admin/commerce/lib/inventory-repository";
 import { formatStockStatusLabel } from "@/features/admin/commerce/lib/inventory-utils";
-import { loadInquiries } from "@/features/admin/inquiries/lib/inquiries-repository";
-import { formatInquiryStatus } from "@/features/admin/inquiries/lib/inquiry-utils";
+import { loadInquiries } from "@/features/inquiries/lib/inquiries-repository";
+import { formatInquiryStatus } from "@/features/inquiries/lib/inquiry-utils";
 import { loadMediaFiles } from "@/features/admin/media/lib/media-repository";
-import { loadPages } from "@/features/admin/pages/lib/pages-repository";
-import { formatOrderStatus } from "@/features/storefront/checkout/lib/order-status-meta";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import { loadPages } from "@/features/content/lib/pages-repository";
+import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { getOrders } from "@/features/orders/lib/orders";
 
 export type GlobalSearchGroup =
   | "products"
@@ -383,7 +383,7 @@ function shouldSearchGroup(group: GlobalSearchGroup, filter: GlobalSearchGroup |
 }
 
 function searchProducts(text: string, limit: number): GlobalSearchResult[] {
-  return loadCakes()
+  return loadProducts()
     .filter((cake) => matchesQuery({ title: cake.name, subtitle: cake.slug }, text))
     .slice(0, limit)
     .map((cake) => ({

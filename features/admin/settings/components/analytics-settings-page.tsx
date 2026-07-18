@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AnalyticsSettings } from "@/types/settings";
-import { defaultAnalyticsSettings } from "../lib/settings-utils";
+import { defaultAnalyticsSettings } from "@/features/settings/lib/settings-utils";
 import {
   getAnalyticsSettings,
   resetAnalyticsSettings,
   saveAnalyticsSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 /** Tracking IDs are machine values — mobile keyboards must not capitalize or correct them. */

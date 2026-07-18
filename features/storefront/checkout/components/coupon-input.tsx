@@ -9,7 +9,7 @@ import {
   applyCouponCode,
   getCouponHint,
   type AppliedCoupon,
-} from "@/features/storefront/checkout/lib/coupons";
+} from "@/features/orders/lib/coupons";
 
 interface CouponInputProps {
   subtotal: number;

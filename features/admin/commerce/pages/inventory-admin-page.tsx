@@ -11,7 +11,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { StockStatusBadge } from "@/features/admin/commerce/components/stock-status-badge";
 import { StockAdjustmentDialog } from "@/features/admin/commerce/components/stock-adjustment-dialog";
 import {

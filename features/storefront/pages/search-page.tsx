@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { CakeProductCard } from "@/features/landing/components/cake-product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { searchCakes } from "@/features/storefront/lib/catalog";
+import { searchProducts } from "@/features/products/lib/product-catalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
@@ -39,7 +39,7 @@ export function SearchPage() {
     setQuery(initialQuery);
   }, [initialQuery]);
 
-  const results = useMemo(() => (mounted ? searchCakes(query) : []), [query, mounted]);
+  const results = useMemo(() => (mounted ? searchProducts(query) : []), [query, mounted]);
 
   function runSearch(term: string) {
     const params = new URLSearchParams();

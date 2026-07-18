@@ -1,17 +1,17 @@
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
+import { loadProducts } from "@/features/products/lib/products-repository";
 import { getCustomerRecords } from "@/features/admin/commerce/lib/customer-utils";
 import { ensureDemoOrders, getOrderStats } from "@/features/admin/commerce/lib/order-utils";
 import { countNewInquiries } from "@/features/admin/inquiries";
 import { loadMediaFiles } from "@/features/admin/media/lib/media-repository";
-import { getActivityLog } from "@/features/admin/settings/lib/settings-repository";
-import { getOrders, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { getActivityLog } from "@/features/settings/lib/settings-repository";
+import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
 import type { ActivityLog } from "@/types/settings";
 import { formatCurrency } from "@/utils/format";
 
 export interface DashboardStats {
   totalCakes: number;
-  publishedCakes: number;
-  draftCakes: number;
+  publishedProducts: number;
+  draftProducts: number;
   newInquiries: number;
   mediaCount: number;
   totalOrders: number;
@@ -31,8 +31,8 @@ export interface DashboardStats {
 /** SSR-safe defaults — real values load after mount from localStorage. */
 export const EMPTY_DASHBOARD_STATS: DashboardStats = {
   totalCakes: 0,
-  publishedCakes: 0,
-  draftCakes: 0,
+  publishedProducts: 0,
+  draftProducts: 0,
   newInquiries: 0,
   mediaCount: 0,
   totalOrders: 0,
@@ -59,9 +59,9 @@ export interface DashboardActivityItem {
 }
 
 export function getDashboardStats(): DashboardStats {
-  const cakes = loadCakes();
-  const publishedCakes = cakes.filter((cake) => cake.status === "published").length;
-  const draftCakes = cakes.filter((cake) => cake.status === "draft").length;
+  const cakes = loadProducts();
+  const publishedProducts = cakes.filter((cake) => cake.status === "published").length;
+  const draftProducts = cakes.filter((cake) => cake.status === "draft").length;
   const featuredCount = cakes.filter((cake) => cake.isFeatured).length;
   const newInquiries = countNewInquiries();
   const mediaCount = loadMediaFiles().length;
@@ -80,8 +80,8 @@ export function getDashboardStats(): DashboardStats {
 
   return {
     totalCakes: cakes.length,
-    publishedCakes,
-    draftCakes,
+    publishedProducts,
+    draftProducts,
     newInquiries,
     mediaCount,
     totalOrders: orderStats.total,
@@ -91,7 +91,7 @@ export function getDashboardStats(): DashboardStats {
     cakesWeeklyChange:
       featuredCount > 0
         ? `${featuredCount} featured in catalog`
-        : `${publishedCakes} live on storefront`,
+        : `${publishedProducts} live on storefront`,
     inquiryWeeklyChange:
       newInquiries > 0 ? `${newInquiries} need attention` : "All caught up",
     ordersChange:
@@ -104,7 +104,7 @@ export function getDashboardStats(): DashboardStats {
       orderStats.revenue > 0
         ? `${formatCurrency(orderStats.revenue)} lifetime`
         : "Revenue appears after checkout",
-    cakesChangeTone: draftCakes > 0 ? "warning" : "positive",
+    cakesChangeTone: draftProducts > 0 ? "warning" : "positive",
     inquiryChangeTone: newInquiries > 0 ? "warning" : "positive",
     ordersChangeTone: activeOrders > 0 ? "warning" : "positive",
     revenueChangeTone: orderStats.revenue > 0 ? "positive" : "neutral",

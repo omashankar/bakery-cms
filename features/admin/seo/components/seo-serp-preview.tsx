@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
-import { buildCanonicalUrl, resolveRouteTitle } from "../lib/seo-metadata";
+import { buildCanonicalUrl, resolveRouteTitle } from "@/features/seo/lib/seo-metadata";
 
 interface SeoSerpPreviewProps {
   entry: Pick<SeoRouteEntry, "path" | "metaTitle" | "metaDescription">;

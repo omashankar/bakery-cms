@@ -23,26 +23,26 @@ import { openCustomerAuthModal } from "@/features/storefront/account/components/
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/admin/commerce/lib/delivery-zones-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+} from "@/features/settings/lib/settings-repository";
+import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/commerce/lib/delivery-zones-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { CheckoutProgress } from "@/features/storefront/checkout/components/checkout-progress";
 import { CouponInput } from "@/features/storefront/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/features/storefront/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import {
   clearCheckoutDraft,
   getCheckoutDraft,
   saveCheckoutDraft,
   type CheckoutAddress,
   type PaymentMethod,
-} from "@/features/storefront/checkout/lib/checkout-draft";
-import type { AppliedCoupon } from "@/features/storefront/checkout/lib/coupons";
-import { recordCouponUsage } from "@/features/storefront/checkout/lib/coupons";
-import { placeOrder } from "@/features/storefront/checkout/lib/orders";
+} from "@/features/orders/lib/checkout-draft";
+import type { AppliedCoupon } from "@/features/orders/lib/coupons";
+import { recordCouponUsage } from "@/features/orders/lib/coupons";
+import { placeOrder } from "@/features/orders/lib/orders";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { clearCart, clearCartPreferences, getCartItems, getCartPreferences } from "@/features/storefront/lib/cart";
-import type { CartLineItem } from "@/features/storefront/lib/cart";
+import { clearCart, clearCartPreferences, getCartItems, getCartPreferences } from "@/features/cart/lib/cart";
+import type { CartLineItem } from "@/features/cart/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

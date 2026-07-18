@@ -40,7 +40,7 @@ import {
   saveNotificationSettings,
   syncNotifications,
 } from "@/features/admin/commerce/lib/notifications-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/admin/inquiries/lib/inquiries-repository";
+import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
 import type {
   NotificationListFilters,
   NotificationOverview,
@@ -49,7 +49,7 @@ import type {
 } from "@/types/notification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 

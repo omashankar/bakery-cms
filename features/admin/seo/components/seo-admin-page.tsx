@@ -12,8 +12,8 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { CakeMediaPicker } from "@/features/admin/cakes/components/cake-media-picker";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { MediaPicker } from "@/features/admin/products/components/media-picker";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -42,7 +42,7 @@ import {
   loadSeoStore,
   resetSeoStore,
   saveGlobalSeo,
-} from "../lib/seo-repository";
+} from "@/features/seo/lib/seo-repository";
 import {
   DESCRIPTION_IDEAL_MAX,
   TITLE_IDEAL_MAX,
@@ -56,7 +56,7 @@ import {
   parseKeywords,
   type SeoOverview,
   type SeoRouteListFilters,
-} from "../lib/seo-metadata";
+} from "@/features/seo/lib/seo-metadata";
 import { SeoRouteEditDialog } from "./seo-route-edit-dialog";
 
 const EMPTY_OVERVIEW: SeoOverview = {
@@ -708,7 +708,7 @@ export function SeoAdminPage() {
         onSaved={refreshRoutesOnly}
       />
 
-      <CakeMediaPicker
+      <MediaPicker
         open={mediaOpen}
         onOpenChange={setMediaOpen}
         onSelect={(url) => {

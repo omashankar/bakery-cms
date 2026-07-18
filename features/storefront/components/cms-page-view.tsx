@@ -9,7 +9,7 @@ import { StorePageHeader } from "@/features/storefront/components/store-page-hea
 import {
   getPageForStorefront,
   processScheduledPagePublishes,
-} from "@/features/admin/pages/lib/pages-repository";
+} from "@/features/content/lib/pages-repository";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

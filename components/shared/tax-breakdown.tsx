@@ -1,4 +1,4 @@
-import type { CartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+import type { CartTotals } from "@/features/orders/lib/cart-totals";
 import type { TaxBreakdownValues } from "@/types/tax-breakdown";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";

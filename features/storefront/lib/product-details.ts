@@ -1,17 +1,17 @@
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
-import type { LandingCake } from "@/constants/landing-data";
-import { getFlavours } from "@/features/admin/catalog/lib/catalog-repository";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+import type { LandingProduct } from "@/constants/landing-data";
+import { getFlavours } from "@/features/catalog/lib/catalog-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
   createDefaultVariantGroups,
   formatPreparationTime,
   formatShelfLife,
-} from "@/features/admin/cakes/lib/variant-utils";
-import type { ProductVariantGroup } from "@/types/cake";
+} from "@/features/products/lib/variant-utils";
+import type { ProductVariantGroup } from "@/types/product";
 import {
-  getStorefrontReviewsForCake,
-} from "@/features/admin/reviews/lib/reviews-repository";
+  getStorefrontReviewsForProduct,
+} from "@/features/reviews/lib/reviews-repository";
 
 export interface ProductReview {
   id: string;
@@ -32,7 +32,7 @@ const galleryPool = [
   demoPhotoIds.cupcakes,
 ];
 
-export function getCakeGalleryImages(cake: LandingCake): string[] {
+export function getProductGalleryImages(cake: LandingProduct): string[] {
   const seed = Number(cake.id.replace(/\D/g, "")) || 1;
   const alternates = galleryPool
     .filter((id) => !cake.image.includes(id))
@@ -42,7 +42,7 @@ export function getCakeGalleryImages(cake: LandingCake): string[] {
   return [cake.image, ...alternates].slice(0, 4);
 }
 
-export function getCakeFlavourOptions(cake: LandingCake): string[] {
+export function getProductFlavourOptions(cake: LandingProduct): string[] {
   if (cake.flavours?.length) return cake.flavours;
 
   const fromCatalog = getFlavours()
@@ -54,12 +54,12 @@ export function getCakeFlavourOptions(cake: LandingCake): string[] {
   return ["Chocolate", "Vanilla", "Red Velvet", "Butterscotch"];
 }
 
-export function getCakeShapeOptions(cake?: LandingCake): string[] {
+export function getProductShapeOptions(cake?: LandingProduct): string[] {
   if (cake?.shapes?.length) return cake.shapes;
   return ["Round", "Square", "Heart"];
 }
 
-export function getCakeVariantGroups(cake: LandingCake): ProductVariantGroup[] {
+export function getProductVariantGroups(cake: LandingProduct): ProductVariantGroup[] {
   if (cake.variantGroups?.length) return cake.variantGroups;
 
   return createDefaultVariantGroups({
@@ -69,7 +69,7 @@ export function getCakeVariantGroups(cake: LandingCake): ProductVariantGroup[] {
   });
 }
 
-export function getProductDetailBadges(cake: LandingCake): string[] {
+export function getProductDetailBadges(cake: LandingProduct): string[] {
   const badges: string[] = [];
   const prep = formatPreparationTime(cake.preparationTimeMinutes);
   const shelf = formatShelfLife(cake.shelfLifeDays);
@@ -88,9 +88,9 @@ export function getDeliveryTimeSlots(): string[] {
   return slots.filter((slot) => slot.trim().length > 0);
 }
 
-export function getCakeReviews(cake: LandingCake): ProductReview[] {
+export function getProductReviews(cake: LandingProduct): ProductReview[] {
   if (typeof window === "undefined") return [];
-  return getStorefrontReviewsForCake(cake.slug);
+  return getStorefrontReviewsForProduct(cake.slug);
 }
 
 export function getMinDeliveryDate(): string {

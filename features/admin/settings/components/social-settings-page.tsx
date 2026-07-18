@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,12 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { SocialLinkSettings } from "@/types/settings";
-import { defaultSocialLinks, socialPlatformOptions } from "../lib/settings-utils";
+import { defaultSocialLinks, socialPlatformOptions } from "@/features/settings/lib/settings-utils";
 import {
   getSocialLinks,
   resetSocialLinks,
   saveSocialLinks,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 function createSocialLink(): SocialLinkSettings {

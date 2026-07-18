@@ -3,9 +3,9 @@
  */
 
 import { demoPhotoIds, unsplash } from "./demo-images";
-import type { ProductVariantGroup } from "@/types/cake";
+import type { ProductVariantGroup } from "@/types/product";
 
-export interface LandingCake {
+export interface LandingProduct {
   id: string;
   name: string;
   slug: string;
@@ -95,7 +95,7 @@ export const socialLinks = [
   { platform: "YouTube", href: "https://youtube.com", label: "YouTube" },
 ];
 
-export const featuredCakes: LandingCake[] = [
+export const featuredProducts: LandingProduct[] = [
   {
     id: "1",
     name: "Chocolate Truffle Delight",
@@ -209,7 +209,7 @@ export const categories: LandingCategory[] = [
   },
 ];
 
-export const trendingCakes: LandingCake[] = [
+export const trendingProducts: LandingProduct[] = [
   {
     id: "5",
     name: "Mango Mousse Paradise",
@@ -244,7 +244,7 @@ export const trendingCakes: LandingCake[] = [
   },
 ];
 
-export const bestSellers: LandingCake[] = [
+export const bestSellers: LandingProduct[] = [
   {
     id: "8",
     name: "Vanilla Dream Cake",
@@ -291,7 +291,7 @@ export const bestSellers: LandingCake[] = [
   },
 ];
 
-export const weddingCakes: LandingCake[] = [
+export const weddingCakes: LandingProduct[] = [
   {
     id: "12",
     name: "Royal Tier Elegance",
@@ -325,7 +325,7 @@ export const weddingCakes: LandingCake[] = [
   },
 ];
 
-export const photoCakes: LandingCake[] = [
+export const photoCakes: LandingProduct[] = [
   {
     id: "pc-1",
     name: "Memory Lane Photo Cake",
@@ -370,7 +370,7 @@ export const photoCakes: LandingCake[] = [
   },
 ];
 
-export const egglessCakes: LandingCake[] = [
+export const egglessCakes: LandingProduct[] = [
   {
     id: "eg-1",
     name: "Eggless Chocolate Fudge",
@@ -420,7 +420,7 @@ export const egglessCakes: LandingCake[] = [
   },
 ];
 
-export const seasonalCakes: LandingCake[] = [
+export const seasonalCakes: LandingProduct[] = [
   {
     id: "ss-1",
     name: "Mango Mousse Paradise",

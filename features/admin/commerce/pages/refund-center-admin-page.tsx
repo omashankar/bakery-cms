@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -38,7 +38,7 @@ import {
   refundOrder,
   type PlacedOrder,
   type RefundOrderInput,
-} from "@/features/storefront/checkout/lib/orders";
+} from "@/features/orders/lib/orders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -12,8 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { slugify } from "@/features/admin/cakes/lib/cake-utils";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { slugify } from "@/features/products/lib/product-utils";
 import { BuilderMediaField } from "@/features/admin/builders/shared/builder-media-field";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,8 +37,8 @@ import {
   getPageById,
   processScheduledPagePublishes,
   updatePage,
-} from "../lib/pages-repository";
-import { getStorefrontPageUrl } from "../lib/pages-utils";
+} from "@/features/content/lib/pages-repository";
+import { getStorefrontPageUrl } from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
 
 interface PageFormPageProps {

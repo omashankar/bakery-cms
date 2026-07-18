@@ -1,4 +1,4 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import type {
   CustomerActivityItem,
   CustomerAddressSummary,
@@ -12,7 +12,7 @@ import {
   getCustomerById,
   getOrdersForCustomerRecord,
 } from "./customer-utils";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import { getOrders } from "@/features/orders/lib/orders";
 import { routes } from "@/constants/routes";
 
 export interface CustomerProfile extends CustomerRecord {
@@ -98,15 +98,15 @@ function getFavoriteProducts(orders: PlacedOrder[]): CustomerFavoriteProduct[] {
     if (COUNTABLE_STATUSES.has(order.status)) continue;
 
     for (const item of order.items) {
-      const current = map.get(item.cakeSlug) ?? {
-        slug: item.cakeSlug,
+      const current = map.get(item.productSlug) ?? {
+        slug: item.productSlug,
         name: item.name,
         quantity: 0,
         revenue: 0,
       };
       current.quantity += item.quantity;
       current.revenue += item.price * item.quantity;
-      map.set(item.cakeSlug, current);
+      map.set(item.productSlug, current);
     }
   }
 

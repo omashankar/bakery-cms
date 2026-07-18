@@ -28,7 +28,7 @@ import {
   deleteWeightOptions,
   loadCatalogStore,
   resetCatalogStore,
-} from "../lib/catalog-repository";
+} from "@/features/catalog/lib/catalog-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
 
 const EMPTY_STORE: CatalogStore = {

@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, IndianRupee, Receipt, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
 import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
 import {
   getOrders,
   type PlacedOrder,
-} from "@/features/storefront/checkout/lib/orders";
+} from "@/features/orders/lib/orders";
 import {
   applyTransactionFilters,
   buildTransactions,

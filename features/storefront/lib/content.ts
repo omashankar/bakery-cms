@@ -2,8 +2,8 @@ import type { LandingFaq, LandingTestimonial } from "@/constants/landing-data";
 import {
   getPublishedTestimonials,
   toLandingTestimonial,
-} from "@/features/admin/testimonials";
-import { getPublishedFaqs, toLandingFaq } from "@/features/admin/faq";
+} from "@/features/content/lib/testimonials-repository";
+import { getPublishedFaqs, toLandingFaq } from "@/features/content/lib/faq-repository";
 import type { FaqCategory } from "@/types/content";
 
 export function getStorefrontTestimonials(): LandingTestimonial[] {

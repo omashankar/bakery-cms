@@ -16,7 +16,7 @@ import {
 import {
   listBuilderRevisions,
   restoreBuilderRevision,
-} from "@/features/admin/builders/shared/builder-revisions";
+} from "@/features/builders/lib/builder-revisions";
 import { BuilderVersionHistoryPanel } from "@/features/admin/builders/shared/builder-version-history-panel";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {

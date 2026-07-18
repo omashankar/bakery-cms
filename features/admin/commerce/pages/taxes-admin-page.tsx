@@ -7,7 +7,7 @@ import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import {
   buildDefaultTaxLabel,
   formatTaxRatePercent,
-} from "@/features/admin/commerce/lib/tax-utils";
+} from "@/features/commerce/lib/tax-utils";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,16 +18,16 @@ import {
   getCommerceSettings,
   saveCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 
 const SAMPLE_ITEM = {
   id: "preview",
-  cakeSlug: "preview",
+  productSlug: "preview",
   name: "Sample cake",
   image: "",
   price: 850,

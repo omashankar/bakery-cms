@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { CakeMediaPicker } from "@/features/admin/cakes/components/cake-media-picker";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { MediaPicker } from "@/features/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +24,7 @@ import {
   createTestimonial,
   getTestimonialById,
   updateTestimonial,
-} from "../lib/testimonials-repository";
+} from "@/features/content/lib/testimonials-repository";
 
 interface TestimonialFormDialogProps {
   open: boolean;
@@ -273,7 +273,7 @@ export function TestimonialFormDialog({
         </DialogContent>
       </Dialog>
 
-      <CakeMediaPicker
+      <MediaPicker
         open={mediaOpen}
         onOpenChange={setMediaOpen}
         onSelect={(url) => {

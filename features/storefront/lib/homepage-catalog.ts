@@ -1,10 +1,10 @@
-import type { LandingCake, LandingCategory } from "@/constants/landing-data";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
-import { getPublishedStorefrontCakes } from "@/features/admin/cakes/lib/cake-mapper";
-import { getCategories } from "@/features/admin/catalog/lib/catalog-repository";
-import { filterCakesByCategory, getAllCakes } from "./catalog";
+import type { LandingProduct, LandingCategory } from "@/constants/landing-data";
+import { loadProducts } from "@/features/products/lib/products-repository";
+import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
+import { getCategories } from "@/features/catalog/lib/catalog-repository";
+import { filterProductsByCategory, getAllProducts } from "@/features/products/lib/product-catalog";
 
-export type HomepageCakeSource =
+export type HomepageProductSource =
   | "featured"
   | "trending"
   | "best-sellers"
@@ -12,12 +12,12 @@ export type HomepageCakeSource =
   | "eggless"
   | "seasonal";
 
-function getPublishedAdminCakes(): ReturnType<typeof loadCakes> {
-  return loadCakes().filter((cake) => cake.status === "published");
+function getPublishedAdminProducts(): ReturnType<typeof loadProducts> {
+  return loadProducts().filter((cake) => cake.status === "published");
 }
 
-function getAdminCakeFlags() {
-  const published = getPublishedAdminCakes();
+function getAdminProductFlags() {
+  const published = getPublishedAdminProducts();
   return {
     featured: published.filter((cake) => cake.isFeatured),
     trending: published.filter((cake) => cake.isTrending),
@@ -28,24 +28,24 @@ function getAdminCakeFlags() {
   };
 }
 
-function mergeWithCatalog(adminCakes: LandingCake[], fallback: LandingCake[]): LandingCake[] {
+function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
   if (adminCakes.length === 0) return fallback;
   const slugs = new Set(adminCakes.map((cake) => cake.slug));
   const extras = fallback.filter((cake) => !slugs.has(cake.slug));
   return [...adminCakes, ...extras];
 }
 
-export function getHomepageCakes(source: HomepageCakeSource, maxCount = 8): LandingCake[] {
-  const flags = getAdminCakeFlags();
-  const all = getAllCakes();
+export function getHomepageProducts(source: HomepageProductSource, maxCount = 8): LandingProduct[] {
+  const flags = getAdminProductFlags();
+  const all = getAllProducts();
 
-  const adminMapped = getPublishedStorefrontCakes(loadCakes());
+  const adminMapped = getPublishedStorefrontProducts(loadProducts());
   const adminBySlug = new Map(adminMapped.map((cake) => [cake.slug, cake]));
 
-  const pickAdmin = (cakes: ReturnType<typeof loadCakes>) =>
-    cakes.map((cake) => adminBySlug.get(cake.slug)).filter((cake): cake is LandingCake => Boolean(cake));
+  const pickAdmin = (cakes: ReturnType<typeof loadProducts>) =>
+    cakes.map((cake) => adminBySlug.get(cake.slug)).filter((cake): cake is LandingProduct => Boolean(cake));
 
-  const sourceMatchers: Record<HomepageCakeSource, () => LandingCake[]> = {
+  const sourceMatchers: Record<HomepageProductSource, () => LandingProduct[]> = {
     featured: () => {
       const admin = pickAdmin(flags.featured);
       return mergeWithCatalog(admin, all.filter((cake) => cake.badge === "Featured"));
@@ -60,15 +60,15 @@ export function getHomepageCakes(source: HomepageCakeSource, maxCount = 8): Land
     },
     "photo-cakes": () => {
       const admin = pickAdmin(flags.photo);
-      return mergeWithCatalog(admin, filterCakesByCategory(all, "photo-cakes"));
+      return mergeWithCatalog(admin, filterProductsByCategory(all, "photo-cakes"));
     },
     eggless: () => {
       const admin = pickAdmin(flags.eggless);
-      return mergeWithCatalog(admin, filterCakesByCategory(all, "eggless"));
+      return mergeWithCatalog(admin, filterProductsByCategory(all, "eggless"));
     },
     seasonal: () => {
       const admin = pickAdmin(flags.seasonal);
-      return mergeWithCatalog(admin, filterCakesByCategory(all, "seasonal"));
+      return mergeWithCatalog(admin, filterProductsByCategory(all, "seasonal"));
     },
   };
 
@@ -81,7 +81,7 @@ export function getHomepageCakes(source: HomepageCakeSource, maxCount = 8): Land
   const extras = all.filter((cake) => !seen.has(cake.slug));
 
   // Rotate the top-up pool per source so adjacent sections don't repeat the same cakes.
-  const sourceOrder: HomepageCakeSource[] = [
+  const sourceOrder: HomepageProductSource[] = [
     "featured",
     "trending",
     "best-sellers",
@@ -99,12 +99,12 @@ export function getHomepageCakes(source: HomepageCakeSource, maxCount = 8): Land
 
 export function getHomepageCategories(maxCount = 6): LandingCategory[] {
   const catalogCategories = getCategories();
-  const publishedCakes = getPublishedAdminCakes();
+  const publishedProducts = getPublishedAdminProducts();
 
   const mapped = catalogCategories.map((category) => {
     const count =
       category.cakeCount ??
-      publishedCakes.filter((cake) => cake.categoryId === category.id).length;
+      publishedProducts.filter((cake) => cake.categoryId === category.id).length;
 
     return {
       id: category.id,

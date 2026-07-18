@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Mail, MapPin, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/features/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/features/admin/commerce/components/admin-payment-status-badge";
 import { CancelOrderDialog } from "@/features/admin/commerce/components/cancel-order-dialog";
@@ -13,12 +13,12 @@ import { OrderInvoice } from "@/features/admin/commerce/components/order-invoice
 import { RefundOrderDialog } from "@/features/admin/commerce/components/refund-order-dialog";
 import { RefundTimeline } from "@/features/admin/commerce/components/refund-timeline";
 import { formatRefundReason } from "@/features/admin/commerce/lib/refund-utils";
-import { runBrowserPrint } from "@/features/admin/commerce/lib/print-invoice";
+import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
-import { OrderStatusTimeline } from "@/features/storefront/checkout/components/order-status-timeline";
-import { getOrderTimeline } from "@/features/storefront/checkout/lib/order-tracking";
-import { isTerminalOrderStatus } from "@/features/storefront/checkout/lib/order-status-meta";
-import { getActiveFulfillmentStatuses } from "@/features/storefront/checkout/lib/order-tracking";
+import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
+import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
+import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { getActiveFulfillmentStatuses } from "@/features/orders/lib/order-tracking";
 import {
   cancelOrder,
   getOrderById,
@@ -28,10 +28,10 @@ import {
   type OrderStatus,
   type PlacedOrder,
   type RefundOrderInput,
-} from "@/features/storefront/checkout/lib/orders";
+} from "@/features/orders/lib/orders";
 import { SafeImage } from "@/components/shared/safe-image";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";

@@ -1,5 +1,5 @@
-import type { LandingCake } from "@/constants/landing-data";
-import { getFlavours, getOccasions } from "@/features/admin/catalog/lib/catalog-repository";
+import type { LandingProduct } from "@/constants/landing-data";
+import { getFlavours, getOccasions } from "@/features/catalog/lib/catalog-repository";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
@@ -41,20 +41,20 @@ export function getFilterWeightOptions(): string[] {
   return ["0.5 kg", "1 kg", "1.5 kg"];
 }
 
-function matchesOccasion(cake: LandingCake, occasions: string[]): boolean {
+function matchesOccasion(cake: LandingProduct, occasions: string[]): boolean {
   if (occasions.length === 0) return true;
   const haystack = `${cake.name} ${cake.category} ${cake.description}`.toLowerCase();
   return occasions.some((occasion) => haystack.includes(occasion.toLowerCase()));
 }
 
-function matchesFlavour(cake: LandingCake, flavours: string[]): boolean {
+function matchesFlavour(cake: LandingProduct, flavours: string[]): boolean {
   if (flavours.length === 0) return true;
-  const cakeFlavours = cake.flavours ?? [];
-  const haystack = `${cake.name} ${cake.description} ${cakeFlavours.join(" ")}`.toLowerCase();
+  const productFlavours = cake.flavours ?? [];
+  const haystack = `${cake.name} ${cake.description} ${productFlavours.join(" ")}`.toLowerCase();
   return flavours.some((flavour) => haystack.includes(flavour.toLowerCase()));
 }
 
-function matchesWeight(cake: LandingCake, weights: string[]): boolean {
+function matchesWeight(cake: LandingProduct, weights: string[]): boolean {
   if (weights.length === 0) return true;
   if (weights.includes("1.5 kg") && cake.price >= 1400) return true;
   if (weights.includes("1 kg") && cake.price >= 900 && cake.price < 1600) return true;
@@ -63,9 +63,9 @@ function matchesWeight(cake: LandingCake, weights: string[]): boolean {
 }
 
 export function applyCollectionFilters(
-  cakes: LandingCake[],
+  cakes: LandingProduct[],
   filters: CollectionFilters
-): LandingCake[] {
+): LandingProduct[] {
   const query = filters.search.trim().toLowerCase();
 
   let result = cakes.filter((cake) => {

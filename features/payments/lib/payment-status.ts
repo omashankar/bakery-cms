@@ -1,4 +1,4 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 
 /**
  * Rich 12-state transaction status — a DERIVED view over the order's existing

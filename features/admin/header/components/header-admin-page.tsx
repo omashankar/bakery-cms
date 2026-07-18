@@ -23,13 +23,13 @@ import {
   loadHeaderSettings,
   resetHeaderSettings,
   saveHeaderSettings,
-} from "../lib/header-repository";
+} from "@/features/site-layout/lib/header-repository";
 import {
   defaultHeaderSettings,
   getHeaderOverview,
   reorderHeaderNav,
   type HeaderOverview,
-} from "../lib/header-utils";
+} from "@/features/site-layout/lib/header-utils";
 
 const EMPTY_OVERVIEW: HeaderOverview = {
   totalLinks: 0,

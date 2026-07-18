@@ -15,7 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -43,7 +43,7 @@ import {
   deletePages,
   loadPages,
   processScheduledPagePublishes,
-} from "../lib/pages-repository";
+} from "@/features/content/lib/pages-repository";
 import {
   defaultPageFilters,
   filterPages,
@@ -54,7 +54,7 @@ import {
   getStorefrontPageUrl,
   type PageListFilters,
   type PageOverview,
-} from "../lib/pages-utils";
+} from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
 
 function PageRowActions({

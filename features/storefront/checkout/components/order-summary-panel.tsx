@@ -1,9 +1,9 @@
 import Link from "next/link";
-import type { CartLineItem } from "@/features/storefront/lib/cart";
-import type { CartTotals } from "@/features/storefront/checkout/lib/cart-totals";
-import { getFreeDeliveryThreshold } from "@/features/storefront/checkout/lib/cart-totals";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+import type { CartLineItem } from "@/features/cart/lib/cart";
+import type { CartTotals } from "@/features/orders/lib/cart-totals";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";

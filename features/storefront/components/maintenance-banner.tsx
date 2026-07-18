@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getMaintenanceSettings } from "@/features/admin/settings";
+import { getMaintenanceSettings } from "@/features/settings/lib/settings-repository";
 
 export function MaintenanceBanner() {
   const [message, setMessage] = useState<string | null>(null);

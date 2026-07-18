@@ -8,7 +8,7 @@ import { StorePageHeader } from "@/features/storefront/components/store-page-hea
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import type { PaymentMethod } from "@/features/storefront/checkout/lib/checkout-draft";
+import type { PaymentMethod } from "@/features/orders/lib/checkout-draft";
 
 function resolveMethod(value: string | null): PaymentMethod {
   if (value === "card" || value === "upi") return value;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Mail, Trash2, UserCheck, UserX, Users } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -33,7 +33,7 @@ import {
   loadNewsletterSubscribers,
   updateNewsletterSubscriber,
   type NewsletterFilters,
-} from "../lib/newsletter-repository";
+} from "@/features/inquiries/lib/newsletter-repository";
 
 const PAGE_SIZE = 12;
 

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { AccountOrderStatusBadge } from "@/features/storefront/account/components/account-order-status-badge";
 import { AccountShell } from "@/features/storefront/account/components/account-shell";
 import { useCustomerAuth } from "@/features/storefront/account/hooks/use-customer-auth";
-import { getOrdersForCustomer } from "@/features/storefront/checkout/lib/orders";
+import { getOrdersForCustomer } from "@/features/orders/lib/orders";
 import { reorderFromOrder } from "@/features/storefront/lib/reorder";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";

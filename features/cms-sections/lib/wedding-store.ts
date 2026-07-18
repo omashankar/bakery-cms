@@ -1,5 +1,5 @@
 import { createDefaultWeddingSections } from "@/constants/wedding-section-registry";
-import { pushBuilderRevision } from "@/features/admin/builders/shared/builder-revisions";
+import { pushBuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   WeddingBuilderSnapshot,
   WeddingBuilderState,

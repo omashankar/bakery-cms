@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { filterCakesByCategory, getAllCakes } from "@/features/storefront/lib/catalog";
+import { filterProductsByCategory, getAllProducts } from "@/features/products/lib/product-catalog";
 import {
   DEFAULT_COLLECTION_FILTERS,
   applyCollectionFilters,
@@ -59,8 +59,8 @@ export function CollectionsPage({ categorySlug: categorySlugProp }: CollectionsP
 
   const filtered = useMemo(() => {
     if (!mounted) return [];
-    const all = getAllCakes();
-    let byCategory = filterCakesByCategory(all, categorySlug || undefined);
+    const all = getAllProducts();
+    let byCategory = filterProductsByCategory(all, categorySlug || undefined);
     // Never dead-end a valid category page — fall back to the full catalogue.
     if (categorySlug && byCategory.length === 0) byCategory = all;
     return applyCollectionFilters(byCategory, filters);

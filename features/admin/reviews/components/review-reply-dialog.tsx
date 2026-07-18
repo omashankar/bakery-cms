@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import type { ProductReview } from "@/types/review";
 
 interface ReviewReplyDialogProps {

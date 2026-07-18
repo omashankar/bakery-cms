@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Package } from "lucide-react";
-import { getOrderByNumber, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
 import { hasCustomerSession } from "@/features/storefront/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/features/storefront/account/components/customer-auth-modal";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";

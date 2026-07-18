@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { getActiveHeroBanners } from "@/features/admin/banners";
+import { getActiveHeroBanners } from "@/features/content/lib/banners-repository";
 import type { Banner } from "@/types/media";
 
 export function StorefrontBannerStrip() {

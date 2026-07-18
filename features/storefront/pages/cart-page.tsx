@@ -11,14 +11,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { OrderSummaryPanel } from "@/features/storefront/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import { ProductRailSection } from "@/features/storefront/components/product-rail-section";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
   CART_PREFERENCES_UPDATED_EVENT,
   getCartPreferences,
@@ -30,13 +30,13 @@ import {
   updateCartPreferences,
   type CartLineItem,
   type CartPreferences,
-} from "@/features/storefront/lib/cart";
+} from "@/features/cart/lib/cart";
 import {
   getSavedForLaterItems,
   removeSavedForLaterItem,
   SAVED_FOR_LATER_UPDATED_EVENT,
-} from "@/features/storefront/lib/saved-for-later";
-import { getRecentlyViewedCakes } from "@/features/storefront/lib/recently-viewed";
+} from "@/features/cart/lib/saved-for-later";
+import { getRecentlyViewedProducts } from "@/features/storefront/lib/recently-viewed";
 import { addToWishlist } from "@/features/storefront/lib/wishlist";
 import { hasCustomerSession } from "@/features/storefront/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/features/storefront/account/components/customer-auth-modal";
@@ -101,7 +101,7 @@ export function CartPage() {
     [items, preferences.giftWrap, commerce]
   );
 
-  const recentlyViewed = useMemo(() => getRecentlyViewedCakes(), [loaded, items.length]);
+  const recentlyViewed = useMemo(() => getRecentlyViewedProducts(), [loaded, items.length]);
 
   function handleSaveForLater(item: CartLineItem) {
     if (moveCartItemToSavedForLater(item.id)) {
@@ -110,7 +110,7 @@ export function CartPage() {
   }
 
   function handleMoveToWishlist(item: CartLineItem) {
-    const added = addToWishlist(item.cakeSlug);
+    const added = addToWishlist(item.productSlug);
     removeCartItem(item.id);
     toast.success(added ? "Moved to wishlist" : "Already in wishlist — removed from cart");
   }
@@ -195,7 +195,7 @@ export function CartPage() {
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 gap-4">
                           <Link
-                            href={routes.store.cake(item.cakeSlug)}
+                            href={routes.store.cake(item.productSlug)}
                             className="size-20 shrink-0 overflow-hidden rounded-lg border border-border bg-cream-100"
                           >
                             {item.image ? (
@@ -210,7 +210,7 @@ export function CartPage() {
                           </Link>
                           <div className="min-w-0 space-y-1">
                           <Link
-                            href={routes.store.cake(item.cakeSlug)}
+                            href={routes.store.cake(item.productSlug)}
                             className="font-medium hover:text-bakery-700"
                           >
                             {item.name}

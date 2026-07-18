@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import type { DashboardDateRange } from "../lib/dashboard-analytics";
 
 const rangeOptions: Array<{ value: DashboardDateRange; label: string }> = [

@@ -3,7 +3,7 @@
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SectionBackground, SectionFieldDef } from "@/types/homepage-builder";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { BuilderMediaField } from "./builder-media-field";

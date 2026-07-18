@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,8 +20,8 @@ import {
   createFaq,
   getFaqById,
   updateFaq,
-} from "../lib/faq-repository";
-import { faqCategoryOptions } from "../lib/faq-utils";
+} from "@/features/content/lib/faq-repository";
+import { faqCategoryOptions } from "@/features/content/lib/faq-utils";
 
 interface FaqFormDialogProps {
   open: boolean;

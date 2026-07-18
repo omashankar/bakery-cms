@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import type { StockStatus } from "@/types/cake";
+import type { StockStatus } from "@/types/product";
 import { cn } from "@/lib/utils";
 import {
   formatStockStatusLabel,

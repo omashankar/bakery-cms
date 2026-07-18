@@ -1,6 +1,6 @@
 export type { ThemeMode, ThemeConfig } from "./theme";
 export type * from "./common";
-export type * from "./cake";
+export type * from "./product";
 export type * from "./inquiry";
 export type * from "./media";
 export type * from "./user";

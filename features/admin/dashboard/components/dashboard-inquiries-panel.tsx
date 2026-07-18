@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { getRecentInquiries } from "@/features/admin/inquiries";
 import { formatRelativeTime } from "@/utils/format";
-import { formatInquiryType } from "@/features/admin/inquiries/lib/inquiry-utils";
+import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "@/features/admin/inquiries/components/inquiry-status-badge";
 import type { Inquiry } from "@/types/inquiry";
 

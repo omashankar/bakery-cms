@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { getCakeBySlug } from "@/features/storefront/lib/catalog";
+import { getProductBySlug } from "@/features/products/lib/product-catalog";
 import { getWishlistSlugs } from "@/features/storefront/lib/wishlist";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -26,7 +26,7 @@ export function WishlistPage() {
   }, []);
 
   const cakes = slugs
-    .map((slug) => getCakeBySlug(slug))
+    .map((slug) => getProductBySlug(slug))
     .filter((cake): cake is NonNullable<typeof cake> => Boolean(cake));
 
   return (

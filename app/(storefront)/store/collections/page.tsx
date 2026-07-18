@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CollectionsPage } from "@/features/storefront";
-import { buildRouteMetadata } from "@/features/admin/seo";
+import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = buildRouteMetadata("store-collections");

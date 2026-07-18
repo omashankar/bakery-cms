@@ -10,7 +10,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/features/admin/commerce/components/admin-order-status-badge";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import {
   exportReportsCsv,
   filterOrdersByPreviousRange,

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Code2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { adminShell } from "@/features/admin/components";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";

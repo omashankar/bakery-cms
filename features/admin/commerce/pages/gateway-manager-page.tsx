@@ -11,10 +11,10 @@ import {
   type ConnectionStatus,
   type GatewayMode,
 } from "@/features/payments/lib/payment-gateway-settings";
-import { SETTINGS_UPDATED_EVENT } from "@/features/admin/settings/lib/settings-repository";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import { GatewayCard } from "@/features/payments/components/gateway-card";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { FilterPanel, FilterPanelSearch } from "@/components/shared/filter-panel";
 
 type Category = "all" | "online" | "offline";

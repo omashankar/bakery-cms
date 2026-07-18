@@ -14,7 +14,7 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
-import { formatFaqCategory } from "@/features/admin/faq";
+import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs } from "@/features/storefront/lib/content";
 import type { FaqCategory } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";

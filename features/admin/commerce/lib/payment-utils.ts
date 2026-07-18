@@ -1,8 +1,8 @@
 import type {
   PaymentStatus,
   PlacedOrder,
-} from "@/features/storefront/checkout/lib/orders";
-import type { PaymentMethod } from "@/features/storefront/checkout/lib/checkout-draft";
+} from "@/features/orders/lib/orders";
+import type { PaymentMethod } from "@/features/orders/lib/checkout-draft";
 
 export type PaymentStatusFilter = PaymentStatus | "all";
 export type PaymentMethodFilter = PaymentMethod | "all";

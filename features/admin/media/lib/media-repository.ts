@@ -5,7 +5,7 @@ import {
   testimonials,
 } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
-import { getAllCakes } from "@/features/storefront/lib/catalog";
+import { getAllProducts } from "@/features/products/lib/product-catalog";
 import type { MediaFile } from "@/types/media";
 import {
   BANNERS_FOLDER_ID,
@@ -39,7 +39,7 @@ function collectSeedUrls(): string[] {
   const urls = new Set<string>();
 
   galleryImages.forEach((url) => urls.add(fixBrokenImageUrl(url)));
-  getAllCakes().forEach((cake) => urls.add(fixBrokenImageUrl(cake.image)));
+  getAllProducts().forEach((cake) => urls.add(fixBrokenImageUrl(cake.image)));
   categories.forEach((category) => urls.add(fixBrokenImageUrl(category.image)));
   specialOffers.forEach((offer) => urls.add(fixBrokenImageUrl(offer.image)));
   testimonials.forEach((item) => urls.add(fixBrokenImageUrl(item.avatar)));
@@ -52,7 +52,7 @@ function inferSeedFolder(url: string): string {
   if (specialOffers.some((offer) => fixBrokenImageUrl(offer.image) === url)) {
     return BANNERS_FOLDER_ID;
   }
-  if (getAllCakes().some((cake) => fixBrokenImageUrl(cake.image) === url)) {
+  if (getAllProducts().some((cake) => fixBrokenImageUrl(cake.image) === url)) {
     return CAKES_FOLDER_ID;
   }
   return GALLERY_FOLDER_ID;

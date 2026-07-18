@@ -8,15 +8,15 @@ import { CreditCard, Loader2, QrCode, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { OrderSummaryPanel } from "@/features/storefront/checkout/components/order-summary-panel";
 import { PaymentDemoNotice } from "@/features/storefront/checkout/components/payment-demo-notice";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import {
   getCheckoutDraft,
   saveCheckoutDraft,
   type PaymentMethod,
-} from "@/features/storefront/checkout/lib/checkout-draft";
+} from "@/features/orders/lib/checkout-draft";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import { getCartItems, getCartPreferences } from "@/features/storefront/lib/cart";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
+import { getCartItems, getCartPreferences } from "@/features/cart/lib/cart";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

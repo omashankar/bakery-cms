@@ -3,7 +3,7 @@ export type ProductReviewStatus = "pending" | "approved" | "rejected" | "reporte
 export interface ProductReview {
   id: string;
   cakeId: string;
-  cakeSlug: string;
+  productSlug: string;
   cakeName: string;
   authorName: string;
   authorEmail?: string;

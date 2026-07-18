@@ -9,12 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { REFUND_REASON_OPTIONS } from "@/features/admin/commerce/lib/refund-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { RefundOrderInput } from "@/features/storefront/checkout/lib/orders";
+import type { RefundOrderInput } from "@/features/orders/lib/orders";
 import type { RefundReasonCode } from "@/types/refund";
 
 interface RefundOrderDialogProps {
