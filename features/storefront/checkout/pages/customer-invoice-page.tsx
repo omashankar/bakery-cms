@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import {
   getOrderByNumber,
   type PlacedOrder,
-} from "@/features/storefront/checkout/lib/orders";
-import { loadInvoiceSettings } from "@/features/admin/commerce/lib/invoice-settings-repository";
-import { getCommerceSettings } from "@/features/admin/settings/lib/settings-repository";
-import { InvoiceDocument } from "@/features/admin/commerce/components/invoice-document";
-import { runBrowserPrint } from "@/features/admin/commerce/lib/print-invoice";
+} from "@/features/orders/lib/orders";
+import { loadInvoiceSettings } from "@/features/commerce/lib/invoice-settings-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { InvoiceDocument } from "@/components/shared/invoice-document";
+import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";

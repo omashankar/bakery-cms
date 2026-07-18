@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getGlobalSeo } from "@/features/admin/seo/lib/seo-repository";
+import { getGlobalSeo } from "@/features/seo/lib/seo-repository";
 
 export default function robots(): MetadataRoute.Robots {
   const global = getGlobalSeo();

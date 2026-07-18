@@ -14,7 +14,7 @@ import { AccountMenu } from "@/features/storefront/account/components/account-me
 import { GuestMenu } from "@/features/storefront/account/components/guest-menu";
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { getCartItemCount } from "@/features/storefront/lib/cart";
+import { getCartItemCount } from "@/features/cart/lib/cart";
 import { getWishlistCount } from "@/features/storefront/lib/wishlist";
 import {
   getCustomerDisplayName,

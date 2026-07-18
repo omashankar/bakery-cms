@@ -2,20 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { computeTaxAmount } from "@/features/admin/commerce/lib/tax-utils";
+import { computeTaxAmount } from "@/features/commerce/lib/tax-utils";
 import type { CommerceSettings } from "@/types/settings";
 import { formatCurrency } from "@/utils/format";
-import { defaultCommerceSettings } from "../lib/settings-utils";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
   getCommerceSettings,
   resetCommerceSettings,
   saveCommerceSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 export function CommerceSettingsPage() {

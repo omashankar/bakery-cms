@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { submitStorefrontReview } from "@/features/admin/reviews/lib/reviews-repository";
+import { submitStorefrontReview } from "@/features/reviews/lib/reviews-repository";
 
 interface ProductReviewFormProps {
-  cakeSlug: string;
+  productSlug: string;
   cakeName: string;
   onSubmitted?: () => void;
 }
 
-export function ProductReviewForm({ cakeSlug, cakeName, onSubmitted }: ProductReviewFormProps) {
+export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: ProductReviewFormProps) {
   const [authorName, setAuthorName] = useState("");
   const [authorEmail, setAuthorEmail] = useState("");
   const [rating, setRating] = useState(5);
@@ -34,7 +34,7 @@ export function ProductReviewForm({ cakeSlug, cakeName, onSubmitted }: ProductRe
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const review = submitStorefrontReview({
-      cakeSlug,
+      productSlug,
       authorName,
       authorEmail,
       rating,

@@ -9,7 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { CustomerSegmentBadge } from "@/features/admin/commerce/components/customer-segment-badge";
 import {
   FilterPanel,

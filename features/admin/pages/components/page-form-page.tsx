@@ -12,8 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { slugify } from "@/features/admin/cakes/lib/cake-utils";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { slugify } from "@/features/products/lib/product-utils";
 import { BuilderMediaField } from "@/features/admin/builders/shared/builder-media-field";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,15 +30,14 @@ import {
   AdminPageHeader,
 } from "@/features/admin/components";
 import type { CmsPageBlock, CmsPageFormData } from "@/types/content";
+import { createEmptyPageForm } from "@/features/content/lib/pages-repository";
 import {
-  createEmptyPageForm,
-  createPage,
-  deletePages,
-  getPageById,
-  processScheduledPagePublishes,
-  updatePage,
-} from "../lib/pages-repository";
-import { getStorefrontPageUrl } from "../lib/pages-utils";
+  createPageRequest,
+  deletePageRequest,
+  fetchPage,
+  updatePageRequest,
+} from "@/features/content/data/pages-client";
+import { getStorefrontPageUrl } from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
 
 interface PageFormPageProps {
@@ -71,8 +70,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
   useEffect(() => {
-    processScheduledPagePublishes();
-
+    async function load() {
     if (mode !== "edit" || !pageId) {
       const empty = createEmptyPageForm();
       setForm(empty);
@@ -81,8 +79,10 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
       return;
     }
 
-    const existing = getPageById(pageId);
-    if (!existing) {
+    let existing;
+    try {
+      existing = await fetchPage(pageId);
+    } catch {
       toast.error("Page not found");
       router.replace(routes.admin.pages.list);
       return;
@@ -93,6 +93,9 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
     setBaseline(serializeForm(data));
     setIsSystem(existing.isSystem);
     setIsLoading(false);
+    }
+
+    void load();
   }, [mode, pageId, router]);
 
   useEffect(() => {
@@ -177,25 +180,33 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
     setIsSaving(true);
     try {
       if (mode === "add") {
-        const created = createPage(payload);
+        const created = await createPageRequest(payload);
         toast.success("Page created");
         router.push(routes.admin.pages.edit(created.id));
         return;
       }
       if (pageId) {
-        updatePage(pageId, payload);
+        await updatePageRequest(pageId, payload);
         setForm(payload);
         setBaseline(serializeForm(payload));
         toast.success("Page saved");
       }
+    } catch (error) {
+      // Keep the user on the form with their input intact so they can retry.
+      toast.error(error instanceof Error ? error.message : "Could not save this page");
     } finally {
       setIsSaving(false);
     }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!pageId || isSystem) return;
-    deletePages([pageId]);
+    try {
+      await deletePageRequest(pageId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete this page");
+      return;
+    }
     toast.success("Page deleted");
     router.replace(routes.admin.pages.list);
   }

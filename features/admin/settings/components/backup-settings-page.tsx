@@ -19,8 +19,8 @@ import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
-import { knownStorageKeys } from "../lib/settings-utils";
-import { importLocalStorageBackup } from "../lib/settings-repository";
+import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
+import { importLocalStorageBackup } from "@/features/settings/lib/settings-repository";
 import {
   BACKUP_UPDATED_EVENT,
   deleteBackupSnapshot,

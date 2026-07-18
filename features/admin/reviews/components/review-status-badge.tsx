@@ -2,7 +2,7 @@ import type { ProductReviewStatus } from "@/types/review";
 import { Badge } from "@/components/ui/badge";
 import { adminShell } from "@/features/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
-import { formatReviewStatus, getReviewStatusTone } from "../lib/review-utils";
+import { formatReviewStatus, getReviewStatusTone } from "@/features/reviews/lib/review-utils";
 
 const toneClasses = {
   neutral: "border-border bg-muted text-foreground",

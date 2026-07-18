@@ -1,5 +1,5 @@
 import { CalendarClock, MapPin, Truck } from "lucide-react";
-import type { DeliveryTrackingSnapshot } from "@/features/storefront/checkout/lib/delivery-tracking";
+import type { DeliveryTrackingSnapshot } from "@/features/orders/lib/delivery-tracking";
 import { cn } from "@/lib/utils";
 
 interface DeliveryEstimatedCardProps {

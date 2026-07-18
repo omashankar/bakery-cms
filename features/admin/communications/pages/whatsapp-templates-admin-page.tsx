@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/features/admin/components";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
 import { TemplatePreviewPanel } from "@/features/admin/communications/components/template-preview-panel";
 import { TemplateStatusBadge } from "@/features/admin/communications/components/template-status-badge";

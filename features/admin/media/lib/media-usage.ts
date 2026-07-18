@@ -1,7 +1,7 @@
 import { galleryImages } from "@/constants/landing-data";
-import { loadBanners } from "@/features/admin/banners/lib/banners-repository";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
-import { getAllCakes } from "@/features/storefront/lib/catalog";
+import { loadBanners } from "@/features/content/lib/banners-repository";
+import { loadProducts } from "@/features/products/lib/products-repository";
+import { getAllProducts } from "@/features/products/lib/product-catalog";
 
 export interface MediaUsageRef {
   label: string;
@@ -29,13 +29,13 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
   const refs: MediaUsageRef[] = [];
   const normalized = url.trim();
 
-  getAllCakes().forEach((cake) => {
+  getAllProducts().forEach((cake) => {
     if (cake.image === normalized) {
       refs.push({ label: cake.name, context: "Storefront cake" });
     }
   });
 
-  loadCakes().forEach((cake) => {
+  loadProducts().forEach((cake) => {
     if (cake.images.includes(normalized)) {
       refs.push({ label: cake.name, context: "Admin cake" });
     }
@@ -64,11 +64,11 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
   );
 
   if (typeof window !== "undefined") {
-    const cakesRaw = localStorage.getItem("bakery-cms-admin-cakes");
-    if (cakesRaw) {
+    const productsRaw = localStorage.getItem("bakery-cms-admin-cakes");
+    if (productsRaw) {
       try {
         const pattern = new RegExp(escapeRegex(normalized), "g");
-        const matches = cakesRaw.match(pattern);
+        const matches = productsRaw.match(pattern);
         if (matches && matches.length > 0 && !refs.some((ref) => ref.context === "Admin cake")) {
           refs.push({ label: "Cake catalog", context: "Admin cakes JSON" });
         }

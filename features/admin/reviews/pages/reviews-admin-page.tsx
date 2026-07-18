@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
+import { loadProducts } from "@/features/products/lib/products-repository";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -41,13 +41,13 @@ import {
   saveReviewReply,
   toggleReviewFeatured,
   updateReview,
-} from "../lib/reviews-repository";
+} from "@/features/reviews/lib/reviews-repository";
 import {
   defaultReviewFilters,
   filterReviews,
   getReviewOverview,
   type ReviewListFilters,
-} from "../lib/review-utils";
+} from "@/features/reviews/lib/review-utils";
 import { ReviewFormDialog } from "../components/review-form-dialog";
 import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
@@ -76,7 +76,7 @@ export function ReviewsAdminPage() {
 
   const cakes = useMemo(() => {
     if (!mounted) return [];
-    return loadCakes().filter((cake) => cake.status === "published");
+    return loadProducts().filter((cake) => cake.status === "published");
   }, [mounted, reviews.length]);
 
   const filtered = useMemo(() => filterReviews(reviews, filters), [reviews, filters]);
@@ -276,8 +276,8 @@ export function ReviewsAdminPage() {
               <option value="1">1 star</option>
             </AdminSelect>
             <AdminSelect
-              value={filters.cakeSlug}
-              onChange={(event) => updateFilters({ cakeSlug: event.target.value })}
+              value={filters.productSlug}
+              onChange={(event) => updateFilters({ productSlug: event.target.value })}
               aria-label="Product"
             >
               <option value="">All products</option>
@@ -385,7 +385,7 @@ export function ReviewsAdminPage() {
 
                       <p className="text-sm font-medium">
                         <Link
-                          href={routes.store.cake(review.cakeSlug)}
+                          href={routes.store.cake(review.productSlug)}
                           className="text-primary hover:underline"
                         >
                           {review.cakeName}

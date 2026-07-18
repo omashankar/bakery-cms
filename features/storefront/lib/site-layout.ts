@@ -1,5 +1,5 @@
-import { getVisibleNavItems, loadHeaderSettings } from "@/features/admin/header";
-import { loadFooterSettings } from "@/features/admin/footer";
+import { getVisibleNavItems, loadHeaderSettings } from "@/features/site-layout/lib/header-repository";
+import { loadFooterSettings } from "@/features/site-layout/lib/footer-repository";
 
 export function getStorefrontHeaderSettings() {
   return loadHeaderSettings();

@@ -23,13 +23,13 @@ import {
   loadFooterSettings,
   resetFooterSettings,
   saveFooterSettings,
-} from "../lib/footer-repository";
+} from "@/features/site-layout/lib/footer-repository";
 import {
   createFooterColumn,
   defaultFooterSettings,
   getFooterOverview,
   type FooterOverview,
-} from "../lib/footer-utils";
+} from "@/features/site-layout/lib/footer-utils";
 
 const EMPTY_OVERVIEW: FooterOverview = {
   columns: 0,

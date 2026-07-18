@@ -11,10 +11,10 @@ export {
   countNewInquiries,
   getRecentInquiries,
   createInquiryFromForm,
-} from "./lib/inquiries-repository";
+} from "@/features/inquiries/lib/inquiries-repository";
 export {
   loadNewsletterSubscribers,
   addNewsletterSubscriber,
   updateNewsletterSubscriber,
   deleteNewsletterSubscribers,
-} from "./lib/newsletter-repository";
+} from "@/features/inquiries/lib/newsletter-repository";

@@ -1,4 +1,4 @@
-import type { OrderStatus, PaymentStatus, PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { OrderStatus, PaymentStatus, PlacedOrder } from "@/features/orders/lib/orders";
 
 export type InvoiceDateRange = "all" | "7d" | "30d" | "90d";
 

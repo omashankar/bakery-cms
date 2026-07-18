@@ -12,14 +12,14 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/features/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/features/admin/commerce/components/admin-payment-status-badge";
 import { InvoiceDesignPanel } from "@/features/admin/commerce/components/invoice-design-panel";
-import { InvoiceDocument } from "@/features/admin/commerce/components/invoice-document";
+import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { InvoicePreviewDialog } from "@/features/admin/commerce/components/invoice-preview-dialog";
 import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
-import { runBrowserPrint } from "@/features/admin/commerce/lib/print-invoice";
+import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import {
   defaultInvoiceListFilters,
   EMPTY_INVOICE_OVERVIEW,
@@ -31,8 +31,8 @@ import {
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
-} from "@/features/admin/commerce/lib/invoice-settings-repository";
-import { defaultInvoiceSettings } from "@/features/admin/commerce/lib/invoice-defaults";
+} from "@/features/commerce/lib/invoice-settings-repository";
+import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 import { AdminPage, AdminPageHeader, adminShell } from "@/features/admin/components";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
 import {
@@ -46,9 +46,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
-import { getOrders, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";

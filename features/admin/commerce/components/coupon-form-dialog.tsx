@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createCoupon, loadCoupons, updateCoupon } from "../lib/coupons-repository";
+import { createCoupon, loadCoupons, updateCoupon } from "@/features/commerce/lib/coupons-repository";
 
 type CouponFormValues = {
   code: string;

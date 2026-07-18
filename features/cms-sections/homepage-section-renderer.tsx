@@ -41,17 +41,18 @@ import {
   instagramPosts,
   specialOffers,
   weddingCakes,
-  type LandingCake,
+  type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import {
   getActiveHeroBanners,
   getActivePromoBanners,
-} from "@/features/admin/banners/lib/banners-repository";
+} from "@/features/content/lib/banners-repository";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/storefront/lib/content";
 import {
-  getHomepageCakes,
+  getHomepageProducts,
+  type HomepageProductSource,
   getHomepageCategories,
 } from "@/features/storefront/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
@@ -63,6 +64,11 @@ import { toast } from "sonner";
 
 interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
+  /**
+   * Product rails built on the server. When absent (admin builder preview) the
+   * renderer falls back to the browser catalogue.
+   */
+  rails?: Partial<Record<HomepageProductSource, LandingProduct[]>>;
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -362,9 +368,9 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function CakeGridSection(
+function ProductGridSection(
   props: HomepageSectionRendererProps & {
-    cakes: LandingCake[];
+    cakes: LandingProduct[];
     showCta?: boolean;
   }
 ) {
@@ -882,6 +888,9 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
 }
 
 export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
+  const railFor = (source: HomepageProductSource, maxCount: number) =>
+    props.rails?.[source]?.slice(0, maxCount) ?? getHomepageProducts(source, maxCount);
+
   const { section } = props;
 
   switch (section.type) {
@@ -897,23 +906,23 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <CategoriesSection {...props} />;
     case "featured-cakes":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("featured", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("featured", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "trending":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("trending", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("trending", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "best-sellers":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("best-sellers", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("best-sellers", contentNumber(section.content, "maxCount", 4))}
         />
       );
     case "offers":
@@ -922,25 +931,25 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <WeddingSection {...props} />;
     case "photo-cakes":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("photo-cakes", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("photo-cakes", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );
     case "eggless":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("eggless", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("eggless", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );
     case "seasonal":
       return (
-        <CakeGridSection
+        <ProductGridSection
           {...props}
-          cakes={getHomepageCakes("seasonal", contentNumber(section.content, "maxCount", 4))}
+          cakes={railFor("seasonal", contentNumber(section.content, "maxCount", 4))}
           showCta
         />
       );

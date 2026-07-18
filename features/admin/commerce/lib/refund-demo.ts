@@ -1,5 +1,5 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrders } from "@/features/orders/lib/orders";
 import { isRefundCase } from "./refund-utils";
 
 function writeDemoOrders(orders: PlacedOrder[]): void {
@@ -23,7 +23,7 @@ export function ensureDemoRefundCases(): void {
     items: [
       {
         id: "refund-demo-1",
-        cakeSlug: "black-forest",
+        productSlug: "black-forest",
         name: "Black Forest Cake",
         image: "/images/cakes/black-forest.jpg",
         price: 1099,
@@ -87,7 +87,7 @@ export function ensureDemoRefundCases(): void {
     items: [
       {
         id: "refund-demo-2",
-        cakeSlug: "vanilla-birthday",
+        productSlug: "vanilla-birthday",
         name: "Vanilla Birthday Cake",
         image: "/images/cakes/vanilla-birthday.jpg",
         price: 749,

@@ -8,5 +8,5 @@ export {
   getRouteSeo,
   updateSeoRoute,
   resetSeoStore,
-} from "./lib/seo-repository";
-export { buildRouteMetadata, buildCanonicalUrl, resolveRouteTitle } from "./lib/seo-metadata";
+} from "@/features/seo/lib/seo-repository";
+export { buildRouteMetadata, buildCanonicalUrl, resolveRouteTitle } from "@/features/seo/lib/seo-metadata";

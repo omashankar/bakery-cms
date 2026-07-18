@@ -1,7 +1,7 @@
-import { addToCart } from "@/features/storefront/lib/cart";
-import { getCakeBySlug } from "@/features/storefront/lib/catalog";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import { getOrderByNumber, getOrders } from "@/features/storefront/checkout/lib/orders";
+import { addToCart } from "@/features/cart/lib/cart";
+import { getProductBySlug } from "@/features/products/lib/product-catalog";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
 
 export interface ReorderResult {
   added: number;
@@ -15,7 +15,7 @@ export function reorderFromOrder(order: PlacedOrder): ReorderResult {
   const unavailable: string[] = [];
 
   for (const item of order.items) {
-    const cake = getCakeBySlug(item.cakeSlug);
+    const cake = getProductBySlug(item.productSlug);
     if (!cake || cake.inStock === false) {
       skipped += 1;
       unavailable.push(item.name);
@@ -23,7 +23,7 @@ export function reorderFromOrder(order: PlacedOrder): ReorderResult {
     }
 
     addToCart({
-      cakeSlug: item.cakeSlug,
+      productSlug: item.productSlug,
       name: item.name,
       image: item.image || cake.image,
       price: item.price,
@@ -54,7 +54,7 @@ export function getFrequentlyOrderedSlugs(limit = 6): string[] {
 
   for (const order of getOrders()) {
     for (const item of order.items) {
-      counts.set(item.cakeSlug, (counts.get(item.cakeSlug) ?? 0) + item.quantity);
+      counts.set(item.productSlug, (counts.get(item.productSlug) ?? 0) + item.quantity);
     }
   }
 

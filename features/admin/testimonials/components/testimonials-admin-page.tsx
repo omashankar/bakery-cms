@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -40,7 +40,7 @@ import {
   bulkUpdateTestimonialStatus,
   deleteTestimonials,
   loadTestimonials,
-} from "../lib/testimonials-repository";
+} from "@/features/content/lib/testimonials-repository";
 import {
   defaultTestimonialFilters,
   filterTestimonials,
@@ -49,7 +49,7 @@ import {
   getTestimonialStatusVariant,
   type TestimonialListFilters,
   type TestimonialOverview,
-} from "../lib/testimonial-utils";
+} from "@/features/content/lib/testimonial-utils";
 import { DeleteTestimonialDialog } from "./delete-testimonial-dialog";
 import { TestimonialFormDialog } from "./testimonial-form-dialog";
 

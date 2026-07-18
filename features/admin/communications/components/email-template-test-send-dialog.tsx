@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { getSampleDataForVariables } from "@/features/admin/communications/lib/template-sample-data";
 import { renderTemplate } from "@/features/admin/communications/lib/template-render";
-import { getSmtpSettings } from "@/features/admin/settings/lib/settings-repository";
+import { getSmtpSettings } from "@/features/settings/lib/settings-repository";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

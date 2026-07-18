@@ -1,4 +1,4 @@
-import type { PaymentStatus } from "@/features/storefront/checkout/lib/orders";
+import type { PaymentStatus } from "@/features/orders/lib/orders";
 import { Badge } from "@/components/ui/badge";
 
 const labels: Record<PaymentStatus, string> = {

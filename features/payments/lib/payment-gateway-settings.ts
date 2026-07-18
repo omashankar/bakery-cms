@@ -7,7 +7,7 @@ import {
 import {
   getCommerceSettings,
   saveCommerceSettings,
-} from "@/features/admin/settings/lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import type { PaymentMethodSettings } from "@/types/settings";
 
 /**

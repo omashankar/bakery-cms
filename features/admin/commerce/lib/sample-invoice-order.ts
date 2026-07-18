@@ -1,4 +1,4 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 
 const placedAt = "2026-07-09T10:30:00.000Z";
 const estimatedDelivery = "2026-07-11T14:00:00.000Z";
@@ -33,7 +33,7 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
   items: [
     {
       id: "preview-item-1",
-      cakeSlug: "chocolate-truffle",
+      productSlug: "chocolate-truffle",
       name: "Chocolate Truffle Cake",
       image: "/images/cakes/chocolate-truffle.jpg",
       price: 850,
@@ -45,7 +45,7 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
     },
     {
       id: "preview-item-2",
-      cakeSlug: "red-velvet",
+      productSlug: "red-velvet",
       name: "Red Velvet Cupcakes (6 pcs)",
       image: "/images/cakes/red-velvet.jpg",
       price: 420,

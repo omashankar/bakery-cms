@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import { DashboardStatCard } from "@/features/admin/dashboard/components/dashboard-stat-card";
 import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
-import { getOrders, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
 import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";
 import { RevenueChart } from "@/features/payments/components/revenue-chart";
 import { PaymentMethodBreakdown } from "@/features/payments/components/payment-method-breakdown";

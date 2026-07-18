@@ -121,7 +121,10 @@ export function ProcessingState({
       ) : null}
 
       {actions?.length ? (
-        <div className="mt-6 flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-center">
+        // Three actions at a 10rem minimum overflowed the dialog, pushing the
+        // last button past its edge. Only pad them out when there is room, and
+        // let them wrap rather than escape.
+        <div className="mt-6 flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center">
           {actions.map((action) => {
             const Icon = action.icon ? ActionIcon[action.icon] : null;
             return (
@@ -129,7 +132,7 @@ export function ProcessingState({
                 key={action.label}
                 variant={action.variant ?? "outline"}
                 onClick={action.onClick}
-                className="sm:min-w-40"
+                className={actions.length > 2 ? undefined : "sm:min-w-40"}
               >
                 {Icon ? <Icon className="size-4" /> : null}
                 {action.label}

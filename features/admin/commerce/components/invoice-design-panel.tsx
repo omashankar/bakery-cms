@@ -4,24 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { Printer, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminMobileActionBar } from "@/features/admin/components";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { InvoiceDocument } from "@/features/admin/commerce/components/invoice-document";
-import { defaultInvoiceSettings } from "@/features/admin/commerce/lib/invoice-defaults";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { InvoiceDocument } from "@/components/shared/invoice-document";
+import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
   resetInvoiceSettings,
   saveInvoiceSettings,
-} from "@/features/admin/commerce/lib/invoice-settings-repository";
+} from "@/features/commerce/lib/invoice-settings-repository";
 import { SAMPLE_INVOICE_ORDER } from "@/features/admin/commerce/lib/sample-invoice-order";
 import {
   getCommerceSettings,
   getContactSettings,
   getGeneralSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
-import { runBrowserPrint } from "@/features/admin/commerce/lib/print-invoice";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

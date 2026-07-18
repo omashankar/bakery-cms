@@ -35,10 +35,10 @@ export {
   resetMaintenanceSettings,
   resetCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "./lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 export {
   defaultAppSettings,
   defaultGeneralSettings,
   defaultContactSettings,
   defaultCommerceSettings,
-} from "./lib/settings-utils";
+} from "@/features/settings/lib/settings-utils";

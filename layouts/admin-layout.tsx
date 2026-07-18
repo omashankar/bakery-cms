@@ -11,6 +11,7 @@ import { adminShell } from "@/features/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";

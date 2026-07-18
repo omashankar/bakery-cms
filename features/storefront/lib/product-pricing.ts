@@ -1,5 +1,5 @@
-import type { ProductVariantGroup } from "@/types/cake";
-import { calculateVariantAdjustment } from "@/features/admin/cakes/lib/variant-utils";
+import type { ProductVariantGroup } from "@/types/product";
+import { calculateVariantAdjustment } from "@/features/products/lib/variant-utils";
 
 export interface ProductPriceInput {
   basePrice: number;

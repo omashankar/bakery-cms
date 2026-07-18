@@ -1,37 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import {
-  getDraftHomepageSections,
-  getPublishedHomepageSections,
-  getVisibleSections,
-  processScheduledHomepagePublish,
-} from "@/features/cms-sections/lib/homepage-store";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
+import type { HomepageProductSource } from "@/features/storefront/lib/homepage-catalog";
+import type { LandingProduct } from "@/constants/landing-data";
 
-export function StoreHomeContent() {
-  const searchParams = useSearchParams();
-  const isPreview = searchParams.get("cmsPreview") === "1";
-  const [mounted, setMounted] = useState(false);
-  const [sections, setSections] = useState<HomepageSectionInstance[]>([]);
+interface StoreHomeContentProps {
+  /** Sections fetched on the server, so they render into the HTML. */
+  sections: HomepageSectionInstance[];
+  /** Product rails built on the server, so both passes render the same cakes. */
+  rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
+  /** Set by the server from ?cmsPreview=1 — shows the draft banner. */
+  isPreview?: boolean;
+}
 
-  useEffect(() => {
-    processScheduledHomepagePublish();
-    const source = isPreview ? getDraftHomepageSections() : getPublishedHomepageSections();
-    // FAQs live only on the dedicated FAQ page — never render a home FAQ section
-    // here, even if an older saved snapshot still contains one.
-    setSections(getVisibleSections(source).filter((section) => section.type !== "faq"));
-    setMounted(true);
-  }, [isPreview]);
-
-  if (!mounted) {
-    return <div className="min-h-96 animate-pulse bg-cream-50" aria-hidden />;
-  }
-
+export function StoreHomeContent({ sections, rails, isPreview = false }: StoreHomeContentProps) {
   return (
     <>
       {isPreview ? (
@@ -39,7 +24,7 @@ export function StoreHomeContent() {
           CMS preview mode — showing draft homepage content
         </div>
       ) : null}
-      {renderSections(sections)}
+      {renderSections(sections, rails)}
     </>
   );
 }
@@ -49,7 +34,10 @@ export function StoreHomeContent() {
  * vertical gap. When both are visible, render them side by side in a single row
  * (at the position of whichever comes first) so the page closes on one tidy band.
  */
-function renderSections(sections: HomepageSectionInstance[]) {
+function renderSections(
+  sections: HomepageSectionInstance[],
+  rails: Partial<Record<HomepageProductSource, LandingProduct[]>>
+) {
   const idxNewsletter = sections.findIndex((s) => s.type === "newsletter");
   const idxCta = sections.findIndex((s) => s.type === "cta");
   const paired = idxNewsletter !== -1 && idxCta !== -1;
@@ -64,14 +52,14 @@ function renderSections(sections: HomepageSectionInstance[]) {
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
             <div className="grid items-stretch gap-6 lg:grid-cols-2">
-              <HomepageSectionRenderer section={sections[idxNewsletter]} embedded />
-              <HomepageSectionRenderer section={sections[idxCta]} embedded />
+              <HomepageSectionRenderer rails={rails} section={sections[idxNewsletter]} embedded />
+              <HomepageSectionRenderer rails={rails} section={sections[idxCta]} embedded />
             </div>
           </div>
         </section>
       );
     }
 
-    return <HomepageSectionRenderer key={section.instanceId} section={section} />;
+    return <HomepageSectionRenderer rails={rails} key={section.instanceId} section={section} />;
   });
 }

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
-import { CakeMediaPicker } from "@/features/admin/cakes/components/cake-media-picker";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
+import { MediaPicker } from "@/features/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,8 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { Banner } from "@/types/media";
-import { createBanner, loadBanners, updateBanner } from "../lib/banners-repository";
-import { bannerPositionOptions, bannerVisibilityOptions } from "../lib/banners-utils";
+import { createBanner, loadBanners, updateBanner } from "@/features/content/lib/banners-repository";
+import { bannerPositionOptions, bannerVisibilityOptions } from "@/features/content/lib/banners-utils";
 
 interface BannerFormDialogProps {
   open: boolean;
@@ -334,7 +334,7 @@ export function BannerFormDialog({
         </DialogContent>
       </Dialog>
 
-      <CakeMediaPicker
+      <MediaPicker
         open={mediaOpen}
         onOpenChange={setMediaOpen}
         onSelect={(url) => {

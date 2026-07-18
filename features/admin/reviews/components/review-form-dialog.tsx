@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import { loadCakes } from "@/features/admin/cakes/lib/cakes-repository";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import { loadProducts } from "@/features/products/lib/products-repository";
 import type { ProductReview, ProductReviewFormData } from "@/types/review";
 
 interface ReviewFormDialogProps {
@@ -30,8 +30,8 @@ export function ReviewFormDialog({
   initial,
   onSubmit,
 }: ReviewFormDialogProps) {
-  const cakes = useMemo(() => loadCakes().filter((cake) => cake.status === "published"), []);
-  const [cakeSlug, setCakeSlug] = useState(cakes[0]?.slug ?? "");
+  const cakes = useMemo(() => loadProducts().filter((cake) => cake.status === "published"), []);
+  const [productSlug, setCakeSlug] = useState(cakes[0]?.slug ?? "");
   const [authorName, setAuthorName] = useState("");
   const [authorEmail, setAuthorEmail] = useState("");
   const [rating, setRating] = useState(5);
@@ -42,8 +42,8 @@ export function ReviewFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    const cake = cakes.find((item) => item.slug === (initial?.cakeSlug ?? cakes[0]?.slug));
-    setCakeSlug(initial?.cakeSlug ?? cakes[0]?.slug ?? "");
+    const cake = cakes.find((item) => item.slug === (initial?.productSlug ?? cakes[0]?.slug));
+    setCakeSlug(initial?.productSlug ?? cakes[0]?.slug ?? "");
     setAuthorName(initial?.authorName ?? "");
     setAuthorEmail(initial?.authorEmail ?? "");
     setRating(initial?.rating ?? 5);
@@ -55,13 +55,13 @@ export function ReviewFormDialog({
   }, [open, initial, cakes]);
 
   function handleSubmit() {
-    const cake = cakes.find((item) => item.slug === cakeSlug);
+    const cake = cakes.find((item) => item.slug === productSlug);
     if (!cake || !authorName.trim() || !body.trim()) return;
 
     onSubmit(
       {
         cakeId: cake.id,
-        cakeSlug: cake.slug,
+        productSlug: cake.slug,
         cakeName: cake.name,
         authorName: authorName.trim(),
         authorEmail: authorEmail.trim() || undefined,
@@ -95,7 +95,7 @@ export function ReviewFormDialog({
             <Label htmlFor="review-cake">Product</Label>
             <AdminSelect
               id="review-cake"
-              value={cakeSlug}
+              value={productSlug}
               onChange={(event) => setCakeSlug(event.target.value)}
             >
               {cakes.map((cake) => (

@@ -1,4 +1,4 @@
-import type { CakeCategory, CakeFlavour, CakeOccasion } from "./cake";
+import type { ProductCategory, ProductFlavour, ProductOccasion } from "./product";
 
 export interface CatalogWeightOption {
   id: string;
@@ -11,9 +11,9 @@ export interface CatalogWeightOption {
 }
 
 export interface CatalogStore {
-  categories: CakeCategory[];
-  flavours: CakeFlavour[];
-  occasions: CakeOccasion[];
+  categories: ProductCategory[];
+  flavours: ProductFlavour[];
+  occasions: ProductOccasion[];
   weights: CatalogWeightOption[];
   updatedAt: string;
 }

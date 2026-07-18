@@ -1,10 +1,24 @@
-import { Suspense } from "react";
 import { WeddingPageContent } from "./wedding-page-content";
+import {
+  getDraftWeddingSections,
+  getPublishedWeddingSections,
+} from "@/features/cms-sections/data/wedding-sections.server";
 
-export function WeddingPage() {
-  return (
-    <Suspense fallback={<div className="min-h-96 animate-pulse bg-cream-50" />}>
-      <WeddingPageContent />
-    </Suspense>
-  );
+interface WeddingPageProps {
+  /** CMS preview flag comes from the URL: ?cmsPreview=wedding */
+  isPreview?: boolean;
+}
+
+/**
+ * Wedding landing page shell.
+ *
+ * Sections are fetched on the server so the page ships real content in its HTML
+ * — see store-home-page.tsx for the full reasoning.
+ */
+export async function WeddingPage({ isPreview = false }: WeddingPageProps) {
+  const sections = isPreview
+    ? await getDraftWeddingSections()
+    : await getPublishedWeddingSections();
+
+  return <WeddingPageContent sections={sections} isPreview={isPreview} />;
 }

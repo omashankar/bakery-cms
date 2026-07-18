@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { CakeCategory, CakeFlavour, CakeOccasion } from "@/types/cake";
+import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
 import type { CatalogTab, CatalogWeightOption } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
@@ -30,7 +30,7 @@ import {
   updateFlavour,
   updateOccasion,
   updateWeightOption,
-} from "../lib/catalog-repository";
+} from "@/features/catalog/lib/catalog-repository";
 
 interface CatalogFormDialogProps {
   open: boolean;
@@ -139,7 +139,7 @@ export function CatalogFormDialog({
     const finalSlug = slug.trim() || slugify(name);
 
     if (tab === "categories") {
-      const payload: Omit<CakeCategory, "id" | "createdAt" | "updatedAt"> = {
+      const payload: Omit<ProductCategory, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
         description: description.trim() || undefined,
@@ -154,7 +154,7 @@ export function CatalogFormDialog({
         toast.success("Category created");
       }
     } else if (tab === "flavours") {
-      const payload: Omit<CakeFlavour, "id" | "createdAt" | "updatedAt"> = {
+      const payload: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
       };
@@ -166,7 +166,7 @@ export function CatalogFormDialog({
         toast.success("Flavour created");
       }
     } else {
-      const payload: Omit<CakeOccasion, "id" | "createdAt" | "updatedAt"> = {
+      const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
       };

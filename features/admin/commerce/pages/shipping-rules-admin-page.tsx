@@ -14,9 +14,9 @@ import {
   getCommerceSettings,
   saveCommerceSettings,
   SETTINGS_UPDATED_EVENT,
-} from "@/features/admin/settings/lib/settings-repository";
-import { defaultCommerceSettings } from "@/features/admin/settings/lib/settings-utils";
-import { calculateCartTotals } from "@/features/storefront/checkout/lib/cart-totals";
+} from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
@@ -24,11 +24,11 @@ import {
   DELIVERY_ZONES_UPDATED_EVENT,
   getDeliveryZoneStats,
   loadDeliveryZones,
-} from "../lib/delivery-zones-repository";
+} from "@/features/commerce/lib/delivery-zones-repository";
 
 const SAMPLE_ITEM = {
   id: "preview",
-  cakeSlug: "preview",
+  productSlug: "preview",
   name: "Sample cake",
   image: "",
   price: 850,

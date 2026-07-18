@@ -14,7 +14,7 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
-import { formatFaqCategory } from "@/features/admin/faq";
+import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs } from "@/features/storefront/lib/content";
 import type { FaqCategory } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
@@ -93,6 +93,13 @@ export function FaqPage() {
                 </div>
               ) : (
                 <Accordion
+                  // The accordion is uncontrolled, so its defaultValue is only
+                  // read once. Searching or switching category produces a
+                  // different first result, and changing defaultValue in place
+                  // warns. Keying on that first id starts a fresh accordion for
+                  // a genuinely new list — which also opens the top match,
+                  // rather than leaving every filtered result collapsed.
+                  key={categoryFiltered[0]?.id ?? "none"}
                   defaultValue={[categoryFiltered[0]?.id ?? "1"]}
                   className="space-y-3"
                 >

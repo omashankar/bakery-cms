@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CakesListPage } from "@/features/admin/cakes";
+import { ProductsListPage } from "@/features/admin/products";
 
 export const metadata: Metadata = {
   title: "Cakes",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <CakesListPage />;
+  return <ProductsListPage />;
 }

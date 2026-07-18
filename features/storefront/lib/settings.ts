@@ -8,7 +8,7 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
-} from "@/features/admin/settings";
+} from "@/features/settings/lib/settings-repository";
 
 export function getStorefrontBrandInfo() {
   const general = getGeneralSettings();

@@ -12,9 +12,9 @@ export {
   createPage,
   updatePage,
   deletePages,
-} from "./lib/pages-repository";
+} from "@/features/content/lib/pages-repository";
 export {
   getStorefrontPageUrl,
   formatPageTemplate,
   formatPageStatus,
-} from "./lib/pages-utils";
+} from "@/features/content/lib/pages-utils";

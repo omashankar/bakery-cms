@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { ActivityLog } from "@/types/settings";
-import { clearActivityLog, getActivityLog } from "../lib/settings-repository";
+import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
 
 const actionTone: Record<string, string> = {
   published: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",

@@ -28,7 +28,7 @@ import { routes } from "@/constants/routes";
 import { galleryCaptions, whyChooseUs } from "@/constants/landing-data";
 import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/storefront/lib/content";
 import {
-  getWeddingCollectionCakes,
+  getWeddingCollectionProducts,
   getWeddingGalleryImages,
   getWeddingOffers,
 } from "@/features/storefront/lib/wedding-catalog";
@@ -283,7 +283,7 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
 function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
-  const cakes = getWeddingCollectionCakes(maxCount);
+  const cakes = getWeddingCollectionProducts(maxCount);
 
   return (
     <SectionShell {...props} noReveal>

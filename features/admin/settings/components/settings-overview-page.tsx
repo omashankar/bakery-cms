@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 import {
   getGeneralSettings,
   getMaintenanceSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 
 type SettingsItem = {
   title: string;

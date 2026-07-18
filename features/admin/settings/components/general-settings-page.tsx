@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AdminSelect, adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect, adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,12 +11,12 @@ import {
   currencyOptions,
   defaultGeneralSettings,
   timezoneOptions,
-} from "../lib/settings-utils";
+} from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
   resetGeneralSettings,
   saveGeneralSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 export function GeneralSettingsPage() {

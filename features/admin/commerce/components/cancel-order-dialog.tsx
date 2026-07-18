@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 
 interface CancelOrderDialogProps {
   open: boolean;

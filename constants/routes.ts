@@ -30,8 +30,6 @@ export const routes = {
     thankYou: "/store/thank-you",
     cart: "/store/cart",
     checkout: "/store/checkout",
-    checkoutPayment: "/store/checkout/payment",
-    checkoutPaymentFailed: "/store/checkout/payment/failed",
     orderSuccess: "/store/order/success",
     orderTrack: "/store/order/track",
     orderDetail: (orderNumber: string) => `/store/order/${encodeURIComponent(orderNumber)}`,

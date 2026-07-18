@@ -1,15 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ArrowRight, Award, Heart, Leaf, Palette, Truck } from "lucide-react";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
-import {
-  getPageForStorefront,
-  processScheduledPagePublishes,
-} from "@/features/admin/pages/lib/pages-repository";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,48 +40,13 @@ function renderBlocks(blocks: CmsPageBlock[]) {
 }
 
 interface CmsPageViewProps {
-  slug: string;
+  /** Page fetched on the server, so its content renders into the HTML. */
+  page: CmsPage | null;
+  /** Set by the server from ?preview=1 — shows the draft banner. */
+  preview?: boolean;
 }
 
-export function CmsPageView({ slug }: CmsPageViewProps) {
-  return (
-    <Suspense
-      fallback={
-        <div className={layoutSpacing.container}>
-          <div className="min-h-48 animate-pulse rounded-xl border border-border bg-cream-50" />
-        </div>
-      }
-    >
-      <CmsPageViewContent slug={slug} />
-    </Suspense>
-  );
-}
-
-function CmsPageViewContent({ slug }: CmsPageViewProps) {
-  const searchParams = useSearchParams();
-  const preview = searchParams.get("preview") === "1";
-  const [mounted, setMounted] = useState(false);
-  const [page, setPage] = useState<CmsPage | null>(null);
-
-  useEffect(() => {
-    processScheduledPagePublishes();
-    setPage(getPageForStorefront(slug, preview));
-    setMounted(true);
-  }, [slug, preview]);
-
-  useEffect(() => {
-    if (!page?.seo?.metaTitle) return;
-    document.title = page.seo.metaTitle;
-  }, [page?.seo?.metaTitle]);
-
-  if (!mounted) {
-    return (
-      <div className={layoutSpacing.container}>
-        <div className="min-h-48 animate-pulse rounded-xl border border-border bg-cream-50" />
-      </div>
-    );
-  }
-
+export function CmsPageView({ page, preview = false }: CmsPageViewProps) {
   if (!page) {
     return (
       <div className={layoutSpacing.container}>

@@ -7,4 +7,4 @@ export {
   createTestimonial,
   updateTestimonial,
   deleteTestimonials,
-} from "./lib/testimonials-repository";
+} from "@/features/content/lib/testimonials-repository";

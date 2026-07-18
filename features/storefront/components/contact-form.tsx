@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
-import { createInquiryFromForm } from "@/features/admin/inquiries";
+import { createInquiryFromForm } from "@/features/inquiries/lib/inquiries-repository";
 import type { InquiryType } from "@/types/inquiry";
 import { cn } from "@/lib/utils";
 

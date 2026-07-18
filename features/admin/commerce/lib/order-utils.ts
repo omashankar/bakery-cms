@@ -1,5 +1,5 @@
-import type { OrderStatus, PaymentStatus, PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import type { OrderStatus, PaymentStatus, PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrders } from "@/features/orders/lib/orders";
 
 export type OrderStatusFilter = OrderStatus | "all";
 export type PaymentStatusFilter = PaymentStatus | "all";
@@ -181,7 +181,7 @@ export function ensureDemoOrders(): PlacedOrder[] {
       items: [
         {
           id: "demo-1",
-          cakeSlug: "chocolate-truffle",
+          productSlug: "chocolate-truffle",
           name: "Chocolate Truffle Cake",
           image: "/images/cakes/chocolate-truffle.jpg",
           price: 1299,
@@ -231,7 +231,7 @@ export function ensureDemoOrders(): PlacedOrder[] {
       items: [
         {
           id: "demo-2",
-          cakeSlug: "red-velvet",
+          productSlug: "red-velvet",
           name: "Red Velvet Cake",
           image: "/images/cakes/red-velvet.jpg",
           price: 899,
@@ -291,7 +291,7 @@ export function ensureDemoOrders(): PlacedOrder[] {
       items: [
         {
           id: "demo-3",
-          cakeSlug: "butterscotch",
+          productSlug: "butterscotch",
           name: "Butterscotch Crunch",
           image: "/images/cakes/butterscotch.jpg",
           price: 749,
@@ -338,7 +338,7 @@ export function ensureDemoOrders(): PlacedOrder[] {
       items: [
         {
           id: "demo-4",
-          cakeSlug: "black-forest",
+          productSlug: "black-forest",
           name: "Black Forest Cake",
           image: "/images/cakes/black-forest.jpg",
           price: 999,

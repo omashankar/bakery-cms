@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminSelect } from "@/features/admin/cakes/components/admin-field";
+import { AdminSelect } from "@/features/admin/products/components/admin-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -52,7 +52,7 @@ import {
   loadBanners,
   resetBanners,
   toggleBannerActive,
-} from "../lib/banners-repository";
+} from "@/features/content/lib/banners-repository";
 import {
   defaultBannerFilters,
   filterBanners,
@@ -64,7 +64,7 @@ import {
   getBannerStatusVariant,
   type BannerListFilters,
   type BannerOverview,
-} from "../lib/banners-utils";
+} from "@/features/content/lib/banners-utils";
 import { BannerFormDialog } from "./banner-form-dialog";
 import { DeleteBannerDialog } from "./delete-banner-dialog";
 

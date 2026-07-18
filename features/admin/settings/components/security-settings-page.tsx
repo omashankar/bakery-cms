@@ -37,12 +37,12 @@ import type {
   LoginHistoryEntry,
   RegisteredDevice,
 } from "@/types/security";
-import { defaultSecuritySettings } from "../lib/settings-utils";
+import { defaultSecuritySettings } from "@/features/settings/lib/settings-utils";
 import {
   getSecuritySettings,
   resetSecuritySettings,
   saveSecuritySettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import {
   clearFailedLoginAttempts,
   getActiveSessions,

@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
 import type { BusinessHoursEntry, ContactSettings } from "@/types/settings";
-import { defaultContactSettings } from "../lib/settings-utils";
+import { defaultContactSettings } from "@/features/settings/lib/settings-utils";
 import {
   getContactSettings,
   resetContactSettings,
   saveContactSettings,
-} from "../lib/settings-repository";
+} from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 
 export function ContactSettingsPage() {

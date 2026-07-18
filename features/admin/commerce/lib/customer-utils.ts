@@ -1,5 +1,5 @@
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
-import { getOrders } from "@/features/storefront/checkout/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrders } from "@/features/orders/lib/orders";
 
 export interface CustomerRecord {
   id: string;

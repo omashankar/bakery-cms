@@ -7,12 +7,14 @@ import { MapPin, Package, RefreshCw } from "lucide-react";
 import { DeliveryEstimatedCard } from "@/features/storefront/checkout/components/delivery-estimated-card";
 import { DeliveryMapPlaceholder } from "@/features/storefront/checkout/components/delivery-map-placeholder";
 import { DeliveryPartnerCard } from "@/features/storefront/checkout/components/delivery-partner-card";
-import { OrderStatusTimeline } from "@/features/storefront/checkout/components/order-status-timeline";
+import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { OrderSummaryPanel } from "@/features/storefront/checkout/components/order-summary-panel";
-import { getDeliveryTrackingSnapshot } from "@/features/storefront/checkout/lib/delivery-tracking";
-import { getOrderTimeline } from "@/features/storefront/checkout/lib/order-tracking";
-import { formatOrderStatus } from "@/features/storefront/checkout/lib/order-status-meta";
-import { getOrderByNumber, type PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { getDeliveryTrackingSnapshot } from "@/features/orders/lib/delivery-tracking";
+import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
+import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { canViewOrder } from "@/features/orders/lib/order-access";
+import { getCustomerSession } from "@/features/storefront/account/lib/customer-session";
+import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
 import { StorePageHeader } from "@/features/storefront/components/store-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ export function OrderDetailPage() {
   const params = useParams<{ orderNumber: string }>();
   const orderNumber = decodeURIComponent(params.orderNumber ?? "");
   const [order, setOrder] = useState<PlacedOrder | null>(null);
+  const [allowed, setAllowed] = useState(false);
   const [ready, setReady] = useState(false);
 
   function refreshOrder() {
@@ -44,6 +47,9 @@ export function OrderDetailPage() {
 
   useEffect(() => {
     refreshOrder();
+    // An order number alone must not reveal a name, phone and home address.
+    const found = orderNumber ? getOrderByNumber(orderNumber) : null;
+    setAllowed(found ? canViewOrder(found, getCustomerSession()?.email) : false);
     setReady(true);
     window.addEventListener("bakery-orders-updated", refreshOrder);
     return () => window.removeEventListener("bakery-orders-updated", refreshOrder);
@@ -63,7 +69,7 @@ export function OrderDetailPage() {
     );
   }
 
-  if (!order || !tracking) {
+  if (!order || !tracking || !allowed) {
     return (
       <>
         <StorePageHeader
@@ -77,7 +83,10 @@ export function OrderDetailPage() {
         <section className={layoutSpacing.sectionY}>
           <div className={layoutSpacing.containerNarrow}>
             <div className="rounded-xl border border-border bg-white p-8 text-center">
-              <p className="text-muted-foreground">Please check the order number and try again.</p>
+              <p className="text-muted-foreground">
+                Please check the order number, and look it up with the email used to
+                place it.
+              </p>
               <Button className="mt-6" variant="bakery" render={<Link href={routes.store.orderTrack} />}>
                 Track another order
               </Button>
@@ -192,7 +201,9 @@ export function OrderDetailPage() {
               />
               <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total paid</span>
+                  <span className="text-muted-foreground">
+                    {order.paymentMethod === "cod" ? "Amount due on delivery" : "Total paid"}
+                  </span>
                   <span className="font-semibold">{formatCurrency(order.totals.total)}</span>
                 </div>
               </div>

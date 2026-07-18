@@ -1,5 +1,5 @@
 import type { EntityStatus } from "./common";
-import type { StockStatus } from "./cake";
+import type { StockStatus } from "./product";
 
 export interface InventorySettings {
   defaultLowStockThreshold: number;

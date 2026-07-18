@@ -21,8 +21,8 @@ import {
 } from "@/features/admin/commerce/lib/customer-profile-utils";
 import { ensureDemoOrders } from "@/features/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader } from "@/features/admin/components";
-import { adminTextareaClassName } from "@/features/admin/cakes/components/admin-field";
-import type { PlacedOrder } from "@/features/storefront/checkout/lib/orders";
+import { adminTextareaClassName } from "@/features/admin/products/components/admin-field";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { getOrdersForCustomerRecord } from "@/features/admin/commerce/lib/customer-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
