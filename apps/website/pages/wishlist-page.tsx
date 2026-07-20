@@ -45,7 +45,19 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
           {!loaded ? (
-            <div className="h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="aspect-square animate-pulse bg-cream-100" />
+                  <div className="space-y-3 p-3.5">
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-cream-100" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-cream-100" />
+                    <div className="h-5 w-1/2 animate-pulse rounded bg-cream-100" />
+                    <div className="h-10 w-full animate-pulse rounded-lg bg-cream-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : cakes.length === 0 ? (
             <EmptyState
               className="border-border bg-cream-50"

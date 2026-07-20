@@ -38,7 +38,7 @@ export function CollectionFiltersPanel({
   };
 
   return (
-    <aside className={cn("space-y-6 rounded-xl border border-border bg-white p-5", className)}>
+    <aside className={cn("space-y-6 rounded-xl border border-border bg-card p-5", className)}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-bakery-700" />
@@ -94,6 +94,7 @@ export function CollectionFiltersPanel({
         <div className="space-y-3">
           <input
             type="range"
+            aria-label="Maximum price"
             min={0}
             max={COLLECTION_PRICE_MAX}
             step={100}

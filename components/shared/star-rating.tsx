@@ -21,15 +21,19 @@ export function StarRating({
   return (
     <div className={cn("flex items-center gap-1", className)}>
       {Array.from({ length: max }).map((_, index) => {
-        const filled = index < Math.round(rating);
+        const fillLevel = Math.max(0, Math.min(1, rating - index));
         return (
-          <Star
-            key={index}
-            className={cn(
-              iconClass,
-              filled ? "fill-gold-300 text-gold-300" : "text-border"
-            )}
-          />
+          <span key={index} className={cn("relative inline-block", iconClass)}>
+            <Star className={cn(iconClass, "text-border")} />
+            {fillLevel > 0 ? (
+              <span
+                className="absolute inset-y-0 left-0 overflow-hidden"
+                style={{ width: `${fillLevel * 100}%` }}
+              >
+                <Star className={cn(iconClass, "fill-gold-300 text-gold-300")} />
+              </span>
+            ) : null}
+          </span>
         );
       })}
       {showValue ? (

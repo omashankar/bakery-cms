@@ -44,23 +44,25 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           </div>
         </button>
 
-        <div className="grid grid-cols-4 gap-2 sm:gap-3">
-          {images.map((src, index) => (
-            <button
-              key={`${src}-${index}`}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={cn(
-                "relative aspect-square overflow-hidden rounded-xl border bg-cream-100 transition-premium",
-                activeIndex === index
-                  ? "border-bakery-700 ring-2 ring-bakery-200"
-                  : "border-border hover:border-bakery-300"
-              )}
-            >
-              <Image src={src} alt="" fill className="object-cover" sizes="100px" />
-            </button>
-          ))}
-        </div>
+        {images.length > 1 ? (
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {images.map((src, index) => (
+              <button
+                key={`${src}-${index}`}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                className={cn(
+                  "relative aspect-square overflow-hidden rounded-xl border bg-cream-100 transition-premium",
+                  activeIndex === index
+                    ? "border-bakery-700 ring-2 ring-bakery-200"
+                    : "border-border hover:border-bakery-300"
+                )}
+              >
+                <Image src={src} alt="" fill className="object-cover" sizes="100px" />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>

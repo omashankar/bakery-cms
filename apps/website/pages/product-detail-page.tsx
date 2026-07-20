@@ -278,11 +278,11 @@ export function ProductDetailPage({
                   ) : null}
                   {cake.badge ? <Badge variant="gold">{cake.badge}</Badge> : null}
                 </div>
-                <h1 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h1>
+                <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
                 {cake.rating ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <StarRating rating={cake.rating} size="md" showValue />
-                    {cake.reviewCount ? <span>({cake.reviewCount} reviews)</span> : null}
+                    {reviews.length ? <span>({reviews.length} reviews)</span> : null}
                   </div>
                 ) : null}
                 <p className="text-muted-foreground">{cake.description}</p>
@@ -425,7 +425,7 @@ export function ProductDetailPage({
                     value={deliveryTime}
                     onChange={(event) => setDeliveryTime(event.target.value)}
                     disabled={!deliveryReady}
-                    className="flex h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
                   >
                     {deliverySlots.map((slot) => (
                       <option key={slot} value={slot}>
@@ -500,9 +500,7 @@ export function ProductDetailPage({
                     <TabsTrigger value="care">Care</TabsTrigger>
                     <TabsTrigger value="reviews">
                       Reviews
-                      {(reviews.length || cake.reviewCount)
-                        ? ` (${reviews.length || cake.reviewCount})`
-                        : ""}
+                      {reviews.length ? ` (${reviews.length})` : ""}
                     </TabsTrigger>
                     <TabsTrigger value="delivery">Delivery</TabsTrigger>
                   </TabsList>
@@ -630,10 +628,20 @@ export function ProductDetailPage({
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white p-4 lg:hidden">
         <div className="mx-auto flex max-w-lg gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => handleAddToCart(false)}>
-            Add to Cart
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={isOutOfStock}
+            onClick={() => handleAddToCart(false)}
+          >
+            {isOutOfStock ? "Out of stock" : "Add to Cart"}
           </Button>
-          <Button variant="bakery" className="flex-1" onClick={() => handleAddToCart(true)}>
+          <Button
+            variant="bakery"
+            className="flex-1"
+            disabled={isOutOfStock}
+            onClick={() => handleAddToCart(true)}
+          >
             Buy Now
           </Button>
         </div>

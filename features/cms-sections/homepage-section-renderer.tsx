@@ -300,7 +300,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
             <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
               {contentString(c, "overline")}
             </p>
-            <h2 className="font-heading text-3xl font-bold">{contentString(c, "title")}</h2>
+            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{contentString(c, "title")}</h2>
             <p className="text-muted-foreground">{contentString(c, "description")}</p>
           </div>
           <StoreLocatorForm buttonLabel={contentString(c, "buttonLabel", "Find Stores")} />
@@ -344,12 +344,12 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
           description={contentString(c, "description")}
         />
       </ScrollReveal>
-      <StaggerReveal className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <StaggerReveal className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
         {items.map((category) => (
           <Link
             key={category.id}
             href={routes.store.collection(category.slug)}
-            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white transition-premium hover:border-bakery-300 hover:shadow-sm"
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
@@ -467,7 +467,7 @@ function WeddingSection(props: HomepageSectionRendererProps) {
           </div>
           {showcase ? (
             <div className="absolute right-5 bottom-5 rounded-2xl border border-border bg-white/95 p-4 shadow-sm">
-              <div className="mb-1 flex gap-0.5 text-gold-500">
+              <div className="mb-1 flex gap-0.5 text-gold-300">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star key={i} className="size-3 fill-current" />
                 ))}
@@ -522,7 +522,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
           return (
             <div
               key={item.title}
-              className="rounded-xl border border-border bg-white p-5 transition-premium hover:border-bakery-300 hover:shadow-sm"
+              className="rounded-xl border border-border bg-white p-5 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
@@ -553,7 +553,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         {items.map((item) => (
           <article
             key={item.id}
-            className="flex flex-col rounded-xl border border-border bg-white p-6 transition-premium hover:border-bakery-300 hover:shadow-sm"
+            className="flex flex-col rounded-xl border border-border bg-white p-6 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
           >
             <div className="mb-4 flex items-center gap-0.5 text-gold-300">
               {Array.from({ length: 5 }).map((_, star) => (
@@ -680,7 +680,7 @@ function CtaSection(props: HomepageSectionRendererProps) {
       <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
         {contentString(c, "overline")}
       </p>
-      <h2 className="mt-3 font-heading text-3xl font-bold">{contentString(c, "title")}</h2>
+      <h2 className="mt-3 font-heading text-3xl font-bold sm:text-4xl">{contentString(c, "title")}</h2>
       <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
         {contentString(c, "description")}
       </p>
@@ -810,7 +810,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
           >
             <Image
               src={post.image}
-              alt="Instagram post"
+              alt=""
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
@@ -858,20 +858,21 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
       <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-white border border-border text-bakery-700">
         <Mail className="size-5" />
       </div>
-      <h2 className="font-heading text-3xl font-bold">{contentString(c, "title")}</h2>
+      <h2 className="font-heading text-3xl font-bold sm:text-4xl">{contentString(c, "title")}</h2>
       <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
         {contentString(c, "description")}
       </p>
       <form onSubmit={handleSubmit} className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row">
         <Input
           type="email"
+          aria-label="Email address"
           placeholder="Enter your email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
           className="h-10 flex-1 bg-white"
         />
-        <Button type="submit" variant="bakery" disabled={loading} className="shrink-0">
+        <Button type="submit" variant="bakery" disabled={loading} className="h-10 shrink-0">
           <Send className="size-4" />
           {loading ? "Subscribing..." : contentString(c, "buttonLabel", "Subscribe")}
         </Button>

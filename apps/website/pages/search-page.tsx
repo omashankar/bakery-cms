@@ -89,7 +89,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
                   key={term}
                   type="button"
                   onClick={() => runSearch(term)}
-                  className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-bakery-300 hover:text-bakery-700"
+                  className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                 >
                   {term}
                 </button>
@@ -118,7 +118,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
           ) : (
             <StaggerReveal
               key={initialQuery}
-              className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+              className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             >
               {results.map((cake) => (
                 <ProductCard key={cake.id} cake={cake} />

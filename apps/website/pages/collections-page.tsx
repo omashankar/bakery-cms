@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SearchX, SlidersHorizontal } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -146,7 +146,7 @@ export function CollectionsPage({
                         sort: event.target.value as CollectionFilters["sort"],
                       })
                     }
-                    className="h-10 rounded-xl border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className="h-8 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     <option value="popular">Sort: Popular</option>
                     <option value="name">Sort: Name</option>
@@ -177,7 +177,10 @@ export function CollectionsPage({
               </div>
 
               {paginated.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-cream-50 py-16 text-center">
+                <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">
+                  <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-cream-100 text-bakery-700">
+                    <SearchX className="size-6" />
+                  </div>
                   <p className="font-medium">No cakes found</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Try adjusting your search or filters.
@@ -193,7 +196,7 @@ export function CollectionsPage({
               ) : (
                 <StaggerReveal
                   key={`${categorySlug}-${currentPage}`}
-                  className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"
+                  className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
                 >
                   {paginated.map((cake) => (
                     <ProductCard key={cake.id} cake={cake} />
