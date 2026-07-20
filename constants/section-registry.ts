@@ -1,6 +1,8 @@
 import { brandInfo, contactInfo } from "@/constants/landing-data";
+import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import { routes } from "@/constants/routes";
 import type {
+  HeroSlideContent,
   HomepageSectionInstance,
   HomepageSectionType,
   SectionBackground,
@@ -16,6 +18,83 @@ export interface HomepageSectionRegistryEntry {
   fields: SectionFieldDef[];
 }
 
+/** Seed slides for a fresh hero carousel — all editable in the builder. */
+export const DEFAULT_HERO_SLIDES: HeroSlideContent[] = [
+  {
+    badge: "Since 1965 · India's Favourite Bakery",
+    headline: brandInfo.tagline,
+    subtext: brandInfo.description,
+    primaryLabel: "Shop Cakes",
+    primaryHref: routes.store.collections,
+    secondaryLabel: "Wedding Collection",
+    secondaryHref: routes.store.weddingCakes,
+    imageUrl: unsplash(demoPhotoIds.blushCake, 800, 1000),
+  },
+  {
+    badge: "Limited Time",
+    headline: "Summer Celebration Sale",
+    subtext: "Up to 25% off our seasonal favourites — this week only.",
+    primaryLabel: "Shop the Sale",
+    primaryHref: routes.store.collections,
+    secondaryLabel: "View Menu",
+    secondaryHref: routes.store.collections,
+    imageUrl: unsplash(demoPhotoIds.chocolateCake, 800, 1000),
+  },
+  {
+    badge: "Bespoke Cakes",
+    headline: "Wedding Season Special",
+    subtext: "Book a tasting and design a custom tiered cake for your big day.",
+    primaryLabel: "Explore Wedding Cakes",
+    primaryHref: routes.store.weddingCakes,
+    secondaryLabel: "Enquire",
+    secondaryHref: routes.store.contact,
+    imageUrl: unsplash(demoPhotoIds.weddingCake, 800, 1000),
+  },
+];
+
+/**
+ * Read hero slides from a section's content. Falls back to the legacy flat
+ * fields (badge/headline/ctaPrimary…) so hero sections saved before the
+ * multi-slide upgrade still render as a single slide.
+ */
+export function parseHeroSlides(
+  content: Record<string, string | number | boolean>
+): HeroSlideContent[] {
+  const raw = content.slides;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (slide): slide is HeroSlideContent =>
+            Boolean(slide) && typeof slide === "object"
+        );
+      }
+    } catch {
+      // fall through to legacy migration
+    }
+  }
+
+  const headline = String(content.headline ?? "");
+  const imageUrl = String(content.imageUrl ?? "");
+  if (headline || imageUrl) {
+    return [
+      {
+        badge: String(content.badge ?? ""),
+        headline,
+        subtext: String(content.subtext ?? ""),
+        primaryLabel: String(content.ctaPrimaryLabel ?? ""),
+        primaryHref: String(content.ctaPrimaryHref ?? ""),
+        secondaryLabel: String(content.ctaSecondaryLabel ?? ""),
+        secondaryHref: String(content.ctaSecondaryHref ?? ""),
+        imageUrl,
+      },
+    ];
+  }
+
+  return [];
+}
+
 export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   {
     type: "hero",
@@ -23,26 +102,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     icon: "Sparkles",
     defaultBackground: "white",
     defaultContent: {
-      badge: "Since 1956 · India's Favourite Bakery",
-      headline: brandInfo.tagline,
-      subtext: brandInfo.description,
-      ctaPrimaryLabel: "Shop Cakes",
-      ctaPrimaryHref: routes.store.collections,
-      ctaSecondaryLabel: "Wedding Collection",
-      ctaSecondaryHref: routes.store.weddingCakes,
-      imageUrl:
-        "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=1000&fit=crop",
+      slides: JSON.stringify(DEFAULT_HERO_SLIDES),
     },
-    fields: [
-      { key: "badge", label: "Badge", type: "text" },
-      { key: "headline", label: "Headline", type: "text" },
-      { key: "subtext", label: "Subtext", type: "textarea" },
-      { key: "ctaPrimaryLabel", label: "Primary CTA label", type: "text" },
-      { key: "ctaPrimaryHref", label: "Primary CTA link", type: "url" },
-      { key: "ctaSecondaryLabel", label: "Secondary CTA label", type: "text" },
-      { key: "ctaSecondaryHref", label: "Secondary CTA link", type: "url" },
-      { key: "imageUrl", label: "Hero image URL", type: "url", isImage: true },
-    ],
+    fields: [{ key: "slides", label: "Hero slides", type: "slides" }],
   },
   {
     type: "our-menu",

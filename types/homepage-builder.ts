@@ -22,7 +22,14 @@ export type HomepageSectionType =
   | "newsletter"
   | "cta";
 
-export type SectionFieldType = "text" | "textarea" | "url" | "number" | "select" | "boolean";
+export type SectionFieldType =
+  | "text"
+  | "textarea"
+  | "url"
+  | "number"
+  | "select"
+  | "boolean"
+  | "slides";
 
 export interface SectionFieldDef {
   key: string;
@@ -31,6 +38,21 @@ export interface SectionFieldDef {
   placeholder?: string;
   isImage?: boolean;
   options?: { label: string; value: string }[];
+}
+
+/**
+ * One hero carousel slide. Stored as a JSON string under the hero section's
+ * `content.slides` key (content values are primitives, so the array is encoded).
+ */
+export interface HeroSlideContent {
+  badge?: string;
+  headline: string;
+  subtext?: string;
+  primaryLabel?: string;
+  primaryHref?: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+  imageUrl?: string;
 }
 
 export interface HomepageSectionInstance {

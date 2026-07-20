@@ -1,9 +1,17 @@
 "use client";
 
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { SectionBackground, SectionFieldDef } from "@/types/homepage-builder";
+import type {
+  HeroSlideContent,
+  SectionBackground,
+  SectionFieldDef,
+} from "@/types/homepage-builder";
+import { parseHeroSlides } from "@/constants/section-registry";
+import { routes } from "@/constants/routes";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { BuilderMediaField } from "./builder-media-field";
@@ -22,12 +30,185 @@ interface SectionEditorPanelProps<T extends BuilderEditableSection> {
   settingsNote?: string;
 }
 
+/** Repeatable editor for the hero carousel's slides (stored as JSON in content). */
+function SlidesField({
+  content,
+  onChange,
+}: {
+  content: Record<string, string | number | boolean>;
+  onChange: (next: string) => void;
+}) {
+  const slides = parseHeroSlides(content);
+  const commit = (next: HeroSlideContent[]) => onChange(JSON.stringify(next));
+
+  const updateSlide = (index: number, patch: Partial<HeroSlideContent>) =>
+    commit(slides.map((slide, i) => (i === index ? { ...slide, ...patch } : slide)));
+
+  const addSlide = () =>
+    commit([
+      ...slides,
+      {
+        headline: "New slide",
+        subtext: "",
+        primaryLabel: "Shop Now",
+        primaryHref: routes.store.collections,
+        imageUrl: "",
+      },
+    ]);
+
+  const removeSlide = (index: number) => commit(slides.filter((_, i) => i !== index));
+
+  const moveSlide = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= slides.length) return;
+    const next = [...slides];
+    [next[index], next[target]] = [next[target], next[index]];
+    commit(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      {slides.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+          No slides yet — add your first slide below.
+        </p>
+      ) : null}
+
+      {slides.map((slide, index) => (
+        <div key={index} className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">Slide {index + 1}</p>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={index === 0}
+                onClick={() => moveSlide(index, -1)}
+                aria-label="Move slide up"
+              >
+                <ChevronUp className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={index === slides.length - 1}
+                onClick={() => moveSlide(index, 1)}
+                aria-label="Move slide down"
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-destructive"
+                onClick={() => removeSlide(index)}
+                aria-label="Remove slide"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`slide-${index}-badge`}>Badge</Label>
+            <Input
+              id={`slide-${index}-badge`}
+              value={slide.badge ?? ""}
+              onChange={(e) => updateSlide(index, { badge: e.target.value })}
+              placeholder="Featured"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`slide-${index}-headline`}>Headline</Label>
+            <Input
+              id={`slide-${index}-headline`}
+              value={slide.headline ?? ""}
+              onChange={(e) => updateSlide(index, { headline: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`slide-${index}-subtext`}>Subtext</Label>
+            <textarea
+              id={`slide-${index}-subtext`}
+              className={adminTextareaClassName}
+              value={slide.subtext ?? ""}
+              onChange={(e) => updateSlide(index, { subtext: e.target.value })}
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`slide-${index}-plabel`}>Primary button</Label>
+              <Input
+                id={`slide-${index}-plabel`}
+                value={slide.primaryLabel ?? ""}
+                onChange={(e) => updateSlide(index, { primaryLabel: e.target.value })}
+                placeholder="Shop Now"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`slide-${index}-phref`}>Primary link</Label>
+              <Input
+                id={`slide-${index}-phref`}
+                value={slide.primaryHref ?? ""}
+                onChange={(e) => updateSlide(index, { primaryHref: e.target.value })}
+                placeholder="/store/collections"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`slide-${index}-slabel`}>Secondary button</Label>
+              <Input
+                id={`slide-${index}-slabel`}
+                value={slide.secondaryLabel ?? ""}
+                onChange={(e) => updateSlide(index, { secondaryLabel: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`slide-${index}-shref`}>Secondary link</Label>
+              <Input
+                id={`slide-${index}-shref`}
+                value={slide.secondaryHref ?? ""}
+                onChange={(e) => updateSlide(index, { secondaryHref: e.target.value })}
+                placeholder="/store/wedding-cakes"
+              />
+            </div>
+          </div>
+          <BuilderMediaField
+            id={`slide-${index}-image`}
+            label="Slide image"
+            value={slide.imageUrl ?? ""}
+            onChange={(next) => updateSlide(index, { imageUrl: next })}
+          />
+        </div>
+      ))}
+
+      <Button type="button" variant="outline" size="sm" className="w-full" onClick={addSlide}>
+        <Plus className="size-4" />
+        Add slide
+      </Button>
+    </div>
+  );
+}
+
 function renderField<T extends BuilderEditableSection>(
   field: SectionFieldDef,
   section: T,
   updateContent: (key: string, value: string | number | boolean) => void
 ) {
   const value = section.content[field.key];
+
+  if (field.type === "slides") {
+    return (
+      <SlidesField
+        key={field.key}
+        content={section.content}
+        onChange={(next) => updateContent(field.key, next)}
+      />
+    );
+  }
 
   if (field.type === "boolean") {
     return (
