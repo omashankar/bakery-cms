@@ -43,10 +43,8 @@ import {
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import {
-  getActiveHeroBanners,
-  getActivePromoBanners,
-} from "@/features/content/lib/banners-repository";
+import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
+import { parseHeroSlides } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
 import {
@@ -154,33 +152,19 @@ const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
 
 function HeroSection(props: HomepageSectionRendererProps) {
   const { section } = props;
-  const c = section.content;
 
-  const cmsSlide: HeroSlide = {
-    badge: contentString(c, "badge"),
-    headline: contentString(c, "headline"),
-    subtext: contentString(c, "subtext"),
-    primaryLabel: contentString(c, "ctaPrimaryLabel", "Shop Cakes"),
-    primaryHref: contentString(c, "ctaPrimaryHref", routes.store.collections),
-    secondaryLabel: contentString(c, "ctaSecondaryLabel", "Wedding Collection"),
-    secondaryHref: contentString(c, "ctaSecondaryHref", routes.store.weddingCakes),
-    imageUrl: contentString(c, "imageUrl"),
-  };
-
-  const bannerSlides: HeroSlide[] = getActiveHeroBanners("homepage")
-    .slice(0, 3)
-    .map((banner) => ({
-      badge: "Featured",
-      headline: banner.title,
-      subtext: "Freshly baked and delivered to your door — order today.",
-      primaryLabel: "Shop Now",
-      primaryHref: banner.link ?? routes.store.collections,
-      imageUrl: banner.image,
-    }));
-
-  const slides = [cmsSlide, ...bannerSlides].filter(
-    (slide) => slide.headline || slide.imageUrl
-  );
+  const slides: HeroSlide[] = parseHeroSlides(section.content)
+    .map((slide) => ({
+      badge: slide.badge?.trim() || undefined,
+      headline: slide.headline ?? "",
+      subtext: slide.subtext?.trim() || undefined,
+      primaryLabel: slide.primaryLabel?.trim() || "Shop Cakes",
+      primaryHref: slide.primaryHref?.trim() || routes.store.collections,
+      secondaryLabel: slide.secondaryLabel?.trim() || undefined,
+      secondaryHref: slide.secondaryHref?.trim() || undefined,
+      imageUrl: slide.imageUrl ?? "",
+    }))
+    .filter((slide) => slide.headline || slide.imageUrl);
 
   return (
     <SectionShell {...props} className="bg-white py-10 sm:py-12 lg:py-16">
