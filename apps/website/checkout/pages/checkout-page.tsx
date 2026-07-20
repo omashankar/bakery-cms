@@ -848,7 +848,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                                 timeSlot: event.target.value,
                               }));
                             }}
-                            className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm"
+                            className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
                           >
                             <option value="">Select a time</option>
                             {slotOptions.map((slot) => (

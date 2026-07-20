@@ -311,7 +311,7 @@ export function StorefrontNavbar() {
                   render={<Link href={accountHref} onClick={() => setMobileOpen(false)} />}
                 >
                   <User className="size-4" />
-                  My Account
+                  Account
                 </Button>
               ) : (
                 <Button

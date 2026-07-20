@@ -42,7 +42,9 @@ export function LandingFooter() {
           <div className="space-y-4 lg:col-span-4">
             <Link href={routes.store.home} className="flex items-center gap-2.5">
               <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700">
-                <span className="font-heading text-sm font-bold text-white">M</span>
+                <span className="font-heading text-sm font-bold text-white">
+                  {brandInfo.name.charAt(0) || "M"}
+                </span>
               </div>
               <span className="font-heading text-lg font-bold">{brandInfo.name}</span>
             </Link>

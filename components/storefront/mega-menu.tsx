@@ -27,7 +27,7 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
         <ChevronDown className="size-3.5 transition-transform group-hover:rotate-180" />
       </Link>
 
-      <div className="pointer-events-none invisible absolute top-full left-0 z-50 w-[640px] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100">
+      <div className="pointer-events-none invisible absolute top-full left-0 z-50 w-[640px] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100">
         <div className="overflow-hidden rounded-xl border border-border bg-white p-6 shadow-sm">
           <div className="grid gap-6 lg:grid-cols-[1fr_1fr_200px]">
             <div>

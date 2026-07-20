@@ -1,4 +1,3 @@
-import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import type { LandingProduct } from "@/constants/landing-data";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -24,21 +23,10 @@ export interface ProductReview {
   isFeatured?: boolean;
 }
 
-const galleryPool = [
-  demoPhotoIds.chocolateCake,
-  demoPhotoIds.decoratedCake,
-  demoPhotoIds.stackCake,
-  demoPhotoIds.cupcakes,
-];
-
 export function getProductGalleryImages(cake: LandingProduct): string[] {
-  const seed = Number(cake.id.replace(/\D/g, "")) || 1;
-  const alternates = galleryPool
-    .filter((id) => !cake.image.includes(id))
-    .slice(0, 3)
-    .map((id, index) => unsplash(id, 800, 800));
-
-  return [cake.image, ...alternates].slice(0, 4);
+  // Products carry a single real image; show only that — never pad the gallery
+  // with unrelated stock photos that don't depict the actual cake.
+  return [cake.image];
 }
 
 /**

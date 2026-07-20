@@ -51,7 +51,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
   return (
     <article
       className={cn(
-        "group flex flex-col overflow-hidden rounded-xl border border-border bg-white transition-premium hover:border-bakery-300 hover:shadow-sm",
+        "group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-bakery-300 hover:shadow-md",
         className
       )}
     >
@@ -103,7 +103,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
           <h3 className="font-heading text-sm font-semibold leading-snug">
             <Link
               href={routes.store.cake(cake.slug)}
-              className="line-clamp-1 hover:text-bakery-700"
+              className="line-clamp-2 hover:text-bakery-700"
             >
               {cake.name}
             </Link>
@@ -111,31 +111,16 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
         </div>
 
         <div className="mt-auto space-y-3">
-          <PriceDisplay
-            price={cake.price}
-            compareAtPrice={cake.compareAtPrice}
-            className="[&_span:first-child]:text-lg [&_span:first-child]:sm:text-lg [&_span:nth-child(2)]:text-sm"
-          />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="bakery"
-              className="flex-1"
-              onClick={handleAddToCart}
-            >
-              <ShoppingBag className="size-4" />
-              Add to Cart
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="shrink-0"
-              render={<Link href={routes.store.cake(cake.slug)} aria-label={`View ${cake.name}`} />}
-            >
-              View
-            </Button>
-          </div>
+          <PriceDisplay price={cake.price} compareAtPrice={cake.compareAtPrice} size="sm" />
+          <Button
+            type="button"
+            variant="bakery"
+            className="h-10 w-full"
+            onClick={handleAddToCart}
+          >
+            <ShoppingBag className="size-4" />
+            Add to Cart
+          </Button>
         </div>
       </div>
     </article>

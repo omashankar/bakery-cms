@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs } from "@/features/content/lib/storefront-content";
+import { getStorefrontContactInfo } from "@/apps/website/lib/settings";
 import type { FaqCategory } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const faqCategories: Array<{ label: string; value: "all" | FaqCategory }> = [
 export function FaqPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
+  const contactInfo = getStorefrontContactInfo();
 
   const categoryFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -143,7 +145,7 @@ export function FaqPage() {
 
                 <div className="mt-6 space-y-3">
                   <a
-                    href="tel:+9118001234567"
+                    href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
                     className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                   >
                     <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
@@ -151,11 +153,11 @@ export function FaqPage() {
                     </span>
                     <span>
                       <span className="block text-sm font-semibold text-foreground">Call us</span>
-                      <span className="block text-xs text-muted-foreground">+91 1800-123-4567</span>
+                      <span className="block text-xs text-muted-foreground">{contactInfo.phone}</span>
                     </span>
                   </a>
                   <a
-                    href="mailto:hello@monginis.com"
+                    href={`mailto:${contactInfo.email}`}
                     className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                   >
                     <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
@@ -163,7 +165,7 @@ export function FaqPage() {
                     </span>
                     <span>
                       <span className="block text-sm font-semibold text-foreground">Email us</span>
-                      <span className="block text-xs text-muted-foreground">hello@monginis.com</span>
+                      <span className="block text-xs text-muted-foreground">{contactInfo.email}</span>
                     </span>
                   </a>
                 </div>

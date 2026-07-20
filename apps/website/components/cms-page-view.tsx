@@ -26,13 +26,16 @@ function renderBlocks(blocks: CmsPageBlock[]) {
   return blocks.map((block) => {
     if (block.type === "heading") {
       return (
-        <h2 key={block.id} className="font-heading text-2xl font-bold text-foreground">
+        <h2
+          key={block.id}
+          className="mt-8 mb-3 font-heading text-2xl font-bold text-foreground first:mt-0"
+        >
           {block.content}
         </h2>
       );
     }
     return (
-      <p key={block.id} className="text-sm leading-relaxed sm:text-base">
+      <p key={block.id} className="mt-4 text-sm leading-relaxed first:mt-0 sm:text-base">
         {block.content}
       </p>
     );
@@ -49,11 +52,13 @@ interface CmsPageViewProps {
 export function CmsPageView({ page, preview = false }: CmsPageViewProps) {
   if (!page) {
     return (
-      <div className={layoutSpacing.container}>
-        <div className="rounded-xl border border-dashed border-border py-16 text-center text-muted-foreground">
-          This page is not available or has not been published yet.
+      <section className={layoutSpacing.sectionY}>
+        <div className={layoutSpacing.containerNarrow}>
+          <div className="rounded-xl border border-dashed border-border py-16 text-center text-muted-foreground">
+            This page is not available or has not been published yet.
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -79,7 +84,7 @@ function StandardTemplate({ page, preview }: { page: CmsPage; preview: boolean }
       />
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.containerNarrow}>
-          <div className="space-y-6 rounded-xl border border-border bg-white p-6 text-muted-foreground sm:p-8">
+          <div className="mx-auto max-w-2xl rounded-xl border border-border bg-white p-6 text-foreground sm:p-8">
             {renderBlocks(page.blocks)}
           </div>
         </div>
@@ -120,7 +125,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                   </div>
                 </div>
                 <div className="absolute bottom-5 left-5 rounded-2xl border border-border bg-white/95 px-4 py-3 shadow-sm">
-                  <p className="font-heading text-2xl font-bold text-bakery-700">Since 1956</p>
+                  <p className="font-heading text-2xl font-bold text-bakery-700">Since 1965</p>
                   <p className="text-[11px] text-muted-foreground">Baking joy for generations</p>
                 </div>
               </ScrollReveal>

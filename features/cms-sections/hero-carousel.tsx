@@ -239,7 +239,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             type="button"
             onClick={() => go(index - 1)}
             aria-label="Previous slide"
-            className="absolute top-1/2 left-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 xl:flex"
+            className="absolute top-1/2 left-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -247,7 +247,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             type="button"
             onClick={() => go(index + 1)}
             aria-label="Next slide"
-            className="absolute top-1/2 right-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(100%+1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 xl:flex"
+            className="absolute top-1/2 right-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(100%+1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
           >
             <ChevronRight className="size-5" />
           </button>

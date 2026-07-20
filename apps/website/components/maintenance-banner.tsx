@@ -16,7 +16,7 @@ export function MaintenanceBanner() {
 
   return (
     <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-      <div className="mx-auto flex max-w-6xl items-start gap-3 text-sm">
+      <div className="mx-auto flex max-w-7xl items-start gap-3 text-sm">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
         <p>{message}</p>
       </div>

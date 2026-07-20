@@ -78,8 +78,14 @@ export function TrackOrderPage() {
                     id="orderNumber"
                     placeholder="BK-20260708-1234"
                     className="uppercase"
+                    aria-invalid={!!formState.errors.orderNumber}
                     {...register("orderNumber", { required: "Order number is required" })}
                   />
+                  {formState.errors.orderNumber ? (
+                    <p role="alert" className="text-xs text-destructive">
+                      {formState.errors.orderNumber.message}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email used at checkout</Label>
@@ -87,8 +93,14 @@ export function TrackOrderPage() {
                     id="email"
                     type="email"
                     placeholder="you@example.com"
+                    aria-invalid={!!formState.errors.email}
                     {...register("email", { required: "Email is required" })}
                   />
+                  {formState.errors.email ? (
+                    <p role="alert" className="text-xs text-destructive">
+                      {formState.errors.email.message}
+                    </p>
+                  ) : null}
                 </div>
                 <Button
                   type="submit"
