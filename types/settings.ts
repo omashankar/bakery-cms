@@ -10,6 +10,27 @@ export interface ThemeSettings {
   customCss?: string;
 }
 
+/**
+ * Business type only changes public branding + which optional modules are shown.
+ * "bakery" is the default template — the CMS behaves exactly as before for it.
+ */
+export type BusinessType =
+  | "bakery"
+  | "sweet-shop"
+  | "flower-shop"
+  | "restaurant"
+  | "gift-shop"
+  | "grocery"
+  | "fashion"
+  | "electronics"
+  | "pharmacy"
+  | "other";
+
+export interface BusinessTypeOption {
+  value: BusinessType;
+  label: string;
+}
+
 export interface GeneralSettings {
   siteName: string;
   siteTagline: string;
@@ -18,6 +39,7 @@ export interface GeneralSettings {
   favicon: string;
   timezone: string;
   currency: string;
+  businessType: BusinessType;
 }
 
 export interface BusinessHoursEntry {
@@ -115,6 +137,20 @@ export interface ActivityLog {
   details?: string;
 }
 
+/**
+ * Optional bakery-specific modules. All ON by default (bakery template).
+ * Turning one OFF hides that feature from the UI only — data/fields are never
+ * deleted, so switching back ON restores everything.
+ */
+export interface ModuleSettings {
+  weddingBuilder: boolean;
+  flavour: boolean;
+  eggEggless: boolean;
+  weight: boolean;
+  shape: boolean;
+  photoCake: boolean;
+}
+
 export interface AppSettings {
   general: GeneralSettings;
   contact: ContactSettings;
@@ -124,6 +160,7 @@ export interface AppSettings {
   analytics: AnalyticsSettings;
   maintenance: MaintenanceSettings;
   commerce: CommerceSettings;
+  modules: ModuleSettings;
   activity: ActivityLog[];
   updatedAt: string;
 }

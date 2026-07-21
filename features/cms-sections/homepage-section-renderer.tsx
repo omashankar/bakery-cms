@@ -56,7 +56,11 @@ import { layoutSpacing } from "@/constants/spacing";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  isWeddingEnabled,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { toast } from "sonner";
 
 interface HomepageSectionRendererProps {
@@ -395,10 +399,23 @@ const weddingPerks = [
 ] as const;
 
 function WeddingSection(props: HomepageSectionRendererProps) {
+  // Wedding is bakery-only. Default to shown so SSR / bakery render unchanged,
+  // then hide after mount for other business types / when the module is off.
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
+  useEffect(() => {
+    const sync = () => setWeddingEnabled(isWeddingEnabled());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
   const c = props.section.content;
   const showcase = weddingCakes[0];
 
+  if (!weddingEnabled) return null;
+
   return (
+    <div className="contents" data-gate-wedding>
     <SectionShell {...props} noReveal className="surface-cream">
       <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
         <ScrollReveal className="space-y-6">
@@ -463,6 +480,7 @@ function WeddingSection(props: HomepageSectionRendererProps) {
         </ScrollReveal>
       </div>
     </SectionShell>
+    </div>
   );
 }
 

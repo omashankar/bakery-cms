@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import { ThemeBlockingScript } from "@/components/theme-blocking-script";
+import { BusinessBlockingScript } from "@/components/business-blocking-script";
 import "./globals.css";
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <ThemeBlockingScript />
+        <BusinessBlockingScript />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

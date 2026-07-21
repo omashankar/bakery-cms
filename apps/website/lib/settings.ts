@@ -8,7 +8,10 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
+  isWeddingEnabled,
 } from "@/features/settings/lib/settings-repository";
+import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
+import type { BusinessType } from "@/types/settings";
 
 export function getStorefrontBrandInfo() {
   const general = getGeneralSettings();
@@ -32,6 +35,19 @@ export function getStorefrontContactInfo() {
 export function getStorefrontBusinessHours() {
   const contact = getContactSettings();
   return contact.businessHours?.length ? contact.businessHours : businessHours;
+}
+
+export function getStorefrontBusinessType(): BusinessType {
+  return getGeneralSettings().businessType;
+}
+
+export function getStorefrontBusinessLabels(): BusinessLabels {
+  return getBusinessLabels(getStorefrontBusinessType());
+}
+
+/** Wedding cakes are bakery-only and gated by the wedding module. */
+export function isStorefrontWeddingEnabled(): boolean {
+  return isWeddingEnabled();
 }
 
 export function getStorefrontSocialLinks() {

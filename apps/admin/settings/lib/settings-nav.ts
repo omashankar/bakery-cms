@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Blocks,
   Database,
   Mail,
   Phone,
@@ -37,6 +38,12 @@ export const settingsNavGroups: SettingsNavGroup[] = [
         label: "General",
         href: routes.admin.settings.general,
         icon: Settings,
+      },
+      {
+        id: "modules",
+        label: "Modules",
+        href: routes.admin.settings.modules,
+        icon: Blocks,
       },
       {
         id: "contact",

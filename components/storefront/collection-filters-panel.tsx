@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +13,12 @@ import {
   getFilterOccasionOptions,
   getFilterWeightOptions,
 } from "@/apps/website/lib/collection-filters";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { cn } from "@/lib/utils";
 
 interface CollectionFiltersPanelProps {
@@ -28,6 +35,15 @@ export function CollectionFiltersPanel({
   const occasions = getFilterOccasionOptions();
   const flavours = getFilterFlavourOptions();
   const weights = getFilterWeightOptions();
+  // Flavour / weight / eggless filters are bakery modules — hide when off.
+  // Default ON so SSR / bakery render exactly as before.
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
 
   const toggleListValue = (key: "occasions" | "flavours" | "weights", value: string) => {
     const current = filters[key];
@@ -66,29 +82,37 @@ export function CollectionFiltersPanel({
         ))}
       </FilterGroup>
 
-      <FilterGroup title="Flavour">
-        {flavours.map((flavour) => (
-          <FilterCheckbox
-            key={flavour}
-            id={`flavour-${flavour}`}
-            label={flavour}
-            checked={filters.flavours.includes(flavour)}
-            onCheckedChange={() => toggleListValue("flavours", flavour)}
-          />
-        ))}
-      </FilterGroup>
+      {modules.flavour ? (
+        <div className="contents" data-gate-flavour>
+          <FilterGroup title="Flavour">
+            {flavours.map((flavour) => (
+              <FilterCheckbox
+                key={flavour}
+                id={`flavour-${flavour}`}
+                label={flavour}
+                checked={filters.flavours.includes(flavour)}
+                onCheckedChange={() => toggleListValue("flavours", flavour)}
+              />
+            ))}
+          </FilterGroup>
+        </div>
+      ) : null}
 
-      <FilterGroup title="Weight">
-        {weights.map((weight) => (
-          <FilterCheckbox
-            key={weight}
-            id={`weight-${weight}`}
-            label={weight}
-            checked={filters.weights.includes(weight)}
-            onCheckedChange={() => toggleListValue("weights", weight)}
-          />
-        ))}
-      </FilterGroup>
+      {modules.weight ? (
+        <div className="contents" data-gate-weight>
+          <FilterGroup title="Weight">
+            {weights.map((weight) => (
+              <FilterCheckbox
+                key={weight}
+                id={`weight-${weight}`}
+                label={weight}
+                checked={filters.weights.includes(weight)}
+                onCheckedChange={() => toggleListValue("weights", weight)}
+              />
+            ))}
+          </FilterGroup>
+        </div>
+      ) : null}
 
       <FilterGroup title="Price range">
         <div className="space-y-3">
@@ -111,12 +135,16 @@ export function CollectionFiltersPanel({
       </FilterGroup>
 
       <FilterGroup title="Preferences">
-        <FilterCheckbox
-          id="eggless-only"
-          label="Eggless only"
-          checked={filters.egglessOnly}
-          onCheckedChange={(checked) => onChange({ ...filters, egglessOnly: checked })}
-        />
+        {modules.eggEggless ? (
+          <div className="contents" data-gate-egg>
+            <FilterCheckbox
+              id="eggless-only"
+              label="Eggless only"
+              checked={filters.egglessOnly}
+              onCheckedChange={(checked) => onChange({ ...filters, egglessOnly: checked })}
+            />
+          </div>
+        ) : null}
         <FilterCheckbox
           id="in-stock-only"
           label="In stock only"

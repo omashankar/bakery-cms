@@ -29,6 +29,12 @@ import {
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
 
 const EMPTY_STORE: CatalogStore = {
@@ -62,6 +68,7 @@ const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }
 export function CatalogAdminPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -77,6 +84,31 @@ export function CatalogAdminPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Flavours/Weights are optional bakery modules — hide those tabs when off.
+  useEffect(() => {
+    const sync = () => {
+      const next = getModuleSettings();
+      setModules(next);
+      setActiveTab((current) => {
+        if (current === "flavours" && !next.flavour) return "categories";
+        if (current === "weights" && !next.weight) return "categories";
+        return current;
+      });
+    };
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  const moduleForTab: Partial<Record<CatalogTab | "themes", keyof ModuleSettings>> = {
+    flavours: "flavour",
+    weights: "weight",
+  };
+  const visibleTabBar = tabBar.filter((tab) => {
+    const mod = moduleForTab[tab.id];
+    return mod ? modules[mod] : true;
+  });
 
   const items = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -203,7 +235,7 @@ export function CatalogAdminPage() {
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
-          {tabBar.map((tab) => {
+          {visibleTabBar.map((tab) => {
             const isThemes = tab.id === "themes";
             const active = isThemes ? showThemes : !showThemes && activeTab === tab.id;
             return (

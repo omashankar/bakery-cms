@@ -1,17 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProductVariantGroup, ProductVariantGroupType } from "@/types/product";
+import type { ModuleSettings } from "@/types/settings";
 import { formatCurrency } from "@/utils/format";
 import {
   createDefaultVariantGroups,
   createVariantGroup,
   createVariantOption,
 } from "@/features/products/lib/variant-utils";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { AdminSelect } from "./admin-field";
 
 interface ProductVariantManagerProps {
@@ -27,6 +34,18 @@ const groupTypeLabels: Record<ProductVariantGroupType, string> = {
 };
 
 export function ProductVariantManager({ groups, basePrice, onChange }: ProductVariantManagerProps) {
+  // Egg / photo variant presets are bakery modules — hide those type options when
+  // the module is off, but never for a group that already uses the type (so a
+  // product's existing variant data stays fully editable).
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
   function updateGroup(groupId: string, patch: Partial<ProductVariantGroup>) {
     onChange(groups.map((group) => (group.id === groupId ? { ...group, ...patch } : group)));
   }
@@ -121,8 +140,7 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
         <div>
           <p className="text-sm font-medium">Variant groups</p>
           <p className="text-xs text-muted-foreground">
-            Configure eggless, photo cake, and custom options with price adjustments on top of
-            weight pricing.
+            Add option groups with price adjustments on top of the base price.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -162,8 +180,12 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                       })
                     }
                   >
-                    <option value="egg">Egg preference</option>
-                    <option value="photo">Photo cake</option>
+                    {modules.eggEggless || group.type === "egg" ? (
+                      <option value="egg">Egg preference</option>
+                    ) : null}
+                    {modules.photoCake || group.type === "photo" ? (
+                      <option value="photo">Photo cake</option>
+                    ) : null}
                     <option value="custom">Custom</option>
                   </AdminSelect>
                 </div>

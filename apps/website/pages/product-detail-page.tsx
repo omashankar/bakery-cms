@@ -41,6 +41,12 @@ import {
   formatVariantSummary,
 } from "@/apps/website/lib/product-pricing";
 import { getDefaultVariantSelections } from "@/features/products/lib/variant-utils";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
@@ -106,6 +112,16 @@ export function ProductDetailPage({
     setMounted(true);
   }, []);
 
+  // Optional bakery modules gate the bakery-specific choosers below. Default ON so
+  // SSR / the bakery template render exactly as before; re-read on the client.
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
   const weightPrice =
     cake.weights?.[selectedWeight]?.price ?? cake.price + (weight?.modifier ?? 0);
@@ -138,10 +154,18 @@ export function ProductDetailPage({
     cake.isEggless ||
     cake.category.toLowerCase().includes("eggless");
   const showPhotoUpload =
-    cake.allowsPhotoUpload === true ||
-    cake.category.toLowerCase().includes("photo") ||
-    selectedPhotoOption?.semantic === "photo-print";
+    (cake.allowsPhotoUpload === true ||
+      cake.category.toLowerCase().includes("photo") ||
+      selectedPhotoOption?.semantic === "photo-print") &&
+    modules.photoCake;
   const isOutOfStock = cake.inStock === false;
+  // Hide the egg / photo variant choosers when their module is off (the group
+  // stays in the data + pricing — only the on-page picker is hidden).
+  const visibleVariantGroups = variantGroups.filter(
+    (group) =>
+      (group.type !== "egg" || modules.eggEggless) &&
+      (group.type !== "photo" || modules.photoCake)
+  );
 
   useEffect(() => {
     const slots = getDeliveryTimeSlots();
@@ -270,11 +294,13 @@ export function ProductDetailPage({
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="accent">{cake.category}</Badge>
-                  {isEggless ? (
-                    <Badge variant="outline" className="gap-1">
-                      <Leaf className="size-3" />
-                      Eggless
-                    </Badge>
+                  {modules.eggEggless && isEggless ? (
+                    <span className="contents" data-gate-egg>
+                      <Badge variant="outline" className="gap-1">
+                        <Leaf className="size-3" />
+                        Eggless
+                      </Badge>
+                    </span>
                   ) : null}
                   {cake.badge ? <Badge variant="gold">{cake.badge}</Badge> : null}
                 </div>
@@ -308,73 +334,90 @@ export function ProductDetailPage({
               </div>
 
               {/* Only offered when this cake actually comes in several flavours. */}
-              {flavourOptions.length > 0 ? (
-                <OptionGroup label="Flavour">
-                  <div className="flex flex-wrap gap-2">
-                    {flavourOptions.map((flavour) => (
-                      <OptionButton
-                        key={flavour}
-                        active={selectedFlavour === flavour}
-                        onClick={() => setSelectedFlavour(flavour)}
-                      >
-                        {flavour}
-                      </OptionButton>
-                    ))}
-                  </div>
-                </OptionGroup>
+              {modules.flavour && flavourOptions.length > 0 ? (
+                <div className="contents" data-gate-flavour>
+                  <OptionGroup label="Flavour">
+                    <div className="flex flex-wrap gap-2">
+                      {flavourOptions.map((flavour) => (
+                        <OptionButton
+                          key={flavour}
+                          active={selectedFlavour === flavour}
+                          onClick={() => setSelectedFlavour(flavour)}
+                        >
+                          {flavour}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </OptionGroup>
+                </div>
               ) : null}
 
-              <OptionGroup label="Weight">
-                <div className="flex flex-wrap gap-2">
-                  {weightOptions.map((option, index) => (
-                    <OptionButton
-                      key={option.label}
-                      active={selectedWeight === index}
-                      onClick={() => setSelectedWeight(index)}
-                    >
-                      {option.label}
-                    </OptionButton>
-                  ))}
+              {modules.weight ? (
+                <div className="contents" data-gate-weight>
+                  <OptionGroup label="Weight">
+                    <div className="flex flex-wrap gap-2">
+                      {weightOptions.map((option, index) => (
+                        <OptionButton
+                          key={option.label}
+                          active={selectedWeight === index}
+                          onClick={() => setSelectedWeight(index)}
+                        >
+                          {option.label}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </OptionGroup>
                 </div>
-              </OptionGroup>
+              ) : null}
 
-              {variantGroups.map((group) => (
-                <OptionGroup key={group.id} label={group.name}>
-                  <div className="flex flex-wrap gap-2">
-                    {group.options.map((option) => (
-                      <OptionButton
-                        key={option.id}
-                        active={variantSelections[group.id] === option.id}
-                        onClick={() =>
-                          setVariantSelections((current) => ({
-                            ...current,
-                            [group.id]: option.id,
-                          }))
-                        }
-                      >
-                        {option.label}
-                        {option.priceAdjustment !== 0
-                          ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
-                          : ""}
-                      </OptionButton>
-                    ))}
-                  </div>
-                </OptionGroup>
+              {visibleVariantGroups.map((group) => (
+                <div
+                  key={group.id}
+                  className="contents"
+                  data-gate-egg={group.type === "egg" ? "" : undefined}
+                  data-gate-photo={group.type === "photo" ? "" : undefined}
+                >
+                  <OptionGroup label={group.name}>
+                    <div className="flex flex-wrap gap-2">
+                      {group.options.map((option) => (
+                        <OptionButton
+                          key={option.id}
+                          active={variantSelections[group.id] === option.id}
+                          onClick={() =>
+                            setVariantSelections((current) => ({
+                              ...current,
+                              [group.id]: option.id,
+                            }))
+                          }
+                        >
+                          {option.label}
+                          {option.priceAdjustment !== 0
+                            ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
+                            : ""}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </OptionGroup>
+                </div>
               ))}
 
-              <OptionGroup label="Shape">
-                <div className="flex flex-wrap gap-2">
-                  {shapeOptions.map((shape) => (
-                    <OptionButton
-                      key={shape}
-                      active={selectedShape === shape}
-                      onClick={() => setSelectedShape(shape)}
-                    >
-                      {shape}
-                    </OptionButton>
-                  ))}
+              {modules.shape ? (
+                <div className="contents" data-gate-shape>
+                  <OptionGroup label="Shape">
+                    <div className="flex flex-wrap gap-2">
+                      {shapeOptions.map((shape) => (
+                        <OptionButton
+                          key={shape}
+                          active={selectedShape === shape}
+                          onClick={() => setSelectedShape(shape)}
+                        >
+                          {shape}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </OptionGroup>
                 </div>
-              </OptionGroup>
+              ) : null}
 
               {cake.allowsMessage !== false ? (
                 <div className="space-y-2">
@@ -390,7 +433,7 @@ export function ProductDetailPage({
               ) : null}
 
               {showPhotoUpload ? (
-                <div className="space-y-2">
+                <div className="space-y-2" data-gate-photo>
                   <Label htmlFor="photo-upload">Upload photo (photo cakes)</Label>
                   <Input
                     id="photo-upload"
@@ -484,10 +527,12 @@ export function ProductDetailPage({
                   <Truck className="size-4 text-bakery-700" />
                   Same-day delivery
                 </li>
-                <li className="flex items-center gap-2">
-                  <Leaf className="size-4 text-bakery-700" />
-                  Eggless available
-                </li>
+                {modules.eggEggless ? (
+                  <li className="flex items-center gap-2" data-gate-egg>
+                    <Leaf className="size-4 text-bakery-700" />
+                    Eggless available
+                  </li>
+                ) : null}
               </ul>
 
               <Tabs defaultValue="description">

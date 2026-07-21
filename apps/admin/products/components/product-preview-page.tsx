@@ -14,6 +14,12 @@ import { formatCurrency, formatDate } from "@/utils/format";
 import { adminCategories, adminFlavours, adminOccasions } from "@/features/products/lib/catalog-options";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getProductById } from "@/features/products/lib/products-repository";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 
 interface ProductPreviewPageProps {
@@ -23,6 +29,7 @@ interface ProductPreviewPageProps {
 export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   const router = useRouter();
   const [cake, setCake] = useState<Product | null>(null);
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
 
   useEffect(() => {
     const found = getProductById(cakeId);
@@ -33,6 +40,13 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
     setCake(found);
   }, [cakeId, router]);
 
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
   if (!cake) {
     return (
       <div className="flex min-h-64 items-center justify-center">
@@ -42,7 +56,9 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   }
 
   const category = adminCategories().find((item) => item.id === cake.categoryId)?.name ?? "—";
-  const flavour = adminFlavours().find((item) => item.id === cake.flavourId)?.name;
+  const flavour = modules.flavour
+    ? adminFlavours().find((item) => item.id === cake.flavourId)?.name
+    : undefined;
   const occasions = adminOccasions()
     .filter((item) => cake.occasionIds.includes(item.id))
     .map((item) => item.name)

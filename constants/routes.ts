@@ -103,6 +103,7 @@ export const routes = {
     settings: {
       overview: "/admin/settings",
       general: "/admin/settings/general",
+      modules: "/admin/settings/modules",
       contact: "/admin/settings/contact",
       social: "/admin/settings/social",
       security: "/admin/settings/security",

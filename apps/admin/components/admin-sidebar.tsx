@@ -62,6 +62,12 @@ import {
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
 import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
+import {
+  getGeneralSettings,
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { cn } from "@/lib/utils";
 import { adminShell } from "./admin-shell";
 
@@ -234,6 +240,7 @@ function NavItem({
   inquiryBadge,
   inventoryBadge,
   notificationBadge,
+  iconOverride,
 }: {
   item: AdminNavItem;
   collapsed: boolean;
@@ -243,8 +250,9 @@ function NavItem({
   inquiryBadge?: number;
   inventoryBadge?: number;
   notificationBadge?: number;
+  iconOverride?: LucideIcon;
 }) {
-  const Icon = iconMap[item.icon] ?? LayoutDashboard;
+  const Icon = iconOverride ?? iconMap[item.icon] ?? LayoutDashboard;
   const { pathname, parentActive } = useNavActiveState(item);
   const hasChildren = Boolean(item.children?.length);
   const showBadge = inquiryBadge && inquiryBadge > 0 && item.icon === "MessageSquare";
@@ -400,6 +408,9 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   const [inquiryBadge, setInquiryBadge] = useState(0);
   const [inventoryBadge, setInventoryBadge] = useState(0);
   const [notificationBadge, setNotificationBadge] = useState(0);
+  // Wedding Builder is bakery-only: hidden for other business types or when the
+  // module is off. Hidden from the sidebar only — the route/page still exist.
+  const [hideWedding, setHideWedding] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(() => findOpenMenuHref(pathname));
 
   useEffect(() => {
@@ -410,20 +421,44 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       setNotificationBadge(countUnreadNotifications());
     }
 
+    function refreshModules() {
+      const isBakery = getGeneralSettings().businessType === "bakery";
+      setHideWedding(!isBakery || !getModuleSettings().weddingBuilder);
+    }
+
     refreshBadges();
+    refreshModules();
 
     window.addEventListener(INVENTORY_UPDATED_EVENT, refreshBadges);
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshBadges);
     window.addEventListener(INQUIRIES_UPDATED_EVENT, refreshBadges);
     window.addEventListener("bakery-orders-updated", refreshBadges);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
 
     return () => {
       window.removeEventListener(INVENTORY_UPDATED_EVENT, refreshBadges);
       window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshBadges);
       window.removeEventListener(INQUIRIES_UPDATED_EVENT, refreshBadges);
       window.removeEventListener("bakery-orders-updated", refreshBadges);
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
     };
   }, []);
+
+  const labels = useBusinessLabels();
+  const navSections = useMemo(() => {
+    return adminNavSections.map((section) => ({
+      ...section,
+      items: section.items
+        .filter((item) => !hideWedding || item.href !== routes.admin.builders.wedding)
+        // Relabel the "Cakes" catalog item for the current business type — the
+        // route/component stay named "cakes"; only the visible label changes.
+        .map((item) =>
+          item.href === routes.admin.cakes.list
+            ? { ...item, label: labels.productWordPlural }
+            : item
+        ),
+    }));
+  }, [hideWedding, labels]);
 
   useEffect(() => {
     setOpenMenu(findOpenMenuHref(pathname));
@@ -461,7 +496,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
         )}
         aria-label="Admin navigation"
       >
-        {adminNavSections.map((section, sectionIndex) => (
+        {navSections.map((section, sectionIndex) => (
           <div
             key={section.title || "root"}
             className={cn("w-full", sectionIndex > 0 && !collapsed ? "mt-4" : "")}
@@ -491,6 +526,9 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
                   }
                   notificationBadge={
                     item.href.includes("/commerce/notifications") ? notificationBadge : undefined
+                  }
+                  iconOverride={
+                    item.href === routes.admin.cakes.list ? labels.productIcon : undefined
                   }
                 />
               ))}

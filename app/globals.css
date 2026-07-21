@@ -442,3 +442,20 @@ html.dark {
     background: #fff !important;
   }
 }
+
+/*
+ * Business-type / module gating — pre-paint hide.
+ * The BusinessBlockingScript stamps data-* flags on <html> before first paint;
+ * these rules hide any element marked with the matching data-gate-* attribute,
+ * so non-bakery / module-off UI never flashes. Bakery sets no flags → all shown.
+ * The React components still gate in JS (final DOM + interactivity); this only
+ * removes the pre-hydration flash.
+ */
+html[data-wed="0"] [data-gate-wedding],
+html[data-mod-flavour="0"] [data-gate-flavour],
+html[data-mod-egg="0"] [data-gate-egg],
+html[data-mod-weight="0"] [data-gate-weight],
+html[data-mod-shape="0"] [data-gate-shape],
+html[data-mod-photo="0"] [data-gate-photo] {
+  display: none !important;
+}

@@ -13,14 +13,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 
-const POPULAR_SEARCHES = [
-  "Chocolate",
-  "Wedding",
-  "Red Velvet",
-  "Eggless",
-  "Photo Cake",
-  "Butterscotch",
+// `requires` chips only show when that bakery module (or wedding) is enabled.
+const POPULAR_SEARCHES: Array<{
+  term: string;
+  requires?: "wedding" | "eggEggless" | "photoCake";
+}> = [
+  { term: "Chocolate" },
+  { term: "Wedding", requires: "wedding" },
+  { term: "Red Velvet" },
+  { term: "Eggless", requires: "eggEggless" },
+  { term: "Photo Cake", requires: "photoCake" },
+  { term: "Butterscotch" },
 ];
 
 interface SearchPageProps {
@@ -37,6 +48,26 @@ export function SearchPage({ catalog }: SearchPageProps) {
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  // Hide module-specific quick-search chips when the module / wedding is off.
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  useEffect(() => {
+    const sync = () => {
+      setWeddingEnabled(isStorefrontWeddingEnabled());
+      setModules(getModuleSettings());
+    };
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  const popularSearches = POPULAR_SEARCHES.filter((item) => {
+    if (item.requires === "wedding") return weddingEnabled;
+    if (item.requires === "eggEggless") return modules.eggEggless;
+    if (item.requires === "photoCake") return modules.photoCake;
+    return true;
+  });
 
   // Searching stays on the client (it is interactive); the catalogue it searches
   // now arrives from the server, so the first paint already shows results.
@@ -84,14 +115,17 @@ export function SearchPage({ catalog }: SearchPageProps) {
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Popular:</span>
-              {POPULAR_SEARCHES.map((term) => (
+              {popularSearches.map((item) => (
                 <button
-                  key={term}
+                  key={item.term}
                   type="button"
-                  onClick={() => runSearch(term)}
+                  onClick={() => runSearch(item.term)}
+                  data-gate-wedding={item.requires === "wedding" ? "" : undefined}
+                  data-gate-egg={item.requires === "eggEggless" ? "" : undefined}
+                  data-gate-photo={item.requires === "photoCake" ? "" : undefined}
                   className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                 >
-                  {term}
+                  {item.term}
                 </button>
               ))}
             </div>

@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import {
+  isWeddingEnabled,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
 import { InquiriesListPage } from "./inquiries-list-page";
 import { NewsletterSubscribersPage } from "./newsletter-subscribers-page";
 import { cn } from "@/lib/utils";
@@ -18,6 +22,22 @@ const TABS: { id: InquiryTab; label: string }[] = [
 /** Inquiries hub — in-page tabs replace the old sidebar submenu. */
 export function InquiriesHubPage() {
   const [tab, setTab] = useState<InquiryTab>("all");
+  // Wedding is bakery-only — hide that tab for other business types / module off.
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
+
+  useEffect(() => {
+    const sync = () => {
+      const on = isWeddingEnabled();
+      setWeddingEnabled(on);
+      // If wedding was the active tab and it just got hidden, fall back to All.
+      if (!on) setTab((current) => (current === "wedding" ? "all" : current));
+    };
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  const tabs = weddingEnabled ? TABS : TABS.filter((t) => t.id !== "wedding");
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
@@ -29,7 +49,7 @@ export function InquiriesHubPage() {
       {/* Tabs */}
       <div className="-mx-1 overflow-x-auto px-1">
         <div className="flex w-max min-w-full gap-1 border-b border-border">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = tab === t.id;
             return (
               <button
