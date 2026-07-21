@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { GeneralSettings } from "@/types/settings";
 import {
+  businessTypeOptions,
   currencyOptions,
   defaultGeneralSettings,
   timezoneOptions,
@@ -57,8 +58,11 @@ export function GeneralSettingsPage() {
       title="General"
       description={
         mounted
-          ? `${settings.siteName} · ${settings.currency} · ${settings.timezone}`
-          : "Site identity, branding, timezone, and currency."
+          ? `${settings.siteName} · ${
+              businessTypeOptions.find((o) => o.value === settings.businessType)?.label ??
+              settings.businessType
+            } · ${settings.currency}`
+          : "Site identity, business type, branding, timezone, and currency."
       }
       isDirty={isDirty}
       mounted={mounted}
@@ -107,9 +111,31 @@ export function GeneralSettingsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Branding &amp; locale</CardTitle>
-            <CardDescription>Logo paths and regional defaults.</CardDescription>
+            <CardDescription>Business type, logo paths, and regional defaults.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessType">Business type</Label>
+              <AdminSelect
+                id="businessType"
+                value={settings.businessType}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    businessType: e.target.value as GeneralSettings["businessType"],
+                  }))
+                }
+              >
+                {businessTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </AdminSelect>
+              <p className="text-xs text-muted-foreground">
+                Controls public labels and which optional modules appear. Bakery keeps every feature on.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="logo">Logo URL</Label>
               <Input

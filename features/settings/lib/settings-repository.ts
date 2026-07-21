@@ -6,6 +6,7 @@ import type {
   ContactSettings,
   GeneralSettings,
   MaintenanceSettings,
+  ModuleSettings,
   SecuritySettings,
   SmtpSettings,
   SocialLinkSettings,
@@ -18,6 +19,7 @@ import {
   defaultContactSettings,
   defaultGeneralSettings,
   defaultMaintenanceSettings,
+  defaultModuleSettings,
   defaultSecuritySettings,
   defaultSmtpSettings,
   defaultSocialLinks,
@@ -136,6 +138,20 @@ export function getCommerceSettings(): CommerceSettings {
   return loadSettings().commerce;
 }
 
+export function getModuleSettings(): ModuleSettings {
+  return loadSettings().modules;
+}
+
+/**
+ * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
+ * bakery-only and gated by the wedding module. Shared by admin + storefront so
+ * every surface hides wedding consistently.
+ */
+export function isWeddingEnabled(): boolean {
+  const settings = loadSettings();
+  return settings.general.businessType === "bakery" && settings.modules.weddingBuilder;
+}
+
 export function getActivityLog(): ActivityLog[] {
   return loadSettings().activity;
 }
@@ -218,6 +234,15 @@ export function saveCommerceSettings(commerce: CommerceSettings): CommerceSettin
   return saved.commerce;
 }
 
+export function saveModuleSettings(modules: ModuleSettings): ModuleSettings {
+  const saved = updateStore({ modules }, {
+    action: "updated",
+    entity: "settings",
+    details: "Module settings saved",
+  });
+  return saved.modules;
+}
+
 export function clearActivityLog(): ActivityLog[] {
   const saved = updateStore({ activity: [] }, {
     action: "cleared",
@@ -262,6 +287,10 @@ export function resetCommerceSettings(): CommerceSettings {
     paymentMethods: { ...defaultCommerceSettings.paymentMethods },
     deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
   });
+}
+
+export function resetModuleSettings(): ModuleSettings {
+  return saveModuleSettings({ ...defaultModuleSettings });
 }
 
 export function exportLocalStorageBackup(): Record<string, string | null> {

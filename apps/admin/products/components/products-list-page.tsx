@@ -5,7 +5,6 @@ import { SafeImage } from "@/components/shared/safe-image";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Cake,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -50,6 +49,13 @@ import {
   formatStatusLabel,
   type ProductListFilters,
 } from "@/features/products/lib/product-utils";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect } from "./admin-field";
 import { DeleteProductDialog } from "./delete-product-dialog";
 
@@ -112,6 +118,10 @@ export function ProductsListPage() {
   const [mounted, setMounted] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cakes, setCakes] = useState<CakeEntity[]>([]);
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  const labels = useBusinessLabels();
+  const productLower = labels.productWord.toLowerCase();
+  const productsLower = labels.productWordPlural.toLowerCase();
   const [filters, setFilters] = useState<ProductListFilters>(defaultProductListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -134,6 +144,13 @@ export function ProductsListPage() {
 
   useEffect(() => {
     void refresh();
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
   const filtered = useMemo(() => filterProducts(cakes, filters), [cakes, filters]);
@@ -227,8 +244,8 @@ export function ProductsListPage() {
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
-        title="Cakes"
-        description="Manage your cake catalog"
+        title={labels.productWordPlural}
+        description={`Manage your ${productLower} catalog`}
         className="gap-3"
         actions={
           <Button
@@ -238,7 +255,7 @@ export function ProductsListPage() {
           >
             <Plus className="size-4" />
             <span className="sm:hidden">Add</span>
-            <span className="hidden sm:inline">Add Cake</span>
+            <span className="hidden sm:inline">Add {labels.productWord}</span>
           </Button>
         }
       />
@@ -266,9 +283,9 @@ export function ProductsListPage() {
           <DashboardStatCard
             title="Total"
             value={stats.total}
-            change="All cakes"
+            change={`All ${productsLower}`}
             changeTone="neutral"
-            icon={Cake}
+            icon={labels.productIcon}
             tone="bakery"
           />
         </button>
@@ -388,8 +405,8 @@ export function ProductsListPage() {
               aria-label="Product type"
             >
               <option value="all">All types</option>
-              <option value="eggless">Eggless</option>
-              <option value="photo">Photo</option>
+              {modules.eggEggless ? <option value="eggless">Eggless</option> : null}
+              {modules.photoCake ? <option value="photo">Photo</option> : null}
               <option value="seasonal">Seasonal</option>
             </AdminSelect>
             <AdminSelect
@@ -411,13 +428,13 @@ export function ProductsListPage() {
 
       {filtered.length === 0 ? (
         <EmptyState
-          icon={Cake}
-          title="No cakes found"
-          description="Try another filter, or add your first cake."
+          icon={labels.productIcon}
+          title={`No ${productsLower} found`}
+          description={`Try another filter, or add your first ${productLower}.`}
           action={
             <Button variant="bakery" render={<Link href={routes.admin.cakes.add} />}>
               <Plus className="size-4" />
-              Add Cake
+              Add {labels.productWord}
             </Button>
           }
         />
@@ -461,7 +478,7 @@ export function ProductsListPage() {
                       aria-label="Select all on page"
                     />
                   </th>
-                  <th className="px-4 py-3 font-medium">Cake</th>
+                  <th className="px-4 py-3 font-medium">{labels.productWord}</th>
                   <th className="px-4 py-3 font-medium">Category</th>
                   <th className="px-4 py-3 font-medium">Price</th>
                   <th className="px-4 py-3 font-medium">Stock</th>
@@ -514,7 +531,7 @@ export function ProductsListPage() {
                                 Best Seller
                               </Badge>
                             ) : null}
-                            {cake.isEggless ? (
+                            {modules.eggEggless && cake.isEggless ? (
                               <Badge variant="outline" className="text-[10px]">
                                 Eggless
                               </Badge>

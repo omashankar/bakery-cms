@@ -171,6 +171,7 @@ export function StorefrontNavbar() {
               <Link
                 key={item.id}
                 href={item.href}
+                data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
                 className={cn(
                   "rounded-lg px-3 py-2 text-sm font-medium transition-premium",
                   isActive
@@ -278,6 +279,7 @@ export function StorefrontNavbar() {
                   key={item.id}
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
+                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
                   className={cn(
                     "rounded-lg px-3 py-2.5 text-sm font-medium",
                     isActive ? "bg-cream-100 text-bakery-700" : "hover:bg-cream-100"

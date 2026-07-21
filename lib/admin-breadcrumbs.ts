@@ -32,6 +32,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   appearance: "Appearance",
   settings: "Settings",
   general: "General",
+  modules: "Modules",
   social: "Social",
   security: "Security",
   smtp: "SMTP",

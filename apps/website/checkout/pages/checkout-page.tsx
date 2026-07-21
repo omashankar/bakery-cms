@@ -619,7 +619,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                 <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
                   <h2 className="font-heading text-lg font-semibold">Delivery details</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Where should we deliver your cakes?
+                    Where should we deliver your order?
                   </p>
 
                   <form

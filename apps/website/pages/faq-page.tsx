@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, HelpCircle, Mail, MessageCircle, Phone, Search } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs } from "@/features/content/lib/storefront-content";
-import { getStorefrontContactInfo } from "@/apps/website/lib/settings";
+import { getStorefrontContactInfo, isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import type { FaqCategory } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,22 @@ export function FaqPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
   const contactInfo = getStorefrontContactInfo();
+  // "Wedding" is a bakery-only FAQ category — hide that pill when wedding is off.
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
+  useEffect(() => {
+    const sync = () => {
+      const on = isStorefrontWeddingEnabled();
+      setWeddingEnabled(on);
+      if (!on) setCategory((current) => (current === "wedding" ? "all" : current));
+    };
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  const categories = weddingEnabled
+    ? faqCategories
+    : faqCategories.filter((item) => item.value !== "wedding");
 
   const categoryFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -71,10 +88,11 @@ export function FaqPage() {
               </div>
 
               <div className="mb-8 flex flex-wrap gap-2">
-                {faqCategories.map((item) => (
+                {categories.map((item) => (
                   <button
                     key={item.value}
                     type="button"
+                    data-gate-wedding={item.value === "wedding" ? "" : undefined}
                     onClick={() => setCategory(item.value)}
                     className={cn(
                       "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",

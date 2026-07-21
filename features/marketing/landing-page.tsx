@@ -24,6 +24,7 @@ import { WeddingMockup } from "./components/wedding-mockup";
 import {
   adminModules,
   builderCapabilities,
+  businessTypes,
   commerceFeatures,
   ctaLinks,
   customerJourney,
@@ -168,9 +169,35 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
+        {/* SECTION 3.5 — Any Business (business types)                  */}
+        {/* ============================================================ */}
+        <Section id="business-types" className="bg-background">
+          <Container>
+            <ScrollReveal>
+              <SectionHeading
+                eyebrow="Any Business"
+                title="One CMS, built for every business"
+                description="Bakery is the default template — but switch your Business Type in Settings and the entire storefront, labels, icons, and optional modules adapt instantly. One codebase, any business — no redesign."
+              />
+            </ScrollReveal>
+            <StaggerReveal className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {businessTypes.map((b) => (
+                <div
+                  key={b.name}
+                  className="group flex items-center gap-3.5 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#D4A373]/60 hover:shadow-md"
+                >
+                  <IconTile icon={b.icon} className="size-11 rounded-xl [&_svg]:size-5" />
+                  <span className="font-heading text-base font-semibold">{b.name}</span>
+                </div>
+              ))}
+            </StaggerReveal>
+          </Container>
+        </Section>
+
+        {/* ============================================================ */}
         {/* SECTION 4 — Customer Journey                                 */}
         {/* ============================================================ */}
-        <Section id="journey" className="bg-background">
+        <Section id="journey" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -202,7 +229,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 5 — Admin Dashboard Modules                          */}
         {/* ============================================================ */}
-        <Section id="modules" className="bg-white">
+        <Section id="modules" className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -236,7 +263,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 6 — Commerce Features                                */}
         {/* ============================================================ */}
-        <Section id="commerce" className="bg-background">
+        <Section id="commerce" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -265,7 +292,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 7 — Website Builder                                  */}
         {/* ============================================================ */}
-        <Section className="bg-white">
+        <Section className="bg-background">
           <Container>
             <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
               <ScrollReveal className="order-2 min-w-0 lg:order-1">
@@ -304,7 +331,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 8 — Wedding Builder                                  */}
         {/* ============================================================ */}
-        <Section className="bg-background">
+        <Section className="bg-white">
           <Container>
             <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
               <ScrollReveal className="flex flex-col gap-6">
@@ -342,7 +369,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 9 — Payment System                                   */}
         {/* ============================================================ */}
-        <Section id="payments" className="bg-white">
+        <Section id="payments" className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -371,7 +398,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 10 — Reports & Analytics                             */}
         {/* ============================================================ */}
-        <Section id="analytics" className="bg-background">
+        <Section id="analytics" className="bg-white">
           <Container>
             <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
               <ScrollReveal className="flex flex-col gap-6">
@@ -405,7 +432,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 11 — Why Choose Bakery CMS                           */}
         {/* ============================================================ */}
-        <Section className="bg-white">
+        <Section className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -434,7 +461,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 12 — Technology                                      */}
         {/* ============================================================ */}
-        <Section className="bg-background !py-16">
+        <Section className="bg-white !py-16">
           <Container>
             <ScrollReveal className="flex flex-col items-center gap-8 text-center">
               <div className="flex flex-col items-center gap-3">
@@ -461,7 +488,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 13 — Roadmap                                         */}
         {/* ============================================================ */}
-        <Section id="roadmap" className="bg-white">
+        <Section id="roadmap" className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -512,7 +539,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 14 — FAQ                                             */}
         {/* ============================================================ */}
-        <Section id="faq" className="bg-background">
+        <Section id="faq" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -530,7 +557,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 15 — Call To Action                                  */}
         {/* ============================================================ */}
-        <Section className="bg-white">
+        <Section className="bg-background">
           <Container>
             <ScrollReveal>
               <div className="relative overflow-hidden rounded-[2rem] bg-primary px-6 py-16 text-center shadow-[0_30px_70px_-30px_rgba(74,51,36,0.6)] md:px-16 md:py-20">

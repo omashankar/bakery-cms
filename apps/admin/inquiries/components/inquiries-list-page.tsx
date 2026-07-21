@@ -32,6 +32,10 @@ import {
   loadInquiries,
 } from "@/features/inquiries/lib/inquiries-repository";
 import {
+  isWeddingEnabled,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import {
   countInquiriesByStatus,
   defaultInquiryFilters,
   filterInquiries,
@@ -60,6 +64,7 @@ export function InquiriesListPage({
 }: InquiriesListPageProps) {
   const [mounted, setMounted] = useState(false);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
   const [filters, setFilters] = useState<InquiryListFilters>({
     ...defaultInquiryFilters,
     type: fixedType ?? "all",
@@ -87,6 +92,13 @@ export function InquiriesListPage({
     window.addEventListener(INQUIRIES_UPDATED_EVENT, refreshList);
     return () => window.removeEventListener(INQUIRIES_UPDATED_EVENT, refreshList);
   }, [fixedType]);
+
+  useEffect(() => {
+    const sync = () => setWeddingEnabled(isWeddingEnabled());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
 
   function refresh() {
     const loaded = loadInquiries().filter((item) => {
@@ -243,7 +255,7 @@ export function InquiriesListPage({
                 aria-label="Inquiry type"
               >
                 <option value="all">All types</option>
-                <option value="wedding">Wedding</option>
+                {weddingEnabled ? <option value="wedding">Wedding</option> : null}
                 <option value="contact">Contact</option>
               </AdminSelect>
             ) : null}

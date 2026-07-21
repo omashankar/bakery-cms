@@ -2,16 +2,39 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { shopMegaMenu } from "@/constants/storefront-nav";
+import { shopMegaMenu, type MegaMenuLink } from "@/constants/storefront-nav";
 import { routes } from "@/constants/routes";
+import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import { cn } from "@/lib/utils";
+
+/**
+ * Wedding Cakes is bakery-only. Defaults to enabled so SSR/first paint matches
+ * the bakery template, then drops wedding links after mount for other business
+ * types (settings live in client localStorage).
+ */
+function useWeddingLinkFilter() {
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
+  useEffect(() => {
+    const sync = () => setWeddingEnabled(isStorefrontWeddingEnabled());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+  return (items: MegaMenuLink[]) =>
+    weddingEnabled ? items : items.filter((item) => item.href !== routes.store.weddingCakes);
+}
 
 interface MegaMenuProps {
   isActive?: boolean;
 }
 
 export function MegaMenu({ isActive }: MegaMenuProps) {
+  const filterWedding = useWeddingLinkFilter();
+  const categories = filterWedding(shopMegaMenu.categories);
+  const occasions = filterWedding(shopMegaMenu.occasions);
   return (
     <div className="group relative">
       <Link
@@ -35,7 +58,7 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
                 Shop by Category
               </p>
               <ul className="space-y-2">
-                {shopMegaMenu.categories.map((item) => (
+                {categories.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
@@ -52,7 +75,7 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
                 Shop by Occasion
               </p>
               <ul className="space-y-2">
-                {shopMegaMenu.occasions.map((item) => (
+                {occasions.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
@@ -92,12 +115,13 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
 }
 
 export function MobileShopLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const filterWedding = useWeddingLinkFilter();
   return (
     <div className="space-y-1 border-t border-border pt-3">
       <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Shop
       </p>
-      {shopMegaMenu.categories.map((item) => (
+      {filterWedding(shopMegaMenu.categories).map((item) => (
         <Link
           key={item.href}
           href={item.href}

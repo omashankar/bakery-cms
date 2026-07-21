@@ -1,6 +1,7 @@
 /** Settings feature module — Phase 19+ */
 export { SettingsOverviewPage } from "./components/settings-overview-page";
 export { GeneralSettingsPage } from "./components/general-settings-page";
+export { ModulesSettingsPage } from "./components/modules-settings-page";
 export { ContactSettingsPage } from "./components/contact-settings-page";
 export { SocialSettingsPage } from "./components/social-settings-page";
 export { SecuritySettingsPage } from "./components/security-settings-page";
@@ -26,6 +27,8 @@ export {
   getMaintenanceSettings,
   getCommerceSettings,
   saveCommerceSettings,
+  getModuleSettings,
+  saveModuleSettings,
   resetGeneralSettings,
   resetContactSettings,
   resetSocialLinks,
@@ -34,6 +37,7 @@ export {
   resetAnalyticsSettings,
   resetMaintenanceSettings,
   resetCommerceSettings,
+  resetModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 export {

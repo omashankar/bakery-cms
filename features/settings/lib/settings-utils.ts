@@ -8,10 +8,12 @@ import type {
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
+  BusinessTypeOption,
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
   MaintenanceSettings,
+  ModuleSettings,
   SecuritySettings,
   SmtpSettings,
   SocialLinkSettings,
@@ -35,6 +37,17 @@ export const defaultGeneralSettings: GeneralSettings = {
   favicon: "/favicon.ico",
   timezone: "Asia/Kolkata",
   currency: "INR",
+  businessType: "bakery",
+};
+
+/** Bakery is the default template — every optional module ships ON. */
+export const defaultModuleSettings: ModuleSettings = {
+  weddingBuilder: true,
+  flavour: true,
+  eggEggless: true,
+  weight: true,
+  shape: true,
+  photoCake: true,
 };
 
 export const defaultContactSettings: ContactSettings = {
@@ -178,9 +191,23 @@ export const defaultAppSettings: AppSettings = {
   analytics: defaultAnalyticsSettings,
   maintenance: defaultMaintenanceSettings,
   commerce: defaultCommerceSettings,
+  modules: defaultModuleSettings,
   activity: seedActivityLog,
   updatedAt: nowIso(),
 };
+
+export const businessTypeOptions: BusinessTypeOption[] = [
+  { value: "bakery", label: "Bakery (Default)" },
+  { value: "sweet-shop", label: "Sweet Shop" },
+  { value: "flower-shop", label: "Flower Shop" },
+  { value: "restaurant", label: "Restaurant" },
+  { value: "gift-shop", label: "Gift Shop" },
+  { value: "grocery", label: "Grocery" },
+  { value: "fashion", label: "Fashion" },
+  { value: "electronics", label: "Electronics" },
+  { value: "pharmacy", label: "Pharmacy" },
+  { value: "other", label: "Other" },
+];
 
 export const timezoneOptions = [
   { value: "Asia/Kolkata", label: "Asia/Kolkata (IST)" },
@@ -288,6 +315,7 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
       deliveryTimeSlots:
         partial.commerce?.deliveryTimeSlots ?? defaultCommerceSettings.deliveryTimeSlots,
     },
+    modules: { ...defaultModuleSettings, ...partial.modules },
     activity: partial.activity ?? seedActivityLog,
     updatedAt: partial.updatedAt ?? nowIso(),
   };

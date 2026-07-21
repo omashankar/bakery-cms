@@ -1,5 +1,6 @@
 import { adminNavSections } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
+import { isWeddingEnabled } from "@/features/settings/lib/settings-repository";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { loadCoupons } from "@/features/commerce/lib/coupons-repository";
 import {
@@ -102,8 +103,17 @@ const SETTINGS_ENTRIES: GlobalSearchResult[] = [
     id: "settings-general",
     group: "settings",
     title: "General Settings",
-    subtitle: "Site name and branding",
+    subtitle: "Site name, branding, business type",
     href: routes.admin.settings.general,
+    keywords: ["business type", "brand", "logo", "currency"],
+  },
+  {
+    id: "settings-modules",
+    group: "settings",
+    title: "Modules",
+    subtitle: "Optional features & wedding builder",
+    href: routes.admin.settings.modules,
+    keywords: ["flavour", "weight", "shape", "egg", "eggless", "photo cake", "wedding"],
   },
   {
     id: "settings-contact",
@@ -550,7 +560,12 @@ function searchSettings(text: string, limit: number): GlobalSearchResult[] {
 }
 
 function searchNavigation(text: string, limit: number): GlobalSearchResult[] {
-  return NAVIGATION_ENTRIES.filter((entry) => matchesQuery(entry, text)).slice(0, limit);
+  // Don't surface the Wedding Builder in search when it's hidden from the sidebar.
+  const weddingOn = isWeddingEnabled();
+  return NAVIGATION_ENTRIES.filter(
+    (entry) =>
+      (weddingOn || entry.href !== routes.admin.builders.wedding) && matchesQuery(entry, text)
+  ).slice(0, limit);
 }
 
 function searchActions(text: string, limit: number): GlobalSearchResult[] {

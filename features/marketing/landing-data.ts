@@ -4,6 +4,14 @@ import {
   BellIcon,
   BoxesIcon,
   CakeIcon,
+  CandyIcon,
+  Flower2Icon,
+  GiftIcon,
+  LaptopIcon,
+  PillIcon,
+  ShirtIcon,
+  ShoppingBasketIcon,
+  UtensilsCrossedIcon,
   ClipboardCheckIcon,
   ClockIcon,
   CloudUploadIcon,
@@ -290,11 +298,32 @@ export const roadmap: {
 /* Section 14 — FAQ                                                    */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Business types — one CMS, any business                              */
+/* ------------------------------------------------------------------ */
+
+export const businessTypes: { icon: IconType; name: string }[] = [
+  { icon: CakeIcon, name: "Bakery" },
+  { icon: CandyIcon, name: "Sweet Shop" },
+  { icon: Flower2Icon, name: "Flower Shop" },
+  { icon: UtensilsCrossedIcon, name: "Restaurant" },
+  { icon: GiftIcon, name: "Gift Shop" },
+  { icon: ShoppingBasketIcon, name: "Grocery" },
+  { icon: ShirtIcon, name: "Fashion" },
+  { icon: LaptopIcon, name: "Electronics" },
+  { icon: PillIcon, name: "Pharmacy" },
+];
+
 export const faqs: { question: string; answer: string }[] = [
   {
     question: "What is Bakery CMS?",
     answer:
       "Bakery CMS is an all-in-one platform to run your bakery online — website, orders, inventory, payments, delivery, and marketing, all from a single modern dashboard.",
+  },
+  {
+    question: "Can I use it for a business other than a bakery?",
+    answer:
+      "Yes. Bakery is the default, but you can switch the Business Type in Settings to a Flower Shop, Restaurant, Gift Shop, Grocery, Pharmacy and more — the storefront labels, icons, and optional modules adapt automatically, all from the same platform and one codebase.",
   },
   {
     question: "Do I need any coding or technical skills?",

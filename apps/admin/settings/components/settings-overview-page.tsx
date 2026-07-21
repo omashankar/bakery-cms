@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Blocks,
   ChevronRight,
   Code2,
   CreditCard,
@@ -72,9 +73,15 @@ const groups: SettingsGroup[] = [
     items: [
       {
         title: "General",
-        description: "Store name, logo, timezone, currency, and language.",
+        description: "Store name, logo, timezone, currency, and business type.",
         href: routes.admin.settings.general,
         icon: Settings,
+      },
+      {
+        title: "Modules",
+        description: "Enable optional bakery features — flavour, weight, shape, and wedding builder.",
+        href: routes.admin.settings.modules,
+        icon: Blocks,
       },
       {
         title: "Contact Information",

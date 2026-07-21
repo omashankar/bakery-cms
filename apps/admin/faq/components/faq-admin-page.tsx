@@ -37,6 +37,10 @@ import type { FaqItem } from "@/types/content";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { bulkUpdateFaqStatus, deleteFaqs, loadFaqs } from "@/features/content/lib/faq-repository";
 import {
+  isWeddingEnabled,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import {
   defaultFaqFilters,
   faqCategoryOptions,
   filterFaqs,
@@ -106,6 +110,9 @@ export function FaqAdminPage() {
     ids: string[];
     question?: string;
   } | null>(null);
+  // "Wedding" is a bakery-only FAQ category — swap that stat card for "Archived"
+  // when wedding is off (the category stays in the data model either way).
+  const [weddingEnabled, setWeddingEnabled] = useState(true);
 
   function refresh() {
     setItems(loadFaqs());
@@ -114,6 +121,13 @@ export function FaqAdminPage() {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setWeddingEnabled(isWeddingEnabled());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
   const filtered = useMemo(() => filterFaqs(items, filters), [items, filters]);
@@ -244,20 +258,37 @@ export function FaqAdminPage() {
             tone="gold"
           />
         </button>
-        <button
-          type="button"
-          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ category: "wedding" })}
-        >
-          <DashboardStatCard
-            title="Wedding"
-            value={overview.byCategory.wedding}
-            change="Wedding category"
-            changeTone="neutral"
-            icon={Quote}
-            tone="neutral"
-          />
-        </button>
+        {weddingEnabled ? (
+          <button
+            type="button"
+            className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => updateFilters({ category: "wedding" })}
+          >
+            <DashboardStatCard
+              title="Wedding"
+              value={overview.byCategory.wedding}
+              change="Wedding category"
+              changeTone="neutral"
+              icon={Quote}
+              tone="neutral"
+            />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => updateFilters({ status: "archived" })}
+          >
+            <DashboardStatCard
+              title="Archived"
+              value={overview.archived}
+              change="Hidden from store"
+              changeTone="neutral"
+              icon={Archive}
+              tone="neutral"
+            />
+          </button>
+        )}
       </section>
 
       <FilterPanel>

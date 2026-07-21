@@ -36,6 +36,13 @@ import {
 } from "@/apps/admin/commerce/lib/inventory-utils";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
+import type { ModuleSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import {
+  getModuleSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
 import { MediaPicker } from "./media-picker";
 import { ProductDetailsFields } from "./product-details-fields";
@@ -60,6 +67,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  // Optional bakery modules hide fields from the form UI only — the underlying
+  // form data is never dropped, so a hidden field keeps whatever it had.
+  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  const labels = useBusinessLabels();
+
+  useEffect(() => {
+    const sync = () => setModules(getModuleSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
 
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
@@ -198,7 +216,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     );
   }
 
-  const title = mode === "add" ? "Add Cake" : "Edit Cake";
+  const title = mode === "add" ? `Add ${labels.productWord}` : `Edit ${labels.productWord}`;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5 pb-20 xl:pb-0">
@@ -243,7 +261,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
               <TabsContent value="basic" className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Cake name</Label>
+                  <Label htmlFor="name">{labels.productWord} name</Label>
                   <Input
                     id="name"
                     value={form.name}
@@ -313,38 +331,42 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     />
                   </div>
                 </div>
-                <Separator />
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Weight variants</p>
-                  {form.weights.map((weight, index) => (
-                    <div
-                      key={weight.label}
-                      className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_120px]"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{weight.label}</p>
-                        {weight.serves ? (
-                          <p className="text-xs text-muted-foreground">Serves {weight.serves}</p>
-                        ) : null}
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`weight-${index}`}>Price (INR)</Label>
-                        <Input
-                          id={`weight-${index}`}
-                          type="number"
-                          min={0}
-                          value={weight.price}
-                          onChange={(e) =>
-                            updateWeightPrice(index, Number(e.target.value) || 0)
-                          }
-                        />
-                      </div>
+                {modules.weight ? (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Weight variants</p>
+                      {form.weights.map((weight, index) => (
+                        <div
+                          key={weight.label}
+                          className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_120px]"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{weight.label}</p>
+                            {weight.serves ? (
+                              <p className="text-xs text-muted-foreground">Serves {weight.serves}</p>
+                            ) : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`weight-${index}`}>Price (INR)</Label>
+                            <Input
+                              id={`weight-${index}`}
+                              type="number"
+                              min={0}
+                              value={weight.price}
+                              onChange={(e) =>
+                                updateWeightPrice(index, Number(e.target.value) || 0)
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground">
+                        Weight presets come from Catalog. Edit prices per variant for this product.
+                      </p>
                     </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground">
-                    Weight presets come from Catalog. Edit prices per variant for this product.
-                  </p>
-                </div>
+                  </>
+                ) : null}
               </TabsContent>
 
               <TabsContent value="details" className="space-y-4">
@@ -378,23 +400,25 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       ))}
                     </AdminSelect>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="flavour">Flavour</Label>
-                    <AdminSelect
-                      id="flavour"
-                      value={form.flavourId ?? ""}
-                      onChange={(e) =>
-                        patchForm({ flavourId: e.target.value || undefined })
-                      }
-                    >
-                      <option value="">Select flavour</option>
-                      {adminFlavours().map((flavour) => (
-                        <option key={flavour.id} value={flavour.id}>
-                          {flavour.name}
-                        </option>
-                      ))}
-                    </AdminSelect>
-                  </div>
+                  {modules.flavour ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="flavour">Flavour</Label>
+                      <AdminSelect
+                        id="flavour"
+                        value={form.flavourId ?? ""}
+                        onChange={(e) =>
+                          patchForm({ flavourId: e.target.value || undefined })
+                        }
+                      >
+                        <option value="">Select flavour</option>
+                        {adminFlavours().map((flavour) => (
+                          <option key={flavour.id} value={flavour.id}>
+                            {flavour.name}
+                          </option>
+                        ))}
+                      </AdminSelect>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>Occasions</Label>
@@ -419,27 +443,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
               <TabsContent value="commerce" className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={form.isEggless}
-                      onCheckedChange={(checked) => {
-                        const isEggless = checked === true;
-                        // Move the egg group's default too, so the variant data
-                        // agrees with the toggle. Without this the derived flag
-                        // overwrites the tick on save.
-                        patchForm({
-                          isEggless,
-                          variantGroups: setGroupDefaultBySemantic(
-                            form.variantGroups,
-                            "egg",
-                            "eggless",
-                            isEggless
-                          ),
-                        });
-                      }}
-                    />
-                    Eggless
-                  </label>
+                  {modules.eggEggless ? (
+                    <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                      <Checkbox
+                        checked={form.isEggless}
+                        onCheckedChange={(checked) => {
+                          const isEggless = checked === true;
+                          // Move the egg group's default too, so the variant data
+                          // agrees with the toggle. Without this the derived flag
+                          // overwrites the tick on save.
+                          patchForm({
+                            isEggless,
+                            variantGroups: setGroupDefaultBySemantic(
+                              form.variantGroups,
+                              "egg",
+                              "eggless",
+                              isEggless
+                            ),
+                          });
+                        }}
+                      />
+                      Eggless
+                    </label>
+                  ) : null}
+                  {modules.photoCake ? (
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                     <Checkbox
                       checked={form.isPhotoCake}
@@ -483,6 +510,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     />
                     Photo cake
                   </label>
+                  ) : null}
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                     <Checkbox
                       checked={form.isSeasonal}
@@ -548,42 +576,46 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Available shapes</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {["Round", "Square", "Heart", "Rectangle"].map((shape) => (
-                      <label
-                        key={shape}
-                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={form.shapes.includes(shape)}
-                          onCheckedChange={(checked) =>
-                            toggleShape(shape, checked === true)
-                          }
-                        />
-                        {shape}
-                      </label>
-                    ))}
+                {modules.shape ? (
+                  <div className="space-y-2">
+                    <Label>Available shapes</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Round", "Square", "Heart", "Rectangle"].map((shape) => (
+                        <label
+                          key={shape}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={form.shapes.includes(shape)}
+                            onCheckedChange={(checked) =>
+                              toggleShape(shape, checked === true)
+                            }
+                          />
+                          {shape}
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
-                <div className="space-y-2">
-                  <Label htmlFor="flavourOptions">Flavour options (comma-separated)</Label>
-                  <Input
-                    id="flavourOptions"
-                    value={form.flavourOptions.join(", ")}
-                    onChange={(e) =>
-                      patchForm({
-                        flavourOptions: e.target.value
-                          .split(",")
-                          .map((item) => item.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="Chocolate, Vanilla, Red Velvet"
-                  />
-                </div>
+                {modules.flavour ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="flavourOptions">Flavour options (comma-separated)</Label>
+                    <Input
+                      id="flavourOptions"
+                      value={form.flavourOptions.join(", ")}
+                      onChange={(e) =>
+                        patchForm({
+                          flavourOptions: e.target.value
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="Chocolate, Vanilla, Red Velvet"
+                    />
+                  </div>
+                ) : null}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex items-center gap-2 text-sm">
@@ -595,15 +627,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     />
                     Allow cake message on PDP
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.allowsPhotoUpload}
-                      onCheckedChange={(checked) =>
-                        patchForm({ allowsPhotoUpload: checked === true })
-                      }
-                    />
-                    Allow photo upload on PDP
-                  </label>
+                  {modules.photoCake ? (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={form.allowsPhotoUpload}
+                        onCheckedChange={(checked) =>
+                          patchForm({ allowsPhotoUpload: checked === true })
+                        }
+                      />
+                      Allow photo upload on PDP
+                    </label>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

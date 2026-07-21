@@ -7,6 +7,9 @@ import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
+import { getStorefrontBusinessLabels } from "@/apps/website/lib/settings";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import type { BusinessLabels } from "@/config/business-labels";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
@@ -54,6 +57,9 @@ export function CollectionsPage({
   const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_COLLECTION_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  // Public labels vary by business type (bakery keeps the original wording).
+  // Read on the client only, so SSR stays hydration-safe on the bakery default.
+  const [labels, setLabels] = useState<BusinessLabels | null>(null);
   // Filtering stays on the client (it is interactive), but the catalogue it
   // filters now arrives from the server, so the first paint shows real cakes.
   const filtered = useMemo(() => {
@@ -72,16 +78,24 @@ export function CollectionsPage({
     setPage(1);
   }, [categorySlug, filters]);
 
+  useEffect(() => {
+    const sync = () => setLabels(getStorefrontBusinessLabels());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
   const updateFilters = (next: CollectionFilters) => setFilters(next);
 
   return (
     <>
       <StorePageHeader
-        title={activeCategory ? activeCategory.name : "Our Collections"}
+        title={activeCategory ? activeCategory.name : labels?.collectionsTitle ?? "Our Collections"}
         description={
           activeCategory
             ? `Browse our ${activeCategory.name.toLowerCase()} — premium quality, freshly baked.`
-            : "Browse premium cakes by category, flavour, and occasion."
+            : labels?.collectionsSubtitle ??
+              "Browse premium cakes by category, flavour, and occasion."
         }
         breadcrumbs={[
           { label: "Collections", href: routes.store.collections },
@@ -104,7 +118,7 @@ export function CollectionsPage({
                   <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     className="pl-9"
-                    placeholder="Search cakes..."
+                    placeholder={`Search ${(labels?.productWordPlural ?? "Cakes").toLowerCase()}...`}
                     value={filters.search}
                     onChange={(event) =>
                       updateFilters({ ...filters, search: event.target.value })
