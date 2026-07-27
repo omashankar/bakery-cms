@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clearDemoSession } from "@/features/auth/lib/session";
+import { logoutRequest } from "@/features/auth/lib/auth-api";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import type { SecuritySettings } from "@/types/settings";
@@ -143,8 +144,11 @@ export function SecuritySettingsPage() {
     );
   }
 
-  function confirmLogoutEverywhere() {
+  async function confirmLogoutEverywhere() {
+    // Revoke OTHER devices (fires with the current cookie) AND this device's own
+    // session/cookie, so "everywhere" truly includes the current browser.
     logoutAllDevices();
+    await logoutRequest().catch(() => undefined);
     clearDemoSession();
     setLogoutEverywhereOpen(false);
     toast.success("Signed out on all devices");

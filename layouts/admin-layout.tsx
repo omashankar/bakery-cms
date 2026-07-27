@@ -11,6 +11,7 @@ import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useSessionRefresh } from "@/features/auth/lib/use-session-refresh";
 import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 import { useInventoryServerSync } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
@@ -34,6 +35,9 @@ interface AdminLayoutShellProps {
 }
 
 export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
+  // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
+  // the hydration calls below don't start 401-ing after the 15-min token expiry.
+  useSessionRefresh();
   // Refresh the browser product cache from the server, for the admin screens
   // that still read it synchronously (inventory, dashboard, global search).
   useProductCacheSync();

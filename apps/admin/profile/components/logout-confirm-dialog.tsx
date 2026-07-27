@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { clearDemoSession } from "@/features/auth/lib/session";
+import { logoutRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +23,10 @@ interface LogoutConfirmDialogProps {
 export function LogoutConfirmDialog({ open, onOpenChange }: LogoutConfirmDialogProps) {
   const router = useRouter();
 
-  function handleLogout() {
+  async function handleLogout() {
+    // Revoke the server session/cookies (access + refresh) first, then clear the
+    // local UI marker. Redirect regardless so the user is never stuck on failure.
+    await logoutRequest().catch(() => undefined);
     clearDemoSession();
     onOpenChange(false);
     router.push(routes.auth.login);

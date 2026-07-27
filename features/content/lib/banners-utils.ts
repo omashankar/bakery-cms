@@ -95,6 +95,28 @@ export function getBannerScheduleState(
   return "live";
 }
 
+/**
+ * Pure selector for the storefront's active hero banners (filtered + sorted).
+ * Shared by the client store AND the server render, so both passes agree. The
+ * server computes this once from MongoDB and passes the snapshot down as a prop,
+ * which is what keeps the homepage hydration-safe even after an admin edits
+ * banners. `now` is injected so the server evaluates schedule windows once.
+ */
+export function selectActiveHeroBanners(
+  banners: Banner[],
+  visibility: Banner["visibility"] | "all" = "all",
+  now = Date.now()
+): Banner[] {
+  return banners
+    .filter((banner) => {
+      if (banner.position !== "hero") return false;
+      if (getBannerScheduleState(banner, now) !== "live") return false;
+      const bannerVisibility = banner.visibility ?? "all";
+      return visibility === "all" || bannerVisibility === "all" || bannerVisibility === visibility;
+    })
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || a.title.localeCompare(b.title));
+}
+
 export function getBannerOverview(banners: Banner[]): BannerOverview {
   let active = 0;
   let hero = 0;

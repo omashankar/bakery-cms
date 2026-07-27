@@ -38,6 +38,29 @@ export function loginRequest(input: { email: string; password: string; rememberM
   return post<AuthUser>("/api/auth/login", input);
 }
 
+/**
+ * Silently renew the short-lived access token from the (30-day) refresh cookie.
+ * Single-flight: many callers (the periodic tick, a tab refocus) can ask at once,
+ * but only one request goes out and everyone awaits it. Returns false when the
+ * refresh token is missing/expired/revoked (i.e. the user must sign in again).
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+export function refreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", { method: "POST" });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
 export function logoutRequest() {
   return post<null>("/api/auth/logout");
 }
