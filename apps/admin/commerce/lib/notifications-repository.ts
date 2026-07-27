@@ -8,6 +8,7 @@ import type {
   NotificationSettings,
 } from "@/types/notification";
 import { formatCurrency } from "@/utils/format";
+import { replaceNotificationSettingsRequest } from "@/apps/admin/communications/lib/communications-api";
 import {
   formatInquiryTypeLabel,
   getInquiryHref,
@@ -125,7 +126,18 @@ export function saveNotificationSettings(
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   const synced = syncNotifications(settings);
   writeStoredNotifications(synced);
+  replaceNotificationSettingsRequest(settings);
   return settings;
+}
+
+/** Hydration: apply the server's notification settings locally (no re-push). */
+export function persistServerNotificationSettings(
+  settings: NotificationSettings
+): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  const synced = syncNotifications(settings);
+  writeStoredNotifications(synced);
 }
 
 function mergeReadState(

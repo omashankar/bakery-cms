@@ -1,4 +1,5 @@
 import { specialOffers } from "@/constants/landing-data";
+import { replaceCouponsRequest } from "./commerce-api";
 
 const COUPONS_STORAGE_KEY = "bakery-cms-coupons";
 
@@ -16,7 +17,7 @@ export interface StoredCoupon {
   expiresAt?: string;
 }
 
-function buildDefaultCoupons(): StoredCoupon[] {
+export function buildDefaultCoupons(): StoredCoupon[] {
   const now = new Date().toISOString();
   const fromOffers = specialOffers
     .filter((offer) => offer.code)
@@ -84,7 +85,9 @@ function getServerCouponDefaults(): StoredCoupon[] {
 
 function seedCoupons(): StoredCoupon[] {
   const seeded = buildDefaultCoupons();
-  writeCoupons(seeded);
+  // Low-write: the seed must NOT dual-write to the server (it would clobber the
+  // admin's coupons before hydration replaces this local seed).
+  lowWriteCoupons(seeded);
   return seeded;
 }
 
@@ -102,10 +105,22 @@ function readCoupons(): StoredCoupon[] {
   }
 }
 
-function writeCoupons(coupons: StoredCoupon[]): void {
+/** Local-only write (localStorage + event). No server dual-write. */
+function lowWriteCoupons(coupons: StoredCoupon[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
   window.dispatchEvent(new Event("bakery-coupons-updated"));
+}
+
+/** Mutation write: local + best-effort server replace-all. */
+function writeCoupons(coupons: StoredCoupon[]): void {
+  lowWriteCoupons(coupons);
+  replaceCouponsRequest(coupons);
+}
+
+/** Hydration: write the server's coupons into the local cache (no re-push). */
+export function persistServerCoupons(coupons: StoredCoupon[]): void {
+  lowWriteCoupons(coupons);
 }
 
 export function loadCoupons(): StoredCoupon[] {

@@ -14,6 +14,8 @@ export interface MediaFile extends BaseEntity {
   tags?: string[];
   width?: number;
   height?: number;
+  /** Cloudinary public id — present for assets uploaded to Cloudinary (enables delete-sync). */
+  publicId?: string;
 }
 
 export interface MediaFolder extends BaseEntity {

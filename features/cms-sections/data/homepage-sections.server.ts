@@ -1,5 +1,5 @@
 import { createDefaultHomepageSections } from "@/constants/section-registry";
-import { createJsonStore } from "@/lib/server/json-store";
+import { createMongoStore } from "@/lib/server/db/cms-store";
 import { getVisibleSections, sortSections } from "@/features/cms-sections/lib/section-utils";
 import type {
   HomepageBuilderSnapshot,
@@ -32,8 +32,8 @@ function createSnapshot(
   };
 }
 
-const store = createJsonStore<HomepageBuilderState>({
-  file: "homepage-sections.json",
+const store = createMongoStore<HomepageBuilderState>({
+  key: "homepage-sections",
   seed: () => ({ draft: createSnapshot(), published: createSnapshot() }),
   isValid: (state) => Boolean(state?.draft?.sections && state?.published?.sections),
 });

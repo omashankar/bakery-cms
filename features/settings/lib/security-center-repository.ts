@@ -5,6 +5,10 @@ import type {
   RegisteredDevice,
   SecurityCenterState,
 } from "@/types/security";
+import {
+  revokeSessionRequest,
+  logoutAllRequest,
+} from "./security-center-api";
 
 const STORAGE_KEY = "bakery-cms-security-center";
 const CURRENT_SESSION_KEY = "bakery-cms-current-session-id";
@@ -218,6 +222,14 @@ function save(state: SecurityCenterState): SecurityCenterState {
   return next;
 }
 
+/**
+ * Hydration: replace the local cache with the server-DERIVED state (login trail
+ * from the audit log, active sessions from live session rows). No re-push.
+ */
+export function persistServerSecurityCenter(state: SecurityCenterState): void {
+  persist(state);
+}
+
 export function getLoginHistory(): LoginHistoryEntry[] {
   return loadSecurityCenter().loginHistory;
 }
@@ -334,6 +346,8 @@ export function revokeSession(sessionId: string): boolean {
     ...state,
     activeSessions: state.activeSessions.filter((s) => s.id !== sessionId),
   });
+  // Real revocation on the server (deletes the session + revokes its refresh chain).
+  revokeSessionRequest(sessionId);
   return true;
 }
 
@@ -347,6 +361,8 @@ export function logoutAllDevices(): number {
     ...state,
     activeSessions: remaining.map((s) => ({ ...s, isCurrent: true })),
   });
+  // Real "log out everywhere" on the server (revokes all other sessions).
+  logoutAllRequest();
 
   return removed;
 }

@@ -6,6 +6,7 @@ import {
   resetWeddingSections,
   saveWeddingDraft,
 } from "@/features/cms-sections/data/wedding-sections.server";
+import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { WeddingSectionInstance } from "@/types/wedding-builder";
 
 /** Wedding builder endpoint — mirrors /api/homepage-sections. */
@@ -33,6 +34,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const body = await parseBody(request);
   if (!body || !Array.isArray(body.sections)) {
     return NextResponse.json({ error: "sections array is required" }, { status: 400 });
@@ -48,6 +52,9 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const body = await parseBody(request);
   if (!body) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });

@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Mongoose is a large CommonJS package with dynamic requires — let Node load it
+  // directly instead of bundling it into the server build (faster, avoids issues).
+  serverExternalPackages: ["mongoose", "cloudinary"],
   images: {
     remotePatterns: [
       {

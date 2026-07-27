@@ -8,6 +8,9 @@ import {
   getCommerceSettings,
   saveCommerceSettings,
 } from "@/features/settings/lib/settings-repository";
+import {
+  replacePaymentGatewaysRequest,
+} from "@/features/admin-config/lib/admin-config-api";
 import type { PaymentMethodSettings } from "@/types/settings";
 
 /**
@@ -45,6 +48,16 @@ function readStore(): GatewayStore {
 }
 
 function writeStore(store: GatewayStore) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  // writeStore is only reached via genuine admin mutations (never a seed/load
+  // path), so dual-writing to the server here cannot clobber with defaults.
+  replacePaymentGatewaysRequest(store);
+  window.dispatchEvent(new Event(GATEWAYS_UPDATED_EVENT));
+}
+
+/** Hydration: apply the server's gateway runtime store locally (no re-push). */
+export function persistServerGateways(store: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORE_KEY, JSON.stringify(store));
   window.dispatchEvent(new Event(GATEWAYS_UPDATED_EVENT));

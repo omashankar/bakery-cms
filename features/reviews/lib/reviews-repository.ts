@@ -5,6 +5,11 @@ import type {
   ProductReviewFormData,
   ProductReviewStatus,
 } from "@/types/review";
+import {
+  submitReviewRequest,
+  updateReviewRequest,
+  deleteReviewsRequest,
+} from "./reviews-api";
 
 const STORAGE_KEY = "bakery-cms-product-reviews";
 const STORAGE_VERSION_KEY = "bakery-cms-product-reviews-version";
@@ -92,6 +97,11 @@ function writeReviews(reviews: ProductReview[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
   emitReviewsUpdated();
+}
+
+/** Hydration: replace the local cache with the server's reviews (no re-push). */
+export function persistServerReviews(reviews: ProductReview[]): void {
+  writeReviews(reviews);
 }
 
 export function syncProductReviewAggregates(): void {
@@ -182,6 +192,7 @@ export function createReview(data: ProductReviewFormData): ProductReview {
   };
   writeReviews([review, ...reviews]);
   syncProductReviewAggregates();
+  submitReviewRequest(review);
   return review;
 }
 
@@ -199,6 +210,7 @@ export function updateReview(id: string, data: ProductReviewFormData): ProductRe
   reviews[index] = updated;
   writeReviews(reviews);
   syncProductReviewAggregates();
+  updateReviewRequest(id, data);
   return updated;
 }
 
@@ -221,6 +233,7 @@ export function approveReviews(ids: string[]): number {
   });
   writeReviews(reviews);
   syncProductReviewAggregates();
+  ids.forEach((id) => updateReviewRequest(id, { status: "approved" }));
   return count;
 }
 
@@ -233,6 +246,7 @@ export function rejectReviews(ids: string[]): number {
   });
   writeReviews(reviews);
   syncProductReviewAggregates();
+  ids.forEach((id) => updateReviewRequest(id, { status: "rejected" }));
   return count;
 }
 
@@ -268,6 +282,7 @@ export function deleteReviews(ids: string[]): number {
   const count = reviews.length - next.length;
   writeReviews(next);
   syncProductReviewAggregates();
+  deleteReviewsRequest(ids);
   return count;
 }
 

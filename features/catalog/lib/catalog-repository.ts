@@ -8,6 +8,7 @@ import {
   defaultOccasions,
   defaultWeightOptions,
 } from "./catalog-utils";
+import { pushCatalogSection, CATALOG_SECTIONS } from "./catalog-api";
 
 const STORAGE_KEY = "bakery-cms-catalog";
 
@@ -79,7 +80,15 @@ export function getWeightOptions(): CatalogWeightOption[] {
 
 function updateStore(patch: Partial<CatalogStore>): CatalogStore {
   const current = loadCatalogStore();
-  return saveCatalogStore({ ...current, ...patch });
+  const saved = saveCatalogStore({ ...current, ...patch });
+  // Best-effort dual-write of any changed section to the server. Fire-and-forget;
+  // localStorage stays the immediate source, the server is the durable one.
+  for (const key of Object.keys(patch)) {
+    if ((CATALOG_SECTIONS as readonly string[]).includes(key)) {
+      void pushCatalogSection(key, saved[key as keyof CatalogStore]);
+    }
+  }
+  return saved;
 }
 
 export function createCategory(data: Omit<ProductCategory, "id" | "createdAt" | "updatedAt">): ProductCategory {

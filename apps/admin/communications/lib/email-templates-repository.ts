@@ -1,5 +1,6 @@
 import type { EmailTemplateFormData, EmailTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "./template-render";
+import { replaceEmailTemplatesRequest } from "./communications-api";
 
 const STORAGE_KEY = "bakery-cms-email-templates";
 const STORAGE_VERSION_KEY = "bakery-cms-email-templates-version";
@@ -16,7 +17,7 @@ function emitUpdated(): void {
   window.dispatchEvent(new Event(EMAIL_TEMPLATES_UPDATED_EVENT));
 }
 
-function seedEmailTemplates(): EmailTemplateRecord[] {
+export function seedEmailTemplates(): EmailTemplateRecord[] {
   const timestamp = nowIso();
   const base = { createdAt: timestamp, updatedAt: timestamp, status: "active" as const };
 
@@ -140,6 +141,19 @@ function writeTemplates(templates: EmailTemplateRecord[]): void {
   emitUpdated();
 }
 
+/** Local write + durable server replace-all. Used by admin mutations only. */
+function persistAndSync(templates: EmailTemplateRecord[]): void {
+  writeTemplates(templates);
+  replaceEmailTemplatesRequest(templates);
+}
+
+/** Hydration: write the server's templates into the local cache (no re-push). */
+export function persistServerEmailTemplates(templates: EmailTemplateRecord[]): void {
+  if (typeof window === "undefined") return;
+  writeTemplates(templates);
+  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+}
+
 function normalizeTemplate(template: EmailTemplateRecord): EmailTemplateRecord {
   const variables = mergeTemplateVariables(template.variables ?? [], [
     template.subject,
@@ -192,7 +206,7 @@ export function saveEmailTemplate(
     updatedAt: nowIso(),
   });
   templates[index] = updated;
-  writeTemplates(templates);
+  persistAndSync(templates);
   return updated;
 }
 
@@ -205,7 +219,7 @@ export function createEmailTemplate(data: EmailTemplateFormData): EmailTemplateR
     createdAt: timestamp,
     updatedAt: timestamp,
   });
-  writeTemplates([template, ...templates]);
+  persistAndSync([template, ...templates]);
   return template;
 }
 
@@ -213,13 +227,13 @@ export function deleteEmailTemplate(id: string): boolean {
   const templates = loadEmailTemplates();
   const next = templates.filter((template) => template.id !== id);
   if (next.length === templates.length) return false;
-  writeTemplates(next);
+  persistAndSync(next);
   return true;
 }
 
 export function resetEmailTemplates(): EmailTemplateRecord[] {
   const seeded = seedEmailTemplates();
-  writeTemplates(seeded);
+  persistAndSync(seeded);
   localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   return seeded;
 }

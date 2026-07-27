@@ -1,5 +1,6 @@
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
+import { replaceSeoRequest } from "@/features/site-layout/lib/site-layout-api";
 import type { GlobalSeoSettings, SeoRouteEntry, SeoStore } from "@/types/seo";
 
 const STORAGE_KEY = "bakery-cms-seo";
@@ -168,7 +169,7 @@ function seedRoutes(): SeoRouteEntry[] {
   ];
 }
 
-function seedStore(): SeoStore {
+export function seedStore(): SeoStore {
   return {
     global: seedGlobal(),
     routes: seedRoutes(),
@@ -217,11 +218,18 @@ export function getGlobalSeo(): GlobalSeoSettings {
   return loadSeoStore().global;
 }
 
+/** Hydration: apply the server's SEO store into the local cache (no re-push). */
+export function persistServerSeo(store: SeoStore): void {
+  serverStore = store;
+  persist(store);
+}
+
 export function saveGlobalSeo(global: GlobalSeoSettings): GlobalSeoSettings {
   const store = loadSeoStore();
   const next = { ...store, global };
   persist(next);
   serverStore = next;
+  replaceSeoRequest(next);
   return global;
 }
 
@@ -249,6 +257,7 @@ export function updateSeoRoute(
   store.routes[index] = updated;
   persist(store);
   serverStore = store;
+  replaceSeoRequest(store);
   return updated;
 }
 
@@ -259,6 +268,7 @@ export function resetSeoStore(): SeoStore {
     persist(seeded);
   }
   serverStore = seeded;
+  replaceSeoRequest(seeded);
   return seeded;
 }
 
@@ -290,6 +300,7 @@ export function upsertSeoRouteForPath(
     store.routes.push(merged);
     persist(store);
     serverStore = store;
+    replaceSeoRequest(store);
     return merged;
   }
 
@@ -302,5 +313,6 @@ export function upsertSeoRouteForPath(
   store.routes[index] = updated;
   persist(store);
   serverStore = store;
+  replaceSeoRequest(store);
   return updated;
 }

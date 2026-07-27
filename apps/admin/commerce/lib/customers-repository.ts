@@ -1,4 +1,5 @@
 import type { CustomerAdminMeta } from "@/types/customer";
+import { saveCustomerMetaRequest } from "./customers-api";
 
 const STORAGE_KEY = "bakery-cms-customer-profiles";
 
@@ -54,7 +55,20 @@ export function saveCustomerAdminMeta(meta: CustomerAdminMeta): CustomerAdminMet
   const store = readAllMeta();
   store[key] = saved;
   writeAllMeta(store);
+  saveCustomerMetaRequest(saved);
   return saved;
+}
+
+/** Hydration: merge the server's customer metadata into the local cache. */
+export function persistServerCustomerMeta(
+  metaByEmail: Record<string, CustomerAdminMeta>
+): void {
+  if (typeof window === "undefined") return;
+  const store = readAllMeta();
+  for (const [email, meta] of Object.entries(metaByEmail)) {
+    store[email.trim().toLowerCase()] = meta;
+  }
+  writeAllMeta(store);
 }
 
 export function updateCustomerNotes(email: string, notes: string): CustomerAdminMeta {

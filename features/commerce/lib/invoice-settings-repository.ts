@@ -3,6 +3,7 @@ import {
   defaultInvoiceSettings,
   mergeInvoiceSettings,
 } from "./invoice-defaults";
+import { saveInvoiceSettingsRequest } from "./invoice-settings-api";
 
 const STORAGE_KEY = "bakery-cms-invoice-settings";
 const STORAGE_VERSION_KEY = "bakery-cms-invoice-settings-version";
@@ -52,7 +53,16 @@ export function saveInvoiceSettings(data: InvoiceSettingsFormData): InvoiceSetti
   };
   writeSettings(next);
   localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  saveInvoiceSettingsRequest(data);
   return next;
+}
+
+/** Hydration: write the server's copy to the local cache without re-pushing. */
+export function persistServerInvoiceSettings(data: Partial<InvoiceSettings>): void {
+  writeSettings(mergeInvoiceSettings(data));
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  }
 }
 
 export function resetInvoiceSettings(): InvoiceSettings {

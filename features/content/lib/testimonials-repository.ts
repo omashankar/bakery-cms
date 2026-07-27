@@ -2,6 +2,7 @@ import type { Testimonial, TestimonialFormData } from "@/types/content";
 import type { LandingTestimonial } from "@/constants/landing-data";
 import { testimonials as seedTestimonials } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
+import { replaceTestimonialsRequest } from "./content-api";
 
 const STORAGE_KEY = "bakery-cms-testimonials";
 const STORAGE_VERSION_KEY = "bakery-cms-testimonials-version";
@@ -11,7 +12,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function seedFromLanding(): Testimonial[] {
+export function seedFromLanding(): Testimonial[] {
   return seedTestimonials.map((item, index) => ({
     id: item.id,
     name: item.name,
@@ -27,9 +28,21 @@ function seedFromLanding(): Testimonial[] {
   }));
 }
 
-function persist(items: Testimonial[]): void {
+/** Local-only write. Used by the seed/migration paths (no server dual-write). */
+function lowPersist(items: Testimonial[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+/** Mutation write: local + best-effort server replace-all. */
+function persist(items: Testimonial[]): void {
+  lowPersist(items);
+  replaceTestimonialsRequest(items);
+}
+
+/** Hydration: write the server's testimonials into the local cache (no re-push). */
+export function persistServerTestimonials(items: Testimonial[]): void {
+  lowPersist(items);
 }
 
 function normalizeTestimonials(items: Testimonial[]): {
@@ -52,7 +65,7 @@ export function loadTestimonials(): Testimonial[] {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     const seeded = seedFromLanding();
-    persist(seeded);
+    lowPersist(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     return seeded;
   }
@@ -61,7 +74,9 @@ export function loadTestimonials(): Testimonial[] {
     const parsed = JSON.parse(raw) as Testimonial[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
       const seeded = seedFromLanding();
-      persist(seeded);
+      // Local-only: re-seeding must NOT push defaults back to the server, or an
+      // admin who deleted every testimonial would have them resurrected on reload.
+      lowPersist(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
       return seeded;
     }
@@ -70,14 +85,14 @@ export function loadTestimonials(): Testimonial[] {
     const { items: normalized, changed } = normalizeTestimonials(parsed);
 
     if (changed || storedVersion < TESTIMONIALS_STORAGE_VERSION) {
-      persist(normalized);
+      lowPersist(normalized);
       localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     }
 
     return normalized;
   } catch {
     const seeded = seedFromLanding();
-    persist(seeded);
+    lowPersist(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     return seeded;
   }

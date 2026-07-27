@@ -1,4 +1,5 @@
 import type { AppearanceSettings } from "@/types/appearance";
+import { replaceAppearanceRequest } from "@/features/site-layout/lib/site-layout-api";
 import {
   applyAppearanceSettings,
   defaultAppearanceSettings,
@@ -71,9 +72,18 @@ export function loadAppearanceSettings(): AppearanceSettings {
 export function saveAppearanceSettings(settings: AppearanceSettings): AppearanceSettings {
   const next = normalizeSettings(settings);
   persist(next);
+  replaceAppearanceRequest(next);
   applyAppearanceSettings(next);
   notifyAppearanceUpdated();
   return next;
+}
+
+/** Hydration: apply the server's appearance settings locally (no re-push). */
+export function persistServerAppearance(settings: AppearanceSettings): void {
+  const next = normalizeSettings(settings);
+  persist(next);
+  applyAppearanceSettings(next);
+  notifyAppearanceUpdated();
 }
 
 export function resetAppearanceSettings(): AppearanceSettings {
@@ -81,6 +91,7 @@ export function resetAppearanceSettings(): AppearanceSettings {
     localStorage.removeItem(STORAGE_KEY);
     persist(defaultAppearanceSettings);
   }
+  replaceAppearanceRequest(defaultAppearanceSettings);
   applyAppearanceSettings(defaultAppearanceSettings);
   notifyAppearanceUpdated();
   return defaultAppearanceSettings;

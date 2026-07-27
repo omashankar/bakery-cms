@@ -6,7 +6,11 @@ export default defineConfig({
   test: {
     // Repositories persist through localStorage, so the domain layer needs a DOM.
     environment: "jsdom",
-    include: ["tests/**/*.test.ts"],
+    include: [
+      "tests/**/*.test.ts",
+      "features/**/*.test.ts",
+      "lib/**/*.test.ts",
+    ],
     restoreMocks: true,
   },
 });

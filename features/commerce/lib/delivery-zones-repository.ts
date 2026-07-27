@@ -4,6 +4,7 @@ import {
   findDeliveryZone,
   getUniqueZoneCities,
 } from "./delivery-zone-utils";
+import { replaceZonesRequest } from "./commerce-api";
 
 const STORAGE_KEY = "bakery-cms-delivery-zones";
 
@@ -18,13 +19,25 @@ function emitUpdated(): void {
   window.dispatchEvent(new Event(DELIVERY_ZONES_UPDATED_EVENT));
 }
 
-function persist(zones: DeliveryZone[]): void {
+/** Local-only write (localStorage + event). No server dual-write. */
+function lowPersist(zones: DeliveryZone[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
   emitUpdated();
 }
 
-function seedZones(): DeliveryZone[] {
+/** Mutation write: local + best-effort server replace-all. */
+function persist(zones: DeliveryZone[]): void {
+  lowPersist(zones);
+  replaceZonesRequest(zones);
+}
+
+/** Hydration: write the server's zones into the local cache (no re-push). */
+export function persistServerZones(zones: DeliveryZone[]): void {
+  lowPersist(zones);
+}
+
+export function seedZones(): DeliveryZone[] {
   const timestamp = nowIso();
   return [
     {
@@ -107,14 +120,16 @@ export function loadDeliveryZones(): DeliveryZone[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       const seeded = seedZones();
-      persist(seeded);
+      lowPersist(seeded);
       return seeded;
     }
     const parsed = JSON.parse(raw) as DeliveryZone[];
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedZones();
   } catch {
     const seeded = seedZones();
-    persist(seeded);
+    // Local-only: re-seeding on corrupt storage must NOT push defaults back to
+    // the server and clobber the admin's real zones.
+    lowPersist(seeded);
     return seeded;
   }
 }
