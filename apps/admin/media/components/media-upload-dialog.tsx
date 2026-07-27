@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addMediaFile } from "../lib/media-repository";
+import { uploadMediaRequest } from "../lib/media-api";
 import { fileNameFromUrl, isPersistableMediaUrl } from "../lib/media-utils";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import type { MediaFile } from "@/types/media";
@@ -35,7 +36,7 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
     setIsDragging(false);
   }
 
-  function createFromUrl(imageUrl: string, name?: string, size = 220_000) {
+  function createFromUrl(imageUrl: string, name?: string, size = 220_000, publicId?: string) {
     const trimmed = imageUrl.trim();
     if (!trimmed) {
       toast.error("Enter an image URL");
@@ -57,6 +58,7 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
       alt: "",
       width: 1200,
       height: 1200,
+      publicId,
     });
 
     onUploaded(file);
@@ -75,10 +77,16 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const dataUrl = reader.result;
       if (typeof dataUrl !== "string") return;
-      createFromUrl(dataUrl, file.name, file.size);
+      // Upload to Cloudinary when configured; otherwise fall back to the data URI.
+      const asset = await uploadMediaRequest(dataUrl);
+      if (asset) {
+        createFromUrl(asset.url, file.name, asset.bytes ?? file.size, asset.publicId);
+      } else {
+        createFromUrl(dataUrl, file.name, file.size);
+      }
     };
     reader.onerror = () => toast.error("Could not read image file");
     reader.readAsDataURL(file);

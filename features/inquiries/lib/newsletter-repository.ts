@@ -1,4 +1,9 @@
 import type { NewsletterSubscriber } from "@/types/inquiry";
+import {
+  subscribeRequest,
+  updateSubscriberRequest,
+  deleteSubscribersRequest,
+} from "./newsletter-api";
 
 const STORAGE_KEY = "bakery-cms-newsletter-subscribers";
 
@@ -10,7 +15,7 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString();
 }
 
-function seedSubscribers(): NewsletterSubscriber[] {
+export function seedSubscribers(): NewsletterSubscriber[] {
   const sources = ["Footer", "Homepage", "Checkout", "Landing", "Popup"];
 
   return [
@@ -44,6 +49,11 @@ function persistSubscribers(subscribers: NewsletterSubscriber[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(subscribers));
 }
 
+/** Hydration: replace the local cache with the server's subscribers (no re-push). */
+export function persistServerSubscribers(subscribers: NewsletterSubscriber[]): void {
+  persistSubscribers(subscribers);
+}
+
 export function loadNewsletterSubscribers(): NewsletterSubscriber[] {
   if (typeof window === "undefined") return seedSubscribers();
 
@@ -72,10 +82,20 @@ export function addNewsletterSubscriber(
   const subscribers = loadNewsletterSubscribers();
   const existing = subscribers.find((item) => item.email === trimmed);
   if (existing) {
-    if (!existing.isActive) {
-      return updateNewsletterSubscriber(existing.id, { isActive: true });
-    }
-    return existing;
+    // Reactivate locally + tell the server via the PUBLIC subscribe route (it
+    // dedupes + reactivates by email). Not the admin PATCH — this runs on the
+    // storefront where there is no admin session.
+    const result = existing.isActive
+      ? existing
+      : (() => {
+          const next = subscribers.map((item) =>
+            item.id === existing.id ? { ...item, isActive: true, updatedAt: nowIso() } : item
+          );
+          persistSubscribers(next);
+          return { ...existing, isActive: true };
+        })();
+    subscribeRequest({ id: result.id, email: trimmed, source: result.source });
+    return result;
   }
 
   const timestamp = nowIso();
@@ -88,6 +108,7 @@ export function addNewsletterSubscriber(
     updatedAt: timestamp,
   };
   persistSubscribers([created, ...subscribers]);
+  subscribeRequest(created);
   return created;
 }
 
@@ -107,6 +128,7 @@ export function updateNewsletterSubscriber(
   };
   subscribers[index] = updated;
   persistSubscribers(subscribers);
+  updateSubscriberRequest(id, patch);
   return updated;
 }
 
@@ -115,6 +137,7 @@ export function deleteNewsletterSubscribers(ids: string[]): number {
   const next = subscribers.filter((item) => !ids.includes(item.id));
   const count = subscribers.length - next.length;
   persistSubscribers(next);
+  deleteSubscribersRequest(ids);
   return count;
 }
 

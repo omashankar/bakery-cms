@@ -6,6 +6,7 @@ import {
   resetHomepageSections,
   saveDraftSections,
 } from "@/features/cms-sections/data/homepage-sections.server";
+import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
 /**
@@ -39,6 +40,9 @@ export async function GET() {
 
 /** Save the draft. */
 export async function PUT(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const body = await parseBody(request);
   if (!body || !Array.isArray(body.sections)) {
     return NextResponse.json({ error: "sections array is required" }, { status: 400 });
@@ -54,6 +58,9 @@ export async function PUT(request: Request) {
 
 /** Publish the given sections, or reset the homepage to registry defaults. */
 export async function POST(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const body = await parseBody(request);
   if (!body) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });

@@ -1,26 +1,41 @@
-import { createJsonStore } from "@/lib/server/json-store";
-import {
-  normalizeCommerceFields,
-  seedProducts,
-} from "@/features/products/lib/products-repository";
+import * as repo from "@/features/products/server/product.repository";
 import type { Product } from "@/types/product";
 
 /**
- * Server-side product store — the seam the real database will replace.
+ * Server-side product store — now backed by MongoDB (was a JSON file).
  *
- * Locking, atomic writes and seeding live in createJsonStore; this file only
- * says what a product store is made of.
+ * The four exports keep their original signatures, so every caller
+ * (products-service, the /api/products routes, storefront SSR) moves to the
+ * database without a single change. `mutateProducts` still serialises through an
+ * in-process queue so concurrent read-modify-writes cannot lose each other.
  */
-const store = createJsonStore<Product[]>({
-  file: "products.json",
-  seed: seedProducts,
-  isValid: (products) => Array.isArray(products) && products.length > 0,
-  normalize: (products) => products.map(normalizeCommerceFields),
-});
 
-export const readProducts = store.read;
-export const saveProducts = store.write;
-export const mutateProducts = store.mutate;
+let queue: Promise<unknown> = Promise.resolve();
 
-/** Test helper: drop the store so the next read re-seeds. */
-export const resetProductStore = store.reset;
+export function readProducts(): Promise<Product[]> {
+  return repo.listAll();
+}
+
+export function saveProducts(products: Product[]): Promise<void> {
+  const run = queue.then(() => repo.replaceAll(products));
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+export function mutateProducts<R>(
+  mutator: (current: Product[]) => { next: Product[]; result: R },
+): Promise<R> {
+  const run = queue.then(async () => {
+    const current = await repo.listAll();
+    const { next, result } = mutator(current);
+    await repo.replaceAll(next);
+    return result;
+  });
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+/** Test helper: drop every product so the next read re-seeds. */
+export function resetProductStore(): Promise<void> {
+  return repo.reset();
+}

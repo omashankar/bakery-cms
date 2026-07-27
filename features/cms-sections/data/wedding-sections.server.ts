@@ -1,5 +1,5 @@
 import { createDefaultWeddingSections } from "@/constants/wedding-section-registry";
-import { createJsonStore } from "@/lib/server/json-store";
+import { createMongoStore } from "@/lib/server/db/cms-store";
 import { getVisibleSections, sortSections } from "@/features/cms-sections/lib/section-utils";
 import type {
   WeddingBuilderSnapshot,
@@ -28,8 +28,8 @@ function createSnapshot(
   };
 }
 
-const store = createJsonStore<WeddingBuilderState>({
-  file: "wedding-sections.json",
+const store = createMongoStore<WeddingBuilderState>({
+  key: "wedding-sections",
   seed: () => ({ draft: createSnapshot(), published: createSnapshot() }),
   isValid: (state) => Boolean(state?.draft?.sections && state?.published?.sections),
 });

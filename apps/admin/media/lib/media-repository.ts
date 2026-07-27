@@ -15,6 +15,7 @@ import {
 } from "./media-folders";
 import { countMediaUsage } from "./media-usage";
 import { fileNameFromUrl, isPersistableMediaUrl } from "./media-utils";
+import { replaceMediaFilesRequest } from "./media-api";
 
 const STORAGE_KEY = "bakery-cms-media-library";
 const STORAGE_VERSION_KEY = "bakery-cms-media-library-version";
@@ -137,7 +138,7 @@ export function loadMediaFiles(): MediaFile[] {
 
   if (!raw) {
     const seeded = seedMedia();
-    persistMedia(seeded);
+    lowPersistMedia(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
     return seeded;
   }
@@ -146,7 +147,9 @@ export function loadMediaFiles(): MediaFile[] {
     const parsed = JSON.parse(raw) as MediaFile[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
       const seeded = seedMedia();
-      persistMedia(seeded);
+      // Local-only: re-seeding must NOT push defaults back to the server, or an
+      // admin who cleared the media library would have it resurrected on reload.
+      lowPersistMedia(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
       return seeded;
     }
@@ -155,7 +158,7 @@ export function loadMediaFiles(): MediaFile[] {
 
     if (storedVersion < MEDIA_LIBRARY_VERSION) {
       const repaired = repairMediaLibrary(parsed);
-      persistMedia(repaired);
+      lowPersistMedia(repaired);
       localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
       return repaired;
     }
@@ -163,25 +166,45 @@ export function loadMediaFiles(): MediaFile[] {
     const { files: normalized, changed } = normalizeMediaFiles(parsed);
 
     if (changed) {
-      persistMedia(normalized);
+      lowPersistMedia(normalized);
     }
 
     return normalized;
   } catch {
     const seeded = seedMedia();
-    persistMedia(seeded);
+    lowPersistMedia(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
     return seeded;
   }
 }
 
-function persistMedia(files: MediaFile[]): void {
+/** Local-only write. Used by the seed/repair/normalize paths (no dual-write). */
+function lowPersistMedia(files: MediaFile[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
 }
 
+/**
+ * Mutation write: local + best-effort server replace-all (which delete-syncs
+ * removed Cloudinary assets). Note: with Cloudinary configured, uploads store
+ * small URLs; the graceful-degrade path stores data URIs, so avoid a very large
+ * library of un-uploaded images (a Mongo document is capped at 16MB).
+ */
+function persistMedia(files: MediaFile[]): void {
+  lowPersistMedia(files);
+  replaceMediaFilesRequest(files);
+}
+
 export function saveMediaFiles(files: MediaFile[]): void {
   persistMedia(files);
+  notifyMediaUpdated();
+}
+
+/** Hydration: write the server's media files into the local cache (no re-push).
+ * Skips an empty server list so it never wipes the local seed on first run. */
+export function persistServerMedia(files: MediaFile[]): void {
+  if (files.length === 0) return;
+  lowPersistMedia(files);
   notifyMediaUpdated();
 }
 

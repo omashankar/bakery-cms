@@ -1,5 +1,6 @@
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 import { defaultHeaderSettings } from "./header-utils";
+import { replaceHeaderRequest } from "./site-layout-api";
 
 const STORAGE_KEY = "bakery-cms-header";
 const STORAGE_VERSION_KEY = "bakery-cms-header-version";
@@ -45,7 +46,13 @@ export function loadHeaderSettings(): HeaderSettings {
 export function saveHeaderSettings(settings: HeaderSettings): HeaderSettings {
   const next = { ...settings, updatedAt: nowIso() };
   persist(next);
+  replaceHeaderRequest(next);
   return next;
+}
+
+/** Hydration: apply the server's header settings locally (no re-push). */
+export function persistServerHeader(settings: HeaderSettings): void {
+  persist(settings);
 }
 
 export function resetHeaderSettings(): HeaderSettings {
@@ -53,6 +60,7 @@ export function resetHeaderSettings(): HeaderSettings {
     localStorage.removeItem(STORAGE_KEY);
     persist(defaultHeaderSettings);
   }
+  replaceHeaderRequest(defaultHeaderSettings);
   return defaultHeaderSettings;
 }
 

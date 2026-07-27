@@ -9,6 +9,7 @@ import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { OtpInput } from "@/features/auth/components/otp-input";
 import { getResetFlow, markResetVerified } from "@/features/auth/lib/reset-flow";
+import { forgotPasswordRequest, verifyOtpRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
@@ -37,13 +38,19 @@ export function OtpFormPage() {
       setError("Enter the 6-digit verification code");
       return;
     }
+    if (!email) return;
 
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setLoading(false);
-    markResetVerified();
-    toast.success("Code verified");
-    router.push(routes.auth.resetPassword);
+    try {
+      await verifyOtpRequest(email, otp);
+      markResetVerified(otp);
+      toast.success("Code verified");
+      router.push(routes.auth.resetPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Incorrect code");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (!email) return null;
@@ -75,11 +82,15 @@ export function OtpFormPage() {
         <button
           type="button"
           className="text-muted-foreground hover:text-bakery-700"
-          onClick={() => toast.message("Code resent (demo)")}
+          onClick={async () => {
+            if (!email) return;
+            await forgotPasswordRequest(email).catch(() => undefined);
+            toast.message("Code resent");
+          }}
         >
           Resend code
         </button>
-        <span className="text-muted-foreground">Demo code: any 6 digits</span>
+        <span className="text-muted-foreground">Enter the 6-digit code</span>
       </div>
 
       <AuthDemoNotice />

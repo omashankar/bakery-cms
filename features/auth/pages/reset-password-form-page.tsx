@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { clearResetFlow, getResetFlow } from "@/features/auth/lib/reset-flow";
+import { resetPasswordRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,11 +37,27 @@ export function ResetPasswordFormPage() {
     setAllowed(true);
   }, [router]);
 
-  const onSubmit = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    clearResetFlow();
-    toast.success("Password updated");
-    router.push(routes.auth.success);
+  const onSubmit = async (data: ResetPasswordForm) => {
+    const flow = getResetFlow();
+    if (!flow?.email || !flow.otp) {
+      router.replace(routes.auth.forgotPassword);
+      return;
+    }
+    try {
+      await resetPasswordRequest({
+        email: flow.email,
+        otp: flow.otp,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+      });
+      clearResetFlow();
+      toast.success("Password updated");
+      router.push(routes.auth.success);
+    } catch (error) {
+      toast.error("Could not update password", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   if (!allowed) return null;

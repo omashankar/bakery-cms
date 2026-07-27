@@ -1,6 +1,7 @@
 import type { FaqCategory, FaqItem, FaqFormData } from "@/types/content";
 import type { LandingFaq } from "@/constants/landing-data";
 import { faqs as seedFaqs } from "@/constants/landing-data";
+import { replaceFaqsRequest } from "./content-api";
 
 const STORAGE_KEY = "bakery-cms-faq";
 const STORAGE_VERSION_KEY = "bakery-cms-faq-version";
@@ -20,7 +21,7 @@ function inferCategory(faq: LandingFaq, index: number): FaqCategory {
   return "general";
 }
 
-function seedFromLanding(): FaqItem[] {
+export function seedFromLanding(): FaqItem[] {
   const extra: Array<Omit<FaqItem, "id" | "createdAt" | "updatedAt">> = [
     {
       question: "Do you provide cake stands for wedding events?",
@@ -70,9 +71,21 @@ function seedFromLanding(): FaqItem[] {
   return [...fromLanding, ...extras];
 }
 
-function persist(items: FaqItem[]): void {
+/** Local-only write. Used by the seed/migration paths (no server dual-write). */
+function lowPersist(items: FaqItem[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+/** Mutation write: local + best-effort server replace-all. */
+function persist(items: FaqItem[]): void {
+  lowPersist(items);
+  replaceFaqsRequest(items);
+}
+
+/** Hydration: write the server's FAQs into the local cache (no re-push). */
+export function persistServerFaqs(items: FaqItem[]): void {
+  lowPersist(items);
 }
 
 export function loadFaqs(): FaqItem[] {
@@ -81,7 +94,7 @@ export function loadFaqs(): FaqItem[] {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     const seeded = seedFromLanding();
-    persist(seeded);
+    lowPersist(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
     return seeded;
   }
@@ -90,7 +103,9 @@ export function loadFaqs(): FaqItem[] {
     const parsed = JSON.parse(raw) as FaqItem[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
       const seeded = seedFromLanding();
-      persist(seeded);
+      // Local-only: re-seeding must NOT push defaults back to the server, or an
+      // admin who deleted every FAQ would have them resurrected on reload.
+      lowPersist(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
       return seeded;
     }
@@ -103,7 +118,7 @@ export function loadFaqs(): FaqItem[] {
     return parsed;
   } catch {
     const seeded = seedFromLanding();
-    persist(seeded);
+    lowPersist(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
     return seeded;
   }

@@ -6,17 +6,25 @@ import { cn } from "@/lib/utils";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { HomepageProductSource } from "@/features/products/lib/homepage-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
+import type { Banner } from "@/types/media";
 
 interface StoreHomeContentProps {
   /** Sections fetched on the server, so they render into the HTML. */
   sections: HomepageSectionInstance[];
   /** Product rails built on the server, so both passes render the same cakes. */
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
+  /** Active hero banners read from the server, so both passes render the same banners. */
+  banners: Banner[];
   /** Set by the server from ?cmsPreview=1 — shows the draft banner. */
   isPreview?: boolean;
 }
 
-export function StoreHomeContent({ sections, rails, isPreview = false }: StoreHomeContentProps) {
+export function StoreHomeContent({
+  sections,
+  rails,
+  banners,
+  isPreview = false,
+}: StoreHomeContentProps) {
   return (
     <>
       {isPreview ? (
@@ -24,7 +32,7 @@ export function StoreHomeContent({ sections, rails, isPreview = false }: StoreHo
           CMS preview mode — showing draft homepage content
         </div>
       ) : null}
-      {renderSections(sections, rails)}
+      {renderSections(sections, rails, banners)}
     </>
   );
 }
@@ -36,7 +44,8 @@ export function StoreHomeContent({ sections, rails, isPreview = false }: StoreHo
  */
 function renderSections(
   sections: HomepageSectionInstance[],
-  rails: Partial<Record<HomepageProductSource, LandingProduct[]>>
+  rails: Partial<Record<HomepageProductSource, LandingProduct[]>>,
+  banners: Banner[]
 ) {
   const idxNewsletter = sections.findIndex((s) => s.type === "newsletter");
   const idxCta = sections.findIndex((s) => s.type === "cta");
@@ -52,14 +61,21 @@ function renderSections(
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
             <div className="grid items-stretch gap-6 lg:grid-cols-2">
-              <HomepageSectionRenderer rails={rails} section={sections[idxNewsletter]} embedded />
-              <HomepageSectionRenderer rails={rails} section={sections[idxCta]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} section={sections[idxNewsletter]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} section={sections[idxCta]} embedded />
             </div>
           </div>
         </section>
       );
     }
 
-    return <HomepageSectionRenderer rails={rails} key={section.instanceId} section={section} />;
+    return (
+      <HomepageSectionRenderer
+        rails={rails}
+        banners={banners}
+        key={section.instanceId}
+        section={section}
+      />
+    );
   });
 }

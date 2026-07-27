@@ -4,6 +4,9 @@ import {
   PAYMENT_NOTIFICATION_TEMPLATES,
   type NotifChannel,
 } from "@/features/payments/registry/notification-templates";
+import {
+  replacePaymentNotifPrefsRequest,
+} from "@/features/admin-config/lib/admin-config-api";
 
 /**
  * Per-notification delivery preferences (frontend placeholder). The backend will
@@ -29,6 +32,16 @@ function read(): PrefStore {
 }
 
 function write(store: PrefStore) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY, JSON.stringify(store));
+  // write() is only reached via genuine admin toggles (no seed/load path), so
+  // dual-writing to the server here cannot clobber with defaults.
+  replacePaymentNotifPrefsRequest(store);
+  window.dispatchEvent(new Event(NOTIF_PREFS_UPDATED_EVENT));
+}
+
+/** Hydration: apply the server's notification prefs locally (no re-push). */
+export function persistServerNotifPrefs(store: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(KEY, JSON.stringify(store));
   window.dispatchEvent(new Event(NOTIF_PREFS_UPDATED_EVENT));

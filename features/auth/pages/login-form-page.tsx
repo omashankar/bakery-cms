@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { setDemoSession } from "@/features/auth/lib/session";
+import { loginRequest } from "@/features/auth/lib/auth-api";
 import {
   recordFailedLogin,
   recordLoginSuccess,
@@ -41,22 +42,22 @@ export function LoginFormPage() {
   });
 
   const onSubmit = async (data: LoginForm) => {
-    await new Promise((resolve) => setTimeout(resolve, 900));
-
-    if (data.password === "invalid") {
-      recordFailedLogin(data.email, "Invalid password");
-      toast.error("Sign in failed", {
-        description: "Invalid password. For this demo, use any password except “invalid”.",
+    try {
+      const user = await loginRequest(data);
+      // UI marker only — the real auth token lives in an httpOnly cookie set by
+      // the server. This keeps existing UI (which reads the demo session for the
+      // signed-in email) working unchanged.
+      setDemoSession(user.email, data.rememberMe);
+      recordLoginSuccess(user.email);
+      toast.success("Signed in", {
+        description: "Opening your dashboard…",
       });
-      return;
+      router.push(routes.admin.dashboard);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign in failed";
+      recordFailedLogin(data.email, message);
+      toast.error("Sign in failed", { description: message });
     }
-
-    setDemoSession(data.email, data.rememberMe);
-    recordLoginSuccess(data.email);
-    toast.success("Signed in", {
-      description: "Opening your dashboard…",
-    });
-    router.push(routes.admin.dashboard);
   };
 
   return (

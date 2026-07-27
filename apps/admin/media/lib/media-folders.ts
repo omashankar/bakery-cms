@@ -1,4 +1,5 @@
 import type { MediaFolder } from "@/types/media";
+import { replaceMediaFoldersRequest } from "./media-api";
 
 const FOLDERS_STORAGE_KEY = "bakery-cms-media-folders";
 
@@ -67,7 +68,13 @@ export function loadMediaFolders(): MediaFolder[] {
 
 export function saveMediaFolders(folders: MediaFolder[]): MediaFolder[] {
   persist(folders);
+  replaceMediaFoldersRequest(folders);
   return folders;
+}
+
+/** Hydration: write the server's folders into the local cache (no re-push). */
+export function persistServerMediaFolders(folders: MediaFolder[]): void {
+  persist(folders);
 }
 
 export function createMediaFolder(name: string): MediaFolder {

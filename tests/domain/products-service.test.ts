@@ -1,12 +1,42 @@
 /**
  * Tests for the async server product store + service.
  *
- * This is the seam the real database will replace. These tests pin the contract
- * the DB adapter must honour, so the swap can be verified rather than hoped for.
+ * The store now sits on MongoDB (product.repository). To keep these unit tests
+ * hermetic — no live database — the repository is mocked with an in-memory
+ * backing. That still exercises everything the SERVICE owns: seeding, the
+ * mutate-under-lock queue, id/slug lookups, and the storefront projections.
+ * The Mongo adapter's own concerns (persistence, atomic writes) are the
+ * repository's to prove, not this file's.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import fs from "node:fs/promises";
-import path from "node:path";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// In-memory stand-in for the Mongo-backed product repository.
+vi.mock("@/features/products/server/product.repository", async () => {
+  const { seedProducts } = await import("@/features/products/lib/products-repository");
+  let store: import("@/types/product").Product[] | null = null;
+
+  return {
+    async listAll() {
+      if (store === null) store = seedProducts();
+      return store;
+    },
+    async replaceAll(products: import("@/types/product").Product[]) {
+      store = [...products];
+    },
+    async reset() {
+      store = null;
+    },
+    async findById(id: string) {
+      return (store ?? []).find((p) => p.id === id) ?? null;
+    },
+    async findBySlug(slug: string) {
+      return (store ?? []).find((p) => p.slug === slug) ?? null;
+    },
+    async slugExists(slug: string, exceptId?: string) {
+      return (store ?? []).some((p) => p.slug === slug && p.id !== exceptId);
+    },
+  };
+});
 
 import {
   createProduct,
@@ -23,8 +53,6 @@ import { resetProductStore } from "@/features/products/data/products-store.serve
 import { createEmptyProductForm } from "@/features/products/lib/products-repository";
 import type { ProductFormData } from "@/types/product";
 
-const DATA_PATH = path.join(process.cwd(), ".data", "products.json");
-
 function form(overrides: Partial<ProductFormData> = {}): ProductFormData {
   return { ...createEmptyProductForm(), name: "Test Cake", slug: "test-cake", ...overrides };
 }
@@ -33,41 +61,16 @@ beforeEach(async () => {
   await resetProductStore();
 });
 
-afterEach(async () => {
-  await resetProductStore();
-});
-
 describe("the store seeds itself", () => {
-  it("creates the file on first read and returns a non-empty catalogue", async () => {
-    await expect(fs.access(DATA_PATH)).rejects.toThrow();
-
+  it("returns a non-empty catalogue on first read", async () => {
     const products = await getProducts();
-
     expect(products.length).toBeGreaterThan(0);
-    await expect(fs.access(DATA_PATH)).resolves.toBeUndefined();
   });
 
   it("returns a stable catalogue across reads", async () => {
     const first = await getProducts();
     const second = await getProducts();
-
     expect(second.map((p) => p.id)).toEqual(first.map((p) => p.id));
-  });
-
-  it("re-seeds instead of throwing when the file is corrupt", async () => {
-    await getProducts();
-    await fs.writeFile(DATA_PATH, "{ not json", "utf8");
-
-    const products = await getProducts();
-
-    expect(products.length).toBeGreaterThan(0);
-  });
-
-  it("re-seeds when the file holds an empty array", async () => {
-    await getProducts();
-    await fs.writeFile(DATA_PATH, "[]", "utf8");
-
-    expect((await getProducts()).length).toBeGreaterThan(0);
   });
 });
 
@@ -95,10 +98,8 @@ describe("writes persist to the store", () => {
     expect(after[0].id).toBe(created.id);
   });
 
-  it("survives a fresh read — the write actually hit disk", async () => {
+  it("survives a fresh read — the write actually persisted", async () => {
     const created = await createProduct(form({ slug: "durable", name: "Durable" }));
-
-    // No in-memory cache to hide behind: this re-reads the file.
     expect((await getProductBySlug("durable"))?.id).toBe(created.id);
   });
 

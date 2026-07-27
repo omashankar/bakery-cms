@@ -1,4 +1,9 @@
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
+import {
+  createInquiryRequest,
+  updateInquiryRequest,
+  deleteInquiriesRequest,
+} from "./inquiries-api";
 
 const STORAGE_KEY = "bakery-cms-inquiries";
 
@@ -12,7 +17,7 @@ function daysAgo(days: number, hours = 0): string {
   return new Date(Date.now() - days * 86400000 - hours * 3600000).toISOString();
 }
 
-function seedInquiries(): Inquiry[] {
+export function seedInquiries(): Inquiry[] {
   const timestamp = nowIso();
 
   const items = [
@@ -187,6 +192,11 @@ function persistInquiries(inquiries: Inquiry[]): void {
   window.dispatchEvent(new Event(INQUIRIES_UPDATED_EVENT));
 }
 
+/** Hydration: replace the local cache with the server's inquiries (no re-push). */
+export function persistServerInquiries(inquiries: Inquiry[]): void {
+  persistInquiries(inquiries);
+}
+
 export function loadInquiries(): Inquiry[] {
   if (typeof window === "undefined") return seedInquiries();
 
@@ -224,6 +234,7 @@ export function addInquiry(
     updatedAt: timestamp,
   };
   persistInquiries([created, ...inquiries]);
+  createInquiryRequest(created);
   return created;
 }
 
@@ -243,6 +254,7 @@ export function updateInquiry(
   };
   inquiries[index] = updated;
   persistInquiries(inquiries);
+  updateInquiryRequest(id, patch);
   return updated;
 }
 
@@ -251,6 +263,7 @@ export function deleteInquiries(ids: string[]): number {
   const next = inquiries.filter((inquiry) => !ids.includes(inquiry.id));
   const count = inquiries.length - next.length;
   persistInquiries(next);
+  deleteInquiriesRequest(ids);
   return count;
 }
 

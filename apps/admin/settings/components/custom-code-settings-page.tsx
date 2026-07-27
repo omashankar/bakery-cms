@@ -11,16 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { routes } from "@/constants/routes";
+import {
+  loadCustomCode,
+  saveCustomCode,
+  EMPTY_CUSTOM_CODE as EMPTY_CODE,
+  CUSTOM_CODE_UPDATED_EVENT,
+  type CustomCode,
+} from "@/apps/admin/settings/lib/custom-code-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
-
-const STORAGE_KEY = "bakery-cms-custom-code";
-
-interface CustomCode {
-  css: string;
-  js: string;
-}
-
-const EMPTY_CODE: CustomCode = { css: "", js: "" };
 
 function countLines(value: string): number {
   const trimmed = value.trim();
@@ -33,30 +31,23 @@ export function CustomCodeSettingsPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const loaded = JSON.parse(raw) as CustomCode;
-        setCode(loaded);
-        setSavedCode(loaded);
-      }
-    } catch {
-      // ignore
-    }
+    // Local cache is hydrated from the server by useAdminConfigServerSync (mounted
+    // in the admin shell) before this page renders, so a plain load reads it.
+    const loaded = loadCustomCode();
+    setCode(loaded);
+    setSavedCode(loaded);
     setMounted(true);
   }, []);
 
   const isDirty = JSON.stringify(code) !== JSON.stringify(savedCode);
 
-  /** Returns false when the browser refuses the write (quota, private mode). */
+  /** Local write + server dual-write. Returns false when the browser refuses the write. */
   function persist(next: CustomCode): boolean {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return true;
-    } catch {
+    const saved = saveCustomCode(next);
+    if (!saved) {
       toast.error("Could not save — browser storage is full or unavailable");
-      return false;
     }
+    return saved;
   }
 
   function handleSave() {

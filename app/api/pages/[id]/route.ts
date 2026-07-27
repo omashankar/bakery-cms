@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { deletePage, getPageById, updatePage } from "@/features/content/data/pages.server";
+import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { CmsPageFormData } from "@/types/content";
 
 /** Next 16 delivers dynamic route params as a Promise — await before use. */
@@ -20,6 +21,9 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await context.params;
 
   let body: Partial<CmsPageFormData>;
@@ -39,6 +43,9 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await context.params;
   try {
     const removed = await deletePage(id);

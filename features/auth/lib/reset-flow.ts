@@ -5,6 +5,8 @@ export interface ResetFlowState {
   email: string;
   /** True once the OTP step passed, gating the reset-password step. */
   verified: boolean;
+  /** The verified OTP, carried to the reset-password step for the final call. */
+  otp?: string;
 }
 
 /**
@@ -40,10 +42,10 @@ export function getResetFlow(): ResetFlowState | null {
   return read();
 }
 
-export function markResetVerified(): void {
+export function markResetVerified(otp?: string): void {
   const current = read();
   if (!current) return;
-  write({ ...current, verified: true });
+  write({ ...current, verified: true, otp: otp ?? current.otp });
 }
 
 export function clearResetFlow(): void {

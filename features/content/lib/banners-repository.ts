@@ -1,6 +1,7 @@
 import type { Banner } from "@/types/media";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { defaultBanners } from "./banners-utils";
+import { replaceBannersRequest } from "./content-api";
 
 const STORAGE_KEY = "bakery-cms-banners";
 const STORAGE_VERSION_KEY = "bakery-cms-banners-version";
@@ -85,7 +86,13 @@ export function loadBanners(): Banner[] {
 
 export function saveBanners(banners: Banner[]): Banner[] {
   persist(banners);
+  replaceBannersRequest(banners);
   return banners;
+}
+
+/** Hydration: write the server's banners into the local cache (no re-push). */
+export function persistServerBanners(banners: Banner[]): void {
+  persist(banners);
 }
 
 export function resetBanners(): Banner[] {

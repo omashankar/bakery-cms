@@ -18,6 +18,8 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { ActivityLog } from "@/types/settings";
 import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
+import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
+import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activity";
 
 const actionTone: Record<string, string> = {
   published: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -38,6 +40,21 @@ export function ActivitySettingsPage() {
   useEffect(() => {
     setEntries(getActivityLog());
     setMounted(true);
+  }, []);
+
+  // Hydrate the durable server audit trail (every admin/customer action, across
+  // devices) into the same list, merged with the local settings activity.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await fetchAuditLogs({ limit: 100 });
+      if (cancelled || !result) return;
+      const serverEntries = result.items.map(auditToActivity);
+      setEntries((local) => mergeActivity(serverEntries, local));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => {

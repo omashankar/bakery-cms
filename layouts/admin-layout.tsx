@@ -11,7 +11,20 @@ import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useSessionRefresh } from "@/features/auth/lib/use-session-refresh";
 import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
+import { useInventoryServerSync } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
+import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
+import { useInvoiceSettingsServerSync } from "@/features/commerce/lib/use-invoice-settings-server-sync";
+import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
+import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
+import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
+import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
+import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
+import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
+import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-config-server-sync";
+import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
@@ -22,9 +35,36 @@ interface AdminLayoutShellProps {
 }
 
 export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
+  // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
+  // the hydration calls below don't start 401-ing after the 15-min token expiry.
+  useSessionRefresh();
   // Refresh the browser product cache from the server, for the admin screens
   // that still read it synchronously (inventory, dashboard, global search).
   useProductCacheSync();
+  // Hydrate inventory stock history + settings from the server.
+  useInventoryServerSync();
+  // Hydrate all orders from the server (so admin sees orders from any device).
+  useOrdersServerSync();
+  // Hydrate invoice settings from the server.
+  useInvoiceSettingsServerSync();
+  // Hydrate admin-managed customer metadata (tags/notes/marketing) from the server.
+  useCustomersServerSync();
+  // Hydrate the media library (files + folders) from the server.
+  useMediaServerSync();
+  // Hydrate email/WhatsApp templates + notification settings from the server.
+  useCommunicationsServerSync();
+  // Hydrate inquiries (contact-form submissions) from the server.
+  useInquiriesServerSync();
+  // Hydrate newsletter subscribers from the server.
+  useNewsletterServerSync();
+  // Hydrate product reviews (all moderation states) from the server.
+  useReviewsServerSync();
+  // Hydrate SEO settings (global + per-route) from the server.
+  useSeoServerSync();
+  // Hydrate admin-only config blobs (profile, gateways, notif prefs, custom code).
+  useAdminConfigServerSync();
+  // Hydrate the Security Center — derived from the real audit trail + sessions.
+  useSecurityCenterServerSync();
 
   const pathname = usePathname();
   const isBuilder =

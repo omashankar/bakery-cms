@@ -44,6 +44,7 @@ import {
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
+import type { Banner } from "@/types/media";
 import { parseHeroSlides } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
@@ -70,6 +71,11 @@ interface HomepageSectionRendererProps {
    * renderer falls back to the browser catalogue.
    */
   rails?: Partial<Record<HomepageProductSource, LandingProduct[]>>;
+  /**
+   * Active hero banners read on the server. When absent (admin builder preview)
+   * the promo section falls back to the browser banner store.
+   */
+  banners?: Banner[];
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -708,7 +714,10 @@ function CtaSection(props: HomepageSectionRendererProps) {
 function PromoBannerSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 2);
-  const banners = getActivePromoBanners(maxCount);
+  // Prefer the server-provided banners (an SSR snapshot → identical on hydration).
+  // Fall back to the client store only in the builder preview, which has no
+  // server data and never server-renders.
+  const banners = (props.banners ?? getActivePromoBanners(maxCount)).slice(0, maxCount);
 
   return (
     <SectionShell {...props}>

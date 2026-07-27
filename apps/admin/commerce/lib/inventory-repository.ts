@@ -18,6 +18,11 @@ import {
   getLowStockThreshold,
   resolveStockFields,
 } from "./inventory-utils";
+import {
+  adjustStockRequest,
+  setUnlimitedRequest,
+  saveInventorySettingsRequest,
+} from "./inventory-api";
 
 export {
   deriveStockStatus,
@@ -65,8 +70,26 @@ export function getInventorySettings(): InventorySettings {
 export function saveInventorySettings(settings: InventorySettings): InventorySettings {
   if (typeof window === "undefined") return settings;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  saveInventorySettingsRequest(settings);
   emitInventoryUpdated();
   return settings;
+}
+
+/**
+ * Hydration helpers — write server data into the local cache WITHOUT pushing it
+ * back to the server (avoids a sync loop). Emit the update event so the admin UI
+ * refreshes. Used by useInventoryServerSync.
+ */
+export function persistServerHistory(entries: StockHistoryEntry[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
+  emitInventoryUpdated();
+}
+
+export function persistServerSettings(settings: InventorySettings): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  emitInventoryUpdated();
 }
 
 export function loadStockHistory(cakeId?: string): StockHistoryEntry[] {
@@ -203,6 +226,9 @@ export function adjustStock({
     createdAt: nowIso(),
   });
 
+  // Durable write to the server (updates the Mongo product stock + history).
+  adjustStockRequest({ cakeId, type, quantity, reason, note });
+
   emitInventoryUpdated();
   return getInventoryItems().find((item) => item.cakeId === cakeId) ?? null;
 }
@@ -220,6 +246,8 @@ export function setUnlimitedStock(cakeId: string, unlimited: boolean): Inventory
     ...cake,
     ...stockFields,
   });
+
+  setUnlimitedRequest(cakeId, unlimited);
 
   emitInventoryUpdated();
   return getInventoryItems().find((item) => item.cakeId === cakeId) ?? null;

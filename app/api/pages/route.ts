@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createPage, getPages } from "@/features/content/data/pages.server";
+import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { CmsPageFormData } from "@/types/content";
 
 /** CMS page collection endpoint — the admin editor reads and writes here. */
@@ -14,6 +15,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   let body: CmsPageFormData;
   try {
     body = (await request.json()) as CmsPageFormData;

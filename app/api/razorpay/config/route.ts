@@ -1,8 +1,11 @@
+import { NextResponse } from "next/server";
+
 import {
   clearRazorpayConfig,
   getRazorpayStatus,
   saveRazorpayConfig,
 } from "@/apps/admin/settings/lib/razorpay-config.server";
+import { requireAdminResponse } from "@/lib/server/auth/guard";
 
 /** Returns connection status only — the secret key is never sent to the client. */
 export async function GET() {
@@ -11,6 +14,9 @@ export async function GET() {
 
 /** Saves admin-entered keys to the server-side config file. */
 export async function POST(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const status = getRazorpayStatus();
   if (status.envLocked) {
     return Response.json(
@@ -45,6 +51,9 @@ export async function POST(request: Request) {
 
 /** Removes saved keys (disconnect). */
 export async function DELETE() {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   const status = getRazorpayStatus();
   if (status.envLocked) {
     return Response.json(

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";
+import { forgotPasswordRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,11 +27,16 @@ export function ForgotPasswordFormPage() {
   });
 
   const onSubmit = async (data: ForgotPasswordForm) => {
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    try {
+      await forgotPasswordRequest(data.email);
+    } catch {
+      // Endpoint never reveals whether the email exists; proceed regardless so
+      // the flow (and messaging) stays identical for every input.
+    }
     startResetFlow(data.email);
     setSent(true);
-    toast.success("Reset link sent", {
-      description: `Instructions sent to ${data.email}`,
+    toast.success("Reset code sent", {
+      description: `If ${data.email} is registered, a code is on its way.`,
     });
     setTimeout(() => router.push(routes.auth.otp), 1200);
   };

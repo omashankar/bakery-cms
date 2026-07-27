@@ -5,6 +5,12 @@ import {
   getProductById,
   updateProduct,
 } from "@/features/products/data/products-service";
+import { productFormSchema } from "@/features/products/server/product.validators";
+import { slugExists } from "@/features/products/server/product.repository";
+import { requireProductAdmin } from "@/features/products/server/guard";
+import { validate, readJson } from "@/lib/server/http/validate";
+import { AppError } from "@/lib/server/http/errors";
+import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
 import type { ProductFormData } from "@/types/product";
 
 /** Next 16 delivers dynamic route params as a Promise — await before use. */
@@ -27,24 +33,38 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
+  const auth = await requireProductAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await context.params;
 
   let body: ProductFormData;
   try {
-    body = (await request.json()) as ProductFormData;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  if (!body?.name?.trim() || !body?.slug?.trim()) {
-    return NextResponse.json({ error: "Name and slug are required" }, { status: 400 });
+    body = validate(productFormSchema, await readJson(request)) as ProductFormData;
+  } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message, errors: error.errors }, { status: error.status });
+    }
+    return NextResponse.json({ error: "Invalid product data" }, { status: 400 });
   }
 
   try {
+    // Slug must stay unique across OTHER products.
+    if (await slugExists(body.slug, id)) {
+      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
+    }
+
     const updated = await updateProduct(id, body);
     if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+    await writeAuditLog({
+      action: "product.update",
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      target: { type: "product", id },
+      ...requestContext(request),
+    });
     return NextResponse.json({ product: updated });
   } catch {
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
@@ -52,6 +72,9 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const auth = await requireProductAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await context.params;
 
   try {
@@ -59,6 +82,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (!removed) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+    await writeAuditLog({
+      action: "product.delete",
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      target: { type: "product", id },
+      ...requestContext(_request),
+    });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });

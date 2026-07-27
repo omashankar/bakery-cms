@@ -5,6 +5,14 @@ import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
 import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
+import {
+  placeOrderRequest,
+  updateStatusRequest,
+  cancelOrderRequest,
+  refundOrderRequest,
+  paymentStatusRequest,
+  adminNotesRequest,
+} from "./orders-api";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
 
@@ -252,7 +260,15 @@ export function placeOrder(input: {
   };
 
   writeOrders([order, ...readOrders()]);
+  // Durable write to the server (creates the order in Mongo + reduces stock,
+  // atomically). Sends the same id/orderNumber so both copies agree.
+  placeOrderRequest(order);
   return order;
+}
+
+/** Hydration: replace the local order cache with the server's copy. */
+export function persistServerOrders(orders: PlacedOrder[]): void {
+  writeOrders(orders.map(normalizeOrder));
 }
 
 export function getOrdersForCustomer(email: string): PlacedOrder[] {
@@ -296,6 +312,7 @@ export function updateOrderStatus(
 
   orders[index] = updated;
   writeOrders(orders);
+  updateStatusRequest(orderId, status);
   return updated;
 }
 
@@ -314,6 +331,7 @@ export function updateOrderAdminNotes(
 
   orders[index] = updated;
   writeOrders(orders);
+  adminNotesRequest(orderId, adminNotes);
   return updated;
 }
 
@@ -344,6 +362,7 @@ export function updatePaymentStatus(
 
   orders[index] = updated;
   writeOrders(orders);
+  paymentStatusRequest(orderId, paymentStatus, updated.paymentReference);
   return updated;
 }
 
@@ -384,6 +403,7 @@ export function cancelOrder(
 
   orders[index] = updated;
   writeOrders(orders);
+  cancelOrderRequest(orderId, cancellationReason);
   return updated;
 }
 
@@ -441,6 +461,7 @@ export function refundOrder(
 
   orders[index] = updated;
   writeOrders(orders);
+  refundOrderRequest(orderId, input);
   return updated;
 }
 

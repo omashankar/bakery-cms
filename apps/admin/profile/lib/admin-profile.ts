@@ -1,6 +1,9 @@
 "use client";
 
 import { getDemoSession } from "@/features/auth/lib/session";
+import {
+  replaceAdminProfileRequest,
+} from "@/features/admin-config/lib/admin-config-api";
 
 /**
  * Admin profile store (single-admin CMS). Email comes from the session (read-only);
@@ -89,11 +92,19 @@ export function saveAdminProfile(
   patch: Pick<AdminProfile, "fullName" | "mobile" | "username" | "photoUrl">
 ): boolean {
   const saved = read();
-  return write({
+  const next: StoredProfile = {
     ...saved,
     fullName: patch.fullName.trim(),
     mobile: patch.mobile.trim(),
     username: patch.username.trim(),
     photoUrl: patch.photoUrl,
-  });
+  };
+  const ok = write(next);
+  if (ok) replaceAdminProfileRequest(next);
+  return ok;
+}
+
+/** Hydration: apply the server's saved profile fields locally (no re-push). */
+export function persistServerAdminProfile(profile: Record<string, unknown>): void {
+  write(profile as StoredProfile);
 }

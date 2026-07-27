@@ -25,6 +25,7 @@ import {
   defaultSocialLinks,
   mergeAppSettings,
 } from "./settings-utils";
+import { pushSection, SERVER_SECTIONS } from "./settings-api";
 
 const STORAGE_KEY = "bakery-cms-settings";
 const MAX_ACTIVITY = 100;
@@ -99,7 +100,16 @@ function updateStore(
   if (activity) {
     next = appendActivity(next, activity.action, activity.entity, activity.details);
   }
-  return saveSettings(next);
+  const saved = saveSettings(next);
+  // Best-effort dual-write to the server for any changed section. Fire-and-forget:
+  // localStorage stays the immediate source; the server is the durable one.
+  // (Silently no-ops if unauthenticated — the storefront never saves settings.)
+  for (const key of Object.keys(patch)) {
+    if ((SERVER_SECTIONS as readonly string[]).includes(key)) {
+      void pushSection(key, saved[key as keyof AppSettings]);
+    }
+  }
+  return saved;
 }
 
 export function getGeneralSettings(): GeneralSettings {

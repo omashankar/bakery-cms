@@ -1,15 +1,15 @@
-import { createJsonStore } from "@/lib/server/json-store";
+import { createMongoStore } from "@/lib/server/db/cms-store";
 import { seedPages } from "@/features/content/lib/pages-repository";
 import type { CmsPage, CmsPageFormData } from "@/types/content";
 
 /**
- * Server-side CMS page store.
+ * Server-side CMS page store (MongoDB-backed).
  *
  * Storefront pages (About, Privacy, Terms, …) read this at render time, so they
  * ship real content in their HTML instead of a client-only skeleton.
  */
-const store = createJsonStore<CmsPage[]>({
-  file: "pages.json",
+const store = createMongoStore<CmsPage[]>({
+  key: "pages",
   seed: seedPages,
   isValid: (pages) => Array.isArray(pages) && pages.length > 0,
 });
