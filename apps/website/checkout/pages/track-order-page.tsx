@@ -29,7 +29,9 @@ export function TrackOrderPage() {
   useEffect(() => {
     const sample = getOrders()[0];
     if (sample) {
-      setDemoHint(`${sample.orderNumber} · ${sample.address.email}`);
+      // Show only the order number as a demo nudge — never the email, which on a
+      // shared/kiosk browser would expose the previous customer's address.
+      setDemoHint(sample.orderNumber);
     }
   }, []);
 

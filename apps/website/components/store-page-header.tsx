@@ -11,7 +11,7 @@ import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 
-interface BreadcrumbItem {
+interface Crumb {
   label: string;
   href?: string;
 }
@@ -19,7 +19,7 @@ interface BreadcrumbItem {
 interface StorePageHeaderProps {
   title: string;
   description?: string;
-  breadcrumbs?: BreadcrumbItem[];
+  breadcrumbs?: Crumb[];
   className?: string;
 }
 

@@ -1,5 +1,6 @@
 import type { LandingProduct } from "@/constants/landing-data";
 import { getFlavours, getOccasions } from "@/features/catalog/lib/catalog-repository";
+import { defaultFlavours, defaultOccasions } from "@/features/catalog/lib/catalog-utils";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
@@ -40,6 +41,15 @@ export function getFilterFlavourOptions(): string[] {
 export function getFilterWeightOptions(): string[] {
   return ["0.5 kg", "1 kg", "1.5 kg"];
 }
+
+/**
+ * Stable occasion / flavour defaults for SSR and the client's first paint —
+ * identical on server and client, so the filter panel hydrates without a
+ * mismatch. The panel swaps in the (possibly customized) catalog values from
+ * localStorage after mount.
+ */
+export const DEFAULT_FILTER_OCCASION_OPTIONS: string[] = defaultOccasions.map((item) => item.name);
+export const DEFAULT_FILTER_FLAVOUR_OPTIONS: string[] = defaultFlavours.map((item) => item.name);
 
 function matchesOccasion(cake: LandingProduct, occasions: string[]): boolean {
   if (occasions.length === 0) return true;

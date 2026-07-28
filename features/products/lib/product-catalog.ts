@@ -11,6 +11,7 @@ import {
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
 import { getWeightOptions } from "@/features/catalog/lib/catalog-repository";
+import { defaultWeightOptions } from "@/features/catalog/lib/catalog-utils";
 
 function getLandingCatalog(): LandingProduct[] {
   const combined = [
@@ -122,6 +123,22 @@ export function getProductWeightOptions(cake?: LandingProduct) {
     modifier: option.modifier,
     serves: option.serves,
   }));
+}
+
+/**
+ * Default (localStorage-free) weight options — identical to what the server
+ * renders from the seed catalog. Used for the product page's first paint so a
+ * product without its own weights hydrates without a mismatch; the client swaps
+ * in the live catalog values after mount.
+ */
+export function getDefaultProductWeightOptions() {
+  return [...defaultWeightOptions]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((option) => ({
+      label: option.label,
+      modifier: option.modifier,
+      serves: option.serves,
+    }));
 }
 
 /** @deprecated Use getProductWeightOptions() */

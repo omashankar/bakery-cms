@@ -1,6 +1,7 @@
 "use client";
 
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
+import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
@@ -72,10 +73,10 @@ function renderSections(
       return (
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
-            <div className="grid items-stretch gap-6 lg:grid-cols-2">
+            <StaggerReveal className="grid items-stretch gap-6 lg:grid-cols-2">
               <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxNewsletter]} embedded />
               <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxCta]} embedded />
-            </div>
+            </StaggerReveal>
           </div>
         </section>
       );

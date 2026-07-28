@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import {
   COLLECTION_PRICE_MAX,
   DEFAULT_COLLECTION_FILTERS,
+  DEFAULT_FILTER_FLAVOUR_OPTIONS,
+  DEFAULT_FILTER_OCCASION_OPTIONS,
   type CollectionFilters,
   getFilterFlavourOptions,
   getFilterOccasionOptions,
@@ -32,14 +34,21 @@ export function CollectionFiltersPanel({
   onChange,
   className,
 }: CollectionFiltersPanelProps) {
-  const occasions = getFilterOccasionOptions();
-  const flavours = getFilterFlavourOptions();
   const weights = getFilterWeightOptions();
+  // Occasion / flavour options live in the catalog store (localStorage on the
+  // client). Seed with the SAME defaults the server renders, then refresh after
+  // mount — otherwise a customized catalog would mismatch the SSR HTML.
+  const [occasions, setOccasions] = useState<string[]>(DEFAULT_FILTER_OCCASION_OPTIONS);
+  const [flavours, setFlavours] = useState<string[]>(DEFAULT_FILTER_FLAVOUR_OPTIONS);
   // Flavour / weight / eggless filters are bakery modules — hide when off.
   // Default ON so SSR / bakery render exactly as before.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
+    const sync = () => {
+      setModules(getModuleSettings());
+      setOccasions(getFilterOccasionOptions());
+      setFlavours(getFilterFlavourOptions());
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
@@ -54,7 +63,15 @@ export function CollectionFiltersPanel({
   };
 
   return (
-    <aside className={cn("space-y-6 rounded-xl border border-border bg-card p-5", className)}>
+    <aside
+      className={cn(
+        "space-y-6 rounded-xl border border-border bg-card p-5",
+        // Sticky desktop sidebar: if the filter list ever outgrows the viewport,
+        // scroll inside the panel instead of clipping the last groups.
+        "lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto panel-scroll",
+        className
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-bakery-700" />
@@ -83,35 +100,31 @@ export function CollectionFiltersPanel({
       </FilterGroup>
 
       {modules.flavour ? (
-        <div className="contents" data-gate-flavour>
-          <FilterGroup title="Flavour">
-            {flavours.map((flavour) => (
-              <FilterCheckbox
-                key={flavour}
-                id={`flavour-${flavour}`}
-                label={flavour}
-                checked={filters.flavours.includes(flavour)}
-                onCheckedChange={() => toggleListValue("flavours", flavour)}
-              />
-            ))}
-          </FilterGroup>
-        </div>
+        <FilterGroup title="Flavour" noDivider data-gate-flavour="">
+          {flavours.map((flavour) => (
+            <FilterCheckbox
+              key={flavour}
+              id={`flavour-${flavour}`}
+              label={flavour}
+              checked={filters.flavours.includes(flavour)}
+              onCheckedChange={() => toggleListValue("flavours", flavour)}
+            />
+          ))}
+        </FilterGroup>
       ) : null}
 
       {modules.weight ? (
-        <div className="contents" data-gate-weight>
-          <FilterGroup title="Weight">
-            {weights.map((weight) => (
-              <FilterCheckbox
-                key={weight}
-                id={`weight-${weight}`}
-                label={weight}
-                checked={filters.weights.includes(weight)}
-                onCheckedChange={() => toggleListValue("weights", weight)}
-              />
-            ))}
-          </FilterGroup>
-        </div>
+        <FilterGroup title="Weight" noDivider data-gate-weight="">
+          {weights.map((weight) => (
+            <FilterCheckbox
+              key={weight}
+              id={`weight-${weight}`}
+              label={weight}
+              checked={filters.weights.includes(weight)}
+              onCheckedChange={() => toggleListValue("weights", weight)}
+            />
+          ))}
+        </FilterGroup>
       ) : null}
 
       <FilterGroup title="Price range">
@@ -136,14 +149,13 @@ export function CollectionFiltersPanel({
 
       <FilterGroup title="Preferences">
         {modules.eggEggless ? (
-          <div className="contents" data-gate-egg>
-            <FilterCheckbox
-              id="eggless-only"
-              label="Eggless only"
-              checked={filters.egglessOnly}
-              onCheckedChange={(checked) => onChange({ ...filters, egglessOnly: checked })}
-            />
-          </div>
+          <FilterCheckbox
+            id="eggless-only"
+            label="Eggless only"
+            checked={filters.egglessOnly}
+            onCheckedChange={(checked) => onChange({ ...filters, egglessOnly: checked })}
+            data-gate-egg=""
+          />
         ) : null}
         <FilterCheckbox
           id="in-stock-only"
@@ -156,9 +168,27 @@ export function CollectionFiltersPanel({
   );
 }
 
-function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function FilterGroup({
+  title,
+  children,
+  noDivider,
+  ...rest
+}: {
+  title: string;
+  children: React.ReactNode;
+  noDivider?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className="space-y-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
+    <div
+      className={cn(
+        "space-y-3",
+        // Occasion → Flavour → Weight read as one cluster (no divider lines
+        // between them, as in the original). The space-y-6 on the aside still
+        // gives each a clean gap — that gap was the only thing missing before.
+        !noDivider && "border-t border-border pt-4 first:border-t-0 first:pt-0"
+      )}
+      {...rest}
+    >
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </p>
@@ -172,14 +202,15 @@ function FilterCheckbox({
   label,
   checked,
   onCheckedChange,
+  ...rest
 }: {
   id: string;
   label: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-}) {
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" {...rest}>
       <Checkbox
         id={id}
         checked={checked}

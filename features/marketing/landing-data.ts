@@ -30,6 +30,7 @@ import {
   MonitorSmartphoneIcon,
   PanelsTopLeftIcon,
   PercentIcon,
+  PhoneIcon,
   RocketIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -41,6 +42,7 @@ import {
   SmartphoneIcon,
   SparklesIcon,
   StarIcon,
+  StoreIcon,
   TicketPercentIcon,
   TrendingUpIcon,
   TruckIcon,
@@ -365,6 +367,13 @@ export const faqs: { question: string; answer: string }[] = [
 /* ------------------------------------------------------------------ */
 /* Footer                                                              */
 /* ------------------------------------------------------------------ */
+
+export const socialLinks: { icon: IconType; label: string; href: string }[] = [
+  { icon: StoreIcon, label: "Visit our storefront", href: routes.store.home },
+  { icon: MailIcon, label: "Email our team", href: routes.store.contact },
+  { icon: MessageCircleIcon, label: "Chat with support", href: routes.store.contact },
+  { icon: PhoneIcon, label: "Call us", href: routes.store.contact },
+];
 
 export const footerColumns: {
   heading: string;

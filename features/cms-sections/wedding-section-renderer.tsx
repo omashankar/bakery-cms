@@ -144,13 +144,28 @@ function accentLastWord(text: string) {
   );
 }
 
+/** In the builder preview (interactive) the hero stays fully visible while
+ *  editing, so it opts out of the scroll entrance; on the live page it fades up. */
+function HeroStatic({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  return <div className={className}>{children}</div>;
+}
+
 function WeddingHeroSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const title = contentString(c, "title", "Celebrate Your Love Story");
+  // Same fade-up entrance the rest of the page uses, staggered text → image.
+  const Reveal = props.interactive ? HeroStatic : ScrollReveal;
   return (
     <SectionShell {...props} className="border-b border-border bg-white py-12 lg:py-16">
       <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-        <div className="space-y-6 text-left">
+        <Reveal className="space-y-6 text-left">
           {contentString(c, "overline") ? (
             <Badge variant="accent" className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]">
               <Heart className="size-3.5" />
@@ -192,9 +207,9 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               );
             })}
           </ul>
-        </div>
+        </Reveal>
 
-        <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+        <Reveal delay={160} className="relative mx-auto w-full max-w-lg lg:max-w-none">
           <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
             <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[4/3] lg:aspect-[4/5]">
               {contentString(c, "imageUrl") ? (
@@ -218,7 +233,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               <p className="mt-1 text-[11px] leading-none text-muted-foreground">wedding studio</p>
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </SectionShell>
   );

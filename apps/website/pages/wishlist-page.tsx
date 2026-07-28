@@ -45,7 +45,7 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
           {!loaded ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
                   <div className="aspect-square animate-pulse bg-cream-100" />

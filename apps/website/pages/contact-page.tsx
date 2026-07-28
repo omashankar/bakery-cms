@@ -6,15 +6,23 @@ import {
   getStorefrontBusinessHours,
   getStorefrontContactInfo,
 } from "@/apps/website/lib/settings";
+import type { StorefrontContact } from "@/apps/website/lib/storefront-contact.server";
 import { layoutSpacing } from "@/constants/spacing";
 
 interface ContactPageProps {
   defaultSubject?: string;
+  /** Contact details read from MongoDB on the server. Falls back to the client
+   *  settings repo only if a caller omits it. */
+  contact?: StorefrontContact;
 }
 
-export function ContactPage({ defaultSubject }: ContactPageProps) {
-  const contactInfo = getStorefrontContactInfo();
-  const businessHours = getStorefrontBusinessHours();
+export function ContactPage({ defaultSubject, contact }: ContactPageProps) {
+  const resolved: StorefrontContact = contact ?? {
+    ...getStorefrontContactInfo(),
+    businessHours: getStorefrontBusinessHours(),
+  };
+  const contactInfo = resolved;
+  const businessHours = resolved.businessHours;
   return (
     <>
       <StorePageHeader
