@@ -5,8 +5,9 @@ import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { HomepageProductSource } from "@/features/products/lib/homepage-catalog";
-import type { LandingProduct } from "@/constants/landing-data";
+import type { LandingCategory, LandingProduct } from "@/constants/landing-data";
 import type { Banner } from "@/types/media";
+import type { FaqItem, Testimonial } from "@/types/content";
 
 interface StoreHomeContentProps {
   /** Sections fetched on the server, so they render into the HTML. */
@@ -15,6 +16,11 @@ interface StoreHomeContentProps {
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
   /** Active hero banners read from the server, so both passes render the same banners. */
   banners: Banner[];
+  /** Categories read from the server, so both passes render the same category cards. */
+  categories: LandingCategory[];
+  /** Raw testimonials + faq read from the server, so both passes render the same. */
+  testimonials: Testimonial[];
+  faqs: FaqItem[];
   /** Set by the server from ?cmsPreview=1 — shows the draft banner. */
   isPreview?: boolean;
 }
@@ -23,6 +29,9 @@ export function StoreHomeContent({
   sections,
   rails,
   banners,
+  categories,
+  testimonials,
+  faqs,
   isPreview = false,
 }: StoreHomeContentProps) {
   return (
@@ -32,7 +41,7 @@ export function StoreHomeContent({
           CMS preview mode — showing draft homepage content
         </div>
       ) : null}
-      {renderSections(sections, rails, banners)}
+      {renderSections(sections, rails, banners, categories, testimonials, faqs)}
     </>
   );
 }
@@ -45,7 +54,10 @@ export function StoreHomeContent({
 function renderSections(
   sections: HomepageSectionInstance[],
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>,
-  banners: Banner[]
+  banners: Banner[],
+  categories: LandingCategory[],
+  testimonials: Testimonial[],
+  faqs: FaqItem[]
 ) {
   const idxNewsletter = sections.findIndex((s) => s.type === "newsletter");
   const idxCta = sections.findIndex((s) => s.type === "cta");
@@ -61,8 +73,8 @@ function renderSections(
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
             <div className="grid items-stretch gap-6 lg:grid-cols-2">
-              <HomepageSectionRenderer rails={rails} banners={banners} section={sections[idxNewsletter]} embedded />
-              <HomepageSectionRenderer rails={rails} banners={banners} section={sections[idxCta]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxNewsletter]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxCta]} embedded />
             </div>
           </div>
         </section>
@@ -73,6 +85,9 @@ function renderSections(
       <HomepageSectionRenderer
         rails={rails}
         banners={banners}
+        categories={categories}
+        testimonials={testimonials}
+        faqs={faqs}
         key={section.instanceId}
         section={section}
       />

@@ -40,6 +40,7 @@ import {
   instagramPosts,
   specialOffers,
   weddingCakes,
+  type LandingCategory,
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
@@ -47,7 +48,12 @@ import { getActivePromoBanners } from "@/features/content/lib/banners-repository
 import type { Banner } from "@/types/media";
 import { parseHeroSlides } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
-import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
+import {
+  getStorefrontFaqs,
+  getStorefrontTestimonials,
+  selectStorefrontFaqs,
+  selectStorefrontTestimonials,
+} from "@/features/content/lib/storefront-content";
 import {
   getHomepageProducts,
   type HomepageProductSource,
@@ -55,6 +61,7 @@ import {
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
+import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
@@ -76,6 +83,14 @@ interface HomepageSectionRendererProps {
    * the promo section falls back to the browser banner store.
    */
   banners?: Banner[];
+  /**
+   * Categories read on the server. When absent (admin builder preview) the
+   * category sections fall back to the browser catalogue.
+   */
+  categories?: LandingCategory[];
+  /** Raw testimonials + faq read on the server (absent in the builder preview). */
+  testimonials?: Testimonial[];
+  faqs?: FaqItem[];
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -202,7 +217,8 @@ function HeroSection(props: HomepageSectionRendererProps) {
 
 function OurMenuSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const items = getHomepageCategories(contentNumber(c, "maxCount", 8));
+  const maxCount = contentNumber(c, "maxCount", 8);
+  const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
 
   if (items.length === 0) return null;
 
@@ -327,7 +343,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
 function CategoriesSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
-  const items = getHomepageCategories(maxCount);
+  const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
 
   return (
     <SectionShell {...props} noReveal>
@@ -549,7 +565,9 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
 
 function TestimonialsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const items = getStorefrontTestimonials();
+  const items = props.testimonials
+    ? selectStorefrontTestimonials(props.testimonials)
+    : getStorefrontTestimonials();
   return (
     <SectionShell {...props}>
       <SectionHeader
@@ -641,7 +659,9 @@ function GallerySection(props: HomepageSectionRendererProps) {
 function FaqSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxItems = contentNumber(c, "maxItems", 6);
-  const items = getStorefrontFaqs();
+  const items = props.faqs
+    ? selectStorefrontFaqs(props.faqs)
+    : getStorefrontFaqs();
 
   return (
     <SectionShell {...props} noReveal>

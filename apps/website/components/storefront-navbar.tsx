@@ -12,7 +12,6 @@ import {
 } from "@/apps/website/account/components/customer-auth-modal";
 import { AccountMenu } from "@/apps/website/account/components/account-menu";
 import { GuestMenu } from "@/apps/website/account/components/guest-menu";
-import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
 import { getWishlistCount } from "@/apps/website/lib/wishlist";
@@ -21,19 +20,21 @@ import {
   getCustomerSession,
   hasCustomerSession,
 } from "@/apps/website/account/lib/customer-session";
-import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
-import {
-  getStorefrontHeaderSettings,
-  getStorefrontNavItems,
-} from "@/apps/website/lib/site-layout";
+import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
 import { cn } from "@/lib/utils";
 
-export function StorefrontNavbar() {
-  const [siteName, setSiteName] = useState(brandInfo.name);
-  const [logoLetter, setLogoLetter] = useState("M");
-  const [navItems, setNavItems] = useState(() => getStorefrontNavItems());
-  const [showSearch, setShowSearch] = useState(true);
+interface StorefrontNavbarProps {
+  chrome: StorefrontChrome;
+}
+
+export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
+  // Read on the server from MongoDB (see StorefrontChrome) — so the HTML already
+  // carries the admin's real store name / logo / nav, no defaults-then-swap flash.
+  const [siteName] = useState(chrome.siteName);
+  const [logoLetter] = useState(chrome.logoLetter);
+  const [navItems] = useState(chrome.navItems);
+  const [showSearch] = useState(chrome.showSearch);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -46,11 +47,8 @@ export function StorefrontNavbar() {
   const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
 
   useEffect(() => {
-    const header = getStorefrontHeaderSettings();
-    setSiteName(getStorefrontBrandInfo().name);
-    setLogoLetter(header.logoLetter || "M");
-    setNavItems(getStorefrontNavItems());
-    setShowSearch(header.showSearch);
+    // Store name / logo / nav / search come from the server chrome prop above;
+    // only the client-only cart, wishlist and customer session are read here.
     setCartCount(getCartItemCount());
     setWishlistCount(getWishlistCount());
     setSignedIn(hasCustomerSession());

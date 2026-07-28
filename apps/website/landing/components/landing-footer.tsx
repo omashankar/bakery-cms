@@ -12,13 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import {
-  getStorefrontBrandInfo,
-  getStorefrontBusinessHours,
-  getStorefrontContactInfo,
-  getStorefrontSocialLinks,
-} from "@/apps/website/lib/settings";
-import { getStorefrontFooterSettings } from "@/apps/website/lib/site-layout";
+import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { cn } from "@/lib/utils";
 
 const socialIconMap = {
@@ -28,12 +22,18 @@ const socialIconMap = {
   YouTube: Video,
 } as const;
 
-export function LandingFooter() {
-  const brandInfo = getStorefrontBrandInfo();
-  const contactInfo = getStorefrontContactInfo();
-  const businessHours = getStorefrontBusinessHours();
-  const socialLinks = getStorefrontSocialLinks();
-  const footerSettings = getStorefrontFooterSettings();
+interface LandingFooterProps {
+  chrome: StorefrontChrome;
+}
+
+export function LandingFooter({ chrome }: LandingFooterProps) {
+  // Read on the server from MongoDB (see StorefrontChrome) — the footer now
+  // renders the admin's real brand, contact, hours, social + columns in the HTML.
+  const brandInfo = chrome.brand;
+  const contactInfo = chrome.contact;
+  const businessHours = chrome.businessHours;
+  const socialLinks = chrome.socialLinks;
+  const footerSettings = chrome.footer;
 
   return (
     <footer className="border-t border-border surface-cream">

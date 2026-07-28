@@ -26,7 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { galleryCaptions, whyChooseUs } from "@/constants/landing-data";
-import { getStorefrontFaqs, getStorefrontTestimonials } from "@/features/content/lib/storefront-content";
+import {
+  getStorefrontFaqs,
+  getStorefrontTestimonials,
+  selectStorefrontFaqs,
+  selectStorefrontTestimonials,
+} from "@/features/content/lib/storefront-content";
 import {
   getWeddingCollectionProducts,
   getWeddingGalleryImages,
@@ -34,11 +39,18 @@ import {
 } from "@/features/products/lib/wedding-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { WeddingSectionInstance } from "@/types/wedding-builder";
+import type { LandingOffer, LandingProduct } from "@/constants/landing-data";
+import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
 
 interface WeddingSectionRendererProps {
   section: WeddingSectionInstance;
+  /** Wedding cakes + offers read on the server (absent in the builder preview). */
+  weddingProducts?: LandingProduct[];
+  weddingOffers?: LandingOffer[];
+  testimonials?: Testimonial[];
+  faqs?: FaqItem[];
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -250,7 +262,7 @@ function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
 function WeddingOffersSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 3);
-  const offers = getWeddingOffers(maxCount);
+  const offers = (props.weddingOffers ?? getWeddingOffers(maxCount)).slice(0, maxCount);
 
   return (
     <SectionShell {...props} noReveal>
@@ -283,7 +295,9 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
 function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
-  const cakes = getWeddingCollectionProducts(maxCount);
+  // Prefer the server-provided snapshot (SSR → identical on hydration); fall back
+  // to the client store only in the builder preview, which never server-renders.
+  const cakes = (props.weddingProducts ?? getWeddingCollectionProducts(maxCount)).slice(0, maxCount);
 
   return (
     <SectionShell {...props} noReveal>
@@ -389,7 +403,9 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
 function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 2);
-  const allTestimonials = getStorefrontTestimonials();
+  const allTestimonials = props.testimonials
+    ? selectStorefrontTestimonials(props.testimonials)
+    : getStorefrontTestimonials();
   const weddingTestimonials = allTestimonials.filter((item) =>
     item.role.toLowerCase().includes("wedding")
   );
@@ -473,8 +489,10 @@ function WeddingInquirySection(props: WeddingSectionRendererProps) {
 function WeddingFaqSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxItems = contentNumber(c, "maxItems", 5);
-  const weddingCategoryFaqs = getStorefrontFaqs("wedding");
-  const allFaqs = getStorefrontFaqs();
+  const weddingCategoryFaqs = props.faqs
+    ? selectStorefrontFaqs(props.faqs, "wedding")
+    : getStorefrontFaqs("wedding");
+  const allFaqs = props.faqs ? selectStorefrontFaqs(props.faqs) : getStorefrontFaqs();
   const keywordFaqs = allFaqs.filter(
     (faq) =>
       faq.question.toLowerCase().includes("wedding") ||
