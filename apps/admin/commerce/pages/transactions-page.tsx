@@ -89,7 +89,7 @@ export function TransactionsPage() {
         }
       />
 
-      <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <DashboardStatCard
           title="Volume"
           value={formatCurrency(volume)}

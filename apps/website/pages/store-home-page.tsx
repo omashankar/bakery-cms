@@ -3,10 +3,13 @@ import {
   getDraftHomepageSections,
   getPublishedHomepageSections,
 } from "@/features/cms-sections/data/homepage-sections.server";
-import { getHomepageRails } from "@/features/products/data/products-service";
+import { getHomepageRails, getProducts } from "@/features/products/data/products-service";
+import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { getContent } from "@/features/content/server/content.service";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
+import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
 import type { Banner } from "@/types/media";
+import type { FaqItem, Testimonial } from "@/types/content";
 
 interface StoreHomePageProps {
   /** CMS preview flag comes from the URL: ?cmsPreview=1 */
@@ -26,20 +29,35 @@ interface StoreHomePageProps {
  * the content lands in the initial HTML rather than streaming in after it.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
-  const [sections, rails, bannersRaw] = await Promise.all([
-    isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
-    getHomepageRails(),
-    // Read banners from MongoDB on the server so the promo-banner section renders
-    // the SAME banners in the HTML and on hydration (no client localStorage race).
-    getContent("banners"),
-  ]);
+  const [sections, rails, bannersRaw, products, catalog, testimonialsRaw, faqsRaw] =
+    await Promise.all([
+      isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
+      getHomepageRails(),
+      // Read banners/testimonials/faq from MongoDB on the server so those sections
+      // render the SAME content in the HTML and on hydration (no localStorage race).
+      getContent("banners"),
+      getProducts(),
+      getCatalog(),
+      getContent("testimonials"),
+      getContent("faq"),
+    ]);
   const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "all");
+  // Categories computed on the server too, so the category sections render the
+  // same in the HTML and on hydration.
+  const categories = selectHomepageCategories(
+    products,
+    (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
+    12
+  );
 
   return (
     <StoreHomeContent
       sections={sections}
       rails={rails}
       banners={banners}
+      categories={categories}
+      testimonials={(testimonialsRaw ?? []) as Testimonial[]}
+      faqs={(faqsRaw ?? []) as FaqItem[]}
       isPreview={isPreview}
     />
   );

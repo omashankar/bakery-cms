@@ -145,7 +145,7 @@ export function AdminHeader({
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-[min(100vw-1rem,15rem)]">
                 <div className="flex items-center gap-3 px-2 py-1.5">
                   <Avatar className="size-9 ring-1 ring-sidebar-border">
                     <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">

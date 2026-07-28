@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -57,7 +58,7 @@ export function MediaPicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Choose from Media Library</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -99,9 +100,11 @@ export function MediaPicker({
           </div>
         )}
 
-        <Button variant="outline" onClick={() => onOpenChange(false)}>
-          Cancel
-        </Button>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -268,8 +268,8 @@ function PhoneStep({
     >
       <div className="space-y-2">
         <Label htmlFor="auth-phone">Mobile Number</Label>
-        <div className="flex items-center overflow-hidden rounded-lg border border-input bg-white focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
-          <span className="flex h-10 items-center border-r border-border bg-cream-100 px-3 text-sm font-medium text-foreground">
+        <div className="flex items-center overflow-hidden rounded-lg border border-input bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+          <span className="flex h-10 items-center border-r border-border bg-muted px-3 text-sm font-medium text-foreground">
             +91
           </span>
           <input
@@ -352,7 +352,7 @@ function OtpStep({
               value={digit}
               onChange={(e) => onChange(index, e.target.value)}
               onKeyDown={(e) => onKeyDown(index, e)}
-              className="size-12 rounded-xl border border-input bg-white text-center font-heading text-xl font-bold text-foreground outline-none focus:border-bakery-500 focus:ring-3 focus:ring-bakery-200"
+              className="size-12 rounded-xl border border-input bg-background text-center font-heading text-xl font-bold text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
             />
           ))}
         </div>
@@ -461,8 +461,8 @@ function SignupStep({
 
       <div className="space-y-2">
         <Label htmlFor="su-phone">Mobile Number</Label>
-        <div className="flex items-center overflow-hidden rounded-lg border border-input bg-white focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
-          <span className="flex h-10 items-center border-r border-border bg-cream-100 px-3 text-sm font-medium text-foreground">
+        <div className="flex items-center overflow-hidden rounded-lg border border-input bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+          <span className="flex h-10 items-center border-r border-border bg-muted px-3 text-sm font-medium text-foreground">
             +91
           </span>
           <input

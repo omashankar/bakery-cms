@@ -90,7 +90,7 @@ export function AdminNotificationBell() {
         )}
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[min(100vw-2rem,380px)] p-0">
+      <DropdownMenuContent align="end" className="w-[min(100vw-2rem,340px)] p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <p className="text-sm font-semibold">Notifications</p>
@@ -105,7 +105,7 @@ export function AdminNotificationBell() {
           ) : null}
         </div>
 
-        <div className="max-h-[min(60vh,420px)] space-y-2 overflow-y-auto p-3">
+        <div className="panel-scroll max-h-[min(60vh,420px)] space-y-2 overflow-y-auto p-3">
           {notifications.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-8 text-center">
               <Bell className="mx-auto size-8 text-muted-foreground/60" />
@@ -128,7 +128,10 @@ export function AdminNotificationBell() {
         </div>
 
         <DropdownMenuSeparator className="m-0" />
-        <DropdownMenuItem render={<Link href={routes.admin.commerce.notifications} />}>
+        <DropdownMenuItem
+          className="justify-center py-2.5 text-sm font-medium text-primary"
+          render={<Link href={routes.admin.commerce.notifications} />}
+        >
           View notification center
         </DropdownMenuItem>
       </DropdownMenuContent>

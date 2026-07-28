@@ -22,6 +22,17 @@ export const defaultHeaderSettings: HeaderSettings = {
   updatedAt: nowIso(),
 };
 
+/**
+ * Pure selector for the storefront's visible nav (filtered + ordered). Shared by
+ * the client store AND the server render so both passes agree — the server reads
+ * this from MongoDB and passes the snapshot down as a prop.
+ */
+export function selectVisibleNavItems(nav: HeaderNavItem[]): HeaderNavItem[] {
+  return [...nav]
+    .filter((item) => item.isVisible)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 export type HeaderOverview = {
   totalLinks: number;
   visibleLinks: number;
