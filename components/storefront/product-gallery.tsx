@@ -66,7 +66,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
-        <DialogContent className="max-w-3xl border-border p-2 sm:p-3" showCloseButton>
+        <DialogContent className="border-border p-2 sm:max-w-3xl sm:p-3" showCloseButton>
           <DialogTitle className="sr-only">{productName}</DialogTitle>
           <div className="relative aspect-square overflow-hidden rounded-xl bg-cream-100">
             <Image src={activeImage} alt={productName} fill className="object-contain" sizes="90vw" />

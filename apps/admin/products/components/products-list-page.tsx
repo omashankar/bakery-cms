@@ -638,7 +638,7 @@ export function ProductsListPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 flex-1"
+                        className="h-8 min-w-0 flex-1"
                         render={<Link href={routes.admin.cakes.edit(cake.id)} />}
                       >
                         Edit
@@ -646,7 +646,7 @@ export function ProductsListPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 flex-1"
+                        className="h-8 min-w-0 flex-1"
                         render={<Link href={routes.admin.cakes.preview(cake.id)} />}
                       >
                         Preview
@@ -654,13 +654,14 @@ export function ProductsListPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8"
+                        className="h-8 shrink-0"
+                        aria-label="Delete"
                         onClick={() =>
                           setDeleteTarget({ ids: [cake.id], name: cake.name })
                         }
                       >
                         <Trash2 className="size-3.5" />
-                        Delete
+                        <span className="hidden sm:inline">Delete</span>
                       </Button>
                     </div>
                   </div>

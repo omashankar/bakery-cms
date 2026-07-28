@@ -77,7 +77,7 @@ export function RefundOrderDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Issue refund?</DialogTitle>
           <DialogDescription>
@@ -100,7 +100,7 @@ export function RefundOrderDialog({
                   className={
                     "rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors " +
                     (refundType === type
-                      ? "border-bakery-700 bg-cream-50 text-bakery-700"
+                      ? "border-primary bg-primary/10 text-primary"
                       : "border-border bg-card text-muted-foreground hover:bg-muted")
                   }
                 >

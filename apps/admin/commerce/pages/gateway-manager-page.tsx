@@ -70,7 +70,7 @@ export function GatewayManagerPage() {
         description="Enable, configure and prioritise the gateways your bakery accepts."
       />
 
-      <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <DashboardStatCard
           title="Active gateways"
           value={String(enabledCount)}

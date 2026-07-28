@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Link2, Upload } from "lucide-react";
+import { ImagePlus, Link2, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,10 +30,12 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
   const inputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   function reset() {
     setUrl("");
     setIsDragging(false);
+    setIsUploading(false);
   }
 
   function createFromUrl(imageUrl: string, name?: string, size = 220_000, publicId?: string) {
@@ -68,6 +70,7 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
   }
 
   function handleFiles(fileList: FileList | null) {
+    if (isUploading) return;
     const file = fileList?.[0];
     if (!file) return;
 
@@ -76,19 +79,30 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
       return;
     }
 
+    setIsUploading(true);
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result;
-      if (typeof dataUrl !== "string") return;
-      // Upload to Cloudinary when configured; otherwise fall back to the data URI.
-      const asset = await uploadMediaRequest(dataUrl);
-      if (asset) {
-        createFromUrl(asset.url, file.name, asset.bytes ?? file.size, asset.publicId);
-      } else {
-        createFromUrl(dataUrl, file.name, file.size);
+      if (typeof dataUrl !== "string") {
+        setIsUploading(false);
+        return;
+      }
+      try {
+        // Upload to Cloudinary when configured; otherwise fall back to the data URI.
+        const asset = await uploadMediaRequest(dataUrl);
+        if (asset) {
+          createFromUrl(asset.url, file.name, asset.bytes ?? file.size, asset.publicId);
+        } else {
+          createFromUrl(dataUrl, file.name, file.size);
+        }
+      } finally {
+        setIsUploading(false);
       }
     };
-    reader.onerror = () => toast.error("Could not read image file");
+    reader.onerror = () => {
+      toast.error("Could not read image file");
+      setIsUploading(false);
+    };
     reader.readAsDataURL(file);
   }
 
@@ -126,9 +140,14 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
           <ImagePlus className="mx-auto mb-3 size-8 text-muted-foreground" />
           <p className="text-sm font-medium">Drag & drop image here</p>
           <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WEBP up to 10 MB (demo)</p>
-          <Button className="mt-4" variant="outline" onClick={() => inputRef.current?.click()}>
-            <Upload className="size-4" />
-            Browse files
+          <Button
+            className="mt-4"
+            variant="outline"
+            disabled={isUploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+            {isUploading ? "Uploading…" : "Browse files"}
           </Button>
           <input
             ref={inputRef}
@@ -148,7 +167,12 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://images.unsplash.com/..."
             />
-            <Button variant="outline" className="shrink-0" onClick={() => createFromUrl(url)}>
+            <Button
+              variant="outline"
+              className="shrink-0"
+              disabled={isUploading}
+              onClick={() => createFromUrl(url)}
+            >
               <Link2 className="size-4" />
               Add
             </Button>
