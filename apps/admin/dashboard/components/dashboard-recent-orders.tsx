@@ -10,6 +10,7 @@ import { routes } from "@/constants/routes";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { getRecentOrders } from "../lib/dashboard-data";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
 export function DashboardRecentOrders() {
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
@@ -20,8 +21,7 @@ export function DashboardRecentOrders() {
     }
 
     refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
+    return subscribeToAdminData(refresh);
   }, []);
 
   return (

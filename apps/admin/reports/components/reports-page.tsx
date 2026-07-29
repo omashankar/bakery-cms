@@ -19,25 +19,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
-import type { PlacedOrder } from "@/features/orders/lib/orders";
 import {
   exportReportsCsv,
-  filterOrdersByPreviousRange,
-  filterOrdersByRange,
-  getCityBreakdown,
-  getCouponBreakdown,
-  getPaymentBreakdown,
-  getRecentReportOrders,
-  getReportsComparison,
   getReportsSummary,
-  getRevenueTrend,
-  getStatusBreakdown,
-  getTopCustomers,
-  getTopProducts,
-  loadReportOrders,
   type ReportDateRange,
   type ReportsComparison,
 } from "../lib/reports-data";
+import {
+  fetchOrderAnalytics,
+  type OrderAnalyticsResponse,
+} from "@/features/orders/lib/orders-api";
+import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
 
 const rangeOptions: Array<{ value: ReportDateRange; label: string }> = [
   { value: "7d", label: "Last 7 days" },
@@ -88,45 +80,46 @@ function RankListItem({
   );
 }
 
+/** How many rows each list card shows. The server returns a longer sorted list. */
+const LIST_ROWS = 6;
+
 export function ReportsPage() {
   const [range, setRange] = useState<ReportDateRange>("30d");
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(null);
+  const [failed, setFailed] = useState(false);
 
+  // Every figure here is a total over the whole range, so it is computed on the
+  // server across every matching order. Computing it in the browser meant
+  // computing it over the cached slice of recent orders — which quietly
+  // understated revenue, items sold and every breakdown once a shop grew.
   useEffect(() => {
-    function refresh() {
-      setOrders(loadReportOrders());
-      setMounted(true);
+    let cancelled = false;
+
+    async function load() {
+      const result = await fetchOrderAnalytics(range);
+      if (cancelled) return;
+      if (result) setAnalytics(result);
+      setFailed(!result);
     }
 
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, []);
+    void load();
+    window.addEventListener(ORDERS_UPDATED_EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ORDERS_UPDATED_EVENT, load);
+    };
+  }, [range]);
 
-  const filteredOrders = useMemo(() => filterOrdersByRange(orders, range), [orders, range]);
-  const previousOrders = useMemo(
-    () => filterOrdersByPreviousRange(orders, range),
-    [orders, range]
-  );
-
-  const summary = useMemo(
-    () => (mounted ? getReportsSummary(filteredOrders) : emptySummary),
-    [filteredOrders, mounted]
-  );
-  const previousSummary = useMemo(
-    () => (mounted ? getReportsSummary(previousOrders) : emptySummary),
-    [previousOrders, mounted]
-  );
-  const comparison = useMemo(
-    () => (mounted ? getReportsComparison(summary, previousSummary) : emptyComparison),
-    [summary, previousSummary, mounted]
-  );
-
-  const trend = useMemo(
-    () => (mounted ? getRevenueTrend(orders, range) : []),
-    [orders, range, mounted]
-  );
+  const summary = analytics?.summary ?? emptySummary;
+  const comparison = analytics?.comparison ?? emptyComparison;
+  const trend = useMemo(() => analytics?.trend ?? [], [analytics]);
+  const statusBreakdown = analytics?.statusBreakdown ?? [];
+  const paymentBreakdown = analytics?.paymentBreakdown ?? [];
+  const topProducts = (analytics?.topProducts ?? []).slice(0, LIST_ROWS);
+  const topCustomers = (analytics?.topCustomers ?? []).slice(0, LIST_ROWS);
+  const cities = (analytics?.cityBreakdown ?? []).slice(0, LIST_ROWS);
+  const coupons = (analytics?.couponBreakdown ?? []).slice(0, LIST_ROWS);
+  const recentOrders = (analytics?.recentOrders ?? []).slice(0, LIST_ROWS);
 
   // The bar grid is wider than the card at every breakpoint, so it scrolls.
   // Start at the right — the latest day matters most on a trend chart.
@@ -135,40 +128,16 @@ export function ReportsPage() {
     const el = trendScrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
   }, [trend]);
-  const statusBreakdown = useMemo(
-    () => (mounted ? getStatusBreakdown(filteredOrders) : []),
-    [filteredOrders, mounted]
-  );
-  const paymentBreakdown = useMemo(
-    () => (mounted ? getPaymentBreakdown(filteredOrders) : []),
-    [filteredOrders, mounted]
-  );
-  const topProducts = useMemo(
-    () => (mounted ? getTopProducts(filteredOrders, 6) : []),
-    [filteredOrders, mounted]
-  );
-  const topCustomers = useMemo(
-    () => (mounted ? getTopCustomers(filteredOrders, 6) : []),
-    [filteredOrders, mounted]
-  );
-  const cities = useMemo(
-    () => (mounted ? getCityBreakdown(filteredOrders, 6) : []),
-    [filteredOrders, mounted]
-  );
-  const coupons = useMemo(
-    () => (mounted ? getCouponBreakdown(filteredOrders, 6) : []),
-    [filteredOrders, mounted]
-  );
-  const recentOrders = useMemo(
-    () => (mounted ? getRecentReportOrders(filteredOrders, 6) : []),
-    [filteredOrders, mounted]
-  );
 
   const maxRevenue = Math.max(...trend.map((item) => item.revenue), 1);
   const hasTrendData = trend.some((item) => item.revenue > 0 || item.orders > 0);
+  // Label the range the FIGURES are for, not the one the selector is on. They
+  // differ while a new range is loading, and captioning last month's revenue
+  // "Last 7 days" is simply a wrong statement.
+  const shownRange = (analytics?.range as ReportDateRange | undefined) ?? range;
   const rangeLabel =
-    rangeOptions.find((option) => option.value === range)?.label ?? "Selected range";
-  const showComparison = range !== "all";
+    rangeOptions.find((option) => option.value === shownRange)?.label ?? "Selected range";
+  const showComparison = shownRange !== "all";
 
   function handleExport() {
     exportReportsCsv(
@@ -178,7 +147,7 @@ export function ReportsPage() {
       cities,
       coupons,
       paymentBreakdown,
-      range
+      shownRange
     );
     toast.success("Full report exported to CSV");
   }
@@ -187,7 +156,9 @@ export function ReportsPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Reports"
-        description={rangeLabel}
+        description={
+          failed ? "Figures unavailable — the server did not answer" : rangeLabel
+        }
         className="gap-3"
         actions={
           <div className="flex w-full gap-2">

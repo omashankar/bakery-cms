@@ -1,25 +1,106 @@
 /**
  * Client-side orders API. The storefront dual-writes placed orders to the
  * server (so the admin, on another device, sees them); the admin dual-writes
- * lifecycle changes and hydrates the full list. Best-effort — never throws, so
- * the localStorage flow keeps working offline/unauthenticated.
+ * lifecycle changes and hydrates the full list. Never throws, so the
+ * localStorage flow keeps working offline/unauthenticated.
+ *
+ * Every mutation resolves to whether the SERVER accepted it. Admin lifecycle
+ * changes — status, cancellation, refunds — must not be reported as saved on the
+ * strength of the local write alone: the server is the source of truth, so a
+ * rejected write is silently undone by the next hydration.
  */
 import type { OrderStatus, PaymentStatus, PlacedOrder, RefundOrderInput } from "./orders";
+import type {
+  CityBreakdownItem,
+  CouponBreakdownItem,
+  PaymentBreakdownItem,
+  ReportsComparison,
+  ReportsSummary,
+  RevenueTrendPoint,
+  StatusBreakdownItem,
+  TopCustomerItem,
+  TopProductItem,
+} from "./order-analytics";
+import type { InvoiceOverview, RefundOverview } from "./order-overviews";
+import type { PaymentAnalytics } from "@/features/payments/lib/payment-analytics";
+import type { TransactionView } from "@/features/payments/lib/transactions";
+
+/** Mirrors `CommerceOverviews` from the server analytics module. */
+export interface CommerceOverviewsResponse {
+  refunds: RefundOverview;
+  invoices: InvoiceOverview;
+  payments: PaymentAnalytics;
+}
+
+/** Mirrors `OrderAnalytics` from the server analytics module. */
+export interface OrderAnalyticsResponse {
+  range: string;
+  summary: ReportsSummary;
+  previousSummary: ReportsSummary;
+  comparison: ReportsComparison;
+  trend: RevenueTrendPoint[];
+  statusBreakdown: StatusBreakdownItem[];
+  paymentBreakdown: PaymentBreakdownItem[];
+  topProducts: TopProductItem[];
+  topCustomers: TopCustomerItem[];
+  cityBreakdown: CityBreakdownItem[];
+  couponBreakdown: CouponBreakdownItem[];
+  recentOrders: PlacedOrder[];
+}
 
 interface Envelope<T> {
   success: boolean;
   data: T | null;
 }
 
-async function send(path: string, method: string, body?: unknown): Promise<void> {
+export interface OrdersPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface PagedEnvelope<T> extends Envelope<T> {
+  pagination: OrdersPagination | null;
+}
+
+/** Per-status counts and revenue across every order, aggregated server-side. */
+export interface OrderStatsSummary {
+  total: number;
+  pending: number;
+  confirmed: number;
+  preparing: number;
+  ready: number;
+  outForDelivery: number;
+  delivered: number;
+  cancelled: number;
+  refunded: number;
+  revenue: number;
+}
+
+export interface OrderPageQuery {
+  status?: string;
+  paymentStatus?: string;
+  deliveryStatus?: string;
+  dateRange?: string;
+  search?: string;
+  amountMin?: number;
+  amountMax?: number;
+  page?: number;
+  limit?: number;
+}
+
+/** Resolves false on a network failure OR a non-2xx response (401, 404, 500…). */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
   try {
-    await fetch(path, {
+    const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    return res.ok;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -28,36 +109,45 @@ export function placeOrderRequest(order: PlacedOrder): void {
   void send("/api/orders", "POST", order);
 }
 
-export function updateStatusRequest(orderId: string, status: OrderStatus): void {
-  void send(`/api/orders/${orderId}/status`, "PATCH", { status });
+export function updateStatusRequest(orderId: string, status: OrderStatus): Promise<boolean> {
+  return send(`/api/orders/${orderId}/status`, "PATCH", { status });
 }
 
-export function cancelOrderRequest(orderId: string, cancellationReason?: string): void {
-  void send(`/api/orders/${orderId}/cancel`, "POST", { cancellationReason });
+export function cancelOrderRequest(
+  orderId: string,
+  cancellationReason?: string,
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/cancel`, "POST", { cancellationReason });
 }
 
-export function refundOrderRequest(orderId: string, input: RefundOrderInput): void {
-  void send(`/api/orders/${orderId}/refund`, "POST", input);
+export function refundOrderRequest(
+  orderId: string,
+  input: RefundOrderInput,
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/refund`, "POST", input);
 }
 
 export function paymentStatusRequest(
   orderId: string,
   paymentStatus: PaymentStatus,
   paymentReference?: string,
-): void {
-  void send(`/api/orders/${orderId}/payment`, "PATCH", { paymentStatus, paymentReference });
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/payment`, "PATCH", { paymentStatus, paymentReference });
 }
 
-export function adminNotesRequest(orderId: string, adminNotes: string): void {
-  void send(`/api/orders/${orderId}/notes`, "PATCH", { adminNotes });
+export function adminNotesRequest(orderId: string, adminNotes: string): Promise<boolean> {
+  return send(`/api/orders/${orderId}/notes`, "PATCH", { adminNotes });
 }
 
-export function refundNotesRequest(orderId: string, notes: string): void {
-  void send(`/api/orders/${orderId}/refund-notes`, "PATCH", { notes });
+export function refundNotesRequest(orderId: string, notes: string): Promise<boolean> {
+  return send(`/api/orders/${orderId}/refund-notes`, "PATCH", { notes });
 }
 
-export function requestRefundRequest(orderId: string, input: RefundOrderInput): void {
-  void send(`/api/orders/${orderId}/refund-request`, "POST", input);
+export function requestRefundRequest(
+  orderId: string,
+  input: RefundOrderInput,
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/refund-request`, "POST", input);
 }
 
 /** Admin: fetch all orders from the server (401 → null for non-admins). */
@@ -66,6 +156,98 @@ export async function fetchOrders(): Promise<PlacedOrder[] | null> {
     const res = await fetch("/api/orders", { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     const json = (await res.json()) as Envelope<PlacedOrder[]>;
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: one filtered, sorted page of orders straight from the server, with the
+ * total matching count.
+ *
+ * The admin list reads this rather than filtering the localStorage cache: that
+ * cache only ever holds the most recent slice, so anything older than it was
+ * both unreachable and silently missing from the counts.
+ */
+export async function fetchOrdersPage(
+  query: OrderPageQuery,
+): Promise<{ items: PlacedOrder[]; pagination: OrdersPagination | null } | null> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    params.set(key, String(value));
+  }
+
+  try {
+    const res = await fetch(`/api/orders?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as PagedEnvelope<PlacedOrder[]>;
+    if (!json.success || !json.data) return null;
+    return { items: json.data, pagination: json.pagination };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: report/dashboard analytics over every order in the range.
+ *
+ * Sends the browser's timezone offset so daily and monthly buckets follow the
+ * admin's calendar rather than the server's.
+ */
+export async function fetchOrderAnalytics(
+  range: string,
+): Promise<OrderAnalyticsResponse | null> {
+  const params = new URLSearchParams({
+    range,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+
+  try {
+    const res = await fetch(`/api/orders/analytics?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<OrderAnalyticsResponse>;
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: refund/invoice/payment overview counters over every order.
+ *
+ * The three screens that show these were counting the local order cache, which
+ * only ever holds the most recent slice — so each card was a total that was
+ * quietly too small.
+ */
+export async function fetchCommerceOverviews(): Promise<CommerceOverviewsResponse | null> {
+  const params = new URLSearchParams({
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+
+  try {
+    const res = await fetch(`/api/orders/overviews?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<CommerceOverviewsResponse>;
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Admin: counts + revenue over the whole collection (not just the loaded page). */
+export async function fetchOrderStats(): Promise<OrderStatsSummary | null> {
+  try {
+    const res = await fetch("/api/orders/stats", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<OrderStatsSummary>;
     return json.success ? json.data : null;
   } catch {
     return null;
@@ -87,3 +269,63 @@ export async function fetchOrder(orderId: string): Promise<PlacedOrder | null> {
     return null;
   }
 }
+
+/** A commerce list screen's page: rows, the total match count, and its counters. */
+export interface CommerceListPageResponse<TItem, TOverview> {
+  items: TItem[];
+  total: number;
+  overview: TOverview;
+}
+
+async function fetchListPage<T>(path: string, query: Record<string, unknown>): Promise<T | null> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    params.set(key, String(value));
+  }
+
+  try {
+    const res = await fetch(`${path}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<T>;
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: refund cases, invoices and transactions — each a filtered page over
+ * EVERY order, returned with its counters from the same snapshot.
+ *
+ * These lists cannot be served by the generic `/api/orders` filter set: a refund
+ * case's status, its reason fallback and its activity date are all derived from
+ * `status` + `refundRecord` together, and a transaction's status group is
+ * derived too. None of them is a stored field to query on.
+ */
+export const fetchRefundCasesPage = (query: Record<string, unknown>) =>
+  fetchListPage<CommerceListPageResponse<PlacedOrder, RefundOverview>>(
+    "/api/orders/refund-cases",
+    query,
+  );
+
+export const fetchInvoicesPage = (query: Record<string, unknown>) =>
+  fetchListPage<CommerceListPageResponse<PlacedOrder, InvoiceOverview>>(
+    "/api/orders/invoices",
+    query,
+  );
+
+/** Mirrors `TransactionsOverview` from the server analytics module. */
+export interface TransactionsOverviewResponse {
+  filteredVolume: number;
+  filteredSuccessCount: number;
+  totalRecords: number;
+}
+
+export const fetchTransactionsPage = (query: Record<string, unknown>) =>
+  fetchListPage<CommerceListPageResponse<TransactionView, TransactionsOverviewResponse>>(
+    "/api/orders/transactions",
+    query,
+  );

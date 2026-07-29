@@ -31,10 +31,16 @@ function readAllMeta(): Record<string, CustomerAdminMeta> {
   }
 }
 
+/**
+ * Writes the local copy WITHOUT announcing it.
+ *
+ * The announcement has to wait for the server write. Listeners react by
+ * refetching, and a refetch that starts before the server has the change reads
+ * the old value back and paints over what the admin just typed.
+ */
 function writeAllMeta(store: Record<string, CustomerAdminMeta>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  emitCustomersUpdated();
 }
 
 export function getCustomerAdminMeta(email: string): CustomerAdminMeta {
@@ -43,7 +49,21 @@ export function getCustomerAdminMeta(email: string): CustomerAdminMeta {
   return store[key] ?? defaultCustomerAdminMeta(key);
 }
 
-export function saveCustomerAdminMeta(meta: CustomerAdminMeta): CustomerAdminMeta {
+/**
+ * Writes locally, then to the server.
+ *
+ * `persisted` is false when the server rejected it — the local copy is only a
+ * cache, so a rejected write is silently discarded at the next hydration and
+ * the caller must not report it as saved.
+ */
+export interface CustomerMetaResult {
+  meta: CustomerAdminMeta;
+  persisted: boolean;
+}
+
+export async function saveCustomerAdminMeta(
+  meta: CustomerAdminMeta
+): Promise<CustomerMetaResult> {
   const key = meta.email.trim().toLowerCase();
   const saved: CustomerAdminMeta = {
     ...defaultCustomerAdminMeta(key),
@@ -55,8 +75,15 @@ export function saveCustomerAdminMeta(meta: CustomerAdminMeta): CustomerAdminMet
   const store = readAllMeta();
   store[key] = saved;
   writeAllMeta(store);
-  saveCustomerMetaRequest(saved);
-  return saved;
+
+  const persisted = await saveCustomerMetaRequest(saved);
+  // Announce only after a write the server ACCEPTED. Listeners refetch when they
+  // hear this; doing so before the write lands — or after one the server
+  // rejected — reads the stale value back over the admin's own edit, while the
+  // toast tells them it was kept.
+  if (persisted) emitCustomersUpdated();
+
+  return { meta: saved, persisted };
 }
 
 /** Hydration: merge the server's customer metadata into the local cache. */
@@ -69,42 +96,53 @@ export function persistServerCustomerMeta(
     store[email.trim().toLowerCase()] = meta;
   }
   writeAllMeta(store);
+  // Safe to announce immediately — this IS the server's copy, so a listener
+  // refetching cannot read back anything older than what just arrived.
+  emitCustomersUpdated();
 }
 
-export function updateCustomerNotes(email: string, notes: string): CustomerAdminMeta {
-  return saveCustomerAdminMeta({
-    ...getCustomerAdminMeta(email),
-    notes,
-  });
+/**
+ * Every one of these takes the CURRENT metadata rather than reading the local
+ * cache for it.
+ *
+ * The screens that call them render the server's copy, and the local cache is
+ * only opportunistically populated — so composing a write from the cache sent
+ * whatever happened to be there. On a cold browser that is an empty record, and
+ * removing one tag would have wiped every tag and note the server held.
+ */
+export function updateCustomerNotes(
+  current: CustomerAdminMeta,
+  notes: string
+): Promise<CustomerMetaResult> {
+  return saveCustomerAdminMeta({ ...current, notes });
 }
 
 export function updateCustomerMarketingOptIn(
-  email: string,
+  current: CustomerAdminMeta,
   marketingOptIn: boolean
-): CustomerAdminMeta {
-  return saveCustomerAdminMeta({
-    ...getCustomerAdminMeta(email),
-    marketingOptIn,
-  });
+): Promise<CustomerMetaResult> {
+  return saveCustomerAdminMeta({ ...current, marketingOptIn });
 }
 
-export function addCustomerTag(email: string, tag: string): CustomerAdminMeta {
+export function addCustomerTag(
+  current: CustomerAdminMeta,
+  tag: string
+): Promise<CustomerMetaResult> {
   const normalizedTag = tag.trim();
-  if (!normalizedTag) return getCustomerAdminMeta(email);
+  // Nothing to write, so nothing could fail to persist.
+  if (!normalizedTag || current.tags.includes(normalizedTag)) {
+    return Promise.resolve({ meta: current, persisted: true });
+  }
 
-  const meta = getCustomerAdminMeta(email);
-  if (meta.tags.includes(normalizedTag)) return meta;
-
-  return saveCustomerAdminMeta({
-    ...meta,
-    tags: [...meta.tags, normalizedTag],
-  });
+  return saveCustomerAdminMeta({ ...current, tags: [...current.tags, normalizedTag] });
 }
 
-export function removeCustomerTag(email: string, tag: string): CustomerAdminMeta {
-  const meta = getCustomerAdminMeta(email);
+export function removeCustomerTag(
+  current: CustomerAdminMeta,
+  tag: string
+): Promise<CustomerMetaResult> {
   return saveCustomerAdminMeta({
-    ...meta,
-    tags: meta.tags.filter((item) => item !== tag),
+    ...current,
+    tags: current.tags.filter((item) => item !== tag),
   });
 }

@@ -58,6 +58,10 @@ const orderSchema = new mongoose.Schema(
   { minimize: false },
 );
 
+// The admin list sorts by placedAt and pages through it; without this index that
+// is a full collection scan plus an in-memory sort on every request.
+orderSchema.index({ placedAt: -1 });
+
 orderSchema.set("toJSON", {
   virtuals: false,
   versionKey: false,

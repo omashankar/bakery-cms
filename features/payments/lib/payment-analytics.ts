@@ -1,4 +1,9 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import {
+  DEFAULT_TIME_ZONE,
+  zonedDayKey,
+  zonedStartOfDay,
+} from "@/features/orders/lib/viewer-time";
 import { deriveTransactionStatus } from "@/features/payments/lib/payment-status";
 
 /**
@@ -39,16 +44,28 @@ export interface PaymentAnalytics {
 }
 
 const SUCCESS = new Set(["captured", "paid", "cod_paid"]);
-const DAY = 86_400_000;
 
 function methodLabel(method: string): string {
   if (method === "cod") return "Cash on Delivery";
   return "Online (Razorpay)";
 }
 
-export function getPaymentAnalytics(orders: PlacedOrder[]): PaymentAnalytics {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+/**
+ * @param timeZone the VIEWER's IANA zone (Asia/Kolkata).
+ *   This runs on the server, so "today" and the daily buckets must follow the
+ *   admin's calendar; reading the environment's zone here would make them
+ *   follow the server's. A numeric offset would not do: a DST zone has two,
+ *   and one of them is wrong for part of the week.
+ */
+export function getPaymentAnalytics(
+  orders: PlacedOrder[],
+  timeZone: string = DEFAULT_TIME_ZONE,
+  nowMs = Date.now(),
+): PaymentAnalytics {
+  // Day boundaries come from the viewer's calendar, per instant — a constant
+  // offset would put the far side of a DST change in the wrong bucket.
+  const startOfToday = zonedStartOfDay(nowMs, timeZone);
+  const dayKey = (ms: number) => zonedDayKey(ms, timeZone);
 
   let todayCollection = 0;
   let totalCollection = 0;
@@ -64,14 +81,21 @@ export function getPaymentAnalytics(orders: PlacedOrder[]): PaymentAnalytics {
   const methodMap = new Map<string, { count: number; amount: number }>();
   const dayBuckets = new Map<string, number>();
 
-  // Seed 7-day buckets (oldest -> newest)
+  // Seed 7-day buckets (oldest -> newest), keyed exactly as orders are keyed.
+  // Stepping by CALENDAR days rather than a fixed 24h: across a DST change the
+  // two drift apart and a whole day lands on a key with no bucket.
   const dayLabels: { key: string; label: string }[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(startOfToday - i * DAY);
-    const key = d.toISOString().slice(0, 10);
-    const label = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-    dayLabels.push({ key, label });
-    dayBuckets.set(key, 0);
+    const dayStart = zonedStartOfDay(nowMs, timeZone, -i);
+    dayLabels.push({
+      key: dayKey(dayStart),
+      label: new Date(dayStart).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        timeZone,
+      }),
+    });
+    dayBuckets.set(dayKey(dayStart), 0);
   }
 
   for (const order of orders) {
@@ -93,7 +117,7 @@ export function getPaymentAnalytics(orders: PlacedOrder[]): PaymentAnalytics {
       const placed = new Date(order.placedAt).getTime();
       if (placed >= startOfToday) todayCollection += amount;
 
-      const key = new Date(order.placedAt).toISOString().slice(0, 10);
+      const key = dayKey(placed);
       if (dayBuckets.has(key)) dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + amount);
 
       const m = methodMap.get(order.paymentMethod) ?? { count: 0, amount: 0 };

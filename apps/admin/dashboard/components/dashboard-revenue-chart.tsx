@@ -1,34 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
-import {
-  EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
-  getDashboardCommerceAnalytics,
-  type DashboardDateRange,
-} from "../lib/dashboard-analytics";
+import { type DashboardCommerceAnalytics } from "../lib/dashboard-analytics";
 
 interface DashboardRevenueChartProps {
-  range: DashboardDateRange;
+  analytics: DashboardCommerceAnalytics;
 }
 
-export function DashboardRevenueChart({ range }: DashboardRevenueChartProps) {
-  const [analytics, setAnalytics] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS);
-
-  useEffect(() => {
-    function refresh() {
-      setAnalytics(getDashboardCommerceAnalytics(range));
-    }
-
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, [range]);
-
+export function DashboardRevenueChart({ analytics }: DashboardRevenueChartProps) {
   const trend = analytics.trend;
   const maxRevenue = Math.max(...trend.map((item) => item.revenue), 1);
   const latest = trend[trend.length - 1];

@@ -119,15 +119,19 @@ export function getNotificationSettings(): NotificationSettings {
   }
 }
 
-export function saveNotificationSettings(
+/**
+ * Applies the preferences locally, re-derives the alert list, and pushes to the
+ * server. Resolves false when the server rejected the write, so the caller can
+ * tell the admin the truth instead of an unconditional "Saved".
+ */
+export async function saveNotificationSettings(
   settings: NotificationSettings
-): NotificationSettings {
-  if (typeof window === "undefined") return settings;
+): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  const synced = syncNotifications(settings);
-  writeStoredNotifications(synced);
-  replaceNotificationSettingsRequest(settings);
-  return settings;
+  // syncNotifications writes + emits itself when the derived set changed.
+  syncNotifications(settings);
+  return replaceNotificationSettingsRequest(settings);
 }
 
 /** Hydration: apply the server's notification settings locally (no re-push). */
@@ -136,8 +140,28 @@ export function persistServerNotificationSettings(
 ): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  const synced = syncNotifications(settings);
-  writeStoredNotifications(synced);
+  syncNotifications(settings);
+  // Settings alone may not change the derived set (so syncNotifications stays
+  // quiet), but the open preferences panel still needs to pick them up.
+  emitNotificationsUpdated();
+}
+
+/**
+ * Forget dismissals for stock alerts whose condition no longer holds, so the
+ * alert can fire again if the product runs low a second time. Also keeps the
+ * dismissed set from growing without bound as stock churns.
+ */
+function pruneResolvedStockDismissals(dismissed: Set<string>, liveIds: Set<string>): void {
+  let changed = false;
+
+  for (const id of dismissed) {
+    if (id.startsWith("stock:") && !liveIds.has(id)) {
+      dismissed.delete(id);
+      changed = true;
+    }
+  }
+
+  if (changed) writeDismissedIds(dismissed);
 }
 
 function mergeReadState(
@@ -273,11 +297,18 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
   }
 
   if (settings.stockAlerts) {
-    for (const item of getInventoryItems()) {
+    // A stock alert describes a *state*, not a one-off event, so its dismissal
+    // must not outlive the condition. Track which stock ids are live right now
+    // and drop dismissals for the ones that have resolved (see the prune below).
+    const liveStockIds = new Set<string>();
+    const inventory = getInventoryItems();
+
+    for (const item of inventory) {
       if (item.unlimitedStock) continue;
 
       if (item.stockStatus === "low_stock") {
         const id = `stock:${item.cakeId}:low_stock`;
+        liveStockIds.add(id);
         if (dismissed.has(id)) continue;
 
         generated.push({
@@ -295,6 +326,7 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
 
       if (item.stockStatus === "out_of_stock") {
         const id = `stock:${item.cakeId}:out_of_stock`;
+        liveStockIds.add(id);
         if (dismissed.has(id)) continue;
 
         generated.push({
@@ -309,6 +341,13 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
           createdAt: item.updatedAt,
         });
       }
+    }
+
+    // Only prune when the catalogue is actually loaded. An empty inventory here
+    // means the product cache has not hydrated yet, not that every stock issue
+    // resolved — pruning then would resurrect every alert the admin dismissed.
+    if (inventory.length > 0) {
+      pruneResolvedStockDismissals(dismissed, liveStockIds);
     }
   }
 
@@ -347,8 +386,14 @@ export function countUnreadNotifications(): number {
   return readStoredNotifications().filter((notification) => !notification.read).length;
 }
 
-export function getNotificationOverview(): NotificationOverview {
-  const notifications = readStoredNotifications();
+/**
+ * Pure counter over an already-derived list. Screens that just called
+ * `syncNotifications()` should use this rather than `getNotificationOverview()`,
+ * so the cards and the list below them are counted from the same snapshot.
+ */
+export function buildNotificationOverview(
+  notifications: AdminNotification[]
+): NotificationOverview {
   return {
     total: notifications.length,
     unread: notifications.filter((notification) => !notification.read).length,
@@ -365,6 +410,10 @@ export function getNotificationOverview(): NotificationOverview {
     inquiryCount: notifications.filter((notification) => notification.type === "inquiry_new")
       .length,
   };
+}
+
+export function getNotificationOverview(): NotificationOverview {
+  return buildNotificationOverview(readStoredNotifications());
 }
 
 export function markNotificationRead(id: string): void {

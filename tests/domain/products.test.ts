@@ -59,8 +59,18 @@ describe("cakes repository", () => {
     expect(loadProducts().length).toBeGreaterThan(0);
   });
 
-  it("re-seeds when stored data is an empty array", () => {
+  it("keeps a stored empty array empty instead of re-seeding", () => {
+    // An empty array is what useProductCacheSync writes when the server's
+    // catalogue is genuinely empty. Re-seeding it would resurrect the demo cakes
+    // on top of a live backend — and the admin would see products that do not
+    // exist. Only a missing key (first run) and corrupt JSON re-seed.
     localStorage.setItem("bakery-cms-admin-cakes", "[]");
+
+    expect(loadProducts()).toEqual([]);
+  });
+
+  it("seeds when nothing has ever been stored", () => {
+    localStorage.removeItem("bakery-cms-admin-cakes");
 
     expect(loadProducts().length).toBeGreaterThan(0);
   });

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,27 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import {
-  EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
-  getDashboardCommerceAnalytics,
-  type DashboardDateRange,
+  type DashboardCommerceAnalytics,
 } from "../lib/dashboard-analytics";
 
 interface DashboardTopProductsProps {
-  range: DashboardDateRange;
+  analytics: DashboardCommerceAnalytics;
 }
 
-export function DashboardTopProducts({ range }: DashboardTopProductsProps) {
-  const [products, setProducts] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS.topProducts);
-
-  useEffect(() => {
-    function refresh() {
-      setProducts(getDashboardCommerceAnalytics(range).topProducts.slice(0, 4));
-    }
-
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, [range]);
+export function DashboardTopProducts({ analytics }: DashboardTopProductsProps) {
+  const products = analytics.topProducts.slice(0, 4);
 
   return (
     <Card className="flex h-full flex-col shadow-sm">

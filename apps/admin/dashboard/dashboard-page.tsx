@@ -5,10 +5,12 @@ import { IndianRupee, MessageSquare, Send, ShoppingBag } from "lucide-react";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { routes } from "@/constants/routes";
+import { DashboardActivityFeed } from "./components/dashboard-activity-feed";
 import { DashboardAlertsStrip } from "./components/dashboard-alerts-strip";
 import { DashboardInventoryWidget } from "./components/dashboard-inventory-widget";
 import { DashboardInquiriesPanel } from "./components/dashboard-inquiries-panel";
 import { DashboardOrderPipeline } from "./components/dashboard-order-pipeline";
+import { DashboardPaymentMix } from "./components/dashboard-payment-mix";
 import { DashboardQuickActions } from "./components/dashboard-quick-actions";
 import { DashboardRangeSelect } from "./components/dashboard-range-select";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
@@ -17,11 +19,14 @@ import { DashboardStatCard } from "./components/dashboard-stat-card";
 import { DashboardTopProducts } from "./components/dashboard-top-products";
 import {
   EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
-  getDashboardCommerceAnalytics,
   getDashboardRangeLabel,
+  toDashboardCommerceAnalytics,
   type DashboardDateRange,
 } from "./lib/dashboard-analytics";
 import { EMPTY_DASHBOARD_STATS, getDashboardStats } from "./lib/dashboard-data";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
+import { fetchOrderAnalytics } from "@/features/orders/lib/orders-api";
+import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 
 export function DashboardPage() {
@@ -30,6 +35,7 @@ export function DashboardPage() {
   const [commerce, setCommerce] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS);
   const [range, setRange] = useState<DashboardDateRange>("30d");
   const [lastUpdated, setLastUpdated] = useState("");
+  const [analyticsFailed, setAnalyticsFailed] = useState(false);
 
   useEffect(() => {
     const session = getDemoSession();
@@ -42,29 +48,52 @@ export function DashboardPage() {
 
     function refresh() {
       setStats(getDashboardStats());
-      setCommerce(getDashboardCommerceAnalytics(range));
       setLastUpdated(formatDate(new Date()));
     }
 
     refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    window.addEventListener("bakery-inventory-updated", refresh);
-    window.addEventListener("bakery-inquiries-updated", refresh);
-    window.addEventListener("bakery-notifications-updated", refresh);
+    return subscribeToAdminData(refresh);
+  }, []);
+
+  // Every commerce figure on this page is a total over the range, so it is
+  // computed on the server across every matching order — and fetched ONCE here
+  // rather than by each card, which would be four requests for one answer.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const result = await fetchOrderAnalytics(range);
+      if (cancelled) return;
+      if (result) setCommerce(toDashboardCommerceAnalytics(range, result));
+      setAnalyticsFailed(!result);
+    }
+
+    void load();
+    // Only the orders event, not all five. Each call is an aggregation over the
+    // whole collection, and admin entry fires several of these events in quick
+    // succession — subscribing to the lot turned one page view into a dozen
+    // full-collection requests. Nothing here derives from products, inventory,
+    // inquiries or notifications anyway.
+    window.addEventListener(ORDERS_UPDATED_EVENT, load);
 
     return () => {
-      window.removeEventListener("bakery-orders-updated", refresh);
-      window.removeEventListener("bakery-inventory-updated", refresh);
-      window.removeEventListener("bakery-inquiries-updated", refresh);
-      window.removeEventListener("bakery-notifications-updated", refresh);
+      // Both, not just the unsubscribe: a request already in flight would
+      // otherwise still resolve and set state after this effect is torn down.
+      cancelled = true;
+      window.removeEventListener(ORDERS_UPDATED_EVENT, load);
     };
   }, [range]);
 
-  const rangeLabel = getDashboardRangeLabel(range);
+  // Label the range the FIGURES are for, not the one the selector is on — they
+  // differ while a new range is loading, and captioning last month's revenue
+  // "Last 7 days" is simply a wrong statement.
+  const rangeLabel = getDashboardRangeLabel(commerce.range);
   const description = [
     greetingName ? `Welcome back, ${greetingName}` : null,
     rangeLabel,
     lastUpdated || null,
+    // Saying nothing would leave ₹0 reading as fact.
+    analyticsFailed ? "Figures unavailable — the server did not answer" : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -127,10 +156,10 @@ export function DashboardPage() {
 
       <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
-          <DashboardRevenueChart range={range} />
+          <DashboardRevenueChart analytics={commerce} />
         </div>
         <div className="min-w-0 lg:col-span-4">
-          <DashboardOrderPipeline range={range} />
+          <DashboardOrderPipeline analytics={commerce} />
         </div>
       </section>
 
@@ -140,11 +169,16 @@ export function DashboardPage() {
       </section>
 
       <section className="grid items-stretch gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <DashboardTopProducts range={range} />
+        <DashboardTopProducts analytics={commerce} />
         <DashboardInventoryWidget />
         <div className="sm:col-span-2 xl:col-span-1">
-          <DashboardQuickActions />
+          <DashboardPaymentMix analytics={commerce} />
         </div>
+      </section>
+
+      <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
+        <DashboardActivityFeed />
+        <DashboardQuickActions />
       </section>
     </AdminPage>
   );

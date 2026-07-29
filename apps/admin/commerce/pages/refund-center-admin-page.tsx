@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
   Clock3,
   Download,
+  Loader2,
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,24 +22,23 @@ import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order-dialog";
 import { RefundStatusBadge } from "@/apps/admin/commerce/components/refund-status-badge";
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
-import { ensureDemoRefundCases } from "@/apps/admin/commerce/lib/refund-demo";
 import {
   defaultRefundFilters,
+  EMPTY_REFUND_OVERVIEW,
   exportRefundsToCsv,
-  filterRefundCases,
   formatRefundReason,
   getRefundCaseStatus,
-  getRefundOverview,
   REFUND_REASON_OPTIONS,
   type RefundListFilters,
+  type RefundOverview,
 } from "@/apps/admin/commerce/lib/refund-utils";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import {
-  getOrders,
   refundOrder,
   type PlacedOrder,
   type RefundOrderInput,
 } from "@/features/orders/lib/orders";
+import { fetchRefundCasesPage } from "@/features/orders/lib/orders-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,18 +47,11 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 const PAGE_SIZE = 8;
-
-const EMPTY_OVERVIEW = {
-  totalCases: 0,
-  refundedCount: 0,
-  cancelledCount: 0,
-  requestedCount: 0,
-  processingCount: 0,
-  refundedAmount: 0,
-  pendingAmount: 0,
-};
+/** Matches the server's max page size — one request, no client-side paging loop. */
+const EXPORT_LIMIT = 500;
 
 const caseTabs: Array<{
   value: RefundListFilters["caseType"];
@@ -181,41 +174,68 @@ function RefundCaseDetail({
 }
 
 export function RefundCenterAdminPage() {
-  const [mounted, setMounted] = useState(false);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [filters, setFilters] = useState<RefundListFilters>(defaultRefundFilters);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<PlacedOrder | null>(null);
+  const [total, setTotal] = useState(0);
+  const [overview, setOverview] = useState<RefundOverview>(EMPTY_REFUND_OVERVIEW);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
-  function refresh() {
-    setOrders(getOrders());
-    setMounted(true);
-  }
-
-  useEffect(() => {
-    ensureDemoRefundCases();
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, []);
-
-  const filtered = useMemo(() => filterRefundCases(orders, filters), [orders, filters]);
-  const overview = useMemo(
-    () => (mounted ? getRefundOverview(orders) : EMPTY_OVERVIEW),
-    [orders, mounted]
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // The rows AND the counters come from one server snapshot over every order.
+  // Filtering the browser cache here meant paging through only the most recent
+  // slice, and a card could report a total the list below could not reach.
+  // One debounced key for filters AND page. The search box is undebounced
+  // and each request filters the whole orders collection server-side, so
+  // keying the fetch straight off the input turned a six-letter name into
+  // six full-collection queries, five of them already stale on arrival.
+  // The request uses the CLAMPED page. Filters or a mutation can shrink the
+  // result set under the page the admin is on; asking for the raw page then
+  // returns nothing and hides the pager, stranding them with no way back.
+  const requestKey = useDebouncedValue(
+    JSON.stringify({ filters, page: currentPage }),
+    250
+  );
+  const request = JSON.parse(requestKey) as {
+    filters: Record<string, unknown>;
+    page: number;
+  };
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // Re-armed on EVERY request, not just the first: without this a refilter
+      // asserts "none found" over the old empty list while the new one loads.
+      setLoading(true);
+      const result = await fetchRefundCasesPage({ ...request.filters, page: request.page, limit: PAGE_SIZE });
+      if (cancelled) return;
+      if (result) {
+        setOrders(result.items);
+        setTotal(result.total);
+        setOverview(result.overview);
+      }
+      setFailed(!result);
+      setLoading(false);
+    }
 
-  const selected = filtered.find((order) => order.id === selectedId) ?? null;
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestKey, reloadKey]);
+
+  const paginated = orders;
+  const selected = orders.find((order) => order.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (selectedId && !filtered.some((order) => order.id === selectedId)) {
+    if (selectedId && !orders.some((order) => order.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [filtered, selectedId]);
+  }, [orders, selectedId]);
 
   function updateFilters(patch: Partial<RefundListFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -230,23 +250,62 @@ export function RefundCenterAdminPage() {
     return overview.processingCount;
   }
 
-  function handleRefundConfirm(input: RefundOrderInput) {
+  async function handleRefundConfirm(input: RefundOrderInput) {
     if (!refundTarget) return;
-    const updated = refundOrder(refundTarget.id, input);
-    if (!updated) return;
+    const { order: updated, persisted } = await refundOrder(refundTarget.id, input);
+    if (!updated) {
+      // The order was not cached and the server read failed too. The dialog has
+      // already closed itself, so without this the click produces nothing at all.
+      setRefundTarget(null);
+      toast.error("Could not load that order", {
+        description: "The server did not answer — reload and try again.",
+      });
+      return;
+    }
     setRefundTarget(null);
-    refresh();
+    // Re-read only now that the refund has actually reached the server; the
+    // local write announces itself before the request resolves.
+    setReloadKey((key) => key + 1);
     setSelectedId(updated.id);
+
+    if (!persisted) {
+      toast.error("Refund recorded on this device only — the server rejected it.", {
+        description: "Reload to see the server's version.",
+      });
+      return;
+    }
+
     toast.success("Refund recorded", { description: updated.refundReference });
   }
 
-  function handleExport() {
-    if (filtered.length === 0) {
+  async function handleExport() {
+    if (total === 0) {
       toast.error("No refund cases to export");
       return;
     }
-    exportRefundsToCsv(filtered);
-    toast.success(`Exported ${filtered.length} refund case${filtered.length === 1 ? "" : "s"}`);
+
+    // The page holds PAGE_SIZE rows, so exporting the whole filtered set means
+    // asking the server for it rather than writing out what happens to be visible.
+    const result = await fetchRefundCasesPage({
+      ...filters,
+      page: 1,
+      limit: Math.min(total, EXPORT_LIMIT),
+    });
+    if (!result || result.items.length === 0) {
+      toast.error("Could not load refund cases to export");
+      return;
+    }
+
+    exportRefundsToCsv(result.items);
+
+    if (total > EXPORT_LIMIT) {
+      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${total} refund cases`, {
+        description: "Narrow the filters to export the rest.",
+      });
+      return;
+    }
+
+    toast.success(`Exported ${result.items.length} refund case${result.items.length === 1 ? "" : "s"}`);
   }
 
   const openCases =
@@ -393,10 +452,17 @@ export function RefundCenterAdminPage() {
             <CardTitle className="text-base">Cases</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5 pt-0">
-            {paginated.length === 0 ? (
+            {paginated.length === 0 && loading ? (
+              // Asserting there are none before the server has answered is a
+              // guess, and a wrong one on every cold load in a shop that has them.
+              <div className="flex min-h-48 items-center justify-center py-14">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <span className="sr-only">Loading refund cases</span>
+              </div>
+            ) : paginated.length === 0 ? (
               <EmptyState
                 icon={RotateCcw}
-                title="No refund cases"
+                title={failed ? "Could not load refund cases" : "No refund cases"}
                 description="Cancelled or refunded orders will appear here."
               />
             ) : (
@@ -450,7 +516,7 @@ export function RefundCenterAdminPage() {
               })
             )}
 
-            {filtered.length > PAGE_SIZE ? (
+            {total > PAGE_SIZE ? (
               <ListPagination
                 currentPage={currentPage}
                 totalPages={totalPages}

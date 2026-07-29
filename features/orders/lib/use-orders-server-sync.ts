@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import { fetchOrders } from "./orders-api";
-import { persistServerOrders } from "./orders";
+import { markOrdersSyncSettled, persistServerOrders } from "./orders";
 
 /**
  * Hydrates the local order cache from the server once on entering the admin, so
@@ -16,7 +16,11 @@ export function useOrdersServerSync(): void {
 
     (async () => {
       const orders = await fetchOrders();
-      if (!cancelled && orders) persistServerOrders(orders);
+      if (cancelled) return;
+      if (orders) persistServerOrders(orders);
+      // Mark settled even when the fetch failed, so screens stop waiting and
+      // fall back to the cache rather than showing a spinner forever.
+      markOrdersSyncSettled();
     })();
 
     return () => {

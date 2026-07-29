@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, MapPin, Phone, Plus, Tag, X } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, MapPin, Phone, Plus, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { CustomerSegmentBadge } from "@/apps/admin/commerce/components/customer-segment-badge";
@@ -13,17 +13,14 @@ import {
   updateCustomerMarketingOptIn,
   updateCustomerNotes,
 } from "@/apps/admin/commerce/lib/customers-repository";
+import { fetchCustomerDetail } from "@/apps/admin/commerce/lib/customers-api";
 import {
   getCustomerActivity,
-  getCustomerAddresses,
-  getCustomerProfileById,
-  type CustomerProfile,
+  getCustomerAddresses,  type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
-import { getOrdersForCustomerRecord } from "@/apps/admin/commerce/lib/customer-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,46 +40,67 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
   const [notes, setNotes] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
+  // Queried by email on the server. Filtering the browser's order cache instead
+  // would silently omit a long-standing customer's earliest orders, and with
+  // them their true order count, spend and first-order date.
   useEffect(() => {
-    function refresh() {
-      ensureDemoOrders();
-      const nextProfile = getCustomerProfileById(customerId);
-      setProfile(nextProfile);
-      if (nextProfile) {
-        setOrders(
-          getOrdersForCustomerRecord(nextProfile.email).sort(
-            (a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime()
-          )
-        );
-        setNotes(nextProfile.meta.notes);
+    let cancelled = false;
+
+    async function refresh() {
+      const result = await fetchCustomerDetail(customerId);
+      if (cancelled) return;
+      setFailed(!result);
+      if (result) {
+        setProfile(result.profile);
+        setOrders(result.orders);
+        if (result.profile) setNotes(result.profile.meta.notes);
       }
+      setLoading(false);
     }
 
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
+    void refresh();
     window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     return () => {
-      window.removeEventListener("bakery-orders-updated", refresh);
+      cancelled = true;
       window.removeEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     };
   }, [customerId, refreshKey]);
 
   const addresses = useMemo(
-    () => (profile ? getCustomerAddresses(profile.email) : []),
-    [profile, refreshKey]
+    () => (profile ? getCustomerAddresses(orders) : []),
+    [profile, orders]
   );
   const activity = useMemo(
-    () => (profile ? getCustomerActivity(profile.email) : []),
-    [profile, refreshKey]
+    () => (profile ? getCustomerActivity(profile.email, orders) : []),
+    [profile, orders]
   );
+
+  if (loading) {
+    // "Customer not found" before the request has answered would be a guess, and
+    // a wrong one every single time an admin opens a customer that does exist.
+    return (
+      <AdminPage>
+        <div className="flex min-h-64 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <span className="sr-only">Loading customer</span>
+        </div>
+      </AdminPage>
+    );
+  }
 
   if (!profile) {
     return (
       <AdminPage>
         <AdminPageHeader
-          title="Customer not found"
-          description="This customer record could not be loaded."
+          title={failed ? "Could not load this customer" : "Customer not found"}
+          description={
+            failed
+              ? "The server did not answer. Check your connection and reload."
+              : "No customer exists for this address."
+          }
           actions={
             <Button variant="outline" render={<Link href={routes.admin.customers.list} />}>
               <ArrowLeft className="size-4" />
@@ -98,32 +116,60 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     setRefreshKey((value) => value + 1);
   }
 
-  function handleSaveNotes() {
+  /**
+   * The local write always succeeds; only the server write makes it real. Saying
+   * "saved" on the strength of the former loses the admin's notes at the next
+   * hydration without ever telling them.
+   */
+  function reportUnpersisted(what: string) {
+    toast.error(`${what} on this device only — the server rejected the change.`, {
+      description: "Reload to see the server's version.",
+    });
+  }
+
+  async function handleSaveNotes() {
     if (!profile) return;
-    updateCustomerNotes(profile.email, notes);
+    const { persisted } = await updateCustomerNotes(profile.meta, notes);
     refreshProfile();
+    if (!persisted) return reportUnpersisted("Notes saved");
     toast.success("Customer notes saved");
   }
 
-  function handleMarketingToggle(checked: boolean) {
+  async function handleMarketingToggle(checked: boolean) {
     if (!profile) return;
-    updateCustomerMarketingOptIn(profile.email, checked);
-    refreshProfile();
+    const current = profile.meta;
+
+    // The Switch is driven by server-sourced state, so without moving it here it
+    // does not budge until the round trip finishes — and not at all if the
+    // request hangs. Move it now; put it back if the server refuses.
+    setProfile((prev) =>
+      prev ? { ...prev, meta: { ...prev.meta, marketingOptIn: checked } } : prev
+    );
+
+    const { meta, persisted } = await updateCustomerMarketingOptIn(current, checked);
+    if (!persisted) {
+      setProfile((prev) => (prev ? { ...prev, meta: current } : prev));
+      return reportUnpersisted("Marketing preference saved");
+    }
+
+    setProfile((prev) => (prev ? { ...prev, meta } : prev));
     toast.success(checked ? "Marketing opt-in enabled" : "Marketing opt-in disabled");
   }
 
-  function handleAddTag() {
+  async function handleAddTag() {
     if (!profile) return;
-    const saved = addCustomerTag(profile.email, tagInput);
+    const { meta, persisted } = await addCustomerTag(profile.meta, tagInput);
     setTagInput("");
-    setProfile((current) => (current ? { ...current, meta: saved } : current));
+    setProfile((current) => (current ? { ...current, meta } : current));
+    if (!persisted) return reportUnpersisted("Tag added");
     toast.success("Tag added");
   }
 
-  function handleRemoveTag(tag: string) {
+  async function handleRemoveTag(tag: string) {
     if (!profile) return;
-    const saved = removeCustomerTag(profile.email, tag);
-    setProfile((current) => (current ? { ...current, meta: saved } : current));
+    const { meta, persisted } = await removeCustomerTag(profile.meta, tag);
+    setProfile((current) => (current ? { ...current, meta } : current));
+    if (!persisted) reportUnpersisted("Tag removed");
   }
 
   return (

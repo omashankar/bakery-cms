@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
+  Loader2,
   Eye,
   FileText,
   IndianRupee,
@@ -18,15 +19,13 @@ import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-
 import { InvoiceDesignPanel } from "@/apps/admin/commerce/components/invoice-design-panel";
 import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { InvoicePreviewDialog } from "@/apps/admin/commerce/components/invoice-preview-dialog";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import {
   defaultInvoiceListFilters,
   EMPTY_INVOICE_OVERVIEW,
   exportInvoicesToCsv,
-  filterInvoiceOrders,
-  getInvoiceOverview,
   type InvoiceListFilters,
+  type InvoiceOverview,
 } from "@/apps/admin/commerce/lib/invoice-utils";
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
@@ -48,21 +47,28 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
-import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { fetchInvoicesPage } from "@/features/orders/lib/orders-api";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { InvoiceSettings } from "@/types/invoice";
 
 const PAGE_SIZE = 10;
+/** Matches the server's max page size — one request, no client-side paging loop. */
+const EXPORT_LIMIT = 500;
 
 type InvoiceTab = "invoices" | "design";
 
 export function InvoicesAdminPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<InvoiceTab>("invoices");
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [overview, setOverview] = useState<InvoiceOverview>(EMPTY_INVOICE_OVERVIEW);
   const [filters, setFilters] = useState<InvoiceListFilters>(defaultInvoiceListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -77,10 +83,6 @@ export function InvoicesAdminPage() {
   });
 
   useEffect(() => {
-    function refreshOrders() {
-      ensureDemoOrders();
-      setOrders(getOrders());
-    }
     function refreshSettings() {
       setInvoiceSettings(loadInvoiceSettings());
       const commerce = getCommerceSettings();
@@ -91,33 +93,66 @@ export function InvoicesAdminPage() {
       });
     }
 
-    refreshOrders();
     refreshSettings();
-    setMounted(true);
 
-    window.addEventListener("bakery-orders-updated", refreshOrders);
     window.addEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     return () => {
-      window.removeEventListener("bakery-orders-updated", refreshOrders);
       window.removeEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     };
   }, []);
+
+  // Rows AND counters from one server snapshot over every order. Filtering the
+  // browser cache meant paging through only the most recent slice, and a card
+  // could report a total the list below could not reach.
+  // One debounced key for filters AND page. The search box is undebounced
+  // and each request filters the whole orders collection server-side, so
+  // keying the fetch straight off the input turned a six-letter name into
+  // six full-collection queries, five of them already stale on arrival.
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  // The request uses the CLAMPED page. Filters or a mutation can shrink the
+  // result set under the page the admin is on; asking for the raw page then
+  // returns nothing and hides the pager, stranding them with no way back.
+  const requestKey = useDebouncedValue(
+    JSON.stringify({ filters, page: currentPage }),
+    250
+  );
+  const request = JSON.parse(requestKey) as {
+    filters: Record<string, unknown>;
+    page: number;
+  };
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // Re-armed on EVERY request, not just the first: without this a refilter
+      // asserts "none found" over the old empty list while the new one loads.
+      setLoading(true);
+      const result = await fetchInvoicesPage({ ...request.filters, page: request.page, limit: PAGE_SIZE });
+      if (cancelled) return;
+      if (result) {
+        setOrders(result.items);
+        setTotal(result.total);
+        setOverview(result.overview);
+      }
+      setFailed(!result);
+      setLoading(false);
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestKey]);
 
   useEffect(() => {
     if (!printOrder) return;
     return runBrowserPrint(() => setPrintOrder(null));
   }, [printOrder]);
 
-  const filtered = useMemo(() => filterInvoiceOrders(orders, filters), [orders, filters]);
-  const overview = useMemo(
-    () => (mounted ? getInvoiceOverview(orders) : EMPTY_INVOICE_OVERVIEW),
-    [orders, mounted]
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginated = orders;
   const pageIds = paginated.map((order) => order.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
@@ -142,17 +177,42 @@ export function InvoicesAdminPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function handleExport() {
-    const target =
-      selectedIds.length > 0
-        ? orders.filter((order) => selectedIds.includes(order.id))
-        : filtered;
-    if (target.length === 0) {
+  async function handleExport() {
+    // A selection only ever spans the current page, so it needs no fetch.
+    if (selectedIds.length > 0) {
+      const target = orders.filter((order) => selectedIds.includes(order.id));
+      exportInvoicesToCsv(target);
+      toast.success(`Exported ${target.length} invoice${target.length === 1 ? "" : "s"}`);
+      return;
+    }
+
+    if (total === 0) {
       toast.error("No invoices to export");
       return;
     }
-    exportInvoicesToCsv(target);
-    toast.success(`Exported ${target.length} invoice${target.length === 1 ? "" : "s"}`);
+
+    // The page holds PAGE_SIZE rows, so exporting the whole filtered set means
+    // asking the server for it rather than writing out what happens to be visible.
+    const result = await fetchInvoicesPage({
+      ...filters,
+      page: 1,
+      limit: Math.min(total, EXPORT_LIMIT),
+    });
+    if (!result || result.items.length === 0) {
+      toast.error("Could not load invoices to export");
+      return;
+    }
+
+    exportInvoicesToCsv(result.items);
+
+    if (total > EXPORT_LIMIT) {
+      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${total} invoices`, {
+        description: "Narrow the filters to export the rest.",
+      });
+      return;
+    }
+
+    toast.success(`Exported ${result.items.length} invoice${result.items.length === 1 ? "" : "s"}`);
   }
 
   function handlePrint(order: PlacedOrder) {
@@ -320,10 +380,17 @@ export function InvoicesAdminPage() {
               </div>
             ) : null}
 
-            {paginated.length === 0 ? (
+            {paginated.length === 0 && loading ? (
+              // Asserting there are none before the server has answered is a
+              // guess, and a wrong one on every cold load in a shop that has them.
+              <div className="flex min-h-48 items-center justify-center py-14">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <span className="sr-only">Loading invoices</span>
+              </div>
+            ) : paginated.length === 0 ? (
               <EmptyState
                 icon={Receipt}
-                title="No invoices found"
+                title={failed ? "Could not load invoices" : "No invoices found"}
                 description="Place a checkout order, or clear filters to see all invoices."
                 className="py-14"
               />

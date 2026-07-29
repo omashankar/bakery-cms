@@ -52,16 +52,12 @@ import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/n
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
 import { countNewInquiries } from "@/apps/admin/inquiries";
-import {
-  countInventoryAlerts,
-  INVENTORY_UPDATED_EVENT,
-} from "@/apps/admin/commerce/lib/inventory-repository";
+import { countInventoryAlerts } from "@/apps/admin/commerce/lib/inventory-repository";
 import {
   countUnreadNotifications,
-  NOTIFICATIONS_UPDATED_EVENT,
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import {
   getGeneralSettings,
   getModuleSettings,
@@ -429,17 +425,11 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     refreshBadges();
     refreshModules();
 
-    window.addEventListener(INVENTORY_UPDATED_EVENT, refreshBadges);
-    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshBadges);
-    window.addEventListener(INQUIRIES_UPDATED_EVENT, refreshBadges);
-    window.addEventListener("bakery-orders-updated", refreshBadges);
+    const unsubscribeBadges = subscribeToAdminData(refreshBadges);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
 
     return () => {
-      window.removeEventListener(INVENTORY_UPDATED_EVENT, refreshBadges);
-      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshBadges);
-      window.removeEventListener(INQUIRIES_UPDATED_EVENT, refreshBadges);
-      window.removeEventListener("bakery-orders-updated", refreshBadges);
+      unsubscribeBadges();
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
     };
   }, []);

@@ -141,8 +141,19 @@ async function refreshStockStatuses(slugs: string[]): Promise<void> {
 
 // ---- Reads ----------------------------------------------------------------
 
-export function getOrders() {
-  return repo.listAll();
+/** Filtered + paginated page for the admin order list. */
+export function getOrdersPage(query: repo.OrderListQuery) {
+  return repo.list(query);
+}
+
+/**
+ * Counts and revenue across every order, aggregated in Mongo.
+ *
+ * Kept separate from the list so the admin's totals stay correct no matter how
+ * few rows the current page happens to carry.
+ */
+export function getStats() {
+  return repo.stats();
 }
 export function getById(id: string) {
   return repo.findById(id);

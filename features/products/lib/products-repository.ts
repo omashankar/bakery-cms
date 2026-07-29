@@ -27,6 +27,30 @@ const STORAGE_VERSION_KEY = "bakery-cms-admin-cakes-version";
 /** v6: variant options carry an explicit `semantic`, backfilled from legacy labels. */
 const CAKES_STORAGE_VERSION = 6;
 
+/**
+ * Fired whenever the product cache changes — including when `useProductCacheSync`
+ * replaces it with the server's copy on entering the admin. Screens that read
+ * products synchronously (dashboard, inventory, global search) subscribe to this;
+ * without it they keep rendering whatever this browser happened to have cached
+ * when they mounted, which on a fresh browser is the seeded demo catalogue.
+ */
+export const PRODUCTS_UPDATED_EVENT = "bakery-products-updated";
+
+function emitProductsUpdated(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(PRODUCTS_UPDATED_EVENT));
+}
+
+/**
+ * Write without notifying. Used by `loadProducts` for its own seed/normalise
+ * self-heal: that runs *inside* readers, so emitting there would re-enter every
+ * subscriber from within its own render.
+ */
+function writeProducts(cakes: Product[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cakes));
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -195,16 +219,19 @@ export function loadProducts(): Product[] {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     const seeded = seedProducts();
-    persistProducts(seeded);
+    writeProducts(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
     return seeded;
   }
 
   try {
     const parsed = JSON.parse(raw) as Product[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // Only corrupt data re-seeds. A stored empty array is a real answer — it is
+    // what `useProductCacheSync` writes when the server's catalogue is empty —
+    // and re-seeding it would resurrect the demo cakes on top of a live backend.
+    if (!Array.isArray(parsed)) {
       const seeded = seedProducts();
-      persistProducts(seeded);
+      writeProducts(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
       return seeded;
     }
@@ -213,22 +240,22 @@ export function loadProducts(): Product[] {
     const { cakes: normalized, changed } = normalizeProductImages(parsed);
 
     if (changed || storedVersion < CAKES_STORAGE_VERSION) {
-      persistProducts(normalized);
+      writeProducts(normalized);
       localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
     }
 
     return normalized;
   } catch {
     const seeded = seedProducts();
-    persistProducts(seeded);
+    writeProducts(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
     return seeded;
   }
 }
 
 export function persistProducts(cakes: Product[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cakes));
+  writeProducts(cakes);
+  emitProductsUpdated();
 }
 
 export function getProductById(id: string): Product | null {

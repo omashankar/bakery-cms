@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Banknote,
@@ -16,9 +16,13 @@ import {
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
-import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
+import { useCommerceOverviews } from "@/apps/admin/commerce/lib/use-commerce-overviews";
 import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";
+import {
+  getOrders,
+  ORDERS_UPDATED_EVENT,
+  type PlacedOrder,
+} from "@/features/orders/lib/orders";
 import { RevenueChart } from "@/features/payments/components/revenue-chart";
 import { PaymentMethodBreakdown } from "@/features/payments/components/payment-method-breakdown";
 import { useCommerceSettingsForm } from "@/apps/admin/commerce/lib/use-commerce-settings-form";
@@ -63,6 +67,7 @@ const quickLinks = [
 export function PaymentsAdminPage() {
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [mounted, setMounted] = useState(false);
+  const { overviews } = useCommerceOverviews();
   const { settings, setSettings, isDirty, save } = useCommerceSettingsForm();
 
   // Razorpay connection (keys live on the server, never the browser).
@@ -72,24 +77,42 @@ export function PaymentsAdminPage() {
   const [gwSaving, setGwSaving] = useState(false);
 
   useEffect(() => {
-    ensureDemoOrders();
-    setOrders(getOrders());
+    let cancelled = false;
     setMounted(true);
-    const refresh = () => setOrders(getOrders());
-    window.addEventListener("bakery-orders-updated", refresh);
+
+    function refresh() {
+      setOrders(getOrders());
+    }
+
+    refresh();
+    window.addEventListener(ORDERS_UPDATED_EVENT, refresh);
 
     fetch("/api/razorpay/config")
       .then((res) => res.json())
       .then((status: GatewayStatus) => {
+        if (cancelled) return;
         setGateway(status);
         setGwKeyId(status.keyId || "");
       })
-      .catch(() => setGateway(null));
+      .catch(() => {
+        if (!cancelled) setGateway(null);
+      });
 
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ORDERS_UPDATED_EVENT, refresh);
+    };
   }, []);
 
-  const a = useMemo(() => getPaymentAnalytics(orders), [orders]);
+  // Collection totals span every order, which the local cache cannot answer —
+  // it only holds the most recent slice. Until the server replies (and if it
+  // never does: offline, expired session) fall back to what is loaded, so the
+  // cards are never a row of zeros telling a working shop it collected nothing.
+  // The offset matters even here: without it "Today's collection" is counted on
+  // UTC days, so an IST admin loses everything placed before 05:30 and gains
+  // yesterday evening's. Every other caller sends it; this path must too.
+  const a =
+    overviews?.payments ?? getPaymentAnalytics(orders, Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   const enabledCount = [settings.paymentMethods.razorpay, settings.paymentMethods.cod].filter(
     Boolean

@@ -6,11 +6,9 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
-import {
-  getInventoryOverview,
-  INVENTORY_UPDATED_EVENT,
-} from "@/apps/admin/commerce/lib/inventory-repository";
+import { getInventoryOverview } from "@/apps/admin/commerce/lib/inventory-repository";
 import type { InventoryOverview } from "@/types/inventory";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
 const EMPTY_INVENTORY_OVERVIEW: InventoryOverview = {
   totalSkus: 0,
@@ -31,8 +29,7 @@ export function DashboardInventoryWidget() {
     }
 
     refresh();
-    window.addEventListener(INVENTORY_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(INVENTORY_UPDATED_EVENT, refresh);
+    return subscribeToAdminData(refresh);
   }, []);
 
   return (

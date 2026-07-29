@@ -88,36 +88,58 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const statusOptions = getActiveFulfillmentStatuses();
   const isTerminal = order ? isTerminalOrderStatus(order.status) : false;
 
-  function handleStatusChange(status: OrderStatus) {
+  /**
+   * The local write always succeeds; the server write is what makes a change
+   * real. Reporting only the former would tell the admin an order was cancelled
+   * or refunded when the next hydration is about to undo it.
+   */
+  /** The order was not cached and the server read failed — never say nothing. */
+  function reportUnreachable() {
+    toast.error("Could not load that order", {
+      description: "The server did not answer — reload and try again.",
+    });
+  }
+
+  function reportUnpersisted(what: string) {
+    toast.error(`${what} on this device only — the server rejected the change.`, {
+      description: "Reload to see the server's version.",
+    });
+  }
+
+  async function handleStatusChange(status: OrderStatus) {
     if (!order) return;
-    const updated = updateOrderStatus(order.id, status);
-    if (!updated) return;
+    const { order: updated, persisted } = await updateOrderStatus(order.id, status);
+    if (!updated) return reportUnreachable();
     setOrder(updated);
+    if (!persisted) return reportUnpersisted("Status changed");
     toast.success(`Order marked as ${status.replace(/_/g, " ")}`);
   }
 
-  function handleSaveNotes() {
+  async function handleSaveNotes() {
     if (!order) return;
-    const updated = updateOrderAdminNotes(order.id, adminNotes);
-    if (!updated) return;
+    const { order: updated, persisted } = await updateOrderAdminNotes(order.id, adminNotes);
+    if (!updated) return reportUnreachable();
     setOrder(updated);
+    if (!persisted) return reportUnpersisted("Notes saved");
     toast.success("Internal notes saved");
   }
 
-  function handleCancel(reason: string) {
+  async function handleCancel(reason: string) {
     if (!order) return;
-    const updated = cancelOrder(order.id, reason);
-    if (!updated) return;
+    const { order: updated, persisted } = await cancelOrder(order.id, reason);
+    if (!updated) return reportUnreachable();
     setOrder(updated);
     setCancelOpen(false);
+    if (!persisted) return reportUnpersisted("Order cancelled");
     toast.success("Order cancelled");
   }
 
-  function handleRefund(input: RefundOrderInput) {
+  async function handleRefund(input: RefundOrderInput) {
     if (!order) return;
-    const updated = refundOrder(order.id, input);
-    if (!updated) return;
+    const { order: updated, persisted } = await refundOrder(order.id, input);
+    if (!updated) return reportUnreachable();
     setOrder(updated);
+    if (!persisted) return reportUnpersisted("Refund recorded");
     toast.success("Refund recorded", {
       description: updated.refundReference,
     });

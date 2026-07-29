@@ -6,6 +6,7 @@ import type { AppliedCoupon } from "./coupons";
 import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
 import {
+  fetchOrder,
   placeOrderRequest,
   updateStatusRequest,
   cancelOrderRequest,
@@ -17,6 +18,8 @@ import {
 } from "./orders-api";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
+
+export const ORDERS_UPDATED_EVENT = "bakery-orders-updated";
 
 export type OrderStatus =
   | "pending"
@@ -96,7 +99,7 @@ function readOrders(): PlacedOrder[] {
 function writeOrders(orders: PlacedOrder[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
-  window.dispatchEvent(new Event("bakery-orders-updated"));
+  window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
 }
 
 function getCommerceConfig() {
@@ -268,6 +271,28 @@ export function placeOrder(input: {
   return order;
 }
 
+/**
+ * Whether the one-shot server hydration has finished (successfully or not).
+ *
+ * The local cache starts empty, so without this an admin screen cannot tell
+ * "this shop has no orders" from "the fetch is still in flight" — and would
+ * show a definitive "No orders found" during every cold load.
+ */
+let ordersSyncSettled = false;
+
+export function hasOrdersSyncSettled(): boolean {
+  return ordersSyncSettled;
+}
+
+/** Called by the sync hook once the fetch resolves, whatever the outcome. */
+export function markOrdersSyncSettled(): void {
+  if (ordersSyncSettled) return;
+  ordersSyncSettled = true;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
+  }
+}
+
 /** Hydration: replace the local order cache with the server's copy. */
 export function persistServerOrders(orders: PlacedOrder[]): void {
   writeOrders(orders.map(normalizeOrder));
@@ -294,16 +319,49 @@ export function getOrderById(id: string): PlacedOrder | null {
   return readOrders().find((order) => order.id === id) ?? null;
 }
 
-export function updateOrderStatus(
+/**
+ * The order a mutation applies to — from the local cache, or from the server
+ * when the cache does not have it.
+ *
+ * The admin lists are server-paginated over every order, so an admin routinely
+ * opens an order far older than the browser cache holds. Resolving against the
+ * cache alone made every action on such an order a silent no-op: no change, no
+ * toast, no error.
+ */
+async function resolveOrderForMutation(orderId: string): Promise<PlacedOrder | null> {
+  return getOrderById(orderId) ?? (await fetchOrder(orderId));
+}
+
+/** Apply an order to the local cache, inserting it if it was not already there. */
+function upsertOrder(updated: PlacedOrder): void {
+  const orders = readOrders();
+  const index = orders.findIndex((order) => order.id === updated.id);
+  if (index === -1) orders.unshift(updated);
+  else orders[index] = updated;
+  writeOrders(orders);
+}
+
+/**
+ * Outcome of an admin order mutation.
+ *
+ * `order` is the locally-updated copy (null when the id was unknown).
+ * `persisted` is whether the SERVER accepted the change. These come apart more
+ * often than you would think — an expired token 401s — and the difference
+ * matters: the local write is a cache, so a change the server rejected is
+ * silently reverted by the next hydration. Callers must not report success on
+ * `order` alone.
+ */
+export interface OrderMutationResult {
+  order: PlacedOrder | null;
+  persisted: boolean;
+}
+
+export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === status) return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
   const updated: PlacedOrder = {
@@ -312,43 +370,36 @@ export function updateOrderStatus(
     statusHistory: [...current.statusHistory, { status, at: now }],
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  updateStatusRequest(orderId, status);
-  return updated;
+  upsertOrder(updated);
+  return { order: updated, persisted: await updateStatusRequest(orderId, status) };
 }
 
-export function updateOrderAdminNotes(
+export async function updateOrderAdminNotes(
   orderId: string,
   adminNotes: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
   const updated: PlacedOrder = {
-    ...orders[index],
+    ...current,
     adminNotes: adminNotes.trim() || undefined,
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  adminNotesRequest(orderId, adminNotes);
-  return updated;
+  upsertOrder(updated);
+  return { order: updated, persisted: await adminNotesRequest(orderId, adminNotes) };
 }
 
-export function updatePaymentStatus(
+export async function updatePaymentStatus(
   orderId: string,
   paymentStatus: PaymentStatus,
   paymentReference?: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  // A refund is terminal — there is nothing left to change.
   if (current.status === "refunded" || current.paymentStatus === "refunded") {
-    return current;
+    return { order: current, persisted: true };
   }
 
   const updated: PlacedOrder = {
@@ -362,38 +413,41 @@ export function updatePaymentStatus(
         : current.paymentReference),
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  paymentStatusRequest(orderId, paymentStatus, updated.paymentReference);
-  return updated;
+  upsertOrder(updated);
+  return {
+    order: updated,
+    persisted: await paymentStatusRequest(orderId, paymentStatus, updated.paymentReference),
+  };
 }
 
-export function bulkUpdatePaymentStatus(
+export async function bulkUpdatePaymentStatus(
   orderIds: string[],
   paymentStatus: PaymentStatus
-): number {
-  let count = 0;
+): Promise<BulkOrderResult> {
+  let updated = 0;
+  let failed = 0;
+
   for (const orderId of orderIds) {
     const before = getOrderById(orderId);
     if (!before || before.paymentStatus === "refunded" || before.status === "refunded") {
       continue;
     }
-    const updated = updatePaymentStatus(orderId, paymentStatus);
-    if (updated && updated.paymentStatus === paymentStatus) count += 1;
+    const result = await updatePaymentStatus(orderId, paymentStatus);
+    if (result.order?.paymentStatus !== paymentStatus) continue;
+    updated += 1;
+    if (!result.persisted) failed += 1;
   }
-  return count;
+
+  return { updated, failed };
 }
 
-export function cancelOrder(
+export async function cancelOrder(
   orderId: string,
   cancellationReason?: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === "cancelled" || current.status === "refunded") return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (current.status === "refunded") return { order: current, persisted: true };
 
   const now = new Date().toISOString();
   const updated: PlacedOrder = {
@@ -403,22 +457,19 @@ export function cancelOrder(
     statusHistory: [...current.statusHistory, { status: "cancelled", at: now }],
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  cancelOrderRequest(orderId, cancellationReason);
-  return updated;
+  upsertOrder(updated);
+  return {
+    order: updated,
+    persisted: await cancelOrderRequest(orderId, cancellationReason),
+  };
 }
 
-export function refundOrder(
+export async function refundOrder(
   orderId: string,
   input: RefundOrderInput = {}
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === "refunded") return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
   const refundReference = `REF-${current.orderNumber.replace(/^BK-/, "")}`;
@@ -461,19 +512,17 @@ export function refundOrder(
     statusHistory: [...current.statusHistory, { status: "refunded", at: now }],
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  refundOrderRequest(orderId, input);
-  return updated;
+  upsertOrder(updated);
+  return { order: updated, persisted: await refundOrderRequest(orderId, input) };
 }
 
-export function updateRefundNotes(orderId: string, notes: string): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (!current.refundRecord) return current;
+export async function updateRefundNotes(
+  orderId: string,
+  notes: string
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (!current.refundRecord) return { order: current, persisted: true };
 
   const updated: PlacedOrder = {
     ...current,
@@ -483,22 +532,19 @@ export function updateRefundNotes(orderId: string, notes: string): PlacedOrder |
     },
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  refundNotesRequest(orderId, notes);
-  return updated;
+  upsertOrder(updated);
+  return { order: updated, persisted: await refundNotesRequest(orderId, notes) };
 }
 
-export function requestRefundForCancelledOrder(
+export async function requestRefundForCancelledOrder(
   orderId: string,
   input: RefundOrderInput = {}
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status !== "cancelled" || current.refundRecord) return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (current.status !== "cancelled" || current.refundRecord) {
+    return { order: current, persisted: true };
+  }
 
   const now = new Date().toISOString();
   const reason = input.reason ?? "order_cancelled";
@@ -516,24 +562,59 @@ export function requestRefundForCancelledOrder(
     },
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  requestRefundRequest(orderId, input);
-  return updated;
+  upsertOrder(updated);
+  return { order: updated, persisted: await requestRefundRequest(orderId, input) };
 }
 
-export function bulkUpdateOrderStatus(
+/** `updated` counts orders that actually changed; `failed` how many the server rejected. */
+export interface BulkOrderResult {
+  updated: number;
+  failed: number;
+}
+
+export async function bulkUpdateOrderStatus(
   orderIds: string[],
   status: OrderStatus
-): number {
-  let count = 0;
+): Promise<BulkOrderResult> {
+  if (orderIds.length === 0) return { updated: 0, failed: 0 };
 
+  const orders = readOrders();
+  const now = new Date().toISOString();
+  let touchedCache = false;
+
+  // Optimistically update the rows the cache happens to hold. The cache covers
+  // only the newest orders while the list is paginated over all of them, so this
+  // is a nicety — the server request below is what actually matters, and it goes
+  // out for EVERY selected id whether or not the cache knows about it.
   for (const orderId of orderIds) {
-    const updated = updateOrderStatus(orderId, status);
-    if (updated) count += 1;
+    const index = orders.findIndex((order) => order.id === orderId);
+    if (index === -1) continue;
+
+    const current = orders[index];
+    if (current.status === status) continue;
+
+    orders[index] = {
+      ...current,
+      status,
+      statusHistory: [...current.statusHistory, { status, at: now }],
+    };
+    touchedCache = true;
   }
 
-  return count;
+  // One write and one event for the whole batch. Going through
+  // updateOrderStatus per id would re-read and re-write storage N times and
+  // wake every subscriber (dashboard, sidebar, bell) on each one.
+  if (touchedCache) writeOrders(orders);
+
+  // Never skip an id because the LOCAL copy already shows the target status:
+  // after a rejected batch that is true of every one of them, and skipping would
+  // turn the admin's retry into a silent no-op.
+  const results = await Promise.all(
+    orderIds.map((orderId) => updateStatusRequest(orderId, status))
+  );
+
+  const failed = results.filter((persisted) => !persisted).length;
+  return { updated: orderIds.length - failed, failed };
 }
 
 export function getLatestOrder(): PlacedOrder | null {

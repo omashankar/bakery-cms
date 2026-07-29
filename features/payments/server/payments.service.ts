@@ -1,4 +1,5 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
+import { DEFAULT_TIME_ZONE } from "@/features/orders/lib/viewer-time";
 import * as orderRepo from "@/features/orders/server/order.repository";
 import { buildTransactions } from "@/features/payments/lib/transactions";
 import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";
@@ -18,14 +19,27 @@ interface RequestCtx {
  * is a facet of its order), matching the app's existing projection design — no
  * separate ledger to drift out of sync.
  */
+/**
+ * One transaction per order, over every order.
+ *
+ * `listAll` capped this at the most recent 500, which silently truncated the
+ * Transaction Center — the missing rows looked like transactions that never
+ * happened rather than a page that ended.
+ */
 export async function getTransactions() {
-  const orders = await orderRepo.listAll();
+  const orders = await orderRepo.listSince(null);
   return buildTransactions(orders);
 }
 
-export async function getAnalytics() {
-  const orders = await orderRepo.listAll();
-  return getPaymentAnalytics(orders);
+/**
+ * Collection totals, success/refund rates and the method split.
+ *
+ * These are sums over the whole ledger, so a cap does not make them smaller and
+ * obviously wrong — it makes them smaller and plausible, which is worse.
+ */
+export async function getAnalytics(timeZone: string = DEFAULT_TIME_ZONE) {
+  const orders = await orderRepo.listSince(null);
+  return getPaymentAnalytics(orders, timeZone);
 }
 
 // ---- Invoice settings (singleton) ----

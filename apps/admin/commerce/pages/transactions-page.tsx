@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Download, IndianRupee, Receipt, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, IndianRupee, Loader2, Receipt, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
 import {
-  getOrders,
-  type PlacedOrder,
-} from "@/features/orders/lib/orders";
+  fetchOrder,
+  fetchTransactionsPage,
+  type TransactionsOverviewResponse,
+} from "@/features/orders/lib/orders-api";
 import {
-  applyTransactionFilters,
-  buildTransactions,
   defaultTransactionFilters,
   exportTransactionsToCsv,
   type TransactionFilters,
+  type TransactionView,
 } from "@/features/payments/lib/transactions";
 import { PaymentStatusBadge } from "@/features/payments/components/payment-status-badge";
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
@@ -28,52 +28,121 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 const PAGE_SIZE = 12;
+/** Matches the server's max page size — one request, no client-side paging loop. */
+const EXPORT_LIMIT = 500;
+
+const EMPTY_TRANSACTIONS_OVERVIEW: TransactionsOverviewResponse = {
+  filteredVolume: 0,
+  filteredSuccessCount: 0,
+  totalRecords: 0,
+};
 
 export function TransactionsPage() {
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [paginated, setPaginated] = useState<TransactionView[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [overview, setOverview] = useState<TransactionsOverviewResponse>(EMPTY_TRANSACTIONS_OVERVIEW);
   const [filters, setFilters] = useState<TransactionFilters>(defaultTransactionFilters);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<PlacedOrder | null>(null);
 
-  useEffect(() => {
-    ensureDemoOrders();
-    setOrders(getOrders());
-    setMounted(true);
-    const refresh = () => setOrders(getOrders());
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, []);
-
-  const transactions = useMemo(() => buildTransactions(orders), [orders]);
-  const filtered = useMemo(
-    () => applyTransactionFilters(transactions, filters),
-    [transactions, filters]
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Rows AND figures from one server pass over every order. A transaction's
+  // status group and gateway are derived from the order rather than stored, so
+  // this cannot be a plain indexed query — but it also cannot be the browser
+  // cache, which only ever holds the most recent slice of orders.
+  // One debounced key for filters AND page. The search box is undebounced
+  // and each request filters the whole orders collection server-side, so
+  // keying the fetch straight off the input turned a six-letter name into
+  // six full-collection queries, five of them already stale on arrival.
+  // The request uses the CLAMPED page. Filters or a mutation can shrink the
+  // result set under the page the admin is on; asking for the raw page then
+  // returns nothing and hides the pager, stranding them with no way back.
+  const requestKey = useDebouncedValue(
+    JSON.stringify({ filters, page: currentPage }),
+    250
+  );
+  const request = JSON.parse(requestKey) as {
+    filters: Record<string, unknown>;
+    page: number;
+  };
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // Re-armed on EVERY request, not just the first: without this a refilter
+      // asserts "none found" over the old empty list while the new one loads.
+      setLoading(true);
+      const result = await fetchTransactionsPage({ ...request.filters, page: request.page, limit: PAGE_SIZE });
+      if (cancelled) return;
+      if (result) {
+        setPaginated(result.items);
+        setTotal(result.total);
+        setOverview(result.overview);
+      }
+      setFailed(!result);
+      setLoading(false);
+    }
 
-  const volume = mounted ? filtered.reduce((sum, t) => sum + t.amount, 0) : 0;
-  const successCount = mounted
-    ? filtered.filter((t) => ["captured", "paid", "cod_paid"].includes(t.status)).length
-    : 0;
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestKey]);
 
   function updateFilters(patch: Partial<TransactionFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
     setPage(1);
   }
 
-  function handleExport() {
-    if (filtered.length === 0) {
+  /** The dialog wants the whole order, which the transaction row does not carry. */
+  async function openDetail(orderId: string) {
+    const order = await fetchOrder(orderId);
+    if (order) {
+      setSelected(order);
+      return;
+    }
+    // Silently doing nothing reads as a broken row; with an expired session that
+    // is every row on the page.
+    toast.error("Could not load that order", {
+      description: "The server did not answer — reload and try again.",
+    });
+  }
+
+  async function handleExport() {
+    if (total === 0) {
       toast.error("No transactions to export");
       return;
     }
-    exportTransactionsToCsv(filtered);
-    toast.success(`Exported ${filtered.length} transaction${filtered.length === 1 ? "" : "s"}`);
+
+    // The page holds PAGE_SIZE rows, so exporting the whole filtered set means
+    // asking the server for it rather than writing out what happens to be visible.
+    const result = await fetchTransactionsPage({
+      ...filters,
+      page: 1,
+      limit: Math.min(total, EXPORT_LIMIT),
+    });
+    if (!result || result.items.length === 0) {
+      toast.error("Could not load transactions to export");
+      return;
+    }
+
+    exportTransactionsToCsv(result.items);
+
+    if (total > EXPORT_LIMIT) {
+      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${total} transactions`, {
+        description: "Narrow the filters to export the rest.",
+      });
+      return;
+    }
+
+    toast.success(
+      `Exported ${result.items.length} transaction${result.items.length === 1 ? "" : "s"}`
+    );
   }
 
   return (
@@ -92,21 +161,21 @@ export function TransactionsPage() {
       <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <DashboardStatCard
           title="Volume"
-          value={formatCurrency(volume)}
-          change={`${filtered.length} transactions`}
+          value={formatCurrency(overview.filteredVolume)}
+          change={`${total} transactions`}
           icon={IndianRupee}
           tone="bakery"
         />
         <DashboardStatCard
           title="Successful"
-          value={String(successCount)}
+          value={String(overview.filteredSuccessCount)}
           change="captured / paid"
           icon={TrendingUp}
           tone="gold"
         />
         <DashboardStatCard
           title="Total records"
-          value={String(transactions.length)}
+          value={String(overview.totalRecords)}
           change="all time"
           icon={Receipt}
           tone="neutral"
@@ -187,10 +256,17 @@ export function TransactionsPage() {
       </FilterPanel>
 
       <section className={adminShell.tableCard}>
-        {paginated.length === 0 ? (
+        {paginated.length === 0 && loading ? (
+          // Asserting there are none before the server has answered is a
+          // guess, and a wrong one on every cold load in a shop that has them.
+          <div className="flex min-h-48 items-center justify-center py-14">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading transactions</span>
+          </div>
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Receipt}
-            title="No transactions found"
+            title={failed ? "Could not load transactions" : "No transactions found"}
             description="Adjust the filters, or place a checkout order."
             className="py-14"
           />
@@ -211,11 +287,10 @@ export function TransactionsPage() {
                 </thead>
                 <tbody>
                   {paginated.map((t) => {
-                    const order = orders.find((o) => o.id === t.orderId) ?? null;
                     return (
                       <tr
                         key={t.orderId}
-                        onClick={() => setSelected(order)}
+                        onClick={() => void openDetail(t.orderId)}
                         className="cursor-pointer border-b border-border/70 transition-colors hover:bg-muted"
                       >
                         <td className="px-4 py-3 font-medium text-foreground">{t.id}</td>
@@ -246,12 +321,11 @@ export function TransactionsPage() {
 
             <ul className="divide-y divide-border lg:hidden">
               {paginated.map((t) => {
-                const order = orders.find((o) => o.id === t.orderId) ?? null;
                 return (
                   <li key={t.orderId}>
                     <button
                       type="button"
-                      onClick={() => setSelected(order)}
+                      onClick={() => void openDetail(t.orderId)}
                       className="w-full p-3 text-left sm:p-4"
                     >
                       <div className="flex items-start justify-between gap-3">

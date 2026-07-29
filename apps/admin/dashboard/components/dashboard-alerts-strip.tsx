@@ -3,15 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, Bell, ChevronRight, MessageSquare, Package } from "lucide-react";
-import { INVENTORY_UPDATED_EVENT } from "@/apps/admin/commerce/lib/inventory-repository";
-import {
-  NOTIFICATIONS_UPDATED_EVENT,
-  syncNotifications,
-} from "@/apps/admin/commerce/lib/notifications-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
+import { syncNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
 import { getDashboardAlerts, type DashboardAlert } from "../lib/dashboard-analytics";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
 const iconMap = {
   "inventory-out": Package,
@@ -36,17 +32,7 @@ export function DashboardAlertsStrip() {
     }
 
     refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    window.addEventListener(INVENTORY_UPDATED_EVENT, refresh);
-    window.addEventListener(INQUIRIES_UPDATED_EVENT, refresh);
-    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
-
-    return () => {
-      window.removeEventListener("bakery-orders-updated", refresh);
-      window.removeEventListener(INVENTORY_UPDATED_EVENT, refresh);
-      window.removeEventListener(INQUIRIES_UPDATED_EVENT, refresh);
-      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
-    };
+    return subscribeToAdminData(refresh);
   }, []);
 
   if (alerts.length === 0) return null;

@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Download,
   IndianRupee,
+  Loader2,
   Package,
   Send,
   ShoppingBag,
@@ -22,19 +23,16 @@ import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import {
   defaultOrderFilters,
-  ensureDemoOrders,
   exportOrdersToCsv,
-  filterOrders,
-  getOrderStats,
   type OrderListFilters,
 } from "@/apps/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import {
   bulkUpdateOrderStatus,
-  getOrders,
   type OrderStatus,
   type PlacedOrder,
 } from "@/features/orders/lib/orders";
+import { fetchOrderStats, fetchOrdersPage } from "@/features/orders/lib/orders-api";
 import { getActiveFulfillmentStatuses } from "@/features/orders/lib/order-tracking";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,8 +42,11 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 const PAGE_SIZE = 10;
+/** Matches the server's max page size — one request, no client-side paging loop. */
+const EXPORT_LIMIT = 500;
 
 const EMPTY_STATS = {
   total: 0,
@@ -74,34 +75,89 @@ const statusTabs: Array<{ value: OrderListFilters["status"]; label: string; shor
 
 export function OrdersListPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [filters, setFilters] = useState<OrderListFilters>(defaultOrderFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus>("preparing");
+  const [applying, setApplying] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [totalMatching, setTotalMatching] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    ensureDemoOrders();
-    setOrders(getOrders());
-    setMounted(true);
-
-    function refresh() {
-      setOrders(getOrders());
-    }
-
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, []);
-
-  const filtered = useMemo(() => filterOrders(orders, filters), [orders, filters]);
-  const stats = useMemo(
-    () => (mounted ? getOrderStats(orders) : EMPTY_STATS),
-    [orders, mounted]
+  const query = useMemo(
+    () => ({
+      status: filters.status === "all" ? undefined : filters.status,
+      paymentStatus: filters.payment === "all" ? undefined : filters.payment,
+      deliveryStatus: filters.deliveryStatus === "all" ? undefined : filters.deliveryStatus,
+      dateRange: filters.dateRange === "all" ? undefined : filters.dateRange,
+      search: filters.search.trim() || undefined,
+      amountMin: filters.amountMin.trim() ? Number(filters.amountMin) : undefined,
+      amountMax: filters.amountMax.trim() ? Number(filters.amountMax) : undefined,
+    }),
+    [filters]
   );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  // The list is server-filtered and server-paginated: the localStorage cache
+  // only ever holds the most recent slice, so filtering it would hide older
+  // orders entirely and undercount every total.
+  // One debounced key for filters AND page. The search box is undebounced
+  // and each request filters the whole orders collection server-side, so
+  // keying the fetch straight off the input turned a six-letter name into
+  // six full-collection queries, five of them already stale on arrival.
+  const totalPages = Math.max(1, Math.ceil(totalMatching / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // The request uses the CLAMPED page. Filters or a mutation can shrink the
+  // result set under the page the admin is on; asking for the raw page then
+  // returns nothing and hides the pager, stranding them with no way back.
+  const requestKey = useDebouncedValue(
+    JSON.stringify({ filters: query, page: currentPage }),
+    250
+  );
+  const request = JSON.parse(requestKey) as {
+    filters: Record<string, unknown>;
+    page: number;
+  };
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      const result = await fetchOrdersPage({ ...request.filters, page: request.page, limit: PAGE_SIZE });
+      if (cancelled) return;
+      if (result) {
+        setOrders(result.items);
+        setTotalMatching(result.pagination?.total ?? result.items.length);
+      }
+      setFailed(!result);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestKey, reloadKey]);
+
+  // Counts and revenue come from a Mongo aggregation over every order, so they
+  // stay right regardless of how many rows this page happens to show.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const summary = await fetchOrderStats();
+      if (!cancelled && summary) setStats(summary);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const paginated = orders;
 
   const inProgress =
     stats.pending +
@@ -121,8 +177,9 @@ export function OrdersListPage() {
   }
 
   function countForStatus(status: OrderListFilters["status"]) {
-    if (status === "all") return orders.length;
-    return orders.filter((order) => order.status === status).length;
+    if (status === "all") return stats.total;
+    if (status === "out_for_delivery") return stats.outForDelivery;
+    return stats[status];
   }
 
   function toggleSelect(id: string) {
@@ -139,25 +196,96 @@ export function OrdersListPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function handleBulkStatusUpdate() {
-    if (selectedIds.length === 0) return;
-    const count = bulkUpdateOrderStatus(selectedIds, bulkStatus);
+  async function handleBulkStatusUpdate() {
+    if (selectedIds.length === 0 || applying) return;
+
+    setApplying(true);
+    // Named apart from the `failed` fetch state above — they mean different things.
+    const { updated, failed: rejected } = await bulkUpdateOrderStatus(selectedIds, bulkStatus);
+    setApplying(false);
     setSelectedIds([]);
-    setOrders(getOrders());
-    toast.success(`Updated ${count} order${count === 1 ? "" : "s"}`);
+    setReloadKey((value) => value + 1);
+
+    if (rejected > 0) {
+      toast.error(`${rejected} of ${selectedIds.length} did not reach the server`, {
+        description: "Those changes exist on this device only — reload to see the server's version.",
+      });
+      return;
+    }
+
+    toast.success(`Applied to ${updated} order${updated === 1 ? "" : "s"}`);
   }
 
-  function handleExport() {
-    const target =
-      selectedIds.length > 0
-        ? orders.filter((order) => selectedIds.includes(order.id))
-        : filtered;
-    if (target.length === 0) {
+  async function handleExport() {
+    if (exporting) return;
+
+    if (selectedIds.length > 0) {
+      const onThisPage = orders.filter((order) => selectedIds.includes(order.id));
+
+      // A selection SURVIVES paging — only a filter change or Clear resets it —
+      // so it routinely covers rows the current page does not hold. Exporting
+      // just the visible ones would drop the rest without saying so.
+      if (onThisPage.length === selectedIds.length) {
+        exportOrdersToCsv(onThisPage);
+        toast.success(`Exported ${onThisPage.length} order${onThisPage.length === 1 ? "" : "s"}`);
+        return;
+      }
+
+      setExporting(true);
+      const wider = await fetchOrdersPage({
+        ...request.filters,
+        page: 1,
+        limit: Math.min(totalMatching, EXPORT_LIMIT),
+      });
+      setExporting(false);
+
+      const target = (wider?.items ?? []).filter((order) => selectedIds.includes(order.id));
+      if (target.length === 0) {
+        toast.error("Could not load the selected orders to export");
+        return;
+      }
+
+      exportOrdersToCsv(target);
+      if (target.length < selectedIds.length) {
+        toast.warning(`Exported ${target.length} of ${selectedIds.length} selected orders`, {
+          description: "The rest fall outside the exportable range — narrow the filters.",
+        });
+        return;
+      }
+      toast.success(`Exported ${target.length} order${target.length === 1 ? "" : "s"}`);
+      return;
+    }
+
+    if (totalMatching === 0) {
       toast.error("No orders to export");
       return;
     }
-    exportOrdersToCsv(target);
-    toast.success(`Exported ${target.length} order${target.length === 1 ? "" : "s"}`);
+
+    // Export the whole filtered set, not just the visible page — which means
+    // going back to the server, since the page holds only PAGE_SIZE rows.
+    setExporting(true);
+    const result = await fetchOrdersPage({
+      ...query,
+      page: 1,
+      limit: Math.min(totalMatching, EXPORT_LIMIT),
+    });
+    setExporting(false);
+
+    if (!result || result.items.length === 0) {
+      toast.error("Could not load orders to export");
+      return;
+    }
+
+    exportOrdersToCsv(result.items);
+
+    if (totalMatching > EXPORT_LIMIT) {
+      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${totalMatching} orders`, {
+        description: "Narrow the filters to export the rest.",
+      });
+      return;
+    }
+
+    toast.success(`Exported ${result.items.length} order${result.items.length === 1 ? "" : "s"}`);
   }
 
   return (
@@ -341,8 +469,13 @@ export function OrdersListPage() {
                   </option>
                 ))}
               </AdminSelect>
-              <Button size="sm" variant="outline" onClick={handleBulkStatusUpdate}>
-                Apply
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkStatusUpdate}
+                disabled={applying}
+              >
+                {applying ? "Applying..." : "Apply"}
               </Button>
               <Button size="sm" variant="outline" onClick={handleExport}>
                 Export
@@ -358,11 +491,18 @@ export function OrdersListPage() {
           </div>
         ) : null}
 
-        {paginated.length === 0 ? (
+        {paginated.length === 0 && loading ? (
+          // Saying "No orders found" before the server has answered would be a
+          // guess, and a wrong one on every cold load in a shop that has orders.
+          <div className="flex min-h-48 items-center justify-center py-14">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading orders</span>
+          </div>
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Package}
-            title="No orders found"
-            description="Try another filter, or wait for new checkout orders."
+            title={failed ? "Could not load orders" : "No orders found"}
+            description={failed ? "The server did not answer. Check your connection and reload." : "Try another filter, or wait for new checkout orders."}
             className="py-14"
           />
         ) : (
