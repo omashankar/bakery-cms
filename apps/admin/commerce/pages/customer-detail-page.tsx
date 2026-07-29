@@ -136,7 +136,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
             <Button
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
-              render={<Link href={routes.admin.orders.detail(orders[0]!.id)} />}
+              render={<Link href={orders[0] ? routes.admin.orders.detail(orders[0].id) : "#"} />}
               disabled={orders.length === 0}
             >
               Latest order

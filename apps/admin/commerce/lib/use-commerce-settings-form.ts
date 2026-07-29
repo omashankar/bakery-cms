@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { CommerceSettings } from "@/types/settings";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -14,9 +14,18 @@ export function useCommerceSettingsForm() {
   const [settings, setSettings] = useState<CommerceSettings>(defaultCommerceSettings);
   const [savedSettings, setSavedSettings] = useState<CommerceSettings>(defaultCommerceSettings);
 
+  // Snapshot for the SETTINGS_UPDATED listener so it can check dirtiness without
+  // re-subscribing on every keystroke.
+  const stateRef = useRef({ settings, savedSettings });
+  stateRef.current = { settings, savedSettings };
+
   useEffect(() => {
     function load() {
       const loaded = getCommerceSettings();
+      const { settings: current, savedSettings: currentSaved } = stateRef.current;
+      // A background hydration must not clobber unsaved edits: skip the reset
+      // while the form is dirty (mid-edit); resync only when pristine.
+      if (JSON.stringify(current) !== JSON.stringify(currentSaved)) return;
       setSettings(loaded);
       setSavedSettings(loaded);
     }

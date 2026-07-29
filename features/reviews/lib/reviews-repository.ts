@@ -312,9 +312,36 @@ export function submitStorefrontReview(input: {
 }
 
 export function resetReviews(): ProductReview[] {
+  const previous = readReviews();
   const seeded = seedReviews(loadProducts());
   writeReviews(seeded);
   localStorage.setItem(STORAGE_VERSION_KEY, String(REVIEWS_STORAGE_VERSION));
   syncProductReviewAggregates();
+
+  // Persist the reset to the server via the SAME dual-write requests the CRUD
+  // uses, so the reset survives an admin reload (otherwise the server-sync
+  // hydration re-applies the old moderated state and the reset appears to
+  // revert). Reviews have no bulk replace endpoint, so mirror the per-item CRUD:
+  // delete rows that are no longer seeds, then PATCH every seed back to its
+  // demo state (status/featured/reply/report), which the server already holds.
+  const seededIds = new Set(seeded.map((review) => review.id));
+  const staleIds = previous
+    .map((review) => review.id)
+    .filter((id) => !seededIds.has(id));
+  if (staleIds.length > 0) deleteReviewsRequest(staleIds);
+
+  seeded.forEach((review) => {
+    updateReviewRequest(review.id, {
+      status: review.status,
+      isFeatured: review.isFeatured,
+      title: review.title ?? "",
+      body: review.body,
+      rating: review.rating,
+      adminReply: review.adminReply ?? "",
+      repliedAt: review.repliedAt ?? "",
+      reportReason: review.reportReason ?? "",
+    });
+  });
+
   return seeded;
 }

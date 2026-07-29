@@ -7,6 +7,8 @@ import {
 
 const STORAGE_KEY = "bakery-cms-newsletter-subscribers";
 
+export const NEWSLETTER_UPDATED_EVENT = "bakery-newsletter-updated";
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -47,6 +49,7 @@ export function seedSubscribers(): NewsletterSubscriber[] {
 function persistSubscribers(subscribers: NewsletterSubscriber[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(subscribers));
+  window.dispatchEvent(new Event(NEWSLETTER_UPDATED_EVENT));
 }
 
 /** Hydration: replace the local cache with the server's subscribers (no re-push). */

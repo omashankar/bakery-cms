@@ -287,6 +287,18 @@ html.dark {
     @apply border-border outline-ring/50;
   }
 
+  /* Tailwind v4 Preflight leaves buttons with the default arrow cursor. Restore
+     the pointer on every interactive control so clickable things read as clickable
+     (disabled ones keep the default — they already have pointer-events-none). */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary,
+  select:not(:disabled),
+  label:has(> input[type="checkbox"]:not(:disabled)),
+  label:has(> input[type="radio"]:not(:disabled)) {
+    cursor: pointer;
+  }
+
   /* Kill color/motion during theme switch — instant snap, no flicker */
   html.theme-switching,
   html.theme-switching *,

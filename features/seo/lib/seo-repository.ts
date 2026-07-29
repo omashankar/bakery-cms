@@ -7,6 +7,8 @@ const STORAGE_KEY = "bakery-cms-seo";
 const STORAGE_VERSION_KEY = "bakery-cms-seo-version";
 const SEO_STORAGE_VERSION = 1;
 
+export const SEO_UPDATED_EVENT = "bakery-seo-updated";
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -180,6 +182,7 @@ function persist(store: SeoStore): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   localStorage.setItem(STORAGE_VERSION_KEY, String(SEO_STORAGE_VERSION));
+  window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
 }
 
 let serverStore: SeoStore = seedStore();

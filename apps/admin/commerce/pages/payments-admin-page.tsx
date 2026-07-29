@@ -263,7 +263,7 @@ export function PaymentsAdminPage() {
                 Connected{gateway.testMode === true ? " · Test" : gateway.testMode === false ? " · Live" : ""}
               </Badge>
             ) : (
-              <Badge className="shrink-0 bg-amber-100 text-amber-800">Not connected</Badge>
+              <Badge className="shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Not connected</Badge>
             )
           ) : null}
         </CardHeader>

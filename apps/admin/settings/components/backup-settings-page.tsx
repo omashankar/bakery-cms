@@ -20,14 +20,16 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
-import { importLocalStorageBackup } from "@/features/settings/lib/settings-repository";
 import {
   BACKUP_UPDATED_EVENT,
+  BROWSER_ONLY_NOTE,
   deleteBackupSnapshot,
-  exportAndArchiveBackup,
+  exportAndArchiveServerBackup,
   formatBackupSize,
   loadBackupHistory,
-  restoreBackupSnapshot,
+  restoreBackupToServer,
+  restoreBackupSnapshotToServer,
+  serverBackedKeys,
 } from "../lib/backup-repository";
 
 export function BackupSettingsPage() {
@@ -42,6 +44,7 @@ export function BackupSettingsPage() {
     data: Record<string, string | null>;
     keyCount: number;
   } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   function refresh() {
     setHistory(loadBackupHistory());
@@ -57,22 +60,31 @@ export function BackupSettingsPage() {
     return () => window.removeEventListener(BACKUP_UPDATED_EVENT, handleUpdate);
   }, []);
 
-  function handleExport() {
-    const snapshot = exportAndArchiveBackup(
-      backupLabel.trim() || `Manual backup ${new Date().toLocaleString()}`
-    );
-    const blob = new Blob([JSON.stringify(snapshot.data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `bakery-cms-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setBackupLabel("");
-    refresh();
-    toast.success(`Exported and archived ${snapshot.keyCount} data keys`);
+  async function handleExport() {
+    setBusy(true);
+    try {
+      // Reads the CURRENT server (Mongo) state for every server-backed slice,
+      // falling back to localStorage — so the file reflects the durable data.
+      const snapshot = await exportAndArchiveServerBackup(
+        backupLabel.trim() || `Manual backup ${new Date().toLocaleString()}`
+      );
+      const blob = new Blob([JSON.stringify(snapshot.data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `bakery-cms-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setBackupLabel("");
+      refresh();
+      toast.success(`Exported and archived ${snapshot.keyCount} data keys`);
+    } catch {
+      toast.error("Export failed — please try again");
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Parses and validates only — the write happens in confirmImport. */
@@ -109,22 +121,47 @@ export function BackupSettingsPage() {
     reader.readAsText(file);
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     if (!pendingImport) return;
-    // Snapshot BEFORE the write — afterwards there is nothing left to roll back to.
-    exportAndArchiveBackup(`Before import — ${new Date().toLocaleString()}`);
-    const count = importLocalStorageBackup(pendingImport.data);
+    const target = pendingImport;
     setPendingImport(null);
-    refresh();
-    toast.success(`Restored ${count} data keys — reload pages to see changes`);
+    setBusy(true);
+    try {
+      // Snapshot the current DURABLE state (server + local) BEFORE the write, so
+      // rolling back from history actually restores the server too.
+      await exportAndArchiveServerBackup(`Before import — ${new Date().toLocaleString()}`);
+      const result = await restoreBackupToServer(target.data);
+      refresh();
+      toast.success(
+        `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
+      );
+    } catch {
+      toast.error("Import failed — please try again");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function confirmRestore() {
+  async function confirmRestore() {
     if (!restoreTarget) return;
-    const count = restoreBackupSnapshot(restoreTarget.id);
-    refresh();
-    toast.success(`Restored ${count} keys from backup history`);
+    const target = restoreTarget;
     setRestoreTarget(null);
+    setBusy(true);
+    try {
+      const result = await restoreBackupSnapshotToServer(target.id);
+      refresh();
+      if (result) {
+        toast.success(
+          `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
+        );
+      } else {
+        toast.error("That snapshot could not be found");
+      }
+    } catch {
+      toast.error("Restore failed — please try again");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function confirmDelete() {
@@ -139,7 +176,7 @@ export function BackupSettingsPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Backup & Restore"
-        description="Export all CMS data, restore from file, and keep a local backup history."
+        description="Export CMS data from the server, restore from a file back to the server, and keep a local backup history."
       />
 
       {!mounted ? (
@@ -151,7 +188,8 @@ export function BackupSettingsPage() {
               <CardHeader>
                 <CardTitle className="text-base">Export backup</CardTitle>
                 <CardDescription>
-                  Downloads a JSON file and saves a snapshot to backup history.
+                  Reads the current server (database) state, downloads a JSON file, and saves a
+                  snapshot to backup history.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -164,7 +202,7 @@ export function BackupSettingsPage() {
                     placeholder="e.g. Before catalog update"
                   />
                 </div>
-                <Button variant="bakery" onClick={handleExport}>
+                <Button variant="bakery" onClick={handleExport} disabled={busy}>
                   <Download className="size-4" />
                   Download &amp; archive
                 </Button>
@@ -175,7 +213,8 @@ export function BackupSettingsPage() {
               <CardHeader>
                 <CardTitle className="text-base">Import backup</CardTitle>
                 <CardDescription>
-                  Upload a JSON backup file. A safety snapshot is created before import.
+                  Upload a JSON backup file. Server-backed sections are pushed to the database so
+                  the restore survives reload. A safety snapshot is created first.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -190,7 +229,11 @@ export function BackupSettingsPage() {
                     e.target.value = "";
                   }}
                 />
-                <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy}
+                >
                   <Upload className="size-4" />
                   Upload backup file
                 </Button>
@@ -261,15 +304,26 @@ export function BackupSettingsPage() {
             <CardHeader>
               <CardTitle className="text-base">Included data keys</CardTitle>
               <CardDescription>
-                These keys are included in exports when present in the browser.
+                Keys marked <span className="font-medium text-foreground">server</span> restore to
+                the database and survive reload. The rest restore to this browser only.{" "}
+                {BROWSER_ONLY_NOTE}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              {knownStorageKeys.map((key) => (
-                <Badge key={key} variant="secondary" className="font-mono text-xs">
-                  {key}
-                </Badge>
-              ))}
+              {knownStorageKeys.map((key) => {
+                const isServer = serverBackedKeys.includes(key);
+                return (
+                  <Badge
+                    key={key}
+                    variant={isServer ? "bakery" : "secondary"}
+                    className="font-mono text-xs"
+                    title={isServer ? "Synced to the database" : "Browser-only"}
+                  >
+                    {key}
+                    {isServer ? " · server" : ""}
+                  </Badge>
+                );
+              })}
               <Badge variant="outline" className="font-mono text-xs">
                 bakery-cms-* (all matching keys)
               </Badge>
@@ -287,16 +341,16 @@ export function BackupSettingsPage() {
             <DialogTitle>Import this backup?</DialogTitle>
             <DialogDescription>
               <strong>{pendingImport?.fileName}</strong> contains {pendingImport?.keyCount} CMS
-              data {pendingImport?.keyCount === 1 ? "key" : "keys"}. Importing overwrites the
-              matching keys in this browser. A snapshot of your current data is archived first, so
-              you can roll back from history.
+              data {pendingImport?.keyCount === 1 ? "key" : "keys"}. Server-backed sections are
+              pushed to the database (so they survive reload); the rest overwrite this browser. A
+              snapshot of your current data is archived first, so you can roll back from history.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setPendingImport(null)}>
+            <Button variant="outline" onClick={() => setPendingImport(null)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={confirmImport}>
+            <Button variant="bakery" onClick={confirmImport} disabled={busy}>
               Import backup
             </Button>
           </DialogFooter>
@@ -308,16 +362,16 @@ export function BackupSettingsPage() {
           <DialogHeader>
             <DialogTitle>Restore this backup?</DialogTitle>
             <DialogDescription>
-              This will overwrite matching local storage keys with the snapshot from{" "}
-              <strong>{restoreTarget?.label}</strong>. Export current data first if you need a
-              rollback.
+              This restores the snapshot from <strong>{restoreTarget?.label}</strong>:
+              server-backed sections are pushed to the database and the rest overwrite this
+              browser. Export current data first if you need a rollback.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setRestoreTarget(null)}>
+            <Button variant="outline" onClick={() => setRestoreTarget(null)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={confirmRestore}>
+            <Button variant="bakery" onClick={confirmRestore} disabled={busy}>
               Restore snapshot
             </Button>
           </DialogFooter>

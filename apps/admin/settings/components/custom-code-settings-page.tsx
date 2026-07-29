@@ -54,7 +54,7 @@ export function CustomCodeSettingsPage() {
     if (!persist(code)) return;
     setSavedCode(code);
     toast.success("Custom code saved", {
-      description: "It will be injected into the storefront once the backend is connected.",
+      description: "Your custom CSS and JavaScript have been saved.",
     });
   }
 

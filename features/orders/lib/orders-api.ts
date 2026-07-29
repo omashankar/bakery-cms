@@ -52,12 +52,36 @@ export function adminNotesRequest(orderId: string, adminNotes: string): void {
   void send(`/api/orders/${orderId}/notes`, "PATCH", { adminNotes });
 }
 
+export function refundNotesRequest(orderId: string, notes: string): void {
+  void send(`/api/orders/${orderId}/refund-notes`, "PATCH", { notes });
+}
+
+export function requestRefundRequest(orderId: string, input: RefundOrderInput): void {
+  void send(`/api/orders/${orderId}/refund-request`, "POST", input);
+}
+
 /** Admin: fetch all orders from the server (401 → null for non-admins). */
 export async function fetchOrders(): Promise<PlacedOrder[] | null> {
   try {
     const res = await fetch("/api/orders", { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     const json = (await res.json()) as Envelope<PlacedOrder[]>;
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: fetch a single order from the server by id. Used as a cache-miss
+ * fallback so a deep link (or an order placed on another device) resolves from
+ * the backend instead of flashing "Order not found" before the list hydrates.
+ */
+export async function fetchOrder(orderId: string): Promise<PlacedOrder | null> {
+  try {
+    const res = await fetch(`/api/orders/${orderId}`, { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<PlacedOrder>;
     return json.success ? json.data : null;
   } catch {
     return null;

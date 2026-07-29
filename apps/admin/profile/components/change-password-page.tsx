@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { changePasswordRequest } from "@/features/auth/lib/auth-api";
 import { cn } from "@/lib/utils";
 
 interface StrengthResult {
@@ -102,14 +103,25 @@ export function ChangePasswordPage() {
     if (confirm !== next) return toast.error("Passwords do not match");
 
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 700));
-    setSaving(false);
-    setCurrent("");
-    setNext("");
-    setConfirm("");
-    toast.success("Password updated", {
-      description: "Use your new password the next time you sign in.",
-    });
+    try {
+      await changePasswordRequest({
+        currentPassword: current,
+        newPassword: next,
+        confirmPassword: confirm,
+      });
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      toast.success("Password updated", {
+        description: "Use your new password the next time you sign in.",
+      });
+    } catch (error) {
+      toast.error("Could not update password", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

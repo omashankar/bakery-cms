@@ -69,6 +69,14 @@ export function forgotPasswordRequest(email: string) {
   return post<null>("/api/auth/forgot-password", { email });
 }
 
+export function changePasswordRequest(input: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  return post<null>("/api/auth/change-password", input);
+}
+
 export function verifyOtpRequest(email: string, otp: string) {
   return post<null>("/api/auth/verify-otp", { email, otp });
 }

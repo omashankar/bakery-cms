@@ -12,6 +12,8 @@ import {
   refundOrderRequest,
   paymentStatusRequest,
   adminNotesRequest,
+  refundNotesRequest,
+  requestRefundRequest,
 } from "./orders-api";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
@@ -483,6 +485,7 @@ export function updateRefundNotes(orderId: string, notes: string): PlacedOrder |
 
   orders[index] = updated;
   writeOrders(orders);
+  refundNotesRequest(orderId, notes);
   return updated;
 }
 
@@ -515,6 +518,7 @@ export function requestRefundForCancelledOrder(
 
   orders[index] = updated;
   writeOrders(orders);
+  requestRefundRequest(orderId, input);
   return updated;
 }
 

@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  HOMEPAGE_REVISIONS_KEY,
-  sortSections,
-} from "@/features/cms-sections/lib/homepage-store";
+import { sortSections } from "@/features/cms-sections/lib/homepage-store";
 import {
   deriveHomepageMeta,
+  fetchHomepageRevisions,
   fetchHomepageState,
   publishHomepage,
   resetHomepage,
+  restoreHomepageRevision,
   saveHomepageDraft,
+  type HomepageRevision,
 } from "@/features/cms-sections/data/homepage-sections-client";
-import {
-  listBuilderRevisions,
-  restoreBuilderRevision,
-} from "@/features/builders/lib/builder-revisions";
 import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder-version-history-panel";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {
@@ -72,13 +68,19 @@ export function HomepageBuilderPage() {
   );
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [revisions, setRevisions] = useState<
-    ReturnType<typeof listBuilderRevisions>
-  >([]);
+  const [revisions, setRevisions] = useState<HomepageRevision[]>([]);
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
   const [publishMeta, setPublishMeta] = useState(EMPTY_META);
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+
+  const refreshRevisions = useCallback(async () => {
+    try {
+      setRevisions(await fetchHomepageRevisions());
+    } catch {
+      // Keep the last known history rather than blanking the panel.
+    }
+  }, []);
 
   const refreshMeta = useCallback(async () => {
     try {
@@ -92,8 +94,8 @@ export function HomepageBuilderPage() {
     } catch {
       // Leave the last known status on screen rather than blanking it.
     }
-    setRevisions(listBuilderRevisions(HOMEPAGE_REVISIONS_KEY));
-  }, []);
+    await refreshRevisions();
+  }, [refreshRevisions]);
 
   useEffect(() => {
     async function load() {
@@ -111,12 +113,12 @@ export function HomepageBuilderPage() {
       } catch {
         toast.error("Could not load the homepage builder");
       }
-      setRevisions(listBuilderRevisions(HOMEPAGE_REVISIONS_KEY));
+      await refreshRevisions();
       setMounted(true);
     }
 
     void load();
-  }, []);
+  }, [refreshRevisions]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -301,13 +303,17 @@ export function HomepageBuilderPage() {
     }
   }
 
-  function handleRestoreRevision(revisionId: string) {
-    const restored = restoreBuilderRevision(HOMEPAGE_REVISIONS_KEY, revisionId);
-    if (!restored) return;
-    setSections(sortSections(restored as HomepageSectionInstance[]));
-    setIsDirty(true);
-    setHistoryOpen(false);
-    toast.success("Revision restored into draft");
+  async function handleRestoreRevision(revisionId: string) {
+    try {
+      const snapshot = await restoreHomepageRevision(revisionId);
+      setSections(sortSections(snapshot.sections));
+      setIsDirty(true);
+      setHistoryOpen(false);
+      await refreshMeta();
+      toast.success("Revision restored into draft");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not restore the revision");
+    }
   }
 
   async function confirmReset() {

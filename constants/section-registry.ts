@@ -251,7 +251,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       ctaLabel: "View Wedding Cakes",
       ctaHref: routes.store.weddingCakes,
       imageUrl:
-        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop",
+        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=900&h=900&fit=crop&q=80",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },

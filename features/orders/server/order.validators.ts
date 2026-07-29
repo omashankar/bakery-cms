@@ -101,5 +101,16 @@ export const paymentSchema = z.object({
 
 export const notesSchema = z.object({ adminNotes: z.string() });
 
+export const refundNotesSchema = z.object({ notes: z.string() });
+
+export const refundRequestSchema = z.object({
+  reason: z.string().optional(),
+  reasonDetail: z.string().optional(),
+  notes: z.string().optional(),
+  amount: z.number().min(0).optional(),
+});
+
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
 export type RefundInput = z.infer<typeof refundSchema>;
+export type RefundNotesInput = z.infer<typeof refundNotesSchema>;
+export type RefundRequestInput = z.infer<typeof refundRequestSchema>;

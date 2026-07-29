@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
@@ -45,12 +45,22 @@ export function ShippingRulesAdminPage() {
   const [previewCity, setPreviewCity] = useState("Mumbai");
   const [zoneStats, setZoneStats] = useState(EMPTY_ZONE_STATS);
 
+  // Snapshot for the SETTINGS_UPDATED listener so it can check dirtiness without
+  // re-subscribing on every keystroke.
+  const stateRef = useRef({ settings, savedSettings });
+  stateRef.current = { settings, savedSettings };
+
   useEffect(() => {
     function load() {
+      // Zone stats are display-only — always resync them.
+      setZoneStats(getDeliveryZoneStats(loadDeliveryZones()));
       const loaded = getCommerceSettings();
+      const { settings: current, savedSettings: currentSaved } = stateRef.current;
+      // A background hydration must not clobber unsaved edits: skip the form
+      // reset while dirty (mid-edit); resync only when pristine.
+      if (JSON.stringify(current) !== JSON.stringify(currentSaved)) return;
       setSettings(loaded);
       setSavedSettings(loaded);
-      setZoneStats(getDeliveryZoneStats(loadDeliveryZones()));
     }
     load();
     setMounted(true);

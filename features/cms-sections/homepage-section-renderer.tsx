@@ -478,7 +478,7 @@ function WeddingSection(props: HomepageSectionRendererProps) {
 
         <ScrollReveal delay={120} className="relative mx-auto w-full max-w-lg lg:max-w-none">
           <div className="rounded-[2rem] border border-border bg-white p-2.5 shadow-md">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-cream-100 sm:aspect-[4/3] lg:aspect-[4/5]">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-cream-100 sm:aspect-[4/3] lg:aspect-square">
               <Image
                 src={contentString(c, "imageUrl", showcase?.image ?? "")}
                 alt="Wedding cake"

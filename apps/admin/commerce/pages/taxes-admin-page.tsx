@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import {
@@ -40,9 +40,18 @@ export function TaxesAdminPage() {
   const [previewDiscount, setPreviewDiscount] = useState(50);
   const [previewDelivery, setPreviewDelivery] = useState(99);
 
+  // Snapshot for the SETTINGS_UPDATED listener so it can check dirtiness without
+  // re-subscribing on every keystroke.
+  const stateRef = useRef({ settings, savedSettings });
+  stateRef.current = { settings, savedSettings };
+
   useEffect(() => {
     function load() {
       const loaded = getCommerceSettings();
+      const { settings: current, savedSettings: currentSaved } = stateRef.current;
+      // A background hydration must not clobber unsaved edits: skip the reset
+      // while the form is dirty (mid-edit); resync only when pristine.
+      if (JSON.stringify(current) !== JSON.stringify(currentSaved)) return;
       setSettings(loaded);
       setSavedSettings(loaded);
     }

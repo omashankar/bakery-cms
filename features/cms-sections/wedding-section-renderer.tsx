@@ -163,7 +163,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
   // Same fade-up entrance the rest of the page uses, staggered text → image.
   const Reveal = props.interactive ? HeroStatic : ScrollReveal;
   return (
-    <SectionShell {...props} className="border-b border-border bg-white py-12 lg:py-16">
+    <SectionShell {...props} className="bg-white py-12 lg:py-16">
       <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
         <Reveal className="space-y-6 text-left">
           {contentString(c, "overline") ? (
@@ -211,7 +211,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
 
         <Reveal delay={160} className="relative mx-auto w-full max-w-lg lg:max-w-none">
           <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[4/3] lg:aspect-[4/5]">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[4/3] lg:aspect-square">
               {contentString(c, "imageUrl") ? (
                 <Image
                   src={contentString(c, "imageUrl")}

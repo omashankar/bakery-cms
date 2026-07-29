@@ -10,7 +10,12 @@ import type { RefundRecord } from "@/types/refund";
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
-import type { PlaceOrderInput, RefundInput } from "./order.validators";
+import type {
+  PlaceOrderInput,
+  RefundInput,
+  RefundNotesInput,
+  RefundRequestInput,
+} from "./order.validators";
 
 interface RequestCtx {
   ip: string;
@@ -248,6 +253,42 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
     statusHistory: [...order.statusHistory, { status: "refunded", at: now }],
   });
   await audit(ctx, "order.refund", id, { amount: refundAmount });
+  return updated;
+}
+
+export async function updateRefundNotes(id: string, notes: RefundNotesInput["notes"], ctx: RequestCtx) {
+  const order = await requireOrder(id);
+  if (!order.refundRecord) return order;
+
+  const updated = await repo.patch(id, {
+    refundRecord: {
+      ...order.refundRecord,
+      notes: notes.trim() || undefined,
+    },
+  });
+  await audit(ctx, "order.refund.notes", id);
+  return updated;
+}
+
+export async function requestRefund(id: string, input: RefundRequestInput, ctx: RequestCtx) {
+  const order = await requireOrder(id);
+  if (order.status !== "cancelled" || order.refundRecord) return order;
+
+  const now = new Date().toISOString();
+  const reason = (input.reason as RefundRecord["reason"]) ?? "order_cancelled";
+
+  const refundRecord: RefundRecord = {
+    status: "requested",
+    reason,
+    reasonDetail: input.reasonDetail?.trim() || undefined,
+    amount: order.totals.total,
+    notes: input.notes?.trim() || undefined,
+    requestedAt: now,
+    history: [{ status: "requested", at: now, note: "Refund requested" }],
+  };
+
+  const updated = await repo.patch(id, { refundRecord });
+  await audit(ctx, "order.refund.request", id, { amount: refundRecord.amount });
   return updated;
 }
 

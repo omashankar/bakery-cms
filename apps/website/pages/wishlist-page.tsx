@@ -9,6 +9,7 @@ import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { getWishlistSlugs } from "@/apps/website/lib/wishlist";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -21,6 +22,7 @@ interface WishlistPageProps {
 export function WishlistPage({ catalog }: WishlistPageProps) {
   const [slugs, setSlugs] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const labels = useBusinessLabels();
 
   useEffect(() => {
     const load = () => setSlugs(getWishlistSlugs());
@@ -39,7 +41,7 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
     <>
       <StorePageHeader
         title="Wishlist"
-        description="Save cakes you love for later."
+        description={`Save ${labels.productWordPlural.toLowerCase()} you love for later.`}
         breadcrumbs={[{ label: "Wishlist" }]}
       />
       <section className={layoutSpacing.sectionY}>
@@ -63,10 +65,10 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
               className="border-border bg-cream-50"
               icon={Heart}
               title="Your wishlist is empty"
-              description="Tap the heart on any cake to save it here."
+              description={`Tap the heart on any ${labels.productWord.toLowerCase()} to save it here.`}
               action={
                 <Button variant="bakery" render={<Link href={routes.store.collections} />}>
-                  Browse Cakes
+                  {`Browse ${labels.productWordPlural}`}
                 </Button>
               }
             />
@@ -75,7 +77,10 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
                   <span className="font-semibold text-foreground">{cakes.length}</span>{" "}
-                  {cakes.length === 1 ? "cake" : "cakes"} saved
+                  {cakes.length === 1
+                    ? labels.productWord.toLowerCase()
+                    : labels.productWordPlural.toLowerCase()}{" "}
+                  saved
                 </p>
                 <Button variant="outline" size="sm" render={<Link href={routes.store.collections} />}>
                   Continue Shopping

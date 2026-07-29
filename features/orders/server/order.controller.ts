@@ -12,6 +12,8 @@ import {
   refundSchema,
   paymentSchema,
   notesSchema,
+  refundNotesSchema,
+  refundRequestSchema,
 } from "./order.validators";
 
 const ORDER_ROLES = ["owner", "admin"] as const;
@@ -112,4 +114,28 @@ export const adminNotesController = withErrorHandler(async (request: Request, ct
     actorEmail: session.email,
   });
   return ok(order, "Notes saved");
+});
+
+export const refundNotesController = withErrorHandler(async (request: Request, ctx: IdContext) => {
+  const session = await requireRole(...ORDER_ROLES);
+  const { id } = await ctx.params;
+  const { notes } = validate(refundNotesSchema, await readJson(request));
+  const order = await service.updateRefundNotes(id, notes, {
+    ...requestContext(request),
+    actorId: session.sub,
+    actorEmail: session.email,
+  });
+  return ok(order, "Refund notes saved");
+});
+
+export const requestRefundController = withErrorHandler(async (request: Request, ctx: IdContext) => {
+  const session = await requireRole(...ORDER_ROLES);
+  const { id } = await ctx.params;
+  const input = validate(refundRequestSchema, await readJson(request));
+  const order = await service.requestRefund(id, input, {
+    ...requestContext(request),
+    actorId: session.sub,
+    actorEmail: session.email,
+  });
+  return ok(order, "Refund requested");
 });
