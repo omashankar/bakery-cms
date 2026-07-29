@@ -14,6 +14,7 @@ import {
   ORDERS_UPDATED_EVENT,
   persistServerOrders,
   refundOrder,
+  updateOrderAdminNotes,
   updateOrderStatus,
   type PlacedOrder,
 } from "@/features/orders/lib/orders";
@@ -142,6 +143,50 @@ describe("admin order mutations", () => {
       order: null,
       persisted: false,
     });
+  });
+});
+
+describe("concurrent mutations", () => {
+  it("does not let one mutation revert another's field", async () => {
+    // Both resolve the order, then both write. Each writes a whole order object,
+    // so if the second builds its copy from the state it read BEFORE the first
+    // landed, saving notes silently reverts the status change beside it.
+    persistServerOrders([order({ id: "o", status: "confirmed" })]);
+    mockServer(true);
+
+    const statusChange = updateOrderStatus("o", "delivered");
+    const notesChange = updateOrderAdminNotes("o", "Call before delivery");
+    await Promise.all([statusChange, notesChange]);
+
+    const finalOrder = getOrderById("o");
+    expect(finalOrder?.status).toBe("delivered");
+    expect(finalOrder?.adminNotes).toBe("Call before delivery");
+  });
+
+  it("keeps both changes when the slower one resolves from the server", async () => {
+    // The order is NOT cached, so each mutation awaits a server read first —
+    // widening the window in which the other can land.
+    persistServerOrders([]);
+    const remote = order({ id: "remote", status: "confirmed" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          String(url).endsWith("/api/orders/remote")
+            ? { ok: true, json: () => Promise.resolve({ success: true, data: remote }) }
+            : { ok: true }
+        )
+      )
+    );
+
+    await Promise.all([
+      updateOrderStatus("remote", "delivered"),
+      updateOrderAdminNotes("remote", "Leave at reception"),
+    ]);
+
+    const finalOrder = getOrderById("remote");
+    expect(finalOrder?.status).toBe("delivered");
+    expect(finalOrder?.adminNotes).toBe("Leave at reception");
   });
 });
 

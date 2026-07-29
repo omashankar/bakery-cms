@@ -333,12 +333,32 @@ async function resolveOrderForMutation(orderId: string): Promise<PlacedOrder | n
 }
 
 /** Apply an order to the local cache, inserting it if it was not already there. */
-function upsertOrder(updated: PlacedOrder): void {
+/**
+ * Applies `patch` to the FRESHEST copy of the order and writes it back.
+ *
+ * `resolveOrderForMutation` may await a server read, and a second mutation can
+ * land in that window. Patching the copy read before the await would write a
+ * whole order object built from stale fields — saving admin notes would quietly
+ * revert a status change made a moment earlier. The patch is applied at write
+ * time instead, so only the field each mutation owns is touched.
+ *
+ * `fallback` is used when the order still is not cached (it came from the
+ * server), in which case there is nothing to conflict with.
+ */
+function commitOrder(
+  orderId: string,
+  fallback: PlacedOrder,
+  patch: (order: PlacedOrder) => PlacedOrder
+): PlacedOrder {
   const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === updated.id);
+  const index = orders.findIndex((order) => order.id === orderId);
+  const updated = patch(index === -1 ? fallback : orders[index]);
+
   if (index === -1) orders.unshift(updated);
   else orders[index] = updated;
+
   writeOrders(orders);
+  return updated;
 }
 
 /**
@@ -364,13 +384,12 @@ export async function updateOrderStatus(
   if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
-  const updated: PlacedOrder = {
-    ...current,
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
     status,
-    statusHistory: [...current.statusHistory, { status, at: now }],
-  };
+    statusHistory: [...order.statusHistory, { status, at: now }],
+  }));
 
-  upsertOrder(updated);
   return { order: updated, persisted: await updateStatusRequest(orderId, status) };
 }
 
@@ -381,12 +400,11 @@ export async function updateOrderAdminNotes(
   const current = await resolveOrderForMutation(orderId);
   if (!current) return { order: null, persisted: false };
 
-  const updated: PlacedOrder = {
-    ...current,
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
     adminNotes: adminNotes.trim() || undefined,
-  };
+  }));
 
-  upsertOrder(updated);
   return { order: updated, persisted: await adminNotesRequest(orderId, adminNotes) };
 }
 
@@ -413,10 +431,15 @@ export async function updatePaymentStatus(
         : current.paymentReference),
   };
 
-  upsertOrder(updated);
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    paymentStatus: updated.paymentStatus,
+    paymentReference: updated.paymentReference,
+  }));
+
   return {
-    order: updated,
-    persisted: await paymentStatusRequest(orderId, paymentStatus, updated.paymentReference),
+    order: committed,
+    persisted: await paymentStatusRequest(orderId, paymentStatus, committed.paymentReference),
   };
 }
 
@@ -457,9 +480,15 @@ export async function cancelOrder(
     statusHistory: [...current.statusHistory, { status: "cancelled", at: now }],
   };
 
-  upsertOrder(updated);
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    status: "cancelled",
+    cancellationReason: updated.cancellationReason,
+    statusHistory: [...order.statusHistory, { status: "cancelled" as const, at: now }],
+  }));
+
   return {
-    order: updated,
+    order: committed,
     persisted: await cancelOrderRequest(orderId, cancellationReason),
   };
 }
@@ -503,17 +532,16 @@ export async function refundOrder(
     ],
   };
 
-  const updated: PlacedOrder = {
-    ...current,
-    status: "refunded",
-    paymentStatus: "refunded",
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    status: "refunded" as const,
+    paymentStatus: "refunded" as const,
     refundReference,
     refundRecord,
-    statusHistory: [...current.statusHistory, { status: "refunded", at: now }],
-  };
+    statusHistory: [...order.statusHistory, { status: "refunded" as const, at: now }],
+  }));
 
-  upsertOrder(updated);
-  return { order: updated, persisted: await refundOrderRequest(orderId, input) };
+  return { order: committed, persisted: await refundOrderRequest(orderId, input) };
 }
 
 export async function updateRefundNotes(
@@ -524,16 +552,14 @@ export async function updateRefundNotes(
   if (!current) return { order: null, persisted: false };
   if (!current.refundRecord) return { order: current, persisted: true };
 
-  const updated: PlacedOrder = {
-    ...current,
-    refundRecord: {
-      ...current.refundRecord,
-      notes: notes.trim() || undefined,
-    },
-  };
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    refundRecord: order.refundRecord
+      ? { ...order.refundRecord, notes: notes.trim() || undefined }
+      : order.refundRecord,
+  }));
 
-  upsertOrder(updated);
-  return { order: updated, persisted: await refundNotesRequest(orderId, notes) };
+  return { order: committed, persisted: await refundNotesRequest(orderId, notes) };
 }
 
 export async function requestRefundForCancelledOrder(
@@ -549,21 +575,22 @@ export async function requestRefundForCancelledOrder(
   const now = new Date().toISOString();
   const reason = input.reason ?? "order_cancelled";
 
-  const updated: PlacedOrder = {
-    ...current,
-    refundRecord: {
-      status: "requested",
-      reason,
-      reasonDetail: input.reasonDetail?.trim() || undefined,
-      amount: current.totals.total,
-      notes: input.notes?.trim() || undefined,
-      requestedAt: now,
-      history: [{ status: "requested", at: now, note: "Refund requested" }],
-    },
+  const refundRecord: RefundRecord = {
+    status: "requested",
+    reason,
+    reasonDetail: input.reasonDetail?.trim() || undefined,
+    amount: current.totals.total,
+    notes: input.notes?.trim() || undefined,
+    requestedAt: now,
+    history: [{ status: "requested", at: now, note: "Refund requested" }],
   };
 
-  upsertOrder(updated);
-  return { order: updated, persisted: await requestRefundRequest(orderId, input) };
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    refundRecord,
+  }));
+
+  return { order: committed, persisted: await requestRefundRequest(orderId, input) };
 }
 
 /** `updated` counts orders that actually changed; `failed` how many the server rejected. */

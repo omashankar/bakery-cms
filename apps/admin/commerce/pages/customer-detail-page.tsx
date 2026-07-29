@@ -74,7 +74,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     [profile, orders]
   );
   const activity = useMemo(
-    () => (profile ? getCustomerActivity(profile.email, orders) : []),
+    () => (profile ? getCustomerActivity(profile.meta, orders) : []),
     [profile, orders]
   );
 

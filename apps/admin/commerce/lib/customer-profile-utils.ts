@@ -101,11 +101,15 @@ export function getCustomerAddresses(orders: PlacedOrder[]): CustomerAddressSumm
   );
 }
 
+/**
+ * Takes the metadata rather than reading the local cache for it — the rest of
+ * this page renders the server's copy, so looking the notes up separately made
+ * one row of the timeline disagree with the notes field above it.
+ */
 export function getCustomerActivity(
-  email: string,
+  meta: CustomerMeta,
   orders: PlacedOrder[]
 ): CustomerActivityItem[] {
-  const meta = getCustomerAdminMeta(email);
   const items: CustomerActivityItem[] = [];
 
   for (const order of orders) {

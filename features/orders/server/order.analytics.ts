@@ -181,6 +181,16 @@ export async function getRefundCasesPage(
   };
 }
 
+/**
+ * Loads the whole collection, deliberately.
+ *
+ * The rows alone could be an indexed query — every invoice filter is a stored
+ * field — but the counters span ALL orders, and `invoicedAmount` has its own
+ * inclusion rule (it excludes cancelled orders only, unlike reports revenue
+ * which also excludes refunded). Expressing that as a second `$group` would put
+ * a money figure in two places, which is exactly how the original bug got in.
+ * One pass, one definition. Revisit only with a benchmark that says it matters.
+ */
 export async function getInvoicesPage(
   filters: InvoiceListFilters,
   page: number,
