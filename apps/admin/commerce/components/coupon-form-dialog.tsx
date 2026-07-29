@@ -157,8 +157,10 @@ export function CouponFormDialog({
                 id="discount-value"
                 type="number"
                 min="1"
+                max={discountType === "percent" ? "100" : undefined}
                 {...register(discountType === "percent" ? "percentOff" : "flatOff", {
                   required: true,
+                  ...(discountType === "percent" ? { max: 100 } : {}),
                 })}
               />
             </div>

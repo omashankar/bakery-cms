@@ -15,10 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
-import { getStorefrontFaqs } from "@/features/content/lib/storefront-content";
+import { getStorefrontFaqs, selectStorefrontFaqs } from "@/features/content/lib/storefront-content";
 import { getStorefrontContactInfo, isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
-import type { FaqCategory } from "@/types/content";
+import type { FaqCategory, FaqItem } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 
@@ -30,10 +30,18 @@ const faqCategories: Array<{ label: string; value: "all" | FaqCategory }> = [
   { label: "Delivery", value: "delivery" },
 ];
 
-export function FaqPage() {
+interface FaqPageProps {
+  /** Published FAQ content read from MongoDB on the server — passed down so the
+   *  list renders the same in the HTML and on hydration (no localStorage race). */
+  faqs?: FaqItem[];
+  /** Contact phone/email read from the server for the help sidebar. */
+  contact?: { phone: string; email: string };
+}
+
+export function FaqPage({ faqs, contact }: FaqPageProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
-  const contactInfo = getStorefrontContactInfo();
+  const contactInfo = contact ?? getStorefrontContactInfo();
   // "Wedding" is a bakery-only FAQ category — hide that pill when wedding is off.
   const [weddingEnabled, setWeddingEnabled] = useState(true);
   useEffect(() => {
@@ -53,8 +61,8 @@ export function FaqPage() {
 
   const categoryFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const items =
-      category === "all" ? getStorefrontFaqs() : getStorefrontFaqs(category);
+    const cat = category === "all" ? undefined : category;
+    const items = faqs ? selectStorefrontFaqs(faqs, cat) : getStorefrontFaqs(cat);
     return items.filter((faq) => {
       if (!query) return true;
       return (
@@ -62,7 +70,7 @@ export function FaqPage() {
         faq.answer.toLowerCase().includes(query)
       );
     });
-  }, [search, category]);
+  }, [search, category, faqs]);
 
   return (
     <>
@@ -82,6 +90,7 @@ export function FaqPage() {
                 <Input
                   className="h-11 rounded-xl pl-9"
                   placeholder="Search FAQ..."
+                  aria-label="Search FAQ"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />

@@ -64,7 +64,7 @@ export function BuilderVersionHistoryPanel<TSection>({
           <DialogDescription>
             {pendingRestoreId
               ? `“${pendingLabel ?? "This revision"}” will replace your current draft. Unsaved edits will be lost.`
-              : "Published snapshots saved in this browser. Restore loads a revision into your draft."}
+              : "Published snapshots saved on the server. Restore loads a revision into your draft."}
           </DialogDescription>
         </DialogHeader>
 

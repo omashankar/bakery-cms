@@ -21,6 +21,7 @@ import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { addToCart } from "@/features/cart/lib/cart";
 import {
   getProductWeightOptions,
+  getDefaultProductWeightOptions,
   getAllProducts,
 } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
@@ -82,7 +83,21 @@ export function ProductDetailPage({
   catalog,
 }: ProductDetailPageProps) {
   const router = useRouter();
-  const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
+  // Related/recommended lists merge localStorage-backed admin cakes (absent during
+  // SSR) — gate them behind mount to avoid a hydration mismatch. weightOptions
+  // shares the gate: its catalog fallback (for products without their own weights)
+  // reads localStorage too, so it renders the seed defaults until mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const weightOptions = useMemo(
+    () =>
+      cake.weights?.length || mounted
+        ? getProductWeightOptions(cake)
+        : getDefaultProductWeightOptions(),
+    [cake, mounted]
+  );
   const flavourOptions = useMemo(() => getProductFlavourOptions(cake), [cake]);
   const shapeOptions = useMemo(() => getProductShapeOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
@@ -105,12 +120,6 @@ export function ProductDetailPage({
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
-  // Related/recommended lists merge localStorage-backed admin cakes (absent during
-  // SSR) — gate them behind mount to avoid a hydration mismatch.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Optional bakery modules gate the bakery-specific choosers below. Default ON so
   // SSR / the bakery template render exactly as before; re-read on the client.

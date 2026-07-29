@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, MapPin, Phone, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
@@ -29,6 +29,7 @@ import {
   type PlacedOrder,
   type RefundOrderInput,
 } from "@/features/orders/lib/orders";
+import { fetchOrder } from "@/features/orders/lib/orders-api";
 import { SafeImage } from "@/components/shared/safe-image";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
@@ -44,23 +45,43 @@ interface OrderDetailPageProps {
 export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter();
   const [order, setOrder] = useState<PlacedOrder | null>(null);
+  const [loading, setLoading] = useState(true);
   const [adminNotes, setAdminNotes] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const current = getOrderById(orderId);
-    setOrder(current);
-    setAdminNotes(current?.adminNotes ?? "");
+    if (current) {
+      setOrder(current);
+      setAdminNotes(current.adminNotes ?? "");
+      setLoading(false);
+    } else {
+      // Not in the local cache yet (deep link, or placed on another device) —
+      // read it straight from the server before deciding it doesn't exist.
+      fetchOrder(orderId).then((fetched) => {
+        if (cancelled) return;
+        if (fetched) {
+          setOrder(fetched);
+          setAdminNotes(fetched.adminNotes ?? "");
+        }
+        setLoading(false);
+      });
+    }
 
     function refresh() {
       const next = getOrderById(orderId);
+      if (!next) return;
       setOrder(next);
-      setAdminNotes(next?.adminNotes ?? "");
+      setAdminNotes(next.adminNotes ?? "");
     }
 
     window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bakery-orders-updated", refresh);
+    };
   }, [orderId]);
 
   const timeline = useMemo(() => (order ? getOrderTimeline(order) : []), [order]);
@@ -100,6 +121,16 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     toast.success("Refund recorded", {
       description: updated.refundReference,
     });
+  }
+
+  if (loading) {
+    return (
+      <AdminPage className="space-y-4 sm:space-y-5">
+        <div className="flex min-h-64 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      </AdminPage>
+    );
   }
 
   if (!order) {

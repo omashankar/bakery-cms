@@ -8,6 +8,7 @@ import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import type { LandingProduct } from "@/constants/landing-data";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { searchProducts } from "@/features/products/lib/product-catalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
   const router = useRouter();
   const initialQuery = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(initialQuery);
+  const labels = useBusinessLabels();
 
   useEffect(() => {
     setQuery(initialQuery);
@@ -88,7 +90,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
     <>
       <StorePageHeader
         title="Search"
-        description="Find cakes by name, flavour, or category."
+        description={`Find ${labels.productWordPlural.toLowerCase()} by name, flavour, or category.`}
         breadcrumbs={[{ label: "Search" }]}
       />
 
@@ -142,7 +144,8 @@ export function SearchPage({ catalog }: SearchPageProps) {
               </span>
               <p className="font-heading text-lg font-semibold">No results found</p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                We couldn&apos;t find any cakes matching {initialQuery ? `"${initialQuery}"` : "your search"}.
+                We couldn&apos;t find any {labels.productWordPlural.toLowerCase()} matching{" "}
+                {initialQuery ? `"${initialQuery}"` : "your search"}.
                 Try a different term or browse our full collection.
               </p>
               <Button variant="outline" className="mt-5" render={<Link href={routes.store.collections} />}>

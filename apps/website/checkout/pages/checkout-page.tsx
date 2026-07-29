@@ -538,8 +538,17 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
     // Cash on Delivery
     setPlacing(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    finalizeOrder("cod", undefined);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      finalizeOrder("cod", undefined);
+    } catch (error) {
+      // Without this guard a thrown placeOrder/clearCart would leave the button
+      // stuck on "Placing order…" forever (finalizeOrder never resets `placing`).
+      setPlacing(false);
+      toast.error("Order failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    }
   };
 
   const retryPayment = () => {

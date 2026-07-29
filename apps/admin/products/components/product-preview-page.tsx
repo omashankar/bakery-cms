@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from "@/utils/format";
 import { adminCategories, adminFlavours, adminOccasions } from "@/features/products/lib/catalog-options";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getProductById } from "@/features/products/lib/products-repository";
+import { fetchProduct } from "@/features/products/data/products-client";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -32,12 +33,24 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
 
   useEffect(() => {
-    const found = getProductById(cakeId);
-    if (!found) {
-      router.replace(routes.admin.cakes.list);
+    let cancelled = false;
+    const cached = getProductById(cakeId);
+    if (cached) {
+      setCake(cached);
       return;
     }
-    setCake(found);
+    // Cache miss (just created, or edited on another device) — read it straight
+    // from the server before giving up and redirecting to the list.
+    fetchProduct(cakeId)
+      .then((found) => {
+        if (!cancelled) setCake(found);
+      })
+      .catch(() => {
+        if (!cancelled) router.replace(routes.admin.cakes.list);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [cakeId, router]);
 
   useEffect(() => {

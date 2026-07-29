@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ExternalLink,
   FileText,
@@ -42,6 +42,7 @@ import {
   loadSeoStore,
   resetSeoStore,
   saveGlobalSeo,
+  SEO_UPDATED_EVENT,
 } from "@/features/seo/lib/seo-repository";
 import {
   DESCRIPTION_IDEAL_MAX,
@@ -146,14 +147,32 @@ export function SeoAdminPage() {
     setSeoRoutes(store.routes);
   }
 
+  // Track dirtiness in a ref so the server-hydration listener can read it without
+  // re-subscribing, and avoid discarding in-progress global edits.
+  const isDirtyRef = useRef(false);
+
   useEffect(() => {
     refresh();
+    function onServerUpdate() {
+      // Server hydration (or another tab) changed the SEO store — reflect it.
+      // Routes are display-only, so always re-read them; only re-read the global
+      // form when the user is not mid-edit, otherwise unsaved changes are lost.
+      if (isDirtyRef.current) {
+        refreshRoutesOnly();
+      } else {
+        refresh();
+      }
+    }
+    window.addEventListener(SEO_UPDATED_EVENT, onServerUpdate);
+    return () => window.removeEventListener(SEO_UPDATED_EVENT, onServerUpdate);
   }, []);
 
   const isDirty = useMemo(
     () => serializeGlobal(global, keywordsInput) !== serializeGlobal(savedGlobal, savedKeywordsInput),
     [global, keywordsInput, savedGlobal, savedKeywordsInput]
   );
+
+  isDirtyRef.current = isDirty;
 
   const overview = useMemo(
     () => (mounted ? getSeoOverview(seoRoutes, global) : EMPTY_OVERVIEW),

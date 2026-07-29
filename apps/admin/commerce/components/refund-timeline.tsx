@@ -22,7 +22,7 @@ export function RefundTimeline({ events, className }: RefundTimelineProps) {
           ) : null}
           <span
             className={cn(
-              "absolute top-1.5 left-0 size-3.5 rounded-full border-2 border-white",
+              "absolute top-1.5 left-0 size-3.5 rounded-full border-2 border-card",
               event.status === "completed" && "bg-green-600",
               event.status === "processing" && "bg-blue-600",
               event.status === "requested" && "bg-amber-500",

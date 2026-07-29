@@ -32,7 +32,7 @@ export function CancelOrderDialog({
           <DialogTitle>Cancel order?</DialogTitle>
           <DialogDescription>
             {orderNumber
-              ? `Order ${orderNumber} will be marked as cancelled. This is a demo action only.`
+              ? `Order ${orderNumber} will be marked as cancelled.`
               : "This order will be marked as cancelled."}
           </DialogDescription>
         </DialogHeader>

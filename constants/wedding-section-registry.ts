@@ -15,7 +15,7 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       ctaLabel: "Request a Quote",
       ctaHref: "#inquiry",
       imageUrl:
-        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=800&fit=crop",
+        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=900&h=900&fit=crop&q=80",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },

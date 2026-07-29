@@ -1,3 +1,4 @@
+import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   WeddingBuilderSnapshot,
   WeddingBuilderState,
@@ -74,4 +75,36 @@ export async function resetWedding(): Promise<WeddingBuilderState> {
     body: JSON.stringify({ action: "reset" }),
   });
   return state;
+}
+
+export type WeddingRevision = BuilderRevision<WeddingSectionInstance>;
+
+async function revisionsRequest<T>(init?: RequestInit): Promise<T> {
+  const response = await fetch("/api/builders/wedding/revisions", {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+  }
+  return payload as T;
+}
+
+/** Server-stored publish revisions, newest first. */
+export async function fetchWeddingRevisions(): Promise<WeddingRevision[]> {
+  const { revisions } = await revisionsRequest<{ revisions: WeddingRevision[] }>();
+  return revisions;
+}
+
+/** Restore a revision's sections into the draft; returns the new draft snapshot. */
+export async function restoreWeddingRevision(
+  revisionId: string
+): Promise<WeddingBuilderSnapshot> {
+  const { snapshot } = await revisionsRequest<{ snapshot: WeddingBuilderSnapshot }>({
+    method: "POST",
+    body: JSON.stringify({ revisionId }),
+  });
+  return snapshot;
 }

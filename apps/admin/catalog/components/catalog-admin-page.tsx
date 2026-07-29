@@ -29,6 +29,7 @@ import {
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
+import { pushCatalogSection, CATALOG_SECTIONS } from "@/features/catalog/lib/catalog-api";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -190,7 +191,12 @@ export function CatalogAdminPage() {
   }
 
   function handleReset() {
-    resetCatalogStore();
+    const store = resetCatalogStore();
+    // Push the defaults to the server too — otherwise CatalogServerSync re-hydrates
+    // the old catalog on the next load and the reset silently reverts.
+    for (const section of CATALOG_SECTIONS) {
+      void pushCatalogSection(section, store[section]);
+    }
     refresh();
     toast.success("Catalog reset to defaults");
   }

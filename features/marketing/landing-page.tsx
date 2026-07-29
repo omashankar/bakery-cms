@@ -3,10 +3,6 @@ import {
   ArrowRightIcon,
   CheckIcon,
   ChevronRightIcon,
-  GlobeIcon,
-  MailIcon,
-  MessageCircleIcon,
-  SendIcon,
   SparklesIcon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -33,6 +29,7 @@ import {
   paymentMethods,
   reportMetrics,
   roadmap,
+  socialLinks,
   techStack,
   trustedFeatures,
   weddingBlocks,
@@ -612,7 +609,7 @@ export function LandingPage() {
       {/* ============================================================ */}
       <footer className="bg-[#241810] text-[#E7DDD1]">
         <Container className="py-16">
-          <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div className="flex flex-col gap-4">
               <Logo tone="invert" />
               <p className="max-w-xs text-sm leading-relaxed text-[#B7A895]">
@@ -620,13 +617,15 @@ export function LandingPage() {
                 payments, and more, from one modern dashboard.
               </p>
               <div className="mt-2 flex items-center gap-2">
-                {[GlobeIcon, MailIcon, MessageCircleIcon, SendIcon].map((Icon, i) => (
-                  <span
-                    key={i}
-                    className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#D8C9B6] transition-colors hover:border-[#D4A373]/60 hover:text-white"
+                {socialLinks.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    aria-label={social.label}
+                    className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#D8C9B6] outline-none transition-colors hover:border-[#D4A373]/60 hover:text-white focus-visible:ring-2 focus-visible:ring-[#D4A373]/60"
                   >
-                    <Icon className="size-4" />
-                  </span>
+                    <social.icon className="size-4" aria-hidden />
+                  </a>
                 ))}
               </div>
             </div>
@@ -660,7 +659,7 @@ export function LandingPage() {
           </div>
 
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-[#8f8171] sm:flex-row">
-            <p>© 2026 Bakery CMS. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Bakery CMS. All rights reserved.</p>
             <p className="flex items-center gap-1.5">
               Crafted for bakeries, cake shops &amp; custom retail
             </p>

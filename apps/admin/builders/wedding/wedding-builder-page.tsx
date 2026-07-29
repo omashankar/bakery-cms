@@ -8,21 +8,17 @@ import {
   WEDDING_SECTION_REGISTRY,
 } from "@/constants/wedding-section-registry";
 import { WeddingSectionRenderer } from "@/features/cms-sections/wedding-section-renderer";
-import {
-  sortSections,
-  WEDDING_REVISIONS_KEY,
-} from "@/features/cms-sections/lib/wedding-store";
+import { sortSections } from "@/features/cms-sections/lib/wedding-store";
 import {
   deriveWeddingMeta,
+  fetchWeddingRevisions,
   fetchWeddingState,
   publishWedding,
   resetWedding,
+  restoreWeddingRevision,
   saveWeddingDraftRequest,
+  type WeddingRevision,
 } from "@/features/cms-sections/data/wedding-sections-client";
-import {
-  listBuilderRevisions,
-  restoreBuilderRevision,
-} from "@/features/builders/lib/builder-revisions";
 import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder-version-history-panel";
 import { routes } from "@/constants/routes";
 import type { WeddingSectionInstance, WeddingSectionType } from "@/types/wedding-builder";
@@ -69,13 +65,19 @@ export function WeddingBuilderPage() {
   );
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [revisions, setRevisions] = useState<
-    ReturnType<typeof listBuilderRevisions>
-  >([]);
+  const [revisions, setRevisions] = useState<WeddingRevision[]>([]);
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
   const [publishMeta, setPublishMeta] = useState(EMPTY_META);
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+
+  const refreshRevisions = useCallback(async () => {
+    try {
+      setRevisions(await fetchWeddingRevisions());
+    } catch {
+      // Keep the last known history rather than blanking the panel.
+    }
+  }, []);
 
   const refreshMeta = useCallback(async () => {
     try {
@@ -89,8 +91,8 @@ export function WeddingBuilderPage() {
     } catch {
       // Leave the last known status on screen rather than blanking it.
     }
-    setRevisions(listBuilderRevisions(WEDDING_REVISIONS_KEY));
-  }, []);
+    await refreshRevisions();
+  }, [refreshRevisions]);
 
   useEffect(() => {
     async function load() {
@@ -108,12 +110,12 @@ export function WeddingBuilderPage() {
       } catch {
         toast.error("Could not load the wedding builder");
       }
-      setRevisions(listBuilderRevisions(WEDDING_REVISIONS_KEY));
+      await refreshRevisions();
       setMounted(true);
     }
 
     void load();
-  }, []);
+  }, [refreshRevisions]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -303,13 +305,17 @@ export function WeddingBuilderPage() {
     );
   }
 
-  function handleRestoreRevision(revisionId: string) {
-    const restored = restoreBuilderRevision(WEDDING_REVISIONS_KEY, revisionId);
-    if (!restored) return;
-    setSections(sortSections(restored as WeddingSectionInstance[]));
-    setIsDirty(true);
-    setHistoryOpen(false);
-    toast.success("Revision restored into draft");
+  async function handleRestoreRevision(revisionId: string) {
+    try {
+      const snapshot = await restoreWeddingRevision(revisionId);
+      setSections(sortSections(snapshot.sections));
+      setIsDirty(true);
+      setHistoryOpen(false);
+      await refreshMeta();
+      toast.success("Revision restored into draft");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not restore the revision");
+    }
   }
 
   async function confirmReset() {

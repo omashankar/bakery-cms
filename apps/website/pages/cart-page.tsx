@@ -14,6 +14,7 @@ import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summ
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
@@ -56,6 +57,7 @@ export function CartPage() {
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
   const [loaded, setLoaded] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const labels = useBusinessLabels();
 
   function refresh() {
     setItems(getCartItems());
@@ -186,10 +188,10 @@ export function CartPage() {
                 className="border-border bg-cream-50"
                 icon={ShoppingBag}
                 title="Your cart is empty"
-                description="Browse our delicious cakes and add your favourites."
+                description={`Browse our delicious ${labels.productWordPlural.toLowerCase()} and add your favourites.`}
                 action={
                   <Button variant="bakery" render={<Link href={routes.store.collections} />}>
-                    Browse Cakes
+                    {`Browse ${labels.productWordPlural}`}
                   </Button>
                 }
               />

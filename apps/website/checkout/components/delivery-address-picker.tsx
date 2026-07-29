@@ -48,7 +48,7 @@ export function DeliveryAddressPicker({
           const isSelected = address.id === selectedId;
 
           return (
-            <li key={address.id}>
+            <li key={address.id} className="relative">
               <label
                 className={cn(
                   "flex cursor-pointer gap-3 rounded-xl border p-4 text-sm transition-colors",
@@ -65,27 +65,10 @@ export function DeliveryAddressPicker({
                   onChange={() => onSelect(address)}
                 />
 
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="inline-flex rounded-full bg-cream-100 px-2.5 py-0.5 text-xs font-medium text-bakery-800">
-                      {address.label}
-                    </span>
-                    {/* Nested inside the label, so stop the click selecting. */}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onEdit(address);
-                      }}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-medium text-bakery-700 hover:underline focus-visible:ring-2 focus-visible:ring-bakery-700 focus-visible:outline-none"
-                    >
-                      <Pencil className="size-3.5" />
-                      Edit
-                      <span className="sr-only"> {address.label} address</span>
-                    </button>
-                  </div>
-
+                <div className="min-w-0 flex-1 space-y-1 pr-9">
+                  <span className="inline-flex rounded-full bg-cream-100 px-2.5 py-0.5 text-xs font-medium text-bakery-800">
+                    {address.label}
+                  </span>
                   <p className="font-medium text-foreground">{address.fullName}</p>
                   <p className="text-muted-foreground">{address.phone}</p>
                   <p className="text-muted-foreground">
@@ -96,6 +79,18 @@ export function DeliveryAddressPicker({
                   <p className="text-muted-foreground">Pincode: {address.pincode}</p>
                 </div>
               </label>
+
+              {/* Sibling of the label (not nested inside it) — valid HTML and its
+                  own tab stop, so no preventDefault juggling is needed. */}
+              <button
+                type="button"
+                onClick={() => onEdit(address)}
+                className="absolute right-4 top-4 inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-medium text-bakery-700 hover:underline focus-visible:ring-2 focus-visible:ring-bakery-700 focus-visible:outline-none"
+              >
+                <Pencil className="size-3.5" />
+                Edit
+                <span className="sr-only"> {address.label} address</span>
+              </button>
             </li>
           );
         })}

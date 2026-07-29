@@ -1,3 +1,4 @@
+import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   HomepageBuilderSnapshot,
   HomepageBuilderState,
@@ -79,4 +80,36 @@ export async function resetHomepage(): Promise<HomepageBuilderState> {
     body: JSON.stringify({ action: "reset" }),
   });
   return state;
+}
+
+export type HomepageRevision = BuilderRevision<HomepageSectionInstance>;
+
+async function revisionsRequest<T>(init?: RequestInit): Promise<T> {
+  const response = await fetch("/api/builders/homepage/revisions", {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+  }
+  return payload as T;
+}
+
+/** Server-stored publish revisions, newest first. */
+export async function fetchHomepageRevisions(): Promise<HomepageRevision[]> {
+  const { revisions } = await revisionsRequest<{ revisions: HomepageRevision[] }>();
+  return revisions;
+}
+
+/** Restore a revision's sections into the draft; returns the new draft snapshot. */
+export async function restoreHomepageRevision(
+  revisionId: string
+): Promise<HomepageBuilderSnapshot> {
+  const { snapshot } = await revisionsRequest<{ snapshot: HomepageBuilderSnapshot }>({
+    method: "POST",
+    body: JSON.stringify({ revisionId }),
+  });
+  return snapshot;
 }

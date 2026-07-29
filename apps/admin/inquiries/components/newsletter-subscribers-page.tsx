@@ -31,6 +31,7 @@ import {
   deleteNewsletterSubscribers,
   filterNewsletterSubscribers,
   loadNewsletterSubscribers,
+  NEWSLETTER_UPDATED_EVENT,
   updateNewsletterSubscriber,
   type NewsletterFilters,
 } from "@/features/inquiries/lib/newsletter-repository";
@@ -52,6 +53,8 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
 
   useEffect(() => {
     refresh();
+    window.addEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
   }, []);
 
   const filtered = useMemo(

@@ -171,7 +171,7 @@ export function CollectionsPage({
               </div>
 
               <p className="mb-4 text-sm text-muted-foreground">
-                {`Showing ${paginated.length} of ${filtered.length} cakes`}
+                {`Showing ${paginated.length} of ${filtered.length} ${(labels?.productWordPlural ?? "Cakes").toLowerCase()}`}
               </p>
 
               <div className="mb-8 flex flex-wrap gap-2">
@@ -195,7 +195,7 @@ export function CollectionsPage({
                   <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-cream-100 text-bakery-700">
                     <SearchX className="size-6" />
                   </div>
-                  <p className="font-medium">No cakes found</p>
+                  <p className="font-medium">{`No ${(labels?.productWordPlural ?? "Cakes").toLowerCase()} found`}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Try adjusting your search or filters.
                   </p>

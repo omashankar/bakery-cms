@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setCustomerSession } from "@/apps/website/account/lib/customer-session";
+import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
 import { routes } from "@/constants/routes";
 
 type Step = "phone" | "otp" | "signup";
@@ -84,7 +85,9 @@ export function CustomerAuthModal({
     setCustomerSession({ name, email, phone: `+91${phone}` }, true);
     onOpenChange(false);
     onAuthenticated?.();
-    toast.success("Signed in", { description: "Welcome to Monginis!" });
+    toast.success("Signed in", {
+      description: `Welcome to ${getStorefrontBrandInfo().name}!`,
+    });
   }
 
   async function handleSendOtp() {
@@ -129,7 +132,7 @@ export function CustomerAuthModal({
     setLoading(true);
     await new Promise((r) => setTimeout(r, 700));
     setLoading(false);
-    completeAuth("Customer", `${phone}@customer.monginis`);
+    completeAuth("Customer", `${phone}@customer.local`);
   }
 
   async function handleSignup() {
@@ -141,7 +144,7 @@ export function CustomerAuthModal({
     await new Promise((r) => setTimeout(r, 800));
     setLoading(false);
     const name = `${signup.firstName} ${signup.lastName}`.trim();
-    completeAuth(name, signup.email.trim() || `${phone}@customer.monginis`);
+    completeAuth(name, signup.email.trim() || `${phone}@customer.local`);
   }
 
   return (
@@ -349,6 +352,7 @@ function OtpStep({
               type="text"
               inputMode="numeric"
               maxLength={1}
+              aria-label={`OTP digit ${index + 1}`}
               value={digit}
               onChange={(e) => onChange(index, e.target.value)}
               onKeyDown={(e) => onKeyDown(index, e)}
