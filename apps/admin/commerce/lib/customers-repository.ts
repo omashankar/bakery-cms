@@ -124,17 +124,28 @@ export function updateCustomerMarketingOptIn(
   return saveCustomerAdminMeta({ ...current, marketingOptIn });
 }
 
+/** `persisted` is meaningless when nothing was written — the caller must not toast. */
+export const NOTHING_TO_WRITE = "nothing-to-write" as const;
+
 export function addCustomerTag(
   current: CustomerAdminMeta,
   tag: string
-): Promise<CustomerMetaResult> {
+): Promise<CustomerMetaResult & { skipped?: typeof NOTHING_TO_WRITE }> {
   const normalizedTag = tag.trim();
-  // Nothing to write, so nothing could fail to persist.
-  if (!normalizedTag || current.tags.includes(normalizedTag)) {
-    return Promise.resolve({ meta: current, persisted: true });
+  if (!normalizedTag) {
+    return Promise.resolve({ meta: current, persisted: true, skipped: NOTHING_TO_WRITE });
   }
 
-  return saveCustomerAdminMeta({ ...current, tags: [...current.tags, normalizedTag] });
+  // Deliberately NOT short-circuiting on an existing tag. That shortcut is only
+  // sound while `current` came from the server, and the one time it matters — a
+  // retry after a rejected write — is exactly when it did not. Re-sending a set
+  // the server already holds is idempotent; claiming success without sending is
+  // how a tag ends up existing only in one browser.
+  const tags = current.tags.includes(normalizedTag)
+    ? current.tags
+    : [...current.tags, normalizedTag];
+
+  return saveCustomerAdminMeta({ ...current, tags });
 }
 
 export function removeCustomerTag(

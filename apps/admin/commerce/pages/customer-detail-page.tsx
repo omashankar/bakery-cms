@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Mail, MapPin, Phone, Plus, Tag, X } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +38,10 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [notes, setNotes] = useState("");
+  /** True while the textarea holds an edit the server has not accepted yet. */
+  const notesDirty = useRef(false);
+  /** Which customer the state below currently describes. */
+  const shownCustomerId = useRef<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -50,22 +54,38 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     let cancelled = false;
 
     async function refresh() {
+      // Navigating to another customer must not leave the previous one on
+      // screen under the new URL while the request runs. A background refresh
+      // of the SAME customer keeps what is on screen, so it does not flash.
+      if (shownCustomerId.current !== customerId) {
+        shownCustomerId.current = customerId;
+        notesDirty.current = false;
+        setLoading(true);
+        setProfile(null);
+        setOrders([]);
+        setNotes("");
+      }
+
       const result = await fetchCustomerDetail(customerId);
       if (cancelled) return;
       setFailed(!result);
       if (result) {
         setProfile(result.profile);
         setOrders(result.orders);
-        if (result.profile) setNotes(result.profile.meta.notes);
+        // Only adopt the server's notes when the field is not mid-edit, or a
+        // background refresh discards whatever the admin has typed.
+        if (result.profile && !notesDirty.current) setNotes(result.profile.meta.notes);
       }
       setLoading(false);
     }
 
+    const onExternalChange = () => void refresh();
+
     void refresh();
-    window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
+    window.addEventListener(CUSTOMERS_UPDATED_EVENT, onExternalChange);
     return () => {
       cancelled = true;
-      window.removeEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
+      window.removeEventListener(CUSTOMERS_UPDATED_EVENT, onExternalChange);
     };
   }, [customerId, refreshKey]);
 
@@ -127,11 +147,32 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     });
   }
 
+  /**
+   * A rejected write must not leave its change on screen. The local copy was
+   * already updated (that is what makes the UI instant), so the honest move is
+   * to drop it and re-read the server rather than keep a change that only this
+   * browser believes in — otherwise the next write composes from that phantom
+   * state and a retry "succeeds" while writing something else entirely.
+   */
+  function rejectWrite(what: string) {
+    reportUnpersisted(what);
+    refreshProfile();
+  }
+
   async function handleSaveNotes() {
     if (!profile) return;
-    const { persisted } = await updateCustomerNotes(profile.meta, notes);
-    refreshProfile();
-    if (!persisted) return reportUnpersisted("Notes saved");
+    const { meta, persisted } = await updateCustomerNotes(profile.meta, notes);
+
+    if (!persisted) {
+      // Keep the text on screen and keep the field dirty — it is the only copy
+      // the admin has left, and the pending refresh must not overwrite it.
+      return rejectWrite("Notes saved");
+    }
+
+    // Adopt what the write returned. Without this the next tag or marketing
+    // write composes from the pre-save meta and reverts the notes server-side.
+    notesDirty.current = false;
+    setProfile((prev) => (prev ? { ...prev, meta } : prev));
     toast.success("Customer notes saved");
   }
 
@@ -148,8 +189,11 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
 
     const { meta, persisted } = await updateCustomerMarketingOptIn(current, checked);
     if (!persisted) {
+      // `current` is only a good rollback target for a single toggle — flip
+      // twice quickly and it is itself an unconfirmed optimistic value. Undo
+      // for the fast case, then let the refetch settle it against the server.
       setProfile((prev) => (prev ? { ...prev, meta: current } : prev));
-      return reportUnpersisted("Marketing preference saved");
+      return rejectWrite("Marketing preference saved");
     }
 
     setProfile((prev) => (prev ? { ...prev, meta } : prev));
@@ -158,18 +202,22 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
 
   async function handleAddTag() {
     if (!profile) return;
-    const { meta, persisted } = await addCustomerTag(profile.meta, tagInput);
+    const { meta, persisted, skipped } = await addCustomerTag(profile.meta, tagInput);
     setTagInput("");
+    // An empty box wrote nothing, so "Tag added" would be a plain lie.
+    if (skipped) return;
+    if (!persisted) return rejectWrite("Tag added");
+
     setProfile((current) => (current ? { ...current, meta } : current));
-    if (!persisted) return reportUnpersisted("Tag added");
     toast.success("Tag added");
   }
 
   async function handleRemoveTag(tag: string) {
     if (!profile) return;
     const { meta, persisted } = await removeCustomerTag(profile.meta, tag);
+    if (!persisted) return rejectWrite("Tag removed");
+
     setProfile((current) => (current ? { ...current, meta } : current));
-    if (!persisted) reportUnpersisted("Tag removed");
   }
 
   return (
@@ -442,7 +490,13 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                   className={adminTextareaClassName}
                   rows={5}
                   value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
+                  onChange={(event) => {
+                    // Mark the field mid-edit so a background refresh — a tag
+                    // write, another tab, the 30s poll — cannot overwrite what
+                    // is being typed with the server's older copy.
+                    notesDirty.current = true;
+                    setNotes(event.target.value);
+                  }}
                   placeholder="VIP wedding client, prefers eggless cakes, always requests morning delivery…"
                 />
               </div>

@@ -67,6 +67,7 @@ export function InvoicesAdminPage() {
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [failed, setFailed] = useState(false);
   const [overview, setOverview] = useState<InvoiceOverview>(EMPTY_INVOICE_OVERVIEW);
   const [filters, setFilters] = useState<InvoiceListFilters>(defaultInvoiceListFilters);
@@ -116,10 +117,13 @@ export function InvoicesAdminPage() {
   // The request uses the CLAMPED page. Filters or a mutation can shrink the
   // result set under the page the admin is on; asking for the raw page then
   // returns nothing and hides the pager, stranding them with no way back.
-  const requestKey = useDebouncedValue(
-    JSON.stringify({ filters, page: currentPage }),
-    250
-  );
+  const liveKey = JSON.stringify({ filters, page: currentPage });
+  const requestKey = useDebouncedValue(liveKey, 250);
+  // `loading` is re-armed only when the DEBOUNCED key changes, so for the first
+  // 250ms after a filter change the fetch has not started yet and the old,
+  // already wrong result is still on screen — asserted as "No invoices found"
+  // rather than shown as pending.
+  const pending = loading || requestKey !== liveKey;
   const request = JSON.parse(requestKey) as {
     filters: Record<string, unknown>;
     page: number;
@@ -177,11 +181,58 @@ export function InvoicesAdminPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
+  /**
+   * The exportable slice of the current filters, straight from the server — the
+   * page in front of the admin holds only PAGE_SIZE rows. Asked for the full
+   * EXPORT_LIMIT rather than `Math.min(total, …)`, because `total` is whatever
+   * the last page load reported and the collection moves underneath it.
+   */
+  async function loadForExport() {
+    setExporting(true);
+    // The DEBOUNCED filters, matching the rows on screen and the count beside
+    // them — not the live inputs, which may be a keystroke ahead of both.
+    const result = await fetchInvoicesPage({ ...request.filters, page: 1, limit: EXPORT_LIMIT });
+    setExporting(false);
+    return result;
+  }
+
   async function handleExport() {
-    // A selection only ever spans the current page, so it needs no fetch.
+    if (exporting) return;
+
     if (selectedIds.length > 0) {
-      const target = orders.filter((order) => selectedIds.includes(order.id));
+      const onThisPage = orders.filter((order) => selectedIds.includes(order.id));
+
+      // A selection SURVIVES paging — only a filter change or Clear resets it —
+      // so it routinely covers rows the current page does not hold. Writing out
+      // just the visible ones would drop the rest without saying so.
+      if (onThisPage.length === selectedIds.length) {
+        exportInvoicesToCsv(onThisPage);
+        toast.success(`Exported ${onThisPage.length} invoice${onThisPage.length === 1 ? "" : "s"}`);
+        return;
+      }
+
+      const wider = await loadForExport();
+      // Merge rather than replace: the visible rows are already in hand, so a
+      // failed or short widening should cost the admin the rows it could not
+      // reach — not the ones on screen in front of them.
+      const byId = new Map(onThisPage.map((order) => [order.id, order]));
+      for (const order of wider?.items ?? []) {
+        if (selectedIds.includes(order.id)) byId.set(order.id, order);
+      }
+
+      const target = [...byId.values()];
+      if (target.length === 0) {
+        toast.error("Could not load the selected invoices to export");
+        return;
+      }
+
       exportInvoicesToCsv(target);
+      if (target.length < selectedIds.length) {
+        toast.warning(`Exported ${target.length} of ${selectedIds.length} selected invoices`, {
+          description: "The rest fall outside the exportable range — narrow the filters.",
+        });
+        return;
+      }
       toast.success(`Exported ${target.length} invoice${target.length === 1 ? "" : "s"}`);
       return;
     }
@@ -191,13 +242,7 @@ export function InvoicesAdminPage() {
       return;
     }
 
-    // The page holds PAGE_SIZE rows, so exporting the whole filtered set means
-    // asking the server for it rather than writing out what happens to be visible.
-    const result = await fetchInvoicesPage({
-      ...filters,
-      page: 1,
-      limit: Math.min(total, EXPORT_LIMIT),
-    });
+    const result = await loadForExport();
     if (!result || result.items.length === 0) {
       toast.error("Could not load invoices to export");
       return;
@@ -205,8 +250,11 @@ export function InvoicesAdminPage() {
 
     exportInvoicesToCsv(result.items);
 
-    if (total > EXPORT_LIMIT) {
-      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${total} invoices`, {
+    // The server's own count, not the card's — `total` is from the last page
+    // this screen loaded, and invoices raised since then would be silently
+    // omitted from both the export and the warning about the omission.
+    if (result.total > result.items.length) {
+      toast.warning(`Exported the newest ${result.items.length} of ${result.total} invoices`, {
         description: "Narrow the filters to export the rest.",
       });
       return;
@@ -380,7 +428,7 @@ export function InvoicesAdminPage() {
               </div>
             ) : null}
 
-            {paginated.length === 0 && loading ? (
+            {paginated.length === 0 && pending ? (
               // Asserting there are none before the server has answered is a
               // guess, and a wrong one on every cold load in a shop that has them.
               <div className="flex min-h-48 items-center justify-center py-14">

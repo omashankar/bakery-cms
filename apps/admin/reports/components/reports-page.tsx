@@ -82,11 +82,18 @@ function RankListItem({
 
 /** How many rows each list card shows. The server returns a longer sorted list. */
 const LIST_ROWS = 6;
+/** 5s, 10s, 20s, 40s — then stop and leave the banner up. */
+const MAX_REFRESH_RETRIES = 4;
+const REFRESH_RETRY_BASE_MS = 5_000;
 
 export function ReportsPage() {
   const [range, setRange] = useState<ReportDateRange>("30d");
   const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(null);
   const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const attempts = useRef(0);
+  /** Which range `attempts` is counting for — changing range starts over. */
+  const loadedRange = useRef<ReportDateRange | null>(null);
 
   // Every figure here is a total over the whole range, so it is computed on the
   // server across every matching order. Computing it in the browser meant
@@ -94,21 +101,44 @@ export function ReportsPage() {
   // understated revenue, items sold and every breakdown once a shop grew.
   useEffect(() => {
     let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
     async function load() {
+      if (loadedRange.current !== range) {
+        loadedRange.current = range;
+        attempts.current = 0;
+      }
+
       const result = await fetchOrderAnalytics(range);
       if (cancelled) return;
-      if (result) setAnalytics(result);
-      setFailed(!result);
+
+      if (result) {
+        attempts.current = 0;
+        setAnalytics(result);
+        setFailed(false);
+        return;
+      }
+
+      setFailed(true);
+      // This panel has no refresh control of its own — the only other trigger is
+      // an order mutation elsewhere in the admin. Without a retry a single blip
+      // leaves the figures frozen at whatever they were, for as long as the tab
+      // stays open. Backs off so a server that is down is not hammered.
+      if (attempts.current < MAX_REFRESH_RETRIES) {
+        const delay = REFRESH_RETRY_BASE_MS * 2 ** attempts.current;
+        attempts.current += 1;
+        retry = setTimeout(() => setRetryKey((value) => value + 1), delay);
+      }
     }
 
     void load();
     window.addEventListener(ORDERS_UPDATED_EVENT, load);
     return () => {
       cancelled = true;
+      if (retry !== undefined) clearTimeout(retry);
       window.removeEventListener(ORDERS_UPDATED_EVENT, load);
     };
-  }, [range]);
+  }, [range, retryKey]);
 
   const summary = analytics?.summary ?? emptySummary;
   const comparison = analytics?.comparison ?? emptyComparison;
@@ -157,7 +187,14 @@ export function ReportsPage() {
       <AdminPageHeader
         title="Reports"
         description={
-          failed ? "Figures unavailable — the server did not answer" : rangeLabel
+          // Nothing loaded and nothing to show is a different message from
+          // figures that ARE on screen and merely stopped refreshing. The old
+          // wording put "unavailable" over perfectly good numbers.
+          !failed
+            ? rangeLabel
+            : analytics
+              ? `${rangeLabel} — could not refresh, showing the last figures loaded`
+              : "Figures unavailable — the server did not answer"
         }
         className="gap-3"
         actions={

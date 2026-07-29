@@ -321,12 +321,17 @@ export function getRevenueTrend(
     // hit no bucket and vanished from the chart while still counting in the
     // cards above it.
     const windowStart = getRangeStart(range, timeZone, nowMs);
+    // Skip unparseable timestamps rather than letting them decide where the
+    // chart starts. `zonedParts` maps invalid input to the epoch so it cannot
+    // throw, which means ONE malformed placedAt would otherwise seed an
+    // all-time chart from January 1970 — 679 monthly bars, with that order's
+    // revenue filed under "Jan 70".
     const earliestMs =
       windowStart?.getTime() ??
-      filtered.reduce(
-        (min, order) => Math.min(min, new Date(order.placedAt).getTime()),
-        nowMs
-      );
+      filtered.reduce((min, order) => {
+        const placedAt = new Date(order.placedAt).getTime();
+        return Number.isFinite(placedAt) ? Math.min(min, placedAt) : min;
+      }, nowMs);
 
     const lastMonth = zonedStartOfMonth(nowMs, timeZone);
     const spansMultipleYears =

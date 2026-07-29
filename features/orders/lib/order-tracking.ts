@@ -66,16 +66,28 @@ export function getActiveFulfillmentStatuses(): OrderStatus[] {
   return FULFILLMENT_STATUSES.filter((status) => !isTerminalOrderStatus(status));
 }
 
+/** A national number — anything shorter is a guess, not a credential. */
+const MIN_PHONE_DIGITS = 10;
+
+/**
+ * Whether the caller proved they own this order.
+ *
+ * This guards `/api/orders/by-number`, so the bar is "only the customer knows
+ * it". The phone branch used to accept ANY suffix: `?phone=1` matched roughly
+ * one order in ten, so a handful of requests walked straight past the gate. It
+ * now needs a full national number and compares the last ten digits exactly.
+ */
 export function verifyOrderLookup(
   order: PlacedOrder,
   lookup: { email?: string; phone?: string }
 ): boolean {
   const email = lookup.email?.trim().toLowerCase();
-  const phone = lookup.phone?.replace(/\D/g, "");
-
   if (email && order.address?.email?.toLowerCase() === email) return true;
-  if (phone && order.address?.phone?.replace(/\D/g, "").endsWith(phone.slice(-10))) {
-    return true;
+
+  const phone = lookup.phone?.replace(/\D/g, "") ?? "";
+  const stored = order.address?.phone?.replace(/\D/g, "") ?? "";
+  if (phone.length >= MIN_PHONE_DIGITS && stored.length >= MIN_PHONE_DIGITS) {
+    return stored.slice(-MIN_PHONE_DIGITS) === phone.slice(-MIN_PHONE_DIGITS);
   }
 
   return false;

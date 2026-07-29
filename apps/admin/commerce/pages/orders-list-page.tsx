@@ -85,6 +85,7 @@ export function OrdersListPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
+  const [statsFailed, setStatsFailed] = useState(false);
   const [totalMatching, setTotalMatching] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -114,10 +115,8 @@ export function OrdersListPage() {
   // The request uses the CLAMPED page. Filters or a mutation can shrink the
   // result set under the page the admin is on; asking for the raw page then
   // returns nothing and hides the pager, stranding them with no way back.
-  const requestKey = useDebouncedValue(
-    JSON.stringify({ filters: query, page: currentPage }),
-    250
-  );
+  const liveKey = JSON.stringify({ filters: query, page: currentPage });
+  const requestKey = useDebouncedValue(liveKey, 250);
   const request = JSON.parse(requestKey) as {
     filters: Record<string, unknown>;
     page: number;
@@ -149,7 +148,11 @@ export function OrdersListPage() {
 
     (async () => {
       const summary = await fetchOrderStats();
-      if (!cancelled && summary) setStats(summary);
+      if (cancelled) return;
+      // EMPTY_STATS would otherwise render as a confident "0 orders, ₹0" — the
+      // one reading an admin must never get from a request that simply failed.
+      setStatsFailed(!summary);
+      if (summary) setStats(summary);
     })();
 
     return () => {
@@ -158,6 +161,17 @@ export function OrdersListPage() {
   }, [reloadKey]);
 
   const paginated = orders;
+
+  // `loading` is re-armed only when the DEBOUNCED key changes, so for the first
+  // 250ms after a keystroke the fetch has not started yet and the old, already
+  // wrong result is still on screen — asserted as "No orders found" rather than
+  // shown as pending. A request the admin has already caused counts as in flight.
+  const pending = loading || requestKey !== liveKey;
+
+  /** Cards must read "unavailable", not zero, when the aggregation did not answer. */
+  const statValue = (value: string | number) => (statsFailed ? "—" : value);
+  const statChange = (change: string) => (statsFailed ? "Unavailable" : change);
+  const statTone = <T,>(tone: T) => (statsFailed ? ("warning" as const) : tone);
 
   const inProgress =
     stats.pending +
@@ -216,6 +230,27 @@ export function OrdersListPage() {
     toast.success(`Applied to ${updated} order${updated === 1 ? "" : "s"}`);
   }
 
+  /**
+   * The exportable slice of the current filters, straight from the server — the
+   * page in front of the admin holds only PAGE_SIZE rows. Asked for the full
+   * EXPORT_LIMIT rather than `Math.min(totalMatching, …)`, because that count is
+   * whatever the last page load reported and the collection moves underneath it.
+   */
+  function mergeById(first: PlacedOrder[], second: PlacedOrder[]) {
+    const byId = new Map(first.map((order) => [order.id, order]));
+    for (const order of second) byId.set(order.id, order);
+    return [...byId.values()];
+  }
+
+  async function loadForExport() {
+    setExporting(true);
+    // The DEBOUNCED filters, matching the rows on screen and the count beside
+    // them — not the live inputs, which may be a keystroke ahead of both.
+    const result = await fetchOrdersPage({ ...request.filters, page: 1, limit: EXPORT_LIMIT });
+    setExporting(false);
+    return result;
+  }
+
   async function handleExport() {
     if (exporting) return;
 
@@ -231,15 +266,14 @@ export function OrdersListPage() {
         return;
       }
 
-      setExporting(true);
-      const wider = await fetchOrdersPage({
-        ...request.filters,
-        page: 1,
-        limit: Math.min(totalMatching, EXPORT_LIMIT),
-      });
-      setExporting(false);
-
-      const target = (wider?.items ?? []).filter((order) => selectedIds.includes(order.id));
+      const wider = await loadForExport();
+      // Merge rather than replace: the visible rows are already in hand, so a
+      // failed or short widening should cost the admin the rows it could not
+      // reach — not the ones on screen in front of them.
+      const target = mergeById(
+        onThisPage,
+        (wider?.items ?? []).filter((order) => selectedIds.includes(order.id))
+      );
       if (target.length === 0) {
         toast.error("Could not load the selected orders to export");
         return;
@@ -261,16 +295,7 @@ export function OrdersListPage() {
       return;
     }
 
-    // Export the whole filtered set, not just the visible page — which means
-    // going back to the server, since the page holds only PAGE_SIZE rows.
-    setExporting(true);
-    const result = await fetchOrdersPage({
-      ...query,
-      page: 1,
-      limit: Math.min(totalMatching, EXPORT_LIMIT),
-    });
-    setExporting(false);
-
+    const result = await loadForExport();
     if (!result || result.items.length === 0) {
       toast.error("Could not load orders to export");
       return;
@@ -278,8 +303,12 @@ export function OrdersListPage() {
 
     exportOrdersToCsv(result.items);
 
-    if (totalMatching > EXPORT_LIMIT) {
-      toast.warning(`Exported the newest ${EXPORT_LIMIT} of ${totalMatching} orders`, {
+    // The server's own count, not the card's — `totalMatching` is from the last
+    // page this screen loaded, and orders placed since then would be silently
+    // omitted from both the export and the warning about the omission.
+    const matched = result.pagination?.total ?? result.items.length;
+    if (matched > result.items.length) {
+      toast.warning(`Exported the newest ${result.items.length} of ${matched} orders`, {
         description: "Narrow the filters to export the rest.",
       });
       return;
@@ -317,9 +346,9 @@ export function OrdersListPage() {
         >
           <DashboardStatCard
             title="Total orders"
-            value={stats.total}
-            change="All orders"
-            changeTone="neutral"
+            value={statValue(stats.total)}
+            change={statChange("All orders")}
+            changeTone={statTone("neutral" as const)}
             icon={ShoppingBag}
             tone="bakery"
           />
@@ -336,9 +365,9 @@ export function OrdersListPage() {
         >
           <DashboardStatCard
             title="In progress"
-            value={inProgress}
-            change={inProgress > 0 ? "Needs fulfillment" : "All clear"}
-            changeTone={inProgress > 0 ? "warning" : "positive"}
+            value={statValue(inProgress)}
+            change={statChange(inProgress > 0 ? "Needs fulfillment" : "All clear")}
+            changeTone={statTone(inProgress > 0 ? ("warning" as const) : ("positive" as const))}
             icon={Send}
             tone="gold"
           />
@@ -355,18 +384,18 @@ export function OrdersListPage() {
         >
           <DashboardStatCard
             title="Delivered"
-            value={stats.delivered}
-            change="Completed orders"
-            changeTone="positive"
+            value={statValue(stats.delivered)}
+            change={statChange("Completed orders")}
+            changeTone={statTone("positive" as const)}
             icon={CheckCircle2}
             tone="bakery"
           />
         </button>
         <DashboardStatCard
           title="Revenue"
-          value={formatCurrency(stats.revenue)}
-          change="Excludes cancelled"
-          changeTone="neutral"
+          value={statValue(formatCurrency(stats.revenue))}
+          change={statChange("Excludes cancelled")}
+          changeTone={statTone("neutral" as const)}
           icon={IndianRupee}
           tone="gold"
         />
@@ -491,7 +520,7 @@ export function OrdersListPage() {
           </div>
         ) : null}
 
-        {paginated.length === 0 && loading ? (
+        {paginated.length === 0 && pending ? (
           // Saying "No orders found" before the server has answered would be a
           // guess, and a wrong one on every cold load in a shop that has orders.
           <div className="flex min-h-48 items-center justify-center py-14">

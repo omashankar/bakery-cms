@@ -119,11 +119,30 @@ export function zonedMidnight(
     return Date.UTC(p.year, p.month, p.day);
   };
 
+  // 15-minute steps because some zones shift by 30 or 45 minutes, and a bound of
+  // a full day rather than a few hours: three hours covers every DST jump on
+  // record, but exhausting the loop returned an instant on the WRONG day without
+  // a word, and a chart quietly filed under the previous date is worse than the
+  // handful of extra formatToParts calls this can never actually spend. The walk
+  // exits the moment it reaches the day, which for every real zone is at most a
+  // few steps and normally zero.
+  const STEP_MS = 15 * 60_000;
+  const MAX_STEPS = (26 * 60) / 15;
+
   let result = settled;
-  // A DST jump is at most a couple of hours; 15-minute steps cover every real
-  // zone (some historical ones shift by 30 or 45 minutes) and the loop is bounded.
-  for (let step = 0; step < 12 && dayOf(result) < wanted; step += 1) {
-    result += 15 * 60_000;
+  let steps = 0;
+  // Runs past `wanted` only for a date that does not exist in this zone at all
+  // — Pacific/Apia skipped 30 Dec 2011 outright. Starting the window at the next
+  // real instant is the only available answer, and the right one.
+  while (steps < MAX_STEPS && dayOf(result) < wanted) {
+    result += STEP_MS;
+    steps += 1;
+  }
+  // Symmetric guard: a zone that moves its clocks BACK across midnight can leave
+  // the correction pass one day ahead.
+  while (steps < MAX_STEPS && dayOf(result) > wanted) {
+    result -= STEP_MS;
+    steps += 1;
   }
 
   return result;

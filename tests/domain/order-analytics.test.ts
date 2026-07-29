@@ -112,6 +112,22 @@ describe("revenue trend bucketing", () => {
     ]);
   });
 
+  it("does not let one malformed timestamp seed an all-time chart from 1970", () => {
+    const now = Date.parse("2026-07-29T12:00:00.000Z");
+    const trend = getRevenueTrend(
+      [
+        order({ id: "good", placedAt: "2026-05-10T06:00:00.000Z" }),
+        order({ id: "broken", placedAt: "not-a-date" }),
+      ],
+      "all",
+      "UTC",
+      now
+    );
+
+    // May, Jun, Jul — not 679 bars back to January 1970.
+    expect(trend.map((p) => p.label)).toEqual(["May", "Jun", "Jul"]);
+  });
+
   it("omits the year when the whole span sits inside one", () => {
     const june30 = Date.parse("2026-06-30T12:00:00.000Z");
 
