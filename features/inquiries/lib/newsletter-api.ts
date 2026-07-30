@@ -10,15 +10,24 @@ interface Envelope<T> {
   data: T | null;
 }
 
-async function send(path: string, method: string, body?: unknown): Promise<void> {
+/**
+ * Whether the SERVER accepted the write. Resolves false on a network failure OR
+ * a non-2xx response; never throws.
+ *
+ * The `res.ok` check is the point. Without it a 401 from an expired admin token
+ * and a 500 both read as success, and the caller goes on to report a change that
+ * the next hydration silently reverts.
+ */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
   try {
-    await fetch(path, {
+    const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    return res.ok;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -27,16 +36,19 @@ export function subscribeRequest(input: {
   id?: string;
   email: string;
   source?: string;
-}): void {
-  void send("/api/newsletter", "POST", input);
+}): Promise<boolean> {
+  return send("/api/newsletter", "POST", input);
 }
 
-export function updateSubscriberRequest(id: string, patch: Partial<NewsletterSubscriber>): void {
-  void send(`/api/newsletter/${id}`, "PATCH", patch);
+export function updateSubscriberRequest(
+  id: string,
+  patch: Partial<NewsletterSubscriber>
+): Promise<boolean> {
+  return send(`/api/newsletter/${id}`, "PATCH", patch);
 }
 
-export function deleteSubscribersRequest(ids: string[]): void {
-  void send("/api/newsletter", "DELETE", { ids });
+export function deleteSubscribersRequest(ids: string[]): Promise<boolean> {
+  return send("/api/newsletter", "DELETE", { ids });
 }
 
 /** Admin: fetch all subscribers (401 → null for non-admins). */

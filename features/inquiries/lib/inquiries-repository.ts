@@ -219,11 +219,24 @@ export function getInquiryById(id: string): Inquiry | null {
   return loadInquiries().find((inquiry) => inquiry.id === id) ?? null;
 }
 
-export function addInquiry(
+/**
+ * A write, plus whether the SERVER took it.
+ *
+ * The local copy is a cache the next hydration overwrites, so a change the
+ * server rejected is not saved — it just looks saved until someone reloads. For
+ * an inquiry that means a customer's enquiry sitting in one browser and reaching
+ * no one, or a reply-status change the rest of the team never sees.
+ */
+export interface InquiryWriteResult {
+  inquiry: Inquiry | null;
+  persisted: boolean;
+}
+
+export async function addInquiry(
   input: Omit<Inquiry, "id" | "createdAt" | "updatedAt" | "status"> & {
     status?: InquiryStatus;
   }
-): Inquiry {
+): Promise<InquiryWriteResult> {
   const inquiries = loadInquiries();
   const timestamp = nowIso();
   const created: Inquiry = {
@@ -234,17 +247,16 @@ export function addInquiry(
     updatedAt: timestamp,
   };
   persistInquiries([created, ...inquiries]);
-  createInquiryRequest(created);
-  return created;
+  return { inquiry: created, persisted: await createInquiryRequest(created) };
 }
 
-export function updateInquiry(
+export async function updateInquiry(
   id: string,
   patch: Partial<Inquiry>
-): Inquiry | null {
+): Promise<InquiryWriteResult> {
   const inquiries = loadInquiries();
   const index = inquiries.findIndex((inquiry) => inquiry.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { inquiry: null, persisted: false };
 
   const updated: Inquiry = {
     ...inquiries[index],
@@ -254,17 +266,17 @@ export function updateInquiry(
   };
   inquiries[index] = updated;
   persistInquiries(inquiries);
-  updateInquiryRequest(id, patch);
-  return updated;
+  return { inquiry: updated, persisted: await updateInquiryRequest(id, patch) };
 }
 
-export function deleteInquiries(ids: string[]): number {
+export async function deleteInquiries(
+  ids: string[]
+): Promise<{ count: number; persisted: boolean }> {
   const inquiries = loadInquiries();
   const next = inquiries.filter((inquiry) => !ids.includes(inquiry.id));
   const count = inquiries.length - next.length;
   persistInquiries(next);
-  deleteInquiriesRequest(ids);
-  return count;
+  return { count, persisted: await deleteInquiriesRequest(ids) };
 }
 
 export function countNewInquiries(): number {
@@ -287,7 +299,7 @@ export function createInquiryFromForm(data: {
   message: string;
   eventDate?: string;
   guestCount?: number;
-}): Inquiry {
+}): Promise<InquiryWriteResult> {
   return addInquiry({
     type: data.type,
     name: data.name,

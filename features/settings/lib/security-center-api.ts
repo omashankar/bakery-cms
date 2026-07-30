@@ -10,15 +10,23 @@ interface Envelope<T> {
   data: T | null;
 }
 
-async function send(path: string, method: string, body?: unknown): Promise<void> {
+/**
+ * Resolves false on a network failure OR a non-2xx response.
+ *
+ * The `res.ok` check is the point. Without it this reported success for a 401
+ * (expired admin token) and a 500 alike, and the caller went on to tell an admin
+ * that a session was revoked while it was still live on the server.
+ */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
   try {
-    await fetch(path, {
+    const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    return res.ok;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -34,10 +42,10 @@ export async function fetchSecurityCenter(): Promise<SecurityCenterState | null>
   }
 }
 
-export function revokeSessionRequest(sessionId: string): void {
-  void send(`/api/security-center/sessions/${sessionId}`, "DELETE");
+export function revokeSessionRequest(sessionId: string): Promise<boolean> {
+  return send(`/api/security-center/sessions/${sessionId}`, "DELETE");
 }
 
-export function logoutAllRequest(): void {
-  void send("/api/security-center/logout-all", "POST");
+export function logoutAllRequest(): Promise<boolean> {
+  return send("/api/security-center/logout-all", "POST");
 }

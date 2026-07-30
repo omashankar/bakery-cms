@@ -337,34 +337,53 @@ export function recordFailedLogin(email: string, reason = "Invalid password"): v
   });
 }
 
-export function revokeSession(sessionId: string): boolean {
+/**
+ * Revoke a session — SERVER FIRST, and the local list only once it agrees.
+ *
+ * Every other write in this file is local-first for a responsive UI. This one is
+ * not, and deliberately: it is an access control. Removing the row first meant a
+ * failed DELETE (expired admin token, 500, offline) left the attacker's session
+ * live on the server while the admin was shown "Session revoked" and the row
+ * they would have retried was already gone from the list.
+ */
+export async function revokeSession(sessionId: string): Promise<boolean> {
   const state = loadSecurityCenter();
   const session = state.activeSessions.find((s) => s.id === sessionId);
   if (!session || session.isCurrent) return false;
+
+  // Deletes the session and revokes its refresh chain.
+  if (!(await revokeSessionRequest(sessionId))) return false;
 
   save({
     ...state,
     activeSessions: state.activeSessions.filter((s) => s.id !== sessionId),
   });
-  // Real revocation on the server (deletes the session + revokes its refresh chain).
-  revokeSessionRequest(sessionId);
   return true;
 }
 
-export function logoutAllDevices(): number {
+export interface LogoutAllResult {
+  /** How many other sessions the list held. Zero is a no-op, not a failure. */
+  removed: number;
+  /** Whether the server actually revoked them. */
+  persisted: boolean;
+}
+
+/** Server first, for the same reason as [revokeSession]. */
+export async function logoutAllDevices(): Promise<LogoutAllResult> {
   const state = loadSecurityCenter();
   const currentId = localStorage.getItem(CURRENT_SESSION_KEY) ?? "sess-current";
   const remaining = state.activeSessions.filter((s) => s.id === currentId || s.isCurrent);
   const removed = state.activeSessions.length - remaining.length;
 
+  // Revokes all sessions other than the caller's.
+  if (!(await logoutAllRequest())) return { removed, persisted: false };
+
   save({
     ...state,
     activeSessions: remaining.map((s) => ({ ...s, isCurrent: true })),
   });
-  // Real "log out everywhere" on the server (revokes all other sessions).
-  logoutAllRequest();
 
-  return removed;
+  return { removed, persisted: true };
 }
 
 export function clearFailedLoginAttempts(): void {

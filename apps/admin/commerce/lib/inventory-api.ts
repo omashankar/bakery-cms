@@ -44,13 +44,24 @@ export interface AdjustStockRequest {
   note?: string;
 }
 
-/** Fire-and-forget stock adjustment to the server (never throws). */
-export function adjustStockRequest(input: AdjustStockRequest): void {
-  void post("/api/inventory/adjust", input);
+/**
+ * Whether the SERVER accepted the write. Never throws.
+ *
+ * These used to be fire-and-forget, which for stock means the admin is told a
+ * count changed while Mongo — the number the storefront actually sells against —
+ * still holds the old one. That gap oversells: the shop keeps taking orders for
+ * a cake it no longer has.
+ */
+async function wrote(path: string, body: unknown, method = "POST"): Promise<boolean> {
+  return (await post(path, body, method)) !== null;
 }
 
-export function setUnlimitedRequest(cakeId: string, unlimited: boolean): void {
-  void post("/api/inventory/unlimited", { cakeId, unlimited });
+export function adjustStockRequest(input: AdjustStockRequest): Promise<boolean> {
+  return wrote("/api/inventory/adjust", input);
+}
+
+export function setUnlimitedRequest(cakeId: string, unlimited: boolean): Promise<boolean> {
+  return wrote("/api/inventory/unlimited", { cakeId, unlimited });
 }
 
 export function fetchStockHistory(): Promise<StockHistoryEntry[] | null> {
@@ -61,6 +72,6 @@ export function fetchInventorySettings(): Promise<InventorySettings | null> {
   return getJson<InventorySettings>("/api/inventory/settings");
 }
 
-export function saveInventorySettingsRequest(settings: InventorySettings): void {
-  void post("/api/inventory/settings", settings, "PUT");
+export function saveInventorySettingsRequest(settings: InventorySettings): Promise<boolean> {
+  return wrote("/api/inventory/settings", settings, "PUT");
 }

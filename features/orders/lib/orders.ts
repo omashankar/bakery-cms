@@ -215,7 +215,21 @@ function buildOrderFingerprint(input: {
   ]);
 }
 
-export function placeOrder(input: {
+/**
+ * The order, plus whether the SERVER has it.
+ *
+ * These come apart, and at checkout the difference is the whole ball game: the
+ * local write is a cache, so an order the server never received exists only in
+ * that one browser. The customer has paid, has a confirmation number, and can
+ * even track it — against their own localStorage — while the bakery never sees
+ * the order at all. Callers must not say "confirmed" on `order` alone.
+ */
+export interface PlaceOrderResult {
+  order: PlacedOrder;
+  persisted: boolean;
+}
+
+export async function placeOrder(input: {
   items: CartLineItem[];
   totals: CartTotals;
   address: CheckoutAddress;
@@ -225,7 +239,7 @@ export function placeOrder(input: {
   coupon?: AppliedCoupon;
   orderNotes?: string;
   deliverySlot?: DeliverySlot;
-}): PlacedOrder {
+}): Promise<PlaceOrderResult> {
   const placedAt = new Date().toISOString();
   const paymentStatus =
     input.paymentStatus ??
@@ -240,7 +254,10 @@ export function placeOrder(input: {
       buildOrderFingerprint(existing) === fingerprint &&
       Date.now() - new Date(existing.placedAt).getTime() < DUPLICATE_ORDER_WINDOW_MS
   );
-  if (recent) return recent;
+  // Re-send rather than assume the first attempt reached the server: a customer
+  // pressing the button again is often doing so BECAUSE it did not. The POST is
+  // idempotent on the order id, so this cannot create a second order.
+  if (recent) return { order: recent, persisted: await placeOrderRequest(recent) };
 
   const order: PlacedOrder = {
     id: newOrderId(),
@@ -267,8 +284,7 @@ export function placeOrder(input: {
   writeOrders([order, ...readOrders()]);
   // Durable write to the server (creates the order in Mongo + reduces stock,
   // atomically). Sends the same id/orderNumber so both copies agree.
-  placeOrderRequest(order);
-  return order;
+  return { order, persisted: await placeOrderRequest(order) };
 }
 
 /**

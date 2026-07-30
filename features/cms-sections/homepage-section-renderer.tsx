@@ -70,6 +70,7 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { toast } from "sonner";
+import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 
 interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
@@ -871,12 +872,24 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
     event.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    // This form used to wait 600ms and say "Subscribed!" without writing
+    // anything anywhere. Nobody was subscribed, and nobody could tell.
+    const { persisted } = await addNewsletterSubscriber(email, "Homepage");
+    setLoading(false);
+
+    if (!persisted) {
+      // Keep the address in the box so one tap retries it.
+      toast.error("We couldn't sign you up", {
+        description: "Please check your connection and try again.",
+      });
+      return;
+    }
+
     toast.success("Subscribed!", {
       description: "You'll receive our sweetest updates.",
     });
     setEmail("");
-    setLoading(false);
   };
 
   const card = (

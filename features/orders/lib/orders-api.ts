@@ -90,23 +90,60 @@ export interface OrderPageQuery {
   limit?: number;
 }
 
-/** Resolves false on a network failure OR a non-2xx response (401, 404, 500…). */
-async function send(path: string, method: string, body?: unknown): Promise<boolean> {
+/** 0 means the request never got an answer — offline, DNS, CORS, abort. */
+async function sendWithStatus(
+  path: string,
+  method: string,
+  body?: unknown
+): Promise<{ ok: boolean; status: number }> {
   try {
     const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    return res.ok;
+    return { ok: res.ok, status: res.status };
   } catch {
-    return false;
+    return { ok: false, status: 0 };
   }
 }
 
-/** Send the fully-built order to the server (verbatim id/orderNumber). */
-export function placeOrderRequest(order: PlacedOrder): void {
-  void send("/api/orders", "POST", order);
+/** Resolves false on a network failure OR a non-2xx response (401, 404, 500…). */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
+  return (await sendWithStatus(path, method, body)).ok;
+}
+
+/** 3 attempts, 400ms then 800ms apart. */
+const PLACE_ORDER_ATTEMPTS = 3;
+const PLACE_ORDER_BACKOFF_MS = 400;
+
+/** A rejection the server will keep rejecting — retrying it just wastes the wait. */
+function isWorthRetrying(status: number): boolean {
+  return status === 0 || status === 408 || status === 429 || status >= 500;
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Confirm the order on the server, with the same id/orderNumber as the local
+ * copy so the two agree.
+ *
+ * Retries, unlike every other write in this file, because of when it runs: the
+ * card has already been charged and the cart is about to be emptied, so a single
+ * dropped request would cost a paid order that the bakery never sees. The POST
+ * is idempotent on the order id, so a retry after a response we never received
+ * cannot create a second order or decrement stock twice.
+ */
+export async function placeOrderRequest(order: PlacedOrder): Promise<boolean> {
+  for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
+
+    const { ok, status } = await sendWithStatus("/api/orders", "POST", order);
+    if (ok) return true;
+    if (!isWorthRetrying(status)) return false;
+  }
+
+  return false;
 }
 
 export function updateStatusRequest(orderId: string, status: OrderStatus): Promise<boolean> {

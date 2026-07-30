@@ -61,7 +61,7 @@ import {
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
-import { placeOrder } from "@/features/orders/lib/orders";
+import { placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
@@ -225,6 +225,16 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
+  /**
+   * An order that exists locally but which the server has not acknowledged. Held
+   * so the customer can retry the write without paying again, and so the cart is
+   * still there if they cannot.
+   */
+  const [unconfirmed, setUnconfirmed] = useState<{
+    order: PlacedOrder;
+    paymentStatus: "paid" | "cod";
+    paymentReference?: string;
+  } | null>(null);
 
   const {
     register,
@@ -469,11 +479,21 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const finalizeOrder = (
+  /**
+   * Commit the order once the server has it — and only then.
+   *
+   * The local write is a cache. An order the server never received exists in
+   * this one browser and nowhere else: the customer has paid, holds a
+   * confirmation number, and can even track it (the tracking page reads the same
+   * cache) while the bakery never sees the order and nobody bakes the cake. So
+   * nothing here is irreversible until `persisted` comes back true — the cart
+   * stays full, the draft stays put, and the success page stays unvisited.
+   */
+  const finalizeOrder = async (
     paymentStatus: "paid" | "cod",
     paymentReference?: string
   ) => {
-    const order = placeOrder({
+    const { order, persisted } = await placeOrder({
       items,
       totals,
       address: getCheckoutDraft().address,
@@ -487,6 +507,16 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       orderNotes: orderNotes.trim() || undefined,
     });
 
+    if (!persisted) {
+      setPlacing(false);
+      // Clear the payment overlay first. It sits above the unconfirmed-order
+      // overlay, so leaving it up on a failed RETRY would strand the customer
+      // behind a "Verifying payment…" spinner with no way back to the button.
+      setPayUI(null);
+      setUnconfirmed({ order, paymentStatus, paymentReference });
+      return;
+    }
+
     if (validCoupon) {
       recordCouponUsage(validCoupon.code);
     }
@@ -495,6 +525,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     clearCartPreferences();
     clearCheckoutDraft();
     setPlacing(false);
+    setUnconfirmed(null);
 
     toast.success("Order placed!", {
       description: `Order ${order.orderNumber} confirmed`,
@@ -504,6 +535,19 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     // through the track-order lookup.
     grantOrderAccess(order.orderNumber);
     router.push(`${routes.store.orderSuccess}?order=${order.orderNumber}`);
+  };
+
+  /**
+   * Re-send an order the server did not acknowledge. Retries the WRITE only —
+   * never the payment, which already succeeded. `placeOrder` recognises the
+   * order by fingerprint and re-sends the same id, and the endpoint is
+   * idempotent, so this cannot charge or order twice.
+   */
+  const retryConfirmation = async () => {
+    if (!unconfirmed) return;
+    setPlacing(true);
+    setPayUI(unconfirmed.paymentStatus === "paid" ? { state: "processing" } : null);
+    await finalizeOrder(unconfirmed.paymentStatus, unconfirmed.paymentReference);
   };
 
   const onPlaceOrder = async () => {
@@ -527,7 +571,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
           phone: address.phone,
         });
         setPayUI({ state: "processing" });
-        finalizeOrder("paid", result.paymentId);
+        await finalizeOrder("paid", result.paymentId);
       } catch (error) {
         setPlacing(false);
         const msg = error instanceof Error ? error.message : "Payment failed";
@@ -540,7 +584,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     setPlacing(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      finalizeOrder("cod", undefined);
+      await finalizeOrder("cod", undefined);
     } catch (error) {
       // Without this guard a thrown placeOrder/clearCart would leave the button
       // stuck on "Placing order…" forever (finalizeOrder never resets `placing`).
@@ -567,6 +611,45 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
   return (
     <>
+      {/*
+        The order reached this browser but not the bakery. Shown INSTEAD of the
+        success page, and it blocks: the customer needs to know their order is
+        not in yet, and if they paid, they need the reference in front of them
+        before they navigate away. Retry re-sends the order — never the payment.
+      */}
+      {unconfirmed && !payUI ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <ProcessingState
+            state="failed"
+            title="Order not confirmed yet"
+            message={
+              unconfirmed.paymentStatus === "paid"
+                ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
+                : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+            }
+            reason={
+              unconfirmed.paymentReference
+                ? `Order ${unconfirmed.order.orderNumber} · payment ${unconfirmed.paymentReference}`
+                : `Order ${unconfirmed.order.orderNumber}`
+            }
+            className="w-full max-w-md"
+            actions={[
+              {
+                label: placing ? "Retrying…" : "Retry confirmation",
+                onClick: () => void retryConfirmation(),
+                variant: "bakery",
+                icon: "retry",
+              },
+              {
+                label: "Contact support",
+                onClick: () => router.push(routes.store.contact),
+                variant: "outline",
+              },
+            ]}
+          />
+        </div>
+      ) : null}
+
       {/* Payment processing / failure overlay (solid backdrop — no glassmorphism) */}
       {payUI ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">

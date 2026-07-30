@@ -109,19 +109,40 @@ export function InventoryAdminPage() {
     setRefreshKey((value) => value + 1);
   }
 
-  function handleSaveSettings() {
-    const saved = saveInventorySettings(settings);
+  async function handleSaveSettings() {
+    const { settings: saved, persisted } = await saveInventorySettings(settings);
     setSettings(saved);
     setSavedSettings(saved);
-    toast.success("Inventory settings saved");
     bump();
+
+    if (!persisted) {
+      // These thresholds drive the low-stock alerts the whole team works off.
+      // Local-only means this browser warns and nobody else does.
+      toast.error("Settings saved on this device only — the server rejected them", {
+        description: "Reload to see the server's version.",
+      });
+      return;
+    }
+
+    toast.success("Inventory settings saved");
   }
 
-  function handleToggleUnlimited(item: InventoryItem) {
-    const updated = setUnlimitedStock(item.cakeId, !item.unlimitedStock);
+  async function handleToggleUnlimited(item: InventoryItem) {
+    const { item: updated, persisted } = await setUnlimitedStock(
+      item.cakeId,
+      !item.unlimitedStock
+    );
     if (!updated) return;
-    toast.success(updated.unlimitedStock ? "Unlimited stock enabled" : "Unlimited stock disabled");
     bump();
+
+    if (!persisted) {
+      toast.error("Changed on this device only — the server rejected it", {
+        description: "The shop is still selling against the old setting.",
+      });
+      return;
+    }
+
+    toast.success(updated.unlimitedStock ? "Unlimited stock enabled" : "Unlimited stock disabled");
   }
 
   return (
@@ -212,7 +233,7 @@ export function InventoryAdminPage() {
             <Button
               variant="bakery"
               className="mt-auto w-full"
-              onClick={handleSaveSettings}
+              onClick={() => void handleSaveSettings()}
               disabled={!settingsDirty}
             >
               <Settings2 className="size-4" />
@@ -377,7 +398,7 @@ export function InventoryAdminPage() {
                             size="sm"
                             variant={item.unlimitedStock ? "bakery" : "outline"}
                             className="h-8"
-                            onClick={() => handleToggleUnlimited(item)}
+                            onClick={() => void handleToggleUnlimited(item)}
                             aria-label={
                               item.unlimitedStock
                                 ? "Unlimited stock on — click to set a limit"
@@ -451,7 +472,7 @@ export function InventoryAdminPage() {
                           size="sm"
                           variant={item.unlimitedStock ? "bakery" : "outline"}
                           className="h-8 flex-1"
-                          onClick={() => handleToggleUnlimited(item)}
+                          onClick={() => void handleToggleUnlimited(item)}
                           aria-label={
                             item.unlimitedStock
                               ? "Unlimited stock on — click to set a limit"

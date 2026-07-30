@@ -12,29 +12,38 @@ interface Envelope<T> {
   data: T | null;
 }
 
-async function send(path: string, method: string, body?: unknown): Promise<void> {
+/**
+ * Whether the SERVER accepted the write. Resolves false on a network failure OR
+ * a non-2xx response; never throws.
+ *
+ * The `res.ok` check is the point. Without it a 401 from an expired admin token
+ * and a 500 both read as success, and the caller goes on to report a change that
+ * the next hydration silently reverts.
+ */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
   try {
-    await fetch(path, {
+    const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    return res.ok;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
 /** Public: send the fully-built inquiry to the server (verbatim id/timestamps). */
-export function createInquiryRequest(inquiry: Inquiry): void {
-  void send("/api/inquiries", "POST", inquiry);
+export function createInquiryRequest(inquiry: Inquiry): Promise<boolean> {
+  return send("/api/inquiries", "POST", inquiry);
 }
 
-export function updateInquiryRequest(id: string, patch: Partial<Inquiry>): void {
-  void send(`/api/inquiries/${id}`, "PATCH", patch);
+export function updateInquiryRequest(id: string, patch: Partial<Inquiry>): Promise<boolean> {
+  return send(`/api/inquiries/${id}`, "PATCH", patch);
 }
 
-export function deleteInquiriesRequest(ids: string[]): void {
-  void send("/api/inquiries", "DELETE", { ids });
+export function deleteInquiriesRequest(ids: string[]): Promise<boolean> {
+  return send("/api/inquiries", "DELETE", { ids });
 }
 
 /** Admin: fetch all inquiries from the server (401 → null for non-admins). */

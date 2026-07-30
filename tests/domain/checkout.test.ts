@@ -5,7 +5,7 @@
  * was earned on, an order number that could collide, a double-click that made
  * two orders, and a cart that could pay for a product no longer on sale.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { applyCouponCode, revalidateCoupon } from "@/features/orders/lib/coupons";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
@@ -55,6 +55,13 @@ const address = {
 
 beforeEach(() => {
   localStorage.clear();
+  // `placeOrder` now confirms with the server and RETRIES on failure. Left
+  // unstubbed these tests would each spend the backoff before returning.
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 201 } as Response));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("a coupon cannot outlive the cart it was earned on", () => {
@@ -115,11 +122,11 @@ describe("a coupon cannot outlive the cart it was earned on", () => {
 });
 
 describe("order numbers are unique", () => {
-  it("does not reuse a number across many orders", () => {
+  it("does not reuse a number across many orders", async () => {
     const numbers = new Set<string>();
 
     for (let i = 0; i < 60; i += 1) {
-      const order = placeOrder({
+      const { order } = await placeOrder({
         items: [line({ price: 100 + i })],
         totals: calculateCartTotals({
           items: [line({ price: 100 + i })],
@@ -136,24 +143,24 @@ describe("order numbers are unique", () => {
 });
 
 describe("placing an order is idempotent under a double-click", () => {
-  it("returns the same order instead of creating a second one", () => {
+  it("returns the same order instead of creating a second one", async () => {
     const items = [line()];
     const totals = calculateCartTotals({ items, commerceOverride: defaultCommerceSettings });
 
-    const first = placeOrder({ items, totals, address, paymentMethod: "cod" });
-    const second = placeOrder({ items, totals, address, paymentMethod: "cod" });
+    const first = await placeOrder({ items, totals, address, paymentMethod: "cod" });
+    const second = await placeOrder({ items, totals, address, paymentMethod: "cod" });
 
-    expect(second.id).toBe(first.id);
+    expect(second.order.id).toBe(first.order.id);
     expect(getOrders()).toHaveLength(1);
   });
 
-  it("still allows a genuinely different order", () => {
+  it("still allows a genuinely different order", async () => {
     const items = [line()];
     const totals = calculateCartTotals({ items, commerceOverride: defaultCommerceSettings });
-    placeOrder({ items, totals, address, paymentMethod: "cod" });
+    await placeOrder({ items, totals, address, paymentMethod: "cod" });
 
     const otherItems = [line({ productSlug: "red-velvet", price: 700 })];
-    placeOrder({
+    await placeOrder({
       items: otherItems,
       totals: calculateCartTotals({
         items: otherItems,

@@ -72,7 +72,7 @@ export function StockAdjustmentDialog({
     return { nextQuantity, stockStatus };
   }, [item, quantity, type]);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!item) return;
 
     const parsedQuantity = Math.max(Number(quantity) || 0, 0);
@@ -81,7 +81,7 @@ export function StockAdjustmentDialog({
       return;
     }
 
-    const updated = adjustStock({
+    const { item: updated, persisted } = await adjustStock({
       cakeId: item.cakeId,
       type,
       quantity: parsedQuantity,
@@ -91,6 +91,17 @@ export function StockAdjustmentDialog({
 
     if (!updated) {
       toast.error("Could not update stock");
+      return;
+    }
+
+    if (!persisted) {
+      // Stock is what the storefront sells against, and that number lives on the
+      // server. Saying "updated" here would leave the shop selling a cake the
+      // admin believes they have taken off the shelf.
+      toast.error("Stock changed on this device only — the server rejected it", {
+        description: "The shop is still selling against the old count. Reload and try again.",
+      });
+      onAdjusted?.();
       return;
     }
 
@@ -201,7 +212,7 @@ export function StockAdjustmentDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" onClick={handleSubmit} disabled={!item}>
+          <Button variant="bakery" onClick={() => void handleSubmit()} disabled={!item}>
             Save adjustment
           </Button>
         </DialogFooter>

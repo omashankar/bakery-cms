@@ -31,10 +31,39 @@ export interface StockReduction {
  * decrement without its order. This is the flagship transactional path.
  * Unlimited-stock products are skipped by the filter.
  */
+/** Mongo's duplicate-key error — this `_id` is already in the collection. */
+const DUPLICATE_KEY = 11000;
+
+function isDuplicateKey(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as {
+    code?: unknown;
+    errorResponse?: { code?: unknown };
+    message?: unknown;
+  };
+
+  // Three shapes because a transaction can wrap the driver error before it gets
+  // here. Getting this wrong is safe in only one direction: an unrecognised
+  // duplicate rethrows, the client sees a 500 and reports the order unconfirmed
+  // — wrong, but recoverable. Mistaking another error for a duplicate would
+  // report an order saved that was not, so the test is specific.
+  return (
+    candidate.code === DUPLICATE_KEY ||
+    candidate.errorResponse?.code === DUPLICATE_KEY ||
+    (typeof candidate.message === "string" && candidate.message.includes("E11000"))
+  );
+}
+
+export interface CreateOrderResult {
+  order: PlacedOrder;
+  /** False when this id was already present, i.e. the caller is retrying. */
+  created: boolean;
+}
+
 export async function createOrderWithStockReduction(
   order: PlacedOrder,
   reductions: StockReduction[],
-): Promise<PlacedOrder> {
+): Promise<CreateOrderResult> {
   await connectDB();
   const session = await mongoose.startSession();
   try {
@@ -49,10 +78,19 @@ export async function createOrderWithStockReduction(
         );
       }
     });
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+    // The storefront is retrying a POST whose response it never saw. The
+    // transaction aborted as a unit, so stock was NOT decremented a second
+    // time; the order from the first attempt is already here. Report the stored
+    // copy rather than an error — the alternative tells a customer who has
+    // already paid that their order failed.
+    const existing = await findById(order.id);
+    return { order: existing ?? order, created: false };
   } finally {
     await session.endSession();
   }
-  return order;
+  return { order, created: true };
 }
 
 export async function findById(id: string): Promise<PlacedOrder | null> {

@@ -127,16 +127,35 @@ export function SecuritySettingsPage() {
     toast.success("Security settings reset to defaults");
   }
 
-  function handleRevokeSession(sessionId: string) {
-    if (revokeSession(sessionId)) {
+  /**
+   * These report on an ACCESS CONTROL, so they say nothing until the server has
+   * acted. A revocation the server refused leaves the session live; claiming
+   * otherwise is the one outcome an admin cannot recover from, because they stop
+   * looking.
+   */
+  async function handleRevokeSession(sessionId: string) {
+    if (await revokeSession(sessionId)) {
       refreshCenter();
       toast.success("Session revoked");
+      return;
     }
+
+    toast.error("Could not revoke that session", {
+      description: "It is still active. Check your connection and try again.",
+    });
   }
 
-  function handleLogoutAll() {
-    const removed = logoutAllDevices();
+  async function handleLogoutAll() {
+    const { removed, persisted } = await logoutAllDevices();
     refreshCenter();
+
+    if (!persisted) {
+      toast.error("Could not sign out the other devices", {
+        description: "They are still signed in. Check your connection and try again.",
+      });
+      return;
+    }
+
     toast.success(
       removed > 0
         ? `Signed out ${removed} other device${removed === 1 ? "" : "s"}`
@@ -147,11 +166,24 @@ export function SecuritySettingsPage() {
   async function confirmLogoutEverywhere() {
     // Revoke OTHER devices (fires with the current cookie) AND this device's own
     // session/cookie, so "everywhere" truly includes the current browser.
-    logoutAllDevices();
-    await logoutRequest().catch(() => undefined);
+    const { persisted } = await logoutAllDevices();
+    const selfLoggedOut = await logoutRequest()
+      .then(() => true)
+      .catch(() => false);
     clearDemoSession();
     setLogoutEverywhereOpen(false);
-    toast.success("Signed out on all devices");
+
+    // This browser is signed out either way — the local session is cleared and
+    // we are leaving for the login page — so the only thing worth reporting is
+    // whether the OTHER devices really went with it.
+    if (persisted && selfLoggedOut) {
+      toast.success("Signed out on all devices");
+    } else {
+      toast.error("Signed out here, but some devices may still be signed in", {
+        description: "Sign in again and retry from Security settings.",
+      });
+    }
+
     router.push(routes.auth.login);
   }
 
@@ -363,7 +395,7 @@ export function SecuritySettingsPage() {
 
         <TabsContent value="sessions" className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleLogoutAll}>
+            <Button variant="outline" size="sm" onClick={() => void handleLogoutAll()}>
               <LogOut className="size-4" />
               Sign out other devices
             </Button>
@@ -413,7 +445,7 @@ export function SecuritySettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRevokeSession(session.id)}
+                        onClick={() => void handleRevokeSession(session.id)}
                       >
                         Revoke
                       </Button>
@@ -514,7 +546,7 @@ export function SecuritySettingsPage() {
             <Button variant="outline" onClick={() => setLogoutEverywhereOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmLogoutEverywhere}>
+            <Button variant="destructive" onClick={() => void confirmLogoutEverywhere()}>
               Sign out everywhere
             </Button>
           </DialogFooter>

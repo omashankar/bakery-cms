@@ -33,7 +33,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
     setSubmitting(true);
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    const review = submitStorefrontReview({
+    const { review, persisted } = await submitStorefrontReview({
       productSlug,
       authorName,
       authorEmail,
@@ -46,6 +46,16 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
 
     if (!review) {
       toast.error("Could not submit review");
+      return;
+    }
+
+    if (!persisted) {
+      // Keep the form filled — this is the customer's only copy of what they
+      // wrote, and "pending approval" would be a promise nobody can keep: the
+      // review never reached the bakery, so no moderator will ever see it.
+      toast.error("We couldn't send your review", {
+        description: "Please check your connection and try again.",
+      });
       return;
     }
 

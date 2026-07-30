@@ -96,10 +96,19 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   };
 
   // Atomic: create the order AND reduce stock for each line together.
-  await repo.createOrderWithStockReduction(
+  //
+  // Idempotent on the client-supplied id. The storefront retries this POST —
+  // by the time it runs the customer's card has already been charged, so one
+  // dropped response must not be the end of it — and a retry must not produce a
+  // second order or decrement stock twice.
+  const { order: saved, created } = await repo.createOrderWithStockReduction(
     order,
     input.items.map((item) => ({ slug: item.productSlug, quantity: item.quantity })),
   );
+
+  // Nothing changed, so there is nothing to refresh and nothing new to record.
+  // A second audit entry would read as a second order.
+  if (!created) return saved;
 
   // Best-effort: refresh each affected product's derived stockStatus (the $inc
   // changed the quantity but not the status field). Not part of the transaction.
