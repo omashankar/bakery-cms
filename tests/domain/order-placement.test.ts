@@ -12,7 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
-import { getOrders, placeOrder } from "@/features/orders/lib/orders";
+import { confirmOrder, getOrders, placeOrder } from "@/features/orders/lib/orders";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 
@@ -130,6 +130,31 @@ describe("placing an order", () => {
 
     expect(persisted).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-sends the same order however long the customer took to press retry", async () => {
+    respond({ ok: false, status: 500 });
+    const first = await settle(checkout());
+    expect(first.persisted).toBe(false);
+
+    // The overlay asks the customer to note their payment reference down before
+    // navigating away, so this pause is the NORMAL case, not an edge case. It
+    // outlasts the 15s double-click window — and that window must not be what
+    // the retry relies on, because past it `placeOrder` mints a fresh id and the
+    // endpoint (which dedupes on the id) would create a SECOND order and
+    // decrement stock twice for one payment.
+    await vi.advanceTimersByTimeAsync(45_000);
+
+    const fetchMock = respond({ ok: true, status: 201 });
+    const persisted = await settle(confirmOrder(first.order));
+
+    expect(persisted).toBe(true);
+    expect(getOrders()).toHaveLength(1);
+
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(sent.id).toBe(first.order.id);
+    expect(sent.orderNumber).toBe(first.order.orderNumber);
+    expect(sent.paymentReference).toBe("pay_test_1");
   });
 
   it("re-sends the SAME order when the customer retries, never a second one", async () => {

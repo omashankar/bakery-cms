@@ -61,7 +61,7 @@ import {
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
-import { placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
+import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
@@ -517,6 +517,11 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       return;
     }
 
+    commitPlacedOrder(order);
+  };
+
+  /** The steps that must happen exactly once, and only once the server has it. */
+  const commitPlacedOrder = (order: PlacedOrder) => {
     if (validCoupon) {
       recordCouponUsage(validCoupon.code);
     }
@@ -526,6 +531,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     clearCheckoutDraft();
     setPlacing(false);
     setUnconfirmed(null);
+    setPayUI(null);
 
     toast.success("Order placed!", {
       description: `Order ${order.orderNumber} confirmed`,
@@ -538,16 +544,31 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   };
 
   /**
-   * Re-send an order the server did not acknowledge. Retries the WRITE only —
-   * never the payment, which already succeeded. `placeOrder` recognises the
-   * order by fingerprint and re-sends the same id, and the endpoint is
-   * idempotent, so this cannot charge or order twice.
+   * Re-send the order the server did not acknowledge. Retries the WRITE only —
+   * never the payment, which already succeeded.
+   *
+   * Sends the held order through `confirmOrder`, NOT back through `placeOrder`.
+   * `placeOrder` would mint a new id and order number once its 15-second
+   * duplicate window had lapsed — and it lapses in the ordinary case, because
+   * this overlay asks the customer to note their payment reference first. Since
+   * the endpoint dedupes on the id, that would have produced a second order and
+   * a second stock decrement for a single payment.
    */
   const retryConfirmation = async () => {
-    if (!unconfirmed) return;
+    if (!unconfirmed || placing) return;
     setPlacing(true);
-    setPayUI(unconfirmed.paymentStatus === "paid" ? { state: "processing" } : null);
-    await finalizeOrder(unconfirmed.paymentStatus, unconfirmed.paymentReference);
+
+    const persisted = await confirmOrder(unconfirmed.order);
+    setPlacing(false);
+
+    if (!persisted) {
+      toast.error("Still couldn't reach the bakery", {
+        description: "Your order is safe here. Try again, or contact support with the reference shown.",
+      });
+      return;
+    }
+
+    commitPlacedOrder(unconfirmed.order);
   };
 
   const onPlaceOrder = async () => {

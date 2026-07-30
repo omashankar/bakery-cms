@@ -64,6 +64,18 @@ function resolveEstimatedDelivery(
 // ---- Place order (transactional) ------------------------------------------
 
 export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promise<PlacedOrder> {
+  // ONE PAYMENT, ONE ORDER — checked before anything is built.
+  //
+  // The id-based idempotency below only catches a retry that kept its id. This
+  // catches the cases that cannot: a client that lost its local copy and
+  // re-submitted, a reload followed by a fresh checkout of the same cart, or a
+  // retry path that minted a new id. A captured payment reference identifies the
+  // money, and the money is what must not be charged for twice.
+  if (input.paymentReference) {
+    const existing = await repo.findByPaymentReference(input.paymentReference);
+    if (existing) return existing;
+  }
+
   const settings = (await getSettings()) as Record<string, unknown>;
   const commerce = (settings.commerce ?? {}) as CommerceSettings;
   const placedAt = input.placedAt ?? new Date().toISOString();

@@ -23,7 +23,11 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
-    paymentReference: { type: String },
+    // Indexed because the "one payment, one order" guard queries it on every
+    // placement. Sparse, not unique: COD orders have none, and a hard uniqueness
+    // constraint here would turn a legitimate duplicate into a 500 rather than
+    // letting the service return the order that already exists.
+    paymentReference: { type: String, index: true, sparse: true },
     coupon: { type: mongoose.Schema.Types.Mixed },
     orderNotes: { type: String },
     placedAt: { type: String, required: true },

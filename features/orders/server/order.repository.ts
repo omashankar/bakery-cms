@@ -99,6 +99,21 @@ export async function findById(id: string): Promise<PlacedOrder | null> {
   return doc ? toOrder(doc) : null;
 }
 
+/**
+ * The order a gateway payment already bought, if any.
+ *
+ * Backs the "one payment, one order" guard. Deliberately not restricted to a
+ * time window: a duplicate a day later is still a duplicate, and the reference
+ * comes from the gateway, so it is unique per capture.
+ */
+export async function findByPaymentReference(reference: string): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOne({ paymentReference: reference })
+    .sort({ placedAt: 1 })
+    .lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function findByNumber(orderNumber: string): Promise<PlacedOrder | null> {
   await connectDB();
   const doc = (await OrderModel.findOne({ orderNumber }).lean()) as unknown as Raw | null;

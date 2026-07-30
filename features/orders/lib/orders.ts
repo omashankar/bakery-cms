@@ -185,7 +185,14 @@ function resolveEstimatedDelivery(
   return getEstimatedDelivery();
 }
 
-/** Two identical submissions this close together are a double-click, not two orders. */
+/**
+ * Two identical submissions this close together are a double-click, not two orders.
+ *
+ * This is a heuristic for accidental double-submits and NOTHING MORE. It must not
+ * be relied on as the retry path's idempotency key: past the window `placeOrder`
+ * mints a fresh id and order number, and since the endpoint dedupes on the id,
+ * that is a second order — see [confirmOrder].
+ */
 const DUPLICATE_ORDER_WINDOW_MS = 15_000;
 
 /**
@@ -227,6 +234,23 @@ function buildOrderFingerprint(input: {
 export interface PlaceOrderResult {
   order: PlacedOrder;
   persisted: boolean;
+}
+
+/**
+ * Re-send an order the server never acknowledged, identity intact.
+ *
+ * `placeOrder` cannot serve as the retry path. Its duplicate guard only
+ * recognises a matching submission for DUPLICATE_ORDER_WINDOW_MS; past that it
+ * mints a new id and order number, and because the endpoint keys idempotency on
+ * the id, that is not a retry — it is a SECOND order with a second stock
+ * decrement, for one payment. And the window lapses in the ordinary case: the
+ * failure notice deliberately puts the payment reference in front of the customer
+ * to write down, which is exactly the pause that outlasts fifteen seconds.
+ *
+ * So the retry sends the order it already has, byte for byte.
+ */
+export function confirmOrder(order: PlacedOrder): Promise<boolean> {
+  return placeOrderRequest(order);
 }
 
 export async function placeOrder(input: {
