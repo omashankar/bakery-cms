@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
+import {
   AlertTriangle,
   Laptop,
   LogOut,
@@ -104,15 +108,14 @@ export function SecuritySettingsPage() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  function handleSave() {
-    const saved = saveSecuritySettings({
+  async function handleSave() {
+    const { value, persisted } = await saveSecuritySettings({
       ...settings,
       sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
       maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
     });
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Security settings saved");
+    setSettings(value);
+    if (reportSettingsWrite(persisted, "Security settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -120,11 +123,10 @@ export function SecuritySettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSecuritySettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Security settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetSecuritySettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "Security settings")) setSavedSettings(value);
   }
 
   /**
@@ -191,7 +193,13 @@ export function SecuritySettingsPage() {
     clearFailedLoginAttempts();
     refreshCenter();
     setClearFailedOpen(false);
-    toast.success("Failed attempts cleared");
+    // The failed-attempt list is DERIVED from the auth.login audit trail on every
+    // load, and an audit trail is not something an admin should be able to erase.
+    // Clearing it here only hides it in this browser until the next reload —
+    // "Failed attempts cleared" promised a deletion that never happens.
+    toast.message("Hidden on this device", {
+      description: "These come from the audit log and will reappear when you reload.",
+    });
   }
 
   return (
@@ -501,7 +509,14 @@ export function SecuritySettingsPage() {
                       onClick={() => {
                         toggleDeviceTrust(device.id);
                         refreshCenter();
-                        toast.success("Device trust updated");
+                        // There is no server-side notion of device trust — the
+                        // list is derived per request and every row comes back
+                        // trusted. So this is a note to yourself on this browser,
+                        // and it resets on reload. Say so, rather than reporting
+                        // a security control that does not exist.
+                        toast.message("Marked on this device only", {
+                          description: "Device trust is not stored — it resets when you reload.",
+                        });
                       }}
                     >
                       {device.trusted ? "Mark untrusted" : "Mark trusted"}

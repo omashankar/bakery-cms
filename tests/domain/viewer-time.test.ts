@@ -51,6 +51,33 @@ describe("zonedMidnight", () => {
 
     expect(zonedDayKey(ms, SANTIAGO)).toBe("2025-09-07");
   });
+
+  it("never lands BEFORE a date the zone skipped entirely", () => {
+    // Pacific/Apia crossed the date line on 30 Dec 2011 — that date has no
+    // instants at all, the zone goes from the 29th straight to the 31st. There
+    // is no right answer inside the day, but landing on 29 Dec 23:45 is the
+    // wrong SIDE of it, and any bucket seeded there collects the previous day's
+    // orders. The forward walk reaches the 31st; a symmetric backward guard used
+    // to march it back over the gap and undo that.
+    const apia = zonedMidnight(2011, 11, 30, "Pacific/Apia");
+    expect(zonedDayKey(apia, "Pacific/Apia") >= "2011-12-30").toBe(true);
+
+    // Same shape: Kiritimati skipped 31 Dec 1994.
+    const kiritimati = zonedMidnight(1994, 11, 31, "Pacific/Kiritimati");
+    expect(zonedDayKey(kiritimati, "Pacific/Kiritimati") >= "1994-12-31").toBe(true);
+  });
+
+  it("still resolves ordinary days in half-hour and quarter-hour zones", () => {
+    expect(zonedDayKey(zonedMidnight(2026, 6, 29, "Asia/Kolkata"), "Asia/Kolkata")).toBe(
+      "2026-07-29"
+    );
+    expect(
+      zonedDayKey(zonedMidnight(2026, 6, 29, "Australia/Lord_Howe"), "Australia/Lord_Howe")
+    ).toBe("2026-07-29");
+    expect(zonedDayKey(zonedMidnight(2026, 6, 29, "Asia/Kathmandu"), "Asia/Kathmandu")).toBe(
+      "2026-07-29"
+    );
+  });
 });
 
 describe("zonedStartOfDay", () => {

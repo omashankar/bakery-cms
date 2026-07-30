@@ -204,7 +204,22 @@ export async function createReview(data: ProductReviewFormData): Promise<ReviewW
   };
   writeReviews([review, ...reviews]);
   syncProductReviewAggregates();
-  return { review, persisted: await submitReviewRequest(review) };
+
+  if (!(await submitReviewRequest(review))) return { review, persisted: false };
+
+  // POST /api/reviews is the PUBLIC submit route, so the server forces every new
+  // review to pending and unfeatured — correctly, since a stranger must not be
+  // able to publish their own review. But the admin's "Add review" form offers
+  // Status and "Feature on the product page", and those choices were silently
+  // dropped: the row rendered approved from the local cache while the server
+  // held it pending, so it never appeared on the product page and flipped back
+  // on the next load. Apply them through the ADMIN route, which is allowed to.
+  const moderation: Partial<ProductReviewFormData> = {};
+  if (data.status !== "pending") moderation.status = data.status;
+  if (data.isFeatured) moderation.isFeatured = true;
+  if (Object.keys(moderation).length === 0) return { review, persisted: true };
+
+  return { review, persisted: await updateReviewRequest(review.id, moderation) };
 }
 
 export async function updateReview(
@@ -336,7 +351,10 @@ export function submitStorefrontReview(input: {
   });
 }
 
-export async function resetReviews(): Promise<ProductReview[]> {
+export async function resetReviews(): Promise<{
+  reviews: ProductReview[];
+  persisted: boolean;
+}> {
   const previous = readReviews();
   const seeded = seedReviews(loadProducts());
   writeReviews(seeded);
@@ -353,9 +371,14 @@ export async function resetReviews(): Promise<ProductReview[]> {
   const staleIds = previous
     .map((review) => review.id)
     .filter((id) => !seededIds.has(id));
-  if (staleIds.length > 0) await deleteReviewsRequest(staleIds);
 
-  await Promise.all(
+  // Every answer counted. This whole sequence used to be awaited and discarded,
+  // so "Reviews reset to demo seed" was reported even when the server refused
+  // all of it — and the next hydration brought the moderated reviews straight
+  // back, with nothing having said the reset never happened.
+  const deleted = staleIds.length > 0 ? await deleteReviewsRequest(staleIds) : true;
+
+  const patched = await Promise.all(
     seeded.map((review) =>
       updateReviewRequest(review.id, {
         status: review.status,
@@ -370,5 +393,5 @@ export async function resetReviews(): Promise<ProductReview[]> {
     )
   );
 
-  return seeded;
+  return { reviews: seeded, persisted: deleted && patched.every(Boolean) };
 }

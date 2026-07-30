@@ -3,6 +3,10 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -47,19 +51,20 @@ export function MaintenanceSettingsPage() {
   const liveEnabled = savedSettings.isEnabled;
   const togglePending = settings.isEnabled !== savedSettings.isEnabled;
 
-  function handleSave() {
+  async function handleSave() {
     const allowedIps = allowedIpsInput
       .split(",")
       .map((ip) => ip.trim())
       .filter(Boolean);
     const payload = { ...settings, allowedIps };
-    const saved = saveMaintenanceSettings(payload);
-    setSavedSettings(saved);
-    setSettings(saved);
-    setAllowedIpsInput(saved.allowedIps.join(", "));
-    toast.success(
-      saved.isEnabled ? "Maintenance mode enabled" : "Maintenance settings saved"
-    );
+    const { value, persisted } = await saveMaintenanceSettings(payload);
+    setSettings(value);
+    setAllowedIpsInput(value.allowedIps.join(", "));
+
+    // Maintenance mode is read from the SERVER copy, so a rejected write leaves
+    // the storefront exactly as it was — open when the admin thinks they closed it.
+    const subject = value.isEnabled ? "Maintenance mode" : "Maintenance settings";
+    if (reportSettingsWrite(persisted, subject)) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -68,12 +73,11 @@ export function MaintenanceSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetMaintenanceSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    setAllowedIpsInput(loaded.allowedIps.join(", "));
-    toast.success("Maintenance settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetMaintenanceSettings();
+    setSettings(value);
+    setAllowedIpsInput(value.allowedIps.join(", "));
+    if (reportSettingsReset(persisted, "Maintenance settings")) setSavedSettings(value);
   }
 
   return (

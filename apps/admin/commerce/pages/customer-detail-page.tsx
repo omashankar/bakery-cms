@@ -40,6 +40,8 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
   const [notes, setNotes] = useState("");
   /** True while the textarea holds an edit the server has not accepted yet. */
   const notesDirty = useRef(false);
+  /** The textarea's current text, readable after an await without going stale. */
+  const notesRef = useRef("");
   /** Which customer the state below currently describes. */
   const shownCustomerId = useRef<string | null>(null);
   const [tagInput, setTagInput] = useState("");
@@ -60,6 +62,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
       if (shownCustomerId.current !== customerId) {
         shownCustomerId.current = customerId;
         notesDirty.current = false;
+        notesRef.current = "";
         setLoading(true);
         setProfile(null);
         setOrders([]);
@@ -74,7 +77,10 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         setOrders(result.orders);
         // Only adopt the server's notes when the field is not mid-edit, or a
         // background refresh discards whatever the admin has typed.
-        if (result.profile && !notesDirty.current) setNotes(result.profile.meta.notes);
+        if (result.profile && !notesDirty.current) {
+          notesRef.current = result.profile.meta.notes;
+          setNotes(result.profile.meta.notes);
+        }
       }
       setLoading(false);
     }
@@ -161,7 +167,8 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
 
   async function handleSaveNotes() {
     if (!profile) return;
-    const { meta, persisted } = await updateCustomerNotes(profile.meta, notes);
+    const sent = notes;
+    const { meta, persisted } = await updateCustomerNotes(profile.meta, sent);
 
     if (!persisted) {
       // Keep the text on screen and keep the field dirty — it is the only copy
@@ -169,9 +176,14 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
       return rejectWrite("Notes saved");
     }
 
+    // Only stand the field down if it still holds what we sent. A cold database
+    // connection makes this write seconds long, and anything typed meanwhile is
+    // newer than the server's copy — clearing the guard unconditionally let the
+    // next refresh replace it with the text as it was at the moment of the click.
+    if (notesRef.current === sent) notesDirty.current = false;
+
     // Adopt what the write returned. Without this the next tag or marketing
     // write composes from the pre-save meta and reverts the notes server-side.
-    notesDirty.current = false;
     setProfile((prev) => (prev ? { ...prev, meta } : prev));
     toast.success("Customer notes saved");
   }
@@ -495,6 +507,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                     // write, another tab, the 30s poll — cannot overwrite what
                     // is being typed with the server's older copy.
                     notesDirty.current = true;
+                    notesRef.current = event.target.value;
                     setNotes(event.target.value);
                   }}
                   placeholder="VIP wedding client, prefers eggless cakes, always requests morning delivery…"

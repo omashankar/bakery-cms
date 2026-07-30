@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import type { ModuleSettings } from "@/types/settings";
@@ -65,11 +69,12 @@ export function ModulesSettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: checked }));
   }
 
-  function handleSave() {
-    const saved = saveModuleSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Modules saved");
+  async function handleSave() {
+    const { value, persisted } = await saveModuleSettings(settings);
+    setSettings(value);
+    // Modules decide which admin sections and storefront pages exist at all, and
+    // that is read from the server copy — a local-only change shows nobody else.
+    if (reportSettingsWrite(persisted, "Modules")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -77,11 +82,10 @@ export function ModulesSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetModuleSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Modules reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetModuleSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "Modules")) setSavedSettings(value);
   }
 
   return (

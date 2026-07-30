@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,11 +38,12 @@ export function GeneralSettingsPage() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  function handleSave() {
-    const saved = saveGeneralSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("General settings saved");
+  async function handleSave() {
+    const { value, persisted } = await saveGeneralSettings(settings);
+    setSettings(value);
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, and greying it out would remove the only retry.
+    if (reportSettingsWrite(persisted, "General settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -46,11 +51,10 @@ export function GeneralSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetGeneralSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("General settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetGeneralSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "General settings")) setSavedSettings(value);
   }
 
   return (

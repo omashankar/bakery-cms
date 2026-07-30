@@ -131,18 +131,29 @@ export function zonedMidnight(
 
   let result = settled;
   let steps = 0;
-  // Runs past `wanted` only for a date that does not exist in this zone at all
-  // — Pacific/Apia skipped 30 Dec 2011 outright. Starting the window at the next
-  // real instant is the only available answer, and the right one.
+  let walkedForward = false;
+
+  // Runs past `wanted` only for a date that does not exist in this zone at all —
+  // Pacific/Apia skipped 30 Dec 2011 outright, jumping from the 29th to the 31st.
+  // Starting the window at the next real instant is the only available answer.
   while (steps < MAX_STEPS && dayOf(result) < wanted) {
     result += STEP_MS;
     steps += 1;
+    walkedForward = true;
   }
-  // Symmetric guard: a zone that moves its clocks BACK across midnight can leave
-  // the correction pass one day ahead.
-  while (steps < MAX_STEPS && dayOf(result) > wanted) {
-    result -= STEP_MS;
-    steps += 1;
+
+  // Symmetric guard for a zone that moves its clocks BACK across midnight, which
+  // can leave the correction pass a day ahead.
+  //
+  // Skipped when the forward walk moved, or the two fight: for a nonexistent
+  // date the forward walk correctly lands on the NEXT day, and this would then
+  // march it back to 23:45 on the day BEFORE — the wrong side of a date that has
+  // no instants of its own, and a bucket keyed to the wrong day.
+  if (!walkedForward) {
+    while (steps < MAX_STEPS && dayOf(result) > wanted) {
+      result -= STEP_MS;
+      steps += 1;
+    }
   }
 
   return result;

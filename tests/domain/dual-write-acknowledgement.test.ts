@@ -13,8 +13,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addInquiry,
   deleteInquiries,
+  loadInquiries,
   updateInquiry,
 } from "@/features/inquiries/lib/inquiries-repository";
+import {
+  adjustStock,
+  defaultInventorySettings,
+  saveInventorySettings,
+  setUnlimitedStock,
+} from "@/apps/admin/commerce/lib/inventory-repository";
+import { persistProducts } from "@/features/products/lib/products-repository";
+import {
+  getGeneralSettings,
+  saveCommerceSettings,
+  saveGeneralSettings,
+  saveMaintenanceSettings,
+  saveSecuritySettings,
+} from "@/features/settings/lib/settings-repository";
+import {
+  defaultCommerceSettings,
+  defaultGeneralSettings,
+  defaultMaintenanceSettings,
+  defaultSecuritySettings,
+} from "@/features/settings/lib/settings-utils";
 import {
   addNewsletterSubscriber,
   deleteNewsletterSubscribers,
@@ -99,7 +120,14 @@ describe("inquiry writes", () => {
 
     const { inquiry: created } = await addInquiry(inquiry);
 
-    expect(created?.name).toBe("Asha Menon");
+    // Read it back out of STORAGE, not off the returned object. Asserting on the
+    // return value only proves the input was echoed — delete the
+    // `persistInquiries` call entirely and that assertion still passes. The
+    // local half of the dual-write is what the retry and the instant UI both
+    // depend on, so it has to be checked where it actually lands.
+    const stored = loadInquiries();
+    expect(stored.map((entry) => entry.id)).toContain(created?.id);
+    expect(stored.find((entry) => entry.id === created?.id)?.name).toBe("Asha Menon");
   });
 });
 
@@ -163,6 +191,92 @@ describe("review moderation writes", () => {
   });
 });
 
+describe("inventory writes", () => {
+  /** One tracked product, so adjustStock has something to adjust. */
+  function seedProduct() {
+    persistProducts([
+      {
+        id: "cake-1",
+        slug: "black-forest",
+        name: "Black Forest",
+        stockQuantity: 20,
+        unlimitedStock: false,
+        lowStockThreshold: 5,
+        status: "published",
+      },
+    ] as unknown as Parameters<typeof persistProducts>[0]);
+  }
+
+  it("reports persisted only when the server accepted the adjustment", async () => {
+    seedProduct();
+    mockServer(true);
+    await expect(adjustStock({ cakeId: "cake-1", type: "remove", quantity: 5 })).resolves.toMatchObject(
+      { persisted: true }
+    );
+
+    // Stock is the number the storefront sells against and it lives in Mongo. A
+    // local-only change means the shop keeps selling a cake the admin believes
+    // they have taken off the shelf — so this must never read as success.
+    mockServer(false);
+    await expect(adjustStock({ cakeId: "cake-1", type: "remove", quantity: 5 })).resolves.toMatchObject(
+      { persisted: false }
+    );
+    await expect(setUnlimitedStock("cake-1", true)).resolves.toMatchObject({ persisted: false });
+    await expect(
+      saveInventorySettings({ ...defaultInventorySettings, defaultLowStockThreshold: 3 })
+    ).resolves.toMatchObject({ persisted: false });
+  });
+
+  it("reports NOT persisted when the request fails outright", async () => {
+    seedProduct();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(adjustStock({ cakeId: "cake-1", type: "add", quantity: 1 })).resolves.toMatchObject(
+      { persisted: false }
+    );
+  });
+});
+
+describe("settings writes", () => {
+  it("reports persisted only when the server accepted the section", async () => {
+    mockServer(true);
+    await expect(
+      saveSecuritySettings({ ...defaultSecuritySettings, sessionTimeoutMinutes: 45 })
+    ).resolves.toMatchObject({ persisted: true });
+
+    // `SettingsServerSync` merges the server's copy over the local one on the
+    // next admin page load, so a rejected section is not saved — it is reverted.
+    // This whole path used to be `void pushSection(...)`, discarding the boolean
+    // it already had, so every settings page toasted success on a 401.
+    mockServer(false);
+    await expect(
+      saveSecuritySettings({ ...defaultSecuritySettings, sessionTimeoutMinutes: 45 })
+    ).resolves.toMatchObject({ persisted: false });
+    await expect(
+      saveCommerceSettings({ ...defaultCommerceSettings, deliveryFee: 99 })
+    ).resolves.toMatchObject({ persisted: false });
+    await expect(
+      saveMaintenanceSettings({ ...defaultMaintenanceSettings, isEnabled: true })
+    ).resolves.toMatchObject({ persisted: false });
+  });
+
+  it("reports NOT persisted when the request fails outright", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(
+      saveGeneralSettings({ ...defaultGeneralSettings, siteName: "Offline Bakes" })
+    ).resolves.toMatchObject({ persisted: false });
+  });
+
+  it("still applies the section locally, so the edit is not lost while it is reported", async () => {
+    mockServer(false);
+
+    await saveGeneralSettings({ ...defaultGeneralSettings, siteName: "Local Only Bakes" });
+
+    expect(getGeneralSettings().siteName).toBe("Local Only Bakes");
+  });
+});
+
 describe("session revocation", () => {
   /** Seed one revocable session alongside the current one. */
   function seedSessions() {
@@ -203,13 +317,24 @@ describe("session revocation", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("reports whether sign-out-everywhere actually reached the server", async () => {
+  it("counts sign-out-everywhere from the SERVER, not the cached session list", async () => {
     seedSessions();
     mockServer(false);
-    await expect(logoutAllDevices()).resolves.toMatchObject({ removed: 1, persisted: false });
+    // Nothing was revoked, so nothing is claimed — the old code reported the
+    // local list's count here regardless.
+    await expect(logoutAllDevices()).resolves.toEqual({ removed: 0, persisted: false });
 
+    // The cache holds one other session; the server says it revoked three (the
+    // admin signed in elsewhere after this page loaded). The server wins.
     seedSessions();
-    mockServer(true);
-    await expect(logoutAllDevices()).resolves.toMatchObject({ removed: 1, persisted: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true, data: { revoked: 3 } }),
+      } as unknown as Response)
+    );
+    await expect(logoutAllDevices()).resolves.toEqual({ removed: 3, persisted: true });
   });
 });

@@ -362,7 +362,7 @@ export async function revokeSession(sessionId: string): Promise<boolean> {
 }
 
 export interface LogoutAllResult {
-  /** How many other sessions the list held. Zero is a no-op, not a failure. */
+  /** How many sessions the SERVER revoked. Zero is a no-op, not a failure. */
   removed: number;
   /** Whether the server actually revoked them. */
   persisted: boolean;
@@ -373,17 +373,18 @@ export async function logoutAllDevices(): Promise<LogoutAllResult> {
   const state = loadSecurityCenter();
   const currentId = localStorage.getItem(CURRENT_SESSION_KEY) ?? "sess-current";
   const remaining = state.activeSessions.filter((s) => s.id === currentId || s.isCurrent);
-  const removed = state.activeSessions.length - remaining.length;
 
-  // Revokes all sessions other than the caller's.
-  if (!(await logoutAllRequest())) return { removed, persisted: false };
+  // Revokes all sessions other than the caller's. The count is the server's —
+  // the cached list is a snapshot from page load and routinely disagrees.
+  const { ok, revoked } = await logoutAllRequest();
+  if (!ok) return { removed: 0, persisted: false };
 
   save({
     ...state,
     activeSessions: remaining.map((s) => ({ ...s, isCurrent: true })),
   });
 
-  return { removed, persisted: true };
+  return { removed: revoked, persisted: true };
 }
 
 export function clearFailedLoginAttempts(): void {

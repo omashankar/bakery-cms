@@ -190,7 +190,15 @@ export function OrdersListPage() {
     setSelectedIds([]);
   }
 
-  function countForStatus(status: OrderListFilters["status"]) {
+  /**
+   * The badge on a status tab, or "—" when the aggregation did not answer.
+   *
+   * The cards above these tabs already read "Unavailable" in that case; the tabs
+   * were still rendering nine confident zeros from the same failed payload —
+   * "All 0", "Pending 0", "Delivered 0" — directly above ten visible orders.
+   */
+  function countForStatus(status: OrderListFilters["status"]): string | number {
+    if (statsFailed) return "—";
     if (status === "all") return stats.total;
     if (status === "out_for_delivery") return stats.outForDelivery;
     return stats[status];
@@ -281,8 +289,14 @@ export function OrdersListPage() {
 
       exportOrdersToCsv(target);
       if (target.length < selectedIds.length) {
+        // Distinguish "the request failed" from "the range does not reach them".
+        // Advising an admin to narrow their filters when the fetch simply 500'd
+        // sends them off to solve the wrong problem, and they file the short CSV
+        // believing it is the most the range allows.
         toast.warning(`Exported ${target.length} of ${selectedIds.length} selected orders`, {
-          description: "The rest fall outside the exportable range — narrow the filters.",
+          description: wider
+            ? "The rest fall outside the exportable range — narrow the filters."
+            : "The rest could not be loaded. Check your connection and try again.",
         });
         return;
       }
@@ -290,7 +304,10 @@ export function OrdersListPage() {
       return;
     }
 
-    if (totalMatching === 0) {
+    // `totalMatching` is 0 both when there are genuinely no matches and when the
+    // page load failed before it ever learned the count. Only the first is a
+    // reason to refuse; the second gets the export fetch, which may well work.
+    if (totalMatching === 0 && !failed) {
       toast.error("No orders to export");
       return;
     }

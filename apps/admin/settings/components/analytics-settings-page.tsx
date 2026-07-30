@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,16 +45,15 @@ export function AnalyticsSettingsPage() {
     settings.hotjarId,
   ].filter((id) => id.trim()).length;
 
-  function handleSave() {
-    const saved = saveAnalyticsSettings({
+  async function handleSave() {
+    const { value, persisted } = await saveAnalyticsSettings({
       googleAnalyticsId: settings.googleAnalyticsId.trim(),
       googleTagManagerId: settings.googleTagManagerId.trim(),
       facebookPixelId: settings.facebookPixelId.trim(),
       hotjarId: settings.hotjarId.trim(),
     });
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Analytics settings saved");
+    setSettings(value);
+    if (reportSettingsWrite(persisted, "Analytics settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -58,11 +61,10 @@ export function AnalyticsSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetAnalyticsSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Analytics settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetAnalyticsSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "Analytics settings")) setSavedSettings(value);
   }
 
   return (

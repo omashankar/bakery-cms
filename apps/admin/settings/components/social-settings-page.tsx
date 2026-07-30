@@ -3,6 +3,10 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,11 +52,10 @@ export function SocialSettingsPage() {
     setLinks((prev) => prev.map((link) => (link.id === id ? { ...link, ...patch } : link)));
   }
 
-  function handleSave() {
-    const saved = saveSocialLinks(links);
-    setSavedLinks(saved);
-    setLinks(saved);
-    toast.success("Social links saved");
+  async function handleSave() {
+    const { value, persisted } = await saveSocialLinks(links);
+    setLinks(value);
+    if (reportSettingsWrite(persisted, "Social links")) setSavedLinks(value);
   }
 
   function handleDiscard() {
@@ -60,11 +63,10 @@ export function SocialSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSocialLinks();
-    setLinks(loaded);
-    setSavedLinks(loaded);
-    toast.success("Social links reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetSocialLinks();
+    setLinks(value);
+    if (reportSettingsReset(persisted, "Social links")) setSavedLinks(value);
   }
 
   return (

@@ -195,8 +195,9 @@ export function ReviewsAdminPage() {
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
-                void resetReviews().then(() => {
+                void resetReviews().then(({ persisted }) => {
                   refresh();
+                  if (!persisted) return reportUnpersisted("Reviews reset");
                   toast.success("Reviews reset to demo seed");
                 });
               }}

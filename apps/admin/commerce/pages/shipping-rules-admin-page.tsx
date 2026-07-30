@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
@@ -85,11 +85,12 @@ export function ShippingRulesAdminPage() {
     [previewCity, previewPincode, settings]
   );
 
-  function handleSave() {
-    const saved = saveCommerceSettings(settings);
-    setSettings(saved);
-    setSavedSettings(saved);
-    toast.success("Shipping rules saved");
+  async function handleSave() {
+    const { value, persisted } = await saveCommerceSettings(settings);
+    setSettings(value);
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, and these rules are what the storefront charges by.
+    if (reportSettingsWrite(persisted, "Shipping rules")) setSavedSettings(value);
   }
 
   function handleReset() {

@@ -91,25 +91,44 @@ function appendActivity(
   return { ...settings, activity, updatedAt: nowIso() };
 }
 
-function updateStore(
+/**
+ * A settings slice, plus whether the SERVER took it.
+ *
+ * `SettingsServerSync` merges the server's copy over the local one on every
+ * admin page load, so a section the server rejected is not saved — it is
+ * reverted at the next navigation. That covers real settings: the session
+ * timeout, the maintenance switch, tax rates, delivery fees.
+ */
+export interface SettingsWriteResult<T> {
+  value: T;
+  persisted: boolean;
+}
+
+async function updateStore(
   patch: Partial<AppSettings>,
   activity?: { action: string; entity: string; details?: string }
-): AppSettings {
+): Promise<SettingsWriteResult<AppSettings>> {
   const current = loadSettings();
   let next = mergeAppSettings({ ...current, ...patch });
   if (activity) {
     next = appendActivity(next, activity.action, activity.entity, activity.details);
   }
   const saved = saveSettings(next);
-  // Best-effort dual-write to the server for any changed section. Fire-and-forget:
-  // localStorage stays the immediate source; the server is the durable one.
-  // (Silently no-ops if unauthenticated — the storefront never saves settings.)
-  for (const key of Object.keys(patch)) {
-    if ((SERVER_SECTIONS as readonly string[]).includes(key)) {
-      void pushSection(key, saved[key as keyof AppSettings]);
-    }
-  }
-  return saved;
+
+  // Dual-write to the server for any changed section. This USED to be
+  // fire-and-forget, discarding the boolean pushSection already computed, so
+  // every settings page toasted success on a 401 or a 422 and the change
+  // silently reverted on the next page load.
+  const sections = Object.keys(patch).filter((key) =>
+    (SERVER_SECTIONS as readonly string[]).includes(key)
+  );
+  const results = await Promise.all(
+    sections.map((key) => pushSection(key, saved[key as keyof AppSettings]))
+  );
+
+  // A patch touching no server-backed section (the activity log) has nothing
+  // that could fail, so it is trivially persisted.
+  return { value: saved, persisted: results.every(Boolean) };
 }
 
 export function getGeneralSettings(): GeneralSettings {
@@ -166,132 +185,146 @@ export function getActivityLog(): ActivityLog[] {
   return loadSettings().activity;
 }
 
-export function saveGeneralSettings(general: GeneralSettings): GeneralSettings {
-  const saved = updateStore({ general }, {
+export async function saveGeneralSettings(
+  general: GeneralSettings
+): Promise<SettingsWriteResult<GeneralSettings>> {
+  const { value, persisted } = await updateStore({ general }, {
     action: "updated",
     entity: "settings",
     details: "General settings saved",
   });
-  return saved.general;
+  return { value: value.general, persisted };
 }
 
-export function saveContactSettings(contact: ContactSettings): ContactSettings {
-  const saved = updateStore({ contact }, {
+export async function saveContactSettings(
+  contact: ContactSettings
+): Promise<SettingsWriteResult<ContactSettings>> {
+  const { value, persisted } = await updateStore({ contact }, {
     action: "updated",
     entity: "settings",
     details: "Contact settings saved",
   });
-  return saved.contact;
+  return { value: value.contact, persisted };
 }
 
-export function saveSocialLinks(social: SocialLinkSettings[]): SocialLinkSettings[] {
-  const saved = updateStore({ social }, {
+export async function saveSocialLinks(
+  social: SocialLinkSettings[]
+): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
+  const { value, persisted } = await updateStore({ social }, {
     action: "updated",
     entity: "settings",
     details: "Social links updated",
   });
-  return saved.social;
+  return { value: value.social, persisted };
 }
 
-export function saveSecuritySettings(security: SecuritySettings): SecuritySettings {
-  const saved = updateStore({ security }, {
+export async function saveSecuritySettings(
+  security: SecuritySettings
+): Promise<SettingsWriteResult<SecuritySettings>> {
+  const { value, persisted } = await updateStore({ security }, {
     action: "updated",
     entity: "settings",
     details: "Security settings saved",
   });
-  return saved.security;
+  return { value: value.security, persisted };
 }
 
-export function saveSmtpSettings(smtp: SmtpSettings): SmtpSettings {
-  const saved = updateStore({ smtp }, {
+export async function saveSmtpSettings(
+  smtp: SmtpSettings
+): Promise<SettingsWriteResult<SmtpSettings>> {
+  const { value, persisted } = await updateStore({ smtp }, {
     action: "updated",
     entity: "settings",
     details: "SMTP settings saved",
   });
-  return saved.smtp;
+  return { value: value.smtp, persisted };
 }
 
-export function saveAnalyticsSettings(
+export async function saveAnalyticsSettings(
   analytics: AnalyticsSettings
-): AnalyticsSettings {
-  const saved = updateStore({ analytics }, {
+): Promise<SettingsWriteResult<AnalyticsSettings>> {
+  const { value, persisted } = await updateStore({ analytics }, {
     action: "updated",
     entity: "settings",
     details: "Analytics settings saved",
   });
-  return saved.analytics;
+  return { value: value.analytics, persisted };
 }
 
-export function saveMaintenanceSettings(
+export async function saveMaintenanceSettings(
   maintenance: MaintenanceSettings
-): MaintenanceSettings {
-  const saved = updateStore({ maintenance }, {
+): Promise<SettingsWriteResult<MaintenanceSettings>> {
+  const { value, persisted } = await updateStore({ maintenance }, {
     action: maintenance.isEnabled ? "enabled" : "disabled",
     entity: "maintenance",
     details: maintenance.isEnabled
       ? "Maintenance mode enabled"
       : "Maintenance mode disabled",
   });
-  return saved.maintenance;
+  return { value: value.maintenance, persisted };
 }
 
-export function saveCommerceSettings(commerce: CommerceSettings): CommerceSettings {
-  const saved = updateStore({ commerce }, {
+export async function saveCommerceSettings(
+  commerce: CommerceSettings
+): Promise<SettingsWriteResult<CommerceSettings>> {
+  const { value, persisted } = await updateStore({ commerce }, {
     action: "updated",
     entity: "settings",
     details: "Commerce settings saved",
   });
-  return saved.commerce;
+  return { value: value.commerce, persisted };
 }
 
-export function saveModuleSettings(modules: ModuleSettings): ModuleSettings {
-  const saved = updateStore({ modules }, {
+export async function saveModuleSettings(
+  modules: ModuleSettings
+): Promise<SettingsWriteResult<ModuleSettings>> {
+  const { value, persisted } = await updateStore({ modules }, {
     action: "updated",
     entity: "settings",
     details: "Module settings saved",
   });
-  return saved.modules;
+  return { value: value.modules, persisted };
 }
 
-export function clearActivityLog(): ActivityLog[] {
-  const saved = updateStore({ activity: [] }, {
+export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLog[]>> {
+  const { value, persisted } = await updateStore({ activity: [] }, {
     action: "cleared",
     entity: "activity",
     details: "Activity log cleared",
   });
-  return saved.activity;
+  return { value: value.activity, persisted };
 }
 
 /** Section-scoped resets — do not wipe sibling settings slices. */
-export function resetGeneralSettings(): GeneralSettings {
+export function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
   return saveGeneralSettings({ ...defaultGeneralSettings });
 }
 
-export function resetContactSettings(): ContactSettings {
+export function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
   return saveContactSettings({ ...defaultContactSettings });
 }
 
-export function resetSocialLinks(): SocialLinkSettings[] {
+export function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
   return saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link })));
 }
 
-export function resetSecuritySettings(): SecuritySettings {
+export function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
   return saveSecuritySettings({ ...defaultSecuritySettings });
 }
 
-export function resetSmtpSettings(): SmtpSettings {
+export function resetSmtpSettings(): Promise<SettingsWriteResult<SmtpSettings>> {
   return saveSmtpSettings({ ...defaultSmtpSettings });
 }
 
-export function resetAnalyticsSettings(): AnalyticsSettings {
+export function resetAnalyticsSettings(): Promise<SettingsWriteResult<AnalyticsSettings>> {
   return saveAnalyticsSettings({ ...defaultAnalyticsSettings });
 }
 
-export function resetMaintenanceSettings(): MaintenanceSettings {
+export function resetMaintenanceSettings(): Promise<SettingsWriteResult<MaintenanceSettings>> {
   return saveMaintenanceSettings({ ...defaultMaintenanceSettings });
 }
 
-export function resetCommerceSettings(): CommerceSettings {
+export function resetCommerceSettings(): Promise<SettingsWriteResult<CommerceSettings>> {
   return saveCommerceSettings({
     ...defaultCommerceSettings,
     paymentMethods: { ...defaultCommerceSettings.paymentMethods },
@@ -299,7 +332,7 @@ export function resetCommerceSettings(): CommerceSettings {
   });
 }
 
-export function resetModuleSettings(): ModuleSettings {
+export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSettings>> {
   return saveModuleSettings({ ...defaultModuleSettings });
 }
 

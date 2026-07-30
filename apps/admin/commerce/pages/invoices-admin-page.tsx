@@ -228,8 +228,13 @@ export function InvoicesAdminPage() {
 
       exportInvoicesToCsv(target);
       if (target.length < selectedIds.length) {
+        // Distinguish "the request failed" from "the range does not reach them".
+        // Advising an admin to narrow their filters when the fetch simply 500'd
+        // sends them off to solve the wrong problem.
         toast.warning(`Exported ${target.length} of ${selectedIds.length} selected invoices`, {
-          description: "The rest fall outside the exportable range — narrow the filters.",
+          description: wider
+            ? "The rest fall outside the exportable range — narrow the filters."
+            : "The rest could not be loaded. Check your connection and try again.",
         });
         return;
       }
@@ -237,7 +242,10 @@ export function InvoicesAdminPage() {
       return;
     }
 
-    if (total === 0) {
+    // `total` is 0 both when there are genuinely no invoices and when the page
+    // load failed before it ever learned the count. Only the first is a reason to
+    // refuse; the second gets the export fetch, which may well work.
+    if (total === 0 && !failed) {
       toast.error("No invoices to export");
       return;
     }

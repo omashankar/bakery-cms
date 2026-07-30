@@ -3,6 +3,10 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,11 +60,12 @@ export function ContactSettingsPage() {
     }));
   }
 
-  function handleSave() {
-    const saved = saveContactSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Contact settings saved");
+  async function handleSave() {
+    const { value, persisted } = await saveContactSettings(settings);
+    setSettings(value);
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, and greying it out would remove the only retry.
+    if (reportSettingsWrite(persisted, "Contact settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -68,11 +73,10 @@ export function ContactSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetContactSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Contact settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetContactSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "Contact settings")) setSavedSettings(value);
   }
 
   return (

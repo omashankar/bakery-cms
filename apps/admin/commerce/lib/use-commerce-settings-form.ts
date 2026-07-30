@@ -36,10 +36,20 @@ export function useCommerceSettingsForm() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  function save(successMessage = "Settings saved", nextSettings?: CommerceSettings) {
-    const saved = saveCommerceSettings(nextSettings ?? settings);
-    setSavedSettings(saved);
-    setSettings(saved);
+  async function save(successMessage = "Settings saved", nextSettings?: CommerceSettings) {
+    const { value, persisted } = await saveCommerceSettings(nextSettings ?? settings);
+    setSettings(value);
+
+    if (!persisted) {
+      // Leave savedSettings alone: the dirty flag is what keeps Save enabled, and
+      // these are delivery fees and tax rates the storefront charges against.
+      toast.error("Saved on this device only — the server rejected it", {
+        description: "Your changes are still here. Try again, or reload to discard them.",
+      });
+      return;
+    }
+
+    setSavedSettings(value);
     toast.success(successMessage);
   }
 

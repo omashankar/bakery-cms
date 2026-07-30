@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,11 +43,12 @@ export function SmtpSettingsPage() {
   const encryptionLabel =
     savedSettings.encryption === "none" ? "None" : savedSettings.encryption.toUpperCase();
 
-  function handleSave() {
-    const saved = saveSmtpSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("SMTP settings saved");
+  async function handleSave() {
+    const { value, persisted } = await saveSmtpSettings(settings);
+    setSettings(value);
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, and greying it out would remove the only retry.
+    if (reportSettingsWrite(persisted, "SMTP settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -51,11 +56,10 @@ export function SmtpSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSmtpSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("SMTP settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetSmtpSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "SMTP settings")) setSavedSettings(value);
   }
 
   function handleTestEmail() {

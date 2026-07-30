@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,11 +63,12 @@ export function CommerceSettingsPage() {
     };
   }, [settings]);
 
-  function handleSave() {
-    const saved = saveCommerceSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Commerce settings saved");
+  async function handleSave() {
+    const { value, persisted } = await saveCommerceSettings(settings);
+    setSettings(value);
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, and greying it out would remove the only retry.
+    if (reportSettingsWrite(persisted, "Commerce settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
@@ -71,11 +76,10 @@ export function CommerceSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetCommerceSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Commerce settings reset to defaults");
+  async function handleReset() {
+    const { value, persisted } = await resetCommerceSettings();
+    setSettings(value);
+    if (reportSettingsReset(persisted, "Commerce settings")) setSavedSettings(value);
   }
 
   return (

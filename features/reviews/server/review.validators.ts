@@ -22,6 +22,16 @@ export const submitReviewSchema = z.object({
 });
 
 /** Admin moderation patch. */
+/**
+ * Every field the admin edit form can change.
+ *
+ * The identity fields below (author, product, order) were missing, and zod is
+ * non-strict, so it stripped them silently: an admin fixing a misspelled
+ * reviewer name or re-pointing a review at the right product got a 200 and a
+ * "Review updated" toast for a change that only ever existed in their browser,
+ * and which the next hydration reverted. If the form offers it, the endpoint
+ * takes it.
+ */
 export const updateReviewSchema = z
   .object({
     status: reviewStatus.optional(),
@@ -32,6 +42,12 @@ export const updateReviewSchema = z
     title: z.string().optional(),
     body: z.string().optional(),
     rating: z.number().min(1).max(5).optional(),
+    authorName: z.string().min(1).optional(),
+    authorEmail: z.string().optional(),
+    cakeId: z.string().min(1).optional(),
+    productSlug: z.string().min(1).optional(),
+    cakeName: z.string().min(1).optional(),
+    orderNumber: z.string().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: "No fields to update" });
 

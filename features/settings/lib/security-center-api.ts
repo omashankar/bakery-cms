@@ -46,6 +46,26 @@ export function revokeSessionRequest(sessionId: string): Promise<boolean> {
   return send(`/api/security-center/sessions/${sessionId}`, "DELETE");
 }
 
-export function logoutAllRequest(): Promise<boolean> {
-  return send("/api/security-center/logout-all", "POST");
+/**
+ * Signs out every session but this one, and reports how many the SERVER revoked.
+ *
+ * The count has to come from here. Counting the locally cached session list
+ * instead reports whatever that list happened to hold when the page loaded: sign
+ * in on a phone afterwards and the admin is told "No other active sessions" at
+ * the very moment one was revoked; leave a tab open past some expiries and it
+ * claims to have signed out devices that were already gone.
+ */
+export async function logoutAllRequest(): Promise<{ ok: boolean; revoked: number }> {
+  try {
+    const res = await fetch("/api/security-center/logout-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return { ok: false, revoked: 0 };
+
+    const json = (await res.json().catch(() => null)) as { data?: { revoked?: number } } | null;
+    return { ok: true, revoked: json?.data?.revoked ?? 0 };
+  } catch {
+    return { ok: false, revoked: 0 };
+  }
 }

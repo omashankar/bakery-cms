@@ -69,10 +69,18 @@ export function ActivitySettingsPage() {
     );
   }, [entries, search]);
 
-  function confirmClear() {
-    const cleared = clearActivityLog();
-    setEntries(cleared);
+  async function confirmClear() {
+    const { value, persisted } = await clearActivityLog();
+    setEntries(value);
     setClearOpen(false);
+
+    if (!persisted) {
+      toast.error("Cleared on this device only — the server rejected it", {
+        description: "Reload to see the server’s version.",
+      });
+      return;
+    }
+
     toast.success("Activity log cleared");
   }
 
