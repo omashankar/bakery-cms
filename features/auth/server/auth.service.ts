@@ -198,8 +198,27 @@ export async function forgotPassword(input: ForgotPasswordInput, ctx: RequestCtx
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   });
 
-  // TODO(Phase 12): send via SMTP. For now surface it server-side for testing.
-  console.info(`[auth] Password reset OTP for ${input.email}: ${otp}`);
+  // There is no mail transport in this codebase yet — no nodemailer, no Resend,
+  // nothing reads the SMTP settings the admin can save. So this OTP currently
+  // reaches nobody, and the reset flow cannot complete in production.
+  //
+  // It used to be logged unconditionally "for testing". That is fine on a laptop
+  // and a credential leak anywhere else: a plaintext reset code in the server log
+  // is an account takeover for anyone who can read logs — a hosting dashboard, a
+  // log aggregator, a shared ops account — with no trace in the audit trail.
+  //
+  // Development keeps the convenience. Production gets a warning that names the
+  // real problem WITHOUT the code in it. The caller's response is unchanged
+  // either way, because it must not reveal whether the address is registered.
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[auth] Password reset OTP for ${input.email}: ${otp}`);
+  } else {
+    console.warn(
+      "[auth] A password reset was requested but no mail transport is configured, " +
+        "so the OTP could not be delivered. Wire an email provider before relying " +
+        "on password reset."
+    );
+  }
 
   await writeAuditLog({
     action: "auth.forgot_password",
