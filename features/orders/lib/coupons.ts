@@ -71,8 +71,8 @@ export function applyCouponCode(
   };
 }
 
-export function recordCouponUsage(code: string): void {
-  incrementCouponUsage(code);
+export function recordCouponUsage(code: string): Promise<void> {
+  return incrementCouponUsage(code);
 }
 
 export function getCouponHint(): string {

@@ -22,16 +22,24 @@ export async function fetchInvoiceSettings(): Promise<Partial<InvoiceSettings> |
   }
 }
 
-export function saveInvoiceSettingsRequest(data: InvoiceSettingsFormData): void {
-  void (async () => {
-    try {
-      await fetch("/api/payments/invoice-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-    } catch {
-      // best-effort
-    }
-  })();
+/**
+ * Whether the SERVER accepted the invoice settings. Never throws.
+ *
+ * These are the shop's legal identity on every invoice — business name, GSTIN,
+ * address, terms. Fire-and-forget meant an admin could correct a wrong GSTIN,
+ * be told it saved, and keep issuing invoices with the old one.
+ */
+export async function saveInvoiceSettingsRequest(
+  data: InvoiceSettingsFormData
+): Promise<boolean> {
+  try {
+    const res = await fetch("/api/payments/invoice-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

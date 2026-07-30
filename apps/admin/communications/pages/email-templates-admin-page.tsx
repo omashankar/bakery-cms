@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -155,21 +156,21 @@ export function EmailTemplatesAdminPage() {
     patchDraft({ body: `${draft.body}{{${variable}}}` });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!draft) return;
     if (!draft.name.trim() || !draft.slug.trim() || !draft.subject.trim()) {
       toast.error("Name, slug, and subject are required");
       return;
     }
     const { id, createdAt, updatedAt, ...data } = draft;
-    const saved = saveEmailTemplate(id, data);
+    const { value: saved, persisted } = await saveEmailTemplate(id, data);
     if (!saved) {
       toast.error("Could not save template");
       return;
     }
     setTemplates(loadEmailTemplates());
     setDraft(saved);
-    toast.success("Email template saved");
+    reportWrite(persisted, "Email template saved");
   }
 
   function handleDiscard() {
@@ -177,9 +178,9 @@ export function EmailTemplatesAdminPage() {
     setDraft(savedSelected);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!guardDirty()) return;
-    const created = createEmailTemplate({
+    const { value: created, persisted } = await createEmailTemplate({
       slug: `custom_${Date.now()}`,
       name: "New email template",
       description: "Custom email template",
@@ -193,12 +194,12 @@ export function EmailTemplatesAdminPage() {
     setTemplates(loadEmailTemplates());
     setSelectedId(created.id);
     setDraft(created);
-    toast.success("Template created");
+    reportWrite(persisted, "Template created");
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!draft) return;
-    const ok = deleteEmailTemplate(draft.id);
+    const { value: ok, persisted } = await deleteEmailTemplate(draft.id);
     setDeleteOpen(false);
     if (!ok) {
       toast.error("Could not delete template");
@@ -207,15 +208,15 @@ export function EmailTemplatesAdminPage() {
     const loaded = loadEmailTemplates();
     setTemplates(loaded);
     setSelectedId(loaded[0]?.id ?? null);
-    toast.success("Template deleted");
+    reportWrite(persisted, "Template deleted");
   }
 
-  function handleReset() {
-    const seeded = resetEmailTemplates();
+  async function handleReset() {
+    const { value: seeded, persisted } = await resetEmailTemplates();
     setResetOpen(false);
     setTemplates(seeded);
     setSelectedId(seeded[0]?.id ?? null);
-    toast.success("Email templates reset to defaults");
+    reportWrite(persisted, "Email templates reset to defaults");
   }
 
   return (
@@ -235,7 +236,7 @@ export function EmailTemplatesAdminPage() {
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset defaults</span>
             </Button>
-            <Button variant="bakery" className="w-full sm:w-auto" onClick={handleCreate}>
+            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
               <span className="hidden sm:inline">New template</span>
@@ -443,7 +444,7 @@ export function EmailTemplatesAdminPage() {
                       variant="bakery"
                       className="hidden md:inline-flex"
                       disabled={!isDirty}
-                      onClick={handleSave}
+                      onClick={() => void handleSave()}
                     >
                       Save changes
                     </Button>
@@ -568,7 +569,7 @@ export function EmailTemplatesAdminPage() {
               description="Choose a template from the list or create a new one."
               className="py-16"
               action={
-                <Button variant="bakery" onClick={handleCreate}>
+                <Button variant="bakery" onClick={() => void handleCreate()}>
                   <Plus className="size-4" />
                   New template
                 </Button>
@@ -603,7 +604,7 @@ export function EmailTemplatesAdminPage() {
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={() => void handleDelete()}>
               Delete
             </Button>
           </DialogFooter>
@@ -622,7 +623,7 @@ export function EmailTemplatesAdminPage() {
             <Button variant="outline" onClick={() => setResetOpen(false)}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={handleReset}>
+            <Button variant="bakery" onClick={() => void handleReset()}>
               Reset defaults
             </Button>
           </DialogFooter>
@@ -634,7 +635,7 @@ export function EmailTemplatesAdminPage() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={handleSave}>
+          <Button variant="bakery" onClick={() => void handleSave()}>
             Save changes
           </Button>
         </AdminMobileActionBar>

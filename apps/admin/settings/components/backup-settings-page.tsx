@@ -28,6 +28,7 @@ import {
   formatBackupSize,
   loadBackupHistory,
   restoreBackupToServer,
+  type RestoreResult,
   restoreBackupSnapshotToServer,
   serverBackedKeys,
 } from "../lib/backup-repository";
@@ -132,14 +133,32 @@ export function BackupSettingsPage() {
       await exportAndArchiveServerBackup(`Before import — ${new Date().toLocaleString()}`);
       const result = await restoreBackupToServer(target.data);
       refresh();
-      toast.success(
-        `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
-      );
+      reportRestore(result);
     } catch {
       toast.error("Import failed — please try again");
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * A restore is exactly when an admin is least able to check by eye. Listing a
+   * section the server refused is how a backup gets trusted that never came back.
+   */
+  function reportRestore(result: RestoreResult) {
+    if (result.failedSections.length > 0) {
+      toast.error(
+        `Restored ${result.serverSections.length} of ${result.serverSections.length + result.failedSections.length} sections to the server`,
+        {
+          description: `The server refused: ${result.failedSections.join(", ")}. Those are restored in this browser only.`,
+        }
+      );
+      return;
+    }
+
+    toast.success(
+      `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
+    );
   }
 
   async function confirmRestore() {
@@ -151,9 +170,7 @@ export function BackupSettingsPage() {
       const result = await restoreBackupSnapshotToServer(target.id);
       refresh();
       if (result) {
-        toast.success(
-          `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
-        );
+        reportRestore(result);
       } else {
         toast.error("That snapshot could not be found");
       }

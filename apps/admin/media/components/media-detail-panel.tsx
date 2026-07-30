@@ -2,6 +2,7 @@
 
 import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,9 +52,12 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
     }
   }
 
-  function saveField(patch: Partial<MediaFile>) {
-    const updated = updateMediaFile(current.id, patch);
+  async function saveField(patch: Partial<MediaFile>) {
+    const { value: updated, persisted } = await updateMediaFile(current.id, patch);
     if (updated) onUpdate(updated);
+    if (!persisted) {
+      reportWrite(false, "Media details saved");
+    }
   }
 
   return (

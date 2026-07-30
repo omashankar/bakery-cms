@@ -30,6 +30,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 
 const ICONS: Record<NotifIcon, typeof Bell> = {
   CheckCircle2,
@@ -71,7 +72,13 @@ function TemplateRow({ template }: { template: NotificationTemplate }) {
         </div>
         <Switch
           checked={pref.enabled}
-          onCheckedChange={(v) => setNotificationEnabled(template.id, v)}
+          onCheckedChange={(v) => {
+            // These decide which alerts the team receives, and the sender reads
+            // the server copy — a local-only toggle silences nothing.
+            void setNotificationEnabled(template.id, v).then((persisted) =>
+              reportWrite(persisted, v ? "Notification enabled" : "Notification disabled")
+            );
+          }}
           aria-label={`Enable ${template.event}`}
         />
       </div>
@@ -85,7 +92,11 @@ function TemplateRow({ template }: { template: NotificationTemplate }) {
               key={channel}
               type="button"
               disabled={!pref.enabled}
-              onClick={() => toggleNotificationChannel(template.id, channel)}
+              onClick={() => {
+                void toggleNotificationChannel(template.id, channel).then((persisted) =>
+                  reportWrite(persisted, `${channel} channel updated`)
+                );
+              }}
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50",
                 active

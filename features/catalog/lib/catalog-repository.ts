@@ -9,6 +9,7 @@ import {
   defaultWeightOptions,
 } from "./catalog-utils";
 import { pushCatalogSection, CATALOG_SECTIONS } from "./catalog-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-catalog";
 
@@ -78,20 +79,29 @@ export function getWeightOptions(): CatalogWeightOption[] {
   return [...loadCatalogStore().weights].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-function updateStore(patch: Partial<CatalogStore>): CatalogStore {
+async function updateStore(
+  patch: Partial<CatalogStore>
+): Promise<WriteResult<CatalogStore>> {
   const current = loadCatalogStore();
   const saved = saveCatalogStore({ ...current, ...patch });
-  // Best-effort dual-write of any changed section to the server. Fire-and-forget;
-  // localStorage stays the immediate source, the server is the durable one.
-  for (const key of Object.keys(patch)) {
-    if ((CATALOG_SECTIONS as readonly string[]).includes(key)) {
-      void pushCatalogSection(key, saved[key as keyof CatalogStore]);
-    }
-  }
-  return saved;
+
+  // `pushCatalogSection` already returned a boolean; this used to discard it
+  // with `void`. Categories, flavours, occasions and weights are what the
+  // product form and the storefront filters are built from, so a section the
+  // server refused leaves the admin editing a taxonomy nobody else has.
+  const sections = Object.keys(patch).filter((key) =>
+    (CATALOG_SECTIONS as readonly string[]).includes(key)
+  );
+  const results = await Promise.all(
+    sections.map((key) => pushCatalogSection(key, saved[key as keyof CatalogStore]))
+  );
+
+  return { value: saved, persisted: results.every(Boolean) };
 }
 
-export function createCategory(data: Omit<ProductCategory, "id" | "createdAt" | "updatedAt">): ProductCategory {
+export async function createCategory(
+  data: Omit<ProductCategory, "id" | "createdAt" | "updatedAt">
+): Promise<WriteResult<ProductCategory>> {
   const store = loadCatalogStore();
   const item: ProductCategory = {
     ...data,
@@ -100,28 +110,33 @@ export function createCategory(data: Omit<ProductCategory, "id" | "createdAt" | 
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  updateStore({ categories: [...store.categories, item] });
-  return item;
+  const { persisted } = await updateStore({ categories: [...store.categories, item] });
+  return { value: item, persisted };
 }
 
-export function updateCategory(id: string, patch: Partial<ProductCategory>): ProductCategory | null {
+export async function updateCategory(
+  id: string,
+  patch: Partial<ProductCategory>
+): Promise<WriteResult<ProductCategory | null>> {
   const store = loadCatalogStore();
   const index = store.categories.findIndex((item) => item.id === id);
-  if (index < 0) return null;
+  if (index < 0) return { value: null, persisted: false };
   const next = [...store.categories];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  updateStore({ categories: next });
-  return next[index];
+  const { persisted } = await updateStore({ categories: next });
+  return { value: next[index], persisted };
 }
 
-export function deleteCategories(ids: string[]): number {
+export async function deleteCategories(ids: string[]): Promise<WriteResult<number>> {
   const store = loadCatalogStore();
   const next = store.categories.filter((item) => !ids.includes(item.id));
-  updateStore({ categories: next });
-  return store.categories.length - next.length;
+  const { persisted } = await updateStore({ categories: next });
+  return { value: store.categories.length - next.length, persisted };
 }
 
-export function createFlavour(data: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt">): ProductFlavour {
+export async function createFlavour(
+  data: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt">
+): Promise<WriteResult<ProductFlavour>> {
   const store = loadCatalogStore();
   const item: ProductFlavour = {
     ...data,
@@ -130,28 +145,33 @@ export function createFlavour(data: Omit<ProductFlavour, "id" | "createdAt" | "u
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  updateStore({ flavours: [...store.flavours, item] });
-  return item;
+  const { persisted } = await updateStore({ flavours: [...store.flavours, item] });
+  return { value: item, persisted };
 }
 
-export function updateFlavour(id: string, patch: Partial<ProductFlavour>): ProductFlavour | null {
+export async function updateFlavour(
+  id: string,
+  patch: Partial<ProductFlavour>
+): Promise<WriteResult<ProductFlavour | null>> {
   const store = loadCatalogStore();
   const index = store.flavours.findIndex((item) => item.id === id);
-  if (index < 0) return null;
+  if (index < 0) return { value: null, persisted: false };
   const next = [...store.flavours];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  updateStore({ flavours: next });
-  return next[index];
+  const { persisted } = await updateStore({ flavours: next });
+  return { value: next[index], persisted };
 }
 
-export function deleteFlavours(ids: string[]): number {
+export async function deleteFlavours(ids: string[]): Promise<WriteResult<number>> {
   const store = loadCatalogStore();
   const next = store.flavours.filter((item) => !ids.includes(item.id));
-  updateStore({ flavours: next });
-  return store.flavours.length - next.length;
+  const { persisted } = await updateStore({ flavours: next });
+  return { value: store.flavours.length - next.length, persisted };
 }
 
-export function createOccasion(data: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt">): ProductOccasion {
+export async function createOccasion(
+  data: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt">
+): Promise<WriteResult<ProductOccasion>> {
   const store = loadCatalogStore();
   const item: ProductOccasion = {
     ...data,
@@ -160,32 +180,35 @@ export function createOccasion(data: Omit<ProductOccasion, "id" | "createdAt" | 
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  updateStore({ occasions: [...store.occasions, item] });
-  return item;
+  const { persisted } = await updateStore({ occasions: [...store.occasions, item] });
+  return { value: item, persisted };
 }
 
-export function updateOccasion(id: string, patch: Partial<ProductOccasion>): ProductOccasion | null {
+export async function updateOccasion(
+  id: string,
+  patch: Partial<ProductOccasion>
+): Promise<WriteResult<ProductOccasion | null>> {
   const store = loadCatalogStore();
   const index = store.occasions.findIndex((item) => item.id === id);
-  if (index < 0) return null;
+  if (index < 0) return { value: null, persisted: false };
   const next = [...store.occasions];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  updateStore({ occasions: next });
-  return next[index];
+  const { persisted } = await updateStore({ occasions: next });
+  return { value: next[index], persisted };
 }
 
-export function deleteOccasions(ids: string[]): number {
+export async function deleteOccasions(ids: string[]): Promise<WriteResult<number>> {
   const store = loadCatalogStore();
   const next = store.occasions.filter((item) => !ids.includes(item.id));
-  updateStore({ occasions: next });
-  return store.occasions.length - next.length;
+  const { persisted } = await updateStore({ occasions: next });
+  return { value: store.occasions.length - next.length, persisted };
 }
 
-export function createWeightOption(
+export async function createWeightOption(
   data: Omit<CatalogWeightOption, "id" | "createdAt" | "updatedAt" | "sortOrder"> & {
     sortOrder?: number;
   }
-): CatalogWeightOption {
+): Promise<WriteResult<CatalogWeightOption>> {
   const store = loadCatalogStore();
   const item: CatalogWeightOption = {
     ...data,
@@ -194,28 +217,28 @@ export function createWeightOption(
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  updateStore({ weights: [...store.weights, item] });
-  return item;
+  const { persisted } = await updateStore({ weights: [...store.weights, item] });
+  return { value: item, persisted };
 }
 
-export function updateWeightOption(
+export async function updateWeightOption(
   id: string,
   patch: Partial<CatalogWeightOption>
-): CatalogWeightOption | null {
+): Promise<WriteResult<CatalogWeightOption | null>> {
   const store = loadCatalogStore();
   const index = store.weights.findIndex((item) => item.id === id);
-  if (index < 0) return null;
+  if (index < 0) return { value: null, persisted: false };
   const next = [...store.weights];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  updateStore({ weights: next });
-  return next[index];
+  const { persisted } = await updateStore({ weights: next });
+  return { value: next[index], persisted };
 }
 
-export function deleteWeightOptions(ids: string[]): number {
+export async function deleteWeightOptions(ids: string[]): Promise<WriteResult<number>> {
   const store = loadCatalogStore();
   const next = store.weights.filter((item) => !ids.includes(item.id));
-  updateStore({ weights: next });
-  return store.weights.length - next.length;
+  const { persisted } = await updateStore({ weights: next });
+  return { value: store.weights.length - next.length, persisted };
 }
 
 export function getCategoryById(id: string): ProductCategory | undefined {

@@ -1,4 +1,5 @@
 import type { Banner } from "@/types/media";
+import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { defaultBanners } from "./banners-utils";
 import { replaceBannersRequest } from "./content-api";
@@ -84,10 +85,9 @@ export function loadBanners(): Banner[] {
   }
 }
 
-export function saveBanners(banners: Banner[]): Banner[] {
+export async function saveBanners(banners: Banner[]): Promise<WriteResult<Banner[]>> {
   persist(banners);
-  replaceBannersRequest(banners);
-  return banners;
+  return { value: banners, persisted: await replaceBannersRequest(banners) };
 }
 
 /** Hydration: write the server's banners into the local cache (no re-push). */
@@ -121,9 +121,9 @@ export function getActivePromoBanners(limit = 3, visibility: Banner["visibility"
   return getActiveHeroBanners(visibility).slice(0, limit);
 }
 
-export function createBanner(
+export async function createBanner(
   data: Omit<Banner, "id" | "createdAt" | "updatedAt">
-): Banner {
+): Promise<WriteResult<Banner>> {
   const banners = loadBanners();
   const banner: Banner = {
     ...data,
@@ -131,35 +131,41 @@ export function createBanner(
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  saveBanners([banner, ...banners]);
-  return banner;
+  const { persisted } = await saveBanners([banner, ...banners]);
+  return { value: banner, persisted };
 }
 
-export function updateBanner(id: string, patch: Partial<Banner>): Banner | null {
+export async function updateBanner(
+  id: string,
+  patch: Partial<Banner>
+): Promise<WriteResult<Banner | null>> {
   const banners = loadBanners();
   const index = banners.findIndex((item) => item.id === id);
-  if (index < 0) return null;
+  if (index < 0) return { value: null, persisted: false };
   const next = [...banners];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  saveBanners(next);
-  return next[index];
+  const { persisted } = await saveBanners(next);
+  return { value: next[index], persisted };
 }
 
-export function deleteBanners(ids: string[]): number {
+export async function deleteBanners(ids: string[]): Promise<WriteResult<number>> {
   const banners = loadBanners();
   const next = banners.filter((item) => !ids.includes(item.id));
-  saveBanners(next);
-  return banners.length - next.length;
+  const { persisted } = await saveBanners(next);
+  return { value: banners.length - next.length, persisted };
 }
 
-export function toggleBannerActive(id: string): Banner | null {
+export function toggleBannerActive(id: string): Promise<WriteResult<Banner | null>> {
   const banner = loadBanners().find((item) => item.id === id);
-  if (!banner) return null;
+  if (!banner) return Promise.resolve({ value: null, persisted: false });
   return updateBanner(id, { isActive: !banner.isActive });
 }
 
-export function bulkSetBannerActive(ids: string[], isActive: boolean): number {
-  if (ids.length === 0) return 0;
+export async function bulkSetBannerActive(
+  ids: string[],
+  isActive: boolean
+): Promise<WriteResult<number>> {
+  if (ids.length === 0) return { value: 0, persisted: true };
   const idSet = new Set(ids);
   const banners = loadBanners();
   let changed = 0;
@@ -168,6 +174,9 @@ export function bulkSetBannerActive(ids: string[], isActive: boolean): number {
     changed += 1;
     return { ...banner, isActive, updatedAt: nowIso() };
   });
-  if (changed > 0) saveBanners(next);
-  return changed;
+  // Nothing changed means nothing was sent, so there is nothing that could have
+  // failed to persist.
+  if (changed === 0) return { value: 0, persisted: true };
+  const { persisted } = await saveBanners(next);
+  return { value: changed, persisted };
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, Info } from "lucide-react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
@@ -48,19 +48,22 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
 
   const isRazorpay = config.id === "razorpay";
 
-  function handleToggle(next: boolean) {
+  // Which gateway is on, in which mode, with which keys — this decides how
+  // customers pay, and checkout reads the SERVER copy. A local-only change means
+  // the admin believes they switched gateways and nothing switched.
+  async function handleToggle(next: boolean) {
     setEnabled(next);
-    setGatewayEnabled(config!.id, next);
+    reportWrite(
+      await setGatewayEnabled(config!.id, next),
+      next ? "Gateway enabled" : "Gateway disabled"
+    );
   }
-  function handleMode(next: GatewayMode) {
+  async function handleMode(next: GatewayMode) {
     setMode(next);
-    setGatewayMode(config!.id, next);
+    reportWrite(await setGatewayMode(config!.id, next), `Switched to ${next} mode`);
   }
-  function handleSave() {
-    saveGatewayCredentials(config!.id, creds);
-    toast.success("Gateway settings saved", {
-      description: "Placeholder config — backend integration wires this later.",
-    });
+  async function handleSave() {
+    reportWrite(await saveGatewayCredentials(config!.id, creds), "Gateway settings saved");
   }
 
   return (

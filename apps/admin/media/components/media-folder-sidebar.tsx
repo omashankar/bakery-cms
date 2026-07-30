@@ -2,7 +2,7 @@
 
 import { Folder, FolderPlus, ImageIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MediaFolder } from "@/types/media";
@@ -27,14 +27,14 @@ export function MediaFolderSidebar({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
-  function handleCreate() {
+  async function handleCreate() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    createMediaFolder(trimmed);
+    const { persisted } = await createMediaFolder(trimmed);
     setName("");
     setCreating(false);
     onFoldersChange();
-    toast.success(`Folder "${trimmed}" created`);
+    reportWrite(persisted, `Folder "${trimmed}" created`);
   }
 
   return (
@@ -64,7 +64,7 @@ export function MediaFolderSidebar({
             }}
           />
           <div className="flex gap-2">
-            <Button type="button" size="sm" className="flex-1" onClick={handleCreate}>
+            <Button type="button" size="sm" className="flex-1" onClick={() => void handleCreate()}>
               Create
             </Button>
             <Button

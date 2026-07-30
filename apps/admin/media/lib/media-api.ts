@@ -1,6 +1,6 @@
 /**
  * Client-side media API. Files + folders replace-all dual-write + hydrate;
- * uploads go through Cloudinary (server-side). Best-effort — never throws.
+ * uploads go through Cloudinary (server-side). Never throws; every write reports whether the server took it.
  */
 import type { MediaFile, MediaFolder } from "@/types/media";
 
@@ -20,18 +20,27 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
-function putJson(path: string, body: unknown): void {
-  void (async () => {
-    try {
-      await fetch(path, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      // best-effort
-    }
-  })();
+/**
+ * Whether the SERVER accepted the write. Resolves false on a network failure OR
+ * a non-2xx response; never throws.
+ *
+ * This used to be fire-and-forget — it launched the request into a floating
+ * async IIFE and returned void, so a 401 from an expired admin token and a 500
+ * were both indistinguishable from success. Every caller then reported "saved"
+ * for a change that lives only in this browser and that the next hydration
+ * silently reverts.
+ */
+async function putJson(path: string, body: unknown): Promise<boolean> {
+  try {
+    const res = await fetch(path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export const fetchMediaFiles = () => getJson<MediaFile[]>("/api/media");

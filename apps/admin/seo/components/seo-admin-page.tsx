@@ -12,6 +12,7 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
 import {
@@ -193,7 +194,7 @@ export function SeoAdminPage() {
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
-  function handleSaveGlobal() {
+  async function handleSaveGlobal() {
     if (!global.siteName.trim() || !global.canonicalBaseUrl.trim()) {
       toast.error("Site name and canonical base URL are required");
       return;
@@ -203,16 +204,20 @@ export function SeoAdminPage() {
       return;
     }
 
-    const saved = saveGlobalSeo({
+    const { value: saved, persisted } = await saveGlobalSeo({
       ...global,
       defaultKeywords: parseKeywords(keywordsInput),
     });
     setGlobal(saved);
-    setSavedGlobal(saved);
     const keywords = saved.defaultKeywords.join(", ");
     setKeywordsInput(keywords);
-    setSavedKeywordsInput(keywords);
-    toast.success("Global SEO settings saved");
+
+    // Only mark clean when the SERVER has it. These tags are what search engines
+    // read from the rendered pages, which are built from the server copy.
+    if (reportWrite(persisted, "Global SEO settings saved")) {
+      setSavedGlobal(saved);
+      setSavedKeywordsInput(keywords);
+    }
   }
 
   function handleDiscard() {
@@ -221,10 +226,10 @@ export function SeoAdminPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    resetSeoStore();
+  async function handleReset() {
+    const { persisted } = await resetSeoStore();
     refresh();
-    toast.success("SEO settings reset to defaults");
+    reportWrite(persisted, "SEO settings reset to defaults");
   }
 
   return (

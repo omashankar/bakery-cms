@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
 import { Button } from "@/components/ui/button";
@@ -110,14 +111,14 @@ export function SeoRouteEditDialog({
     onOpenChange(false);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!entry) return;
     if (!form.metaTitle.trim() || !form.metaDescription.trim()) {
       toast.error("Title and description are required");
       return;
     }
 
-    updateSeoRoute(entry.id, {
+    const { persisted } = await updateSeoRoute(entry.id, {
       metaTitle: form.metaTitle.trim(),
       metaDescription: form.metaDescription.trim(),
       metaKeywords: parseKeywords(form.keywords),
@@ -127,7 +128,7 @@ export function SeoRouteEditDialog({
       twitterCard: form.twitterCard,
     });
 
-    toast.success(`SEO updated for ${entry.label}`);
+    reportWrite(persisted, `SEO updated for ${entry.label}`);
     onSaved();
     onOpenChange(false);
   }
@@ -293,7 +294,7 @@ export function SeoRouteEditDialog({
                 Cancel
               </Button>
             )}
-            <Button variant="bakery" disabled={!isDirty} onClick={handleSave}>
+            <Button variant="bakery" disabled={!isDirty} onClick={() => void handleSave()}>
               Save SEO
             </Button>
           </DialogFooter>

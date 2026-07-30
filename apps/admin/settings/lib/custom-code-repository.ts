@@ -24,17 +24,21 @@ export function loadCustomCode(): CustomCode {
   }
 }
 
-/** Local write + durable server replace-all. Returns false if the write was refused. */
-export function saveCustomCode(code: CustomCode): boolean {
+/**
+ * False when the code did not reach the SERVER. This is script and style
+ * injected into every storefront page, rendered from the server copy — a
+ * local-only save changes nothing any visitor sees.
+ */
+export async function saveCustomCode(code: CustomCode): Promise<boolean> {
   if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(code));
   } catch {
     return false;
   }
-  replaceCustomCodeRequest(code);
+  const persisted = await replaceCustomCodeRequest(code);
   window.dispatchEvent(new Event(CUSTOM_CODE_UPDATED_EVENT));
-  return true;
+  return persisted;
 }
 
 /** Hydration: apply the server's custom code into the local cache (no re-push). */

@@ -87,10 +87,13 @@ export function getAdminProfile(): AdminProfile {
   };
 }
 
-/** Returns false when the write was refused (e.g. photo too large for the quota). */
-export function saveAdminProfile(
+/**
+ * False when the profile did not reach the SERVER — either the local write was
+ * refused (photo too large for the quota) or the server rejected it.
+ */
+export async function saveAdminProfile(
   patch: Pick<AdminProfile, "fullName" | "mobile" | "username" | "photoUrl">
-): boolean {
+): Promise<boolean> {
   const saved = read();
   const next: StoredProfile = {
     ...saved,
@@ -99,9 +102,8 @@ export function saveAdminProfile(
     username: patch.username.trim(),
     photoUrl: patch.photoUrl,
   };
-  const ok = write(next);
-  if (ok) replaceAdminProfileRequest(next);
-  return ok;
+  if (!write(next)) return false;
+  return replaceAdminProfileRequest(next);
 }
 
 /** Hydration: apply the server's saved profile fields locally (no re-push). */

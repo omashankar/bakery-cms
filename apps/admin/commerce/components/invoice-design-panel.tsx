@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Printer, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminMobileActionBar } from "@/apps/admin/components";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { InvoiceDocument } from "@/components/shared/invoice-document";
@@ -110,12 +111,14 @@ export function InvoiceDesignPanel() {
     setSettings((prev) => ({ ...prev, ...next }));
   }
 
-  function handleSave() {
-    const saved = saveInvoiceSettings(settings);
+  async function handleSave() {
+    const { value: saved, persisted } = await saveInvoiceSettings(settings);
     const form = toForm(saved);
     setSettings(form);
-    setSavedSettings(form);
-    toast.success("Invoice design saved");
+    // These are the shop's legal details on every invoice — business name,
+    // GSTIN, address, terms — and the PDF is built from the server copy. Only
+    // mark clean once the server has them, so Save stays live for a retry.
+    if (reportWrite(persisted, "Invoice design saved")) setSavedSettings(form);
   }
 
   function handleDiscard() {
@@ -164,7 +167,7 @@ export function InvoiceDesignPanel() {
         <Button
           variant="bakery"
           className={cn("w-full sm:w-auto", isDirty && "hidden md:inline-flex")}
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           disabled={!isDirty}
         >
           Save design
@@ -427,7 +430,7 @@ export function InvoiceDesignPanel() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={handleSave}>
+          <Button variant="bakery" onClick={() => void handleSave()}>
             Save design
           </Button>
         </AdminMobileActionBar>

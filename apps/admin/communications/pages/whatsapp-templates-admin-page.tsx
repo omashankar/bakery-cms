@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -155,21 +156,21 @@ export function WhatsAppTemplatesAdminPage() {
     patchDraft({ body: `${draft.body}{{${variable}}}` });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!draft) return;
     if (!draft.name.trim() || !draft.slug.trim() || !draft.body.trim()) {
       toast.error("Name, slug, and message body are required");
       return;
     }
     const { id, createdAt, updatedAt, ...data } = draft;
-    const saved = saveWhatsAppTemplate(id, data);
+    const { value: saved, persisted } = await saveWhatsAppTemplate(id, data);
     if (!saved) {
       toast.error("Could not save template");
       return;
     }
     setTemplates(loadWhatsAppTemplates());
     setDraft(saved);
-    toast.success("WhatsApp template saved");
+    reportWrite(persisted, "WhatsApp template saved");
   }
 
   function handleDiscard() {
@@ -177,9 +178,9 @@ export function WhatsAppTemplatesAdminPage() {
     setDraft(savedSelected);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!guardDirty()) return;
-    const created = createWhatsAppTemplate({
+    const { value: created, persisted } = await createWhatsAppTemplate({
       slug: `custom_${Date.now()}`,
       name: "New WhatsApp template",
       description: "Custom WhatsApp notification",
@@ -191,12 +192,12 @@ export function WhatsAppTemplatesAdminPage() {
     setTemplates(loadWhatsAppTemplates());
     setSelectedId(created.id);
     setDraft(created);
-    toast.success("Template created");
+    reportWrite(persisted, "Template created");
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!draft) return;
-    const ok = deleteWhatsAppTemplate(draft.id);
+    const { value: ok, persisted } = await deleteWhatsAppTemplate(draft.id);
     setDeleteOpen(false);
     if (!ok) {
       toast.error("Could not delete template");
@@ -205,15 +206,15 @@ export function WhatsAppTemplatesAdminPage() {
     const loaded = loadWhatsAppTemplates();
     setTemplates(loaded);
     setSelectedId(loaded[0]?.id ?? null);
-    toast.success("Template deleted");
+    reportWrite(persisted, "Template deleted");
   }
 
-  function handleReset() {
-    const seeded = resetWhatsAppTemplates();
+  async function handleReset() {
+    const { value: seeded, persisted } = await resetWhatsAppTemplates();
     setResetOpen(false);
     setTemplates(seeded);
     setSelectedId(seeded[0]?.id ?? null);
-    toast.success("WhatsApp templates reset to defaults");
+    reportWrite(persisted, "WhatsApp templates reset to defaults");
   }
 
   return (
@@ -233,7 +234,7 @@ export function WhatsAppTemplatesAdminPage() {
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset defaults</span>
             </Button>
-            <Button variant="bakery" className="w-full sm:w-auto" onClick={handleCreate}>
+            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
               <span className="hidden sm:inline">New template</span>
@@ -439,7 +440,7 @@ export function WhatsAppTemplatesAdminPage() {
                       variant="bakery"
                       className="hidden md:inline-flex"
                       disabled={!isDirty}
-                      onClick={handleSave}
+                      onClick={() => void handleSave()}
                     >
                       Save changes
                     </Button>
@@ -545,7 +546,7 @@ export function WhatsAppTemplatesAdminPage() {
               description="Choose a template from the list or create a new one."
               className="py-16"
               action={
-                <Button variant="bakery" onClick={handleCreate}>
+                <Button variant="bakery" onClick={() => void handleCreate()}>
                   <Plus className="size-4" />
                   New template
                 </Button>
@@ -580,7 +581,7 @@ export function WhatsAppTemplatesAdminPage() {
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={() => void handleDelete()}>
               Delete
             </Button>
           </DialogFooter>
@@ -599,7 +600,7 @@ export function WhatsAppTemplatesAdminPage() {
             <Button variant="outline" onClick={() => setResetOpen(false)}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={handleReset}>
+            <Button variant="bakery" onClick={() => void handleReset()}>
               Reset defaults
             </Button>
           </DialogFooter>
@@ -611,7 +612,7 @@ export function WhatsAppTemplatesAdminPage() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={handleSave}>
+          <Button variant="bakery" onClick={() => void handleSave()}>
             Save changes
           </Button>
         </AdminMobileActionBar>

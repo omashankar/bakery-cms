@@ -1,6 +1,7 @@
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 import { defaultHeaderSettings } from "./header-utils";
 import { replaceHeaderRequest } from "./site-layout-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-header";
 const STORAGE_VERSION_KEY = "bakery-cms-header-version";
@@ -43,11 +44,12 @@ export function loadHeaderSettings(): HeaderSettings {
   }
 }
 
-export function saveHeaderSettings(settings: HeaderSettings): HeaderSettings {
+export async function saveHeaderSettings(
+  settings: HeaderSettings
+): Promise<WriteResult<HeaderSettings>> {
   const next = { ...settings, updatedAt: nowIso() };
   persist(next);
-  replaceHeaderRequest(next);
-  return next;
+  return { value: next, persisted: await replaceHeaderRequest(next) };
 }
 
 /** Hydration: apply the server's header settings locally (no re-push). */
@@ -55,13 +57,12 @@ export function persistServerHeader(settings: HeaderSettings): void {
   persist(settings);
 }
 
-export function resetHeaderSettings(): HeaderSettings {
+export async function resetHeaderSettings(): Promise<WriteResult<HeaderSettings>> {
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY);
     persist(defaultHeaderSettings);
   }
-  replaceHeaderRequest(defaultHeaderSettings);
-  return defaultHeaderSettings;
+  return { value: defaultHeaderSettings, persisted: await replaceHeaderRequest(defaultHeaderSettings) };
 }
 
 export function getVisibleNavItems(): HeaderNavItem[] {

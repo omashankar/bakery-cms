@@ -1,6 +1,7 @@
 import type { EmailTemplateFormData, EmailTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "./template-render";
 import { replaceEmailTemplatesRequest } from "./communications-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-email-templates";
 const STORAGE_VERSION_KEY = "bakery-cms-email-templates-version";
@@ -141,10 +142,10 @@ function writeTemplates(templates: EmailTemplateRecord[]): void {
   emitUpdated();
 }
 
-/** Local write + durable server replace-all. Used by admin mutations only. */
-function persistAndSync(templates: EmailTemplateRecord[]): void {
+/** Local write first, then the server, reporting what the server did. */
+async function persistAndSync(templates: EmailTemplateRecord[]): Promise<boolean> {
   writeTemplates(templates);
-  replaceEmailTemplatesRequest(templates);
+  return replaceEmailTemplatesRequest(templates);
 }
 
 /** Hydration: write the server's templates into the local cache (no re-push). */
@@ -191,13 +192,13 @@ export function getEmailTemplateBySlug(slug: string): EmailTemplateRecord | null
   return loadEmailTemplates().find((template) => template.slug === slug) ?? null;
 }
 
-export function saveEmailTemplate(
+export async function saveEmailTemplate(
   id: string,
   data: EmailTemplateFormData
-): EmailTemplateRecord | null {
+): Promise<WriteResult<EmailTemplateRecord | null>> {
   const templates = loadEmailTemplates();
   const index = templates.findIndex((template) => template.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: EmailTemplateRecord = normalizeTemplate({
     ...templates[index],
@@ -206,11 +207,12 @@ export function saveEmailTemplate(
     updatedAt: nowIso(),
   });
   templates[index] = updated;
-  persistAndSync(templates);
-  return updated;
+  return { value: updated, persisted: await persistAndSync(templates) };
 }
 
-export function createEmailTemplate(data: EmailTemplateFormData): EmailTemplateRecord {
+export async function createEmailTemplate(
+  data: EmailTemplateFormData
+): Promise<WriteResult<EmailTemplateRecord>> {
   const templates = loadEmailTemplates();
   const timestamp = nowIso();
   const template = normalizeTemplate({
@@ -219,21 +221,20 @@ export function createEmailTemplate(data: EmailTemplateFormData): EmailTemplateR
     createdAt: timestamp,
     updatedAt: timestamp,
   });
-  persistAndSync([template, ...templates]);
-  return template;
+  return { value: template, persisted: await persistAndSync([template, ...templates]) };
 }
 
-export function deleteEmailTemplate(id: string): boolean {
+/** `value` is false when no such template existed, so nothing was sent. */
+export async function deleteEmailTemplate(id: string): Promise<WriteResult<boolean>> {
   const templates = loadEmailTemplates();
   const next = templates.filter((template) => template.id !== id);
-  if (next.length === templates.length) return false;
-  persistAndSync(next);
-  return true;
+  if (next.length === templates.length) return { value: false, persisted: false };
+  return { value: true, persisted: await persistAndSync(next) };
 }
 
-export function resetEmailTemplates(): EmailTemplateRecord[] {
+export async function resetEmailTemplates(): Promise<WriteResult<EmailTemplateRecord[]>> {
   const seeded = seedEmailTemplates();
-  persistAndSync(seeded);
+  const persisted = await persistAndSync(seeded);
   localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-  return seeded;
+  return { value: seeded, persisted };
 }

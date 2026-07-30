@@ -1,6 +1,7 @@
 import type { FooterSettings } from "@/types/site-layout";
 import { defaultFooterSettings } from "./footer-utils";
 import { replaceFooterRequest } from "./site-layout-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-footer";
 const STORAGE_VERSION_KEY = "bakery-cms-footer-version";
@@ -43,11 +44,12 @@ export function loadFooterSettings(): FooterSettings {
   }
 }
 
-export function saveFooterSettings(settings: FooterSettings): FooterSettings {
+export async function saveFooterSettings(
+  settings: FooterSettings
+): Promise<WriteResult<FooterSettings>> {
   const next = { ...settings, updatedAt: nowIso() };
   persist(next);
-  replaceFooterRequest(next);
-  return next;
+  return { value: next, persisted: await replaceFooterRequest(next) };
 }
 
 /** Hydration: apply the server's footer settings locally (no re-push). */
@@ -55,11 +57,10 @@ export function persistServerFooter(settings: FooterSettings): void {
   persist(settings);
 }
 
-export function resetFooterSettings(): FooterSettings {
+export async function resetFooterSettings(): Promise<WriteResult<FooterSettings>> {
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY);
     persist(defaultFooterSettings);
   }
-  replaceFooterRequest(defaultFooterSettings);
-  return defaultFooterSettings;
+  return { value: defaultFooterSettings, persisted: await replaceFooterRequest(defaultFooterSettings) };
 }

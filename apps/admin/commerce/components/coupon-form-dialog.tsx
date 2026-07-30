@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -88,7 +89,7 @@ export function CouponFormDialog({
     reset(emptyValues);
   }, [open, editingCoupon, reset]);
 
-  const onSubmit = handleSubmit((values) => {
+  const onSubmit = handleSubmit(async (values) => {
     const payload = {
       code: values.code,
       label: values.label,
@@ -102,11 +103,11 @@ export function CouponFormDialog({
 
     try {
       if (editingCoupon) {
-        updateCoupon(editingCoupon.id, payload);
-        toast.success("Coupon updated");
+        const { persisted } = await updateCoupon(editingCoupon.id, payload);
+        reportWrite(persisted, "Coupon updated");
       } else {
-        createCoupon(payload);
-        toast.success("Coupon created");
+        const { persisted } = await createCoupon(payload);
+        reportWrite(persisted, "Coupon created");
       }
       onSaved();
     } catch (error) {

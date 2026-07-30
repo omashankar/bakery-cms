@@ -16,6 +16,7 @@ import { GatewayCard } from "@/features/payments/components/gateway-card";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { FilterPanel, FilterPanelSearch } from "@/components/shared/filter-panel";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 
 type Category = "all" | "online" | "offline";
 
@@ -121,8 +122,16 @@ export function GatewayManagerPage() {
             config={config}
             runtime={runtime}
             status={config.id === "razorpay" && razorpayStatus ? razorpayStatus : status}
-            onToggle={(enabled) => setGatewayEnabled(config.id, enabled)}
-            onModeChange={(mode: GatewayMode) => setGatewayMode(config.id, mode)}
+            onToggle={(enabled) => {
+              void setGatewayEnabled(config.id, enabled).then((persisted) =>
+                reportWrite(persisted, enabled ? "Gateway enabled" : "Gateway disabled")
+              );
+            }}
+            onModeChange={(mode: GatewayMode) => {
+              void setGatewayMode(config.id, mode).then((persisted) =>
+                reportWrite(persisted, `Switched to ${mode} mode`)
+              );
+            }}
           />
         ))}
       </section>

@@ -15,7 +15,6 @@ import {
   loadCustomCode,
   saveCustomCode,
   EMPTY_CUSTOM_CODE as EMPTY_CODE,
-  CUSTOM_CODE_UPDATED_EVENT,
   type CustomCode,
 } from "@/apps/admin/settings/lib/custom-code-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
@@ -41,17 +40,23 @@ export function CustomCodeSettingsPage() {
 
   const isDirty = JSON.stringify(code) !== JSON.stringify(savedCode);
 
-  /** Local write + server dual-write. Returns false when the browser refuses the write. */
-  function persist(next: CustomCode): boolean {
-    const saved = saveCustomCode(next);
+  /**
+   * False when the code did not reach the SERVER. This is script and style
+   * injected into every storefront page, rendered from the server copy — saving
+   * it only in this browser changes nothing any visitor sees.
+   */
+  async function persist(next: CustomCode): Promise<boolean> {
+    const saved = await saveCustomCode(next);
     if (!saved) {
-      toast.error("Could not save — browser storage is full or unavailable");
+      toast.error("Custom code was not saved", {
+        description: "The server rejected it, or browser storage is unavailable.",
+      });
     }
     return saved;
   }
 
-  function handleSave() {
-    if (!persist(code)) return;
+  async function handleSave() {
+    if (!(await persist(code))) return;
     setSavedCode(code);
     toast.success("Custom code saved", {
       description: "Your custom CSS and JavaScript have been saved.",
@@ -63,8 +68,8 @@ export function CustomCodeSettingsPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    if (!persist(EMPTY_CODE)) return;
+  async function handleReset() {
+    if (!(await persist(EMPTY_CODE))) return;
     setCode(EMPTY_CODE);
     setSavedCode(EMPTY_CODE);
     toast.success("Custom code cleared");

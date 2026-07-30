@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -58,18 +59,18 @@ export function DeliveryZoneFormDialog({
     setForm((prev) => ({ ...prev, ...patch }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name.trim() || !form.city.trim()) {
       toast.error("Zone name and city are required");
       return;
     }
 
     if (zone) {
-      updateDeliveryZone(zone.id, form);
-      toast.success("Delivery zone updated");
+      const { persisted } = await updateDeliveryZone(zone.id, form);
+      reportWrite(persisted, "Delivery zone updated");
     } else {
-      createDeliveryZone(form);
-      toast.success("Delivery zone created");
+      const { persisted } = await createDeliveryZone(form);
+      reportWrite(persisted, "Delivery zone created");
     }
 
     onOpenChange(false);
@@ -184,7 +185,7 @@ export function DeliveryZoneFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" onClick={handleSubmit}>
+          <Button variant="bakery" onClick={() => void handleSubmit()}>
             {zone ? "Save changes" : "Create zone"}
           </Button>
         </DialogFooter>

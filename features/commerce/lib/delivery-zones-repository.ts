@@ -5,6 +5,7 @@ import {
   getUniqueZoneCities,
 } from "./delivery-zone-utils";
 import { replaceZonesRequest } from "./commerce-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-delivery-zones";
 
@@ -27,9 +28,9 @@ function lowPersist(zones: DeliveryZone[]): void {
 }
 
 /** Mutation write: local + best-effort server replace-all. */
-function persist(zones: DeliveryZone[]): void {
+async function persist(zones: DeliveryZone[]): Promise<boolean> {
   lowPersist(zones);
-  replaceZonesRequest(zones);
+  return replaceZonesRequest(zones);
 }
 
 /** Hydration: write the server's zones into the local cache (no re-push). */
@@ -138,7 +139,9 @@ export function getDeliveryZoneById(id: string): DeliveryZone | null {
   return loadDeliveryZones().find((zone) => zone.id === id) ?? null;
 }
 
-export function createDeliveryZone(data: DeliveryZoneFormData): DeliveryZone {
+export async function createDeliveryZone(
+  data: DeliveryZoneFormData
+): Promise<WriteResult<DeliveryZone>> {
   const zones = loadDeliveryZones();
   const timestamp = nowIso();
   const zone: DeliveryZone = {
@@ -147,17 +150,16 @@ export function createDeliveryZone(data: DeliveryZoneFormData): DeliveryZone {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  persist([zone, ...zones]);
-  return zone;
+  return { value: zone, persisted: await persist([zone, ...zones]) };
 }
 
-export function updateDeliveryZone(
+export async function updateDeliveryZone(
   id: string,
   data: DeliveryZoneFormData
-): DeliveryZone | null {
+): Promise<WriteResult<DeliveryZone | null>> {
   const zones = loadDeliveryZones();
   const index = zones.findIndex((zone) => zone.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: DeliveryZone = {
     ...zones[index],
@@ -166,29 +168,29 @@ export function updateDeliveryZone(
     updatedAt: nowIso(),
   };
   zones[index] = updated;
-  persist(zones);
-  return updated;
+  return { value: updated, persisted: await persist(zones) };
 }
 
-export function deleteDeliveryZones(ids: string[]): number {
+export async function deleteDeliveryZones(ids: string[]): Promise<WriteResult<number>> {
   const zones = loadDeliveryZones();
   const next = zones.filter((zone) => !ids.includes(zone.id));
   const count = zones.length - next.length;
-  if (count === 0) return 0;
-  persist(next);
-  return count;
+  // Nothing removed means nothing was sent, so nothing could fail to persist.
+  if (count === 0) return { value: 0, persisted: true };
+  return { value: count, persisted: await persist(next) };
 }
 
-export function toggleDeliveryZoneActive(id: string): DeliveryZone | null {
+export function toggleDeliveryZoneActive(
+  id: string
+): Promise<WriteResult<DeliveryZone | null>> {
   const zone = getDeliveryZoneById(id);
-  if (!zone) return null;
+  if (!zone) return Promise.resolve({ value: null, persisted: false });
   return updateDeliveryZone(id, { ...zone, isActive: !zone.isActive });
 }
 
-export function resetDeliveryZones(): DeliveryZone[] {
+export async function resetDeliveryZones(): Promise<WriteResult<DeliveryZone[]>> {
   const seeded = seedZones();
-  persist(seeded);
-  return seeded;
+  return { value: seeded, persisted: await persist(seeded) };
 }
 
 export function getActiveDeliveryZones(): DeliveryZone[] {

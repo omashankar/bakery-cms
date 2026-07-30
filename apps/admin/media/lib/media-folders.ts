@@ -1,5 +1,6 @@
 import type { MediaFolder } from "@/types/media";
 import { replaceMediaFoldersRequest } from "./media-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const FOLDERS_STORAGE_KEY = "bakery-cms-media-folders";
 
@@ -66,10 +67,11 @@ export function loadMediaFolders(): MediaFolder[] {
   }
 }
 
-export function saveMediaFolders(folders: MediaFolder[]): MediaFolder[] {
+export async function saveMediaFolders(
+  folders: MediaFolder[]
+): Promise<WriteResult<MediaFolder[]>> {
   persist(folders);
-  replaceMediaFoldersRequest(folders);
-  return folders;
+  return { value: folders, persisted: await replaceMediaFoldersRequest(folders) };
 }
 
 /** Hydration: write the server's folders into the local cache (no re-push). */
@@ -77,7 +79,7 @@ export function persistServerMediaFolders(folders: MediaFolder[]): void {
   persist(folders);
 }
 
-export function createMediaFolder(name: string): MediaFolder {
+export async function createMediaFolder(name: string): Promise<WriteResult<MediaFolder>> {
   const folders = loadMediaFolders();
   const folder: MediaFolder = {
     id: `folder-${Date.now()}`,
@@ -85,15 +87,18 @@ export function createMediaFolder(name: string): MediaFolder {
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  saveMediaFolders([...folders, folder]);
-  return folder;
+  const { persisted } = await saveMediaFolders([...folders, folder]);
+  return { value: folder, persisted };
 }
 
-export function deleteMediaFolder(id: string): boolean {
-  if (defaultMediaFolders.some((folder) => folder.id === id)) return false;
+/** `value` is false for a built-in folder, which cannot be deleted at all. */
+export async function deleteMediaFolder(id: string): Promise<WriteResult<boolean>> {
+  if (defaultMediaFolders.some((folder) => folder.id === id)) {
+    return { value: false, persisted: false };
+  }
   const folders = loadMediaFolders().filter((folder) => folder.id !== id);
-  saveMediaFolders(folders);
-  return true;
+  const { persisted } = await saveMediaFolders(folders);
+  return { value: true, persisted };
 }
 
 export function getMediaFolderById(id: string): MediaFolder | undefined {

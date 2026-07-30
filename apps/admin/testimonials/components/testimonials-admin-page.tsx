@@ -12,7 +12,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,
@@ -162,20 +162,21 @@ export function TestimonialsAdminPage() {
     setFormOpen(true);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    const count = deleteTestimonials(deleteTarget.ids);
+    const { value: count, persisted } = await deleteTestimonials(deleteTarget.ids);
     refresh();
     setSelectedIds((prev) => prev.filter((id) => !deleteTarget.ids.includes(id)));
-    toast.success(`${count} testimonial${count === 1 ? "" : "s"} deleted`);
     setDeleteTarget(null);
+    reportWrite(persisted, `${count} testimonial${count === 1 ? "" : "s"} deleted`);
   }
 
-  function applyBulkStatus(status: Testimonial["status"]) {
+  async function applyBulkStatus(status: Testimonial["status"]) {
     if (selectedIds.length === 0) return;
-    bulkUpdateTestimonialStatus(selectedIds, status);
+    const { persisted } = await bulkUpdateTestimonialStatus(selectedIds, status);
     refresh();
-    toast.success(
+    reportWrite(
+      persisted,
       status === "published"
         ? "Selected testimonials published"
         : status === "draft"

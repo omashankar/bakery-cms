@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Link2, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,7 +39,12 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
     setIsUploading(false);
   }
 
-  function createFromUrl(imageUrl: string, name?: string, size = 220_000, publicId?: string) {
+  async function createFromUrl(
+    imageUrl: string,
+    name?: string,
+    size = 220_000,
+    publicId?: string
+  ) {
     const trimmed = imageUrl.trim();
     if (!trimmed) {
       toast.error("Enter an image URL");
@@ -51,7 +57,7 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
       return;
     }
 
-    const file = addMediaFile({
+    const { value: file, persisted } = await addMediaFile({
       name: name ?? fileNameFromUrl(normalizedUrl),
       url: normalizedUrl,
       type: "image",
@@ -64,9 +70,9 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
     });
 
     onUploaded(file);
-    toast.success("Image added to media library");
     onOpenChange(false);
     reset();
+    reportWrite(persisted, "Image added to media library");
   }
 
   function handleFiles(fileList: FileList | null) {
@@ -91,9 +97,9 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
         // Upload to Cloudinary when configured; otherwise fall back to the data URI.
         const asset = await uploadMediaRequest(dataUrl);
         if (asset) {
-          createFromUrl(asset.url, file.name, asset.bytes ?? file.size, asset.publicId);
+          await createFromUrl(asset.url, file.name, asset.bytes ?? file.size, asset.publicId);
         } else {
-          createFromUrl(dataUrl, file.name, file.size);
+          await createFromUrl(dataUrl, file.name, file.size);
         }
       } finally {
         setIsUploading(false);
@@ -171,7 +177,7 @@ export function MediaUploadDialog({ open, onOpenChange, onUploaded }: MediaUploa
               variant="outline"
               className="shrink-0"
               disabled={isUploading}
-              onClick={() => createFromUrl(url)}
+              onClick={() => void createFromUrl(url)}
             >
               <Link2 className="size-4" />
               Add

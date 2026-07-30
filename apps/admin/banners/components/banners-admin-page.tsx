@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,
@@ -190,20 +191,21 @@ export function BannersAdminPage() {
     setFormOpen(true);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    const count = deleteBanners(deleteTarget.ids);
+    const { value: count, persisted } = await deleteBanners(deleteTarget.ids);
     refresh();
     setSelectedIds((prev) => prev.filter((id) => !deleteTarget.ids.includes(id)));
-    toast.success(`Deleted ${count} banner${count === 1 ? "" : "s"}`);
     setDeleteTarget(null);
+    reportWrite(persisted, `Deleted ${count} banner${count === 1 ? "" : "s"}`);
   }
 
-  function applyBulkActive(isActive: boolean) {
+  async function applyBulkActive(isActive: boolean) {
     if (selectedIds.length === 0) return;
-    const count = bulkSetBannerActive(selectedIds, isActive);
+    const { value: count, persisted } = await bulkSetBannerActive(selectedIds, isActive);
     refresh();
-    toast.success(
+    reportWrite(
+      persisted,
       isActive
         ? `Activated ${count} banner${count === 1 ? "" : "s"}`
         : `Deactivated ${count} banner${count === 1 ? "" : "s"}`

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Columns3, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,7 +144,7 @@ export function FooterAdminPage() {
     toast.message("Link removed");
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (settings.columns.some((col) => !col.title.trim())) {
       toast.error("Every column needs a title");
       return;
@@ -156,10 +157,11 @@ export function FooterAdminPage() {
       toast.error("Every footer link needs a label and URL");
       return;
     }
-    const next = saveFooterSettings(settings);
+    const { value: next, persisted } = await saveFooterSettings(settings);
     setSettings(next);
-    setSaved(next);
-    toast.success("Footer settings saved");
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, so adopting a rejected value removes the retry.
+    if (reportWrite(persisted, "Footer settings saved")) setSaved(next);
   }
 
   function handleDiscard() {
@@ -167,11 +169,10 @@ export function FooterAdminPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const next = resetFooterSettings();
+  async function handleReset() {
+    const { value: next, persisted } = await resetFooterSettings();
     setSettings(next);
-    setSaved(next);
-    toast.success("Footer reset to defaults");
+    if (reportWrite(persisted, "Footer reset to defaults")) setSaved(next);
   }
 
   return (

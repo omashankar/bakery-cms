@@ -47,13 +47,14 @@ function readStore(): GatewayStore {
   }
 }
 
-function writeStore(store: GatewayStore) {
-  if (typeof window === "undefined") return;
+async function writeStore(store: GatewayStore): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   localStorage.setItem(STORE_KEY, JSON.stringify(store));
   // writeStore is only reached via genuine admin mutations (never a seed/load
   // path), so dual-writing to the server here cannot clobber with defaults.
-  replacePaymentGatewaysRequest(store);
+  const persisted = await replacePaymentGatewaysRequest(store);
   window.dispatchEvent(new Event(GATEWAYS_UPDATED_EVENT));
+  return persisted;
 }
 
 /** Hydration: apply the server's gateway runtime store locally (no re-push). */
@@ -80,37 +81,41 @@ export function getGatewayRuntime(id: string): GatewayRuntime {
   };
 }
 
-export function setGatewayEnabled(id: string, enabled: boolean) {
+/** Whether the SERVER took it. Which gateway is on decides how customers pay. */
+export async function setGatewayEnabled(id: string, enabled: boolean): Promise<boolean> {
   if (CORE.has(id)) {
     const commerce = getCommerceSettings();
-    saveCommerceSettings({
+    const { persisted } = await saveCommerceSettings({
       ...commerce,
       paymentMethods: { ...commerce.paymentMethods, [id]: enabled },
     });
     window.dispatchEvent(new Event(GATEWAYS_UPDATED_EVENT));
-    return;
+    return persisted;
   }
   const store = readStore();
   store[id] = { ...store[id], enabled };
-  writeStore(store);
+  return writeStore(store);
 }
 
-export function setGatewayMode(id: string, mode: GatewayMode) {
+export function setGatewayMode(id: string, mode: GatewayMode): Promise<boolean> {
   const store = readStore();
   store[id] = { ...store[id], mode };
-  writeStore(store);
+  return writeStore(store);
 }
 
-export function setGatewayPriority(id: string, priority: number) {
+export function setGatewayPriority(id: string, priority: number): Promise<boolean> {
   const store = readStore();
   store[id] = { ...store[id], priority };
-  writeStore(store);
+  return writeStore(store);
 }
 
-export function saveGatewayCredentials(id: string, credentials: Record<string, string>) {
+export function saveGatewayCredentials(
+  id: string,
+  credentials: Record<string, string>
+): Promise<boolean> {
   const store = readStore();
   store[id] = { ...store[id], credentials };
-  writeStore(store);
+  return writeStore(store);
 }
 
 export type ConnectionStatus = "connected" | "configured" | "not_configured" | "ready";

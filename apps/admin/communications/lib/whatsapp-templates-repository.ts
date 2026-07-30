@@ -1,6 +1,7 @@
 import type { WhatsAppTemplateFormData, WhatsAppTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "./template-render";
 import { replaceWhatsAppTemplatesRequest } from "./communications-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-whatsapp-templates";
 const STORAGE_VERSION_KEY = "bakery-cms-whatsapp-templates-version";
@@ -102,10 +103,10 @@ function writeTemplates(templates: WhatsAppTemplateRecord[]): void {
   emitUpdated();
 }
 
-/** Local write + durable server replace-all. Used by admin mutations only. */
-function persistAndSync(templates: WhatsAppTemplateRecord[]): void {
+/** Local write first, then the server, reporting what the server did. */
+async function persistAndSync(templates: WhatsAppTemplateRecord[]): Promise<boolean> {
   writeTemplates(templates);
-  replaceWhatsAppTemplatesRequest(templates);
+  return replaceWhatsAppTemplatesRequest(templates);
 }
 
 /** Hydration: write the server's templates into the local cache (no re-push). */
@@ -141,13 +142,13 @@ export function getWhatsAppTemplateById(id: string): WhatsAppTemplateRecord | nu
   return loadWhatsAppTemplates().find((template) => template.id === id) ?? null;
 }
 
-export function saveWhatsAppTemplate(
+export async function saveWhatsAppTemplate(
   id: string,
   data: WhatsAppTemplateFormData
-): WhatsAppTemplateRecord | null {
+): Promise<WriteResult<WhatsAppTemplateRecord | null>> {
   const templates = loadWhatsAppTemplates();
   const index = templates.findIndex((template) => template.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: WhatsAppTemplateRecord = normalizeTemplate({
     ...templates[index],
@@ -156,11 +157,12 @@ export function saveWhatsAppTemplate(
     updatedAt: nowIso(),
   });
   templates[index] = updated;
-  persistAndSync(templates);
-  return updated;
+  return { value: updated, persisted: await persistAndSync(templates) };
 }
 
-export function createWhatsAppTemplate(data: WhatsAppTemplateFormData): WhatsAppTemplateRecord {
+export async function createWhatsAppTemplate(
+  data: WhatsAppTemplateFormData
+): Promise<WriteResult<WhatsAppTemplateRecord>> {
   const templates = loadWhatsAppTemplates();
   const timestamp = nowIso();
   const template = normalizeTemplate({
@@ -169,21 +171,20 @@ export function createWhatsAppTemplate(data: WhatsAppTemplateFormData): WhatsApp
     createdAt: timestamp,
     updatedAt: timestamp,
   });
-  persistAndSync([template, ...templates]);
-  return template;
+  return { value: template, persisted: await persistAndSync([template, ...templates]) };
 }
 
-export function deleteWhatsAppTemplate(id: string): boolean {
+/** `value` is false when no such template existed, so nothing was sent. */
+export async function deleteWhatsAppTemplate(id: string): Promise<WriteResult<boolean>> {
   const templates = loadWhatsAppTemplates();
   const next = templates.filter((template) => template.id !== id);
-  if (next.length === templates.length) return false;
-  persistAndSync(next);
-  return true;
+  if (next.length === templates.length) return { value: false, persisted: false };
+  return { value: true, persisted: await persistAndSync(next) };
 }
 
-export function resetWhatsAppTemplates(): WhatsAppTemplateRecord[] {
+export async function resetWhatsAppTemplates(): Promise<WriteResult<WhatsAppTemplateRecord[]>> {
   const seeded = seedWhatsAppTemplates();
-  persistAndSync(seeded);
+  const persisted = await persistAndSync(seeded);
   localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-  return seeded;
+  return { value: seeded, persisted };
 }

@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DeliveryZoneFormDialog } from "@/apps/admin/commerce/components/delivery-zone-form-dialog";
 import { formatZoneDeliveryTime } from "@/features/commerce/lib/delivery-zone-utils";
@@ -153,19 +154,19 @@ export function DeliveryZonesAdminPage() {
     setFormOpen(true);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (selectedIds.length === 0) return;
-    const count = deleteDeliveryZones(selectedIds);
+    const { value: count, persisted } = await deleteDeliveryZones(selectedIds);
     setSelectedIds([]);
     setZones(loadDeliveryZones());
-    toast.success(`Deleted ${count} zone${count === 1 ? "" : "s"}`);
+    reportWrite(persisted, `Deleted ${count} zone${count === 1 ? "" : "s"}`);
   }
 
-  function handleReset() {
-    resetDeliveryZones();
+  async function handleReset() {
+    const { persisted } = await resetDeliveryZones();
     setSelectedIds([]);
     setZones(loadDeliveryZones());
-    toast.success("Delivery zones reset to defaults");
+    reportWrite(persisted, "Delivery zones reset to defaults");
   }
 
   function handleExport() {
@@ -189,7 +190,11 @@ export function DeliveryZonesAdminPage() {
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={handleReset}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => void handleReset()}
+            >
               <RotateCcw className="size-4" />
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset demo</span>
@@ -382,8 +387,15 @@ export function DeliveryZonesAdminPage() {
                         <Switch
                           checked={zone.isActive}
                           onCheckedChange={() => {
-                            toggleDeliveryZoneActive(zone.id);
-                            setZones(loadDeliveryZones());
+                            void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
+                              setZones(loadDeliveryZones());
+                              // A zone active on the server but shown inactive
+                              // here decides whether the shop delivers there.
+                              reportWrite(
+                                persisted,
+                                zone.isActive ? "Zone deactivated" : "Zone activated"
+                              );
+                            });
                           }}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
@@ -429,8 +441,15 @@ export function DeliveryZonesAdminPage() {
                         <Switch
                           checked={zone.isActive}
                           onCheckedChange={() => {
-                            toggleDeliveryZoneActive(zone.id);
-                            setZones(loadDeliveryZones());
+                            void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
+                              setZones(loadDeliveryZones());
+                              // A zone active on the server but shown inactive
+                              // here decides whether the shop delivers there.
+                              reportWrite(
+                                persisted,
+                                zone.isActive ? "Zone deactivated" : "Zone activated"
+                              );
+                            });
                           }}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />

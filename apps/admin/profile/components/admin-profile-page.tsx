@@ -93,9 +93,13 @@ export function AdminProfilePage() {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 500));
 
-    if (!saveAdminProfile(form)) {
+    // Awaited, not just truthy-checked: this returns a Promise now, and a bare
+    // `if (!promise)` is always false — the guard would be dead.
+    if (!(await saveAdminProfile(form))) {
       setSaving(false);
-      toast.error("Could not save — the photo may be too large for browser storage");
+      toast.error("Profile was not saved", {
+        description: "The server rejected it, or the photo is too large for browser storage.",
+      });
       return;
     }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
@@ -124,7 +125,7 @@ export function BannerFormDialog({
     onOpenChange(false);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.title.trim() || !form.image.trim()) {
       toast.error("Title and image are required");
       return;
@@ -141,11 +142,11 @@ export function BannerFormDialog({
       isActive: form.isActive,
     };
     if (isEdit && bannerId) {
-      updateBanner(bannerId, payload);
-      toast.success("Banner updated");
+      const { persisted } = await updateBanner(bannerId, payload);
+      reportWrite(persisted, "Banner updated");
     } else {
-      createBanner(payload);
-      toast.success("Banner created");
+      const { persisted } = await createBanner(payload);
+      reportWrite(persisted, "Banner created");
     }
     onSaved();
     onOpenChange(false);
@@ -326,7 +327,7 @@ export function BannerFormDialog({
             <Button
               variant="bakery"
               disabled={isEdit && !isDirty}
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
             >
               {isEdit ? "Save changes" : "Create banner"}
             </Button>

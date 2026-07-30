@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,7 +110,7 @@ export function HeaderAdminPage() {
     toast.message("Navigation link removed");
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!settings.logoLetter.trim()) {
       toast.error("Logo letter is required");
       return;
@@ -118,10 +119,11 @@ export function HeaderAdminPage() {
       toast.error("Every nav link needs a label and URL");
       return;
     }
-    const next = saveHeaderSettings(settings);
+    const { value: next, persisted } = await saveHeaderSettings(settings);
     setSettings(next);
-    setSaved(next);
-    toast.success("Header settings saved");
+    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
+    // Save button enabled, so adopting a rejected value removes the retry.
+    if (reportWrite(persisted, "Header settings saved")) setSaved(next);
   }
 
   function handleDiscard() {
@@ -129,11 +131,10 @@ export function HeaderAdminPage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const next = resetHeaderSettings();
+  async function handleReset() {
+    const { value: next, persisted } = await resetHeaderSettings();
     setSettings(next);
-    setSaved(next);
-    toast.success("Header reset to defaults");
+    if (reportWrite(persisted, "Header reset to defaults")) setSaved(next);
   }
 
   return (

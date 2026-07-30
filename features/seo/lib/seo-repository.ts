@@ -1,6 +1,7 @@
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { replaceSeoRequest } from "@/features/site-layout/lib/site-layout-api";
+import type { WriteResult } from "@/lib/write-result";
 import type { GlobalSeoSettings, SeoRouteEntry, SeoStore } from "@/types/seo";
 
 const STORAGE_KEY = "bakery-cms-seo";
@@ -227,13 +228,14 @@ export function persistServerSeo(store: SeoStore): void {
   persist(store);
 }
 
-export function saveGlobalSeo(global: GlobalSeoSettings): GlobalSeoSettings {
+export async function saveGlobalSeo(
+  global: GlobalSeoSettings
+): Promise<WriteResult<GlobalSeoSettings>> {
   const store = loadSeoStore();
   const next = { ...store, global };
   persist(next);
   serverStore = next;
-  replaceSeoRequest(next);
-  return global;
+  return { value: global, persisted: await replaceSeoRequest(next) };
 }
 
 export function getSeoRoutes(): SeoRouteEntry[] {
@@ -244,13 +246,13 @@ export function getRouteSeo(routeKey: string): SeoRouteEntry | null {
   return getSeoRoutes().find((entry) => entry.routeKey === routeKey) ?? null;
 }
 
-export function updateSeoRoute(
+export async function updateSeoRoute(
   id: string,
   patch: Partial<Omit<SeoRouteEntry, "id" | "routeKey" | "path" | "label">>
-): SeoRouteEntry | null {
+): Promise<WriteResult<SeoRouteEntry | null>> {
   const store = loadSeoStore();
   const index = store.routes.findIndex((entry) => entry.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: SeoRouteEntry = {
     ...store.routes[index],
@@ -260,26 +262,24 @@ export function updateSeoRoute(
   store.routes[index] = updated;
   persist(store);
   serverStore = store;
-  replaceSeoRequest(store);
-  return updated;
+  return { value: updated, persisted: await replaceSeoRequest(store) };
 }
 
-export function resetSeoStore(): SeoStore {
+export async function resetSeoStore(): Promise<WriteResult<SeoStore>> {
   const seeded = seedStore();
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY);
     persist(seeded);
   }
   serverStore = seeded;
-  replaceSeoRequest(seeded);
-  return seeded;
+  return { value: seeded, persisted: await replaceSeoRequest(seeded) };
 }
 
-export function upsertSeoRouteForPath(
+export async function upsertSeoRouteForPath(
   path: string,
   label: string,
   patch: Partial<Omit<SeoRouteEntry, "id" | "routeKey" | "path" | "label">>
-): SeoRouteEntry {
+): Promise<WriteResult<SeoRouteEntry>> {
   const store = loadSeoStore();
   const routeKey = `cms-page-${path.replace(/[^\w-]+/g, "-")}`;
   const index = store.routes.findIndex((entry) => entry.path === path);
@@ -303,8 +303,7 @@ export function upsertSeoRouteForPath(
     store.routes.push(merged);
     persist(store);
     serverStore = store;
-    replaceSeoRequest(store);
-    return merged;
+    return { value: merged, persisted: await replaceSeoRequest(store) };
   }
 
   const updated: SeoRouteEntry = {
@@ -316,6 +315,5 @@ export function upsertSeoRouteForPath(
   store.routes[index] = updated;
   persist(store);
   serverStore = store;
-  replaceSeoRequest(store);
-  return updated;
+  return { value: updated, persisted: await replaceSeoRequest(store) };
 }

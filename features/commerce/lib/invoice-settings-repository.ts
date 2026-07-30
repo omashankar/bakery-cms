@@ -4,6 +4,7 @@ import {
   mergeInvoiceSettings,
 } from "./invoice-defaults";
 import { saveInvoiceSettingsRequest } from "./invoice-settings-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-invoice-settings";
 const STORAGE_VERSION_KEY = "bakery-cms-invoice-settings-version";
@@ -46,15 +47,16 @@ export function loadInvoiceSettings(): InvoiceSettings {
   }
 }
 
-export function saveInvoiceSettings(data: InvoiceSettingsFormData): InvoiceSettings {
+export async function saveInvoiceSettings(
+  data: InvoiceSettingsFormData
+): Promise<WriteResult<InvoiceSettings>> {
   const next: InvoiceSettings = {
     ...mergeInvoiceSettings(data),
     updatedAt: nowIso(),
   };
   writeSettings(next);
   localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-  saveInvoiceSettingsRequest(data);
-  return next;
+  return { value: next, persisted: await saveInvoiceSettingsRequest(data) };
 }
 
 /** Hydration: write the server's copy to the local cache without re-pushing. */

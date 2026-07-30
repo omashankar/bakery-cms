@@ -75,7 +75,7 @@ interface ServerBackupSection {
   /** Read the durable server value (null when unauthenticated/unreachable). */
   fetch: () => Promise<unknown | null>;
   /** Push a parsed value back to the server (best-effort, never throws). */
-  push: (value: unknown) => void;
+  push: (value: unknown) => Promise<boolean>;
   /**
    * Server value is a partial slice (settings/catalog) — overlay it onto the
    * local value for export so sibling fields (activity, updatedAt) survive.
@@ -83,23 +83,29 @@ interface ServerBackupSection {
   mergeForExport?: (server: unknown, localParsed: unknown) => unknown;
 }
 
-/** Adapts a typed replace-request into the section's `(value: unknown) => void`. */
-function replacer<T>(fn: (value: T) => void): (value: unknown) => void {
+/** Adapts a typed replace-request into the section's untyped push signature. */
+function replacer<T>(fn: (value: T) => Promise<boolean>): (value: unknown) => Promise<boolean> {
   return (value) => fn(value as T);
 }
 
-function pushSettingsSections(value: unknown): void {
+async function pushSettingsSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
-  for (const section of SERVER_SECTIONS) {
-    if (record[section] !== undefined) void pushSection(section, record[section]);
-  }
+  const results = await Promise.all(
+    SERVER_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
+      pushSection(section, record[section])
+    )
+  );
+  return results.every(Boolean);
 }
 
-function pushCatalogSections(value: unknown): void {
+async function pushCatalogSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
-  for (const section of CATALOG_SECTIONS) {
-    if (record[section] !== undefined) void pushCatalogSection(section, record[section]);
-  }
+  const results = await Promise.all(
+    CATALOG_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
+      pushCatalogSection(section, record[section])
+    )
+  );
+  return results.every(Boolean);
 }
 
 /**
@@ -196,8 +202,10 @@ export const BROWSER_ONLY_NOTE =
 export interface RestoreResult {
   /** localStorage keys written. */
   localCount: number;
-  /** Titles of the slices pushed to the server. */
+  /** Titles of the slices the server ACCEPTED. */
   serverSections: string[];
+  /** Titles the server refused — restored in this browser only. */
+  failedSections: string[];
 }
 
 function nowIso(): string {
@@ -303,6 +311,7 @@ export async function restoreBackupToServer(
   const localCount = importLocalStorageBackup(data);
 
   const serverSections: string[] = [];
+  const failedSections: string[] = [];
   for (const section of SERVER_BACKUP_SECTIONS) {
     const raw = data[section.key];
     if (raw == null) continue;
@@ -314,11 +323,14 @@ export async function restoreBackupToServer(
       continue;
     }
 
-    section.push(parsed);
-    serverSections.push(section.title);
+    // Only count a section as restored once the SERVER has it. A restore is
+    // exactly when an admin is least able to check by eye, and listing a section
+    // that never landed is how a backup gets trusted that never came back.
+    if (await section.push(parsed)) serverSections.push(section.title);
+    else failedSections.push(section.title);
   }
 
-  return { localCount, serverSections };
+  return { localCount, serverSections, failedSections };
 }
 
 export async function restoreBackupSnapshotToServer(

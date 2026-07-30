@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,28 +104,28 @@ export function CatalogFormDialog({
     }
   }, [open, itemId, tab]);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (tab === "weights") {
       if (!name.trim()) {
         toast.error("Label is required");
         return;
       }
       if (isEdit && itemId) {
-        updateWeightOption(itemId, {
+        const { persisted } = await updateWeightOption(itemId, {
           label: name.trim(),
           modifier,
           serves: serves.trim(),
           sortOrder,
         });
-        toast.success("Weight option updated");
+        reportWrite(persisted, "Weight option updated");
       } else {
-        createWeightOption({
+        const { persisted } = await createWeightOption({
           label: name.trim(),
           modifier,
           serves: serves.trim(),
           sortOrder,
         });
-        toast.success("Weight option created");
+        reportWrite(persisted, "Weight option created");
       }
       onSaved();
       onOpenChange(false);
@@ -147,11 +148,11 @@ export function CatalogFormDialog({
         cakeCount,
       };
       if (isEdit && itemId) {
-        updateCategory(itemId, payload);
-        toast.success("Category updated");
+        const { persisted } = await updateCategory(itemId, payload);
+        reportWrite(persisted, "Category updated");
       } else {
-        createCategory(payload);
-        toast.success("Category created");
+        const { persisted } = await createCategory(payload);
+        reportWrite(persisted, "Category created");
       }
     } else if (tab === "flavours") {
       const payload: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt"> = {
@@ -159,11 +160,11 @@ export function CatalogFormDialog({
         slug: finalSlug,
       };
       if (isEdit && itemId) {
-        updateFlavour(itemId, payload);
-        toast.success("Flavour updated");
+        const { persisted } = await updateFlavour(itemId, payload);
+        reportWrite(persisted, "Flavour updated");
       } else {
-        createFlavour(payload);
-        toast.success("Flavour created");
+        const { persisted } = await createFlavour(payload);
+        reportWrite(persisted, "Flavour created");
       }
     } else {
       const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
@@ -171,11 +172,11 @@ export function CatalogFormDialog({
         slug: finalSlug,
       };
       if (isEdit && itemId) {
-        updateOccasion(itemId, payload);
-        toast.success("Occasion updated");
+        const { persisted } = await updateOccasion(itemId, payload);
+        reportWrite(persisted, "Occasion updated");
       } else {
-        createOccasion(payload);
-        toast.success("Occasion created");
+        const { persisted } = await createOccasion(payload);
+        reportWrite(persisted, "Occasion created");
       }
     }
 
@@ -290,7 +291,7 @@ export function CatalogFormDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" onClick={handleSubmit}>
+          <Button variant="bakery" onClick={() => void handleSubmit()}>
             {isEdit ? "Save changes" : "Create"}
           </Button>
         </DialogFooter>
