@@ -4,6 +4,7 @@
  * Never throws; every write reports whether the server took it. The SEED is never dual-written; only admin
  * mutations are. These endpoints are admin-guarded.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type {
   EmailTemplateRecord,
   WhatsAppTemplateRecord,
@@ -49,6 +50,19 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
+/** Settled by this module's `*ServerSync` once the server's copy is loaded. */
+export const communicationsHydration = createHydrationGate();
+
+/**
+ * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
+ * stops a browser that never loaded the server's copy from overwriting it — see
+ * `createHydrationGate`.
+ */
+async function guardedPut(path: string, body: unknown): Promise<boolean> {
+  if (!(await communicationsHydration.waitForSettled())) return false;
+  return putJson(path, body);
+}
+
 /**
  * Awaited variant that reports whether the server actually accepted the write.
  *
@@ -76,11 +90,11 @@ const NOTIFICATION_SETTINGS_PATH = "/api/communications/notification-settings";
 
 export const fetchEmailTemplates = () => getJson<EmailTemplateRecord[]>(EMAIL_PATH);
 export const replaceEmailTemplatesRequest = (items: EmailTemplateRecord[]) =>
-  putJson(EMAIL_PATH, items);
+  guardedPut(EMAIL_PATH, items);
 
 export const fetchWhatsAppTemplates = () => getJson<WhatsAppTemplateRecord[]>(WHATSAPP_PATH);
 export const replaceWhatsAppTemplatesRequest = (items: WhatsAppTemplateRecord[]) =>
-  putJson(WHATSAPP_PATH, items);
+  guardedPut(WHATSAPP_PATH, items);
 
 export const fetchNotificationSettings = () =>
   getJson<NotificationSettings>(NOTIFICATION_SETTINGS_PATH);

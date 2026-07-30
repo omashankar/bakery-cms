@@ -3,6 +3,7 @@
  * replace-all dual-write + hydrate. Never throws; every write reports whether the server took it. The SEED is
  * never dual-written (that would clobber the server); only real mutations are.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { StoredCoupon } from "./coupons-repository";
 import type { DeliveryZone } from "@/types/delivery";
 
@@ -45,8 +46,21 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
+/** Settled by this module's `*ServerSync` once the server's copy is loaded. */
+export const commerceHydration = createHydrationGate();
+
+/**
+ * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
+ * stops a browser that never loaded the server's copy from overwriting it — see
+ * `createHydrationGate`.
+ */
+async function guardedPut(path: string, body: unknown): Promise<boolean> {
+  if (!(await commerceHydration.waitForSettled())) return false;
+  return putJson(path, body);
+}
+
 export const fetchCoupons = () => getJson<StoredCoupon[]>("/api/coupons");
-export const replaceCouponsRequest = (coupons: StoredCoupon[]) => putJson("/api/coupons", coupons);
+export const replaceCouponsRequest = (coupons: StoredCoupon[]) => guardedPut("/api/coupons", coupons);
 
 export const fetchZones = () => getJson<DeliveryZone[]>("/api/delivery-zones");
-export const replaceZonesRequest = (zones: DeliveryZone[]) => putJson("/api/delivery-zones", zones);
+export const replaceZonesRequest = (zones: DeliveryZone[]) => guardedPut("/api/delivery-zones", zones);

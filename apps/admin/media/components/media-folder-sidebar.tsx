@@ -60,7 +60,7 @@ export function MediaFolderSidebar({
             onChange={(event) => setName(event.target.value)}
             placeholder="Folder name"
             onKeyDown={(event) => {
-              if (event.key === "Enter") handleCreate();
+              if (event.key === "Enter") void handleCreate();
             }}
           />
           <div className="flex gap-2">

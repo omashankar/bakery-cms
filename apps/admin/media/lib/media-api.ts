@@ -2,6 +2,7 @@
  * Client-side media API. Files + folders replace-all dual-write + hydrate;
  * uploads go through Cloudinary (server-side). Never throws; every write reports whether the server took it.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { MediaFile, MediaFolder } from "@/types/media";
 
 interface Envelope<T> {
@@ -43,12 +44,25 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
+/** Settled by this module's `*ServerSync` once the server's copy is loaded. */
+export const mediaHydration = createHydrationGate();
+
+/**
+ * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
+ * stops a browser that never loaded the server's copy from overwriting it — see
+ * `createHydrationGate`.
+ */
+async function guardedPut(path: string, body: unknown): Promise<boolean> {
+  if (!(await mediaHydration.waitForSettled())) return false;
+  return putJson(path, body);
+}
+
 export const fetchMediaFiles = () => getJson<MediaFile[]>("/api/media");
-export const replaceMediaFilesRequest = (files: MediaFile[]) => putJson("/api/media", files);
+export const replaceMediaFilesRequest = (files: MediaFile[]) => guardedPut("/api/media", files);
 
 export const fetchMediaFolders = () => getJson<MediaFolder[]>("/api/media/folders");
 export const replaceMediaFoldersRequest = (folders: MediaFolder[]) =>
-  putJson("/api/media/folders", folders);
+  guardedPut("/api/media/folders", folders);
 
 export interface UploadedAsset {
   url: string;

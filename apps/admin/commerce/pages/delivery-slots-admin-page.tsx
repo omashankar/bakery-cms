@@ -43,7 +43,8 @@ export function DeliverySlotsAdminPage() {
     const cleanedSlots = settings.deliveryTimeSlots
       .map((slot) => slot.trim())
       .filter(Boolean);
-    save("Delivery slots saved", {
+    // `save` reports the server outcome itself.
+    void save("Delivery slots saved", {
       ...settings,
       deliveryTimeSlots:
         cleanedSlots.length > 0 ? cleanedSlots : ["10:00 AM – 12:00 PM"],

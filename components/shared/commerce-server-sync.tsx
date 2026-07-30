@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchCoupons, fetchZones } from "@/features/commerce/lib/commerce-api";
+import { commerceHydration, fetchCoupons, fetchZones } from "@/features/commerce/lib/commerce-api";
 import { persistServerCoupons } from "@/features/commerce/lib/coupons-repository";
 import { persistServerZones } from "@/features/commerce/lib/delivery-zones-repository";
 
@@ -21,6 +21,10 @@ export function CommerceServerSync() {
       if (cancelled) return;
       if (coupons) persistServerCoupons(coupons);
       if (zones) persistServerZones(zones);
+
+      // Only NOW may a replace-all mutation send the local list — before this,
+      // that list is whatever this browser happened to hold.
+      if (coupons && zones) commerceHydration.markSettled();
     })();
 
     return () => {

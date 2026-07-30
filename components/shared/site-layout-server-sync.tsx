@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import {
+  siteLayoutHydration,
   fetchHeaderSettings,
   fetchFooterSettings,
   fetchAppearanceSettings,
@@ -31,6 +32,10 @@ export function SiteLayoutServerSync() {
       if (header) persistServerHeader(header);
       if (footer) persistServerFooter(footer);
       if (appearance) persistServerAppearance(appearance);
+
+      // Only NOW may a replace-all mutation send the local list — before this,
+      // that list is whatever this browser happened to hold.
+      if (header && footer && appearance) siteLayoutHydration.markSettled();
     })();
 
     return () => {

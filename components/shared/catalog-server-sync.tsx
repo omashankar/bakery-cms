@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchCatalog } from "@/features/catalog/lib/catalog-api";
+import { catalogHydration, fetchCatalog } from "@/features/catalog/lib/catalog-api";
 import {
   loadCatalogStore,
   saveCatalogStore,
@@ -33,6 +33,10 @@ export function CatalogServerSync() {
         occasions: server.occasions ?? current.occasions,
         weights: server.weights ?? current.weights,
       });
+
+      // Only NOW may a replace-all mutation send the local taxonomy — before
+      // this, it is whatever this browser happened to hold.
+      catalogHydration.markSettled();
     })();
 
     return () => {

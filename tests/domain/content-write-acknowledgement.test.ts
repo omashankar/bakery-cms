@@ -46,6 +46,13 @@ import {
 } from "@/apps/admin/communications/lib/email-templates-repository";
 import { saveCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
 import { saveAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
+import { contentHydration } from "@/features/content/lib/content-api";
+import { commerceHydration } from "@/features/commerce/lib/commerce-api";
+import { seoHydration, siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
+import { catalogHydration } from "@/features/catalog/lib/catalog-api";
+import { mediaHydration } from "@/apps/admin/media/lib/media-api";
+import { communicationsHydration } from "@/apps/admin/communications/lib/communications-api";
+import { createHydrationGate } from "@/lib/hydration-gate";
 
 /** Stub every dual-write endpoint with a fixed HTTP outcome. */
 function mockServer(ok: boolean, status = ok ? 200 : 500) {
@@ -58,8 +65,24 @@ function mockServer(ok: boolean, status = ok ? 200 : 500) {
   return fetchMock;
 }
 
+/**
+ * Stand in for the `*ServerSync` components, which open each store's hydration
+ * gate once the server's copy has been read into the local cache. Without this a
+ * replace-all write refuses to send — see the "hydration gate" block below.
+ */
+function markHydrated() {
+  contentHydration.markSettled();
+  commerceHydration.markSettled();
+  siteLayoutHydration.markSettled();
+  seoHydration.markSettled();
+  mediaHydration.markSettled();
+  communicationsHydration.markSettled();
+  catalogHydration.markSettled();
+}
+
 beforeEach(() => {
   localStorage.clear();
+  markHydrated();
 });
 
 afterEach(() => {
@@ -163,6 +186,50 @@ describe("writes that return a bare boolean", () => {
     await expect(
       saveAdminProfile({ fullName: "Asha", mobile: "", username: "asha", photoUrl: "" })
     ).resolves.toBe(false);
+  });
+});
+
+describe("the hydration gate", () => {
+  it("opens once, and stays open", async () => {
+    const gate = createHydrationGate();
+    expect(gate.hasSettled()).toBe(false);
+
+    gate.markSettled();
+    expect(gate.hasSettled()).toBe(true);
+    await expect(gate.waitForSettled()).resolves.toBe(true);
+
+    gate.markSettled();
+    expect(gate.hasSettled()).toBe(true);
+  });
+
+  it("releases everyone waiting when hydration lands", async () => {
+    const gate = createHydrationGate();
+    const waiters = [gate.waitForSettled(), gate.waitForSettled(), gate.waitForSettled()];
+
+    gate.markSettled();
+
+    await expect(Promise.all(waiters)).resolves.toEqual([true, true, true]);
+  });
+
+  it("gives up rather than let a replace-all send an unhydrated list", async () => {
+    const gate = createHydrationGate();
+
+    // The server never answered, so the local list is whatever this browser
+    // held — the demo seed on a fresh one. Sending it would overwrite every real
+    // banner the shop has, from one click, silently.
+    await expect(gate.waitForSettled(10)).resolves.toBe(false);
+  });
+
+  it("refuses the write itself while the store is unhydrated", async () => {
+    // A fresh gate for the content store cannot be injected, so this asserts the
+    // wiring the other way: with the gate closed, the request never goes out.
+    const fetchMock = mockServer(true);
+    const gate = createHydrationGate();
+
+    const wouldSend = await gate.waitForSettled(10);
+
+    expect(wouldSend).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

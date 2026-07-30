@@ -523,7 +523,10 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   /** The steps that must happen exactly once, and only once the server has it. */
   const commitPlacedOrder = (order: PlacedOrder) => {
     if (validCoupon) {
-      recordCouponUsage(validCoupon.code);
+      // Deliberately not awaited or reported: the customer cannot act on a
+      // failed usage counter, and holding up their confirmation for it would be
+      // worse than an undercount the shop can reconcile.
+      void recordCouponUsage(validCoupon.code);
     }
 
     clearCart();

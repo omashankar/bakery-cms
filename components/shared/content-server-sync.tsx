@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 
-import { fetchBanners, fetchTestimonials, fetchFaqs } from "@/features/content/lib/content-api";
+import {
+  contentHydration,
+  fetchBanners,
+  fetchTestimonials,
+  fetchFaqs,
+} from "@/features/content/lib/content-api";
 import { persistServerBanners } from "@/features/content/lib/banners-repository";
 import { persistServerTestimonials } from "@/features/content/lib/testimonials-repository";
 import { persistServerFaqs } from "@/features/content/lib/faq-repository";
@@ -27,6 +32,10 @@ export function ContentServerSync() {
       if (banners) persistServerBanners(banners);
       if (testimonials) persistServerTestimonials(testimonials);
       if (faqs) persistServerFaqs(faqs);
+
+      // Only NOW may a replace-all mutation send the local list — before this,
+      // that list is whatever this browser happened to hold.
+      if (banners && testimonials && faqs) contentHydration.markSettled();
     })();
 
     return () => {

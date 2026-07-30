@@ -186,7 +186,7 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
                 .split(",")
                 .map((tag) => tag.trim())
                 .filter(Boolean);
-              saveField({ tags });
+              void saveField({ tags });
             }}
           />
           {(current.tags ?? []).length > 0 ? (

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +112,7 @@ export function AppearancePage() {
     }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!hasValidAppearanceColors(settings)) {
       toast.error("Use valid hex colors (e.g. #6f4e37)");
       return;
@@ -126,10 +127,13 @@ export function AppearancePage() {
       preset: resolvePresetFromColors(settings),
     };
 
-    const saved = saveAppearanceSettings(normalized);
+    const { value: saved, persisted } = await saveAppearanceSettings(normalized);
     setSettings(saved);
-    setSavedSettings(saved);
-    toast.success("Appearance saved — storefront uses these colors (light only)");
+    // The storefront renders these colours from the SERVER copy, so only mark
+    // clean once it has them — otherwise Save greys out with nothing saved.
+    if (reportWrite(persisted, "Appearance saved — storefront uses these colors (light only)")) {
+      setSavedSettings(saved);
+    }
   }
 
   function handleDiscard() {
@@ -137,11 +141,10 @@ export function AppearancePage() {
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const reset = resetAppearanceSettings();
+  async function handleReset() {
+    const { value: reset, persisted } = await resetAppearanceSettings();
     setSettings(reset);
-    setSavedSettings(reset);
-    toast.success("Appearance reset to defaults");
+    if (reportWrite(persisted, "Appearance reset to defaults")) setSavedSettings(reset);
   }
 
   return (

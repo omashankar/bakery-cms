@@ -4,6 +4,7 @@
  * visitor is unauthenticated (backward compatibility during migration).
  */
 import type { CatalogStore } from "@/types/catalog";
+import { createHydrationGate } from "@/lib/hydration-gate";
 
 interface Envelope<T> {
   success: boolean;
@@ -25,8 +26,19 @@ export async function fetchCatalog(): Promise<Partial<CatalogStore> | null> {
   }
 }
 
-/** Push one section. Best-effort — never throws. */
+/** Settled by `CatalogServerSync` once the server's taxonomy is loaded. */
+export const catalogHydration = createHydrationGate();
+
+/**
+ * Push one section, whole. Never throws.
+ *
+ * Waits for hydration first: each section is a replace-all, so sending before
+ * the server's copy has been read would overwrite the real taxonomy with
+ * whatever this browser held — the demo seed on a fresh one.
+ */
 export async function pushCatalogSection(section: string, value: unknown): Promise<boolean> {
+  if (!(await catalogHydration.waitForSettled())) return false;
+
   try {
     const res = await fetch(`/api/catalog/${section}`, {
       method: "PUT",

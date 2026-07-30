@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import {
+  communicationsHydration,
   fetchEmailTemplates,
   fetchWhatsAppTemplates,
   fetchNotificationSettings,
@@ -32,6 +33,10 @@ export function useCommunicationsServerSync(): void {
       if (email) persistServerEmailTemplates(email);
       if (whatsapp) persistServerWhatsAppTemplates(whatsapp);
       if (settings) persistServerNotificationSettings(settings);
+
+      // Only NOW may a replace-all mutation send the local list — before this,
+      // that list is whatever this browser happened to hold.
+      if (email && whatsapp) communicationsHydration.markSettled();
     })();
 
     return () => {

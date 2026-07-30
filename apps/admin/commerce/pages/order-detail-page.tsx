@@ -60,7 +60,8 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     } else {
       // Not in the local cache yet (deep link, or placed on another device) —
       // read it straight from the server before deciding it doesn't exist.
-      fetchOrder(orderId).then((fetched) => {
+      // `fetchOrder` resolves null on any failure, so it cannot reject.
+      void fetchOrder(orderId).then((fetched) => {
         if (cancelled) return;
         if (fetched) {
           setOrder(fetched);

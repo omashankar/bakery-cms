@@ -498,8 +498,13 @@ export function BannersAdminPage() {
                             <Switch
                               checked={banner.isActive}
                               onCheckedChange={() => {
-                                toggleBannerActive(banner.id);
-                                refresh();
+                                void toggleBannerActive(banner.id).then(({ persisted }) => {
+                                  refresh();
+                                  reportWrite(
+                                    persisted,
+                                    banner.isActive ? "Banner hidden" : "Banner shown"
+                                  );
+                                });
                               }}
                               aria-label={`Toggle ${banner.title}`}
                             />
@@ -578,8 +583,13 @@ export function BannersAdminPage() {
                           <Switch
                             checked={banner.isActive}
                             onCheckedChange={() => {
-                              toggleBannerActive(banner.id);
-                              refresh();
+                              void toggleBannerActive(banner.id).then(({ persisted }) => {
+                                refresh();
+                                reportWrite(
+                                  persisted,
+                                  banner.isActive ? "Banner hidden" : "Banner shown"
+                                );
+                              });
                             }}
                             aria-label={`Toggle ${banner.title}`}
                           />

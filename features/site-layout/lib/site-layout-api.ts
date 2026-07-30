@@ -3,6 +3,7 @@
  * replace-all dual-write + hydrate. Never throws; every write reports whether the server took it. The SEED is
  * never dual-written; only admin mutations are. Reads are public.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { SeoStore } from "@/types/seo";
 import type { HeaderSettings, FooterSettings } from "@/types/site-layout";
 import type { AppearanceSettings } from "@/types/appearance";
@@ -46,17 +47,38 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
+/** Settled by `SiteLayoutServerSync` — header, footer, appearance. */
+export const siteLayoutHydration = createHydrationGate();
+
+/** Settled by `useSeoServerSync`, which loads the SEO store separately. */
+export const seoHydration = createHydrationGate();
+
+async function guardedSeoPut(path: string, body: unknown): Promise<boolean> {
+  if (!(await seoHydration.waitForSettled())) return false;
+  return putJson(path, body);
+}
+
+/**
+ * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
+ * stops a browser that never loaded the server's copy from overwriting it — see
+ * `createHydrationGate`.
+ */
+async function guardedPut(path: string, body: unknown): Promise<boolean> {
+  if (!(await siteLayoutHydration.waitForSettled())) return false;
+  return putJson(path, body);
+}
+
 const url = (key: string) => `/api/site-layout/${key}`;
 
 export const fetchSeoStore = () => getJson<SeoStore>(url("seo"));
-export const replaceSeoRequest = (store: SeoStore) => putJson(url("seo"), store);
+export const replaceSeoRequest = (store: SeoStore) => guardedSeoPut(url("seo"), store);
 
 export const fetchHeaderSettings = () => getJson<HeaderSettings>(url("header"));
-export const replaceHeaderRequest = (settings: HeaderSettings) => putJson(url("header"), settings);
+export const replaceHeaderRequest = (settings: HeaderSettings) => guardedPut(url("header"), settings);
 
 export const fetchFooterSettings = () => getJson<FooterSettings>(url("footer"));
-export const replaceFooterRequest = (settings: FooterSettings) => putJson(url("footer"), settings);
+export const replaceFooterRequest = (settings: FooterSettings) => guardedPut(url("footer"), settings);
 
 export const fetchAppearanceSettings = () => getJson<AppearanceSettings>(url("appearance"));
 export const replaceAppearanceRequest = (settings: AppearanceSettings) =>
-  putJson(url("appearance"), settings);
+  guardedPut(url("appearance"), settings);
