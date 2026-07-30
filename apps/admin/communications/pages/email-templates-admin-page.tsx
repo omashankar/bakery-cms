@@ -36,7 +36,7 @@ import {
   getEmailTemplateOverview,
   type EmailTemplateListFilters,
 } from "@/apps/admin/communications/lib/email-template-utils";
-import { mergeTemplateVariables } from "@/apps/admin/communications/lib/template-render";
+import { mergeTemplateVariables } from "@/lib/template-render";
 import { formatTemplateCategory } from "@/apps/admin/communications/lib/template-utils";
 import {
   FilterPanel,

@@ -1,5 +1,5 @@
 import type { EmailTemplateFormData, EmailTemplateRecord } from "@/types/communication";
-import { mergeTemplateVariables } from "./template-render";
+import { mergeTemplateVariables } from "@/lib/template-render";
 import { replaceEmailTemplatesRequest } from "./communications-api";
 import type { WriteResult } from "@/lib/write-result";
 
@@ -98,12 +98,15 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       id: "email-password-reset",
       slug: "password_reset",
       name: "Password reset",
-      description: "Account password reset link.",
+      description: "Account password reset code.",
       category: "system",
       subject: "Reset your {{store_name}} password",
-      previewText: "Use the secure link to reset your password.",
-      body: `Hi {{customer_name}},\n\nWe received a request to reset your password.\n\nReset link: {{reset_link}}\n\nIf you didn't request this, ignore this email.\n\n— {{store_name}} Support`,
-      variables: ["customer_name", "store_name", "reset_link"],
+      previewText: "Use the code below to reset your password.",
+      // The reset flow issues a one-time CODE, not a link. This copy asked for
+      // {{reset_link}}, which nothing ever supplied — so even once mail was
+      // wired, the code the customer needs would not have been in the email.
+      body: `Hi {{customer_name}},\n\nUse this code to reset your password:\n\n{{reset_code}}\n\nIt expires in {{expires_in}}. If you didn't request this, ignore this email — your password has not changed.\n\n— {{store_name}} Support`,
+      variables: ["customer_name", "store_name", "reset_code", "expires_in"],
       ...base,
     },
     {

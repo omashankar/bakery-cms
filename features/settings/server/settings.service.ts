@@ -1,5 +1,6 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
+import { resetMailTransport } from "@/lib/server/mail/transport";
 import {
   defaultAnalyticsSettings,
   defaultCommerceSettings,
@@ -95,6 +96,9 @@ export async function getLabels() {
 
 export async function updateSection(section: string, value: unknown, ctx: RequestCtx) {
   const doc = await repo.updateSection(section, value);
+  // The mail transport is cached across requests, so new credentials must not
+  // keep failing against the old ones.
+  if (section === "smtp") resetMailTransport();
   await writeAuditLog({
     action: `settings.update.${section}`,
     actorId: ctx.actorId ?? null,
@@ -109,6 +113,7 @@ export async function updateSection(section: string, value: unknown, ctx: Reques
 export async function resetSection(section: string, ctx: RequestCtx) {
   if (!(section in SECTION_DEFAULTS)) throw new NotFoundError("Unknown settings section");
   const doc = await repo.updateSection(section, SECTION_DEFAULTS[section]);
+  if (section === "smtp") resetMailTransport();
   await writeAuditLog({
     action: `settings.reset.${section}`,
     actorId: ctx.actorId ?? null,

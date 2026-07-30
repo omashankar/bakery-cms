@@ -1,5 +1,5 @@
 import type { WhatsAppTemplateFormData, WhatsAppTemplateRecord } from "@/types/communication";
-import { mergeTemplateVariables } from "./template-render";
+import { mergeTemplateVariables } from "@/lib/template-render";
 import { replaceWhatsAppTemplatesRequest } from "./communications-api";
 import type { WriteResult } from "@/lib/write-result";
 

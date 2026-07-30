@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
-import { renderTemplate } from "@/apps/admin/communications/lib/template-render";
+import { renderTemplate } from "@/lib/template-render";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

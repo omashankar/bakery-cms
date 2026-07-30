@@ -8,6 +8,12 @@ import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
 import type { CommerceSettings } from "@/types/settings";
 import type { RefundRecord } from "@/types/refund";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
+import {
+  publicBaseUrl,
+  sendTemplatedEmail,
+} from "@/features/communications/server/email.service";
+import { routes } from "@/constants/routes";
+import { formatCurrency } from "@/utils/format";
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
@@ -180,6 +186,34 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });
+
+  // Awaited, but never allowed to fail the placement: the order is already
+  // committed and paid for, so throwing here would report a successful order as
+  // failed and send the customer into the retry path for something that is
+  // already done. A missing confirmation email is an operator problem.
+  // An absolute URL, because an email is read outside the app where a relative
+  // path goes nowhere. Every variable the template declares is supplied here —
+  // an unsupplied one renders as the literal `{{invoice_url}}` in the customer's
+  // inbox, which is how this was caught.
+  const base = await publicBaseUrl();
+  const mail = await sendTemplatedEmail("order_confirmation", placed.address.email, {
+    customer_name: placed.address.fullName?.trim() || "there",
+    order_number: placed.orderNumber,
+    order_total: formatCurrency(placed.totals.total),
+    payment_method: placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
+    delivery_date: placed.deliverySlot?.date
+      ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+      : new Date(placed.estimatedDelivery).toDateString(),
+    invoice_url: base
+      ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
+      : "Reply to this email and we will send your invoice.",
+  });
+
+  if (!mail.sent) {
+    console.error(
+      `[orders] Could not email the confirmation for ${placed.orderNumber}: ${mail.error}`
+    );
+  }
 
   return placed;
 }

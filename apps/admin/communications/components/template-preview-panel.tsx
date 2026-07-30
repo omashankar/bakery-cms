@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSampleDataForVariables } from "../lib/template-sample-data";
-import { renderTemplate } from "../lib/template-render";
+import { renderTemplate } from "@/lib/template-render";
 import { cn } from "@/lib/utils";
 
 interface TemplatePreviewPanelProps {

@@ -9,6 +9,7 @@ import {
 import { setAuthCookies, clearAuthCookies } from "@/lib/server/auth/cookies";
 import { sha256, generateOtp } from "@/lib/server/auth/hash";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
+import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import {
   AuthError,
   ConflictError,
@@ -198,26 +199,26 @@ export async function forgotPassword(input: ForgotPasswordInput, ctx: RequestCtx
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   });
 
-  // There is no mail transport in this codebase yet — no nodemailer, no Resend,
-  // nothing reads the SMTP settings the admin can save. So this OTP currently
-  // reaches nobody, and the reset flow cannot complete in production.
-  //
-  // It used to be logged unconditionally "for testing". That is fine on a laptop
-  // and a credential leak anywhere else: a plaintext reset code in the server log
-  // is an account takeover for anyone who can read logs — a hosting dashboard, a
-  // log aggregator, a shared ops account — with no trace in the audit trail.
-  //
-  // Development keeps the convenience. Production gets a warning that names the
-  // real problem WITHOUT the code in it. The caller's response is unchanged
-  // either way, because it must not reveal whether the address is registered.
+  const mail = await sendTemplatedEmail("password_reset", input.email, {
+    customer_name: user.name?.trim() || "there",
+    reset_code: otp,
+    expires_in: `${Math.round(OTP_TTL_MS / 60_000)} minutes`,
+  });
+
+  // The response to the caller is deliberately unchanged either way: saying "we
+  // couldn't email you" only for registered addresses would reveal which
+  // addresses are registered, which is exactly what the early return above
+  // avoids. So a delivery failure is an operator problem, logged for them.
+  if (!mail.sent) {
+    // Never the OTP itself. A plaintext reset code in a server log is an account
+    // takeover for anyone who can read logs — a hosting dashboard, a log
+    // aggregator, a shared ops account — and leaves no trace in the audit trail.
+    console.error(`[auth] Could not email a password reset code: ${mail.error}`);
+  }
+
+  // In development the code is worth having to hand; nowhere else.
   if (process.env.NODE_ENV === "development") {
     console.info(`[auth] Password reset OTP for ${input.email}: ${otp}`);
-  } else {
-    console.warn(
-      "[auth] A password reset was requested but no mail transport is configured, " +
-        "so the OTP could not be delivered. Wire an email provider before relying " +
-        "on password reset."
-    );
   }
 
   await writeAuditLog({

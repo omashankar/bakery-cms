@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { sendTestEmailRequest } from "@/features/settings/lib/settings-api";
 import {
   reportSettingsReset,
   reportSettingsWrite,
@@ -24,6 +25,7 @@ import { SettingsSectionShell } from "./settings-section-shell";
 
 export function SmtpSettingsPage() {
   const [mounted, setMounted] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [settings, setSettings] = useState<SmtpSettings>(defaultSmtpSettings);
   const [savedSettings, setSavedSettings] = useState<SmtpSettings>(defaultSmtpSettings);
   const [showPassword, setShowPassword] = useState(false);
@@ -62,12 +64,36 @@ export function SmtpSettingsPage() {
     if (reportSettingsReset(persisted, "SMTP settings")) setSavedSettings(value);
   }
 
-  function handleTestEmail() {
-    if (!settings.enabled) {
+  /**
+   * Sends a REAL test email through the saved settings.
+   *
+   * The server reads what is stored, not what is on screen, so unsaved edits are
+   * not what gets tested — say so rather than test the wrong thing silently.
+   */
+  async function handleTestEmail() {
+    if (isDirty) {
+      toast.error("Save your changes first", {
+        description: "The test uses the saved settings, not the ones on screen.",
+      });
+      return;
+    }
+    if (!savedSettings.enabled) {
       toast.error("Enable SMTP before sending a test email");
       return;
     }
-    toast.success("Test email queued (demo — no backend connected)");
+
+    setTesting(true);
+    const result = await sendTestEmailRequest();
+    setTesting(false);
+
+    if (!result.sent) {
+      toast.error("Test email failed", { description: result.error });
+      return;
+    }
+
+    toast.success("Test email sent", {
+      description: "Check the inbox of the account you are signed in as.",
+    });
   }
 
   return (
@@ -84,8 +110,13 @@ export function SmtpSettingsPage() {
       onDiscard={handleDiscard}
       onReset={handleReset}
       extraActions={
-        <Button variant="outline" className="w-full sm:w-auto" onClick={handleTestEmail}>
-          Send test email
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto"
+          onClick={() => void handleTestEmail()}
+          disabled={testing}
+        >
+          {testing ? "Sending…" : "Send test email"}
         </Button>
       }
     >
