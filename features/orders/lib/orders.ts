@@ -15,6 +15,7 @@ import {
   adminNotesRequest,
   refundNotesRequest,
   requestRefundRequest,
+  type PlaceOrderResponse,
 } from "./orders-api";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
@@ -249,8 +250,33 @@ export interface PlaceOrderResult {
  *
  * So the retry sends the order it already has, byte for byte.
  */
-export function confirmOrder(order: PlacedOrder): Promise<boolean> {
-  return placeOrderRequest(order);
+export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult> {
+  return adoptStoredOrder(order, await placeOrderRequest(order));
+}
+
+/**
+ * Reconcile the local copy with what the server actually stored.
+ *
+ * The server owns order-number uniqueness, so the number it returns may not be
+ * the one this browser proposed. Whatever it says is the number on the invoice,
+ * in the admin list and on the tracking page, so the local cache has to agree —
+ * otherwise the customer's confirmation matches no order in the bakery.
+ */
+function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): PlaceOrderResult {
+  if (!response.ok) return { order: local, persisted: false };
+
+  const stored = response.order;
+  if (!stored || stored.orderNumber === local.orderNumber) {
+    return { order: local, persisted: true };
+  }
+
+  const orders = readOrders();
+  const index = orders.findIndex((entry) => entry.id === local.id);
+  if (index === -1) orders.unshift(stored);
+  else orders[index] = stored;
+  writeOrders(orders);
+
+  return { order: stored, persisted: true };
 }
 
 export async function placeOrder(input: {
@@ -281,7 +307,7 @@ export async function placeOrder(input: {
   // Re-send rather than assume the first attempt reached the server: a customer
   // pressing the button again is often doing so BECAUSE it did not. The POST is
   // idempotent on the order id, so this cannot create a second order.
-  if (recent) return { order: recent, persisted: await placeOrderRequest(recent) };
+  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent));
 
   const order: PlacedOrder = {
     id: newOrderId(),
@@ -308,7 +334,7 @@ export async function placeOrder(input: {
   writeOrders([order, ...readOrders()]);
   // Durable write to the server (creates the order in Mongo + reduces stock,
   // atomically). Sends the same id/orderNumber so both copies agree.
-  return { order, persisted: await placeOrderRequest(order) };
+  return adoptStoredOrder(order, await placeOrderRequest(order));
 }
 
 /**

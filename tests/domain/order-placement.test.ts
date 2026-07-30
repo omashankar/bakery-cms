@@ -51,14 +51,20 @@ function checkout(overrides: Partial<Parameters<typeof placeOrder>[0]> = {}) {
   });
 }
 
+type Answer = { ok: boolean; status: number; data?: unknown } | "network-error";
+
 /** A fetch stub that answers each call with the next entry, then repeats the last. */
-function respond(...answers: Array<{ ok: boolean; status: number } | "network-error">) {
+function respond(...answers: Answer[]) {
   let call = 0;
   const fetchMock = vi.fn().mockImplementation(() => {
     const answer = answers[Math.min(call, answers.length - 1)];
     call += 1;
     if (answer === "network-error") return Promise.reject(new Error("offline"));
-    return Promise.resolve(answer as Response);
+    return Promise.resolve({
+      ok: answer.ok,
+      status: answer.status,
+      json: () => Promise.resolve({ success: answer.ok, data: answer.data ?? null }),
+    } as Response);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -132,6 +138,35 @@ describe("placing an order", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("adopts the order number the server actually stored", async () => {
+    // The browser picks its own order number, de-duplicated only against its OWN
+    // history — the function's comment puts a clash at ~43% after 100 orders, and
+    // `orderNumber` is uniquely indexed. So the server regularly has to issue a
+    // different one. Whatever it stored is what appears on the invoice, in the
+    // admin list and on the tracking page; a customer holding the number this
+    // browser proposed would be holding a number that matches no order.
+    const stored = { id: "will-be-replaced", orderNumber: "BK-20260730-9999" };
+    respond({ ok: true, status: 201, data: stored });
+
+    const { order, persisted } = await settle(checkout());
+
+    expect(persisted).toBe(true);
+    expect(order.orderNumber).toBe("BK-20260730-9999");
+    // And the local cache agrees, so the tracking page finds the same order.
+    expect(getOrders()[0].orderNumber).toBe("BK-20260730-9999");
+    expect(getOrders()).toHaveLength(1);
+  });
+
+  it("keeps its own copy when the server echoes the same number back", async () => {
+    respond({ ok: true, status: 201, data: null });
+
+    const { order, persisted } = await settle(checkout());
+
+    expect(persisted).toBe(true);
+    expect(order.orderNumber).toMatch(/^BK-/);
+    expect(getOrders()).toHaveLength(1);
+  });
+
   it("re-sends the same order however long the customer took to press retry", async () => {
     respond({ ok: false, status: 500 });
     const first = await settle(checkout());
@@ -146,7 +181,7 @@ describe("placing an order", () => {
     await vi.advanceTimersByTimeAsync(45_000);
 
     const fetchMock = respond({ ok: true, status: 201 });
-    const persisted = await settle(confirmOrder(first.order));
+    const { persisted } = await settle(confirmOrder(first.order));
 
     expect(persisted).toBe(true);
     expect(getOrders()).toHaveLength(1);

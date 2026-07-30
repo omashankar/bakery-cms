@@ -31,39 +31,69 @@ export interface StockReduction {
  * decrement without its order. This is the flagship transactional path.
  * Unlimited-stock products are skipped by the filter.
  */
-/** Mongo's duplicate-key error — this `_id` is already in the collection. */
+/** Mongo's duplicate-key error code. */
 const DUPLICATE_KEY = 11000;
 
-function isDuplicateKey(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
+/**
+ * WHICH unique index rejected the insert — the distinction is the whole point.
+ *
+ * The orders collection has two: `_id` and `orderNumber`. They mean opposite
+ * things here. An `_id` collision is the same order arriving twice, i.e. a
+ * retry. An `orderNumber` collision is a DIFFERENT order that happens to have
+ * picked a number already in use — and the storefront picks its own number
+ * de-duplicated only against that browser's localStorage, where a ~43% clash
+ * after 100 orders is expected (see generateOrderNumber in orders.ts).
+ *
+ * Treating the second as the first is how a paid order gets reported "placed"
+ * and never stored: the row was never inserted, the id lookup finds nothing, and
+ * the caller is handed back the very object it sent.
+ */
+function duplicateKeyField(error: unknown): "id" | "orderNumber" | null {
+  if (typeof error !== "object" || error === null) return null;
   const candidate = error as {
     code?: unknown;
-    errorResponse?: { code?: unknown };
+    keyPattern?: Record<string, unknown>;
+    keyValue?: Record<string, unknown>;
+    errorResponse?: { code?: unknown; keyPattern?: Record<string, unknown> };
     message?: unknown;
   };
 
-  // Three shapes because a transaction can wrap the driver error before it gets
-  // here. Getting this wrong is safe in only one direction: an unrecognised
-  // duplicate rethrows, the client sees a 500 and reports the order unconfirmed
-  // — wrong, but recoverable. Mistaking another error for a duplicate would
-  // report an order saved that was not, so the test is specific.
-  return (
-    candidate.code === DUPLICATE_KEY ||
-    candidate.errorResponse?.code === DUPLICATE_KEY ||
-    (typeof candidate.message === "string" && candidate.message.includes("E11000"))
-  );
+  const isDuplicate =
+    candidate.code === DUPLICATE_KEY || candidate.errorResponse?.code === DUPLICATE_KEY;
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+  if (!isDuplicate && !message.includes("E11000")) return null;
+
+  const keys = {
+    ...(candidate.errorResponse?.keyPattern ?? {}),
+    ...(candidate.keyPattern ?? {}),
+    ...(candidate.keyValue ?? {}),
+  };
+  if ("orderNumber" in keys) return "orderNumber";
+  if ("_id" in keys) return "id";
+
+  // The driver did not say which index. The message names it, e.g.
+  // `E11000 duplicate key error collection: bakery.orders index: orderNumber_1`.
+  if (message.includes("orderNumber")) return "orderNumber";
+  if (message.includes("_id_")) return "id";
+
+  // Unattributable. Rethrow rather than guess: a wrong "id" guess reports a
+  // paid order saved when it was not, which is the failure this whole change
+  // exists to prevent. A 500 here is wrong but recoverable.
+  return null;
 }
 
-export interface CreateOrderResult {
-  order: PlacedOrder;
-  /** False when this id was already present, i.e. the caller is retrying. */
-  created: boolean;
-}
+export type CreateOrderOutcome =
+  /** Inserted now. */
+  | { kind: "created"; order: PlacedOrder }
+  /** This id was already stored — the caller is retrying. */
+  | { kind: "already-placed"; order: PlacedOrder }
+  /** A DIFFERENT order owns this orderNumber. The caller must pick another. */
+  | { kind: "order-number-taken" };
 
 export async function createOrderWithStockReduction(
   order: PlacedOrder,
   reductions: StockReduction[],
-): Promise<CreateOrderResult> {
+): Promise<CreateOrderOutcome> {
   await connectDB();
   const session = await mongoose.startSession();
   try {
@@ -79,18 +109,25 @@ export async function createOrderWithStockReduction(
       }
     });
   } catch (error) {
-    if (!isDuplicateKey(error)) throw error;
+    const field = duplicateKeyField(error);
+    if (field === null) throw error;
+    if (field === "orderNumber") return { kind: "order-number-taken" };
+
     // The storefront is retrying a POST whose response it never saw. The
     // transaction aborted as a unit, so stock was NOT decremented a second
     // time; the order from the first attempt is already here. Report the stored
     // copy rather than an error — the alternative tells a customer who has
     // already paid that their order failed.
     const existing = await findById(order.id);
-    return { order: existing ?? order, created: false };
+    // No stored row behind an `_id` duplicate should be impossible, but if the
+    // read fails we must not answer "saved" on the strength of the payload we
+    // were handed. Rethrowing surfaces it as a failure, which is the safe side.
+    if (!existing) throw error;
+    return { kind: "already-placed", order: existing };
   } finally {
     await session.endSession();
   }
-  return { order, created: true };
+  return { kind: "created", order };
 }
 
 export async function findById(id: string): Promise<PlacedOrder | null> {

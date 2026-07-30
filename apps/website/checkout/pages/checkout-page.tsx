@@ -558,17 +558,20 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     if (!unconfirmed || placing) return;
     setPlacing(true);
 
-    const persisted = await confirmOrder(unconfirmed.order);
+    const { order, persisted } = await confirmOrder(unconfirmed.order);
     setPlacing(false);
 
     if (!persisted) {
       toast.error("Still couldn't reach the bakery", {
-        description: "Your order is safe here. Try again, or contact support with the reference shown.",
+        description:
+          "Your order is safe here. Try again, or contact support with the reference shown.",
       });
       return;
     }
 
-    commitPlacedOrder(unconfirmed.order);
+    // `order`, not `unconfirmed.order` — the server may have had to issue a
+    // different order number, and that is the one the customer must be shown.
+    commitPlacedOrder(order);
   };
 
   const onPlaceOrder = async () => {

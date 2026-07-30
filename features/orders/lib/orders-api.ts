@@ -90,19 +90,36 @@ export interface OrderPageQuery {
   limit?: number;
 }
 
+/** The stored order out of a success envelope, or null if it cannot be read. */
+async function readOrderBody(res: Response): Promise<PlacedOrder | null> {
+  try {
+    if (typeof res.json !== "function") return null;
+    const json = (await res.json()) as { data?: PlacedOrder | null } | null;
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** 0 means the request never got an answer — offline, DNS, CORS, abort. */
 async function sendWithStatus(
   path: string,
   method: string,
   body?: unknown
-): Promise<{ ok: boolean; status: number }> {
+): Promise<{ ok: boolean; status: number; data?: PlacedOrder | null }> {
   try {
     const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    return { ok: res.ok, status: res.status };
+    if (!res.ok) return { ok: false, status: res.status };
+
+    // A body we cannot read does not undo a 2xx — the order IS stored. Every
+    // failure here degrades to "no data", never to "the write failed", which is
+    // why the parse is isolated from the outer catch.
+    const data = await readOrderBody(res);
+    return { ok: true, status: res.status, data };
   } catch {
     return { ok: false, status: 0 };
   }
@@ -134,16 +151,28 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * is idempotent on the order id, so a retry after a response we never received
  * cannot create a second order or decrement stock twice.
  */
-export async function placeOrderRequest(order: PlacedOrder): Promise<boolean> {
+export interface PlaceOrderResponse {
+  ok: boolean;
+  /**
+   * The order as STORED. The server owns order-number uniqueness — the number
+   * this browser picked is de-duplicated only against its own history, so it
+   * collides with other customers and the server may have had to issue a
+   * different one. Callers must adopt this copy, or the customer walks away with
+   * a confirmation number that matches nothing.
+   */
+  order?: PlacedOrder;
+}
+
+export async function placeOrderRequest(order: PlacedOrder): Promise<PlaceOrderResponse> {
   for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
 
-    const { ok, status } = await sendWithStatus("/api/orders", "POST", order);
-    if (ok) return true;
-    if (!isWorthRetrying(status)) return false;
+    const { ok, status, data } = await sendWithStatus("/api/orders", "POST", order);
+    if (ok) return { ok: true, order: data ?? undefined };
+    if (!isWorthRetrying(status)) return { ok: false };
   }
 
-  return false;
+  return { ok: false };
 }
 
 export function updateStatusRequest(orderId: string, status: OrderStatus): Promise<boolean> {

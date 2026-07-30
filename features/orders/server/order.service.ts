@@ -7,6 +7,7 @@ import * as productRepo from "@/features/products/server/product.repository";
 import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
 import type { CommerceSettings } from "@/types/settings";
 import type { RefundRecord } from "@/types/refund";
+import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
@@ -63,6 +64,9 @@ function resolveEstimatedDelivery(
 
 // ---- Place order (transactional) ------------------------------------------
 
+/** Fresh order numbers to try when the client's collided with another customer's. */
+const ORDER_NUMBER_ATTEMPTS = 5;
+
 export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promise<PlacedOrder> {
   // ONE PAYMENT, ONE ORDER — checked before anything is built.
   //
@@ -113,14 +117,52 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // by the time it runs the customer's card has already been charged, so one
   // dropped response must not be the end of it — and a retry must not produce a
   // second order or decrement stock twice.
-  const { order: saved, created } = await repo.createOrderWithStockReduction(
-    order,
-    input.items.map((item) => ({ slug: item.productSlug, quantity: item.quantity })),
-  );
+  const reductions = input.items.map((item) => ({
+    slug: item.productSlug,
+    quantity: item.quantity,
+  }));
 
-  // Nothing changed, so there is nothing to refresh and nothing new to record.
-  // A second audit entry would read as a second order.
-  if (!created) return saved;
+  let candidate = order;
+  let placed: PlacedOrder | null = null;
+
+  // The loop exists for orderNumber collisions only. The storefront picks its
+  // own number, de-duplicated against that browser's orders alone, so two
+  // customers clash regularly. The server owns uniqueness: mint a fresh number
+  // and insert again. Bounded because each attempt is a real round trip, and
+  // generateOrderNumber already checks the collection.
+  for (let attempt = 0; attempt < ORDER_NUMBER_ATTEMPTS && !placed; attempt += 1) {
+    const outcome = await repo.createOrderWithStockReduction(candidate, reductions);
+
+    if (outcome.kind === "already-placed") {
+      // This endpoint is deliberately unauthenticated — it is the storefront
+      // checkout. That makes the idempotent branch a read of stored data keyed
+      // on a guessable id, so it must not hand back a stranger's record: name,
+      // phone, street address, every line item. A genuine retry always carries
+      // the same contact details it was placed with, so requiring them costs
+      // nothing and closes the oracle.
+      if (!verifyOrderLookup(outcome.order, input.address)) {
+        throw new NotFoundError("Order not found");
+      }
+
+      // Nothing changed, so there is nothing to refresh and nothing new to
+      // record — a second audit entry would read as a second order.
+      return outcome.order;
+    }
+
+    if (outcome.kind === "created") {
+      placed = outcome.order;
+      break;
+    }
+
+    candidate = { ...candidate, orderNumber: await generateOrderNumber(commerce) };
+  }
+
+  if (!placed) {
+    // Never claim a placement we could not make. The caller reports the order
+    // unconfirmed and the customer can retry, which is recoverable; a false
+    // success is not.
+    throw new Error("Could not allocate a unique order number");
+  }
 
   // Best-effort: refresh each affected product's derived stockStatus (the $inc
   // changed the quantity but not the status field). Not part of the transaction.
@@ -129,13 +171,17 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   await writeAuditLog({
     action: "order.place",
     actorEmail: input.address.email,
-    target: { type: "order", id: order.id },
-    metadata: { orderNumber: order.orderNumber, total: input.totals.total, method: input.paymentMethod },
+    target: { type: "order", id: placed.id },
+    metadata: {
+      orderNumber: placed.orderNumber,
+      total: input.totals.total,
+      method: input.paymentMethod,
+    },
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });
 
-  return order;
+  return placed;
 }
 
 async function refreshStockStatuses(slugs: string[]): Promise<void> {
