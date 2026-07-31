@@ -5,7 +5,7 @@ import { NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
 import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
-import type { CommerceSettings } from "@/types/settings";
+import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { RefundRecord } from "@/types/refund";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import {
@@ -88,6 +88,10 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
 
   const settings = (await getSettings()) as Record<string, unknown>;
   const commerce = (settings.commerce ?? {}) as CommerceSettings;
+  // Passed explicitly to `formatCurrency` below: this runs in a route handler,
+  // which never renders the root layout, so there is no `<html>` and no
+  // per-request locale for the formatter to fall back on.
+  const currency = ((settings.general ?? {}) as GeneralSettings).currency;
   const placedAt = input.placedAt ?? new Date().toISOString();
   const paymentStatus: PaymentStatus =
     (input.paymentStatus as PaymentStatus | undefined) ??
@@ -199,7 +203,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   const mail = await sendTemplatedEmail("order_confirmation", placed.address.email, {
     customer_name: placed.address.fullName?.trim() || "there",
     order_number: placed.orderNumber,
-    order_total: formatCurrency(placed.totals.total),
+    order_total: formatCurrency(placed.totals.total, currency),
     payment_method: placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
     delivery_date: placed.deliverySlot?.date
       ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`

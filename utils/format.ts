@@ -1,20 +1,40 @@
+import {
+  fractionDigits,
+  getActiveLocale,
+  localeForCurrency,
+} from "@/features/settings/lib/active-locale";
+
 /**
- * Format currency for display (INR default for bakery context)
+ * Format currency for display, in the currency chosen in General settings.
+ *
+ * The currency used to be hard-coded to INR here, which made the admin's
+ * currency picker decorative — a shop set to USD still priced everything in
+ * rupees. Callers may still pass an explicit currency (the server does, where
+ * there is no `<html>` to read it from); the locale then follows that currency,
+ * so an explicit EUR is grouped and placed the way EUR is written.
  */
 export function formatCurrency(
   amount: number,
-  currency = "INR",
-  locale = "en-IN"
+  currency?: string,
+  locale?: string
 ): string {
-  return new Intl.NumberFormat(locale, {
+  const resolved = currency ?? getActiveLocale().currency;
+  const digits = fractionDigits(resolved);
+
+  return new Intl.NumberFormat(locale ?? localeForCurrency(resolved), {
     style: "currency",
-    currency,
-    maximumFractionDigits: 0,
+    currency: resolved,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   }).format(amount);
 }
 
 /**
- * Format a date string for display
+ * Format a date string for display, in the timezone chosen in General settings.
+ *
+ * Without an explicit `timeZone` this rendered in whatever zone the machine ran
+ * in — the server's, for anything server-rendered — so a 9pm order could show
+ * as the previous day to an admin in Kolkata.
  */
 export function formatDate(
   date: string | Date,
@@ -24,7 +44,10 @@ export function formatDate(
     year: "numeric",
   }
 ): string {
-  return new Intl.DateTimeFormat("en-IN", options).format(new Date(date));
+  const { locale, timezone } = getActiveLocale();
+  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(
+    new Date(date)
+  );
 }
 
 /**

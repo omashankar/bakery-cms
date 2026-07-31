@@ -32,6 +32,11 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   // Read on the server from MongoDB (see StorefrontChrome) — so the HTML already
   // carries the admin's real store name / logo / nav, no defaults-then-swap flash.
   const [siteName] = useState(chrome.siteName);
+  const [logo] = useState(chrome.logo);
+  // An admin can point this anywhere, and anywhere can 404 — a stale path, a
+  // deleted upload, a CDN that moved. A broken-image glyph in the header is
+  // worse than the letter mark it replaced, so fall back to it.
+  const [logoBroken, setLogoBroken] = useState(false);
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
   const [showSearch] = useState(chrome.showSearch);
@@ -143,11 +148,32 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href={routes.store.home} className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
-            <span className="font-heading text-sm font-bold text-white">
-              {logoLetter}
-            </span>
-          </div>
+          {logo && !logoBroken ? (
+            // An admin-typed URL on any host, so next/image is not usable here:
+            // it would need every such host allow-listed in next.config
+            // remotePatterns, and an un-listed one throws instead of rendering.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt={siteName}
+              onError={() => setLogoBroken(true)}
+              // The logo is in the SERVER-rendered HTML, so a 404 can resolve
+              // before the bundle has even downloaded — and React does not
+              // replay load/error events that completed before hydration. The
+              // handler above would never fire and the header would keep a
+              // broken-image glyph forever. This asks the element directly.
+              ref={(node) => {
+                if (node?.complete && node.naturalWidth === 0) setLogoBroken(true);
+              }}
+              className="size-9 rounded-xl object-contain shadow-sm"
+            />
+          ) : (
+            <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
+              <span className="font-heading text-sm font-bold text-white">
+                {logoLetter}
+              </span>
+            </div>
+          )}
           <span className="font-heading text-lg font-bold tracking-tight text-foreground">
             {siteName}
           </span>

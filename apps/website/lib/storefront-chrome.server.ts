@@ -18,6 +18,8 @@ import type { HeaderNavItem, HeaderSettings, FooterSettings } from "@/types/site
  */
 export interface StorefrontChrome {
   siteName: string;
+  /** General settings logo URL. Empty means "render the letter mark instead". */
+  logo: string;
   logoLetter: string;
   showSearch: boolean;
   navItems: HeaderNavItem[];
@@ -31,6 +33,7 @@ export interface StorefrontChrome {
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
+    logo: "",
     logoLetter: defaultHeaderSettings.logoLetter,
     showSearch: defaultHeaderSettings.showSearch,
     navItems: selectVisibleNavItems(defaultHeaderSettings.nav),
@@ -76,6 +79,10 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
 
     return {
       siteName: name,
+      // The General settings logo, finally rendered somewhere: it was stored,
+      // validated and read only by the invoice designer, so setting it changed
+      // nothing a customer ever saw.
+      logo: (general.logo ?? "").trim(),
       logoLetter: header.logoLetter || defaultHeaderSettings.logoLetter,
       showSearch: header.showSearch ?? defaultHeaderSettings.showSearch,
       navItems: selectVisibleNavItems(header.nav ?? []),

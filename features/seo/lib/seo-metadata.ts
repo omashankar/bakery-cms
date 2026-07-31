@@ -50,7 +50,7 @@ export function buildRouteMetadata(routeKey: string): Metadata {
   const entry = getRouteSeo(routeKey);
   if (!entry) {
     return {
-      title: global.siteName,
+      title: { absolute: global.siteName },
       description: global.defaultDescription,
     };
   }
@@ -68,7 +68,10 @@ export function buildRouteMetadata(routeKey: string): Metadata {
         : undefined;
 
   return {
-    title,
+    // `absolute`, so the root layout's "%s | <site name>" template does not
+    // apply: `resolveRouteTitle` has already appended the SEO title suffix, and
+    // letting the template run again renders "Wedding Cakes | Monginis | Monginis".
+    title: { absolute: title },
     description,
     keywords:
       entry.metaKeywords && entry.metaKeywords.length > 0

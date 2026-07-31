@@ -33,7 +33,10 @@ export const defaultGeneralSettings: GeneralSettings = {
   siteName: brandInfo.name,
   siteTagline: brandInfo.tagline,
   siteDescription: brandInfo.description,
-  logo: "/images/logo.svg",
+  // Empty, not "/images/logo.svg" — no such file was ever shipped, so the
+  // default pointed at a 404. Empty means "use the header's letter mark", which
+  // is what the storefront has always actually rendered.
+  logo: "",
   favicon: "/favicon.ico",
   timezone: "Asia/Kolkata",
   currency: "INR",
@@ -224,6 +227,83 @@ export const currencyOptions = [
   { value: "EUR", label: "EUR — Euro" },
   { value: "GBP", label: "GBP — British Pound" },
 ] as const;
+
+/**
+ * A logo / favicon reference the app may safely render.
+ *
+ * These two fields end up in `<img src>` and `<link rel="icon" href>`, so the
+ * set of accepted values is the set of things that are safe there: empty, a
+ * site-relative path, or an absolute http(s) URL. `javascript:` and `data:`
+ * URLs are rejected — an admin field that reaches an href attribute is a script
+ * injection point otherwise, and a protocol-relative `//host` is a silent
+ * off-site fetch. Shared by the form and the Zod schema so the browser and the
+ * server agree on what is valid.
+ */
+export function isSafeAssetUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (trimmed.startsWith("//")) return false;
+  if (trimmed.startsWith("/")) return true;
+  return /^https?:\/\/\S+$/i.test(trimmed);
+}
+
+/**
+ * Turns whatever the admin pasted into the map field into a bare URL.
+ *
+ * The field is labelled "Google Maps embed URL", but Google's Share → "Embed a
+ * map" tab hands you a whole `<iframe src="…" …></iframe>` snippet — so pasting
+ * what Google actually gives you stored the entire HTML string as the `src` and
+ * the map silently rendered blank, with nothing anywhere saying why. Accept both
+ * forms and keep the URL.
+ */
+export function normalizeMapEmbedUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!/<iframe/i.test(trimmed)) return trimmed;
+
+  // Quoted or unquoted, in any case — the snippet may have been through a
+  // WYSIWYG or an older Maps UI before it reaches the paste buffer.
+  const src = /<iframe[^>]*\ssrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(trimmed);
+  const extracted = src?.[2] ?? src?.[3] ?? src?.[4];
+  if (extracted === undefined) return trimmed;
+
+  return decodeHtmlEntities(extracted).trim();
+}
+
+/**
+ * Undoes the escaping an HTML attribute forces on a URL.
+ *
+ * This is not a nicety. Inside an attribute `&` is always written `&amp;`, so
+ * every embed URL with more than one query parameter — OpenStreetMap's
+ * `?bbox=…&amp;layer=mapnik`, the Google Maps Embed API v1's `?key=…&amp;q=…`,
+ * i.e. exactly the providers the https-only rule exists to allow — unwrapped to
+ * a URL whose second parameter was named `amp;layer` / `amp;q`. It passed
+ * validation, stored fine, and rendered a blank map with nothing saying why:
+ * the same silent failure the unwrapping was written to eliminate.
+ */
+function decodeHtmlEntities(value: string): string {
+  // Only the entities that legitimately appear in a URL inside an attribute.
+  // `&lt;`/`&gt;` are deliberately left alone: they never belong in an embed
+  // URL, and decoding them would only manufacture stranger strings.
+  return value
+    .replace(/&(?:quot|#0*34);/g, '"')
+    .replace(/&(?:apos|#0*39);/g, "'")
+    .replace(/&(?:amp|#0*38|#[xX]0*26);/g, "&");
+}
+
+/**
+ * A map URL that is safe to put in an `<iframe src>`.
+ *
+ * https only. An iframe `src` executes whatever it is given, so `javascript:`
+ * and `data:` here are script injection into every visitor's contact page, and
+ * plain `http:` is a mixed-content frame that browsers block anyway. The host is
+ * deliberately NOT restricted to Google — plenty of shops embed OpenStreetMap or
+ * Mapbox, and an admin choosing who to embed is the feature.
+ */
+export function isValidMapEmbedUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  return /^https:\/\/\S+$/i.test(trimmed);
+}
 
 export const socialPlatformOptions = [
   "Instagram",

@@ -72,6 +72,9 @@ export async function getPublicSettings() {
       logo: json.general?.logo,
       favicon: json.general?.favicon,
       currency: json.general?.currency,
+      // Not a secret, and the storefront needs it: every date it renders is
+      // formatted in the store's timezone, not the visitor's machine zone.
+      timezone: json.general?.timezone,
       businessType,
     },
     contact: json.contact,

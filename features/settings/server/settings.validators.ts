@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+import {
+  currencyOptions,
+  isSafeAssetUrl,
+  isValidMapEmbedUrl,
+  normalizeMapEmbedUrl,
+  timezoneOptions,
+} from "@/features/settings/lib/settings-utils";
+
 /**
  * Zod contracts for each settings section. The API validates every write
  * through these — the Mongoose schema mirrors the shape, but Zod is the
@@ -21,24 +29,68 @@ export const businessTypeEnum = z.enum([
 
 const nonNegative = z.number().min(0, "Must be zero or more");
 
+/**
+ * Timezone and currency are closed sets, not free text: both are fed straight to
+ * `Intl`, which throws a RangeError on an unknown currency code — that would
+ * take out every price on the storefront, from a settings write. The admin only
+ * ever offers these, so the server accepts only these.
+ */
+const timezoneValues = timezoneOptions.map((option) => option.value) as [string, ...string[]];
+const currencyValues = currencyOptions.map((option) => option.value) as [string, ...string[]];
+
+/**
+ * Logo / favicon: rendered into `<img src>` and `<link rel="icon" href>`, so the
+ * server refuses anything that is not empty, site-relative, or absolute http(s)
+ * — see `isSafeAssetUrl`. The browser checks the same rule; this is the boundary
+ * that actually enforces it.
+ */
+const assetUrl = z
+  .string()
+  .trim()
+  .default("")
+  .refine(isSafeAssetUrl, "Use a path like /images/logo.svg or a full https:// URL");
+
 export const generalSchema = z.object({
   siteName: z.string().trim().min(1, "Site name is required"),
   siteTagline: z.string().trim().default(""),
   siteDescription: z.string().trim().default(""),
-  logo: z.string().trim().default(""),
-  favicon: z.string().trim().default(""),
-  timezone: z.string().trim().min(1),
-  currency: z.string().trim().min(1),
+  logo: assetUrl,
+  favicon: assetUrl,
+  timezone: z.enum(timezoneValues, "Unknown timezone"),
+  currency: z.enum(currencyValues, "Unknown currency"),
   businessType: businessTypeEnum,
 });
 
 export const contactSchema = z.object({
-  email: z.string().trim().pipe(z.email("Invalid email")).or(z.literal("")),
+  // Trim FIRST, then decide. Written as `.trim().pipe(email).or(literal(""))`
+  // the union's second branch saw the UNTRIMMED input, so a field cleared to a
+  // single space was a 422 while an empty one was fine — and the browser, which
+  // trims before checking, called it valid and let the admin hit Save.
+  email: z
+    .string()
+    .trim()
+    .pipe(z.literal("").or(z.email("Invalid email"))),
   phone: z.string().trim().default(""),
   address: z.string().trim().default(""),
-  mapEmbedUrl: z.string().trim().optional(),
+  // Normalised first, so an API caller that pastes Google's whole `<iframe …>`
+  // snippet gets the URL out of it rather than a stored blob of HTML. Then
+  // https-only: this value is written straight into an `<iframe src>` on the
+  // public contact page, where `javascript:` is script execution.
+  mapEmbedUrl: z
+    .string()
+    .transform(normalizeMapEmbedUrl)
+    .refine(isValidMapEmbedUrl, "Use an https:// map URL")
+    .optional(),
+  // Both halves required: a row with an empty day or empty hours renders as a
+  // blank line in the storefront footer and on the contact page, which reads as
+  // a broken site rather than as a row nobody filled in.
   businessHours: z
-    .array(z.object({ day: z.string(), hours: z.string() }))
+    .array(
+      z.object({
+        day: z.string().trim().min(1, "Day is required"),
+        hours: z.string().trim().min(1, "Hours are required"),
+      }),
+    )
     .default([]),
 });
 
