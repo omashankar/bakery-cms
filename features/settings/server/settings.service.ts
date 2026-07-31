@@ -11,6 +11,7 @@ import {
   defaultSecuritySettings,
   defaultSmtpSettings,
   defaultSocialLinks,
+  isSafeSocialUrl,
 } from "@/features/settings/lib/settings-utils";
 import type { BusinessType } from "@/types/settings";
 
@@ -78,7 +79,13 @@ export async function getPublicSettings() {
       businessType,
     },
     contact: json.contact,
-    social: (json.social ?? []).filter((s: { isActive?: boolean }) => s.isActive),
+    // Active AND renderable. This payload feeds any client that asks, so the
+    // href guard belongs at the boundary rather than only in the surfaces that
+    // happen to render it today — the field was free text for the life of the
+    // project, so what is at rest can still be a `javascript:` URL.
+    social: (json.social ?? [])
+      .filter((s: { isActive?: boolean }) => s.isActive)
+      .filter((s: { href?: string }) => isSafeSocialUrl(s.href ?? "")),
     commerce: json.commerce,
     maintenance: {
       isEnabled: json.maintenance?.isEnabled ?? false,

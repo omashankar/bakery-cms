@@ -316,6 +316,115 @@ export const socialPlatformOptions = [
   "TikTok",
 ] as const;
 
+export type SocialPlatform = (typeof socialPlatformOptions)[number];
+
+/**
+ * A social profile link that is safe to put in the footer's `<a href>`.
+ *
+ * That anchor is on EVERY page of the storefront, so this field is the widest
+ * untrusted-input surface in the settings: a `javascript:` URL here is script
+ * execution site-wide, not on one page. http(s) only — `mailto:` and `tel:`
+ * belong to the Contact section, which renders them itself.
+ */
+export function isSafeSocialUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /^https?:\/\/\S+$/i.test(trimmed);
+}
+
+/**
+ * A stable id for a new social row.
+ *
+ * `social-${Date.now()}` collided: two rows added inside the same millisecond —
+ * which is what happens when "Add link" is clicked twice, or held — shared an
+ * id, and `updateLink` matches on it, so editing one edited both. They also
+ * collided as React keys.
+ */
+export function createSocialLinkId(): string {
+  const unique =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  return `social-${unique}`;
+}
+
+/**
+ * The @handle inside an Instagram profile URL, if there is one.
+ *
+ * `https://instagram.com/sweetcrumb` and `https://www.instagram.com/sweetcrumb/`
+ * both give "sweetcrumb"; the bare `https://instagram.com` gives "". Used to
+ * label the homepage's Instagram section from the profile the admin already
+ * configured under Social settings, instead of a hardcoded demo handle.
+ */
+export function instagramHandleFromUrl(url: string): string {
+  const match = /^https?:\/\/(?:[\w-]+\.)*instagram\.com\/+([^/?#\s]+)/i.exec(url.trim());
+  const handle = match?.[1] ?? "";
+  // `p`, `reel` and `explore` are Instagram's own routes, not accounts.
+  return ["p", "reel", "reels", "explore", "accounts"].includes(handle.toLowerCase())
+    ? ""
+    : handle.replace(/^@/, "");
+}
+
+/** One correction to a stored settings document, as a path and the value to set. */
+export interface SettingsRepair {
+  path: string;
+  value: unknown;
+  reason: string;
+}
+
+/**
+ * Decides what to repair in a settings document written before the current
+ * contracts existed. Pure, so the rules can be tested without a database — this
+ * is the only logic in the app that REWRITES data at rest, which makes it the
+ * last place to leave untested.
+ *
+ * Tightening a Zod schema only constrains future writes, and the Mongoose model
+ * stores these fields as bare `String`. So:
+ *
+ * - `contact.mapEmbedUrl` may hold Google's whole `<iframe …>` snippet (the
+ *   paste that field invites) or a `javascript:` URL. Unwrap what can be
+ *   unwrapped, drop what cannot.
+ * - `social[].href` may hold a `javascript:` URL, and an active row is rendered
+ *   into an `<a href>` in the footer of every storefront page. DEACTIVATE rather
+ *   than delete or blank: the row keeps its label and platform, so the admin can
+ *   see what needs a real URL instead of finding a link silently gone.
+ */
+export function planSettingsRepairs(settings: {
+  contact?: { mapEmbedUrl?: string };
+  social?: { href?: string; isActive?: boolean }[];
+}): SettingsRepair[] {
+  const repairs: SettingsRepair[] = [];
+
+  const storedMap = settings.contact?.mapEmbedUrl ?? "";
+  if (storedMap) {
+    const normalized = normalizeMapEmbedUrl(storedMap);
+    const repaired = isValidMapEmbedUrl(normalized) ? normalized : "";
+    if (repaired !== storedMap) {
+      repairs.push({
+        path: "contact.mapEmbedUrl",
+        value: repaired,
+        reason: repaired ? "unwrapped" : "dropped as unsafe",
+      });
+    }
+  }
+
+  if (Array.isArray(settings.social)) {
+    settings.social.forEach((link, index) => {
+      // An already-hidden row is not rendered anywhere, so there is nothing to
+      // repair — and rewriting it would churn the document on every read.
+      if (link?.isActive === false) return;
+      if (isSafeSocialUrl(link?.href ?? "")) return;
+      repairs.push({
+        path: `social.${index}.isActive`,
+        value: false,
+        reason: `social[${index}] hidden (unsafe href)`,
+      });
+    });
+  }
+
+  return repairs;
+}
+
 export const knownStorageKeys = [
   "bakery-cms-header",
   "bakery-cms-header-version",

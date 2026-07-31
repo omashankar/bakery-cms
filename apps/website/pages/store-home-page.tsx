@@ -5,6 +5,7 @@ import {
 } from "@/features/cms-sections/data/homepage-sections.server";
 import { getHomepageRails, getProducts } from "@/features/products/data/products-service";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
+import { getStorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 import { getContent } from "@/features/content/server/content.service";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
@@ -29,7 +30,7 @@ interface StoreHomePageProps {
  * the content lands in the initial HTML rather than streaming in after it.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
-  const [sections, rails, bannersRaw, products, catalog, testimonialsRaw, faqsRaw] =
+  const [sections, rails, bannersRaw, products, catalog, testimonialsRaw, faqsRaw, instagram] =
     await Promise.all([
       isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
       getHomepageRails(),
@@ -40,6 +41,9 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
       getCatalog(),
       getContent("testimonials"),
       getContent("faq"),
+      // The shop's real Instagram, for the same reason: the gallery section used
+      // to hardcode a demo handle and ignore Settings → Social entirely.
+      getStorefrontInstagram(),
     ]);
   const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "all");
   // Categories computed on the server too, so the category sections render the
@@ -58,6 +62,7 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
       categories={categories}
       testimonials={(testimonialsRaw ?? []) as Testimonial[]}
       faqs={(faqsRaw ?? []) as FaqItem[]}
+      instagram={instagram}
       isPreview={isPreview}
     />
   );

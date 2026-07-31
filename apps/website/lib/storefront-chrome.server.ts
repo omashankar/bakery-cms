@@ -6,8 +6,8 @@ import {
   brandInfo,
   businessHours as defaultHours,
   contactInfo as defaultContact,
-  socialLinks as defaultSocial,
 } from "@/constants/landing-data";
+import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import type { HeaderNavItem, HeaderSettings, FooterSettings } from "@/types/site-layout";
 
 /**
@@ -44,7 +44,11 @@ function fallbackChrome(): StorefrontChrome {
       email: defaultContact.email,
     },
     businessHours: defaultHours,
-    socialLinks: defaultSocial.map((s) => ({ platform: s.platform, href: s.href, label: s.label })),
+    // Empty, not the demo profiles. This is the database-unreachable path, and
+    // rendering instagram.com/facebook.com as the shop's own accounts is worse
+    // than rendering no social row: the rest of the fallback is generic filler,
+    // but these would be live links to somebody else's profiles.
+    socialLinks: [],
     footer: defaultFooterSettings,
   };
 }
@@ -97,11 +101,22 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
         email: contact.email || defaultContact.email,
       },
       businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
-      socialLinks: (activeSocial.length ? activeSocial : defaultSocial).map((s) => ({
-        platform: s.platform,
-        href: s.href,
-        label: s.label,
-      })),
+      // No fallback to the demo profiles. Deactivating every link is a
+      // deliberate "we are not on social", and answering that with
+      // instagram.com/facebook.com pointed visitors at accounts the shop does
+      // not own. Each surviving href is re-checked because the schema only
+      // constrains future writes — see `isSafeSocialUrl`.
+      socialLinks: activeSocial
+        .filter((s) => isSafeSocialUrl(s.href ?? ""))
+        .map((s) => ({
+          platform: s.platform,
+          href: s.href,
+          // The anchor renders an icon and nothing else, so this is its entire
+          // accessible name. `label` is only required for future writes, so a
+          // row at rest can still be missing one — falling back to the platform
+          // keeps the link announceable instead of unnamed.
+          label: s.label?.trim() || s.platform,
+        })),
       footer,
     };
   } catch {

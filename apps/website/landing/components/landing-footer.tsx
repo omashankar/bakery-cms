@@ -1,26 +1,11 @@
 import Link from "next/link";
-import {
-  Clock,
-  Globe,
-  Mail,
-  MapPin,
-  MessageCircle,
-  Phone,
-  Share2,
-  Video,
-} from "lucide-react";
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { SocialMark } from "@/components/shared/social-mark";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { cn } from "@/lib/utils";
-
-const socialIconMap = {
-  Instagram: Share2,
-  Facebook: Globe,
-  WhatsApp: MessageCircle,
-  YouTube: Video,
-} as const;
 
 interface LandingFooterProps {
   chrome: StorefrontChrome;
@@ -51,23 +36,26 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               {brandInfo.description}
             </p>
-            {footerSettings.showSocial ? (
+            {/* No row at all when there is nothing to show. An admin who turns
+                every profile off means "we are not on social", and the row used
+                to fall back to the demo accounts. */}
+            {footerSettings.showSocial && socialLinks.length > 0 ? (
               <div className="flex items-center gap-2">
-                {socialLinks.map((social) => {
-                  const Icon =
-                    socialIconMap[social.platform as keyof typeof socialIconMap] ??
-                    Share2;
-                  return (
-                    <a
-                      key={social.platform}
-                      href={social.href}
-                      aria-label={social.label}
-                      className="flex size-9 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
-                    >
-                      <Icon className="size-4" />
-                    </a>
-                  );
-                })}
+                {socialLinks.map((social, index) => (
+                  <a
+                    // Index, not the platform: two profiles on the same platform
+                    // is ordinary (a shop and its café), and keying on the name
+                    // collided and dropped one of them.
+                    key={index}
+                    href={social.href}
+                    aria-label={social.label}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
+                  >
+                    <SocialMark platform={social.platform} />
+                  </a>
+                ))}
               </div>
             ) : null}
           </div>

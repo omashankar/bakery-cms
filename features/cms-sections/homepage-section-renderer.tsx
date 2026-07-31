@@ -69,6 +69,7 @@ import {
   isWeddingEnabled,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 
@@ -92,6 +93,11 @@ interface HomepageSectionRendererProps {
   /** Raw testimonials + faq read on the server (absent in the builder preview). */
   testimonials?: Testimonial[];
   faqs?: FaqItem[];
+  /**
+   * The shop's Instagram from Settings → Social, read on the server. Absent in
+   * the admin builder preview, where the section falls back to its own content.
+   */
+  instagram?: { url: string; handle: string } | null;
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -818,8 +824,30 @@ function OffersSection(props: HomepageSectionRendererProps) {
 function InstagramSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
-  const handle = contentString(c, "instagramHandle", "monginisofficial");
-  const profileUrl = contentString(c, "instagramUrl", "https://instagram.com");
+  // The section's own content wins when the admin has set it in the builder;
+  // otherwise the shop's real Instagram from Settings → Social. The shipped
+  // placeholders count as "not set" — they were seeded, not chosen, and a shop
+  // that has configured its own profile should not keep advertising the demo
+  // account across seven links and a "Follow @…" button.
+  const SEED_HANDLE = "monginisofficial";
+  const SEED_URL = "https://instagram.com";
+  const contentHandle = contentString(c, "instagramHandle");
+  const contentUrl = contentString(c, "instagramUrl");
+  const configured = props.instagram ?? null;
+
+  const handle =
+    (contentHandle && contentHandle !== SEED_HANDLE ? contentHandle : "") ||
+    configured?.handle ||
+    contentHandle ||
+    SEED_HANDLE;
+
+  // Seven anchors below render this. It is builder-editable content, so it is
+  // admin-typed text reaching an `href` exactly like `social[].href` was —
+  // `javascript:` here is script execution on the homepage. Anything that is not
+  // an http(s) URL falls back rather than being rendered.
+  const preferredUrl =
+    (contentUrl && contentUrl !== SEED_URL ? contentUrl : "") || configured?.url || contentUrl;
+  const profileUrl = isSafeSocialUrl(preferredUrl) ? preferredUrl : SEED_URL;
 
   return (
     <SectionShell {...props} noReveal>
@@ -827,7 +855,15 @@ function InstagramSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description", `@${handle}`)}
+          // The seeded copy reads "@monginisofficial — daily inspiration…", and
+          // that text is stored on every homepage created before this. Swapping
+          // the placeholder handle at RENDER time keeps the admin's own words
+          // and their stored content untouched, while a shop that has set its
+          // real Instagram stops advertising the demo account in prose.
+          description={contentString(c, "description", `@${handle}`).replaceAll(
+            `@${SEED_HANDLE}`,
+            `@${handle}`
+          )}
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

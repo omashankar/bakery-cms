@@ -3,10 +3,13 @@ import { z } from "zod";
 import {
   currencyOptions,
   isSafeAssetUrl,
+  isSafeSocialUrl,
   isValidMapEmbedUrl,
   normalizeMapEmbedUrl,
+  socialPlatformOptions,
   timezoneOptions,
 } from "@/features/settings/lib/settings-utils";
+import { isValidIp } from "@/features/settings/lib/maintenance-access";
 
 /**
  * Zod contracts for each settings section. The API validates every write
@@ -37,6 +40,7 @@ const nonNegative = z.number().min(0, "Must be zero or more");
  */
 const timezoneValues = timezoneOptions.map((option) => option.value) as [string, ...string[]];
 const currencyValues = currencyOptions.map((option) => option.value) as [string, ...string[]];
+const socialPlatformValues = [...socialPlatformOptions] as [string, ...string[]];
 
 /**
  * Logo / favicon: rendered into `<img src>` and `<link rel="icon" href>`, so the
@@ -95,13 +99,32 @@ export const contactSchema = z.object({
 });
 
 export const socialSchema = z.array(
-  z.object({
-    id: z.string(),
-    platform: z.string(),
-    href: z.string().trim(),
-    label: z.string(),
-    isActive: z.boolean(),
-  }),
+  z
+    .object({
+      id: z.string().trim().min(1),
+      // A closed set: the footer picks its mark by platform name, so an unknown
+      // one renders a placeholder that says nothing about where the link goes.
+      platform: z.enum(socialPlatformValues, "Unknown social platform"),
+      href: z.string().trim().default(""),
+      label: z.string().trim().min(1, "Label is required"),
+      isActive: z.boolean(),
+    })
+    // The URL rule applies to ACTIVE rows only, and that is load-bearing rather
+    // than lenient. An active row is rendered into an `<a href>` in the footer of
+    // EVERY storefront page — the widest untrusted-input surface in the settings,
+    // and it was `z.string().trim()`, which accepts `javascript:`. An inactive row
+    // is rendered nowhere.
+    //
+    // Requiring it unconditionally created a trap: `migrate()` repairs a stored
+    // `javascript:` row by DEACTIVATING it (keeping the label so an admin can see
+    // what needs fixing), which would then have produced a document the section's
+    // own write path rejects forever — one row the server hid, and the whole
+    // section unsaveable. Reactivating still has to pass, so nothing unsafe can
+    // reach a visitor.
+    .refine((link) => !link.isActive || isSafeSocialUrl(link.href), {
+      path: ["href"],
+      error: "An active link needs a full http(s):// profile URL",
+    }),
 );
 
 export const securitySchema = z.object({

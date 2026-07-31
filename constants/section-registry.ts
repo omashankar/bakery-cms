@@ -389,9 +389,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Follow Us",
       title: "On Instagram",
-      description: "@monginisofficial — daily inspiration and behind-the-scenes sweetness.",
-      instagramHandle: "monginisofficial",
-      instagramUrl: "https://instagram.com",
+      description: "Daily inspiration and behind-the-scenes sweetness.",
+      // No handle or URL seeded on purpose: left unset, the section uses the
+      // shop's own Instagram from Settings → Social. Baking the demo account in
+      // here meant a shop that had configured its real profile still advertised
+      // someone else's across seven links and a "Follow @…" button.
       maxCount: 6,
     },
     fields: [
