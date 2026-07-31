@@ -302,7 +302,7 @@ export function SettingsOverviewPage() {
         >
           <AlertTriangle className="size-4 shrink-0" />
           <span className="min-w-0 flex-1">
-            Maintenance mode is on — storefront is paused.
+            Maintenance mode is on — visitors cannot reach the store.
           </span>
           <ChevronRight className="size-4 shrink-0 opacity-50" />
         </Link>

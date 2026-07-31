@@ -235,6 +235,14 @@ function buildOrderFingerprint(input: {
 export interface PlaceOrderResult {
   order: PlacedOrder;
   persisted: boolean;
+  /**
+   * The shop is closed for maintenance, carrying the admin's own message.
+   *
+   * Distinct from a plain `persisted: false`, which means "we could not reach
+   * the bakery" and is worth retrying. This one will be refused every time, so
+   * the caller must say so instead of offering a retry that cannot work.
+   */
+  closed?: string;
 }
 
 /**
@@ -263,7 +271,7 @@ export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult
  * otherwise the customer's confirmation matches no order in the bakery.
  */
 function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): PlaceOrderResult {
-  if (!response.ok) return { order: local, persisted: false };
+  if (!response.ok) return { order: local, persisted: false, closed: response.closed };
 
   const stored = response.order;
   if (!stored || stored.orderNumber === local.orderNumber) {

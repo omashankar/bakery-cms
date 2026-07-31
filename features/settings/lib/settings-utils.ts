@@ -101,7 +101,11 @@ export const defaultMaintenanceSettings: MaintenanceSettings = {
   isEnabled: false,
   message:
     "We are currently performing scheduled maintenance. Please check back shortly.",
-  allowedIps: ["127.0.0.1"],
+  // Empty, not `["127.0.0.1"]`. That default was seeded into every fresh
+  // install, so the moment the allow-list became a real access decision it
+  // meant a guessable address was pre-authorised on every deployment. An
+  // allow-list starts with nobody on it.
+  allowedIps: [],
 };
 
 export const defaultCommerceSettings: CommerceSettings = {

@@ -493,7 +493,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     paymentStatus: "paid" | "cod",
     paymentReference?: string
   ) => {
-    const { order, persisted } = await placeOrder({
+    const { order, persisted, closed } = await placeOrder({
       items,
       totals,
       address: getCheckoutDraft().address,
@@ -506,6 +506,17 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
     });
+
+    if (closed) {
+      // The bakery is closed, not unreachable. The unconfirmed-order overlay
+      // below offers a retry, and a retry cannot succeed while the shop is
+      // shut — it would just send the customer round the same loop. Tell them
+      // what actually happened, in the admin's own words.
+      setPlacing(false);
+      setPayUI(null);
+      toast.error("The store is closed right now", { description: closed, duration: 10000 });
+      return;
+    }
 
     if (!persisted) {
       setPlacing(false);

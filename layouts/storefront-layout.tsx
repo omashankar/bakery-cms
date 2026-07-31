@@ -3,6 +3,7 @@ import { MaintenanceBanner } from "@/apps/website/components/maintenance-banner"
 import { StorefrontBannerStrip } from "@/apps/website/components/storefront-banner-strip";
 import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
+import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
 import { cn } from "@/lib/utils";
 
 interface StorefrontLayoutShellProps {
@@ -10,6 +11,11 @@ interface StorefrontLayoutShellProps {
   className?: string;
   /** Navbar + footer data read from MongoDB on the server. */
   chrome: StorefrontChrome;
+  /**
+   * Read on the server. Only reaches here when the viewer is EXEMPT — a closed
+   * shop is replaced by the maintenance screen before this renders.
+   */
+  maintenance: MaintenanceState;
 }
 
 /** Public bakery website — always light; never follows admin dark mode. */
@@ -17,6 +23,7 @@ export function StorefrontLayoutShell({
   children,
   className,
   chrome,
+  maintenance,
 }: StorefrontLayoutShellProps) {
   return (
     <div
@@ -25,7 +32,7 @@ export function StorefrontLayoutShell({
       style={{ colorScheme: "light" }}
     >
       <div className="contents print:hidden">
-        <MaintenanceBanner />
+        <MaintenanceBanner maintenance={maintenance} />
         <StorefrontBannerStrip />
         <StorefrontNavbar chrome={chrome} />
       </div>

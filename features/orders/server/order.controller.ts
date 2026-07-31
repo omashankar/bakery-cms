@@ -1,5 +1,6 @@
 import { ok, created } from "@/lib/server/http/response";
-import { withErrorHandler, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
+import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getSession, requireRole, requireSession } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -36,6 +37,26 @@ type NumberContext = { params: Promise<{ orderNumber: string }> };
 // ---- Public (customer) ----
 
 export const placeOrderController = withErrorHandler(async (request: Request) => {
+  // A closed shop must not take money. Hiding the storefront stops a customer
+  // REACHING checkout, but this endpoint is reachable directly — and a cart that
+  // was already open when the admin closed the shop would otherwise submit
+  // straight through, producing an order nobody expects to fulfil.
+  //
+  // The exemptions are the same as the storefront's, so an admin can still place
+  // a test order against a shop they have closed, which is often the reason it
+  // is closed.
+  const maintenance = await getMaintenanceState();
+  if (maintenance.isClosed) {
+    const message =
+      maintenance.message || "The store is closed for maintenance. Please try again shortly.";
+    // 503 is the honest status, but this client RETRIES every 5xx — it exists to
+    // rescue a paid order from a dropped request. A closed shop will refuse all
+    // three attempts, so the customer waits out the backoff and is then offered a
+    // manual retry that cannot succeed. The `maintenance` marker is how the
+    // client tells this refusal apart from an outage, without matching on prose.
+    throw new AppError(message, 503, [{ field: "maintenance", message }]);
+  }
+
   const input = validate(placeOrderSchema, await readJson(request));
   const order = await service.placeOrder(input, requestContext(request));
   return created(order, "Order placed");

@@ -155,8 +155,15 @@ export const analyticsSchema = z.object({
 
 export const maintenanceSchema = z.object({
   isEnabled: z.boolean(),
-  message: z.string().default(""),
-  allowedIps: z.array(z.string()).default([]),
+  // Shown to every visitor while the shop is closed, so it cannot be blank —
+  // that would render the maintenance screen with an empty explanation.
+  message: z.string().trim().min(1, "Visitors need to be told why the store is closed"),
+  // Now enforced rather than decorative. These decide who may still reach a
+  // closed shop, and an entry the server can never match against a real client
+  // address is an admin believing they have access that they do not have.
+  allowedIps: z
+    .array(z.string().trim().refine(isValidIp, "Not a valid IP address"))
+    .default([]),
 });
 
 export const commerceSchema = z.object({

@@ -106,14 +106,14 @@ async function sendWithStatus(
   path: string,
   method: string,
   body?: unknown
-): Promise<{ ok: boolean; status: number; data?: PlacedOrder | null }> {
+): Promise<{ ok: boolean; status: number; data?: PlacedOrder | null; closed?: string }> {
   try {
     const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!res.ok) return { ok: false, status: res.status };
+    if (!res.ok) return { ok: false, status: res.status, closed: await readClosedReason(res) };
 
     // A body we cannot read does not undo a 2xx — the order IS stored. Every
     // failure here degrades to "no data", never to "the write failed", which is
@@ -133,6 +133,27 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
 /** 3 attempts, 400ms then 800ms apart. */
 const PLACE_ORDER_ATTEMPTS = 3;
 const PLACE_ORDER_BACKOFF_MS = 400;
+
+/**
+ * The admin's "we are closed" message, when THAT is why the write was refused.
+ *
+ * A closed shop answers 503, which this file otherwise treats as a transient
+ * outage worth retrying. The server tags the refusal so the two can be told
+ * apart without matching on prose.
+ */
+async function readClosedReason(res: Response): Promise<string | undefined> {
+  if (res.status !== 503) return undefined;
+  try {
+    const body = (await res.json()) as {
+      message?: string;
+      errors?: { field?: string; message?: string }[] | null;
+    };
+    const marker = body.errors?.find((error) => error.field === "maintenance");
+    return marker ? marker.message || body.message || "The store is closed." : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** A rejection the server will keep rejecting — retrying it just wastes the wait. */
 function isWorthRetrying(status: number): boolean {
@@ -161,14 +182,23 @@ export interface PlaceOrderResponse {
    * a confirmation number that matches nothing.
    */
   order?: PlacedOrder;
+  /**
+   * Set when the shop is closed for maintenance. Carries the admin's own
+   * message, so the customer is told the bakery is closed rather than left
+   * looking at a generic "could not reach the server".
+   */
+  closed?: string;
 }
 
 export async function placeOrderRequest(order: PlacedOrder): Promise<PlaceOrderResponse> {
   for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
 
-    const { ok, status, data } = await sendWithStatus("/api/orders", "POST", order);
+    const { ok, status, data, closed } = await sendWithStatus("/api/orders", "POST", order);
     if (ok) return { ok: true, order: data ?? undefined };
+    // A closed shop will refuse every attempt. Retrying only makes the customer
+    // wait out the backoff before being told the same thing.
+    if (closed) return { ok: false, closed };
     if (!isWorthRetrying(status)) return { ok: false };
   }
 
