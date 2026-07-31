@@ -14,6 +14,7 @@ import {
 } from "@/features/communications/server/email.service";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
+import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
@@ -83,7 +84,18 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // money, and the money is what must not be charged for twice.
   if (input.paymentReference) {
     const existing = await repo.findByPaymentReference(input.paymentReference);
-    if (existing) return existing;
+    if (existing) {
+      // Same reasoning as the `already-placed` branch below, which has had this
+      // guard from the start — this one was missed. The endpoint is deliberately
+      // unauthenticated, so returning a stored order keyed on a client-supplied
+      // string hands a stranger's name, phone, street address and every line
+      // item to anyone who guesses a reference. A genuine retry always carries
+      // the contact details it was placed with.
+      if (!verifyOrderLookup(existing, input.address)) {
+        throw new NotFoundError("Order not found");
+      }
+      return existing;
+    }
   }
 
   const settings = (await getSettings()) as Record<string, unknown>;
@@ -92,17 +104,44 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // which never renders the root layout, so there is no `<html>` and no
   // per-request locale for the formatter to fall back on.
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
-  const placedAt = input.placedAt ?? new Date().toISOString();
-  const paymentStatus: PaymentStatus =
-    (input.paymentStatus as PaymentStatus | undefined) ??
-    (input.paymentMethod === "cod" ? "cod" : "paid");
+  const placedAt = new Date().toISOString();
 
-  const status = (input.status as OrderStatus | undefined) ?? "confirmed";
+  // The server decides whether an order is paid. It used to be
+  //   input.paymentStatus ?? (paymentMethod === "cod" ? "cod" : "paid")
+  // — the caller's word, and "paid" by default for anything that was not COD. A
+  // plain anonymous POST with `paymentMethod: "razorpay"` and no payment
+  // whatsoever was therefore stored as CONFIRMED and PAID.
+  //
+  // Now: cash is cash, and anything else is only paid once the GATEWAY says the
+  // money was captured. Anything unconfirmed lands as "pending", which is the
+  // honest answer — the shop can see it and reconcile, and no one is told money
+  // arrived that did not.
+  const payment =
+    input.paymentMethod === "cod"
+      ? null
+      : await checkRazorpayPayment(input.paymentReference ?? "");
+
+  if (payment?.unavailable) {
+    // An operator problem, not a customer one: the order is still taken, just
+    // not marked paid. Logged so it is visible when reconciling.
+    console.error(`[orders] Could not confirm payment with Razorpay: ${payment.unavailable}`);
+  }
+
+  const paymentStatus: PaymentStatus =
+    input.paymentMethod === "cod" ? "cod" : payment?.captured ? "paid" : "pending";
+
+  // Not client-settable either: an order begins its life confirmed, and every
+  // later state comes from an admin action through `updateStatus`.
+  const status: OrderStatus = "confirmed";
   const order: PlacedOrder = {
     // Use the client-provided identity/state when present (storefront), else
     // generate (direct API). Keeps local and server copies in agreement.
     id: input.id ?? randomUUID(),
-    orderNumber: input.orderNumber ?? (await generateOrderNumber(commerce)),
+    // Always minted here. The client used to propose one so its success page had
+    // a number early, and the server only reissued on collision — but the client
+    // already adopts whatever comes back (`adoptStoredOrder`), so owning it
+    // outright costs nothing and removes a caller-chosen key from the record.
+    orderNumber: await generateOrderNumber(commerce),
     items: input.items as unknown as PlacedOrder["items"],
     totals: input.totals as unknown as PlacedOrder["totals"],
     address: input.address as unknown as PlacedOrder["address"],
@@ -114,11 +153,8 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     deliverySlot: input.deliverySlot as unknown as PlacedOrder["deliverySlot"],
     placedAt,
     status,
-    statusHistory:
-      (input.statusHistory as PlacedOrder["statusHistory"] | undefined) ?? [
-        { status, at: placedAt },
-      ],
-    estimatedDelivery: input.estimatedDelivery ?? resolveEstimatedDelivery(input, commerce),
+    statusHistory: [{ status, at: placedAt }],
+    estimatedDelivery: resolveEstimatedDelivery(input, commerce),
   };
 
   // Atomic: create the order AND reduce stock for each line together.
@@ -141,7 +177,14 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // and insert again. Bounded because each attempt is a real round trip, and
   // generateOrderNumber already checks the collection.
   for (let attempt = 0; attempt < ORDER_NUMBER_ATTEMPTS && !placed; attempt += 1) {
-    const outcome = await repo.createOrderWithStockReduction(candidate, reductions);
+    // Oversell only for money that has actually arrived — see the parameter's
+    // own note. An unpaid caller is refused instead, which is what stops an
+    // anonymous POST driving the catalogue negative.
+    const outcome = await repo.createOrderWithStockReduction(
+      candidate,
+      reductions,
+      paymentStatus === "paid",
+    );
 
     if (outcome.kind === "already-placed") {
       // This endpoint is deliberately unauthenticated — it is the storefront
@@ -291,6 +334,11 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
   return updated;
 }
 
+/** The stock an order took off the shelf, for putting back. */
+function stockFor(order: PlacedOrder) {
+  return order.items.map((item) => ({ slug: item.productSlug, quantity: item.quantity }));
+}
+
 export async function cancel(id: string, cancellationReason: string | undefined, ctx: RequestCtx) {
   const order = await requireOrder(id);
   if (order.status === "cancelled" || order.status === "refunded") return order;
@@ -301,6 +349,13 @@ export async function cancel(id: string, cancellationReason: string | undefined,
     cancellationReason: cancellationReason?.trim() || undefined,
     statusHistory: [...order.statusHistory, { status: "cancelled", at: now }],
   });
+
+  // The cakes are back on the shelf. Nothing in this repo ever added stock, so
+  // a cancelled order used to destroy inventory permanently — the shop's own
+  // counts drifted down every time it corrected a mistake. The early return
+  // above is what keeps this from running twice.
+  await repo.restoreStock(stockFor(order));
+
   await audit(ctx, "order.cancel", id, { reason: cancellationReason });
   return updated;
 }
@@ -368,6 +423,13 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
     refundRecord,
     statusHistory: [...order.statusHistory, { status: "refunded", at: now }],
   });
+
+  // Only when the order was not already cancelled — `cancel` has put the stock
+  // back already, and refunding a cancelled order must not put it back twice.
+  if (order.status !== "cancelled") {
+    await repo.restoreStock(stockFor(order));
+  }
+
   await audit(ctx, "order.refund", id, { amount: refundAmount });
   return updated;
 }

@@ -46,27 +46,26 @@ export const placeOrderSchema = z.object({
   // sends the id/orderNumber it already generated (so local + server agree);
   // a direct/headless API call omits them and the server generates them.
   id: z.string().optional(),
-  orderNumber: z.string().optional(),
-  placedAt: z.string().optional(),
-  status: z
-    .enum([
-      "pending",
-      "confirmed",
-      "preparing",
-      "ready",
-      "out_for_delivery",
-      "delivered",
-      "cancelled",
-      "refunded",
-    ])
-    .optional(),
-  statusHistory: z.array(z.object({ status: z.string(), at: z.string() }).passthrough()).optional(),
-  estimatedDelivery: z.string().optional(),
+  // NOT accepted from the caller, and deliberately absent from this schema:
+  // `orderNumber`, `placedAt`, `status`, `statusHistory`, `estimatedDelivery`,
+  // `paymentStatus`. Every one of them used to be stored verbatim, and this
+  // endpoint is anonymous — so a single POST could file an order that was
+  // already `delivered`, or already `refunded`, backdated to any date, with a
+  // fabricated history no lifecycle transition could have produced. The payment
+  // ledger has no separate existence (transactions are derived from orders), so
+  // those forgeries landed straight in the Transaction and Refund centres.
+  //
+  // `id` stays: it is the idempotency key the retry path re-sends byte for byte,
+  // and a uuid is not enumerable. The client may keep sending the rest — `.strip()`
+  // is Zod's default, so they are dropped rather than rejected, and no storefront
+  // change is needed.
   items: z.array(cartItemSchema).min(1, "Cannot place an empty order"),
   totals: totalsSchema,
   address: addressSchema,
   paymentMethod: z.enum(["cod", "upi", "card", "razorpay"]),
-  paymentStatus: z.enum(["cod", "paid", "pending", "failed", "refunded"]).optional(),
+  // `paymentReference` is still accepted — it is the gateway's payment id, and
+  // the server now VERIFIES it against the gateway rather than taking the
+  // client's word for what it means. `paymentStatus` is derived from that check.
   paymentReference: z.string().optional(),
   coupon: z.record(z.string(), z.unknown()).optional(),
   orderNotes: z.string().optional(),

@@ -7,6 +7,27 @@ import type { OrderStatus, PaymentStatus, PlacedOrder } from "@/features/orders/
 
 /** Order repository — the only place that touches the orders collection. */
 
+/**
+ * A line could not be reserved. Thrown from inside the transaction so the order
+ * is unwound with it — the alternative is an order for stock the shop does not
+ * have, which is worse than a refused checkout.
+ */
+export class OutOfStockError extends Error {
+  readonly productName: string;
+  readonly available: number;
+
+  constructor(productName: string, available: number) {
+    super(
+      available > 0
+        ? `Only ${available} left of ${productName}.`
+        : `${productName} is out of stock.`,
+    );
+    this.name = "OutOfStockError";
+    this.productName = productName;
+    this.available = available;
+  }
+}
+
 type Raw = OrderDoc & { __v?: number };
 
 function toDoc(order: PlacedOrder): OrderDoc {
@@ -93,6 +114,19 @@ export type CreateOrderOutcome =
 export async function createOrderWithStockReduction(
   order: PlacedOrder,
   reductions: StockReduction[],
+  /**
+   * Take the order even if a line cannot be reserved.
+   *
+   * Set when the gateway has CONFIRMED the money was captured. Refusing then
+   * would leave a customer charged with no order and a retry that can never
+   * succeed — strictly worse than a shop that oversold by one cake and can ring
+   * the customer. Unpaid and COD orders are refused instead, which is what stops
+   * an anonymous caller driving the whole catalogue negative.
+   *
+   * The proper fix is to reserve stock BEFORE payment, which needs the
+   * quote/draft step this architecture does not have yet.
+   */
+  allowOversell = false,
 ): Promise<CreateOrderOutcome> {
   await connectDB();
   const session = await mongoose.startSession();
@@ -101,11 +135,50 @@ export async function createOrderWithStockReduction(
       await OrderModel.create([toDoc(order)], { session });
       for (const r of reductions) {
         if (!r.slug || r.quantity <= 0) continue;
-        await ProductModel.updateOne(
-          { slug: r.slug, unlimitedStock: { $ne: true } },
+        const result = await ProductModel.updateOne(
+          {
+            slug: r.slug,
+            unlimitedStock: { $ne: true },
+            // The filter used to be slug + unlimitedStock alone, so the
+            // decrement ALWAYS applied and drove `stockQuantity` negative. This
+            // endpoint is anonymous, so the whole catalogue could be pushed
+            // below zero — and nothing anywhere adds stock back, so it stayed
+            // there. Matching on availability makes the check and the decrement
+            // one atomic step, which is also what stops two concurrent orders
+            // from both selling the last cake.
+            stockQuantity: { $gte: r.quantity },
+          },
           { $inc: { stockQuantity: -r.quantity } },
           { session },
         );
+
+        if (result.matchedCount === 0) {
+          // Either the product is unlimited, gone, or there is not enough of it.
+          const product = (await ProductModel.findOne({ slug: r.slug })
+            .select({ name: 1, unlimitedStock: 1, stockQuantity: 1 })
+            .session(session)
+            .lean()) as { name?: string; unlimitedStock?: boolean; stockQuantity?: number } | null;
+
+          if (product?.unlimitedStock) continue;
+
+          if (allowOversell) {
+            // Paid for. Take the order, go negative, and make the shortfall
+            // loud — an operator has to call this customer.
+            await ProductModel.updateOne(
+              { slug: r.slug, unlimitedStock: { $ne: true } },
+              { $inc: { stockQuantity: -r.quantity } },
+              { session },
+            );
+            console.error(
+              `[orders] OVERSOLD ${r.slug} on paid order ${order.orderNumber}: wanted ${r.quantity}, had ${product?.stockQuantity ?? 0}`,
+            );
+            continue;
+          }
+
+          // Not paid: refuse. Aborting the transaction unwinds the order with
+          // it, so nothing is recorded for stock the shop does not have.
+          throw new OutOfStockError(product?.name ?? r.slug, product?.stockQuantity ?? 0);
+        }
       }
     });
   } catch (error) {
@@ -128,6 +201,28 @@ export async function createOrderWithStockReduction(
     await session.endSession();
   }
   return { kind: "created", order };
+}
+
+/**
+ * Puts the stock an order reserved back on the shelf.
+ *
+ * There was exactly one `$inc` on `stockQuantity` in the whole repo and it was
+ * negative — so every cancellation and every refund destroyed inventory
+ * permanently. A shop that cancelled a mistaken order watched its own stock
+ * count fall with no way to raise it except editing each product by hand.
+ *
+ * Idempotent at the caller: `cancel` and `refund` both return early once the
+ * order already holds that status, so the restore cannot run twice.
+ */
+export async function restoreStock(reductions: StockReduction[]): Promise<void> {
+  await connectDB();
+  for (const r of reductions) {
+    if (!r.slug || r.quantity <= 0) continue;
+    await ProductModel.updateOne(
+      { slug: r.slug, unlimitedStock: { $ne: true } },
+      { $inc: { stockQuantity: r.quantity } },
+    );
+  }
 }
 
 export async function findById(id: string): Promise<PlacedOrder | null> {

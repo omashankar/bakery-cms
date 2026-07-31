@@ -4,7 +4,7 @@ import {
   clearRazorpayConfig,
   getRazorpayStatus,
   saveRazorpayConfig,
-} from "@/apps/admin/settings/lib/razorpay-config.server";
+} from "@/lib/server/payments/razorpay-credentials";
 import { requireAdminResponse } from "@/lib/server/auth/guard";
 
 /** Returns connection status only — the secret key is never sent to the client. */

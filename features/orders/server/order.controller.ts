@@ -6,6 +6,7 @@ import { getSession, requireRole, requireSession } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
+import { OutOfStockError } from "./order.repository";
 import * as service from "./order.service";
 import {
   placeOrderSchema,
@@ -58,8 +59,21 @@ export const placeOrderController = withErrorHandler(async (request: Request) =>
   }
 
   const input = validate(placeOrderSchema, await readJson(request));
-  const order = await service.placeOrder(input, requestContext(request));
-  return created(order, "Order placed");
+
+  try {
+    const order = await service.placeOrder(input, requestContext(request));
+    return created(order, "Order placed");
+  } catch (error) {
+    // A line could not be reserved. 409 rather than 5xx so the checkout client
+    // does not retry it — the answer will be the same until stock changes — and
+    // the customer is told which item, not handed a generic failure.
+    if (error instanceof OutOfStockError) {
+      throw new AppError(error.message, 409, [
+        { field: "items", message: error.message },
+      ]);
+    }
+    throw error;
+  }
 });
 
 /**
