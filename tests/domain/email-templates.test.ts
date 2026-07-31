@@ -87,6 +87,48 @@ describe("the seeded transactional templates", () => {
     expect(rendered).toContain("482913");
   });
 
+  /**
+   * The `store_*` variables `sendTemplatedEmail` fills in for every template, so
+   * no caller has to. Kept here as data: a template that references a `store_`
+   * variable outside this set has no one to fill it, and `renderTemplate` leaves
+   * an unresolved key as literal text — which is how customers were sent
+   * "Need help? Call {{store_phone}}".
+   */
+  const AUTO_FILLED = ["store_name", "store_phone", "store_email"];
+
+  it("only references store_ variables that the email service actually fills", () => {
+    for (const template of templates) {
+      const referenced = extractTemplateVariables(`${template.subject} ${template.body}`).filter(
+        (name) => name.startsWith("store_")
+      );
+
+      for (const name of referenced) {
+        expect(AUTO_FILLED, `${template.slug} references {{${name}}}`).toContain(name);
+      }
+    }
+  });
+
+  it("leaves no store_ slot unrendered once the service has merged its own values", () => {
+    // The shipped "order shipped" and invoice copies use store_phone and
+    // store_email; only store_name was ever merged, so those two arrived at the
+    // customer as literal braces.
+    const shipped = bySlug("order_shipped");
+    expect(shipped?.body).toContain("{{store_phone}}");
+
+    const rendered = renderTemplate(shipped?.body ?? "", {
+      customer_name: "Asha",
+      order_number: "BK-1",
+      delivery_date: "2026-08-01",
+      delivery_address: "12 Bakery Lane",
+      store_name: "Monginis",
+      store_phone: "+91 90000 00000",
+      store_email: "hello@shop.in",
+    });
+
+    expect(extractTemplateVariables(rendered)).toEqual([]);
+    expect(rendered).toContain("+91 90000 00000");
+  });
+
   it("renders the order confirmation with what order.service supplies", () => {
     const confirmation = bySlug("order_confirmation");
     const rendered = renderTemplate(confirmation?.body ?? "", {

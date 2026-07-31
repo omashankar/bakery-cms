@@ -4,7 +4,7 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import type { EmailTemplateRecord } from "@/types/communication";
 import type { SeoStore } from "@/types/seo";
-import type { GeneralSettings } from "@/types/settings";
+import type { ContactSettings, GeneralSettings } from "@/types/settings";
 
 import { getTemplates } from "./communications.service";
 
@@ -70,12 +70,30 @@ function toHtml(text: string): string {
     .join("<br />")}</div>`;
 }
 
-async function storeName(): Promise<string> {
+/**
+ * The shop's own details, for the variables every template may reference.
+ *
+ * `store_phone` and `store_email` are advertised to admins as insertable chips,
+ * previewed with sample values, and used by two of the templates this repo
+ * SHIPS — "out for delivery" says "Need help? Call {{store_phone}}" and the
+ * invoice mail says "Questions? Email {{store_email}}". Only `store_name` was
+ * ever merged, and `renderTemplate` leaves an unresolved key as literal text,
+ * so customers received "Need help? Call {{store_phone}}".
+ */
+async function storeIdentity(): Promise<Record<string, string>> {
+  const fallback = { store_name: "Our bakery", store_phone: "", store_email: "" };
   try {
-    const settings = (await getSettings()) as { general?: GeneralSettings };
-    return settings.general?.siteName?.trim() || "Our bakery";
+    const settings = (await getSettings()) as {
+      general?: GeneralSettings;
+      contact?: ContactSettings;
+    };
+    return {
+      store_name: settings.general?.siteName?.trim() || fallback.store_name,
+      store_phone: settings.contact?.phone?.trim() ?? "",
+      store_email: settings.contact?.email?.trim() ?? "",
+    };
   } catch {
-    return "Our bakery";
+    return fallback;
   }
 }
 
@@ -112,9 +130,10 @@ export async function sendTemplatedEmail(
   const stored = await findTemplate(slug);
   const source = stored ?? FALLBACKS[slug];
 
-  // `store_name` is filled here rather than by every caller — it is the same
-  // value for all of them and reads from settings the caller may not have.
-  const merged = { store_name: await storeName(), ...variables };
+  // The store's own details are filled here rather than by every caller — they
+  // are the same for all of them and read from settings the caller may not
+  // have. A caller may still override any of them explicitly.
+  const merged = { ...(await storeIdentity()), ...variables };
 
   const body = renderTemplate(source.body, merged);
 
