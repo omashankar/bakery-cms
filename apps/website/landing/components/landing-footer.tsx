@@ -114,8 +114,11 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             <div className="space-y-4 lg:col-span-2">
               <h4 className="text-sm font-semibold text-foreground">Opening Hours</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                {businessHours.map((item) => (
-                  <li key={item.day} className="flex items-start gap-2">
+                {businessHours.map((item, index) => (
+                  // Index, not the day: these rows are admin-typed, and two rows
+                  // named the same thing collided as React keys and dropped one
+                  // of them from the footer.
+                  <li key={index} className="flex items-start gap-2">
                     <Clock className="mt-0.5 size-4 shrink-0 text-bakery-700" />
                     <span>
                       <span className="font-medium text-foreground">{item.day}</span>

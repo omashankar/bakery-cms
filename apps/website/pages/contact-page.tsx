@@ -93,9 +93,12 @@ export function ContactPage({ defaultSubject, contact }: ContactPageProps) {
               <div className="rounded-2xl border border-border bg-white p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Opening Hours</h2>
                 <ul className="mt-5 space-y-3 text-sm">
-                  {businessHours.map((item) => (
+                  {businessHours.map((item, index) => (
                     <li
-                      key={item.day}
+                      // Index, not the day: these rows are admin-typed, and two
+                      // rows named the same thing (or a blank one) collided as
+                      // React keys and dropped a row from the rendered list.
+                      key={index}
                       className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
                     >
                       <span className="flex items-center gap-2.5 font-medium text-foreground">
@@ -110,17 +113,30 @@ export function ContactPage({ defaultSubject, contact }: ContactPageProps) {
             </ScrollReveal>
           </div>
 
-          {/* Map — full-width band so both columns stay balanced */}
-          <ScrollReveal className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
-            <iframe
-              title="Bakery location"
-              src={contactInfo.mapEmbedUrl}
-              className="h-full w-full border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-            />
-          </ScrollReveal>
+          {/* Map — full-width band so both columns stay balanced. Rendered only
+              when there is a map: an admin who clears the field means "no map",
+              and the band used to fall back to the demo pin, advertising
+              somebody else's address as the shop's. */}
+          {contactInfo.mapEmbedUrl ? (
+            <ScrollReveal className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
+              <iframe
+                title="Bakery location"
+                src={contactInfo.mapEmbedUrl}
+                className="h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                // The accepted host set is deliberately "any https", so an
+                // admin can embed OpenStreetMap or Mapbox rather than only
+                // Google. That also means the framed page is not trusted:
+                // without a sandbox it could navigate the TOP window, and every
+                // visitor to the contact page follows it wherever it goes.
+                // `allow-top-navigation` is the permission being withheld;
+                // scripts, same-origin and popups are what a map needs to work.
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+                allowFullScreen
+              />
+            </ScrollReveal>
+          ) : null}
         </div>
       </section>
     </>
