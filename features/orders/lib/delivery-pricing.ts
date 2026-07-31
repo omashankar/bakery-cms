@@ -1,7 +1,11 @@
 import type { CommerceSettings } from "@/types/settings";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
-import { resolveDeliveryZoneForAddress } from "@/features/commerce/lib/delivery-zones-repository";
+import {
+  findDeliveryZone,
+  resolveDeliveryZoneForAddress,
+} from "@/features/commerce/lib/delivery-zones-repository";
+import type { DeliveryZone } from "@/types/delivery";
 
 export interface DeliveryQuote {
   delivery: number;
@@ -18,7 +22,14 @@ export function calculateDeliveryQuote(
     city?: string;
     pincode?: string;
   },
-  commerceOverride?: CommerceSettings
+  commerceOverride?: CommerceSettings,
+  /**
+   * Zones from the caller instead of `localStorage`. The server has to pass its
+   * own — without this the zone lookup silently found nothing on the server and
+   * every delivery fell back to the flat fee, which is a different number from
+   * the one the customer was shown.
+   */
+  zonesOverride?: DeliveryZone[],
 ): DeliveryQuote {
   const commerce = commerceOverride ?? (
     typeof window === "undefined" ? defaultCommerceSettings : getCommerceSettings()
@@ -35,10 +46,9 @@ export function calculateDeliveryQuote(
     };
   }
 
-  const match = resolveDeliveryZoneForAddress({
-    city: input.city,
-    pincode: input.pincode,
-  });
+  const match = zonesOverride
+    ? findDeliveryZone(zonesOverride, { city: input.city, pincode: input.pincode })
+    : resolveDeliveryZoneForAddress({ city: input.city, pincode: input.pincode });
 
   if (!match) {
     return {

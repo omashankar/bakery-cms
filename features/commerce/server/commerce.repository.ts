@@ -42,6 +42,24 @@ export async function replaceCoupons(coupons: StoredCoupon[]): Promise<void> {
   await CouponModel.bulkWrite(ops);
 }
 
+/**
+ * Counts one redemption, atomically.
+ *
+ * The counter used to be incremented from the BROWSER, through
+ * `PUT /api/coupons` — a whole-collection replace that requires an admin role.
+ * For a real customer that write was a guaranteed 403, and the result was
+ * discarded, so `usageCount` only ever moved when an admin happened to check
+ * out. The admin's coupon list has been showing the seed constant ever since.
+ */
+export async function incrementCouponUsage(code: string): Promise<void> {
+  await connectDB();
+  const normalized = code.trim().toUpperCase();
+  await CouponModel.updateOne(
+    { code: { $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+    { $inc: { usageCount: 1 } },
+  );
+}
+
 // ---- Delivery zones ----
 
 export async function listZones(): Promise<DeliveryZone[]> {

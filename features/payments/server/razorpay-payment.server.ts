@@ -26,11 +26,13 @@ export interface PaymentCheck {
   captured: boolean;
   /** What the gateway says was actually paid, in major units. */
   amount: number | null;
+  /** The gateway order this payment settled — must be the cart's own. */
+  orderId: string | null;
   /** Why we could not confirm — an operator problem, not a customer one. */
   unavailable?: string;
 }
 
-const NOT_CONFIRMED: PaymentCheck = { captured: false, amount: null };
+const NOT_CONFIRMED: PaymentCheck = { captured: false, amount: null, orderId: null };
 
 export async function checkRazorpayPayment(paymentId: string): Promise<PaymentCheck> {
   const reference = paymentId.trim();
@@ -57,6 +59,7 @@ export async function checkRazorpayPayment(paymentId: string): Promise<PaymentCh
     return {
       captured,
       amount: Number.isFinite(paise) ? paise / 100 : null,
+      orderId: typeof payment?.order_id === "string" ? payment.order_id : null,
     };
   } catch (error) {
     // Fail CLOSED on the payment status: an unreachable gateway must never

@@ -190,11 +190,17 @@ export interface PlaceOrderResponse {
   closed?: string;
 }
 
-export async function placeOrderRequest(order: PlacedOrder): Promise<PlaceOrderResponse> {
+export async function placeOrderRequest(
+  order: PlacedOrder,
+  /** The cart the server priced. Sent so the server uses its own numbers. */
+  draftId?: string,
+): Promise<PlaceOrderResponse> {
+  const body = draftId ? { ...order, draftId } : order;
+
   for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
 
-    const { ok, status, data, closed } = await sendWithStatus("/api/orders", "POST", order);
+    const { ok, status, data, closed } = await sendWithStatus("/api/orders", "POST", body);
     if (ok) return { ok: true, order: data ?? undefined };
     // A closed shop will refuse every attempt. Retrying only makes the customer
     // wait out the backoff before being told the same thing.

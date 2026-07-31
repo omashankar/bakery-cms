@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
-import { NotFoundError } from "@/lib/server/http/errors";
+import { AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
 import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
@@ -15,6 +15,8 @@ import {
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
+import { consumeDraft, findDraft } from "@/features/checkout/server/draft.repository";
+import { incrementCouponUsage as recordCouponRedemption } from "@/features/commerce/server/commerce.repository";
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
@@ -106,6 +108,34 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
   const placedAt = new Date().toISOString();
 
+  // The priced cart the shop holds. When there is one, its numbers ARE the
+  // order's — `input.items[].price`, `input.totals` and `input.coupon` are
+  // ignored. They used to be stored verbatim, so a 5000-rupee cake could be
+  // ordered at 1 rupee and a coupon could be invented outright.
+  const draft = input.draftId ? await findDraft(input.draftId) : null;
+  if (input.draftId && !draft) {
+    throw new AppError("This cart needs to be priced again. Please refresh and retry.", 409);
+  }
+  if (draft?.consumedByOrderId) {
+    // Already spent. Fall through to the id-based idempotent path rather than
+    // creating a second order for one payment.
+    const existing = await repo.findById(draft.consumedByOrderId);
+    if (existing) {
+      if (!verifyOrderLookup(existing, input.address)) throw new NotFoundError("Order not found");
+      return existing;
+    }
+  }
+
+  // An online payment must be against a cart the shop priced. Without this a
+  // caller could skip the quote entirely and go straight to placement with
+  // whatever numbers they liked — which is the hole the draft exists to close.
+  if (input.paymentMethod !== "cod" && !draft) {
+    throw new AppError(
+      "This cart needs to be priced again before payment. Please refresh and retry.",
+      409,
+    );
+  }
+
   // The server decides whether an order is paid. It used to be
   //   input.paymentStatus ?? (paymentMethod === "cod" ? "cod" : "paid")
   // — the caller's word, and "paid" by default for anything that was not COD. A
@@ -127,8 +157,31 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     console.error(`[orders] Could not confirm payment with Razorpay: ${payment.unavailable}`);
   }
 
+  // Captured is not enough on its own — it has to be captured FOR THIS CART.
+  // Without the amount and order-id checks a genuine 1-rupee payment could be
+  // presented against any cart, which is the same hole from the other end.
+  const expectedTotal = draft ? Number(draft.totals?.total) : null;
+  const amountMatches =
+    payment?.amount == null || expectedTotal == null
+      ? false
+      : Math.abs(payment.amount - expectedTotal) < 0.01;
+  const boundToDraft =
+    !draft?.razorpayOrderId || !payment?.orderId || payment.orderId === draft.razorpayOrderId;
+
+  if (payment?.captured && (!amountMatches || !boundToDraft)) {
+    console.error(
+      `[orders] Payment ${input.paymentReference} does not match its cart` +
+        ` (paid ${payment.amount}, expected ${expectedTotal};` +
+        ` gateway order ${payment.orderId}, draft ${draft?.razorpayOrderId}).`,
+    );
+  }
+
   const paymentStatus: PaymentStatus =
-    input.paymentMethod === "cod" ? "cod" : payment?.captured ? "paid" : "pending";
+    input.paymentMethod === "cod"
+      ? "cod"
+      : payment?.captured && amountMatches && boundToDraft
+        ? "paid"
+        : "pending";
 
   // Not client-settable either: an order begins its life confirmed, and every
   // later state comes from an admin action through `updateStatus`.
@@ -142,13 +195,20 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     // already adopts whatever comes back (`adoptStoredOrder`), so owning it
     // outright costs nothing and removes a caller-chosen key from the record.
     orderNumber: await generateOrderNumber(commerce),
-    items: input.items as unknown as PlacedOrder["items"],
-    totals: input.totals as unknown as PlacedOrder["totals"],
+    // The SHOP's prices, from when it quoted this cart. The request body is
+    // only a fallback for a headless COD caller that never quoted —
+    // `input.items[].price` and `input.totals` used to be stored verbatim
+    // either way, which is how a 5000-rupee cake could be ordered at 1 rupee.
+    items: (draft?.items ?? input.items) as unknown as PlacedOrder["items"],
+    totals: (draft?.totals ?? input.totals) as unknown as PlacedOrder["totals"],
     address: input.address as unknown as PlacedOrder["address"],
     paymentMethod: input.paymentMethod,
     paymentStatus,
     paymentReference: input.paymentReference,
-    coupon: input.coupon as unknown as PlacedOrder["coupon"],
+    // Resolved by the shop against its own coupon list. It used to arrive as
+    // an object the caller invented, discount included, and then appeared in
+    // the admin's coupon performance report as if it were real.
+    coupon: (draft?.coupon ?? input.coupon) as unknown as PlacedOrder["coupon"],
     orderNotes: input.orderNotes,
     deliverySlot: input.deliverySlot as unknown as PlacedOrder["deliverySlot"],
     placedAt,
@@ -163,7 +223,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // by the time it runs the customer's card has already been charged, so one
   // dropped response must not be the end of it — and a retry must not produce a
   // second order or decrement stock twice.
-  const reductions = input.items.map((item) => ({
+  const reductions = (draft?.items ?? input.items).map((item) => ({
     slug: item.productSlug,
     quantity: item.quantity,
   }));
@@ -217,9 +277,28 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     throw new Error("Could not allocate a unique order number");
   }
 
+  // Mark the priced cart spent, so a second placement of the same draft cannot
+  // become a second order. Conditional in Mongo, so two concurrent requests
+  // cannot both win it.
+  if (draft) await consumeDraft(draft.id, placed.id);
+
+  // The redemption counter, recorded where it can actually be written. The
+  // client used to do this through `PUT /api/coupons`, which requires an admin
+  // role — so for a real customer it was a guaranteed 403 and the count only
+  // ever moved when an admin checked out.
+  if (draft?.coupon?.code) {
+    try {
+      await recordCouponRedemption(draft.coupon.code);
+    } catch (error) {
+      // A miscounted redemption is a reporting problem; failing the order over
+      // it would be far worse.
+      console.error(`[orders] Could not record coupon usage: ${String(error)}`);
+    }
+  }
+
   // Best-effort: refresh each affected product's derived stockStatus (the $inc
   // changed the quantity but not the status field). Not part of the transaction.
-  await refreshStockStatuses(input.items.map((i) => i.productSlug));
+  await refreshStockStatuses(reductions.map((r) => r.slug));
 
   await writeAuditLog({
     action: "order.place",

@@ -288,6 +288,12 @@ function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): Pla
 }
 
 export async function placeOrder(input: {
+  /**
+   * The cart the SERVER priced. Its prices and totals are the ones stored — the
+   * `items`/`totals` below are still sent for the local copy the customer sees
+   * immediately, but the server ignores them when a draft is present.
+   */
+  draftId?: string;
   items: CartLineItem[];
   totals: CartTotals;
   address: CheckoutAddress;
@@ -341,8 +347,10 @@ export async function placeOrder(input: {
 
   writeOrders([order, ...readOrders()]);
   // Durable write to the server (creates the order in Mongo + reduces stock,
-  // atomically). Sends the same id/orderNumber so both copies agree.
-  return adoptStoredOrder(order, await placeOrderRequest(order));
+  // atomically). Sends the same id so a retry cannot become a second order, and
+  // the draft id so the server prices from its own record rather than from this
+  // payload.
+  return adoptStoredOrder(order, await placeOrderRequest(order, input.draftId));
 }
 
 /**

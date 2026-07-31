@@ -38,7 +38,7 @@ import { DeliveryAddressPicker } from "@/apps/website/checkout/components/delive
 import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
+import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import {
   clearCheckoutDraft,
   EMPTY_CHECKOUT_ADDRESS,
@@ -62,6 +62,7 @@ import {
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
+import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
@@ -400,7 +401,19 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   );
   const validCoupon = useMemo(() => revalidateCoupon(coupon, subtotal), [coupon, subtotal]);
 
-  const totals = useMemo(
+  /**
+   * The SHOP's totals, once it has priced this cart.
+   *
+   * The number below is computed in the browser from a localStorage copy of the
+   * commerce settings, so it can legitimately disagree with the shop — stale
+   * settings, a price change, a coupon that no longer applies. It is fine as a
+   * running estimate, but the customer must not be asked to pay against it: the
+   * server's number is what gets charged. When they differ, this holds the
+   * server's and the customer is asked to look again before committing.
+   */
+  const [serverTotals, setServerTotals] = useState<CartTotals | null>(null);
+
+  const localTotals = useMemo(
     () =>
       calculateCartTotals({
         items,
@@ -414,6 +427,13 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       }),
     [items, validCoupon, giftWrap, watchedCity, watchedPincode, commerce]
   );
+
+  const totals = serverTotals ?? localTotals;
+
+  // Anything that changes the price invalidates the shop's last answer.
+  useEffect(() => {
+    setServerTotals(null);
+  }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
 
   function persistDraft(
     patch: Partial<{
@@ -491,9 +511,12 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
    */
   const finalizeOrder = async (
     paymentStatus: "paid" | "cod",
-    paymentReference?: string
+    paymentReference: string | undefined,
+    /** The cart the SHOP priced. Its numbers are the ones that get stored. */
+    draftId: string,
   ) => {
     const { order, persisted, closed } = await placeOrder({
+      draftId,
       items,
       totals,
       address: getCheckoutDraft().address,
@@ -596,20 +619,54 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
     const address = getCheckoutDraft().address;
 
+    // Ask the SHOP what this cart costs, and hold on to the draft it prices.
+    // Everything downstream — the amount charged and the prices stored on the
+    // order — comes from that draft rather than from anything computed here.
+    setPlacing(true);
+    const { quote, error: quoteError } = await requestCartQuote({
+      items,
+      couponCode: validCoupon?.code,
+      giftWrap,
+      deliveryAddress: { city: address.city, pincode: address.pincode },
+      // The whole order intent, so the webhook can finish this order from the
+      // draft if the customer's browser never comes back from the gateway.
+      address,
+      deliverySlot,
+      orderNotes: orderNotes.trim() || undefined,
+    });
+
+    if (!quote) {
+      setPlacing(false);
+      toast.error("Could not price your order", {
+        description: quoteError ?? "Please refresh and try again.",
+      });
+      return;
+    }
+
+    // The shop's number is the one that will be charged, so it is the one the
+    // customer has to see before they commit to paying.
+    if (Math.abs(quote.totals.total - totals.total) >= 0.01) {
+      setServerTotals(quote.totals);
+      setPlacing(false);
+      toast.error("Prices have changed", {
+        description: `This order now comes to ${formatCurrency(quote.totals.total)}. Please review and place it again.`,
+        duration: 10000,
+      });
+      return;
+    }
+
     // Online payment — open the Razorpay modal, place the order only once verified.
     if (paymentMethod === "razorpay") {
-      setPlacing(true);
       setPayUI({ state: "redirecting" });
       try {
         const result = await openRazorpayCheckout({
-          amount: totals.total,
-          receipt: `bk-${Date.now()}`,
+          draftId: quote.draftId,
           name: address.fullName,
           email: address.email,
           phone: address.phone,
         });
         setPayUI({ state: "processing" });
-        await finalizeOrder("paid", result.paymentId);
+        await finalizeOrder("paid", result.paymentId, quote.draftId);
       } catch (error) {
         setPlacing(false);
         const msg = error instanceof Error ? error.message : "Payment failed";
@@ -619,10 +676,9 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     }
 
     // Cash on Delivery
-    setPlacing(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      await finalizeOrder("cod", undefined);
+      await finalizeOrder("cod", undefined, quote.draftId);
     } catch (error) {
       // Without this guard a thrown placeOrder/clearCart would leave the button
       // stuck on "Placing order…" forever (finalizeOrder never resets `placing`).

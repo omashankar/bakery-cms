@@ -38,6 +38,27 @@ export function getRazorpayCredentials(): RazorpayCredentials | null {
   return readFileConfig();
 }
 
+/**
+ * The secret Razorpay signs WEBHOOKS with.
+ *
+ * A different secret from the API key — set in the Razorpay dashboard when the
+ * webhook is created. Without it a webhook cannot be trusted at all, so the
+ * handler refuses every delivery rather than acting on unsigned input.
+ */
+export function getRazorpayWebhookSecret(): string | null {
+  const fromEnv = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) return null;
+    const parsed = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+    const stored = parsed?.webhookSecret;
+    return typeof stored === "string" && stored.trim() ? stored.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Safe status for the admin UI — never includes the secret. */
 export function getRazorpayStatus() {
   const fromEnv = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);

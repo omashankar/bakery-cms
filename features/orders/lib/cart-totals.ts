@@ -13,6 +13,8 @@ export interface CartTotalsInput {
     pincode?: string;
   };
   commerceOverride?: import("@/types/settings").CommerceSettings;
+  /** Delivery zones from the caller — the server passes its own; see below. */
+  zonesOverride?: import("@/types/delivery").DeliveryZone[];
 }
 
 export interface CartTotals {

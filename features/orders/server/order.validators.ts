@@ -59,6 +59,17 @@ export const placeOrderSchema = z.object({
   // and a uuid is not enumerable. The client may keep sending the rest — `.strip()`
   // is Zod's default, so they are dropped rather than rejected, and no storefront
   // change is needed.
+  /**
+   * The priced cart, minted by `POST /api/checkout/quote`.
+   *
+   * When present the SHOP's prices and totals are used and `items`/`totals`
+   * from the request are ignored entirely. This is the path the storefront
+   * takes, and the only one an online payment can use.
+   */
+  draftId: z.string().trim().optional(),
+  // Still accepted for a headless/COD caller that has not quoted. They are only
+  // ever a fallback: with a `draftId` present these are ignored, and an online
+  // payment now requires one, so nobody can pay a self-chosen price.
   items: z.array(cartItemSchema).min(1, "Cannot place an empty order"),
   totals: totalsSchema,
   address: addressSchema,
