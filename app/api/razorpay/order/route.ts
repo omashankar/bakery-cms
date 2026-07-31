@@ -8,7 +8,7 @@ import { attachRazorpayOrder, findDraft } from "@/features/checkout/server/draft
  * converted to paise (Razorpay's smallest unit).
  */
 export async function POST(request: Request) {
-  const credentials = getRazorpayCredentials();
+  const credentials = await getRazorpayCredentials();
   if (!credentials) {
     // The customer sees this verbatim in the payment-failed dialog, so it must
     // read as help, not as a task for whoever runs the shop. The setup detail

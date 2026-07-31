@@ -17,7 +17,7 @@ import { getTemplates } from "./communications.service";
  */
 
 /** The transactional templates this codebase actually triggers. */
-export type EmailTemplateSlug = "order_confirmation" | "password_reset";
+export type EmailTemplateSlug = "order_confirmation" | "password_reset" | "refund_processed";
 
 /**
  * Used when the stored template is missing or still a draft.
@@ -34,6 +34,22 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Hi {{customer_name}},\n\nThank you for your order {{order_number}}.\n\n" +
       "Order total: {{order_total}}\nPayment: {{payment_method}}\n" +
       "Delivery: {{delivery_date}}\n\n— {{store_name}}",
+  },
+  /**
+   * A refund the gateway has accepted.
+   *
+   * Deliberately says the money is on its way rather than that it has arrived:
+   * a card refund takes days to appear on the customer's statement, and a
+   * "refunded" email followed by nothing in the account for a week generates
+   * exactly the support call it was meant to prevent.
+   */
+  refund_processed: {
+    subject: "Refund for order {{order_number}}",
+    body:
+      "Hi {{customer_name}},\n\nWe have refunded {{refund_amount}} for your order " +
+      "{{order_number}}.\n\nIt is on its way back to the account you paid from and " +
+      "usually takes {{refund_eta}} to appear, depending on your bank.\n\n" +
+      "Reference: {{refund_reference}}\n\n— {{store_name}}",
   },
   password_reset: {
     subject: "Reset your {{store_name}} password",

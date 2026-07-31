@@ -1,8 +1,10 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import type { PaymentMethod } from "@/features/orders/lib/checkout-draft";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import {
   deriveTransactionStatus,
+  isCollectedMoney,
   TRANSACTION_STATUS_META,
   type StatusGroup,
   type TransactionStatus,
@@ -21,6 +23,19 @@ export interface TransactionView {
   tax: number;
   discount: number;
   status: TransactionStatus;
+  /**
+   * Did this order's money actually arrive?
+   *
+   * Carried on the row rather than re-derived from `status`, because `status` is
+   * a BADGE and cannot answer it: a captured payment on a cancelled order
+   * derives to "cancelled", indistinguishable from an order that was never paid.
+   * The Transaction Centre filtered its Volume on the badge and the Payments
+   * screen reached past it, so one ₹1,000 order read ₹1,000 collected on one
+   * screen and ₹0 volume on the next.
+   */
+  collected: boolean;
+  /** Money the gateway confirmed going back out. Zero for most rows. */
+  refundedAmount: number;
   reference?: string;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +67,8 @@ export function buildTransactions(orders: PlacedOrder[]): TransactionView[] {
       tax: order.totals.tax ?? 0,
       discount: order.totals.discount ?? 0,
       status: deriveTransactionStatus(order),
+      collected: isCollectedMoney(order),
+      refundedAmount: settledRefundAmount(order),
       reference: order.paymentReference,
       createdAt: order.placedAt,
       updatedAt,
@@ -124,6 +141,7 @@ export function exportTransactionsToCsv(txns: TransactionView[]) {
     "Gateway",
     "Method",
     "Amount",
+    "Refunded",
     "Tax",
     "Discount",
     "Status",
@@ -139,6 +157,7 @@ export function exportTransactionsToCsv(txns: TransactionView[]) {
     t.gatewayName,
     t.method,
     t.amount,
+    t.refundedAmount,
     t.tax,
     t.discount,
     TRANSACTION_STATUS_META[t.status].label,

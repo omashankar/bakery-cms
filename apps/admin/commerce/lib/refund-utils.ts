@@ -1,5 +1,5 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
-import type { RefundListFilters } from "@/features/orders/lib/order-overviews";
+import { settledRefundAmount, type RefundListFilters } from "@/features/orders/lib/order-overviews";
 import type { RefundReasonCode, RefundStatus } from "@/types/refund";
 
 export const REFUND_REASON_OPTIONS: Array<{ value: RefundReasonCode; label: string }> = [
@@ -37,11 +37,16 @@ export function countActiveRefundFilters(filters: RefundListFilters): number {
 export function exportRefundsToCsv(orders: PlacedOrder[]): void {
   if (typeof window === "undefined" || orders.length === 0) return;
 
+  // "Amount" alone was the ORDER total, on an export whose every other column
+  // describes a refund — so the file an operator hands their accountant listed
+  // the sale value beside the refund's status and reference, and the refunded
+  // figure appeared in no column at all.
   const headers = [
     "Order Number",
     "Customer",
     "Email",
-    "Amount",
+    "Order Total",
+    "Refunded Amount",
     "Order Status",
     "Refund Status",
     "Reason",
@@ -55,6 +60,7 @@ export function exportRefundsToCsv(orders: PlacedOrder[]): void {
     order.address.fullName,
     order.address.email,
     String(order.totals.total),
+    String(settledRefundAmount(order)),
     order.status,
     order.refundRecord ? formatRefundStatus(order.refundRecord.status) : "—",
     order.refundRecord ? formatRefundReason(order.refundRecord.reason) : order.cancellationReason ?? "—",

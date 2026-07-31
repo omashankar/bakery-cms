@@ -252,7 +252,11 @@ export function RefundCenterAdminPage() {
 
   async function handleRefundConfirm(input: RefundOrderInput) {
     if (!refundTarget) return;
-    const { order: updated, persisted } = await refundOrder(refundTarget.id, input);
+    const {
+      order: updated,
+      persisted,
+      error: refundError,
+    } = await refundOrder(refundTarget.id, input);
     if (!updated) {
       // The order was not cached and the server read failed too. The dialog has
       // already closed itself, so without this the click produces nothing at all.
@@ -269,13 +273,21 @@ export function RefundCenterAdminPage() {
     setSelectedId(updated.id);
 
     if (!persisted) {
-      toast.error("Refund recorded on this device only — the server rejected it.", {
-        description: "Reload to see the server's version.",
+      // The server's own words. This used to say "Refund recorded on this device
+      // only — the server rejected it", which was wrong twice: nothing was
+      // recorded anywhere, and it named no cause. The reasons are all things an
+      // admin can act on — nothing left to refund, the payment was never
+      // captured, this COD order was never delivered, the gateway is down.
+      toast.error(refundError ?? "The refund was not accepted.", {
+        description: "No money has moved. Nothing was recorded.",
       });
       return;
     }
 
-    toast.success("Refund recorded", { description: updated.refundReference });
+    toast.success("Refund sent to the gateway", {
+      description:
+        "It usually settles in a few days. This screen updates when the gateway confirms.",
+    });
   }
 
   async function handleExport() {

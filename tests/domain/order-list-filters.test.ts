@@ -172,9 +172,15 @@ describe("refund pre-filter safety", () => {
 });
 
 describe("getRefundOverview", () => {
-  it("double-counts an order that is both cancelled and refund-requested", () => {
-    // Preserved behaviour, not an accident: the Refund Center has always shown
-    // this, and quietly halving pendingAmount would be its own surprise.
+  it("counts an order that is both cancelled and refund-requested ONCE", () => {
+    // This asserted 2000 — the order appeared in the cancelled bucket and the
+    // requested bucket, and pendingAmount summed both. The old comment defended
+    // it as preserved behaviour, but there is only one order and only ₹1,000 is
+    // owed; a card headed "pending payout" reading twice the money that can
+    // possibly go out is not a surprise worth preserving.
+    //
+    // The per-bucket COUNTS still show it in both, which is right: it is one
+    // cancelled case and one requested case.
     const both = order({
       status: "cancelled",
       refundRecord: { status: "requested", reason: "order_cancelled", amount: 1000 },
@@ -184,7 +190,28 @@ describe("getRefundOverview", () => {
 
     expect(overview.cancelledCount).toBe(1);
     expect(overview.requestedCount).toBe(1);
-    expect(overview.pendingAmount).toBe(2000);
+    expect(overview.pendingAmount).toBe(1000);
+  });
+
+  it("counts only what is still OWED, not the order's face value", () => {
+    // A ₹5,000 order with ₹200 already paid back has ₹4,800 outstanding. This
+    // summed totals.total, so it reported ₹5,000 waiting to go out — including
+    // the part that already had.
+    const partlyRefunded = order({
+      status: "confirmed",
+      totals: { total: 5000, subtotal: 5000, itemCount: 1 },
+      refundRecord: {
+        status: "processing",
+        reason: "quality_issue",
+        amount: 200,
+        history: [],
+        gatewayRefunds: [
+          { id: "rfnd_1", amount: 200, status: "processed", createdAt: "2026-01-01" },
+        ],
+      },
+    } as unknown as Partial<PlacedOrder>);
+
+    expect(getRefundOverview([partlyRefunded]).pendingAmount).toBe(4800);
   });
 });
 

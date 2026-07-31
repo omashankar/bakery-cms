@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import {
+  adminConfigHydration,
   fetchAdminProfileConfig,
   fetchPaymentGateways,
   fetchPaymentNotifPrefs,
@@ -35,6 +36,14 @@ export function useAdminConfigServerSync(): void {
       if (gateways) persistServerGateways(gateways);
       if (prefs) persistServerNotifPrefs(prefs);
       if (code) persistServerCustomCode(code);
+
+      // Open the gate only once the local caches actually hold the server's
+      // copy. A `null` here is a failed or forbidden read, not an empty config —
+      // leaving the gate shut then is what stops a whole-blob write from
+      // replacing real settings with this device's defaults.
+      if (profile !== null || gateways !== null || prefs !== null || code !== null) {
+        adminConfigHydration.markSettled();
+      }
     })();
 
     return () => {

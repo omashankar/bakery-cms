@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getRazorpayCredentials } from "@/lib/server/payments/razorpay-credentials";
+import { timingSafeEquals } from "@/features/payments/lib/webhook-signature";
 
 /**
  * Verifies a Razorpay payment signature server-side (HMAC-SHA256 with the secret
@@ -7,7 +8,7 @@ import { getRazorpayCredentials } from "@/lib/server/payments/razorpay-credentia
  * what confirms the payment is real before we mark the order as paid.
  */
 export async function POST(request: Request) {
-  const keySecret = getRazorpayCredentials()?.keySecret;
+  const keySecret = (await getRazorpayCredentials())?.keySecret;
   if (!keySecret) {
     return Response.json(
       { verified: false, error: "Razorpay secret not configured" },
@@ -36,9 +37,10 @@ export async function POST(request: Request) {
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
-  const verified =
-    expected.length === razorpay_signature.length &&
-    crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature));
+  // Byte-safe: comparing `String.length` here let a crafted non-ASCII signature
+  // through to `timingSafeEqual`, which throws on a length mismatch — a 500 in
+  // the middle of a checkout that has already been charged.
+  const verified = timingSafeEquals(expected, razorpay_signature);
 
   return Response.json({ verified, paymentId: verified ? razorpay_payment_id : null });
 }

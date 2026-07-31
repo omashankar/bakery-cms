@@ -192,7 +192,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
     async function checkGateway() {
       try {
-        const response = await fetch("/api/razorpay/config");
+        const response = await fetch("/api/razorpay/availability");
         const status = await response.json();
         if (!cancelled) setOnlinePaymentReady(Boolean(status?.configured));
       } catch {

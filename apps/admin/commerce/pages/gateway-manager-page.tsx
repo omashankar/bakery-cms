@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Landmark, Layers } from "lucide-react";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import {
+  fetchGatewayCredentialStatus,
   getAllGatewayStates,
   GATEWAYS_UPDATED_EVENT,
   setGatewayEnabled,
-  setGatewayMode,
   type ConnectionStatus,
-  type GatewayMode,
+  type GatewayCredentialStatus,
 } from "@/features/payments/lib/payment-gateway-settings";
+import { PAYMENT_GATEWAYS } from "@/features/payments/registry/gateways";
 import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import { GatewayCard } from "@/features/payments/components/gateway-card";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -28,15 +29,38 @@ export function GatewayManagerPage() {
   const [razorpayStatus, setRazorpayStatus] = useState<ConnectionStatus | null>(null);
 
   useEffect(() => {
-    const refresh = () => setGateways(getAllGatewayStates());
+    // Credential status comes from the SERVER now. It used to be derived from
+    // whether this browser's localStorage held the required fields, so the same
+    // gateway read "Configured" on the laptop it was set up on and "Not
+    // configured" everywhere else.
+    let statuses: Record<string, GatewayCredentialStatus | null> = {};
+    const refresh = () => setGateways(getAllGatewayStates(statuses));
     refresh();
     setMounted(true);
 
-    fetch("/api/razorpay/config")
-      .then((res) => res.json())
-      .then((s: { configured: boolean }) =>
-        setRazorpayStatus(s.configured ? "connected" : "not_configured")
-      )
+    void Promise.all(
+      PAYMENT_GATEWAYS.filter((g) => g.id !== "razorpay" && g.category !== "offline").map(
+        async (g) => [g.id, await fetchGatewayCredentialStatus(g.id)] as const,
+      ),
+    ).then((entries) => {
+      statuses = Object.fromEntries(entries);
+      refresh();
+    });
+
+    // `verify=1`, like the two detail screens. Without it this list asked only
+    // "are the variables non-empty" and printed a green Connected for keys
+    // Razorpay rejects — so the same shop read Connected here and "Keys
+    // rejected" one click away. `verified === false` is a real answer and must
+    // not be rounded up to connected.
+    fetch("/api/razorpay/config?verify=1")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((s: { configured?: boolean; verified?: boolean | null } | null) => {
+        if (!s?.configured || s.verified === false) {
+          setRazorpayStatus("not_configured");
+          return;
+        }
+        setRazorpayStatus("connected");
+      })
       .catch(() => setRazorpayStatus("not_configured"));
 
     window.addEventListener(GATEWAYS_UPDATED_EVENT, refresh);
@@ -56,26 +80,41 @@ export function GatewayManagerPage() {
     );
   }, [gateways, category, search]);
 
-  const enabledCount = mounted ? gateways.filter((g) => g.runtime.enabled).length : 0;
+  // Split by what can actually charge someone. Ten of these twelve cannot: the
+  // checkout renders exactly two methods, and only Razorpay has a server-side
+  // payment path. Mixing them into one grid is what made a decorative card
+  // indistinguishable from a working one.
+  const wiredGateways = useMemo(() => filtered.filter((g) => g.config.isCore === true), [filtered]);
+  const notYetGateways = useMemo(() => filtered.filter((g) => g.config.isCore !== true), [filtered]);
+
+  // Counted over the gateways that can take money — the others cannot be
+  // "active" in any sense a customer would notice.
+  const chargeable = gateways.filter((g) => g.config.isCore === true);
+  const enabledCount = mounted ? chargeable.filter((g) => g.runtime.enabled).length : 0;
   const onlineCount = mounted
-    ? gateways.filter((g) => g.config.category === "online" && g.runtime.enabled).length
+    ? chargeable.filter((g) => g.config.category === "online" && g.runtime.enabled).length
     : 0;
   const offlineCount = mounted
-    ? gateways.filter((g) => g.config.category === "offline" && g.runtime.enabled).length
+    ? chargeable.filter((g) => g.config.category === "offline" && g.runtime.enabled).length
     : 0;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Payment Gateways"
-        description="Enable, configure and prioritise the gateways your bakery accepts."
+        description="Enable and configure the gateways your bakery accepts."
       />
 
       <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
+        {/*
+          These counted the whole catalogue, so enabling Stripe raised "Online —
+          live at checkout" to 2 when only one method could take a payment. They
+          now count only the gateways that can.
+        */}
         <DashboardStatCard
           title="Active gateways"
           value={String(enabledCount)}
-          change={`of ${gateways.length} available`}
+          change={`of ${chargeable.length} available today`}
           icon={Layers}
           tone="bakery"
         />
@@ -89,7 +128,7 @@ export function GatewayManagerPage() {
         <DashboardStatCard
           title="Offline"
           value={String(offlineCount)}
-          change="COD / pickup / transfer"
+          change="cash on delivery"
           icon={Landmark}
           tone="neutral"
         />
@@ -115,26 +154,61 @@ export function GatewayManagerPage() {
         </div>
       </FilterPanel>
 
-      <section className="grid gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {filtered.map(({ config, runtime, status }) => (
-          <GatewayCard
-            key={config.id}
-            config={config}
-            runtime={runtime}
-            status={config.id === "razorpay" && razorpayStatus ? razorpayStatus : status}
-            onToggle={(enabled) => {
-              void setGatewayEnabled(config.id, enabled).then((persisted) =>
-                reportWrite(persisted, enabled ? "Gateway enabled" : "Gateway disabled")
-              );
-            }}
-            onModeChange={(mode: GatewayMode) => {
-              void setGatewayMode(config.id, mode).then((persisted) =>
-                reportWrite(persisted, `Switched to ${mode} mode`)
-              );
-            }}
-          />
-        ))}
-      </section>
+      {wiredGateways.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-heading text-base font-bold text-foreground">Available now</h2>
+            <p className="text-sm text-muted-foreground">
+              These can take money and appear at checkout.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {wiredGateways.map(({ config, runtime, status }) => (
+              <GatewayCard
+                key={config.id}
+                config={config}
+                runtime={runtime}
+                status={config.id === "razorpay" && razorpayStatus ? razorpayStatus : status}
+                onToggle={(enabled) => {
+                  void setGatewayEnabled(config.id, enabled).then((persisted) =>
+                    reportWrite(persisted, enabled ? "Gateway enabled" : "Gateway disabled")
+                  );
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/*
+        Kept, but no longer pretending. Every one of these had a live switch, a
+        credentials form and a place in the "live at checkout" count — so an
+        admin could enable Stripe, paste a real `sk_live_` secret, and have the
+        screen agree that online payments were set up, while the checkout went on
+        offering only Razorpay and cash.
+      */}
+      {notYetGateways.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-heading text-base font-bold text-foreground">Not available yet</h2>
+            <p className="text-sm text-muted-foreground">
+              In the catalogue, but not connected to a payment path — they cannot take money and do
+              not appear at checkout. Nothing to configure until they are built.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {notYetGateways.map(({ config, runtime, status }) => (
+              <GatewayCard
+                key={config.id}
+                config={config}
+                runtime={runtime}
+                status={status}
+                onToggle={() => undefined}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </AdminPage>
   );
 }

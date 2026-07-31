@@ -236,14 +236,23 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
         });
       }
 
+      // Keyed by STATUS as well as order.
+      //
+      // A single `refund:<id>` meant the refund's whole lifecycle shared one
+      // notification id, and two separate mechanisms then suppressed the later
+      // states: `mergeReadState` carries the read flag forward by id, so
+      // "Refund completed" arrived already marked read once the admin had seen
+      // "Refund requested"; and dismissing the request added that id to
+      // `dismissed`, which skipped generation entirely from then on. The alert
+      // that the money had actually gone out could never raise the bell.
       if (
         settings.paymentAlerts &&
         order.refundRecord &&
-        !dismissed.has(`refund:${order.id}`)
+        !dismissed.has(`refund:${order.refundRecord.status}:${order.id}`)
       ) {
         const completed = order.refundRecord.status === "completed";
         generated.push({
-          id: `refund:${order.id}`,
+          id: `refund:${order.refundRecord.status}:${order.id}`,
           type: "refund_request",
           title: `Refund ${completed ? "completed" : order.refundRecord.status} · ${order.orderNumber}`,
           message: `${formatCurrency(order.refundRecord.amount)} · ${order.address.fullName}`,

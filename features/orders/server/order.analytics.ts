@@ -237,9 +237,27 @@ export async function getTransactionsPage(
       // Volume and success count follow the FILTERS — that is what those two
       // cards have always meant, they move as the admin narrows the list.
       // Total records deliberately does not.
-      filteredVolume: matching.reduce((sum, txn) => sum + txn.amount, 0),
-      filteredSuccessCount: matching.filter((txn) => SUCCESS_STATUSES.includes(txn.status))
-        .length,
+      //
+      // Volume is money that ARRIVED, not the face value of every row. It used
+      // to sum `txn.amount` (the order total) across everything matching, with
+      // no status test — while the very next line filtered by status for the
+      // success count. The default filter is `statusGroup: "all"`, so the
+      // headline money figure on page load was the gross value of every order
+      // ever placed, including the ones the same table labels Failed, Cancelled,
+      // Pending and Refunded.
+      // Both filter on `collected`, not on the display status.
+      //
+      // The status is a badge: `deriveTransactionStatus` tests cancellation and
+      // refund state before payment state, so a captured payment on a cancelled
+      // order derives to "cancelled" — the same value an order that was never
+      // paid gets. Filtering Volume on it therefore dropped real money, and the
+      // Payments screen (which reaches past the badge to the same predicate this
+      // now uses) reported ₹1,000 collected for the very order Volume called ₹0.
+      // One definition of "the money arrived", used by both screens.
+      filteredVolume: matching
+        .filter((txn) => txn.collected)
+        .reduce((sum, txn) => sum + txn.amount - txn.refundedAmount, 0),
+      filteredSuccessCount: matching.filter((txn) => txn.collected).length,
       totalRecords: transactions.length,
     },
   };

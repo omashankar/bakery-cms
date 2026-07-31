@@ -135,12 +135,43 @@ describe("buildCustomerProfiles", () => {
     expect(profile.lastOrderNumber).toBe("BK-LAST");
   });
 
-  it("averages over countable orders only, while spend still includes them", () => {
+  it("counts neither cancelled nor refunded money as spend", () => {
     const [profile] = buildCustomerProfiles(orders, noMeta, NOW);
 
-    // Three orders of ₹500; the cancelled one is excluded from the divisor.
-    expect(profile.totalSpent).toBe(1500);
-    expect(profile.averageOrderValue).toBe(750);
+    // Three orders of ₹500, one of them cancelled.
+    //
+    // This used to assert 1500 and 750 — the cancelled order counted in full
+    // towards spend, but was excluded from the divisor. ₹750 described nothing:
+    // not the average of the three orders (₹500), not the average of the two
+    // real ones (₹500). The file already defined UNCOUNTABLE_STATUSES and
+    // applied it in two other places; the record builder was the one that did
+    // not, so "Lifetime revenue" on the Customers list and "Lifetime value" on
+    // the detail page both counted money the shop never kept — and
+    // `deriveCustomerSegment` promoted customers to VIP tiers on it.
+    expect(profile.totalSpent).toBe(1000);
+    expect(profile.averageOrderValue).toBe(500);
+  });
+
+  it("subtracts a partial refund, which leaves the order in its fulfilment status", () => {
+    const withPartialRefund = [
+      order({ id: "a", placedAt: new Date(NOW).toISOString() }),
+      order({
+        id: "b",
+        placedAt: new Date(NOW - DAY).toISOString(),
+        refundRecord: {
+          status: "completed",
+          reason: "quality_issue",
+          amount: 200,
+          history: [],
+          gatewayRefunds: [
+            { id: "rfnd_1", amount: 200, status: "processed", createdAt: "2026-01-01" },
+          ],
+        },
+      }),
+    ];
+
+    const [profile] = buildCustomerProfiles(withPartialRefund, noMeta, NOW);
+    expect(profile.totalSpent).toBe(800);
   });
 
   it("counts orders by status", () => {

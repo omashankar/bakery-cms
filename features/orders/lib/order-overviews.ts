@@ -30,6 +30,32 @@ function matchesDateRange(
   return new Date(timestamp).getTime() >= nowMs - days * 86_400_000;
 }
 
+/**
+ * Money that has actually gone back to the customer for this order.
+ *
+ * Only refunds the gateway confirmed count. A `pending` gateway refund has been
+ * accepted but not paid out, a `failed` one moved nothing at all, and a
+ * `requested` record is an intention with no payment behind it — `requestRefund`
+ * writes one with the full order total and performs no payment check whatsoever,
+ * so a cancelled COD order that never collected a rupee used to contribute its
+ * whole value to the refunded figure.
+ */
+export function settledRefundAmount(order: PlacedOrder): number {
+  const record = order.refundRecord;
+  if (!record) return 0;
+
+  const gatewayRefunds = record.gatewayRefunds;
+  if (Array.isArray(gatewayRefunds) && gatewayRefunds.length > 0) {
+    return gatewayRefunds
+      .filter((refund) => refund.status === "processed")
+      .reduce((sum, refund) => sum + (Number(refund.amount) || 0), 0);
+  }
+
+  // No gateway list: either cash handed back, or a record written before gateway
+  // refunds existed. Both are only money if the record says it completed.
+  return record.status === "completed" ? Number(record.amount) || 0 : 0;
+}
+
 export function getRefundCaseStatus(order: PlacedOrder): RefundStatus | "cancelled" | "none" {
   if (order.status === "refunded") {
     return order.refundRecord?.status ?? "completed";
@@ -76,13 +102,33 @@ export function getRefundOverview(orders: PlacedOrder[]): RefundOverview {
   const requested = cases.filter((order) => getRefundCaseStatus(order) === "requested");
   const processing = cases.filter((order) => getRefundCaseStatus(order) === "processing");
 
-  const refundedAmount = refunded.reduce((sum, order) => sum + order.totals.total, 0);
-  // A cancelled order that has since had a refund requested is in BOTH the
-  // cancelled and the requested bucket, so its total is counted twice here.
-  // Preserved deliberately: this is the figure the Refund Center has always
-  // shown, and quietly halving it would be its own surprise.
-  const pendingAmount = [...cancelled, ...requested, ...processing].reduce(
-    (sum, order) => sum + order.totals.total,
+  // What was REFUNDED, not what the order was worth.
+  //
+  // This summed `totals.total`, so a ₹200 partial refund on a ₹5,000 order added
+  // ₹5,000 to a card labelled "Completed payouts" — while the detail row two
+  // inches below it, on the same screen, printed ₹200 from `refundRecord.amount`.
+  // The Payments page used the right field, so the two admin screens reported
+  // different totals for the same refunds.
+  //
+  // Counted over every case with a refund record rather than only orders whose
+  // status is `refunded`, because a partial refund deliberately leaves the order
+  // in its fulfilment status — the money still went out.
+  const refundedAmount = cases.reduce((sum, order) => sum + settledRefundAmount(order), 0);
+  // What is still OWED, not what the order was worth.
+  //
+  // This summed `totals.total`, so an order with a ₹200 partial refund still
+  // settling contributed ₹5,000 to a card labelled as money waiting to go out —
+  // and a case that was already half refunded counted its refunded half again.
+  //
+  // Each order is taken once (a cancelled order that has since had a refund
+  // requested appeared in two buckets and was counted twice), and only the part
+  // that has not yet been paid out.
+  const pendingCases = new Map<string, PlacedOrder>();
+  for (const order of [...cancelled, ...requested, ...processing]) {
+    pendingCases.set(order.id, order);
+  }
+  const pendingAmount = [...pendingCases.values()].reduce(
+    (sum, order) => sum + Math.max(0, order.totals.total - settledRefundAmount(order)),
     0
   );
 

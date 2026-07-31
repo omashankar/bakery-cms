@@ -467,6 +467,41 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
   return doc ? toOrder(doc) : null;
 }
 
+/**
+ * Write a refund record only if nobody else has written one since we looked.
+ *
+ * Guarded on `refundRecord.version`, a counter bumped by every writer. The
+ * obvious alternatives both have blind spots: the SIZE of `gatewayRefunds` does
+ * not change when the refund webhook promotes an entry from `pending` to
+ * `processed` in place, so a slow `refund()` holding a stale array would
+ * silently overwrite that confirmation and the order would never settle; and it
+ * does not change for an offline cash refund either, so two of those would both
+ * match and one payout would go unrecorded. A version counter moves on every
+ * write by construction, which is the property actually needed.
+ *
+ * Callers pass the version they read. A missing version (records written before
+ * this existed) reads as 0.
+ *
+ * (Razorpay itself caps the total refundable, so losing this race cannot cause a
+ * double gateway payout — the danger is a payout that no record accounts for.)
+ */
+export async function compareAndSetRefund(
+  id: string,
+  expectedVersion: number,
+  fields: Partial<PlacedOrder>,
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    {
+      _id: id,
+      $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, expectedVersion] },
+    },
+    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function orderNumberExists(orderNumber: string): Promise<boolean> {
   await connectDB();
   return (await OrderModel.exists({ orderNumber })) !== null;

@@ -456,6 +456,14 @@ function commitOrder(
 export interface OrderMutationResult {
   order: PlacedOrder | null;
   persisted: boolean;
+  /**
+   * Why the server refused, when it said. Only refunds populate it today.
+   *
+   * `persisted: false` alone cannot tell "the network dropped" from "the gateway
+   * says this payment has nothing left to refund", and those need opposite
+   * responses from the admin.
+   */
+  error?: string;
 }
 
 export async function updateOrderStatus(
@@ -583,7 +591,6 @@ export async function refundOrder(
   if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
-  const refundReference = `REF-${current.orderNumber.replace(/^BK-/, "")}`;
   const reason = input.reason ?? "customer_request";
 
   // Partial when a valid amount below the order total is supplied; else full.
@@ -592,38 +599,59 @@ export async function refundOrder(
   const refundAmount = Math.min(Math.max(0, requested), orderTotal);
   const isPartial = refundAmount < orderTotal;
 
+  // OPTIMISTIC, and therefore deliberately modest.
+  //
+  // This used to write `completed`, mint a `REF-…` reference and flip the order
+  // to `refunded` — a full, confident record of a payout, composed in the
+  // browser before the request had even been sent. It matched what the server
+  // then wrote, so nothing looked wrong; both were fiction.
+  //
+  // The server now asks the gateway, and a gateway refund starts PENDING. So the
+  // most this can honestly claim is that a refund is under way. The reference is
+  // the gateway's and is not knowable here, and the order's own status only
+  // changes once the money has actually left. The page re-reads immediately
+  // after, which is what brings the real record.
   const refundRecord: RefundRecord = {
-    status: "completed",
+    status: "processing",
     reason,
-    reasonDetail: input.reasonDetail?.trim() || undefined,
+    reasonDetail: input.reasonDetail?.trim() || current.refundRecord?.reasonDetail,
     amount: refundAmount,
-    reference: refundReference,
-    notes: input.notes?.trim() || undefined,
+    reference: current.refundRecord?.reference,
+    notes: input.notes?.trim() || current.refundRecord?.notes,
     requestedAt: current.refundRecord?.requestedAt ?? now,
-    completedAt: now,
+    gatewayRefunds: current.refundRecord?.gatewayRefunds,
     history: [
       ...(current.refundRecord?.history ?? []),
-      { status: "processing", at: now, note: "Refund initiated" },
       {
-        status: "completed",
+        status: "processing",
         at: now,
-        note:
-          input.notes?.trim() ||
-          `${isPartial ? "Partial" : "Full"} refund completed`,
+        note: input.notes?.trim() || `${isPartial ? "Partial" : "Full"} refund sent to the gateway`,
       },
     ],
   };
 
   const committed = commitOrder(orderId, current, (order) => ({
     ...order,
-    status: "refunded" as const,
-    paymentStatus: "refunded" as const,
-    refundReference,
     refundRecord,
-    statusHistory: [...order.statusHistory, { status: "refunded" as const, at: now }],
   }));
 
-  return { order: committed, persisted: await refundOrderRequest(orderId, input) };
+  const outcome = await refundOrderRequest(orderId, input);
+
+  // The server's refusal reason travels with the result. A refund can be
+  // declined for reasons an admin can act on — nothing left to refund, the
+  // payment was never captured, the gateway is unreachable — and every one of
+  // them used to arrive as the same bare `false`.
+  if (!outcome.ok) {
+    // Nothing moved, so the optimistic record has to go back too. Leaving it
+    // would show a refund "processing" that no gateway has ever heard of.
+    commitOrder(orderId, committed ?? current, (order) => ({
+      ...order,
+      refundRecord: current.refundRecord,
+    }));
+    return { order: current, persisted: false, error: outcome.error };
+  }
+
+  return { order: committed, persisted: true };
 }
 
 export async function updateRefundNotes(

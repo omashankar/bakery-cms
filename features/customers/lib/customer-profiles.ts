@@ -12,6 +12,7 @@
  * either side of the wire.
  */
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import type {
   CustomerAdminMeta,
   CustomerFavoriteProduct,
@@ -81,6 +82,24 @@ export function emptyCustomerMeta(email: string, updatedAt: string): CustomerMet
   };
 }
 
+/**
+ * What this customer's order is really worth to the shop.
+ *
+ * `totalSpent` used to accumulate `totals.total` for EVERY order with no status
+ * test — even though this same file defines `UNCOUNTABLE_STATUSES` and applies
+ * it in two other places. So a customer who cancelled a ₹10,000 wedding cake, or
+ * had it fully refunded, still counted as having spent ₹10,000: on the Customers
+ * list's "Lifetime revenue" card, on their own "Lifetime value", and in
+ * `deriveCustomerSegment`, which then promoted them to a VIP tier on money the
+ * shop does not have.
+ */
+function countableSpend(order: PlacedOrder): number {
+  if (UNCOUNTABLE_STATUSES.has(order.status)) return 0;
+  // A partial refund leaves the order in its fulfilment status, so it is not
+  // caught above — subtract what went back.
+  return Math.max(0, order.totals.total - settledRefundAmount(order));
+}
+
 export function buildCustomerRecords(orders: PlacedOrder[]): CustomerRecord[] {
   const map = new Map<string, CustomerRecord>();
 
@@ -96,7 +115,7 @@ export function buildCustomerRecords(orders: PlacedOrder[]): CustomerRecord[] {
         name: order.address.fullName,
         phone: order.address.phone,
         orderCount: 1,
-        totalSpent: order.totals.total,
+        totalSpent: countableSpend(order),
         lastOrderAt: order.placedAt,
         lastOrderNumber: order.orderNumber,
       });
@@ -111,7 +130,7 @@ export function buildCustomerRecords(orders: PlacedOrder[]): CustomerRecord[] {
       name: order.address.fullName || existing.name,
       phone: order.address.phone || existing.phone,
       orderCount: existing.orderCount + 1,
-      totalSpent: existing.totalSpent + order.totals.total,
+      totalSpent: existing.totalSpent + countableSpend(order),
       lastOrderAt: isNewer ? order.placedAt : existing.lastOrderAt,
       lastOrderNumber: isNewer ? order.orderNumber : existing.lastOrderNumber,
     });

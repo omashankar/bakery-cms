@@ -106,12 +106,78 @@ export async function attachRazorpayOrder(id: string, razorpayOrderId: string): 
  * Conditional on `consumedByOrderId` still being null, so two concurrent
  * placements of the same draft cannot both become orders — the second gets
  * `false` and is sent to the idempotent path instead.
+ *
+ * This must be called BEFORE the order is inserted, not after. Called after,
+ * both of two concurrent placements have already inserted their order by the
+ * time either one loses the race, and the loser's return value cannot undo
+ * anything — one captured payment becomes two paid orders and two stock
+ * decrements. Claiming first makes this the single point where the two requests
+ * are ordered.
  */
 export async function consumeDraft(id: string, orderId: string): Promise<boolean> {
   await connectDB();
   const result = await CheckoutDraftModel.updateOne(
     { _id: id, consumedByOrderId: null },
-    { $set: { consumedByOrderId: orderId } },
+    { $set: { consumedByOrderId: orderId, consumedAt: new Date() } },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
+ * How long a claim is left alone before another request may take it.
+ *
+ * Must comfortably exceed the longest a claimer could still be working. The
+ * order insert runs inside `session.withTransaction`, whose writes are invisible
+ * to outside readers until it commits, and whose driver-side retry of transient
+ * errors runs for up to 120 seconds. Anything shorter and a healthy, slow
+ * transaction gets its claim stolen — which produces the exact double order this
+ * whole protocol exists to prevent.
+ */
+const CLAIM_GRACE_MS = 3 * 60_000;
+
+/**
+ * Hand the claim back, so a placement that failed after claiming can be retried.
+ *
+ * Conditional on us still being the owner: if a takeover has happened in between
+ * we must not clear someone else's claim.
+ */
+export async function releaseDraft(id: string, orderId: string): Promise<void> {
+  await connectDB();
+  await CheckoutDraftModel.updateOne(
+    { _id: id, consumedByOrderId: orderId },
+    { $set: { consumedByOrderId: null, consumedAt: null } },
+  );
+}
+
+/**
+ * Take over a claim whose order never materialised.
+ *
+ * A request that claims the draft and then dies before inserting leaves it
+ * pointing at an order id that does not exist. Without a way back that is a
+ * captured payment nobody can ever place — strictly worse than the duplicate
+ * this claim-first ordering exists to prevent.
+ *
+ * But "the order is not readable" does NOT mean the claimer is dead. The insert
+ * runs inside a transaction, and until it commits the row is invisible to
+ * everyone else — so a perfectly healthy claimer looks identical to a dead one.
+ * Only a claim that has been sitting unfinished for longer than any transaction
+ * could plausibly run is taken, which is what keeps this from re-creating the
+ * duplicate order it exists to repair. Conditional on the stale owner too, so
+ * only one of several retries wins.
+ */
+export async function reclaimDraft(
+  id: string,
+  staleOrderId: string,
+  newOrderId: string,
+): Promise<boolean> {
+  await connectDB();
+  const result = await CheckoutDraftModel.updateOne(
+    {
+      _id: id,
+      consumedByOrderId: staleOrderId,
+      consumedAt: { $lt: new Date(Date.now() - CLAIM_GRACE_MS) },
+    },
+    { $set: { consumedByOrderId: newOrderId, consumedAt: new Date() } },
   );
   return result.modifiedCount === 1;
 }

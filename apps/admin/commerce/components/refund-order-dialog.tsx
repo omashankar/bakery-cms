@@ -63,7 +63,11 @@ export function RefundOrderDialog({
       reason,
       reasonDetail: reasonDetail.trim() || undefined,
       notes: notes.trim() || undefined,
-      amount: refundType === "partial" ? partialValue : orderTotal,
+      // A full refund sends no amount at all, so the SERVER decides what is
+      // still owed. Sending the order total was wrong once partial refunds
+      // began to accumulate: on an order already partly refunded it asks for
+      // more than remains, and the server would have to silently clamp it.
+      amount: refundType === "partial" ? partialValue : undefined,
     });
     resetForm();
     onOpenChange(false);
@@ -80,10 +84,15 @@ export function RefundOrderDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Issue refund?</DialogTitle>
+          {/*
+            This said "Record a demo refund", which was accurate — nothing sent
+            money anywhere. It does now, so the copy has to say so. An admin
+            reading "record" would reasonably expect to be able to undo it.
+          */}
           <DialogDescription>
             {orderNumber
-              ? `Record a demo refund for ${orderNumber}${totalLabel ? ` (${totalLabel})` : ""}.`
-              : "Record a demo refund for this order."}
+              ? `Send money back to the customer for ${orderNumber}${totalLabel ? ` (${totalLabel})` : ""}. This cannot be undone.`
+              : "Send money back to the customer. This cannot be undone."}
           </DialogDescription>
         </DialogHeader>
 

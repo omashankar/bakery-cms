@@ -41,6 +41,17 @@ const checkoutDraftSchema = new mongoose.Schema(
     razorpayOrderId: { type: String, default: null, index: true },
     /** Set once the draft becomes a real order, so it cannot be spent twice. */
     consumedByOrderId: { type: String, default: null },
+    /**
+     * When that claim was made.
+     *
+     * A claim whose order cannot be read is ambiguous: the claimer may have
+     * died, or may simply still be inside its `withTransaction` — uncommitted
+     * writes are invisible to every reader outside that session, and the driver
+     * retries transient errors for up to two minutes. Without a timestamp, a
+     * second request treats the second case as the first, takes the claim, and
+     * one payment becomes two orders. This is what tells them apart.
+     */
+    consumedAt: { type: Date, default: null },
 
     createdAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },

@@ -52,12 +52,29 @@ export async function replaceCoupons(coupons: StoredCoupon[]): Promise<void> {
  * out. The admin's coupon list has been showing the seed constant ever since.
  */
 export async function incrementCouponUsage(code: string): Promise<void> {
+  await adjustCouponUsage(code, 1);
+}
+
+/**
+ * Give a redemption back when the order it belonged to is cancelled or refunded.
+ *
+ * Nothing ever did. `usageCount` only went up, so a coupon with a usage limit
+ * was consumed by orders that never happened — and the coupon performance report
+ * counted them as redemptions forever. Floored at zero: a count that has already
+ * been corrected by hand must not go negative.
+ */
+export async function decrementCouponUsage(code: string): Promise<void> {
+  await adjustCouponUsage(code, -1);
+}
+
+async function adjustCouponUsage(code: string, delta: number): Promise<void> {
   await connectDB();
   const normalized = code.trim().toUpperCase();
-  await CouponModel.updateOne(
-    { code: { $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
-    { $inc: { usageCount: 1 } },
-  );
+  const filter = {
+    code: { $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    ...(delta < 0 ? { usageCount: { $gt: 0 } } : {}),
+  };
+  await CouponModel.updateOne(filter, { $inc: { usageCount: delta } });
 }
 
 // ---- Delivery zones ----

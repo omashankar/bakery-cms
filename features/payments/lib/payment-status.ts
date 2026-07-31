@@ -54,6 +54,42 @@ export const TRANSACTION_STATUS_ORDER: TransactionStatus[] = [
   "refunded",
 ];
 
+/**
+ * Whether this order's money is really in the shop's account.
+ *
+ * Separate from `deriveTransactionStatus` because they answer different
+ * questions. That one decides which BADGE a row wears, and to do so it tests
+ * refund and cancellation state before payment state — right for a badge, wrong
+ * for a total. A cancelled or refunded order that was genuinely paid still had
+ * money arrive; the counters have to start from that and subtract.
+ *
+ * Lives here, shared, because the Payments screen and the Transaction Centre
+ * were answering it differently — one reached past the display status, the other
+ * filtered on it — so the same paid-then-cancelled order showed as ₹1,000
+ * collected on one screen and ₹0 volume on the next.
+ */
+export function isCollectedMoney(order: PlacedOrder): boolean {
+  if (order.paymentMethod === "cod") return everDelivered(order);
+  return order.paymentStatus === "paid" || order.paymentStatus === "refunded";
+}
+
+/**
+ * Did this COD order EVER reach the customer? Not: is it delivered right now.
+ *
+ * Cash arrives at delivery, and refunding afterwards flips `status` to
+ * `refunded` — so a current-status test lost the fact that the money had ever
+ * come in. The order then counted as a refund but never as a collection, which
+ * put the refund numerator and the collection denominator in different
+ * populations and let the refund rate print 150%.
+ *
+ * `statusHistory` is appended to rather than replaced on every transition, so
+ * the original `delivered` entry survives the flip and is the honest signal.
+ */
+function everDelivered(order: PlacedOrder): boolean {
+  if (order.status === "delivered") return true;
+  return (order.statusHistory ?? []).some((entry) => entry.status === "delivered");
+}
+
 /** Maps an order's real state to a rich transaction status for display. */
 export function deriveTransactionStatus(order: PlacedOrder): TransactionStatus {
   const refund = order.refundRecord;

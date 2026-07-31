@@ -83,26 +83,59 @@ export const placeOrderSchema = z.object({
   deliverySlot: deliverySlotSchema.optional(),
 });
 
-const ORDER_STATUSES = [
+/**
+ * The statuses an admin may set directly.
+ *
+ * `cancelled` and `refunded` are NOT among them, and that omission is the point.
+ * `updateStatus` only writes a status and a history entry — it puts no stock
+ * back, records no refund, moves no money and changes no payment status. Setting
+ * either of those through this endpoint therefore produced an order the derived
+ * screens could not agree about: the Refund Centre read it as a COMPLETED payout
+ * with no amount and no timeline, the Payments page still counted the money as
+ * collected, and no refund had happened in either direction.
+ *
+ * They have their own endpoints, which do the rest of the work.
+ */
+const SETTABLE_STATUSES = [
   "pending",
   "confirmed",
   "preparing",
   "ready",
   "out_for_delivery",
   "delivered",
-  "cancelled",
-  "refunded",
 ] as const;
 
-export const statusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+export const statusSchema = z.object({
+  status: z.enum(SETTABLE_STATUSES, {
+    message: "Use the cancel or refund action for those — they move stock and money.",
+  }),
+});
 
 export const cancelSchema = z.object({ cancellationReason: z.string().optional() });
 
+/** The reasons the Refund Centre can actually filter and report on. */
+const REFUND_REASONS = [
+  "customer_request",
+  "duplicate_order",
+  "quality_issue",
+  "delivery_failed",
+  "payment_error",
+  "order_cancelled",
+  "other",
+] as const;
+
 export const refundSchema = z.object({
-  reason: z.string().optional(),
+  // Was a free string, so any value could be stored — and then the Refund
+  // Centre's own reason filter, which offers exactly these seven, could never
+  // match it. The row became invisible to the screen that exists to find it.
+  reason: z.enum(REFUND_REASONS).optional(),
   reasonDetail: z.string().optional(),
   notes: z.string().optional(),
-  amount: z.number().min(0).optional(),
+  // `.min(0)` accepted zero. A zero refund moved nothing, yet marked the order
+  // fully refunded, restored stock and — because the re-entry guard was the
+  // order's status — permanently blocked the real refund. Omit the field for a
+  // full refund; a number here means a partial one.
+  amount: z.number().positive("A refund has to be for more than zero.").optional(),
 });
 
 export const paymentSchema = z.object({
@@ -115,10 +148,10 @@ export const notesSchema = z.object({ adminNotes: z.string() });
 export const refundNotesSchema = z.object({ notes: z.string() });
 
 export const refundRequestSchema = z.object({
-  reason: z.string().optional(),
+  reason: z.enum(REFUND_REASONS).optional(),
   reasonDetail: z.string().optional(),
   notes: z.string().optional(),
-  amount: z.number().min(0).optional(),
+  amount: z.number().positive().optional(),
 });
 
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;

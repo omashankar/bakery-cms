@@ -5,7 +5,6 @@ import { CheckCircle2, Circle, Settings2 } from "lucide-react";
 import type { PaymentGatewayConfig } from "@/features/payments/registry/gateways";
 import type {
   ConnectionStatus,
-  GatewayMode,
   GatewayRuntime,
 } from "@/features/payments/lib/payment-gateway-settings";
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
@@ -20,7 +19,6 @@ interface GatewayCardProps {
   runtime: GatewayRuntime;
   status: ConnectionStatus;
   onToggle: (enabled: boolean) => void;
-  onModeChange: (mode: GatewayMode) => void;
 }
 
 const STATUS_META: Record<ConnectionStatus, { label: string; className: string }> = {
@@ -35,16 +33,16 @@ export function GatewayCard({
   runtime,
   status,
   onToggle,
-  onModeChange,
 }: GatewayCardProps) {
   const statusMeta = STATUS_META[status];
-  const showMode = config.category === "online";
+  const wired = config.isCore === true;
 
   return (
     <div
       className={cn(
         "flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-colors",
-        runtime.enabled ? "border-bakery-700/40" : "border-border"
+        !wired ? "border-dashed border-border opacity-70" : null,
+        wired && runtime.enabled ? "border-bakery-700/40" : "border-border"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -53,56 +51,46 @@ export function GatewayCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-heading font-bold text-foreground">{config.name}</h3>
-              {config.isCore ? (
-                <Badge variant="accent" className="text-[10px]">Core</Badge>
-              ) : null}
             </div>
             <p className="text-xs capitalize text-muted-foreground">{config.category}</p>
           </div>
         </div>
+        {/*
+          A switch that cannot do anything must not look like one it can. This
+          was live for every gateway, so turning Stripe "on" read exactly like
+          turning Razorpay on — and did nothing at all, because the checkout can
+          only render Razorpay and COD.
+        */}
         <Switch
-          checked={runtime.enabled}
+          checked={wired && runtime.enabled}
           onCheckedChange={onToggle}
-          aria-label={`Enable ${config.name}`}
+          disabled={!wired}
+          aria-label={wired ? `Enable ${config.name}` : `${config.name} is not available yet`}
         />
       </div>
 
       <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{config.description}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            statusMeta.className
-          )}
-        >
-          {status === "connected" || status === "configured" || status === "ready" ? (
-            <CheckCircle2 className="size-3" />
-          ) : (
-            <Circle className="size-3" />
-          )}
-          {statusMeta.label}
-        </span>
-
-        {showMode ? (
-          <div className="inline-flex overflow-hidden rounded-lg border border-border text-[11px]">
-            {(["test", "live"] as GatewayMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onModeChange(mode)}
-                className={cn(
-                  "px-2.5 py-1 font-medium capitalize transition-colors",
-                  runtime.mode === mode
-                    ? "bg-bakery-700 text-white"
-                    : "bg-card text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        {wired ? (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+              statusMeta.className
+            )}
+          >
+            {status === "connected" || status === "configured" || status === "ready" ? (
+              <CheckCircle2 className="size-3" />
+            ) : (
+              <Circle className="size-3" />
+            )}
+            {statusMeta.label}
+          </span>
+        ) : (
+          <Badge variant="outline" className="text-[11px] font-medium">
+            Not available yet
+          </Badge>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -124,7 +112,7 @@ export function GatewayCard({
       <div className="mt-auto pt-4">
         <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
           <span className="text-xs text-muted-foreground">
-            Priority {runtime.priority} · {config.processingTime}
+            {config.processingTime}
           </span>
           <Button
             variant="outline"
@@ -133,7 +121,7 @@ export function GatewayCard({
             render={<Link href={routes.admin.commerce.gateway(config.id)} />}
           >
             <Settings2 className="size-4" />
-            Configure
+            {wired ? "Configure" : "Details"}
           </Button>
         </div>
       </div>

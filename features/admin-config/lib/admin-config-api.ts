@@ -4,6 +4,14 @@
  * Never throws; every write reports whether the server took it. Admin-guarded endpoints, so reads return null for
  * non-admins. The SEED/first-load is never pushed; only genuine saves are.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
+
+/**
+ * Opened by `useAdminConfigServerSync` once the server's blobs have been read
+ * into the local caches. Until then no replace-all write may go out.
+ */
+export const adminConfigHydration = createHydrationGate();
+
 interface Envelope<T> {
   success: boolean;
   data: T | null;
@@ -31,6 +39,17 @@ async function getJson<T>(path: string): Promise<T | null> {
  * silently reverts.
  */
 async function putJson(path: string, body: unknown): Promise<boolean> {
+  // Every write here is a whole-blob REPLACE, sent from a local copy. Until that
+  // local copy has been filled from the server, sending it overwrites the
+  // server's real config with whatever this device happens to hold — and
+  // hydration is async, fired once on entering the admin, so an admin who
+  // toggles a gateway in the first second sends an empty or partial blob and
+  // wipes every other gateway's saved settings.
+  //
+  // The settings API already learned this (`pushSection` waits on
+  // `settingsHydration`); this path never did.
+  if (!(await adminConfigHydration.waitForSettled())) return false;
+
   try {
     const res = await fetch(path, {
       method: "PUT",

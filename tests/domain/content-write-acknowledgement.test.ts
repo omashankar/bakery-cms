@@ -18,6 +18,7 @@
  * against is exactly that shallow, and it shipped in nineteen screens.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
 
 import { createBanner, deleteBanners } from "@/features/content/lib/banners-repository";
 import { createFaq, deleteFaqs } from "@/features/content/lib/faq-repository";
@@ -166,6 +167,23 @@ describe("content and configuration writes", () => {
 });
 
 describe("writes that return a bare boolean", () => {
+  // These go through the admin-config replace-all path, which now waits for
+  // hydration before sending — a whole-blob PUT from a cache that was never
+  // filled from the server overwrites the real config with this device's
+  // defaults. `useAdminConfigServerSync` opens the gate in the app; there is no
+  // layout here, so it is opened directly.
+  beforeEach(() => {
+    adminConfigHydration.markSettled();
+  });
+
+  it("refuses to send before the local cache has been filled from the server", async () => {
+    // The gate is one-way, so this is checked on its own instance rather than by
+    // un-setting the shared one.
+    const gate = createHydrationGate();
+    expect(gate.hasSettled()).toBe(false);
+    await expect(gate.waitForSettled(10)).resolves.toBe(false);
+  });
+
   it("custom code reports what the server did", async () => {
     // This is script and style injected into every storefront page, rendered
     // from the server copy — a local-only save changes nothing any visitor sees.

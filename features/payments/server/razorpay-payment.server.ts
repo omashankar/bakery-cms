@@ -38,7 +38,7 @@ export async function checkRazorpayPayment(paymentId: string): Promise<PaymentCh
   const reference = paymentId.trim();
   if (!reference) return NOT_CONFIRMED;
 
-  const credentials = getRazorpayCredentials();
+  const credentials = await getRazorpayCredentials();
   if (!credentials) {
     return { ...NOT_CONFIRMED, unavailable: "Razorpay credentials are not configured" };
   }

@@ -106,14 +106,27 @@ async function sendWithStatus(
   path: string,
   method: string,
   body?: unknown
-): Promise<{ ok: boolean; status: number; data?: PlacedOrder | null; closed?: string }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  data?: PlacedOrder | null;
+  closed?: string;
+  /** The server's own explanation for a refusal, when it gave one. */
+  error?: string;
+}> {
   try {
     const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!res.ok) return { ok: false, status: res.status, closed: await readClosedReason(res) };
+    if (!res.ok) {
+      // One read of the body, two answers out of it — a Response can only be
+      // consumed once, so the maintenance marker and the plain message have to
+      // come from the same parse.
+      const refusal = await readRefusal(res);
+      return { ok: false, status: res.status, closed: refusal.closed, error: refusal.message };
+    }
 
     // A body we cannot read does not undo a 2xx — the order IS stored. Every
     // failure here degrades to "no data", never to "the write failed", which is
@@ -141,17 +154,22 @@ const PLACE_ORDER_BACKOFF_MS = 400;
  * outage worth retrying. The server tags the refusal so the two can be told
  * apart without matching on prose.
  */
-async function readClosedReason(res: Response): Promise<string | undefined> {
-  if (res.status !== 503) return undefined;
+async function readRefusal(
+  res: Response,
+): Promise<{ closed?: string; message?: string }> {
   try {
     const body = (await res.json()) as {
       message?: string;
       errors?: { field?: string; message?: string }[] | null;
     };
-    const marker = body.errors?.find((error) => error.field === "maintenance");
-    return marker ? marker.message || body.message || "The store is closed." : undefined;
+    const marker =
+      res.status === 503 ? body.errors?.find((error) => error.field === "maintenance") : undefined;
+    return {
+      closed: marker ? marker.message || body.message || "The store is closed." : undefined,
+      message: body.message || undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -222,11 +240,23 @@ export function cancelOrderRequest(
   return send(`/api/orders/${orderId}/cancel`, "POST", { cancellationReason });
 }
 
-export function refundOrderRequest(
+/**
+ * Refunds report WHY they were refused, unlike every other write here.
+ *
+ * The server has real reasons and they are all actionable: the gateway says
+ * nothing is left to refund, the payment was never captured, this COD order was
+ * never delivered, the gateway could not be reached. Collapsing all of that to
+ * `false` produced one message — "Refund recorded on this device only — the
+ * server rejected it" — which is both wrong (nothing was recorded anywhere) and
+ * useless (it names no cause and suggests no action).
+ */
+export async function refundOrderRequest(
   orderId: string,
   input: RefundOrderInput,
-): Promise<boolean> {
-  return send(`/api/orders/${orderId}/refund`, "POST", input);
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await sendWithStatus(`/api/orders/${orderId}/refund`, "POST", input);
+  if (result.ok) return { ok: true };
+  return { ok: false, error: result.error };
 }
 
 export function paymentStatusRequest(
