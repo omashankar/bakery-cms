@@ -55,6 +55,7 @@ import {
   revokeSession,
 } from "@/features/settings/lib/security-center-repository";
 import type { SecurityCenterState } from "@/types/security";
+import { settingsHydration } from "@/features/settings/lib/settings-api";
 
 /** Stub the dual-write endpoints with a fixed HTTP outcome. */
 function mockServer(ok: boolean, status = ok ? 200 : 500) {
@@ -87,6 +88,10 @@ const review = {
 
 beforeEach(() => {
   localStorage.clear();
+  // Stands in for `SettingsServerSync`, which opens the settings gate once the
+  // server's copy has been read. Without it a section PUT refuses to send — see
+  // the "settings hydration gate" block below.
+  settingsHydration.markSettled();
 });
 
 afterEach(() => {
@@ -274,6 +279,52 @@ describe("settings writes", () => {
     await saveGeneralSettings({ ...defaultGeneralSettings, siteName: "Local Only Bakes" });
 
     expect(getGeneralSettings().siteName).toBe("Local Only Bakes");
+  });
+});
+
+describe("the settings hydration gate", () => {
+  /**
+   * `PUT /api/settings/general` replaces the whole section, not the one field the
+   * admin edited. Before the server's copy has been read, the local section is
+   * whatever `loadSettings()` seeded into an empty localStorage — the demo
+   * defaults. Sending that overwrites the shop's real name, logo, timezone and
+   * currency in Mongo, from one Save, silently.
+   *
+   * Every other replace-all store in the repo already waited for hydration;
+   * settings was the one that did not.
+   */
+  it("refuses to send a section before the server's copy has been read", async () => {
+    // A fresh module instance, so the process-wide gate is closed again — this is
+    // a browser whose settings read failed, or has not finished.
+    vi.resetModules();
+    const fresh = await import("@/features/settings/lib/settings-api");
+    const fetchMock = mockServer(true);
+
+    vi.useFakeTimers();
+    try {
+      const pushed = fresh.pushSection("general", { ...defaultGeneralSettings });
+      // Give up waiting rather than send an unhydrated section.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(pushed).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends once hydration has landed", async () => {
+    vi.resetModules();
+    const fresh = await import("@/features/settings/lib/settings-api");
+    const fetchMock = mockServer(true);
+
+    fresh.settingsHydration.markSettled();
+
+    await expect(fresh.pushSection("general", { ...defaultGeneralSettings })).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/settings/general",
+      expect.objectContaining({ method: "PUT" })
+    );
   });
 });
 

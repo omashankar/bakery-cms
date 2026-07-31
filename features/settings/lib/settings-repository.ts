@@ -25,7 +25,13 @@ import {
   defaultSocialLinks,
   mergeAppSettings,
 } from "./settings-utils";
-import { pushSection, SERVER_SECTIONS } from "./settings-api";
+import {
+  fetchFullSettings,
+  fetchPublicSettings,
+  pushSection,
+  SERVER_SECTIONS,
+  settingsHydration,
+} from "./settings-api";
 
 const STORAGE_KEY = "bakery-cms-settings";
 const MAX_ACTIVITY = 100;
@@ -92,6 +98,67 @@ function appendActivity(
 }
 
 /**
+ * Reads the server's settings into the local store, and opens the hydration
+ * gate if that read was the full, authenticated one.
+ *
+ * Server values are deep-merged OVER the local ones, so a section the server
+ * omits keeps its existing value. `saveSettings` fires SETTINGS_UPDATED_EVENT,
+ * which every live consumer already listens to.
+ */
+export async function hydrateSettingsFromServer(): Promise<boolean> {
+  const full = await fetchFullSettings();
+  const server = full ?? (await fetchPublicSettings());
+  if (!server) return false;
+
+  const current = loadSettings();
+  const merged = mergeAppSettings({
+    ...current,
+    general: { ...current.general, ...(server.general ?? {}) },
+    contact: { ...current.contact, ...(server.contact ?? {}) },
+    social: server.social ?? current.social,
+    security: { ...current.security, ...(server.security ?? {}) },
+    smtp: { ...current.smtp, ...(server.smtp ?? {}) },
+    analytics: { ...current.analytics, ...(server.analytics ?? {}) },
+    maintenance: { ...current.maintenance, ...(server.maintenance ?? {}) },
+    commerce: {
+      ...current.commerce,
+      ...(server.commerce ?? {}),
+      paymentMethods: {
+        ...current.commerce.paymentMethods,
+        ...(server.commerce?.paymentMethods ?? {}),
+      },
+    },
+    modules: { ...current.modules, ...(server.modules ?? {}) },
+    // Activity is a client-only convenience log; the server uses audit_logs.
+    activity: current.activity,
+  });
+
+  saveSettings(merged);
+
+  // Only a FULL read may open the gate: the public subset carries no
+  // smtp/security/analytics, so settling on it would still let those sections
+  // be pushed as this browser's seed.
+  if (full) settingsHydration.markSettled();
+  return Boolean(full);
+}
+
+/**
+ * Guarantees the local copy came from the server before anything is written back.
+ *
+ * The gate used to have exactly one opener: a `[]`-dep effect in the root
+ * layout. An admin who signs in through the LOGIN FORM loads that layout while
+ * anonymous — so `/api/settings` 401s and the gate stays shut — and then reaches
+ * the admin by `router.push`, a soft navigation that never remounts the layout.
+ * The effect never ran again, so the gate stayed shut for the entire session and
+ * every settings save in the app failed with "saved on this device only". Being
+ * able to open it on demand is what makes the gate safe to depend on.
+ */
+export async function ensureSettingsHydrated(): Promise<boolean> {
+  if (settingsHydration.hasSettled()) return true;
+  return hydrateSettingsFromServer();
+}
+
+/**
  * A settings slice, plus whether the SERVER took it.
  *
  * `SettingsServerSync` merges the server's copy over the local one on every
@@ -108,6 +175,18 @@ async function updateStore(
   patch: Partial<AppSettings>,
   activity?: { action: string; entity: string; details?: string }
 ): Promise<SettingsWriteResult<AppSettings>> {
+  // Before reading the local copy, make sure it IS the server's copy. A section
+  // PUT is a replace-all, so merging a patch onto an unhydrated cache and
+  // sending it is how the demo seed overwrites a real shop's settings.
+  //
+  // Note what this can and cannot do. The SECTIONS NOT IN `patch` are protected
+  // here. The section that IS in `patch` came from the caller — a form holding a
+  // snapshot — and merging server values back into it would silently undo the
+  // admin's deliberate deletions. Protecting that one is the form's job: see
+  // `useSettingsSection`, which keeps the fields behind a skeleton until this
+  // same hydration has landed.
+  const hydrated = await ensureSettingsHydrated();
+
   const current = loadSettings();
   let next = mergeAppSettings({ ...current, ...patch });
   if (activity) {
@@ -122,6 +201,14 @@ async function updateStore(
   const sections = Object.keys(patch).filter((key) =>
     (SERVER_SECTIONS as readonly string[]).includes(key)
   );
+
+  // Hydration failed, so `pushSection` would refuse every one of these anyway —
+  // after burning the gate's 8-second timeout each time, with the Save button
+  // sitting there enabled and unlabelled. Report the failure now instead.
+  if (!hydrated && sections.length > 0) {
+    return { value: saved, persisted: false };
+  }
+
   const results = await Promise.all(
     sections.map((key) => pushSection(key, saved[key as keyof AppSettings]))
   );

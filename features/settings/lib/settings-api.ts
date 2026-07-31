@@ -4,11 +4,28 @@
  * the visitor is unauthenticated (backward compatibility during migration).
  */
 import type { AppSettings } from "@/types/settings";
+import { createHydrationGate } from "@/lib/hydration-gate";
 
 interface Envelope<T> {
   success: boolean;
   data: T | null;
 }
+
+/**
+ * Settled by `SettingsServerSync` once the FULL server copy has been read into
+ * the local store.
+ *
+ * A section PUT is a replace-all: `/api/settings/general` overwrites the whole
+ * general object, not the one field the admin touched. Before hydration the
+ * local copy is the demo seed — `loadSettings()` writes `defaultAppSettings`
+ * into an empty localStorage and returns it — so saving from a browser that had
+ * not yet read the server would push "Monginis", `/images/logo.svg`,
+ * `Asia/Kolkata` and `INR` over the shop's real identity. One save, silent.
+ *
+ * Only a full read settles it: the public subset omits smtp/security/analytics,
+ * so settling on that would let those sections be sent as seed values too.
+ */
+export const settingsHydration = createHydrationGate();
 
 /** Sections the server accepts (subset of AppSettings + none of activity/updatedAt). */
 export const SERVER_SECTIONS = [
@@ -44,8 +61,17 @@ export function fetchPublicSettings() {
   return getJson<Partial<AppSettings>>("/api/settings/public");
 }
 
-/** Push one section. Best-effort — never throws. */
+/**
+ * Push one section. Best-effort — never throws.
+ *
+ * Waits for hydration first: a section PUT replaces the section wholesale, so
+ * sending one before the server's copy has been read would overwrite it with
+ * this browser's seed. Refusing reports `persisted: false`, which the settings
+ * pages already surface as "saved on this device only" and keep Save enabled for.
+ */
 export async function pushSection(section: string, value: unknown): Promise<boolean> {
+  if (!(await settingsHydration.waitForSettled())) return false;
+
   try {
     const res = await fetch(`/api/settings/${section}`, {
       method: "PUT",
