@@ -32,14 +32,44 @@ function readGrants(): string[] {
 }
 
 /** Called after the track-order form verifies an email against the order. */
-export function grantOrderAccess(orderNumber: string): void {
+export function grantOrderAccess(orderNumber: string, lookupEmail?: string): void {
   if (typeof window === "undefined") return;
+
+  // The email that proved ownership is kept beside the grant.
+  //
+  // The order pages read the SERVER now, and `GET /api/orders/by-number` demands
+  // the email on the confirmation for every anonymous read — so a page that only
+  // knew the order number could not fetch the very order the customer had just
+  // proved they owned. Session-scoped and their own address, on their own
+  // device, for the life of one tab.
+  if (lookupEmail?.trim()) {
+    try {
+      sessionStorage.setItem(lookupKey(orderNumber), lookupEmail.trim());
+    } catch {
+      // Storage full or blocked. The page falls back to its local copy.
+    }
+  }
+
   const grants = readGrants();
   if (grants.includes(orderNumber)) return;
   try {
     sessionStorage.setItem(ACCESS_KEY, JSON.stringify([...grants, orderNumber]));
   } catch {
     // Storage full or blocked — the session check below still applies.
+  }
+}
+
+function lookupKey(orderNumber: string): string {
+  return `${ACCESS_KEY}:lookup:${orderNumber}`;
+}
+
+/** The email this browser proved ownership with, for re-reading from the server. */
+export function readOrderLookupEmail(orderNumber: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(lookupKey(orderNumber));
+  } catch {
+    return null;
   }
 }
 

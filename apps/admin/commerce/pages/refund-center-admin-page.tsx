@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
@@ -227,6 +227,26 @@ export function RefundCenterAdminPage() {
       cancelled = true;
     };
   }, [requestKey, reloadKey]);
+
+  // Chase refunds the gateway never reported settling, once per visit.
+  //
+  // A refund is created `pending` and the `refund.processed` webhook promotes
+  // it — but a webhook is a delivery someone else makes, and when it does not
+  // arrive the record sits at `processing` for good while the money has gone.
+  // The operator opening this screen is exactly the person who wants that
+  // resolved, so opening it asks. Reloads the list only when something changed.
+  const reconciledRef = useRef(false);
+  useEffect(() => {
+    if (reconciledRef.current) return;
+    reconciledRef.current = true;
+
+    void fetch("/api/orders/refunds/reconcile", { method: "POST" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result: { settled?: number } | null) => {
+        if (result?.settled) setReloadKey((key) => key + 1);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const paginated = orders;
   const selected = orders.find((order) => order.id === selectedId) ?? null;

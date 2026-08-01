@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Package } from "lucide-react";
 import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
+import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
+import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
@@ -29,7 +31,26 @@ export function OrderSuccessPage() {
 
   useEffect(() => {
     if (!orderNumber) return;
-    setOrder(getOrderByNumber(orderNumber));
+    const local = getOrderByNumber(orderNumber);
+    setOrder(local);
+
+    // Re-read from the server once.
+    //
+    // The payment status shown here is the one the browser recorded, and it can
+    // be out of date within seconds: a capture the placement lookup could not
+    // confirm lands as `pending`, and the gateway's webhook corrects it moments
+    // later. This is exactly the screen where a customer who has just paid reads
+    // "pending" and worries.
+    const email = readOrderLookupEmail(orderNumber) ?? local?.address?.email;
+    if (!email) return;
+
+    let cancelled = false;
+    void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
+      if (!cancelled && fresh) setOrder(fresh);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [orderNumber]);
 
   useEffect(() => {

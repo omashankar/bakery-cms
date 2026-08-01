@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { MapPin, PackageSearch, Truck } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
+import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { Button } from "@/components/ui/button";
@@ -35,24 +36,40 @@ export function TrackOrderPage() {
     }
   }, []);
 
-  const onSubmit = (data: TrackOrderForm) => {
-    const order = getOrderByNumber(data.orderNumber.trim().toUpperCase());
+  const onSubmit = async (data: TrackOrderForm) => {
+    const orderNumber = data.orderNumber.trim().toUpperCase();
+    const email = data.email.trim();
+
+    // The SERVER decides, not this browser's cache.
+    //
+    // Looking the order up locally meant an order this device had never stored
+    // could not be tracked at all — which is exactly the order most likely to be
+    // typed into this form: one the webhook placed after the customer's tab
+    // died mid-payment. It also meant the state shown was frozen at placement,
+    // so a refund or cancellation never appeared.
+    //
+    // The endpoint applies the same ownership rule this form always has (order
+    // number AND the email on the confirmation) and answers 404 either way, so
+    // it cannot be used to discover which order numbers exist.
+    const order =
+      (await fetchOrderByNumber(orderNumber, { email })) ??
+      // Offline, or the server is unreachable: fall back to the local copy so a
+      // customer with the order in this browser is not stranded by a blip.
+      (() => {
+        const local = getOrderByNumber(orderNumber);
+        return local && verifyOrderLookup(local, { email }) ? local : null;
+      })();
+
     if (!order) {
-      toast.error("Order not found", {
-        description: "Check the order number and try again.",
+      toast.error("We could not find that order", {
+        description: "Check the order number and use the email from your confirmation.",
       });
       return;
     }
 
-    if (!verifyOrderLookup(order, { email: data.email })) {
-      toast.error("Details do not match", {
-        description: "Use the email from your order confirmation.",
-      });
-      return;
-    }
-
-    // Ownership proven — let the detail page render for this browser session.
-    grantOrderAccess(order.orderNumber);
+    // Ownership proven — let the detail page render for this browser session,
+    // and remember the email so that page can re-read from the server too.
+    grantOrderAccess(order.orderNumber, email);
     router.push(routes.store.orderDetail(order.orderNumber));
   };
 

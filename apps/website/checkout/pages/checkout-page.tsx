@@ -575,8 +575,10 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     });
 
     // The customer who just placed this order can view it without going
-    // through the track-order lookup.
-    grantOrderAccess(order.orderNumber);
+    // through the track-order lookup. Their email travels with the grant so the
+    // order pages can re-read the SERVER's copy later — that is what makes a
+    // refund or a status change visible to them at all.
+    grantOrderAccess(order.orderNumber, order.address?.email);
     router.push(`${routes.store.orderSuccess}?order=${order.orderNumber}`);
   };
 

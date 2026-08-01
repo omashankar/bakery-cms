@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Mail, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
+import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
+import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import {
   getOrderByNumber,
   type PlacedOrder,
@@ -31,11 +34,27 @@ export function CustomerInvoicePage({ orderNumber }: CustomerInvoicePageProps) {
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     setOrder(getOrderByNumber(orderNumber));
     setSettings(loadInvoiceSettings());
     const c = getCommerceSettings();
     setLabels({ tax: c.taxLabel, platform: c.platformChargeLabel, giftwrap: c.giftWrapLabel });
     setReady(true);
+
+    // Prefer the SERVER's copy. An invoice is the document a customer keeps, and
+    // this browser's cache is frozen at placement — so after a refund it printed
+    // the full original total with no mention of the money that had gone back.
+    const email = readOrderLookupEmail(orderNumber) ?? getCustomerSession()?.email;
+    if (email) {
+      void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
+        if (!cancelled && fresh) setOrder(fresh);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [orderNumber]);
 
   useEffect(() => {

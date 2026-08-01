@@ -12,9 +12,10 @@ import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summ
 import { getDeliveryTrackingSnapshot } from "@/features/orders/lib/delivery-tracking";
 import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
 import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
-import { canViewOrder } from "@/features/orders/lib/order-access";
+import { canViewOrder, readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
+import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,19 +41,70 @@ export function OrderDetailPage() {
   const [allowed, setAllowed] = useState(false);
   const [ready, setReady] = useState(false);
 
-  function refreshOrder() {
+  /**
+   * Re-read the order — from the server when we can prove ownership.
+   *
+   * "Refresh status" used to re-read this browser's own cache, which cannot have
+   * changed unless this same browser changed it. The one thing a customer
+   * presses it for — has my order moved, has my refund gone through — was the
+   * one thing it could never show.
+   */
+  async function refreshOrder() {
     if (!orderNumber) return;
+    const email = readOrderLookupEmail(orderNumber) ?? getCustomerSession()?.email;
+    if (email) {
+      const fresh = await fetchOrderByNumber(orderNumber, { email });
+      if (fresh) {
+        setOrder(fresh);
+        return;
+      }
+    }
     setOrder(getOrderByNumber(orderNumber));
   }
 
   useEffect(() => {
-    refreshOrder();
-    // An order number alone must not reveal a name, phone and home address.
-    const found = orderNumber ? getOrderByNumber(orderNumber) : null;
-    setAllowed(found ? canViewOrder(found, getCustomerSession()?.email) : false);
-    setReady(true);
-    window.addEventListener("bakery-orders-updated", refreshOrder);
-    return () => window.removeEventListener("bakery-orders-updated", refreshOrder);
+    if (!orderNumber) {
+      setReady(true);
+      return;
+    }
+
+    // Access is still decided locally where we can, so the page does not flash
+    // a stranger's details while a request is in flight.
+    const local = getOrderByNumber(orderNumber);
+    const sessionEmail = getCustomerSession()?.email;
+    const lookupEmail = readOrderLookupEmail(orderNumber) ?? sessionEmail ?? undefined;
+    const localAllowed = local ? canViewOrder(local, sessionEmail) : false;
+
+    setOrder(local);
+    setAllowed(localAllowed);
+    // Not ready until the server has answered, unless there is nothing to ask
+    // with — otherwise the page renders "not found" for a webhook-placed order
+    // a moment before its data arrives.
+    if (!lookupEmail) setReady(true);
+
+    let cancelled = false;
+    if (lookupEmail) {
+      // The SERVER's copy is the real one. The local copy is frozen at the
+      // moment this browser stored it, so a refund, a cancellation or a payment
+      // correction never showed here — and an order the WEBHOOK placed was not
+      // in this browser at all, leaving the customer who most needed to track it
+      // with nothing.
+      void fetchOrderByNumber(orderNumber, { email: lookupEmail }).then((fresh) => {
+        if (cancelled) return;
+        if (fresh) {
+          setOrder(fresh);
+          setAllowed(true);
+        }
+        setReady(true);
+      });
+    }
+
+    const onLocalChange = () => void refreshOrder();
+    window.addEventListener("bakery-orders-updated", onLocalChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bakery-orders-updated", onLocalChange);
+    };
   }, [orderNumber]);
 
   const timeline = useMemo(() => (order ? getOrderTimeline(order) : []), [order]);
@@ -120,7 +172,7 @@ export function OrderDetailPage() {
                 <Badge variant="outline">Ref {order.paymentReference}</Badge>
               ) : null}
             </div>
-            <Button variant="outline" size="sm" onClick={refreshOrder}>
+            <Button variant="outline" size="sm" onClick={() => void refreshOrder()}>
               <RefreshCw className="size-4" />
               Refresh status
             </Button>

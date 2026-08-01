@@ -502,6 +502,29 @@ export async function compareAndSetRefund(
   return doc ? toOrder(doc) : null;
 }
 
+/**
+ * Orders whose refund the gateway has accepted but not yet reported settling.
+ *
+ * These are what the `refund.processed` webhook is supposed to finish. When that
+ * delivery is missed — no webhook secret configured, a wrong URL, Razorpay
+ * exhausting its retries — the record sits at `processing` forever: the money
+ * has very likely gone, and the shop's own screens never say so.
+ *
+ * Bounded, and oldest first, because the ones that have been waiting longest are
+ * the ones a webhook is least likely to still rescue.
+ */
+export async function listUnsettledRefunds(limit = 50): Promise<PlacedOrder[]> {
+  await connectDB();
+  const docs = (await OrderModel.find({
+    "refundRecord.status": "processing",
+    "refundRecord.gatewayRefunds.status": "pending",
+  })
+    .sort({ "refundRecord.requestedAt": 1 })
+    .limit(limit)
+    .lean()) as unknown as Raw[];
+  return docs.map(toOrder);
+}
+
 export async function orderNumberExists(orderNumber: string): Promise<boolean> {
   await connectDB();
   return (await OrderModel.exists({ orderNumber })) !== null;

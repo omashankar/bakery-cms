@@ -241,6 +241,40 @@ export function cancelOrderRequest(
 }
 
 /**
+ * One order, from the SERVER, for a customer who can prove they own it.
+ *
+ * The storefront's order pages read `localStorage` and nothing else, which made
+ * them wrong in two directions. A refund, a cancellation or a payment correction
+ * never reached the customer — their copy was frozen at whatever it looked like
+ * when they placed it, forever. And an order the WEBHOOK placed (the rescue path
+ * for a payment whose customer closed the tab) exists only on the server, so the
+ * person most in need of tracking it could not: their browser had never heard of
+ * it.
+ *
+ * `email` is what the endpoint checks; it refuses with the same 404 as an
+ * unknown number rather than confirming which order numbers exist.
+ */
+export async function fetchOrderByNumber(
+  orderNumber: string,
+  lookup: { email?: string; phone?: string },
+): Promise<PlacedOrder | null> {
+  const params = new URLSearchParams();
+  if (lookup.email?.trim()) params.set("email", lookup.email.trim());
+  if (lookup.phone?.trim()) params.set("phone", lookup.phone.trim());
+
+  try {
+    const res = await fetch(
+      `/api/orders/by-number/${encodeURIComponent(orderNumber)}?${params.toString()}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    return await readOrderBody(res);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Refunds report WHY they were refused, unlike every other write here.
  *
  * The server has real reasons and they are all actionable: the gateway says

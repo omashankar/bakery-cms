@@ -15,6 +15,7 @@ import {
 } from "@/features/orders/lib/refund-planning";
 import {
   createRazorpayRefund,
+  fetchRazorpayRefund,
   getRefundableAmount,
 } from "@/features/payments/server/razorpay-refund.server";
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
@@ -818,6 +819,60 @@ async function sendRefundEmail(order: PlacedOrder, amount: number, settled: bool
  * order already carries. It cannot downgrade, and it cannot touch a refunded or
  * cancelled order.
  */
+/**
+ * Ask the gateway about refunds it never told us had settled.
+ *
+ * `settleGatewayRefund` is driven by the `refund.processed` webhook, and a
+ * webhook is a delivery someone else makes. If it never arrives — no secret
+ * configured, a wrong URL, Razorpay giving up after its retry window — the
+ * refund record sits at `processing` for good. The money has almost certainly
+ * left; the shop's own Refund Centre is the only place that does not know.
+ *
+ * So this pulls the answer instead of waiting to be pushed it. Same settle path,
+ * so stock, coupons and the order's own status all follow the same rules.
+ * `fetchRazorpayRefund` existed for exactly this and had no caller.
+ */
+export async function reconcilePendingRefunds(
+  limit = 50,
+): Promise<{ checked: number; settled: number; stillPending: number }> {
+  const orders = await repo.listUnsettledRefunds(limit);
+  let settled = 0;
+  let stillPending = 0;
+  let checked = 0;
+
+  for (const order of orders) {
+    for (const refund of order.refundRecord?.gatewayRefunds ?? []) {
+      if (refund.status !== "pending") continue;
+      checked += 1;
+
+      const latest = await fetchRazorpayRefund(refund.id);
+      if (latest.unavailable || !latest.status) {
+        // Could not ask. Leave it alone — guessing at a refund's state is the
+        // failure this whole change exists to remove.
+        stillPending += 1;
+        continue;
+      }
+      if (latest.status === "pending") {
+        stillPending += 1;
+        continue;
+      }
+
+      const ok = await settleGatewayRefund({
+        refundId: refund.id,
+        paymentId: order.paymentReference ?? "",
+        amount: latest.amount ?? refund.amount,
+        status: latest.status,
+      });
+      if (ok) settled += 1;
+    }
+  }
+
+  if (settled > 0) {
+    console.info(`[orders] Reconciled ${settled} refund(s) the webhook never reported.`);
+  }
+  return { checked, settled, stillPending };
+}
+
 /** The order a gateway payment produced, if any. Identifies the money, not the cart. */
 export function findOrderByPayment(paymentId: string) {
   return repo.findByPaymentReference(paymentId);
