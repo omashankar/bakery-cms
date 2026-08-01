@@ -18,6 +18,8 @@ interface InvoicePreviewDialogProps {
   order: PlacedOrder | null;
   settings: InvoiceSettings;
   taxLabel: string;
+  /** Today's rate, only to check each order's stored rate against. */
+  currentTaxRate?: number;
   platformChargeLabel: string;
   giftWrapLabel: string;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +31,7 @@ export function InvoicePreviewDialog({
   order,
   settings,
   taxLabel,
+  currentTaxRate,
   platformChargeLabel,
   giftWrapLabel,
   onOpenChange,
@@ -49,6 +52,7 @@ export function InvoicePreviewDialog({
               order={order}
               settings={settings}
               taxLabel={taxLabel}
+              currentTaxRate={currentTaxRate}
               platformChargeLabel={platformChargeLabel}
               giftWrapLabel={giftWrapLabel}
               variant="screen"

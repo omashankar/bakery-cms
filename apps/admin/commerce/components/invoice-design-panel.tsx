@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Printer, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -11,14 +11,16 @@ import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
-  resetInvoiceSettings,
   saveInvoiceSettings,
 } from "@/features/commerce/lib/invoice-settings-repository";
+import { invoiceSettingsHydration } from "@/features/commerce/lib/invoice-settings-api";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import { SAMPLE_INVOICE_ORDER } from "@/apps/admin/commerce/lib/sample-invoice-order";
 import {
   getCommerceSettings,
   getContactSettings,
   getGeneralSettings,
+  ensureSettingsHydrated,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -29,6 +31,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { InvoiceSettingsFormData } from "@/types/invoice";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 import { cn } from "@/lib/utils";
 
 const VISIBILITY_OPTIONS = [
@@ -68,72 +74,167 @@ function toForm(settings: ReturnType<typeof loadInvoiceSettings>): InvoiceSettin
 }
 
 export function InvoiceDesignPanel() {
-  const [settings, setSettings] = useState<InvoiceSettingsFormData>(() => {
-    const { updatedAt: _updatedAt, ...form } = defaultInvoiceSettings;
-    return form;
+  // One state object, not two — `saved` is the last copy the SERVER confirmed.
+  //
+  // These were separate states read back through refs, which meant writing a ref
+  // during render (React forbids it, and the linter says so) and, worse, two
+  // updaters that had to agree about dirtiness while each could only see its
+  // own `prev`. A single object lets one functional update decide with both
+  // values in hand. `useSettingsSection` holds its form the same way.
+  const [form, setForm] = useState<{
+    current: InvoiceSettingsFormData;
+    saved: InvoiceSettingsFormData;
+  }>(() => {
+    const { updatedAt: _updatedAt, ...initial } = defaultInvoiceSettings;
+    return { current: initial, saved: initial };
   });
-  const [savedSettings, setSavedSettings] = useState(settings);
+  const settings = form.current;
+  const savedSettings = form.saved;
+  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">(
+    invoiceSettingsHydration.hasSettled() ? "ready" : "pending",
+  );
+  const [isWriting, setIsWriting] = useState(false);
   const [commerceLabels, setCommerceLabels] = useState({
     taxLabel: defaultCommerceSettings.taxLabel,
     platformChargeLabel: defaultCommerceSettings.platformChargeLabel,
     giftWrapLabel: defaultCommerceSettings.giftWrapLabel,
+    taxRate: defaultCommerceSettings.taxRate,
   });
 
-  function loadAll() {
-    const form = toForm(loadInvoiceSettings());
-    setSettings(form);
-    setSavedSettings(form);
-    const commerce = getCommerceSettings();
-    setCommerceLabels({
-      taxLabel: commerce.taxLabel,
-      platformChargeLabel: commerce.platformChargeLabel,
-      giftWrapLabel: commerce.giftWrapLabel,
-    });
-  }
+  // Read synchronously by the listener; `isWriting` above is what renders.
+  const writingRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    function loadAll() {
+      // A write dispatches INVOICE_SETTINGS_UPDATED_EVENT from `writeSettings`
+      // SYNCHRONOUSLY, before its server round-trip finishes — so this ran
+      // mid-save and re-baselined `savedSettings` to the value being written.
+      // A save the server then REJECTED looked clean: not dirty, Save greyed
+      // out, no retry, while the toast said the change was only on this device.
+      if (writingRef.current) return;
+
+      const loaded = toForm(loadInvoiceSettings());
+      // Never over an edit in progress. This overwrote the form unconditionally,
+      // so hydration landing while the admin was typing their GSTIN discarded
+      // it mid-word.
+      //
+      // The fields are held behind `SettingsFormGate` until hydration settles,
+      // so on a cold load there is nothing to protect yet and the server's copy
+      // is adopted — which is what stops the admin editing the seed and then
+      // saving it.
+      setForm((prev) =>
+        JSON.stringify(prev.current) !== JSON.stringify(prev.saved)
+          ? prev
+          : { current: loaded, saved: loaded },
+      );
+
+      const commerce = getCommerceSettings();
+      setCommerceLabels({
+        taxLabel: commerce.taxLabel,
+        platformChargeLabel: commerce.platformChargeLabel,
+        giftWrapLabel: commerce.giftWrapLabel,
+        taxRate: commerce.taxRate,
+      });
+    }
+
     loadAll();
     window.addEventListener(INVOICE_SETTINGS_UPDATED_EVENT, loadAll);
     window.addEventListener(SETTINGS_UPDATED_EVENT, loadAll);
+
+    // Open the gate rather than wait on the layout effect to — see
+    // `ensureInvoiceSettingsHydrated` for why waiting is not enough.
+    void ensureInvoiceSettingsHydrated().then((settled) => {
+      if (cancelled) return;
+      // Adopt what arrived BEFORE unlocking, or the admin edits the seed again.
+      if (settled) loadAll();
+      setHydration(settled ? "ready" : "unavailable");
+    });
+
     return () => {
+      cancelled = true;
       window.removeEventListener(INVOICE_SETTINGS_UPDATED_EVENT, loadAll);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, loadAll);
     };
   }, []);
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  // Not while a write is in flight: the round-trip can take seconds on a cold
+  // read, and an enabled button through all of it invites a second click.
+  const canSave = hydration === "ready" && !isWriting;
   const previewSettings = useMemo(
     () => ({ ...settings, updatedAt: new Date().toISOString() }),
     [settings]
   );
 
   function patch(next: Partial<InvoiceSettingsFormData>) {
-    setSettings((prev) => ({ ...prev, ...next }));
+    setForm((prev) => ({ ...prev, current: { ...prev.current, ...next } }));
+  }
+
+  /** Runs a write with the resync listener suppressed, then commits the result. */
+  async function runWrite(write: () => Promise<{ form: InvoiceSettingsFormData; accepted: boolean }>) {
+    writingRef.current = true;
+    setIsWriting(true);
+    try {
+      const { form: written, accepted } = await write();
+      setForm((prev) => ({ current: written, saved: accepted ? written : prev.saved }));
+    } finally {
+      writingRef.current = false;
+      setIsWriting(false);
+    }
   }
 
   async function handleSave() {
-    const { value: saved, persisted } = await saveInvoiceSettings(settings);
-    const form = toForm(saved);
-    setSettings(form);
-    // These are the shop's legal details on every invoice — business name,
-    // GSTIN, address, terms — and the PDF is built from the server copy. Only
-    // mark clean once the server has them, so Save stays live for a retry.
-    if (reportWrite(persisted, "Invoice design saved")) setSavedSettings(form);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value: saved, persisted } = await saveInvoiceSettings(settings);
+      // These are the shop's legal details on every invoice — business name,
+      // GSTIN, address, terms — and the PDF is built from the server copy. Only
+      // mark clean once the server has them, so Save stays live for a retry.
+      return { form: toForm(saved), accepted: reportWrite(persisted, "Invoice design saved") };
+    });
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    setForm((prev) => ({ ...prev, current: prev.saved }));
   }
 
-  function handleResetDefaults() {
-    const seeded = resetInvoiceSettings();
-    const form = toForm(seeded);
-    setSettings(form);
-    setSavedSettings(form);
-    toast.success("Invoice design reset to defaults");
+  async function handleResetDefaults() {
+    if (!canSave) return;
+    // Reset used to be LOCAL ONLY: `resetInvoiceSettings()` writes localStorage
+    // and dispatches an event, and nothing pushed it. The toast said "reset to
+    // defaults" while the server kept the old identity — so every invoice the
+    // shop generated after that still carried it, and the next hydration put it
+    // back in the form as well. Going through the same dual-write as Save is
+    // what makes the message true.
+    await runWrite(async () => {
+      // Straight through the same dual-write as Save. Calling
+      // `resetInvoiceSettings()` first only wrote localStorage a second time,
+      // and did it BEFORE the server had agreed.
+      const form = toForm({ ...defaultInvoiceSettings });
+      const { value, persisted } = await saveInvoiceSettings(form);
+      return {
+        form: toForm(value),
+        accepted: reportWrite(persisted, "Invoice design reset to defaults"),
+      };
+    });
   }
 
-  function handleImportFromSite() {
+  async function handleImportFromSite() {
+    // Import from settings this browser has actually READ from the server.
+    //
+    // These are two more localStorage reads, and they seed demo values just
+    // like the invoice ones do — so on an unhydrated browser this button copied
+    // the demo brand and the demo address straight into the shop's invoice
+    // identity, which the admin would then quite reasonably save.
+    if (!(await ensureSettingsHydrated())) {
+      toast.error("Could not read your site settings", {
+        description: "Reload once the connection is back — importing now would copy placeholders.",
+      });
+      return;
+    }
+
     const general = getGeneralSettings();
     const contact = getContactSettings();
     patch({
@@ -150,6 +251,8 @@ export function InvoiceDesignPanel() {
   return (
     <div className={cn("space-y-4 sm:space-y-5", isDirty && "pb-20 md:pb-0")}>
       <div className="print:hidden space-y-4 sm:space-y-5">
+      <SettingsHydrationNotice hydration={hydration} />
+
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         {isDirty ? (
           <Button variant="outline" className="hidden md:inline-flex" onClick={handleDiscard}>
@@ -168,9 +271,12 @@ export function InvoiceDesignPanel() {
           variant="bakery"
           className={cn("w-full sm:w-auto", isDirty && "hidden md:inline-flex")}
           onClick={() => void handleSave()}
-          disabled={!isDirty}
+          // `canSave` is false until the SERVER's copy has landed, and while a
+          // write is in flight. Saving before hydration would push this
+          // browser's seed over the shop's real invoice identity.
+          disabled={!isDirty || !canSave}
         >
-          Save design
+          {isWriting ? "Saving…" : "Save design"}
         </Button>
       </div>
 
@@ -181,6 +287,7 @@ export function InvoiceDesignPanel() {
         </div>
       ) : null}
 
+      <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
@@ -196,7 +303,7 @@ export function InvoiceDesignPanel() {
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
-                  onClick={handleImportFromSite}
+                  onClick={() => void handleImportFromSite()}
                 >
                   <Settings2 className="size-4" />
                   Import site
@@ -205,7 +312,8 @@ export function InvoiceDesignPanel() {
                   variant="ghost"
                   size="sm"
                   className="w-full sm:w-auto"
-                  onClick={handleResetDefaults}
+                  onClick={() => void handleResetDefaults()}
+                  disabled={!canSave}
                 >
                   <RotateCcw className="size-4" />
                   Reset defaults
@@ -404,6 +512,7 @@ export function InvoiceDesignPanel() {
                 order={SAMPLE_INVOICE_ORDER}
                 settings={previewSettings}
                 taxLabel={commerceLabels.taxLabel}
+                currentTaxRate={commerceLabels.taxRate}
                 platformChargeLabel={commerceLabels.platformChargeLabel}
                 giftWrapLabel={commerceLabels.giftWrapLabel}
                 variant="screen"
@@ -412,6 +521,7 @@ export function InvoiceDesignPanel() {
           </CardContent>
         </Card>
       </div>
+      </SettingsFormGate>
       </div>
 
       <div className="hidden print:block">
@@ -419,6 +529,7 @@ export function InvoiceDesignPanel() {
           order={SAMPLE_INVOICE_ORDER}
           settings={previewSettings}
           taxLabel={commerceLabels.taxLabel}
+          currentTaxRate={commerceLabels.taxRate}
           platformChargeLabel={commerceLabels.platformChargeLabel}
           giftWrapLabel={commerceLabels.giftWrapLabel}
           variant="print"
@@ -430,7 +541,7 @@ export function InvoiceDesignPanel() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={() => void handleSave()}>
+          <Button variant="bakery" onClick={() => void handleSave()} disabled={!canSave}>
             Save design
           </Button>
         </AdminMobileActionBar>

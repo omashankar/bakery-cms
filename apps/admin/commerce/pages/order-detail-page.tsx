@@ -376,6 +376,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <TaxBreakdown
                 values={taxBreakdownFromCartTotals(order.totals, {
                   taxLabel: getCommerceSettings().taxLabel,
+                  currentTaxRate: getCommerceSettings().taxRate,
                   platformChargeLabel: getCommerceSettings().platformChargeLabel,
                   discountLabel: order.coupon ? `Discount (${order.coupon.code})` : "Discount",
                 })}

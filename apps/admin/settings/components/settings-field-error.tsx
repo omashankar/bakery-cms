@@ -29,6 +29,40 @@ export function FieldError({ id, message }: { id: string; message: string }) {
  * demo data. Saving is blocked until a reload succeeds; showing the values
  * read-only is more useful than an empty page, as long as it says so.
  */
+/**
+ * Holds a settings form closed until the server's copy has landed.
+ *
+ * Gating only the SAVE button is not enough, and the gap is the whole bug.
+ * `SettingsServerSync` reads the server copy from a root-layout effect, so on a
+ * hard load that read is still in flight while the fields are already
+ * interactive — and the local store answers with the demo seed meanwhile. The
+ * admin types one character, the form is now dirty, the "never clobber unsaved
+ * edits" rule makes the arriving server values get SKIPPED, and hydration then
+ * settles and unlocks Save over a form that is the seed. The gate cannot help:
+ * it is open by then.
+ *
+ * So the fields do not exist until there is something real to put in them. When
+ * hydration never lands they appear anyway, showing the seed, with saving
+ * blocked and `SettingsHydrationNotice` above them saying why — a screen that
+ * shows defaults and refuses to save them is correct; one that offers to save
+ * them is not.
+ *
+ * `SettingsSectionShell` does this for the sections that use it. Screens built
+ * on `AdminPage` need it too, which is what this is for.
+ */
+export function SettingsFormGate({
+  hydration,
+  children,
+}: {
+  hydration: SectionHydration;
+  children: React.ReactNode;
+}) {
+  if (hydration === "pending") {
+    return <div className="min-h-48 animate-pulse rounded-xl border border-border bg-muted" />;
+  }
+  return <>{children}</>;
+}
+
 export function SettingsHydrationNotice({ hydration }: { hydration: SectionHydration }) {
   if (hydration !== "unavailable") return null;
 

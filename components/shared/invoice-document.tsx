@@ -12,6 +12,15 @@ interface InvoiceDocumentProps {
   order: PlacedOrder;
   settings: InvoiceSettings;
   taxLabel?: string;
+  /**
+   * The rate the shop charges TODAY.
+   *
+   * Only used to check the order's own stored rate against: when they agree the
+   * shop's current wording is printed, and when they do not the rate this order
+   * was actually charged at wins. Without it, changing the rate restated every
+   * invoice already issued.
+   */
+  currentTaxRate?: number;
   platformChargeLabel?: string;
   giftWrapLabel?: string;
   variant?: "screen" | "print";
@@ -22,6 +31,7 @@ export function InvoiceDocument({
   order,
   settings,
   taxLabel = defaultCommerceSettings.taxLabel,
+  currentTaxRate,
   platformChargeLabel = defaultCommerceSettings.platformChargeLabel,
   giftWrapLabel = defaultCommerceSettings.giftWrapLabel,
   variant = "print",
@@ -29,6 +39,7 @@ export function InvoiceDocument({
 }: InvoiceDocumentProps) {
   const breakdown = taxBreakdownFromCartTotals(order.totals, {
     taxLabel,
+    currentTaxRate,
     platformChargeLabel,
     giftWrapLabel,
     discountLabel: order.coupon ? `Discount (${order.coupon.code})` : "Discount",
@@ -162,7 +173,18 @@ export function InvoiceDocument({
         </tbody>
       </table>
 
-      <TaxBreakdown values={breakdown} className="ml-auto mt-6 max-w-xs" showAllLines />
+      {/*
+        `showTaxableAmount` matters on an invoice specifically: without it the
+        document states a tax AMOUNT and nothing it was computed from, so the
+        rate lived only inside a free-text label. Printing the value the tax was
+        charged on makes the line self-checking.
+      */}
+      <TaxBreakdown
+        values={breakdown}
+        className="ml-auto mt-6 max-w-xs"
+        showAllLines
+        showTaxableAmount
+      />
 
       {/*
         A refunded invoice used to bill the full total and say nothing about the

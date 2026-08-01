@@ -79,6 +79,7 @@ export function InvoicesAdminPage() {
     useState<InvoiceSettings>(defaultInvoiceSettings);
   const [commerceLabels, setCommerceLabels] = useState({
     taxLabel: defaultCommerceSettings.taxLabel,
+    taxRate: defaultCommerceSettings.taxRate,
     platformChargeLabel: defaultCommerceSettings.platformChargeLabel,
     giftWrapLabel: defaultCommerceSettings.giftWrapLabel,
   });
@@ -89,6 +90,7 @@ export function InvoicesAdminPage() {
       const commerce = getCommerceSettings();
       setCommerceLabels({
         taxLabel: commerce.taxLabel,
+        taxRate: commerce.taxRate,
         platformChargeLabel: commerce.platformChargeLabel,
         giftWrapLabel: commerce.giftWrapLabel,
       });
@@ -326,6 +328,14 @@ export function InvoicesAdminPage() {
 
       {tab === "invoices" ? (
         <div className="print:hidden space-y-4 sm:space-y-5">
+          {/*
+            These count EVERY order, not the filtered list below them — they are
+            filter shortcuts, so a count that collapsed to the current filter
+            would read zero the moment you used one. "all time" says so, because
+            the number sitting above a filtered list otherwise reads as a count
+            of what is on screen. The Transaction Center makes the same
+            distinction explicitly; this one made it silently.
+          */}
           <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
               type="button"
@@ -335,7 +345,7 @@ export function InvoicesAdminPage() {
               <DashboardStatCard
                 title="Paid"
                 value={overview.paid}
-                change="Prepaid orders"
+                change="Prepaid orders · all time"
                 changeTone="positive"
                 icon={IndianRupee}
                 tone="bakery"
@@ -349,7 +359,7 @@ export function InvoicesAdminPage() {
               <DashboardStatCard
                 title="COD"
                 value={overview.cod}
-                change="Pay on delivery"
+                change="Pay on delivery · all time"
                 changeTone="neutral"
                 icon={Wallet}
                 tone="gold"
@@ -647,6 +657,7 @@ export function InvoicesAdminPage() {
             order={printOrder}
             settings={invoiceSettings}
             taxLabel={commerceLabels.taxLabel}
+            currentTaxRate={commerceLabels.taxRate}
             platformChargeLabel={commerceLabels.platformChargeLabel}
             giftWrapLabel={commerceLabels.giftWrapLabel}
             variant="print"
@@ -659,6 +670,7 @@ export function InvoicesAdminPage() {
         order={previewOrder}
         settings={invoiceSettings}
         taxLabel={commerceLabels.taxLabel}
+        currentTaxRate={commerceLabels.taxRate}
         platformChargeLabel={commerceLabels.platformChargeLabel}
         giftWrapLabel={commerceLabels.giftWrapLabel}
         onOpenChange={(open) => {

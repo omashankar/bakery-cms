@@ -1,4 +1,6 @@
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
+import { historicalTaxLabel } from "@/features/commerce/lib/tax-utils";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { TaxBreakdownValues } from "@/types/tax-breakdown";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -112,6 +114,13 @@ export function taxBreakdownFromCartTotals(
     platformChargeLabel?: string;
     giftWrapLabel?: string;
     discountLabel?: string;
+    /**
+     * What the shop charges today, used only to check the stored rate against.
+     * When they agree the shop's own wording is kept.
+     */
+    currentTaxRate?: number;
+    /** The shop's currency, so a derived rate knows how coarse its input was. */
+    currency?: string;
   }
 ): TaxBreakdownValues {
   return {
@@ -120,7 +129,15 @@ export function taxBreakdownFromCartTotals(
     discountLabel: options?.discountLabel,
     delivery: totals.delivery,
     tax: totals.tax,
-    taxLabel: options?.taxLabel,
+    // The rate this order was CHARGED at, not the one the shop charges now.
+    // Reading the live label relabelled every invoice already issued whenever
+    // the admin changed the rate.
+    taxLabel: historicalTaxLabel(
+      totals,
+      options?.taxLabel ?? defaultCommerceSettings.taxLabel,
+      options?.currentTaxRate,
+      options?.currency,
+    ),
     platformCharge: totals.platformCharge ?? 0,
     platformChargeLabel: options?.platformChargeLabel,
     giftWrapFee: totals.giftWrapFee ?? 0,

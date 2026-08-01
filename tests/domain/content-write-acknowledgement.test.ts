@@ -52,6 +52,7 @@ import { contentHydration } from "@/features/content/lib/content-api";
 import { couponsHydration, zonesHydration } from "@/features/commerce/lib/commerce-api";
 import { seoHydration, siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
 import { catalogHydration } from "@/features/catalog/lib/catalog-api";
+import { invoiceSettingsHydration } from "@/features/commerce/lib/invoice-settings-api";
 import { mediaHydration } from "@/apps/admin/media/lib/media-api";
 import { communicationsHydration } from "@/apps/admin/communications/lib/communications-api";
 import { createHydrationGate } from "@/lib/hydration-gate";
@@ -81,6 +82,10 @@ function markHydrated() {
   mediaHydration.markSettled();
   communicationsHydration.markSettled();
   catalogHydration.markSettled();
+  // The shop's legal identity on every invoice — company name, address, GSTIN,
+  // PAN, terms. It is a whole-document replace like the others and had no gate
+  // at all, so a browser whose read failed pushed the demo seed over it.
+  invoiceSettingsHydration.markSettled();
 }
 
 beforeEach(() => {

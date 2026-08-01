@@ -7,6 +7,8 @@ import { priceCart, UnknownProductError } from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
 import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
+import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
+import { formatCurrency } from "@/utils/format";
 
 /**
  * Prices a cart and holds the result as a draft.
@@ -60,6 +62,22 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
         `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
         409,
         [{ field: "deliverySlot.date", message: "Too soon for this delivery area" }],
+      );
+    }
+
+    // The shop's minimum, enforced where refusing is free.
+    //
+    // This lived only in the browser — a disabled button and a toast — so the
+    // quote priced a below-minimum cart, handed back a draft, and the Razorpay
+    // order was opened on it. The refusal, if it came at all, came after the
+    // card was captured. Same lesson as the delivery lead time above: the quote
+    // is the last moment a refusal costs nobody anything.
+    const minimum = checkMinimumOrder(quote.totals.subtotal, quote.commerce.minOrderValue);
+    if (minimum.below) {
+      throw new AppError(
+        `This shop's minimum order is ${formatCurrency(quote.commerce.minOrderValue, quote.currency)}. Please add ${formatCurrency(minimum.shortfall, quote.currency)} more to continue.`,
+        409,
+        [{ field: "items", message: "Order is below the shop's minimum" }],
       );
     }
 

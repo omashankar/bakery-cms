@@ -6,7 +6,7 @@ import { getProductWeightOptions } from "@/features/products/lib/product-catalog
 import { getProductVariantGroups } from "@/apps/website/lib/product-details";
 import { calculateProductUnitPrice } from "@/apps/website/lib/product-pricing";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
-import type { CommerceSettings } from "@/types/settings";
+import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { DeliveryZone } from "@/types/delivery";
 
@@ -63,6 +63,14 @@ export interface CartQuote {
   /** Codes the caller sent that the shop does not honour, for reporting back. */
   rejectedCoupon?: string;
   commerce: CommerceSettings;
+  /**
+   * The shop's currency, from General settings.
+   *
+   * Carried alongside the money so a server-side caller can format it. Route
+   * handlers never render the root layout, so `formatCurrency` has no `<html>`
+   * to read the active locale from and silently falls back to rupees.
+   */
+  currency: string;
 }
 
 export class UnknownProductError extends Error {
@@ -103,6 +111,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
 
   const settings = settingsRaw as unknown as Record<string, unknown>;
   const commerce = (settings.commerce ?? {}) as CommerceSettings;
+  const currency = ((settings.general ?? {}) as GeneralSettings).currency;
 
   const items: QuotedLine[] = [];
   for (const line of input.items) {
@@ -139,6 +148,9 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     deliveryAddress: input.deliveryAddress,
     commerceOverride: commerce,
     zonesOverride: (await Promise.resolve(zones)) as DeliveryZone[],
+    // Tax rounds to the shop's minor unit. On the server there is no `<html>`
+    // for the formatter to read a locale from, so this has to be passed.
+    currencyOverride: currency,
   });
 
   return {
@@ -147,5 +159,6 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     coupon: applied,
     rejectedCoupon: input.couponCode && !applied ? input.couponCode : undefined,
     commerce,
+    currency,
   };
 }

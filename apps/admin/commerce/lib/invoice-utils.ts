@@ -1,4 +1,5 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 
 export function exportInvoicesToCsv(orders: PlacedOrder[]): void {
   const headers = [
@@ -10,19 +11,32 @@ export function exportInvoicesToCsv(orders: PlacedOrder[]): void {
     "Payment",
     "Reference",
     "Amount",
+    // A refunded invoice used to export its GROSS total with no column saying
+    // any of it had gone back — so the CSV, which is what gets reconciled
+    // against the bank and handed to an accountant, disagreed with the invoice
+    // document for the same order, which does show the refund.
+    "Refunded",
+    "Net",
     "Placed",
   ];
-  const rows = orders.map((order) => [
-    order.orderNumber,
-    order.address.fullName,
-    order.address.email,
-    order.address.phone,
-    order.status,
-    order.paymentStatus,
-    order.paymentReference ?? "",
-    String(order.totals.total),
-    order.placedAt,
-  ]);
+  const rows = orders.map((order) => {
+    // Only money the gateway confirmed leaving. A refund it has accepted but
+    // not yet paid out is not something to net off a ledger.
+    const refunded = settledRefundAmount(order);
+    return [
+      order.orderNumber,
+      order.address.fullName,
+      order.address.email,
+      order.address.phone,
+      order.status,
+      order.paymentStatus,
+      order.paymentReference ?? "",
+      String(order.totals.total),
+      String(refunded),
+      String(Math.max(order.totals.total - refunded, 0)),
+      order.placedAt,
+    ];
+  });
   const csv = [headers, ...rows]
     .map((row) =>
       row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")

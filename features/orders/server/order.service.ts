@@ -21,6 +21,8 @@ import {
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
+import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
+import { priceCart, UnknownProductError } from "@/features/checkout/server/pricing.server";
 import {
   publicBaseUrl,
   sendTemplatedEmail,
@@ -109,6 +111,57 @@ function resolveEstimatedDelivery(
 }
 
 // ---- Place order (transactional) ------------------------------------------
+
+/**
+ * Prices a cart that arrived WITHOUT a draft, from the shop's own records.
+ *
+ * Everything the caller chose is kept; nothing the caller costed is. Gift wrap
+ * is inferred from the fee it claimed rather than trusted as an amount, and the
+ * coupon is re-resolved from a code — the request's `coupon` object used to be
+ * stored whole, discount included, and then counted in the coupon report.
+ *
+ * `UnknownProductError` becomes a 409 for the same reason the quote endpoint
+ * does it: a slug the catalogue does not have means the cart and the shop
+ * disagree, and pricing it at zero is how a shop gives away a deleted cake.
+ */
+async function repriceForPlacement(input: PlaceOrderInput) {
+  const claimedCoupon = input.coupon as { code?: unknown } | undefined;
+  const couponCode = typeof claimedCoupon?.code === "string" ? claimedCoupon.code : undefined;
+
+  try {
+    const quote = await priceCart({
+      items: input.items.map((item) => {
+        const line = item as unknown as Record<string, unknown>;
+        return {
+          productSlug: item.productSlug,
+          quantity: item.quantity,
+          weight: typeof line.weight === "string" ? line.weight : undefined,
+          flavour: typeof line.flavour === "string" ? line.flavour : undefined,
+          shape: typeof line.shape === "string" ? line.shape : undefined,
+          message: typeof line.message === "string" ? line.message : undefined,
+          deliveryDate: typeof line.deliveryDate === "string" ? line.deliveryDate : undefined,
+          deliveryTime: typeof line.deliveryTime === "string" ? line.deliveryTime : undefined,
+          variantSelections:
+            line.variantSelections && typeof line.variantSelections === "object"
+              ? (line.variantSelections as Record<string, string>)
+              : undefined,
+        };
+      }),
+      couponCode,
+      giftWrap: Number((input.totals as { giftWrapFee?: unknown } | undefined)?.giftWrapFee) > 0,
+      deliveryAddress: input.address
+        ? { city: input.address.city, pincode: input.address.pincode }
+        : undefined,
+    });
+
+    return { items: quote.items, totals: quote.totals, coupon: quote.coupon };
+  } catch (error) {
+    if (error instanceof UnknownProductError) {
+      throw new AppError("One of the items is no longer available.", 409);
+    }
+    throw error;
+  }
+}
 
 /** Fresh order numbers to try when the client's collided with another customer's. */
 const ORDER_NUMBER_ATTEMPTS = 5;
@@ -201,6 +254,26 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     }
   }
 
+  // What this order COSTS, decided here in every case.
+  //
+  // `draft?.items ?? input.items` and `draft?.totals ?? input.totals` used to
+  // stand in for this, and the `??` was the hole: a draft is only REQUIRED for
+  // an online payment (below), so a plain anonymous POST with
+  // `paymentMethod: "cod"` and no `draftId` fell through to the request body and
+  // had its own subtotal, its own tax and its own total stored verbatim. The
+  // previous pass closed this for anything that pays a gateway and left the cash
+  // door open — but COD is the one where a wrong total is collected in cash at
+  // the customer's doorstep, so it is the one that costs the shop real money.
+  //
+  // A headless COD caller may still place an order without quoting first. It
+  // just does not get to say what the goods cost: the same `priceCart` the quote
+  // endpoint uses re-prices the cart from the shop's own catalogue and settings.
+  // The caller keeps every CHOICE it sent — slug, quantity, weight, variants,
+  // gift wrap, coupon code — and none of the arithmetic.
+  const priced = draft
+    ? { items: draft.items, totals: draft.totals, coupon: draft.coupon }
+    : await repriceForPlacement(input);
+
   // A date the shop can actually bake for.
   //
   // The zone's minimum lead time was collected, stored, displayed — and enforced
@@ -208,10 +281,37 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // `deliveryLeadDays`, which knows nothing about zones, and `min` on an input
   // is a suggestion to a browser rather than a rule. So a five-day zone accepted
   // tomorrow, and a direct POST accepted today.
-  const leadDays = Number((draft?.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays);
+  const leadDays = Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays);
   if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
     throw new AppError(
       `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
+      409,
+    );
+  }
+
+  // The shop's minimum order value, enforced by the shop.
+  //
+  // It was configured on two admin screens and checked in exactly one place —
+  // the browser. `checkout-page.tsx` greys out the Pay button and toasts; the
+  // server had never heard of the setting, so any direct POST placed an order
+  // under it, and so did the storefront with one value edited in devtools.
+  //
+  // Checked against the SUBTOTAL, and against the shop's own subtotal now that
+  // `priced` is authoritative — clearing a minimum by inflating the delivery fee
+  // would defeat what the minimum is for.
+  //
+  // Only for a cart that was never quoted. With a draft, the quote endpoint
+  // already refused a below-minimum cart — and re-checking here would refuse an
+  // order the shop had ALREADY opened a gateway payment against, so an admin
+  // raising the minimum between the quote and the callback would strand a
+  // customer whose card had just been captured. The minimum decides whether to
+  // take an order, not whether to honour one already paid for.
+  const minimum = draft
+    ? { below: false, shortfall: 0 }
+    : checkMinimumOrder(Number(priced.totals?.subtotal), commerce.minOrderValue);
+  if (minimum.below) {
+    throw new AppError(
+      `This shop's minimum order is ${formatCurrency(commerce.minOrderValue, currency)}. Please add ${formatCurrency(minimum.shortfall, currency)} more to continue.`,
       409,
     );
   }
@@ -250,6 +350,9 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // Captured is not enough on its own — it has to be captured FOR THIS CART.
   // Without the amount and order-id checks a genuine 1-rupee payment could be
   // presented against any cart, which is the same hole from the other end.
+  // Still the DRAFT's total, not `priced` — a gateway payment is only ever
+  // opened against a draft (the guard above requires one), and the amount that
+  // must match is the amount the shop held at the moment it asked for money.
   const expectedTotal = draft ? Number(draft.totals?.total) : null;
   const amountMatches =
     payment?.amount == null || expectedTotal == null
@@ -285,12 +388,11 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     // already adopts whatever comes back (`adoptStoredOrder`), so owning it
     // outright costs nothing and removes a caller-chosen key from the record.
     orderNumber: await generateOrderNumber(commerce),
-    // The SHOP's prices, from when it quoted this cart. The request body is
-    // only a fallback for a headless COD caller that never quoted —
-    // `input.items[].price` and `input.totals` used to be stored verbatim
-    // either way, which is how a 5000-rupee cake could be ordered at 1 rupee.
-    items: (draft?.items ?? input.items) as unknown as PlacedOrder["items"],
-    totals: (draft?.totals ?? input.totals) as unknown as PlacedOrder["totals"],
+    // The SHOP's prices — from the draft it quoted, or re-priced here for a
+    // caller that never quoted. `input.items[].price` and `input.totals` are
+    // never stored: that is how a 5000-rupee cake could be ordered at 1 rupee.
+    items: priced.items as unknown as PlacedOrder["items"],
+    totals: priced.totals as unknown as PlacedOrder["totals"],
     address: input.address as unknown as PlacedOrder["address"],
     paymentMethod: input.paymentMethod,
     paymentStatus,
@@ -298,7 +400,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     // Resolved by the shop against its own coupon list. It used to arrive as
     // an object the caller invented, discount included, and then appeared in
     // the admin's coupon performance report as if it were real.
-    coupon: (draft?.coupon ?? input.coupon) as unknown as PlacedOrder["coupon"],
+    coupon: priced.coupon as unknown as PlacedOrder["coupon"],
     orderNotes: input.orderNotes,
     deliverySlot: input.deliverySlot as unknown as PlacedOrder["deliverySlot"],
     placedAt,
@@ -307,7 +409,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     estimatedDelivery: resolveEstimatedDelivery(
       input,
       commerce,
-      (draft?.totals ?? null) as unknown as Record<string, unknown> | null,
+      (priced.totals ?? null) as unknown as Record<string, unknown> | null,
     ),
   };
 
@@ -317,7 +419,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // by the time it runs the customer's card has already been charged, so one
   // dropped response must not be the end of it — and a retry must not produce a
   // second order or decrement stock twice.
-  const reductions = (draft?.items ?? input.items).map((item) => ({
+  const reductions = priced.items.map((item) => ({
     slug: item.productSlug,
     quantity: item.quantity,
   }));
@@ -433,9 +535,15 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // client used to do this through `PUT /api/coupons`, which requires an admin
   // role — so for a real customer it was a guaranteed 403 and the count only
   // ever moved when an admin checked out.
-  if (draft?.coupon?.code) {
+  // `priced.coupon`, not `draft.coupon`. A COD order placed without quoting has
+  // its coupon RESOLVED by `repriceForPlacement` against the shop's own list —
+  // the discount is real and comes off the total — so not counting it here
+  // would let a usage-limited code be spent an unlimited number of times
+  // through the one path that skips the quote.
+  const redeemed = (priced.coupon as { code?: string } | null | undefined)?.code;
+  if (redeemed) {
     try {
-      await recordCouponRedemption(draft.coupon.code);
+      await recordCouponRedemption(redeemed);
     } catch (error) {
       // A miscounted redemption is a reporting problem; failing the order over
       // it would be far worse.
@@ -453,7 +561,10 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     target: { type: "order", id: placed.id },
     metadata: {
       orderNumber: placed.orderNumber,
-      total: input.totals.total,
+      // What the SHOP charged. This recorded `input.totals.total` — the
+      // caller's claim — so the one record kept specifically to be trusted
+      // later carried the number the audit exists to detect lies about.
+      total: placed.totals.total,
       method: input.paymentMethod,
     },
     ip: ctx.ip,
