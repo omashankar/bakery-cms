@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -20,6 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadHeaderSettings,
   resetHeaderSettings,
@@ -41,26 +45,33 @@ const EMPTY_OVERVIEW: HeaderOverview = {
 };
 
 export function HeaderAdminPage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<HeaderSettings>(defaultHeaderSettings);
-  const [saved, setSaved] = useState<HeaderSettings>(defaultHeaderSettings);
+  // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
+  // effect read localStorage on mount and declared the form ready in the same
+  // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout
+  // effect, so on a hard load that read is still in flight and
+  // `loadHeaderSettings()` answers with the DEMO NAVIGATION — and saving is a
+  // replace-all, so one edit replaced the shop's entire storefront menu, its
+  // logo badge, its search toggle and its CTA with the demo set.
+  const {
+    value: settings,
+    isDirty,
+    hydration,
+    isWriting,
+    canSave,
+    edit: setSettings,
+    discard,
+    runWrite,
+  } = useHydratedForm<HeaderSettings>({
+    read: loadHeaderSettings,
+    fallback: defaultHeaderSettings,
+    gate: siteLayoutHydration,
+    ensureHydrated: ensureSiteLayoutHydrated,
+  });
   const [removeTarget, setRemoveTarget] = useState<HeaderNavItem | null>(null);
 
-  useEffect(() => {
-    const loaded = loadHeaderSettings();
-    setSettings(loaded);
-    setSaved(loaded);
-    setMounted(true);
-  }, []);
-
-  const isDirty = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(saved),
-    [settings, saved]
-  );
-
   const overview = useMemo(
-    () => (mounted ? getHeaderOverview(settings) : EMPTY_OVERVIEW),
-    [mounted, settings]
+    () => (hydration === "pending" ? EMPTY_OVERVIEW : getHeaderOverview(settings)),
+    [hydration, settings]
   );
 
   const sortedNav = useMemo(
@@ -119,40 +130,51 @@ export function HeaderAdminPage() {
       toast.error("Every nav link needs a label and URL");
       return;
     }
-    const { value: next, persisted } = await saveHeaderSettings(settings);
-    setSettings(next);
-    // Only mark clean when the SERVER has it — the dirty flag is what keeps the
-    // Save button enabled, so adopting a rejected value removes the retry.
-    if (reportWrite(persisted, "Header settings saved")) setSaved(next);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value: next, persisted } = await saveHeaderSettings(settings);
+      // Only mark clean when the SERVER has it — the dirty flag is what keeps
+      // the Save button enabled, so adopting a rejected value removes the retry.
+      return { value: next, accepted: reportWrite(persisted, "Header settings saved") };
+    });
   }
 
   function handleDiscard() {
-    setSettings(saved);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
   async function handleReset() {
-    const { value: next, persisted } = await resetHeaderSettings();
-    setSettings(next);
-    if (reportWrite(persisted, "Header reset to defaults")) setSaved(next);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value: next, persisted } = await resetHeaderSettings();
+      return { value: next, accepted: reportWrite(persisted, "Header reset to defaults") };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Header"
       description={
-        mounted
+        hydration === "ready"
           ? `${overview.visibleLinks} visible links · search ${overview.searchEnabled ? "on" : "off"} · CTA ${overview.ctaEnabled ? "on" : "off"}`
           : "Configure storefront top navigation, search, and CTA"
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open: the admin edits the demo nav, the
+      // arriving values are skipped because the form is dirty, and Save unlocks
+      // over it.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
       resetTitle="Reset header?"
       resetDescription="Replace current header settings with the default demo navigation."
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>

@@ -156,6 +156,103 @@ describe("admin forms that replace a whole settings section", () => {
   });
 });
 
+/**
+ * Admin forms that replace a whole document in a store OUTSIDE the settings
+ * sections — SEO, header, footer, appearance, inventory, custom code, the admin
+ * profile. Same defect, different stores, so the assertions are about the shared
+ * `useHydratedForm` rather than `useSettingsSection`.
+ *
+ * These were found only after four separate rounds had each fixed the screen
+ * that happened to be reported. Listing them is what stops a fifth.
+ */
+const REPLACE_ALL_FORMS: Array<{ name: string; file: string; fieldGate: "shell" | "gate" | "early-return" }> = [
+  { name: "SEO", file: "apps/admin/seo/components/seo-admin-page.tsx", fieldGate: "shell" },
+  { name: "Header", file: "apps/admin/header/components/header-admin-page.tsx", fieldGate: "shell" },
+  { name: "Footer", file: "apps/admin/footer/components/footer-admin-page.tsx", fieldGate: "shell" },
+  {
+    name: "Appearance",
+    file: "apps/admin/appearance/components/appearance-page.tsx",
+    fieldGate: "shell",
+  },
+  {
+    name: "Custom Code",
+    file: "apps/admin/settings/components/custom-code-settings-page.tsx",
+    fieldGate: "shell",
+  },
+  {
+    name: "Inventory settings",
+    file: "apps/admin/commerce/pages/inventory-admin-page.tsx",
+    fieldGate: "gate",
+  },
+  {
+    name: "Admin profile",
+    file: "apps/admin/profile/components/admin-profile-page.tsx",
+    fieldGate: "early-return",
+  },
+];
+
+describe("admin forms that replace a whole document in their own store", () => {
+  it.each(REPLACE_ALL_FORMS)("$name reads through the shared hydrated form", ({ file }) => {
+    // The CALL, not the import: an import alone satisfied this while the hook
+    // had been swapped out below it, which is the silent-failure mode this file
+    // exists to catch.
+    expect(source(file)).toMatch(/useHydratedForm<[^>]+>\(\{/);
+  });
+
+  it.each(REPLACE_ALL_FORMS)("$name waits on its store's gate", ({ file }) => {
+    const code = source(file);
+    // A gate AND an opener. The gate alone is what several of these already had:
+    // it protected the request while the form had long since captured the seed.
+    expect(code).toMatch(/gate:\s*\w+Hydration/);
+    expect(code).toMatch(/ensureHydrated:\s*ensure\w+Hydrated/);
+  });
+
+  it.each(REPLACE_ALL_FORMS)("$name holds its FIELDS closed until hydration", ({ file, fieldGate }) => {
+    const code = source(file);
+    if (fieldGate === "shell") {
+      expect(code).toContain('mounted={hydration !== "pending"}');
+    } else if (fieldGate === "gate") {
+      expect(code).toContain("<SettingsFormGate hydration={hydration}>");
+    } else {
+      // The whole page is the form, so it returns the skeleton outright.
+      expect(code).toMatch(/if \(hydration === "pending"\) \{[\s\S]*?return \(/);
+    }
+  });
+
+  it.each(REPLACE_ALL_FORMS)("$name blocks saving until hydration too", ({ file }) => {
+    expect(source(file)).toMatch(/(saveDisabled=\{[^}]*|disabled=\{[^}]*|if \(!)canSave|hydration !== "ready"/);
+  });
+});
+
+describe("the store gates behind those forms", () => {
+  it("opens the admin-config gate only when EVERY blob it vouches for arrived", () => {
+    const code = source("features/admin-config/lib/admin-config-hydration.ts");
+    // It was `profile !== null || gateways !== null || prefs !== null || code !== null`
+    // — one arrival opened the gate for three stores it had never read.
+    expect(code).toContain("if (!profile || !gateways || !prefs || !code) return false;");
+  });
+
+  it("opens the site-layout gate only when header, footer AND appearance arrived", () => {
+    // Beside the sync component, not in `features/site-layout/lib/`: it needs
+    // the appearance repository, which lives under `apps/`, and a domain module
+    // may not depend on an app's UI layer.
+    const code = source("components/shared/site-layout-server-sync.tsx");
+    expect(code).toContain("if (!header || !footer || !appearance) return false;");
+  });
+
+  it("opens the SEO gate only on a successful read", () => {
+    const code = source("features/site-layout/lib/site-layout-hydration.ts");
+    expect(code).toContain("if (!store) return false;");
+  });
+
+  it("gives inventory settings a gate at all", () => {
+    // This was the only replace-all writer in the codebase with none.
+    const api = source("apps/admin/commerce/lib/inventory-api.ts");
+    expect(api).toContain("export const inventoryHydration");
+    expect(api).toContain("await inventoryHydration.waitForSettled()");
+  });
+});
+
 describe("the commerce form wrapper", () => {
   const code = source("apps/admin/commerce/lib/use-commerce-settings-form.ts");
 

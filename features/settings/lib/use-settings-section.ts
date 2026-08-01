@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 
 import { settingsHydration } from "./settings-api";
+import { useHydratedForm } from "./use-hydrated-form";
 import { ensureSettingsHydrated, SETTINGS_UPDATED_EVENT } from "./settings-repository";
 
 /**
@@ -63,97 +63,29 @@ export interface SectionForm<T> {
 }
 
 export function useSettingsSection<T>(read: () => T, fallback: T): SectionForm<T> {
-  const [form, setForm] = useState<{ current: T; saved: T }>({
-    current: fallback,
-    saved: fallback,
+  // The shared implementation, with the settings store wired in. The logic
+  // lived here first and then had to be repeated on every other admin form
+  // that writes a replace-all — SEO, header, footer, appearance, inventory,
+  // custom code, the admin profile — so it moved to `useHydratedForm` and this
+  // is now the settings-shaped view of it. One implementation is the point:
+  // every hand-rolled copy reintroduced at least one of the two bugs above.
+  const form = useHydratedForm<T>({
+    read,
+    fallback,
+    gate: settingsHydration,
+    ensureHydrated: ensureSettingsHydrated,
+    updatedEvent: SETTINGS_UPDATED_EVENT,
   });
-  const [hydration, setHydration] = useState<SectionHydration>(
-    // Already open from an earlier page in this session — no need to make the
-    // admin wait again on a client-side navigation between settings pages.
-    settingsHydration.hasSettled() ? "ready" : "pending",
-  );
-
-  // Written only from event handlers and effects, never during render. The ref
-  // is what the listener reads synchronously; the state is what renders.
-  const writingRef = useRef(false);
-  const [isWriting, setIsWriting] = useState(false);
-  const readRef = useRef(read);
-  useEffect(() => {
-    readRef.current = read;
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function load() {
-      // A write dispatches the update event before its server round-trip
-      // finishes; adopting the in-flight value as `saved` is bug 2 above.
-      if (writingRef.current) return;
-      const loaded = readRef.current();
-      setForm((prev) =>
-        JSON.stringify(prev.current) !== JSON.stringify(prev.saved)
-          ? prev
-          : { current: loaded, saved: loaded },
-      );
-    }
-
-    load();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, load);
-
-    // Open the gate rather than wait on someone else to. Waiting was the bug:
-    // the only opener was a root-layout effect that never re-ran after an
-    // in-app login, so the gate stayed shut for the whole session.
-    void ensureSettingsHydrated().then((settled) => {
-      if (cancelled) return;
-      // The values that arrived with hydration have to be adopted before the
-      // form unlocks, or the admin edits on top of the seed again.
-      if (settled) load();
-      setHydration(settled ? "ready" : "unavailable");
-    });
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, load);
-    };
-  }, []);
-
-  const isDirty = JSON.stringify(form.current) !== JSON.stringify(form.saved);
-
-  const edit = useCallback((update: (prev: T) => T) => {
-    setForm((prev) => ({ ...prev, current: update(prev.current) }));
-  }, []);
-
-  const discard = useCallback(() => {
-    setForm((prev) => ({ ...prev, current: prev.saved }));
-  }, []);
-
-  const runWrite = useCallback(
-    async (write: () => Promise<{ value: T; accepted: boolean }>) => {
-      writingRef.current = true;
-      setIsWriting(true);
-      try {
-        const { value, accepted } = await write();
-        setForm((prev) => ({ current: value, saved: accepted ? value : prev.saved }));
-      } finally {
-        writingRef.current = false;
-        setIsWriting(false);
-      }
-    },
-    [],
-  );
 
   return {
-    settings: form.current,
+    settings: form.value,
     saved: form.saved,
-    isDirty,
-    hydration,
-    isWriting,
-    // Not while a write is already in flight: the round-trip can take seconds
-    // on a cold serverless read, and the button used to sit there enabled and
-    // unlabelled, inviting a second click that races the first.
-    canSave: hydration === "ready" && !isWriting,
-    edit,
-    discard,
-    runWrite,
+    isDirty: form.isDirty,
+    hydration: form.hydration,
+    isWriting: form.isWriting,
+    canSave: form.canSave,
+    edit: form.edit,
+    discard: form.discard,
+    runWrite: form.runWrite,
   };
 }

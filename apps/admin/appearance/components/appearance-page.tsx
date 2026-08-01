@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -13,6 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { AppearanceSettings } from "@/types/appearance";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadAppearanceSettings,
   resetAppearanceSettings,
@@ -31,6 +35,7 @@ import {
   settingsFromPreset,
   type AppearanceOverview,
 } from "../lib/appearance-utils";
+import { APPEARANCE_UPDATED_EVENT } from "../lib/appearance-utils";
 import { AppearancePreview } from "./appearance-preview";
 
 const EMPTY_OVERVIEW: AppearanceOverview = {
@@ -48,35 +53,44 @@ const COLOR_FIELDS = [
 ];
 
 export function AppearancePage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<AppearanceSettings>(defaultAppearanceSettings);
-  const [savedSettings, setSavedSettings] =
-    useState<AppearanceSettings>(defaultAppearanceSettings);
+  // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
+  // effect read localStorage on mount and declared the form ready in the same
+  // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout
+  // effect, so on a hard load that read is still in flight and
+  // `loadAppearanceSettings()` answers with the DEMO PALETTE — and saving is a
+  // replace-all, so one preset click pushed demo brand colours over the shop's
+  // storefront theme.
+  const {
+    value: settings,
+    isDirty,
+    hydration,
+    isWriting,
+    canSave,
+    edit: setSettings,
+    discard,
+    runWrite,
+  } = useHydratedForm<AppearanceSettings>({
+    read: loadAppearanceSettings,
+    fallback: defaultAppearanceSettings,
+    gate: siteLayoutHydration,
+    ensureHydrated: ensureSiteLayoutHydrated,
+    updatedEvent: APPEARANCE_UPDATED_EVENT,
+  });
 
   useEffect(() => {
-    const loaded = loadAppearanceSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
+    // Nothing to preview until the server's palette has landed — applying the
+    // seed would repaint the admin in demo colours for the duration.
+    if (hydration === "pending") return;
     if (!hasValidAppearanceColors(settings)) return;
     applyAppearanceSettings(settings);
     return () => {
       applyAppearanceSettings(loadAppearanceSettings());
     };
-  }, [settings, mounted]);
-
-  const isDirty = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
-    [settings, savedSettings]
-  );
+  }, [settings, hydration]);
 
   const overview = useMemo(
-    () => (mounted ? getAppearanceOverview(settings) : EMPTY_OVERVIEW),
-    [mounted, settings]
+    () => (hydration === "pending" ? EMPTY_OVERVIEW : getAppearanceOverview(settings)),
+    [hydration, settings]
   );
 
   const activePresetId = resolvePresetFromColors(settings);
@@ -127,43 +141,56 @@ export function AppearancePage() {
       preset: resolvePresetFromColors(settings),
     };
 
-    const { value: saved, persisted } = await saveAppearanceSettings(normalized);
-    setSettings(saved);
-    // The storefront renders these colours from the SERVER copy, so only mark
-    // clean once it has them — otherwise Save greys out with nothing saved.
-    if (reportWrite(persisted, "Appearance saved — storefront uses these colors (light only)")) {
-      setSavedSettings(saved);
-    }
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveAppearanceSettings(normalized);
+      // The storefront renders these colours from the SERVER copy, so only mark
+      // clean once it has them — otherwise Save greys out with nothing saved.
+      return {
+        value,
+        accepted: reportWrite(
+          persisted,
+          "Appearance saved — storefront uses these colors (light only)",
+        ),
+      };
+    });
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
   async function handleReset() {
-    const { value: reset, persisted } = await resetAppearanceSettings();
-    setSettings(reset);
-    if (reportWrite(persisted, "Appearance reset to defaults")) setSavedSettings(reset);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetAppearanceSettings();
+      return { value, accepted: reportWrite(persisted, "Appearance reset to defaults") };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Appearance"
       description={
-        mounted
+        hydration === "ready"
           ? `Storefront brand (light only) · ${overview.presetLabel} · ${overview.borderRadius}px radius · ${overview.isCustom ? "custom colors" : "preset palette"}`
           : "Storefront brand colors and shape — light mode only, never dark"
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open: the admin picks a preset, the arriving
+      // palette is skipped because the form is dirty, and Save unlocks over it.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
-      saveDisabled={!hasValidAppearanceColors(settings)}
+      saveDisabled={!hasValidAppearanceColors(settings) || !canSave}
       resetTitle="Reset appearance?"
       resetDescription="Restore the Monginis Classic preset and default radius. Custom colors will be lost."
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">

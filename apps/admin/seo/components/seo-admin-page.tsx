@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   FileText,
@@ -39,6 +39,10 @@ import { formatRelativeTime } from "@/utils/format";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
 import { adminShell } from "@/apps/admin/components";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { seoHydration } from "@/features/site-layout/lib/site-layout-api";
+import { ensureSeoHydrated } from "@/features/site-layout/lib/site-layout-hydration";
+import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadSeoStore,
   resetSeoStore,
@@ -81,15 +85,15 @@ const PLACEHOLDER_GLOBAL: GlobalSeoSettings = {
   defaultTwitterCard: "summary_large_image",
 };
 
-function serializeGlobal(global: GlobalSeoSettings, keywordsInput: string): string {
-  return JSON.stringify({
-    ...global,
-    defaultKeywords: parseKeywords(keywordsInput),
-    googleSiteVerification: global.googleSiteVerification ?? "",
-    twitterSite: global.twitterSite ?? "",
-    twitterCreator: global.twitterCreator ?? "",
-    organizationSchemaJson: global.organizationSchemaJson ?? "",
-  });
+/** The global SEO form: the settings, plus the comma-separated keyword box. */
+interface SeoGlobalForm {
+  global: GlobalSeoSettings;
+  keywords: string;
+}
+
+function readGlobalForm(): SeoGlobalForm {
+  const { global } = loadSeoStore();
+  return { global, keywords: global.defaultKeywords.join(", ") };
 }
 
 function SeoRowActions({
@@ -122,62 +126,70 @@ function SeoRowActions({
 }
 
 export function SeoAdminPage() {
-  const [mounted, setMounted] = useState(false);
-  const [global, setGlobal] = useState<GlobalSeoSettings>(PLACEHOLDER_GLOBAL);
-  const [savedGlobal, setSavedGlobal] = useState<GlobalSeoSettings>(PLACEHOLDER_GLOBAL);
+  // A real hydration state, not a "has this component mounted" flag.
+  //
+  // `mounted` flipped true in the same synchronous tick as the localStorage
+  // read, so the form was interactive over `loadSeoStore()` — which SEEDS the
+  // demo store when the key is absent. One edit made the form dirty, the
+  // arriving server values were then skipped by the guard below (correctly,
+  // to protect the edit), and Save pushed the demo canonical domain, demo
+  // site name and demo titles over the real ones — whole-store replace.
+  // The global form goes through the shared hydrated form; the ROUTES below
+  // are display-only and keep their own state.
+  //
+  // The keyword box is part of the value rather than a sibling state: it is a
+  // comma-separated view of `defaultKeywords`, and holding it separately is
+  // what made the dirty check a hand-rolled composite that then had to be
+  // mirrored into a ref for the resync listener to read.
+  const {
+    value: form,
+    isDirty,
+    hydration,
+    canSave,
+    edit,
+    discard,
+    runWrite,
+  } = useHydratedForm<SeoGlobalForm>({
+    read: readGlobalForm,
+    fallback: { global: PLACEHOLDER_GLOBAL, keywords: "" },
+    gate: seoHydration,
+    ensureHydrated: ensureSeoHydrated,
+    updatedEvent: SEO_UPDATED_EVENT,
+  });
+  const global = form.global;
+  const keywordsInput = form.keywords;
   const [seoRoutes, setSeoRoutes] = useState<SeoRouteEntry[]>([]);
   const [filters, setFilters] = useState<SeoRouteListFilters>(defaultSeoRouteFilters);
   const [editingEntry, setEditingEntry] = useState<SeoRouteEntry | null>(null);
-  const [keywordsInput, setKeywordsInput] = useState("");
-  const [savedKeywordsInput, setSavedKeywordsInput] = useState("");
   const [mediaOpen, setMediaOpen] = useState(false);
 
-  function refresh() {
-    const store = loadSeoStore();
-    setGlobal(store.global);
-    setSavedGlobal(store.global);
-    setSeoRoutes(store.routes);
-    const keywords = store.global.defaultKeywords.join(", ");
-    setKeywordsInput(keywords);
-    setSavedKeywordsInput(keywords);
-    setMounted(true);
+  /** Edits the settings half of the form, leaving the keyword box alone. */
+  function editGlobal(update: (prev: GlobalSeoSettings) => GlobalSeoSettings) {
+    edit((prev) => ({ ...prev, global: update(prev.global) }));
   }
 
-  function refreshRoutesOnly() {
-    const store = loadSeoStore();
-    setSeoRoutes(store.routes);
+  /** The keyword box is free text until save, when it is parsed into a list. */
+  function setKeywords(keywords: string) {
+    edit((prev) => ({ ...prev, keywords }));
   }
 
-  // Track dirtiness in a ref so the server-hydration listener can read it without
-  // re-subscribing, and avoid discarding in-progress global edits.
-  const isDirtyRef = useRef(false);
+  function refreshRoutes() {
+    setSeoRoutes(loadSeoStore().routes);
+  }
 
   useEffect(() => {
-    refresh();
-    function onServerUpdate() {
-      // Server hydration (or another tab) changed the SEO store — reflect it.
-      // Routes are display-only, so always re-read them; only re-read the global
-      // form when the user is not mid-edit, otherwise unsaved changes are lost.
-      if (isDirtyRef.current) {
-        refreshRoutesOnly();
-      } else {
-        refresh();
-      }
-    }
-    window.addEventListener(SEO_UPDATED_EVENT, onServerUpdate);
-    return () => window.removeEventListener(SEO_UPDATED_EVENT, onServerUpdate);
+    // Routes only. The global form resyncs through the hook, which already
+    // listens on this event and already refuses to clobber an edit in
+    // progress — the ref-mirrored dirty check this replaces existed to do
+    // exactly that by hand.
+    refreshRoutes();
+    window.addEventListener(SEO_UPDATED_EVENT, refreshRoutes);
+    return () => window.removeEventListener(SEO_UPDATED_EVENT, refreshRoutes);
   }, []);
 
-  const isDirty = useMemo(
-    () => serializeGlobal(global, keywordsInput) !== serializeGlobal(savedGlobal, savedKeywordsInput),
-    [global, keywordsInput, savedGlobal, savedKeywordsInput]
-  );
-
-  isDirtyRef.current = isDirty;
-
   const overview = useMemo(
-    () => (mounted ? getSeoOverview(seoRoutes, global) : EMPTY_OVERVIEW),
-    [mounted, seoRoutes, global]
+    () => (hydration === "pending" ? EMPTY_OVERVIEW : getSeoOverview(seoRoutes, global)),
+    [hydration, seoRoutes, global]
   );
 
   const filtered = useMemo(
@@ -204,32 +216,36 @@ export function SeoAdminPage() {
       return;
     }
 
-    const { value: saved, persisted } = await saveGlobalSeo({
-      ...global,
-      defaultKeywords: parseKeywords(keywordsInput),
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value: saved, persisted } = await saveGlobalSeo({
+        ...global,
+        defaultKeywords: parseKeywords(keywordsInput),
+      });
+      // Only mark clean when the SERVER has it. These tags are what search
+      // engines read from the rendered pages, built from the server copy.
+      return {
+        value: { global: saved, keywords: saved.defaultKeywords.join(", ") },
+        accepted: reportWrite(persisted, "Global SEO settings saved"),
+      };
     });
-    setGlobal(saved);
-    const keywords = saved.defaultKeywords.join(", ");
-    setKeywordsInput(keywords);
-
-    // Only mark clean when the SERVER has it. These tags are what search engines
-    // read from the rendered pages, which are built from the server copy.
-    if (reportWrite(persisted, "Global SEO settings saved")) {
-      setSavedGlobal(saved);
-      setSavedKeywordsInput(keywords);
-    }
   }
 
   function handleDiscard() {
-    setGlobal(savedGlobal);
-    setKeywordsInput(savedKeywordsInput);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
   async function handleReset() {
-    const { persisted } = await resetSeoStore();
-    refresh();
-    reportWrite(persisted, "SEO settings reset to defaults");
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { persisted } = await resetSeoStore();
+      refreshRoutes();
+      return {
+        value: readGlobalForm(),
+        accepted: reportWrite(persisted, "SEO settings reset to defaults"),
+      };
+    });
   }
 
   return (
@@ -237,15 +253,22 @@ export function SeoAdminPage() {
       title="SEO"
       description="Manage meta tags, Open Graph, and page-level SEO"
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open: the admin edits the seeded canonical
+      // domain, the arriving values are skipped because the form is dirty, and
+      // Save unlocks over it.
+      mounted={hydration !== "pending"}
       onSave={handleSaveGlobal}
       onDiscard={handleDiscard}
       onReset={handleReset}
-      saveDisabled={!isValidJson(global.organizationSchemaJson ?? "")}
+      saveDisabled={
+        !isValidJson(global.organizationSchemaJson ?? "") || hydration !== "ready"
+      }
       saveLabel="Save global SEO"
       resetTitle="Reset SEO?"
       resetDescription="Replace global defaults and all page SEO routes with the demo seed data."
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <button
           type="button"
@@ -319,7 +342,7 @@ export function SeoAdminPage() {
                 id="site-name"
                 value={global.siteName}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, siteName: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, siteName: e.target.value }))
                 }
               />
             </div>
@@ -329,7 +352,7 @@ export function SeoAdminPage() {
                 id="title-suffix"
                 value={global.titleSuffix}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, titleSuffix: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, titleSuffix: e.target.value }))
                 }
                 placeholder="| Monginis"
               />
@@ -353,7 +376,7 @@ export function SeoAdminPage() {
               className={adminTextareaClassName}
               value={global.defaultDescription}
               onChange={(e) =>
-                setGlobal((prev) => ({ ...prev, defaultDescription: e.target.value }))
+                editGlobal((prev) => ({ ...prev, defaultDescription: e.target.value }))
               }
             />
           </div>
@@ -365,7 +388,7 @@ export function SeoAdminPage() {
                 id="canonical-base"
                 value={global.canonicalBaseUrl}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, canonicalBaseUrl: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, canonicalBaseUrl: e.target.value }))
                 }
               />
             </div>
@@ -385,7 +408,7 @@ export function SeoAdminPage() {
                 id="default-og"
                 value={global.defaultOgImage}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, defaultOgImage: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, defaultOgImage: e.target.value }))
                 }
               />
             </div>
@@ -396,7 +419,7 @@ export function SeoAdminPage() {
             <Input
               id="default-keywords"
               value={keywordsInput}
-              onChange={(e) => setKeywordsInput(e.target.value)}
+              onChange={(e) => setKeywords(e.target.value)}
             />
           </div>
 
@@ -407,7 +430,7 @@ export function SeoAdminPage() {
                 id="google-verification"
                 value={global.googleSiteVerification ?? ""}
                 onChange={(e) =>
-                  setGlobal((prev) => ({
+                  editGlobal((prev) => ({
                     ...prev,
                     googleSiteVerification: e.target.value,
                   }))
@@ -421,7 +444,7 @@ export function SeoAdminPage() {
                 id="allow-indexing"
                 value={global.allowIndexing ? "allow" : "block"}
                 onChange={(e) =>
-                  setGlobal((prev) => ({
+                  editGlobal((prev) => ({
                     ...prev,
                     allowIndexing: e.target.value === "allow",
                   }))
@@ -442,7 +465,7 @@ export function SeoAdminPage() {
                 id="twitter-site"
                 value={global.twitterSite ?? ""}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, twitterSite: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, twitterSite: e.target.value }))
                 }
                 placeholder="@monginis"
               />
@@ -453,7 +476,7 @@ export function SeoAdminPage() {
                 id="twitter-creator"
                 value={global.twitterCreator ?? ""}
                 onChange={(e) =>
-                  setGlobal((prev) => ({ ...prev, twitterCreator: e.target.value }))
+                  editGlobal((prev) => ({ ...prev, twitterCreator: e.target.value }))
                 }
                 placeholder="@monginis"
               />
@@ -464,7 +487,7 @@ export function SeoAdminPage() {
                 id="twitter-card"
                 value={global.defaultTwitterCard}
                 onChange={(e) =>
-                  setGlobal((prev) => ({
+                  editGlobal((prev) => ({
                     ...prev,
                     defaultTwitterCard: e.target
                       .value as GlobalSeoSettings["defaultTwitterCard"],
@@ -485,7 +508,7 @@ export function SeoAdminPage() {
               rows={8}
               value={global.organizationSchemaJson ?? ""}
               onChange={(e) =>
-                setGlobal((prev) => ({
+                editGlobal((prev) => ({
                   ...prev,
                   organizationSchemaJson: e.target.value,
                 }))
@@ -729,14 +752,14 @@ export function SeoAdminPage() {
         entry={editingEntry}
         global={global}
         onOpenChange={(open) => !open && setEditingEntry(null)}
-        onSaved={refreshRoutesOnly}
+        onSaved={refreshRoutes}
       />
 
       <MediaPicker
         open={mediaOpen}
         onOpenChange={setMediaOpen}
         onSelect={(url) => {
-          setGlobal((prev) => ({ ...prev, defaultOgImage: url }));
+          editGlobal((prev) => ({ ...prev, defaultOgImage: url }));
           setMediaOpen(false);
         }}
       />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   BadgeCheck,
   CalendarClock,
@@ -17,8 +17,12 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import {
   getAdminProfile,
   saveAdminProfile,
+  ADMIN_PROFILE_UPDATED_EVENT,
   type AdminProfile,
 } from "@/apps/admin/profile/lib/admin-profile";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
+import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +31,19 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatDate } from "@/utils/format";
 
+/** Shown only while hydration is pending, behind the skeleton. */
+const EMPTY_PROFILE: AdminProfile = {
+  fullName: "",
+  email: "",
+  mobile: "",
+  username: "",
+  photoUrl: "",
+  role: "",
+  status: "Active",
+  lastLogin: "",
+  createdAt: "",
+};
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "A";
@@ -34,23 +51,29 @@ function initials(name: string) {
 }
 
 export function AdminProfilePage() {
-  const [profile, setProfile] = useState<AdminProfile | null>(null);
-  const [form, setForm] = useState({ fullName: "", mobile: "", username: "", photoUrl: "" });
-  const [saving, setSaving] = useState(false);
+  // The shared hydrated form. This page read `getAdminProfile()` once on mount
+  // with no gate — and that read DERIVES a placeholder profile from the signed-in
+  // email when the local blob is absent, which on a hard load it is. Saving is a
+  // whole-blob replace, so one edit to the mobile number pushed that derived
+  // placeholder over the admin's real name, username and photo.
+  const {
+    value: form,
+    saved: profile,
+    isDirty,
+    hydration,
+    isWriting: saving,
+    canSave,
+    edit,
+    set,
+    runWrite,
+  } = useHydratedForm<AdminProfile>({
+    read: getAdminProfile,
+    fallback: EMPTY_PROFILE,
+    gate: adminConfigHydration,
+    ensureHydrated: ensureAdminConfigHydrated,
+    updatedEvent: ADMIN_PROFILE_UPDATED_EVENT,
+  });
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const p = getAdminProfile();
-    setProfile(p);
-    setForm({ fullName: p.fullName, mobile: p.mobile, username: p.username, photoUrl: p.photoUrl });
-  }, []);
-
-  const isDirty = profile
-    ? form.fullName !== profile.fullName ||
-      form.mobile !== profile.mobile ||
-      form.username !== profile.username ||
-      form.photoUrl !== profile.photoUrl
-    : false;
 
   useEffect(() => {
     if (!isDirty) return;
@@ -63,13 +86,7 @@ export function AdminProfilePage() {
   }, [isDirty]);
 
   function resetForm() {
-    if (!profile) return;
-    setForm({
-      fullName: profile.fullName,
-      mobile: profile.mobile,
-      username: profile.username,
-      photoUrl: profile.photoUrl,
-    });
+    set(profile);
   }
 
   function handlePhoto(event: React.ChangeEvent<HTMLInputElement>) {
@@ -81,7 +98,7 @@ export function AdminProfilePage() {
     }
     const reader = new FileReader();
     reader.onerror = () => toast.error("Could not read that image");
-    reader.onload = () => setForm((f) => ({ ...f, photoUrl: String(reader.result) }));
+    reader.onload = () => edit((f) => ({ ...f, photoUrl: String(reader.result) }));
     reader.readAsDataURL(file);
   }
 
@@ -90,33 +107,31 @@ export function AdminProfilePage() {
       toast.error("Full name is required");
       return;
     }
-    setSaving(true);
-    await new Promise((r) => setTimeout(r, 500));
+    if (!canSave) return;
+    await runWrite(async () => {
+      // Awaited, not just truthy-checked: this returns a Promise, and a bare
+      // `if (!promise)` is always false — the guard would be dead.
+      const accepted = await saveAdminProfile(form);
+      if (!accepted) {
+        toast.error("Profile was not saved", {
+          description: "The server rejected it, or the photo is too large for browser storage.",
+        });
+        // The working copy stays as typed so the admin can retry; the saved
+        // baseline does not move, which is what keeps Save live.
+        return { value: form, accepted: false };
+      }
 
-    // Awaited, not just truthy-checked: this returns a Promise now, and a bare
-    // `if (!promise)` is always false — the guard would be dead.
-    if (!(await saveAdminProfile(form))) {
-      setSaving(false);
-      toast.error("Profile was not saved", {
-        description: "The server rejected it, or the photo is too large for browser storage.",
-      });
-      return;
-    }
-
-    // Re-seed the form from the saved profile so trimmed values clear the dirty state.
-    const fresh = getAdminProfile();
-    setProfile(fresh);
-    setForm({
-      fullName: fresh.fullName,
-      mobile: fresh.mobile,
-      username: fresh.username,
-      photoUrl: fresh.photoUrl,
+      // Re-read so trimmed values clear the dirty state.
+      toast.success("Profile updated");
+      return { value: getAdminProfile(), accepted: true };
     });
-    setSaving(false);
-    toast.success("Profile updated");
   }
 
-  if (!profile) {
+  // Behind the skeleton until the SERVER's copy has landed. Gating only the
+  // Save button leaves the gap open: the admin edits the derived placeholder,
+  // the arriving values are skipped because the form is dirty, and Save then
+  // unlocks over it.
+  if (hydration === "pending") {
     return (
       <AdminPage className="space-y-4 sm:space-y-5">
         <div className="h-96 animate-pulse rounded-2xl border border-border bg-muted" />
@@ -212,7 +227,7 @@ export function AdminProfilePage() {
                   <Input
                     id="fullName"
                     value={form.fullName}
-                    onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                    onChange={(e) => edit((f) => ({ ...f, fullName: e.target.value }))}
                     placeholder="Your name"
                   />
                 </div>
@@ -236,7 +251,7 @@ export function AdminProfilePage() {
                     id="mobile"
                     type="tel"
                     value={form.mobile}
-                    onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+                    onChange={(e) => edit((f) => ({ ...f, mobile: e.target.value }))}
                     placeholder="+91 98765 43210"
                   />
                 </div>
@@ -247,7 +262,7 @@ export function AdminProfilePage() {
                   <Input
                     id="username"
                     value={form.username}
-                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                    onChange={(e) => edit((f) => ({ ...f, username: e.target.value }))}
                     placeholder="bakeryowner"
                   />
                 </div>

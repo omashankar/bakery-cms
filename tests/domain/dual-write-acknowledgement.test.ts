@@ -56,6 +56,7 @@ import {
 } from "@/features/settings/lib/security-center-repository";
 import type { SecurityCenterState } from "@/types/security";
 import { settingsHydration } from "@/features/settings/lib/settings-api";
+import { inventoryHydration } from "@/apps/admin/commerce/lib/inventory-api";
 
 /** Stub the dual-write endpoints with a fixed HTTP outcome. */
 function mockServer(ok: boolean, status = ok ? 200 : 500) {
@@ -92,6 +93,10 @@ beforeEach(() => {
   // server's copy has been read. Without it a section PUT refuses to send — see
   // the "settings hydration gate" block below.
   settingsHydration.markSettled();
+  // Inventory settings are a whole-document PUT too, and had no gate at all
+  // until the seed-clobber sweep — a browser whose read failed replaced the
+  // shop's low-stock thresholds with the defaults.
+  inventoryHydration.markSettled();
 });
 
 afterEach(() => {
