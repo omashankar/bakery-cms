@@ -60,6 +60,8 @@ import {
   toggleDeviceTrust,
 } from "@/features/settings/lib/security-center-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { SettingsHydrationNotice } from "./settings-field-error";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
@@ -73,10 +75,20 @@ function clamp(value: number, { min, max }: { min: number; max: number }): numbe
 
 export function SecuritySettingsPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  // The shared section form. This page hand-rolled it and never resynced: a
+  // one-shot `[]`-dep effect read localStorage on mount, with no
+  // SETTINGS_UPDATED_EVENT listener at all, so the form was stuck on whatever
+  // that read returned for the whole page session. `SettingsServerSync` reads
+  // the real copy from a root-layout effect, so on a hard load that read is
+  // still in flight and the local store answers with the DEMO SEED — and Save
+  // PUT the seed over the real section, which is a whole-section replace.
+  //
+  // This section is the session timeout, the lockout policy, the
+  // strong-password rule and 2FA. What lands loosens a policy the shop had
+  // deliberately tightened, and nothing on any screen says it happened.
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<SecuritySettings>(getSecuritySettings, defaultSecuritySettings);
   const [tab, setTab] = useState<SecurityTab>("policies");
-  const [settings, setSettings] = useState<SecuritySettings>(defaultSecuritySettings);
-  const [savedSettings, setSavedSettings] = useState<SecuritySettings>(defaultSecuritySettings);
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -92,11 +104,9 @@ export function SecuritySettingsPage() {
   }
 
   useEffect(() => {
-    const loaded = getSecuritySettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
+    // The security CENTRE — login history, sessions, devices — has its own
+    // store and its own event. The settings form above is the hook's business.
     refreshCenter();
-    setMounted(true);
 
     function handleUpdate() {
       refreshCenter();
@@ -106,27 +116,29 @@ export function SecuritySettingsPage() {
     return () => window.removeEventListener(SECURITY_CENTER_UPDATED_EVENT, handleUpdate);
   }, []);
 
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
-
   async function handleSave() {
-    const { value, persisted } = await saveSecuritySettings({
-      ...settings,
-      sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
-      maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveSecuritySettings({
+        ...settings,
+        sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
+        maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
+      });
+      return { value, accepted: reportSettingsWrite(persisted, "Security settings") };
     });
-    setSettings(value);
-    if (reportSettingsWrite(persisted, "Security settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
   async function handleReset() {
-    const { value, persisted } = await resetSecuritySettings();
-    setSettings(value);
-    if (reportSettingsReset(persisted, "Security settings")) setSavedSettings(value);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetSecuritySettings();
+      return { value, accepted: reportSettingsReset(persisted, "Security settings") };
+    });
   }
 
   /**
@@ -206,16 +218,25 @@ export function SecuritySettingsPage() {
     <SettingsSectionShell
       title="Security"
       description={
-        mounted
-          ? `${settings.sessionTimeoutMinutes}m timeout · 2FA ${settings.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
-          : "Session policies, login history, active devices, and access controls (demo)."
+        // The SAVED policy, not the draft. This read the working copy, so
+        // dragging the timeout slider or flipping 2FA restated the header as
+        // though the change were already in effect — on the one screen where
+        // what is actually enforced is the whole question.
+        hydration === "ready"
+          ? `${saved.sessionTimeoutMinutes}m timeout · 2FA ${saved.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+          : "Session policies, login history, active devices, and access controls."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as SecurityTab)}
@@ -253,7 +274,7 @@ export function SecuritySettingsPage() {
                     max={SESSION_TIMEOUT.max}
                     value={settings.sessionTimeoutMinutes}
                     onChange={(e) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         sessionTimeoutMinutes: Number(e.target.value) || 60,
                       }))
@@ -269,7 +290,7 @@ export function SecuritySettingsPage() {
                     max={LOGIN_ATTEMPTS.max}
                     value={settings.maxLoginAttempts}
                     onChange={(e) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         maxLoginAttempts: Number(e.target.value) || 5,
                       }))
@@ -292,7 +313,7 @@ export function SecuritySettingsPage() {
                   description="Require 8+ chars with mixed case and numbers."
                   checked={settings.requireStrongPasswords}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, requireStrongPasswords: checked }))
+                    edit((prev) => ({ ...prev, requireStrongPasswords: checked }))
                   }
                 />
                 <PolicySwitch
@@ -300,7 +321,7 @@ export function SecuritySettingsPage() {
                   description="OTP verification on login (demo toggle)."
                   checked={settings.twoFactorEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, twoFactorEnabled: checked }))
+                    edit((prev) => ({ ...prev, twoFactorEnabled: checked }))
                   }
                 />
                 <PolicySwitch
@@ -308,7 +329,7 @@ export function SecuritySettingsPage() {
                   description="Email alert when a new device signs in."
                   checked={settings.loginNotifications}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, loginNotifications: checked }))
+                    edit((prev) => ({ ...prev, loginNotifications: checked }))
                   }
                 />
               </CardContent>

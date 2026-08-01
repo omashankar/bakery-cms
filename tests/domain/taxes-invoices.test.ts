@@ -12,7 +12,7 @@ import {
   computeTaxAmount,
   formatTaxRatePercent,
   historicalTaxLabel,
-  isDerivedTaxLabel,
+  retagTaxLabel,
 } from "@/features/commerce/lib/tax-utils";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
@@ -221,17 +221,25 @@ describe("the label on an invoice already issued", () => {
   });
 });
 
-describe("re-deriving the tax label when the rate changes", () => {
-  it("replaces the label while it is still the derived one", () => {
-    expect(isDerivedTaxLabel(buildDefaultTaxLabel(0.05), 0.05)).toBe(true);
-    expect(isDerivedTaxLabel("", 0.05)).toBe(true);
+describe("re-tagging the tax label when the rate changes", () => {
+  it("rebuilds the label while it is still the derived one", () => {
+    expect(retagTaxLabel(buildDefaultTaxLabel(0.05), 0.18)).toBe("GST (18%)");
+    expect(retagTaxLabel("", 0.18)).toBe("GST (18%)");
   });
 
-  it("leaves a label the shop typed alone", () => {
-    // Rewriting "VAT" or "Service tax" back to "GST (n%)" on every rate change
-    // discarded the shop's own wording silently.
-    expect(isDerivedTaxLabel("VAT", 0.05)).toBe(false);
-    expect(isDerivedTaxLabel("Service tax", 0.05)).toBe(false);
+  it("keeps the shop's wording and moves the percentage inside it", () => {
+    // Rebuilding it wholesale discarded the shop's own wording. Leaving a
+    // customised label untouched was the opposite mistake: the stale "(5%)"
+    // then froze onto every order and printed over tax charged at 18%.
+    expect(retagTaxLabel("Sales tax (5%)", 0.18)).toBe("Sales tax (18%)");
+    expect(retagTaxLabel("VAT (5%)", 0.12)).toBe("VAT (12%)");
+  });
+
+  it("leaves a label that makes no claim about the rate entirely alone", () => {
+    // "VAT" says nothing about a percentage, so there is nothing to correct and
+    // appending one would put words in the shop's mouth.
+    expect(retagTaxLabel("VAT", 0.18)).toBe("VAT");
+    expect(retagTaxLabel("Service tax", 0.18)).toBe("Service tax");
   });
 });
 

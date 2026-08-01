@@ -134,15 +134,25 @@ export function buildDefaultTaxLabel(rate: number): string {
 }
 
 /**
- * True when the label is still the one this file derived for that rate.
+ * The label to show after the rate changes.
  *
- * The Taxes screen re-derives the label on every rate change, which is right
- * for the default "GST (5%)" and wrong for a shop that typed its own — "VAT",
- * "Service tax", a bilingual label. Their wording was overwritten silently the
- * next time anyone touched the rate.
+ * Three cases, and the middle one is easy to get wrong in both directions:
+ *
+ *  - Blank, or still the derived "GST (5%)" — rebuild it.
+ *  - The shop's own wording WITH a percentage in it, "Sales tax (5%)" — keep
+ *    the wording, move the percentage. Leaving it alone (which an
+ *    is-it-derived check does) freezes a stale rate into the label, and that
+ *    label is now stored on every order and printed verbatim: an invoice
+ *    reading "Sales tax (5%)" over tax charged at 18%.
+ *  - The shop's own wording with NO percentage, "VAT" — leave it entirely. It
+ *    makes no claim about the rate, so there is nothing to correct, and
+ *    appending one would put words in the shop's mouth.
  */
-export function isDerivedTaxLabel(label: string, rate: number): boolean {
-  return !label.trim() || label === buildDefaultTaxLabel(rate);
+export function retagTaxLabel(label: string, rate: number): string {
+  const trimmed = label.trim();
+  if (!trimmed) return buildDefaultTaxLabel(rate);
+  if (!/%/.test(trimmed)) return trimmed;
+  return relabel(trimmed, rate);
 }
 
 /** The tax fields an already-placed order carries. */

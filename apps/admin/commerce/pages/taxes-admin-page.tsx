@@ -5,9 +5,8 @@ import { useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import {
-  buildDefaultTaxLabel,
   formatTaxRatePercent,
-  isDerivedTaxLabel,
+  retagTaxLabel,
 } from "@/features/commerce/lib/tax-utils";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
@@ -92,12 +91,12 @@ export function TaxesAdminPage() {
     edit((prev) => ({
       ...prev,
       taxRate,
-      // Only re-derive the label while it still IS the derived one. Rewriting a
-      // label the shop had customised ("VAT", "Service tax") back to
-      // "GST (n%)" on every rate change discarded their wording silently.
-      taxLabel: isDerivedTaxLabel(prev.taxLabel, prev.taxRate)
-        ? buildDefaultTaxLabel(taxRate)
-        : prev.taxLabel,
+      // Keeps the shop's wording and moves the percentage inside it. Rebuilding
+      // it wholesale discarded a customised label; leaving a customised one
+      // untouched froze a stale percentage into it — and that label is now
+      // stored on every order and printed verbatim, so "Sales tax (5%)" would
+      // head a line charged at 18% forever.
+      taxLabel: retagTaxLabel(prev.taxLabel, taxRate),
     }));
   }
 
@@ -106,7 +105,12 @@ export function TaxesAdminPage() {
       <AdminPageHeader
         title="Taxes"
         description={
-          liveTaxEnabled
+          // Not before hydration. The fields below are held closed until the
+          // server's copy lands, but this line sat above them stating the demo
+          // seed — "GST (5%)" — as though it were what checkout charges.
+          hydration === "pending"
+            ? "Loading the shop's tax configuration…"
+            : liveTaxEnabled
             ? `${saved.taxLabel} · ${formatTaxRatePercent(saved.taxRate)}${
                 saved.platformChargeEnabled
                   ? ` · ${saved.platformChargeLabel} ${formatCurrency(saved.platformChargeAmount)}`
@@ -140,7 +144,9 @@ export function TaxesAdminPage() {
 
       <SettingsHydrationNotice hydration={hydration} />
 
-      {!liveTaxEnabled ? (
+      {/* Also gated: "Tax is off" is a claim about what checkout charges, and
+          before hydration it is a claim about the demo seed. */}
+      {hydration !== "pending" && !liveTaxEnabled ? (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
           Tax is off. Checkout, invoices, and order summaries do not show a tax line until you
           enable it below.

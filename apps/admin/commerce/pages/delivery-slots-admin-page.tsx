@@ -7,9 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommerceSettingsForm } from "../lib/use-commerce-settings-form";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 
 export function DeliverySlotsAdminPage() {
-  const { settings, setSettings, savedSettings, isDirty, save } = useCommerceSettingsForm();
+  // `hydration` holds the fields closed until the server's copy lands. This
+  // screen edits time slots but SAVES the whole commerce section — the tax
+  // rate, the delivery fees, the minimum order value — so an unhydrated save
+  // here resets settings that live on three other screens.
+  const { settings, setSettings, savedSettings, isDirty, hydration, canSave, isWriting, save } =
+    useCommerceSettingsForm();
 
   function updateSlot(index: number, value: string) {
     setSettings((prev) => ({
@@ -36,7 +45,7 @@ export function DeliverySlotsAdminPage() {
   }
 
   function discard() {
-    setSettings(savedSettings);
+    setSettings(() => savedSettings);
   }
 
   function handleSave() {
@@ -55,7 +64,7 @@ export function DeliverySlotsAdminPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Delivery Slots"
-        description={`${settings.deliveryTimeSlots.length} time slot${settings.deliveryTimeSlots.length === 1 ? "" : "s"} · lead ${settings.deliveryLeadDays} day${settings.deliveryLeadDays === 1 ? "" : "s"}`}
+        description={hydration === "pending" ? "Loading delivery settings…" : `${settings.deliveryTimeSlots.length} time slot${settings.deliveryTimeSlots.length === 1 ? "" : "s"} · lead ${settings.deliveryLeadDays} day${settings.deliveryLeadDays === 1 ? "" : "s"}`}
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -67,15 +76,18 @@ export function DeliverySlotsAdminPage() {
             <Button
               variant="bakery"
               className="w-full sm:w-auto"
-              disabled={!isDirty}
+              disabled={!isDirty || !canSave}
               onClick={handleSave}
             >
-              Save changes
+              {isWriting ? "Saving…" : "Save changes"}
             </Button>
           </div>
         }
       />
 
+      <SettingsHydrationNotice hydration={hydration} />
+
+      <SettingsFormGate hydration={hydration}>
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Lead time</CardTitle>
@@ -152,6 +164,7 @@ export function DeliverySlotsAdminPage() {
           ))}
         </CardContent>
       </Card>
+      </SettingsFormGate>
     </AdminPage>
   );
 }

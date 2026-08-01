@@ -31,6 +31,7 @@ import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
 } from "@/features/commerce/lib/invoice-settings-repository";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -85,6 +86,8 @@ export function InvoicesAdminPage() {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
     function refreshSettings() {
       setInvoiceSettings(loadInvoiceSettings());
       const commerce = getCommerceSettings();
@@ -98,9 +101,23 @@ export function InvoicesAdminPage() {
 
     refreshSettings();
 
+    // Ask for the server's copy rather than waiting on the admin layout to.
+    //
+    // `loadInvoiceSettings()` SEEDS demo constants when localStorage is empty,
+    // and this page PRINTS invoices from what it returns. The customer's copy
+    // is now resolved server-side, so an admin printing before hydration landed
+    // would hand out a document that disagrees with the customer's about who
+    // issued it — the exact split this work set out to close, reopened from the
+    // other side. The layout's sync runs from a `[]`-dep effect that never
+    // re-runs after an in-app login, which is why waiting is not enough.
+    void ensureInvoiceSettingsHydrated().then((settled) => {
+      if (!cancelled && settled) refreshSettings();
+    });
+
     window.addEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     return () => {
+      cancelled = true;
       window.removeEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     };

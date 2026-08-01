@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   reportSettingsReset,
@@ -17,6 +16,8 @@ import {
   saveAnalyticsSettings,
 } from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { SettingsHydrationNotice } from "./settings-field-error";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
 /** Tracking IDs are machine values — mobile keyboards must not capitalize or correct them. */
 const trackingIdProps = {
@@ -26,18 +27,20 @@ const trackingIdProps = {
 } as const;
 
 export function AnalyticsSettingsPage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<AnalyticsSettings>(defaultAnalyticsSettings);
-  const [savedSettings, setSavedSettings] = useState<AnalyticsSettings>(defaultAnalyticsSettings);
+  // The shared section form. This page hand-rolled it and never resynced: a
+  // one-shot `[]`-dep effect read localStorage on mount, with no
+  // SETTINGS_UPDATED_EVENT listener at all, so the form was stuck on whatever
+  // that read returned for the whole page session. `SettingsServerSync` reads
+  // the real copy from a root-layout effect, so on a hard load that read is
+  // still in flight and the local store answers with the DEMO SEED — and Save
+  // PUT the seed over the real section, which is a whole-section replace.
+  //
+  // The four tracking IDs default to empty strings, so what lands is all four
+  // blanked: the storefront stops reporting to Google Analytics, GTM, Meta and
+  // Hotjar, and the gap only surfaces as missing data days later.
+  const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<AnalyticsSettings>(getAnalyticsSettings, defaultAnalyticsSettings);
 
-  useEffect(() => {
-    const loaded = getAnalyticsSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    setMounted(true);
-  }, []);
-
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const configuredCount = [
     settings.googleAnalyticsId,
     settings.googleTagManagerId,
@@ -46,41 +49,51 @@ export function AnalyticsSettingsPage() {
   ].filter((id) => id.trim()).length;
 
   async function handleSave() {
-    const { value, persisted } = await saveAnalyticsSettings({
-      googleAnalyticsId: settings.googleAnalyticsId.trim(),
-      googleTagManagerId: settings.googleTagManagerId.trim(),
-      facebookPixelId: settings.facebookPixelId.trim(),
-      hotjarId: settings.hotjarId.trim(),
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveAnalyticsSettings({
+        googleAnalyticsId: settings.googleAnalyticsId.trim(),
+        googleTagManagerId: settings.googleTagManagerId.trim(),
+        facebookPixelId: settings.facebookPixelId.trim(),
+        hotjarId: settings.hotjarId.trim(),
+      });
+      return { value, accepted: reportSettingsWrite(persisted, "Analytics settings") };
     });
-    setSettings(value);
-    if (reportSettingsWrite(persisted, "Analytics settings")) setSavedSettings(value);
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
   async function handleReset() {
-    const { value, persisted } = await resetAnalyticsSettings();
-    setSettings(value);
-    if (reportSettingsReset(persisted, "Analytics settings")) setSavedSettings(value);
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetAnalyticsSettings();
+      return { value, accepted: reportSettingsReset(persisted, "Analytics settings") };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Analytics"
       description={
-        mounted
+        hydration === "ready"
           ? `${configuredCount} of 4 integrations configured`
-          : "Tracking IDs for analytics and marketing pixels (demo storage only)."
+          : "Tracking IDs for analytics and marketing pixels."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open: the admin edits the seed, the arriving
+      // values are skipped because the form is dirty, and Save unlocks over it.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Tracking IDs</CardTitle>
@@ -95,7 +108,7 @@ export function AnalyticsSettingsPage() {
               id="ga"
               value={settings.googleAnalyticsId}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, googleAnalyticsId: e.target.value }))
+                edit((prev) => ({ ...prev, googleAnalyticsId: e.target.value }))
               }
               placeholder="G-XXXXXXXXXX"
               {...trackingIdProps}
@@ -107,7 +120,7 @@ export function AnalyticsSettingsPage() {
               id="gtm"
               value={settings.googleTagManagerId}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, googleTagManagerId: e.target.value }))
+                edit((prev) => ({ ...prev, googleTagManagerId: e.target.value }))
               }
               placeholder="GTM-XXXXXXX"
               {...trackingIdProps}
@@ -119,7 +132,7 @@ export function AnalyticsSettingsPage() {
               id="pixel"
               value={settings.facebookPixelId}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, facebookPixelId: e.target.value }))
+                edit((prev) => ({ ...prev, facebookPixelId: e.target.value }))
               }
               placeholder="1234567890"
               inputMode="numeric"
@@ -131,7 +144,7 @@ export function AnalyticsSettingsPage() {
             <Input
               id="hotjar"
               value={settings.hotjarId}
-              onChange={(e) => setSettings((prev) => ({ ...prev, hotjarId: e.target.value }))}
+              onChange={(e) => edit((prev) => ({ ...prev, hotjarId: e.target.value }))}
               placeholder="1234567"
               inputMode="numeric"
               {...trackingIdProps}
