@@ -30,6 +30,7 @@ import { createCoupon, deleteCoupons } from "@/features/commerce/lib/coupons-rep
 import {
   createDeliveryZone,
   deleteDeliveryZones,
+  persistServerZones,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import { saveHeaderSettings, loadHeaderSettings } from "@/features/site-layout/lib/header-repository";
 import { saveFooterSettings, loadFooterSettings } from "@/features/site-layout/lib/footer-repository";
@@ -48,7 +49,7 @@ import {
 import { saveCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
 import { saveAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
 import { contentHydration } from "@/features/content/lib/content-api";
-import { commerceHydration } from "@/features/commerce/lib/commerce-api";
+import { couponsHydration, zonesHydration } from "@/features/commerce/lib/commerce-api";
 import { seoHydration, siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
 import { catalogHydration } from "@/features/catalog/lib/catalog-api";
 import { mediaHydration } from "@/apps/admin/media/lib/media-api";
@@ -73,7 +74,8 @@ function mockServer(ok: boolean, status = ok ? 200 : 500) {
  */
 function markHydrated() {
   contentHydration.markSettled();
-  commerceHydration.markSettled();
+  couponsHydration.markSettled();
+  zonesHydration.markSettled();
   siteLayoutHydration.markSettled();
   seoHydration.markSettled();
   mediaHydration.markSettled();
@@ -109,8 +111,31 @@ const WRITES: Array<[name: string, write: () => Promise<{ persisted: boolean }>]
   [
     "zone delete",
     async () => {
-      const { value: zone } = await createDeliveryZone({ name: "Andheri", city: "Mumbai" } as never);
-      return deleteDeliveryZones([zone.id]);
+      // Seeded through the HYDRATION path, not by creating it first.
+      //
+      // A create against a rejecting server no longer leaves anything behind:
+      // the local write is rolled back, because a value the server refused would
+      // otherwise sit in the cache and make every later save fail too. So
+      // creating-then-deleting left nothing to delete and the early return
+      // ("nothing sent, nothing could fail") reported success without ever
+      // exercising the write.
+      persistServerZones([
+        {
+          id: "zone-andheri",
+          name: "Andheri",
+          city: "Mumbai",
+          pincode: "400053",
+          radiusKm: 5,
+          deliveryCharge: 50,
+          minDeliveryDays: 1,
+          estimatedDeliveryDays: 2,
+          isActive: true,
+          priority: 1,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ]);
+      return deleteDeliveryZones(["zone-andheri"]);
     },
   ],
   ["header save", () => saveHeaderSettings(loadHeaderSettings())],

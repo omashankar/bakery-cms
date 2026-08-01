@@ -41,3 +41,20 @@ const deliveryZoneSchema = z
 
 export const couponsArraySchema = z.array(couponSchema);
 export const deliveryZonesArraySchema = z.array(deliveryZoneSchema);
+
+/**
+ * A zone save, with what the caller believed existed when it started.
+ *
+ * `knownIds` turns a blind replace-all into a diff: the server deletes only the
+ * ids the caller HAD and no longer sends, and leaves anything created elsewhere
+ * in the meantime alone. A bare array is still accepted — that is the shape an
+ * older tab sends — and is treated as "delete nothing I have not seen", which is
+ * the safe reading.
+ */
+export const deliveryZonesReplaceSchema = z.union([
+  deliveryZonesArraySchema.transform((zones) => ({ zones, knownIds: null as string[] | null })),
+  z.object({
+    zones: deliveryZonesArraySchema,
+    knownIds: z.array(z.string()),
+  }),
+]);

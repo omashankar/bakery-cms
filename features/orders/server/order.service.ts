@@ -20,6 +20,7 @@ import {
 } from "@/features/payments/server/razorpay-refund.server";
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
+import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
 import {
   publicBaseUrl,
   sendTemplatedEmail,
@@ -73,19 +74,35 @@ async function generateOrderNumber(commerce: CommerceSettings): Promise<string> 
   return `${prefix}-${stamp}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+/**
+ * When the shop promises to deliver.
+ *
+ * The lead time comes from the DRAFT's totals when there is one — the numbers
+ * the shop computed from its own zones — not from `input.totals`. That object is
+ * `.passthrough()`, so `estimatedDeliveryDays` arrived straight from the caller
+ * and was used verbatim: a request could ask for `0` and be promised same-day
+ * delivery on a zone the shop had configured for five. Every other figure on the
+ * order was taken back from the client; this one was still being handed over.
+ */
 function resolveEstimatedDelivery(
   input: PlaceOrderInput,
   commerce: CommerceSettings,
+  draftTotals?: Record<string, unknown> | null,
 ): string {
   const slotDate = input.deliverySlot?.date;
   if (slotDate) {
     const chosen = new Date(slotDate);
     if (!Number.isNaN(chosen.getTime())) return chosen.toISOString();
   }
+
+  const quoted = draftTotals?.estimatedDeliveryDays;
   const days =
-    typeof input.totals.estimatedDeliveryDays === "number"
-      ? input.totals.estimatedDeliveryDays
-      : commerce.estimatedDeliveryDays;
+    typeof quoted === "number"
+      ? quoted
+      : // No draft: a headless COD caller that never quoted. Fall back to the
+        // shop's own setting rather than to anything the request supplied.
+        commerce.estimatedDeliveryDays;
+
   const date = new Date();
   date.setDate(date.getDate() + Math.max(days ?? 1, 0));
   return date.toISOString();
@@ -144,6 +161,59 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
       if (!verifyOrderLookup(existing, input.address)) throw new NotFoundError("Order not found");
       return existing;
     }
+  }
+
+  // The order must go where the quote was priced FOR.
+  //
+  // The draft's totals are used verbatim, and the delivery charge inside them
+  // depends entirely on the city and pincode. Taking `input.address` without
+  // checking it against the address the draft was priced for meant a caller
+  // could quote for the cheapest zone and then place the order somewhere else
+  // and be charged the cheap zone's fee — the same hole as choosing your own
+  // price, one field along.
+  //
+  // Only city and pincode are compared, because only those two decide the zone;
+  // correcting a flat number or a landmark must not force a re-quote.
+  // A draft priced with NO address is not a price for this address.
+  //
+  // The guard below only ran when the draft had one, so a caller could quote
+  // with the address omitted — which prices at the fallback fee, or free — and
+  // then place the order anywhere. The missing case was the cheap one.
+  if (draft && !draft.deliveryAddress && input.address) {
+    throw new AppError(
+      "This cart was priced before a delivery address was entered. Please refresh so the delivery charge can be calculated.",
+      409,
+    );
+  }
+
+  if (draft?.deliveryAddress && input.address) {
+    const priced = draft.deliveryAddress;
+    const sameCity =
+      (priced.city ?? "").trim().toLowerCase() === input.address.city.trim().toLowerCase();
+    const samePincode =
+      (priced.pincode ?? "").replace(/\D/g, "") === input.address.pincode.replace(/\D/g, "");
+
+    if (!sameCity || !samePincode) {
+      throw new AppError(
+        "The delivery address has changed since this cart was priced. Please refresh so the delivery charge can be recalculated.",
+        409,
+      );
+    }
+  }
+
+  // A date the shop can actually bake for.
+  //
+  // The zone's minimum lead time was collected, stored, displayed — and enforced
+  // nowhere. The checkout's date picker floors on the shop-wide
+  // `deliveryLeadDays`, which knows nothing about zones, and `min` on an input
+  // is a suggestion to a browser rather than a rule. So a five-day zone accepted
+  // tomorrow, and a direct POST accepted today.
+  const leadDays = Number((draft?.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays);
+  if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
+    throw new AppError(
+      `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
+      409,
+    );
   }
 
   // An online payment must be against a cart the shop priced. Without this a
@@ -234,7 +304,11 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     placedAt,
     status,
     statusHistory: [{ status, at: placedAt }],
-    estimatedDelivery: resolveEstimatedDelivery(input, commerce),
+    estimatedDelivery: resolveEstimatedDelivery(
+      input,
+      commerce,
+      (draft?.totals ?? null) as unknown as Record<string, unknown> | null,
+    ),
   };
 
   // Atomic: create the order AND reduce stock for each line together.

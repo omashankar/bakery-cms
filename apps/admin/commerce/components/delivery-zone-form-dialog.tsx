@@ -14,12 +14,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import {
   createDeliveryZone,
   createEmptyDeliveryZone,
   updateDeliveryZone,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import type { DeliveryZone, DeliveryZoneFormData } from "@/types/delivery";
+
+/**
+ * Whole days, always.
+ *
+ * The server requires an integer (`z.number().int()`), and the write path saves
+ * to localStorage BEFORE it PUTs — so a typed "1.5" was rejected by the server
+ * and kept locally, and because every save sends the whole zone list, that one
+ * character then made every SUBSEQUENT save fail too. The admin had no way to
+ * see why and no way out but clearing site data.
+ *
+ * Rounded rather than refused: "1.5 days" has an obvious intention, and blocking
+ * the keystroke mid-typing is worse than settling it on the way in.
+ */
+function wholeDays(value: string): number {
+  const parsed = Math.round(Number(value));
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
 
 interface DeliveryZoneFormDialogProps {
   open: boolean;
@@ -65,12 +83,22 @@ export function DeliveryZoneFormDialog({
       return;
     }
 
+    // Nothing stopped min > estimated, and the table then rendered "5–2 days".
+    if (form.minDeliveryDays > form.estimatedDeliveryDays) {
+      toast.error("Minimum delivery time cannot be longer than the estimate");
+      return;
+    }
+
     if (zone) {
       const { persisted } = await updateDeliveryZone(zone.id, form);
-      reportWrite(persisted, "Delivery zone updated");
+      reportWrite(persisted, "Delivery zone updated", {
+        failure: "Could not update the zone — the server rejected it",
+      });
     } else {
       const { persisted } = await createDeliveryZone(form);
-      reportWrite(persisted, "Delivery zone created");
+      reportWrite(persisted, "Delivery zone created", {
+        failure: "Could not create the zone — the server rejected it",
+      });
     }
 
     onOpenChange(false);
@@ -110,10 +138,22 @@ export function DeliveryZoneFormDialog({
             <Label htmlFor="zone-pincode">Pincode / prefix</Label>
             <Input
               id="zone-pincode"
+              inputMode="numeric"
               value={form.pincode}
-              onChange={(event) => patch({ pincode: event.target.value })}
+              // Normalised to what the MATCHER uses: digits only, six at most.
+              // The field accepted anything, so "400 001" and a pasted list of
+              // pincodes were silently truncated to something else entirely, and
+              // a typo became a prefix zone covering a whole state.
+              onChange={(event) => patch({ pincode: normalizePincode(event.target.value) })}
               placeholder="400001 or 4000"
             />
+            <p className="text-xs text-muted-foreground">
+              {form.pincode.length === 6
+                ? "Exactly this pincode."
+                : form.pincode
+                  ? `Any pincode starting ${form.pincode}. Also covers the whole city as a fallback when no other zone matches.`
+                  : "Matches the whole city — leave empty for a city-wide zone."}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="zone-radius">Radius (km)</Label>
@@ -152,10 +192,9 @@ export function DeliveryZoneFormDialog({
               id="zone-min-days"
               type="number"
               min={0}
+              step={1}
               value={form.minDeliveryDays}
-              onChange={(event) =>
-                patch({ minDeliveryDays: Math.max(0, Number(event.target.value) || 0) })
-              }
+              onChange={(event) => patch({ minDeliveryDays: wholeDays(event.target.value) })}
             />
           </div>
           <div className="space-y-2">
@@ -164,18 +203,16 @@ export function DeliveryZoneFormDialog({
               id="zone-est-days"
               type="number"
               min={0}
+              step={1}
               value={form.estimatedDeliveryDays}
-              onChange={(event) =>
-                patch({
-                  estimatedDeliveryDays: Math.max(0, Number(event.target.value) || 0),
-                })
-              }
+              onChange={(event) => patch({ estimatedDeliveryDays: wholeDays(event.target.value) })}
             />
           </div>
           <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
             <span>Active zone</span>
             <Switch
               checked={form.isActive}
+              aria-label="Active zone"
               onCheckedChange={(checked) => patch({ isActive: checked === true })}
             />
           </label>

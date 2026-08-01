@@ -127,6 +127,8 @@ vi.mock("@/features/commerce/server/commerce.repository", () => ({
   decrementCouponUsage: async () => undefined,
 }));
 
+import * as service from "@/features/orders/server/order.service";
+
 /** One order document, mutated by the fake repository as the service writes to it. */
 function seedOrder(over: Record<string, unknown> = {}) {
   return {
@@ -146,8 +148,16 @@ function seedOrder(over: Record<string, unknown> = {}) {
   };
 }
 
-/** Resets the shared state and returns the real service against it. */
-async function harness(initial: Record<string, unknown> = {}) {
+/**
+ * Resets the shared state and hands back the real service.
+ *
+ * The service is imported STATICALLY at the top of this file. Importing it per
+ * test with `await import()` charged a cold transform of its whole module graph
+ * to the first test's 5s budget, and under a full parallel run that timed out
+ * about one run in four — taking the next test down with it, because this shared
+ * state was left mid-flight.
+ */
+function harness(initial: Record<string, unknown> = {}) {
   state.db.order = seedOrder(initial);
   state.restoredStock.length = 0;
   state.refundCalls.length = 0;
@@ -157,7 +167,6 @@ async function harness(initial: Record<string, unknown> = {}) {
   state.gateway.unavailable = undefined;
   state.gateway.fetchStatus = null;
 
-  const service = await import("@/features/orders/server/order.service");
   // Always seeded immediately above; the null in the hoisted type is only for
   // the moment before the first harness() call.
   return { h: state as typeof state & { db: { order: Record<string, unknown> } }, service };

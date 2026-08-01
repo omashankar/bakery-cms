@@ -46,21 +46,56 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
-/** Settled by this module's `*ServerSync` once the server's copy is loaded. */
-export const commerceHydration = createHydrationGate();
+/**
+ * One gate per LIST, not one for the module.
+ *
+ * A single shared gate needed both reads to succeed before either list could be
+ * written, so a coupons outage blocked zone saves — and the admin was told the
+ * server had rejected a request it never received. A gate can only vouch for the
+ * list its own read filled.
+ *
+ */
+export const couponsHydration = createHydrationGate();
+export const zonesHydration = createHydrationGate();
 
 /**
  * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
  * stops a browser that never loaded the server's copy from overwriting it — see
  * `createHydrationGate`.
  */
-async function guardedPut(path: string, body: unknown): Promise<boolean> {
-  if (!(await commerceHydration.waitForSettled())) return false;
+async function guardedPut(
+  gate: { waitForSettled: (ms?: number) => Promise<boolean> },
+  path: string,
+  body: unknown,
+): Promise<boolean> {
+  if (!(await gate.waitForSettled())) return false;
   return putJson(path, body);
 }
 
 export const fetchCoupons = () => getJson<StoredCoupon[]>("/api/coupons");
-export const replaceCouponsRequest = (coupons: StoredCoupon[]) => guardedPut("/api/coupons", coupons);
+export const replaceCouponsRequest = (coupons: StoredCoupon[]) => guardedPut(couponsHydration, "/api/coupons", coupons);
 
 export const fetchZones = () => getJson<DeliveryZone[]>("/api/delivery-zones");
-export const replaceZonesRequest = (zones: DeliveryZone[]) => guardedPut("/api/delivery-zones", zones);
+/**
+ * `knownIds` is what this browser believed existed before the edit.
+ *
+ * Without it a replace-all asserts "these are all the zones", so a stale tab
+ * deletes everything another device has created since.
+ */
+export const replaceZonesRequest = (zones: DeliveryZone[], knownIds?: string[]) =>
+  guardedPut(zonesHydration, "/api/delivery-zones", knownIds ? { zones, knownIds } : zones);
+
+/**
+ * A backup restore, which genuinely means "make the server look like this".
+ *
+ * `replaceZonesRequest` without `knownIds` deletes nothing — the safe reading for
+ * an ordinary save from a possibly-stale tab, and the wrong one here: a restore
+ * that cannot remove a zone silently leaves rows the backup does not contain,
+ * and reported success. So the CURRENT server ids are read first and sent as the
+ * known set, which is exactly the claim a restore is entitled to make.
+ */
+export async function restoreZonesRequest(zones: DeliveryZone[]): Promise<boolean> {
+  const current = await fetchZones();
+  if (current === null) return false;
+  return replaceZonesRequest(zones, current.map((zone) => zone.id));
+}

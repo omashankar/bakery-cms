@@ -36,7 +36,7 @@ import {
 } from "@/features/content/lib/content-api";
 import {
   fetchZones,
-  replaceZonesRequest,
+  restoreZonesRequest,
   fetchCoupons,
   replaceCouponsRequest,
 } from "@/features/commerce/lib/commerce-api";
@@ -157,7 +157,9 @@ const SERVER_BACKUP_SECTIONS: ServerBackupSection[] = [
     key: "bakery-cms-delivery-zones",
     title: "Delivery zones",
     fetch: fetchZones,
-    push: replacer(replaceZonesRequest),
+    // restore, not save: a bare replaceZonesRequest sends no knownIds and so
+    // deletes nothing, leaving rows the backup does not contain.
+    push: replacer(restoreZonesRequest),
   },
   { key: "bakery-cms-coupons", title: "Coupons", fetch: fetchCoupons, push: replacer(replaceCouponsRequest) },
   {

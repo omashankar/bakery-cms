@@ -33,8 +33,12 @@ export function getZones() {
   return repo.listZones();
 }
 
-export async function replaceZones(zones: DeliveryZone[], ctx: RequestCtx) {
-  await repo.replaceZones(zones);
+export async function replaceZones(
+  zones: DeliveryZone[],
+  knownIds: string[] | null,
+  ctx: RequestCtx,
+) {
+  await repo.replaceZones(zones, knownIds);
   await writeAuditLog({
     action: "delivery_zones.replace",
     actorId: ctx.actorId ?? null,

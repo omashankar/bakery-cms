@@ -64,6 +64,7 @@ import type { LandingProduct } from "@/constants/landing-data";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
+import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
@@ -429,6 +430,27 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   );
 
   const totals = serverTotals ?? localTotals;
+
+  /**
+   * The earliest date this address can actually be delivered on.
+   *
+   * The picker floored on the shop-wide `deliveryLeadDays` alone, so a zone the
+   * admin had configured for five days happily accepted tomorrow. The zone's own
+   * lead time is the stricter of the two and now moves the floor. The server
+   * refuses an earlier date regardless — this is so the customer never picks one
+   * only to be told no.
+   */
+  const earliestDeliveryDate = useMemo(() => {
+    const zoneDays = totals.deliveryMinDays;
+    if (typeof zoneDays !== "number" || zoneDays <= 0) return minDeliveryDate;
+
+    // Calendar arithmetic, not Date arithmetic. The first version built a LOCAL
+    // midnight and read it back through `toISOString()`, which is UTC — so in
+    // IST the floor came out a day early and the picker offered exactly the date
+    // the server refuses, with the refusal landing after the card was charged.
+    const zoneFloor = earliestDeliveryDateString(zoneDays);
+    return zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
+  }, [totals.deliveryMinDays, minDeliveryDate]);
 
   // Anything that changes the price invalidates the shop's last answer.
   useEffect(() => {
@@ -1014,7 +1036,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                           <Input
                             id="deliveryDate"
                             type="date"
-                            min={minDeliveryDate}
+                            min={earliestDeliveryDate}
                             value={deliverySlot.date}
                             aria-invalid={Boolean(slotError) && !deliverySlot.date}
                             onChange={(event) => {

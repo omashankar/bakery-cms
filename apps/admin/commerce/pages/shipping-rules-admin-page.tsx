@@ -277,19 +277,43 @@ export function ShippingRulesAdminPage() {
               }}
             />
 
+            {/*
+              Says what actually happened, in the order it happened.
+
+              This read "No active zone matched — fallback fee applied" for every
+              case where no zone NAME came back, which included an order over the
+              free-delivery threshold: nothing had failed to match and no fee had
+              been applied, yet the operator was told both.
+            */}
             {previewTotals.deliveryZoneName ? (
               <p className="text-xs text-muted-foreground">
                 Matched zone: <span className="font-medium">{previewTotals.deliveryZoneName}</span>
                 {previewTotals.estimatedDeliveryDays
                   ? ` · Est. ${previewTotals.estimatedDeliveryDays} day(s)`
                   : ""}
+                {previewTotals.delivery === 0 ? " · free at this cart value" : ""}
               </p>
-            ) : settings.useZoneBasedDelivery ? (
+            ) : !settings.useZoneBasedDelivery ? (
+              <p className="text-xs text-muted-foreground">
+                {previewTotals.delivery === 0
+                  ? "Free at this cart value — flat fee otherwise."
+                  : "Using default flat delivery fee."}
+              </p>
+            ) : previewTotals.delivery === 0 ? (
+              // WHY it is zero, not just that it is. Attributing every zero to
+              // the threshold was wrong for the zero FALLBACK this change set
+              // made possible — the operator would have gone looking at the wrong
+              // setting.
+              <p className="text-xs text-muted-foreground">
+                No active zone matched.{" "}
+                {previewTotals.subtotal >= settings.freeDeliveryThreshold
+                  ? "This cart is over the free-delivery threshold, so nothing is charged."
+                  : "The fallback fee is set to zero, so nothing is charged."}
+              </p>
+            ) : (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 No active zone matched — fallback fee applied.
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Using default flat delivery fee.</p>
             )}
 
             <p className="text-xs text-muted-foreground">

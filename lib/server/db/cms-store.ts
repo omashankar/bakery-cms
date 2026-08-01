@@ -89,3 +89,29 @@ export function createMongoStore<T>(options: {
     },
   };
 }
+
+/**
+ * Has this collection ever been seeded with demo data?
+ *
+ * A repository that seeds "when the collection is empty" cannot tell a brand new
+ * shop from one that deliberately deleted everything — so emptying it resurrects
+ * the demo rows on the next read, and for delivery zones those demo rows go on
+ * to PRICE live checkouts. The marker is what separates "never set up" from
+ * "set up, and the answer is none".
+ *
+ * Kept in the same key/value collection as the other CMS stores rather than as a
+ * flag on the data itself, so an empty list stays an empty list.
+ */
+export async function hasSeeded(key: string): Promise<boolean> {
+  await connectDB();
+  return (await CmsStoreModel.exists({ _id: `seeded:${key}` })) !== null;
+}
+
+export async function markSeeded(key: string): Promise<void> {
+  await connectDB();
+  await CmsStoreModel.updateOne(
+    { _id: `seeded:${key}` },
+    { $set: { data: { at: new Date().toISOString() } } },
+    { upsert: true },
+  );
+}

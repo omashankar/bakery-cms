@@ -14,10 +14,36 @@ import { toast } from "sonner";
  * Pass the same phrase you would have used for success ("Banner created"); the
  * failure message is built from it so the two read as the same event.
  */
-export function reportWrite(persisted: boolean, success: string): boolean {
+export function reportWrite(
+  persisted: boolean,
+  success: string,
+  options?: {
+    /**
+     * What to say instead when the write was UNDONE locally as well.
+     *
+     * "on this device only" describes a store that keeps its optimistic write.
+     * For one that rolls back — delivery zones do, because a value the server
+     * refused would otherwise poison every later save — the change is nowhere at
+     * all, and telling the admin it survived locally sends them looking for
+     * something that is not there.
+     *
+     * Given as a phrase rather than derived from `success`: turning "Deleted 3
+     * zones" into a failure sentence by pattern is the kind of cleverness that
+     * quietly produces nonsense for the next caller.
+     */
+    failure?: string;
+  },
+): boolean {
   if (persisted) {
     toast.success(success);
     return true;
+  }
+
+  if (options?.failure) {
+    toast.error(options.failure, {
+      description: "Nothing was changed. Check the values and try again.",
+    });
+    return false;
   }
 
   toast.error(`${success} on this device only — the server rejected it`, {

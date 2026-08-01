@@ -31,6 +31,10 @@ import {
   toggleDeliveryZoneActive,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import {
+  getCommerceSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import {
   FilterPanel,
   FilterPanelSearch,
 } from "@/components/shared/filter-panel";
@@ -100,14 +104,23 @@ export function DeliveryZonesAdminPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
 
+  // Whether any of this reaches a customer. The master switch lives on Shipping
+  // Rules and is OFF by default, so a zone map built here can be entirely inert.
+  const [zonePricingOn, setZonePricingOn] = useState(false);
+
   useEffect(() => {
     function refresh() {
       setZones(loadDeliveryZones());
+      setZonePricingOn(Boolean(getCommerceSettings().useZoneBasedDelivery));
     }
     refresh();
     setMounted(true);
     window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
+    return () => {
+      window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
+    };
   }, []);
 
   const stats = useMemo(
@@ -156,17 +169,41 @@ export function DeliveryZonesAdminPage() {
 
   async function handleDelete() {
     if (selectedIds.length === 0) return;
+
+    // Deleting a zone reprices every future order to that address — to another
+    // zone, or to the fallback fee. Worth a sentence before it happens.
+    const ok = window.confirm(
+      `Delete ${selectedIds.length} delivery zone${selectedIds.length === 1 ? "" : "s"}?\n\n` +
+        "Orders to those addresses will be priced by another matching zone, or by the fallback fee.",
+    );
+    if (!ok) return;
+
     const { value: count, persisted } = await deleteDeliveryZones(selectedIds);
     setSelectedIds([]);
     setZones(loadDeliveryZones());
-    reportWrite(persisted, `Deleted ${count} zone${count === 1 ? "" : "s"}`);
+    reportWrite(persisted, `Deleted ${count} zone${count === 1 ? "" : "s"}`, {
+      failure: "Could not delete — the server rejected it",
+    });
   }
 
   async function handleReset() {
+    // "Reset demo" replaces every zone in the DATABASE with the five sample
+    // rows, and those rows then price live checkouts. One unconfirmed click was
+    // all it took to delete a shop's real delivery pricing.
+    const ok = window.confirm(
+      // "all N" overstated it: a save only removes the zones this browser knows
+      // about, so anything created elsewhere since this page loaded survives.
+      `This replaces the ${zones.length} zone${zones.length === 1 ? "" : "s"} shown here with the demo zones.\n\n` +
+        "Live checkout will be priced from the demo zones until you set yours up again. This cannot be undone.",
+    );
+    if (!ok) return;
+
     const { persisted } = await resetDeliveryZones();
     setSelectedIds([]);
     setZones(loadDeliveryZones());
-    reportWrite(persisted, "Delivery zones reset to defaults");
+    reportWrite(persisted, "Delivery zones reset to defaults", {
+      failure: "Could not reset — the server rejected it",
+    });
   }
 
   function handleExport() {
@@ -226,13 +263,20 @@ export function DeliveryZonesAdminPage() {
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "active" })}
+          // Clears the other filters too. The card asserts a COUNT, and leaving
+          // a city or search term applied meant the number it showed and the rows
+          // it produced disagreed.
+          onClick={() => updateFilters({ status: "active", city: "all", search: "" })}
         >
+          {/* "Used at checkout" is only true when zone pricing is switched ON,
+              and that switch lives on Shipping Rules and defaults to OFF. An
+              admin could build a whole zone map here and be told it was live
+              while every order was priced at the flat fee. */}
           <DashboardStatCard
             title="Active"
             value={stats.active}
-            change="Used at checkout"
-            changeTone="positive"
+            change={zonePricingOn ? "Used at checkout" : "Not in use — zone pricing is off"}
+            changeTone={zonePricingOn ? "positive" : "warning"}
             icon={CheckCircle2}
             tone="bakery"
           />
@@ -240,7 +284,7 @@ export function DeliveryZonesAdminPage() {
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "inactive" })}
+          onClick={() => updateFilters({ status: "inactive", city: "all", search: "" })}
         >
           <DashboardStatCard
             title="Inactive"
@@ -319,19 +363,39 @@ export function DeliveryZonesAdminPage() {
           </div>
         ) : null}
 
+        {/* "No zones" and "no zones MATCH" are different facts, and the second
+            one needs a way back. This showed "Create zones" to an admin whose
+            shop had twelve, hidden behind a filter they had forgotten. */}
         {paginated.length === 0 ? (
-          <EmptyState
-            icon={MapPin}
-            title="No delivery zones found"
-            description="Create zones, then enable zone pricing in Shipping rules."
-            className="py-14"
-            action={
-              <Button variant="bakery" onClick={openCreate}>
-                <Plus className="size-4" />
-                Add zone
-              </Button>
-            }
-          />
+          zones.length === 0 ? (
+            <EmptyState
+              icon={MapPin}
+              title="No delivery zones yet"
+              description="Create zones, then enable zone pricing in Shipping rules."
+              className="py-14"
+              action={
+                <Button variant="bakery" onClick={openCreate}>
+                  <Plus className="size-4" />
+                  Add zone
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={MapPin}
+              title="No zones match these filters"
+              description={`${zones.length} zone${zones.length === 1 ? "" : "s"} exist — none of them match what you are filtering by.`}
+              className="py-14"
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => updateFilters({ status: "all", city: "all", search: "" })}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          )
         ) : (
           <>
             <div className="hidden overflow-x-auto lg:block">

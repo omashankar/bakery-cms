@@ -35,13 +35,9 @@ export function calculateDeliveryQuote(
     typeof window === "undefined" ? defaultCommerceSettings : getCommerceSettings()
   );
 
-  if (input.subtotal >= commerce.freeDeliveryThreshold) {
-    return { delivery: 0, usedZonePricing: commerce.useZoneBasedDelivery };
-  }
-
   if (!commerce.useZoneBasedDelivery) {
     return {
-      delivery: commerce.deliveryFee,
+      delivery: input.subtotal >= commerce.freeDeliveryThreshold ? 0 : commerce.deliveryFee,
       usedZonePricing: false,
     };
   }
@@ -50,15 +46,29 @@ export function calculateDeliveryQuote(
     ? findDeliveryZone(zonesOverride, { city: input.city, pincode: input.pincode })
     : resolveDeliveryZoneForAddress({ city: input.city, pincode: input.pincode });
 
+  // Free delivery no longer short-circuits the lookup.
+  //
+  // It used to return before any zone was resolved, so an order over the
+  // threshold lost its zone name and its delivery estimate entirely — the
+  // customer saw no zone and no lead time on the very orders the shop most wants
+  // to look confident about, and the stored order carried neither.
+  const free = input.subtotal >= commerce.freeDeliveryThreshold;
+
   if (!match) {
     return {
-      delivery: commerce.zoneFallbackDeliveryFee || commerce.deliveryFee,
+      // `??`, not `||`. A shop that deliberately sets a ZERO fallback — deliver
+      // anywhere unmatched at no charge — got the standard fee instead, because
+      // 0 is falsy. The two settings mean opposite things and one silently
+      // became the other.
+      delivery: free ? 0 : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
       usedZonePricing: true,
     };
   }
 
   return {
-    delivery: match.zone.deliveryCharge,
+    // The zone is still reported when delivery is free, so the customer keeps
+    // its name and its lead time.
+    delivery: free ? 0 : match.zone.deliveryCharge,
     zoneName: match.zone.name,
     zoneId: match.zone.id,
     minDeliveryDays: match.zone.minDeliveryDays,

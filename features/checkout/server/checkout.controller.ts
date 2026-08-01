@@ -6,6 +6,7 @@ import { getMaintenanceState } from "@/features/settings/server/maintenance.serv
 import { priceCart, UnknownProductError } from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
+import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
 
 /**
  * Prices a cart and holds the result as a draft.
@@ -28,11 +29,43 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
 
   const input = validate(quoteSchema, await readJson(request));
 
+  // PRICE the address the order is actually going to.
+  //
+  // `deliveryAddress` (city + pincode, used to pick the zone) and `address` (the
+  // full destination stored on the order) arrived as two independent
+  // caller-supplied fields and were never compared. So a caller could be quoted
+  // for the cheapest zone and delivered anywhere: `deliveryAddress` of Thane,
+  // `address` of Pune, and the draft — which is what Razorpay is charged and
+  // what the webhook builds the order from — carried both.
+  //
+  // When the full address is present it IS the delivery address, so it decides
+  // the zone. `deliveryAddress` only stands alone before the customer has
+  // entered one, which is the running-total case it exists for.
+  const pricingAddress = input.address
+    ? { city: input.address.city, pincode: input.address.pincode }
+    : input.deliveryAddress;
+
   try {
-    const quote = await priceCart(input);
+    const quote = await priceCart({ ...input, deliveryAddress: pricingAddress });
+
+    // Refuse an impossible delivery date HERE, before any money moves.
+    //
+    // The same rule is enforced at placement, but placement runs after the
+    // gateway has captured — so a refusal there strands a paid customer, and the
+    // webhook retries the identical doomed placement until the gateway gives up.
+    // The quote is the last moment this costs nothing.
+    const leadDays = Number((quote.totals as { deliveryMinDays?: number }).deliveryMinDays);
+    if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
+      throw new AppError(
+        `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
+        409,
+        [{ field: "deliverySlot.date", message: "Too soon for this delivery area" }],
+      );
+    }
+
     const draft = await createDraft(quote, {
       giftWrap: Boolean(input.giftWrap),
-      deliveryAddress: input.deliveryAddress,
+      deliveryAddress: pricingAddress,
       address: input.address,
       deliverySlot: input.deliverySlot,
       orderNotes: input.orderNotes,

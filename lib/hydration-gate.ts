@@ -42,7 +42,12 @@ export function createHydrationGate(): HydrationGate {
     markSettled() {
       if (settled) return;
       settled = true;
-      while (waiting.length > 0) waiting.pop()?.(true);
+      // FIFO. `pop()` released the queue in REVERSE, and everything waiting here
+      // is a replace-all write — so two saves made before hydration landed were
+      // dispatched newest first, and the OLDER list overwrote the newer one on
+      // the server while both reported success. The admin's second edit was the
+      // one that disappeared.
+      while (waiting.length > 0) waiting.shift()?.(true);
     },
 
     waitForSettled(timeoutMs = DEFAULT_TIMEOUT_MS) {
@@ -57,7 +62,15 @@ export function createHydrationGate(): HydrationGate {
           resolve(ok);
         };
 
-        const timer = setTimeout(() => finish(false), timeoutMs);
+        const timer = setTimeout(() => {
+          // Drop it from the queue as well as resolving it. The `done` flag made
+          // a later resolve harmless, but the entry itself was never removed, so
+          // a page that never hydrates accumulated one dead closure per attempted
+          // write for as long as it stayed open.
+          const index = waiting.indexOf(finish);
+          if (index >= 0) waiting.splice(index, 1);
+          finish(false);
+        }, timeoutMs);
         waiting.push(finish);
       });
     },

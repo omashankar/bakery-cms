@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./commerce.service";
-import { couponsArraySchema, deliveryZonesArraySchema } from "./commerce.validators";
+import { couponsArraySchema, deliveryZonesReplaceSchema } from "./commerce.validators";
 
 const COMMERCE_ROLES = ["owner", "admin"] as const;
 
@@ -35,8 +35,8 @@ export const getZonesController = withErrorHandler(async () => {
 
 export const replaceZonesController = withErrorHandler(async (request: Request) => {
   const session = await requireRole(...COMMERCE_ROLES);
-  const zones = validate(deliveryZonesArraySchema, await readJson(request));
-  const result = await service.replaceZones(zones, {
+  const { zones, knownIds } = validate(deliveryZonesReplaceSchema, await readJson(request));
+  const result = await service.replaceZones(zones, knownIds, {
     ...requestContext(request),
     actorId: session.sub,
     actorEmail: session.email,

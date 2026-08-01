@@ -29,6 +29,15 @@ export interface CartTotals {
   itemCount: number;
   deliveryZoneName?: string;
   estimatedDeliveryDays?: number;
+  /**
+   * The zone's minimum lead time, carried so the checkout and the server can
+   * both refuse a date the shop cannot bake for.
+   *
+   * The quote produced it and this dropped it, so a zone configured for five
+   * days accepted tomorrow: the date picker floors on the shop-wide
+   * `deliveryLeadDays` and nothing anywhere consulted the zone.
+   */
+  deliveryMinDays?: number;
 }
 
 function getCommerceConfig() {
@@ -49,6 +58,21 @@ export function calculateCartTotals({
   giftWrap = false,
   deliveryAddress,
   commerceOverride,
+  // Was declared on the input type and never taken out of it.
+  //
+  // `pricing.server.ts` has been passing the shop's Mongo zones in here since
+  // the server took over pricing, and every one of them was dropped on the
+  // floor: the third argument to `calculateDeliveryQuote` was simply never
+  // supplied, so the server fell through to `loadDeliveryZones()`, which
+  // returns the hardcoded DEMO zones when there is no `window`. The
+  // authoritative price — the one Razorpay is asked for — was computed against
+  // Mumbai/Pune sample data no matter what the shop had configured.
+  //
+  // It stayed invisible because `listZones()` seeds Mongo from the same demo
+  // rows when the collection is empty, so an untouched install agrees with
+  // itself. The prices only diverge once an admin edits a zone, which is to say
+  // the moment the feature is used for real.
+  zonesOverride,
 }: CartTotalsInput): CartTotals {
   const commerce = commerceOverride ?? getCommerceConfig();
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -64,7 +88,8 @@ export function calculateCartTotals({
             city: deliveryAddress?.city,
             pincode: deliveryAddress?.pincode,
           },
-          commerce
+          commerce,
+          zonesOverride
         );
   const delivery = deliveryQuote.delivery;
   const { taxableAmount, tax, platformCharge } = computeTaxAmount(commerce, {
@@ -86,5 +111,6 @@ export function calculateCartTotals({
     itemCount,
     deliveryZoneName: deliveryQuote.zoneName,
     estimatedDeliveryDays: deliveryQuote.estimatedDeliveryDays,
+    deliveryMinDays: deliveryQuote.minDeliveryDays,
   };
 }
