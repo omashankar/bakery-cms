@@ -273,6 +273,15 @@ export function SettingsOverviewPage() {
   //
   // Both claims now wait for the server's copy. "Loading" is a smaller lie than
   // "everything is fine".
+  // TWO different questions, and conflating them blanked this page.
+  //
+  //  - `mounted`: has the client rendered? The section list below is static
+  //    navigation — it has nothing to do with settings values, and gating it on
+  //    anything else leaves an admin staring at four grey rectangles. Its only
+  //    job is avoiding a server/client mismatch on first paint.
+  //  - `hydrated`: has the SERVER's copy arrived? Only the two CLAIMS wait on
+  //    this — the shop's name, and whether maintenance mode is on.
+  const [mounted, setMounted] = useState(false);
   const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
   const [siteName, setSiteName] = useState("");
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
@@ -286,13 +295,16 @@ export function SettingsOverviewPage() {
     }
 
     read();
+    setMounted(true);
     window.addEventListener(SETTINGS_UPDATED_EVENT, read);
 
     void ensureSettingsHydrated().then((settled) => {
       if (cancelled) return;
       if (settled) read();
-      // Only a SUCCESSFUL read may unlock the claims. When it fails they stay
-      // generic rather than reporting this browser's defaults as fact.
+      // Only a SUCCESSFUL read may unlock the claims. `ensureSettingsHydrated`
+      // reports false when the FULL admin read failed even if the public subset
+      // landed — so this legitimately stays false, and the claims stay generic
+      // rather than reporting this browser's defaults as fact.
       setHydrated(settled);
     });
 
@@ -302,14 +314,13 @@ export function SettingsOverviewPage() {
     };
   }, []);
 
-  const mounted = hydrated;
-
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Settings"
         description={
-          mounted
+          // The shop's NAME is a claim, so it waits for the server's copy.
+          hydrated && siteName
             ? `The control center for ${siteName} — store, commerce, communication, website, and security.`
             : "The control center for this bakery."
         }
@@ -326,7 +337,13 @@ export function SettingsOverviewPage() {
         }
       />
 
-      {mounted && maintenanceEnabled ? (
+      {/*
+        Also a claim, and the one that matters: showing nothing here means "the
+        storefront is open". Before hydration that would be the local seed
+        talking, so the banner waits for the server rather than reassuring an
+        admin whose shop may be closed to every customer.
+      */}
+      {hydrated && maintenanceEnabled ? (
         <Link
           href={routes.admin.settings.maintenance}
           className="flex items-center gap-3 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 transition-colors hover:bg-amber-100/80 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"

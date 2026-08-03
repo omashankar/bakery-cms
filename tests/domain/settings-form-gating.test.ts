@@ -253,6 +253,39 @@ describe("the store gates behind those forms", () => {
   });
 });
 
+/**
+ * The other half of the rule, learned by breaking it.
+ *
+ * Holding a form closed until hydration is right. Holding STATIC content closed
+ * is not, and the difference is not cosmetic: `hydrated` is a boolean that stays
+ * false whenever the full admin read fails — `ensureSettingsHydrated` reports
+ * false even when the public subset landed — so anything gated on it that is not
+ * a settings VALUE simply never appears. The settings Overview was briefly
+ * rendered as four grey rectangles that way: its section list is plain
+ * navigation, and it had been gated on the same flag as the shop's name.
+ *
+ * Which is why every form above uses the tri-state instead. `"unavailable"` must
+ * still render — fields visible, saving refused, a notice saying why.
+ */
+describe("gating the right things", () => {
+  it("does not gate the settings Overview's navigation on hydration", () => {
+    const code = source("apps/admin/settings/components/settings-overview-page.tsx");
+    // The card list is behind `mounted` — a plain client-render flag — and only
+    // the two claims consult `hydrated`.
+    expect(code).toContain("{!mounted ? (");
+    expect(code).toMatch(/hydrated && maintenanceEnabled/);
+    expect(code).toMatch(/hydrated && siteName/);
+  });
+
+  it("keeps every gated form visible when hydration is UNAVAILABLE", () => {
+    // A screen that shows defaults and refuses to save them is correct; one
+    // that shows nothing at all has turned a failed read into a broken page.
+    const gate = source("apps/admin/settings/components/settings-field-error.tsx");
+    expect(gate).toContain('if (hydration === "pending") {');
+    expect(gate).not.toMatch(/hydration !== "ready"[\s\S]{0,40}animate-pulse/);
+  });
+});
+
 describe("the commerce form wrapper", () => {
   const code = source("apps/admin/commerce/lib/use-commerce-settings-form.ts");
 
