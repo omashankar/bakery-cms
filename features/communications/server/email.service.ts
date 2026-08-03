@@ -123,17 +123,47 @@ async function storeIdentity(): Promise<Record<string, string>> {
  */
 export async function publicBaseUrl(): Promise<string> {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && isReachableOrigin(fromEnv)) return fromEnv.replace(/\/$/, "");
 
   try {
     const seo = (await getSiteLayout("seo")) as SeoStore | null;
     const base = seo?.global?.canonicalBaseUrl?.trim();
-    if (base) return base.replace(/\/$/, "");
+    if (base && isReachableOrigin(base)) return base.replace(/\/$/, "");
   } catch {
     // Fall through — a missing base URL must not stop the email going out.
   }
 
   return "";
+}
+
+/**
+ * Whether an origin is one a customer's mail client could actually open.
+ *
+ * The SEO store SEEDS `canonicalBaseUrl` as "https://www.monginis.example", and
+ * `.example` is reserved by RFC 2606 precisely so that it never resolves. Until
+ * a shop edited its SEO settings or set NEXT_PUBLIC_SITE_URL, every order
+ * confirmation therefore went out with a "view your invoice" link pointing at a
+ * host that does not exist — the mail sent, the customer clicked, and nothing
+ * happened. A dead link is worse than no link, because the caller's fallback
+ * ("Reply to this email and we will send your invoice") is a sentence that
+ * actually works.
+ *
+ * The other reserved names go with it for the same reason, and a bare hostname
+ * with no scheme is rejected because a mail client will not linkify it.
+ */
+function isReachableOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+
+  const host = url.hostname.toLowerCase();
+  // RFC 2606 / RFC 6761 reserved — guaranteed never to resolve.
+  return !/\.(example|invalid|test|localhost)$/.test(host) && host !== "localhost";
 }
 
 export async function sendTemplatedEmail(

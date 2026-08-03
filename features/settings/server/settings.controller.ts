@@ -14,9 +14,42 @@ const SETTINGS_ROLES = ["owner", "admin"] as const;
 
 type SectionContext = { params: Promise<{ section: string }> };
 
+/**
+ * The mail password never leaves the server.
+ *
+ * `getSettings()` returns the whole document because the MAIL TRANSPORT reads it
+ * — but this is the HTTP boundary, and everything past it is a browser. The
+ * password used to cross it in cleartext, and from there it was written to
+ * `localStorage` by the settings store, survived logout (only the session key is
+ * cleared), rode along to every device that admin signed in from, was readable
+ * by any script on any admin page, and was swept into every downloadable backup
+ * file — up to eight archived copies of it in localStorage at a time.
+ *
+ * This codebase already decided that is not acceptable, for the other secret it
+ * holds: `features/payments/server/gateway-credentials.server.ts` keeps the
+ * Razorpay key secret server-side and tells the browser only WHICH fields are
+ * set. This is the same treatment for the same reason. The form is given
+ * `passwordSet` so it can say "saved" without being told what was saved, and a
+ * blank password on the way back in means "keep the stored one" (see
+ * `updateSection`), so a save that does not touch the field cannot wipe it.
+ */
+export function redactMailPassword(settings: Awaited<ReturnType<typeof service.getSettings>>) {
+  const smtp = (settings as { smtp?: Record<string, unknown> }).smtp;
+  if (!smtp) return settings;
+
+  return {
+    ...settings,
+    smtp: {
+      ...smtp,
+      password: "",
+      passwordSet: Boolean(typeof smtp.password === "string" && smtp.password),
+    },
+  };
+}
+
 export const getSettingsController = withErrorHandler(async () => {
   await requireRole(...SETTINGS_ROLES);
-  return ok(await service.getSettings(), "Settings");
+  return ok(redactMailPassword(await service.getSettings()), "Settings");
 });
 
 export const getPublicSettingsController = withErrorHandler(async () => {

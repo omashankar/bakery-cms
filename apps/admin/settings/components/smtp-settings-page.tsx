@@ -192,7 +192,10 @@ export function SmtpSettingsPage() {
                 type={showPassword ? "text" : "password"}
                 value={settings.password}
                 onChange={(e) => edit((prev) => ({ ...prev, password: e.target.value }))}
-                placeholder="••••••••"
+                // Write-only now. The server redacts it on read, so this box is
+                // empty unless the admin is typing a new one — and sending an
+                // empty one back means "keep the stored password".
+                placeholder={saved.passwordSet ? "Saved — leave blank to keep it" : "••••••••"}
                 // new-password is the reliable signal that stops the browser autofilling
                 // the admin's own saved login password into the SMTP field.
                 autoComplete="new-password"
@@ -207,6 +210,11 @@ export function SmtpSettingsPage() {
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {saved.passwordSet
+                ? "A password is saved on the server. Leave this blank to keep it, or type a new one to replace it."
+                : "No password saved. An internal relay on a trusted network may not need one."}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromEmail">From email</Label>
