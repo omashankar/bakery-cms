@@ -27,7 +27,7 @@ import {
   TEMPLATE_VARIABLE_CONTRACT,
   validateSlug,
 } from "@/features/communications/lib/template-contract";
-import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { defaultTemplateSampleData } from "@/apps/admin/communications/lib/template-sample-data";
 
 function source(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -382,14 +382,17 @@ describe("the variables an admin is offered", () => {
     expect(availableVariablesFor("promo_custom", ["coupon_code"])).toEqual(["coupon_code"]);
   });
 
-  it("every contract variable has preview sample data", () => {
-    // A contract variable with no sample renders as a literal in the preview AND
-    // in the real test-send, which is the one place an admin would have caught
-    // the mismatch.
+  it("every contract variable has REAL preview sample data", () => {
+    // Asserted against the raw table, not against `getSampleDataForVariables`.
+    //
+    // That helper fills any unknown key with `[name]`, so the first version of
+    // this test — `typeof sample[v] === "string"` on its OUTPUT — was true no
+    // matter what and passed while EIGHT contract variables had no sample at
+    // all. The admin previewing a refund saw "[refund_amount]" where the
+    // customer will see a sum of money, and the test-send landed the same way.
     for (const [slug, vars] of Object.entries(TEMPLATE_VARIABLE_CONTRACT)) {
-      const sample = getSampleDataForVariables([...vars]);
       for (const v of vars) {
-        expect(typeof sample[v], `${slug}.${v}`).toBe("string");
+        expect(defaultTemplateSampleData[v], `${slug}.${v}`).toBeTruthy();
       }
     }
   });
@@ -441,5 +444,25 @@ describe("deleting a template", () => {
 
     expect(body.items.map((t) => t.id)).not.toContain("email-doomed");
     expect(body.knownIds).toContain("email-doomed");
+  });
+});
+
+describe("slug validation reaches BOTH template screens", () => {
+  it.each([
+    ["Email Templates", "apps/admin/communications/pages/email-templates-admin-page.tsx"],
+    ["WhatsApp Templates", "apps/admin/communications/pages/whatsapp-templates-admin-page.tsx"],
+  ])("%s checks the slug and blocks the save", (_name, file) => {
+    // The email screen got this and the WhatsApp one did not on the first pass,
+    // which would have left a collection of malformed and duplicate keys for
+    // whoever wires a provider — the same silent-fallback bug, on data admitted
+    // years earlier.
+    const src = source(file);
+    expect(src).toContain("validateSlug(");
+    expect(src).toContain("slugProblem.message");
+    expect(src).toMatch(/disabled=\{[^}]*Boolean\(slugProblem\)/);
+    // And the SAVE ITSELF, not only the button. A disabled button is a
+    // suggestion — every other handler on these pages guards its own entry, and
+    // without this line the assertion passed with the guard deleted.
+    expect(src).toMatch(/if \(slugProblem\) \{/);
   });
 });

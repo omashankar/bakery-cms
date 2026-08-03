@@ -19,6 +19,7 @@ import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-s
 import { TemplatePreviewPanel } from "@/apps/admin/communications/components/template-preview-panel";
 import { TemplateStatusBadge } from "@/apps/admin/communications/components/template-status-badge";
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
+import { validateSlug } from "@/features/communications/lib/template-contract";
 import { WhatsAppTemplatePreviewDialog } from "@/apps/admin/communications/components/whatsapp-template-preview-dialog";
 import { WhatsAppTemplateTestSendDialog } from "@/apps/admin/communications/components/whatsapp-template-test-send-dialog";
 import {
@@ -195,6 +196,23 @@ export function WhatsAppTemplatesAdminPage() {
     draftOriginRef.current = draftOrigin;
   }, [draftOrigin]);
 
+  /**
+   * Checked here too, even though nothing sends a WhatsApp template yet.
+   *
+   * The email screen got this and this one did not, which would have left a
+   * collection full of malformed and duplicate keys for whoever wires a
+   * provider — at which point it becomes the same silent-fallback bug the
+   * email side was just fixed for, on data that was allowed in years earlier.
+   * Nothing is locked here, because no slug is wired.
+   */
+  const slugProblem = draft
+    ? validateSlug(
+        draft.slug,
+        savedSelected?.slug ?? draft.slug,
+        templates.filter((t) => t.id !== draft.id).map((t) => t.slug),
+      )
+    : null;
+
   const isDirty =
     !!draft &&
     !!savedSelected &&
@@ -245,6 +263,10 @@ export function WhatsAppTemplatesAdminPage() {
     if (!draft) return;
     if (!draft.name.trim() || !draft.slug.trim() || !draft.body.trim()) {
       toast.error("Name, slug, and message body are required");
+      return;
+    }
+    if (slugProblem) {
+      toast.error("Fix the slug first", { description: slugProblem.message });
       return;
     }
     const { id, createdAt, updatedAt, ...data } = draft;
@@ -578,7 +600,7 @@ export function WhatsAppTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty || hydration !== "ready"}
+                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem)}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -601,7 +623,13 @@ export function WhatsAppTemplatesAdminPage() {
                         id="wa-slug"
                         value={draft.slug}
                         onChange={(event) => patchDraft({ slug: event.target.value })}
+                        aria-invalid={Boolean(slugProblem)}
                       />
+                      {slugProblem ? (
+                        <p className="text-xs text-destructive" role="alert">
+                          {slugProblem.message}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="wa-description">Description</Label>
