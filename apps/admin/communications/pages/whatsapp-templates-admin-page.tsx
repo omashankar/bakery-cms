@@ -665,6 +665,7 @@ export function WhatsAppTemplatesAdminPage() {
 
                   <TemplateVariableChips
                     variables={draft.variables}
+                    slug={draft.slug}
                     onInsert={insertVariable}
                   />
                 </CardContent>

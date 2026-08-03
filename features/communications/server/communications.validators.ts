@@ -21,9 +21,24 @@ const whatsappTemplateSchema = z
   })
   .passthrough();
 
+/**
+ * A save may send the bare array (an older client) or `{ items, knownIds }`.
+ *
+ * `knownIds` is the ids the caller BELIEVED existed before its edit. A
+ * replace-all otherwise asserts "these are all the templates there are", so a
+ * save from a tab opened an hour ago deleted every template another admin had
+ * added since — both saves reporting success. Delivery zones send the same
+ * thing for the same reason.
+ */
+const withKnownIds = <T extends z.ZodTypeAny>(item: T) =>
+  z.union([
+    z.array(item),
+    z.object({ items: z.array(item), knownIds: z.array(z.string()) }),
+  ]);
+
 export const templateSchemas = {
-  "email-templates": z.array(emailTemplateSchema),
-  "whatsapp-templates": z.array(whatsappTemplateSchema),
+  "email-templates": withKnownIds(emailTemplateSchema),
+  "whatsapp-templates": withKnownIds(whatsappTemplateSchema),
 } as const;
 
 export const notificationSettingsSchema = z.object({

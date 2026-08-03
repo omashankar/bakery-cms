@@ -120,11 +120,32 @@ function writeTemplates(templates: WhatsAppTemplateRecord[]): void {
  * on a refusal instead of quietly losing it. `delivery-zones-repository.ts`
  * does the same, including the concurrency guard below.
  */
+/**
+ * The ids in a raw cache snapshot.
+ *
+ * Read from the snapshot taken BEFORE the write, not from the outgoing list:
+ * a delete would otherwise report only the survivors as "known" and the
+ * server would never remove the one that was dropped.
+ */
+function readIds(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as { id?: string }[];
+    return Array.isArray(parsed)
+      ? parsed.map((item) => item?.id).filter((id): id is string => Boolean(id))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 async function persistAndSync(templates: WhatsAppTemplateRecord[]): Promise<boolean> {
   const previous = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
 
+  const knownIds = readIds(previous);
+
   writeTemplates(templates);
-  const accepted = await replaceWhatsAppTemplatesRequest(templates);
+  const accepted = await replaceWhatsAppTemplatesRequest(templates, knownIds);
 
   // Roll back ONLY if this write is still the one in the cache. Restoring the
   // entry snapshot unconditionally would undo a concurrent save the server had

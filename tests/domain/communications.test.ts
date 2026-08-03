@@ -17,10 +17,17 @@ import {
 } from "@/apps/admin/communications/lib/communications-api";
 import {
   createEmailTemplate,
+  deleteEmailTemplate,
   loadEmailTemplates,
   persistServerEmailTemplates,
   saveEmailTemplate,
 } from "@/apps/admin/communications/lib/email-templates-repository";
+import {
+  availableVariablesFor,
+  TEMPLATE_VARIABLE_CONTRACT,
+  validateSlug,
+} from "@/features/communications/lib/template-contract";
+import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
 
 function source(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -106,7 +113,12 @@ describe("a template mutation composes its payload AFTER hydration", () => {
     await pending;
 
     const sent = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse((sent[1] as RequestInit).body as string) as { id: string }[];
+    const raw = JSON.parse((sent[1] as RequestInit).body as string) as
+      | { id: string }[]
+      | { items: { id: string }[]; knownIds: string[] };
+    // Either envelope — the payload gained `knownIds` so the server can delete
+    // only what this admin actually removed.
+    const body = Array.isArray(raw) ? raw : raw.items;
 
     // The shop's real template must be in the payload. Composing before the
     // gate opened would have sent the six demo seeds and none of it.
@@ -316,5 +328,118 @@ describe("a refused write is reported as a refusal", () => {
     // matching it last found the CLOSING tag (slice = nothing after it).
     const mobile = code.slice(code.indexOf("<AdminMobileActionBar"));
     expect(mobile).toContain('disabled={hydration !== "ready"}');
+  });
+});
+
+describe("the slug is the key a sender matches on", () => {
+  it("locks the slug of a template the shop actually sends", () => {
+    // Renaming one does not break loudly: `findTemplate` simply stops matching
+    // and the hardcoded fallback goes out instead, so the admin's own wording
+    // quietly stops reaching anyone.
+    const problem = validateSlug("order_confirmation_v2", "order_confirmation", []);
+    expect(problem?.locked).toBe(true);
+  });
+
+  it("refuses a duplicate, because sending would pick one at random", () => {
+    // `findTemplate` takes the FIRST active match.
+    expect(validateSlug("promo_summer", "promo_old", ["promo_summer"])?.locked).toBe(false);
+    expect(validateSlug("promo_summer", "promo_old", ["promo_summer"])).not.toBeNull();
+  });
+
+  it("refuses a custom template claiming a slug the shop sends", () => {
+    // The hijack: add a template, name it `order_confirmation`, and take over
+    // the shop's real order confirmation.
+    expect(validateSlug("order_confirmation", "promo_old", [])).not.toBeNull();
+  });
+
+  it("refuses a slug that could never match anything", () => {
+    for (const bad of [" order_confirmation ", "Order_Confirmation", "order-confirmation", ""]) {
+      expect(validateSlug(bad, "promo_old", [])).not.toBeNull();
+    }
+  });
+
+  it("accepts an ordinary new slug", () => {
+    expect(validateSlug("summer_promo", "promo_old", ["other_slug"])).toBeNull();
+  });
+});
+
+describe("the variables an admin is offered", () => {
+  it("offers only what the sender for that template supplies", () => {
+    // The chips were built from every common variable regardless of template, so
+    // the password-reset editor advertised {{order_total}}. Insert it, watch the
+    // preview render it happily from sample data, and the customer receives the
+    // literal text — `renderTemplate` leaves an unresolved key as written.
+    const reset = availableVariablesFor("password_reset", []);
+    expect(reset).toContain("reset_code");
+    expect(reset).not.toContain("order_total");
+
+    const confirmation = availableVariablesFor("order_confirmation", []);
+    expect(confirmation).toContain("order_total");
+    expect(confirmation).not.toContain("reset_code");
+  });
+
+  it("falls back to the template's own list when nothing sends it", () => {
+    expect(availableVariablesFor("promo_custom", ["coupon_code"])).toEqual(["coupon_code"]);
+  });
+
+  it("every contract variable has preview sample data", () => {
+    // A contract variable with no sample renders as a literal in the preview AND
+    // in the real test-send, which is the one place an admin would have caught
+    // the mismatch.
+    for (const [slug, vars] of Object.entries(TEMPLATE_VARIABLE_CONTRACT)) {
+      const sample = getSampleDataForVariables([...vars]);
+      for (const v of vars) {
+        expect(typeof sample[v], `${slug}.${v}`).toBe("string");
+      }
+    }
+  });
+});
+
+describe("two admins editing templates at once", () => {
+  it("sends the ids it knew about, so the server deletes only what was removed", async () => {
+    // A whole-collection write otherwise means "these are all the templates
+    // there are", so a save from a tab opened an hour ago deleted every
+    // template another admin had added since — both saves reporting success.
+    emailTemplatesHydration.markSettled();
+    persistServerEmailTemplates(SERVER_TEMPLATES as never);
+    mockServer(true);
+
+    await saveEmailTemplate("email-real", {
+      ...SERVER_TEMPLATES[0],
+      subject: "Edited",
+    } as never);
+
+    const sent = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((sent[1] as RequestInit).body as string) as {
+      knownIds?: string[];
+    };
+    expect(body.knownIds).toEqual(["email-real"]);
+  });
+});
+
+describe("deleting a template", () => {
+  it("still tells the server the id it removed", async () => {
+    // `knownIds` has to come from the cache snapshot taken BEFORE the write,
+    // not from the outgoing list. Reading it from what is being sent would
+    // report only the survivors as known — and the server, told nothing was
+    // removed, would keep the deleted template forever while the admin was
+    // shown a successful delete.
+    emailTemplatesHydration.markSettled();
+    persistServerEmailTemplates([
+      ...SERVER_TEMPLATES,
+      { ...SERVER_TEMPLATES[0], id: "email-doomed", slug: "promo_old" },
+    ] as never);
+    mockServer(true);
+
+    await deleteEmailTemplate("email-doomed");
+
+    const sent = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((sent[1] as RequestInit).body as string) as {
+      items: { id: string }[];
+      knownIds: string[];
+    };
+
+    expect(body.items.map((t) => t.id)).not.toContain("email-doomed");
+    expect(body.knownIds).toContain("email-doomed");
   });
 });

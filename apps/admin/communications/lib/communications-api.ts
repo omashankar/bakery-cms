@@ -90,12 +90,34 @@ const WHATSAPP_PATH = "/api/communications/templates/whatsapp-templates";
 const NOTIFICATION_SETTINGS_PATH = "/api/communications/notification-settings";
 
 export const fetchEmailTemplates = () => getJson<EmailTemplateRecord[]>(EMAIL_PATH);
-export const replaceEmailTemplatesRequest = (items: EmailTemplateRecord[]) =>
-  guardedPut(emailTemplatesHydration, EMAIL_PATH, items);
+/**
+ * `knownIds` is the ids this browser BELIEVED existed before its edit.
+ *
+ * A replace-all otherwise asserts "these are all the templates there are", so
+ * a save from a tab opened an hour ago deleted every template another admin
+ * had added since — both saves reporting success, with nothing left to show
+ * the missing ones had existed. Delivery zones send the same thing.
+ */
+export const replaceEmailTemplatesRequest = (
+  items: EmailTemplateRecord[],
+  knownIds?: string[],
+) =>
+  guardedPut(
+    emailTemplatesHydration,
+    EMAIL_PATH,
+    knownIds ? { items, knownIds } : items,
+  );
 
 export const fetchWhatsAppTemplates = () => getJson<WhatsAppTemplateRecord[]>(WHATSAPP_PATH);
-export const replaceWhatsAppTemplatesRequest = (items: WhatsAppTemplateRecord[]) =>
-  guardedPut(whatsappTemplatesHydration, WHATSAPP_PATH, items);
+export const replaceWhatsAppTemplatesRequest = (
+  items: WhatsAppTemplateRecord[],
+  knownIds?: string[],
+) =>
+  guardedPut(
+    whatsappTemplatesHydration,
+    WHATSAPP_PATH,
+    knownIds ? { items, knownIds } : items,
+  );
 
 export const fetchNotificationSettings = () =>
   getJson<NotificationSettings>(NOTIFICATION_SETTINGS_PATH);

@@ -24,12 +24,23 @@ export const replaceTemplatesController = withErrorHandler(async (request: Reque
   const schema = templateSchemas[key as keyof typeof templateSchemas];
   if (!schema) throw new NotFoundError("Unknown template collection");
 
-  const items = validate(schema, await readJson(request));
-  const result = await service.replaceTemplates(key, items, {
-    ...requestContext(request),
-    actorId: session.sub,
-    actorEmail: session.email,
-  });
+  const parsed = validate(schema, await readJson(request));
+  // Either shape: a bare array from an older client, or the newer
+  // `{ items, knownIds }` that lets the server delete only what this admin
+  // actually removed rather than everything it did not send.
+  const items = Array.isArray(parsed) ? parsed : parsed.items;
+  const knownIds = Array.isArray(parsed) ? undefined : parsed.knownIds;
+
+  const result = await service.replaceTemplates(
+    key,
+    items,
+    {
+      ...requestContext(request),
+      actorId: session.sub,
+      actorEmail: session.email,
+    },
+    knownIds,
+  );
   return ok(result, `${key} saved`);
 });
 

@@ -22,6 +22,10 @@ import { TemplatePreviewPanel } from "@/apps/admin/communications/components/tem
 import { TemplateStatusBadge } from "@/apps/admin/communications/components/template-status-badge";
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
 import {
+  isSendableSlug,
+  validateSlug,
+} from "@/features/communications/lib/template-contract";
+import {
   createEmailTemplate,
   deleteEmailTemplate,
   EMAIL_TEMPLATES_UPDATED_EVENT,
@@ -193,6 +197,20 @@ export function EmailTemplatesAdminPage() {
     draftOriginRef.current = draftOrigin;
   }, [draftOrigin]);
 
+  /**
+   * The slug is the KEY a sender matches on, so it is checked live rather
+   * than at save time — an admin who types over `order_confirmation` should
+   * be told immediately, not after the copy customers receive has changed.
+   */
+  const slugProblem = draft
+    ? validateSlug(
+        draft.slug,
+        savedSelected?.slug ?? draft.slug,
+        templates.filter((t) => t.id !== draft.id).map((t) => t.slug),
+      )
+    : null;
+  const slugLocked = Boolean(draft && isSendableSlug(savedSelected?.slug ?? draft.slug));
+
   const isDirty =
     !!draft &&
     !!savedSelected &&
@@ -245,6 +263,10 @@ export function EmailTemplatesAdminPage() {
     if (!draft) return;
     if (!draft.name.trim() || !draft.slug.trim() || !draft.subject.trim()) {
       toast.error("Name, slug, and subject are required");
+      return;
+    }
+    if (slugProblem) {
+      toast.error("Fix the slug first", { description: slugProblem.message });
       return;
     }
     const { id, createdAt, updatedAt, ...data } = draft;
@@ -560,7 +582,7 @@ export function EmailTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty || hydration !== "ready"}
+                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem)}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -583,7 +605,25 @@ export function EmailTemplatesAdminPage() {
                         id="template-slug"
                         value={draft.slug}
                         onChange={(event) => patchDraft({ slug: event.target.value })}
+                        // Read-only for the templates the shop actually sends.
+                        // Renaming one does not break loudly: `findTemplate`
+                        // simply stops matching and the hardcoded fallback goes
+                        // out instead, so the admin's own wording quietly stops
+                        // reaching anyone.
+                        readOnly={slugLocked}
+                        aria-invalid={Boolean(slugProblem)}
+                        className={slugLocked ? "bg-muted" : undefined}
                       />
+                      {slugLocked ? (
+                        <p className="text-xs text-muted-foreground">
+                          This email is sent by the shop — its slug is fixed. The wording
+                          above is yours to change.
+                        </p>
+                      ) : slugProblem ? (
+                        <p className="text-xs text-destructive" role="alert">
+                          {slugProblem.message}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="template-description">Description</Label>
@@ -664,6 +704,7 @@ export function EmailTemplatesAdminPage() {
 
                   <TemplateVariableChips
                     variables={draft.variables}
+                    slug={draft.slug}
                     onInsert={insertVariable}
                   />
                 </CardContent>

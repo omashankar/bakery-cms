@@ -44,13 +44,38 @@ export function getTemplates(key: string) {
   return templateStoreFor(key).read();
 }
 
+/**
+ * Saves a template collection, deleting only what the caller actually removed.
+ *
+ * `knownIds` is the ids the caller believed existed before its edit. Without
+ * it a whole-collection write means "these are all the templates there are",
+ * so a save from a tab opened an hour ago silently deleted every template
+ * another admin had added since — and both admins were told it worked, with
+ * nothing to show the missing ones had ever existed. Delivery zones solved
+ * this the same way.
+ *
+ * A caller that sends no `knownIds` is an older client, and then nothing
+ * outside its list is touched — the safe reading.
+ */
 export async function replaceTemplates(
   key: string,
   items: unknown[],
   ctx: { ip: string; userAgent: string; actorId?: string | null; actorEmail?: string },
+  knownIds?: string[],
 ) {
   const store = templateStoreFor(key);
-  await store.write(items as never);
+
+  const incoming = items as { id?: string }[];
+  const keepIds = new Set(incoming.map((item) => item.id).filter(Boolean));
+  const removedIds = new Set((knownIds ?? []).filter((id) => !keepIds.has(id)));
+
+  const stored = ((await store.read()) ?? []) as { id?: string }[];
+  // Anything the caller never knew about is left exactly where it is.
+  const untouched = stored.filter(
+    (item) => item.id && !keepIds.has(item.id) && !removedIds.has(item.id),
+  );
+
+  await store.write([...incoming, ...untouched] as never);
   await writeAuditLog({
     action: `communications.${key}.replace`,
     actorId: ctx.actorId ?? null,
