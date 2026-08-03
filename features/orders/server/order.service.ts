@@ -599,7 +599,65 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     );
   }
 
+  // And tell the BAKERY.
+  //
+  // Nothing did. The customer got a confirmation, the order appeared in an admin
+  // screen nobody had open, and a cake needed baking by Saturday — the system
+  // was silent towards the only people who could act on it. Best effort and
+  // never allowed to fail the placement, exactly like the customer's copy.
+  await notifyShopOfOrder(placed, settings, currency, base);
+
   return placed;
+}
+
+/**
+ * Emails the shop its own new order.
+ *
+ * Goes to the CONTACT email the shop has already published on its site — the
+ * one place an address for the bakery itself is configured. No address means no
+ * notification rather than a guess: mailing the from-address instead would send
+ * a noreply@ mailbox a message nobody reads.
+ */
+async function notifyShopOfOrder(
+  order: PlacedOrder,
+  settings: Record<string, unknown>,
+  currency: string | undefined,
+  base: string,
+): Promise<void> {
+  const shopEmail = ((settings.contact ?? {}) as { email?: string }).email?.trim();
+  if (!shopEmail) return;
+
+  const items = order.items
+    .map((item) => `  ${item.quantity} x ${item.name}`)
+    .join("\n");
+
+  const mail = await sendTemplatedEmail("admin_new_order", shopEmail, {
+    order_number: order.orderNumber,
+    order_total: formatCurrency(order.totals.total, currency),
+    customer_name: order.address.fullName,
+    customer_phone: order.address.phone,
+    payment_method: order.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
+    delivery_date: order.deliverySlot?.date
+      ? `${order.deliverySlot.date}${order.deliverySlot.timeSlot ? `, ${order.deliverySlot.timeSlot}` : ""}`
+      : new Date(order.estimatedDelivery).toDateString(),
+    delivery_address: [
+      order.address.addressLine1,
+      order.address.addressLine2,
+      `${order.address.city} ${order.address.pincode}`,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    order_items: items,
+    admin_url: base
+      ? `${base}${routes.admin.orders.detail(order.id)}`
+      : "Open the admin to see it.",
+  });
+
+  if (!mail.sent) {
+    console.error(
+      `[orders] Could not notify the shop about ${order.orderNumber}: ${mail.error}`,
+    );
+  }
 }
 
 async function refreshStockStatuses(slugs: string[]): Promise<void> {
@@ -668,7 +726,72 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
     statusHistory: [...order.statusHistory, { status, at: now }],
   });
   await audit(ctx, "order.status", id, { status });
+
+  // Tell the customer their cake has left the bakery.
+  //
+  // The `order_shipped` template was seeded ACTIVE and shown in the template
+  // editor, and nothing sent it — an admin could word it carefully and no
+  // customer would ever see it. This is the moment it describes, and it is the
+  // one status change a customer genuinely wants to hear about: the confirmation
+  // told them it was coming, and until now nothing told them it was on the way.
+  //
+  // Awaited but never allowed to fail the status change: the cake is already out
+  // for delivery, and reporting that as a failure would have an admin set the
+  // status twice.
+  if (status === "out_for_delivery" && updated) {
+    await notifyOutForDelivery(updated);
+  }
+
   return updated;
+}
+
+/**
+ * Sends the customer their invoice, on request.
+ *
+ * The storefront button for this was a toast saying the feature awaited a
+ * backend that already existed. The link is absolute and degrades to prose when
+ * no public origin is configured, exactly like the confirmation email — a
+ * relative path in an email goes nowhere.
+ */
+export async function emailInvoice(order: PlacedOrder): Promise<{ sent: boolean; error?: string }> {
+  const settings = (await getSettings()) as Record<string, unknown>;
+  const currency = ((settings.general ?? {}) as GeneralSettings).currency;
+  const base = await publicBaseUrl();
+
+  return sendTemplatedEmail("invoice", order.address.email, {
+    customer_name: order.address.fullName?.trim() || "there",
+    order_number: order.orderNumber,
+    order_total: formatCurrency(order.totals.total, currency),
+    order_date: new Date(order.placedAt).toDateString(),
+    invoice_url: base
+      ? `${base}${routes.store.orderDetail(order.orderNumber)}/invoice`
+      : "Reply to this email and we will send your invoice as a PDF.",
+  });
+}
+
+async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
+  const address = [
+    order.address.addressLine1,
+    order.address.addressLine2,
+    `${order.address.city} ${order.address.pincode}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const mail = await sendTemplatedEmail("order_shipped", order.address.email, {
+    customer_name: order.address.fullName?.trim() || "there",
+    order_number: order.orderNumber,
+    delivery_date: order.deliverySlot?.date
+      ? `${order.deliverySlot.date}${order.deliverySlot.timeSlot ? `, ${order.deliverySlot.timeSlot}` : ""}`
+      : new Date(order.estimatedDelivery).toDateString(),
+    delivery_address: address,
+  });
+
+  if (!mail.sent) {
+    console.error(
+      `[orders] Could not send the out-for-delivery email for ${order.orderNumber}: ${mail.error}`,
+    );
+  }
 }
 
 /**

@@ -1,11 +1,11 @@
 import { ok } from "@/lib/server/http/response";
-import { withErrorHandler, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./communications.service";
-import { templateSchemas, notificationSettingsSchema } from "./communications.validators";
+import { templateSchemas, notificationSettingsSchema, templateTestSchema } from "./communications.validators";
 
 const COMMS_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
@@ -47,4 +47,32 @@ export const saveNotificationSettingsController = withErrorHandler(async (reques
     actorEmail: session.email,
   });
   return ok(result, "Notification settings saved");
+});
+
+/**
+ * Sends a real test of one email template to the signed-in admin.
+ *
+ * The dialog behind this awaited a 900ms timer and toasted "Test email queued
+ * (demo)" — while a working transport, a real SMTP test endpoint and the
+ * template itself all already existed. An admin could word a template, "test"
+ * it, be told it worked, and discover on the next real order that it did not.
+ *
+ * The recipient is the caller's own session address and is NOT read from the
+ * body. The dialog offered a free-text recipient box, and honouring that would
+ * have turned an admin convenience into a way to send arbitrary mail from the
+ * shop's domain to anyone — the same reason the SMTP test only mails the caller.
+ *
+ * Rendered with `getSampleDataForVariables`, so what lands in the inbox is what
+ * the admin was shown in the live preview.
+ */
+export const sendTemplateTestController = withErrorHandler(async (request: Request) => {
+  const session = await requireRole(...COMMS_ROLES);
+  const { slug } = validate(templateTestSchema, await readJson(request));
+
+  const result = await service.sendTemplateTest(slug, session.email);
+  if (!result.sent) {
+    throw new AppError(result.error ?? "Could not send the test email", 502);
+  }
+
+  return ok({ to: session.email }, "Test email sent");
 });

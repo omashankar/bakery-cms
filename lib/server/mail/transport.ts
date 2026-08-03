@@ -76,6 +76,12 @@ function build(smtp: SmtpSettings): MailTransport {
     // otherwise-correct SMTP config appears broken.
     secure,
     requireTLS: smtp.encryption === "tls",
+    // "None" has to actually mean none. Without this nodemailer still upgrades
+    // opportunistically whenever the server advertises STARTTLS, so an admin who
+    // picked "None" — which in practice means a local relay, Mailpit, or an
+    // internal host with a self-signed certificate — got a TLS handshake anyway
+    // and a certificate error they had explicitly asked to avoid.
+    ignoreTLS: smtp.encryption === "none",
     auth: smtp.password ? { user: smtp.username, pass: smtp.password } : undefined,
     // A queued admin action must not hold a request open indefinitely.
     connectionTimeout: 10_000,

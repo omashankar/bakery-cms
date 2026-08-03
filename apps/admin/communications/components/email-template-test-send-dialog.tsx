@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
 import { renderTemplate } from "@/lib/template-render";
 import { getSmtpSettings } from "@/features/settings/lib/settings-repository";
+import { sendTemplateTestRequest } from "@/apps/admin/communications/lib/communications-api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import type { EmailTemplateRecord } from "@/types/communication";
@@ -30,14 +30,12 @@ export function EmailTemplateTestSendDialog({
   template,
   onOpenChange,
 }: EmailTemplateTestSendDialogProps) {
-  const [to, setTo] = useState("demo@bakery.test");
   const [sending, setSending] = useState(false);
   const [smtpEnabled, setSmtpEnabled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setSmtpEnabled(getSmtpSettings().enabled);
-    setTo("demo@bakery.test");
   }, [open]);
 
   const preview = useMemo(() => {
@@ -57,17 +55,18 @@ export function EmailTemplateTestSendDialog({
       });
       return;
     }
-    if (!to.trim()) {
-      toast.error("Enter a recipient email");
+    setSending(true);
+    const result = await sendTemplateTestRequest(template.slug);
+    setSending(false);
+
+    if (!result.sent) {
+      toast.error("Could not send the test email", { description: result.error });
       return;
     }
 
-    setSending(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setSending(false);
     onOpenChange(false);
-    toast.success("Test email queued (demo)", {
-      description: `${template.name} → ${to.trim()}`,
+    toast.success("Test email sent", {
+      description: `${template.name} → ${result.to}`,
     });
   }
 
@@ -97,14 +96,16 @@ export function EmailTemplateTestSendDialog({
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="test-email-to">Send to</Label>
-            <Input
-              id="test-email-to"
-              type="email"
-              value={to}
-              onChange={(event) => setTo(event.target.value)}
-              placeholder="you@example.com"
-            />
+            <Label>Send to</Label>
+            {/*
+              Not a free-text box any more. Honouring a caller-supplied
+              recipient would turn this into a way to send mail from the
+              shop's domain to anyone; the server ignores the body and mails
+              the signed-in admin, the same rule the SMTP test follows.
+            */}
+            <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Your own admin address
+            </p>
           </div>
 
           {preview ? (

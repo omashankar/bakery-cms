@@ -56,14 +56,26 @@ function scrub(message: string, secrets: string[]): string {
 }
 
 export async function sendMail(message: MailMessage): Promise<MailResult> {
-  const result = await getMailTransport();
-  if (!result.ok) {
-    return { sent: false, error: describeUnavailable(result.reason as MailUnavailableReason) };
-  }
-
-  const { transporter, from } = result.transport;
+  // Held outside the try so the catch can still scrub with it, whether the
+  // throw came from the settings read or from the send.
+  let authPassword = "";
 
   try {
+    // INSIDE the try. `getMailTransport` reads the settings from Mongo, so it
+    // rejects whenever the database is unreachable — and this function's own
+    // contract says it never throws. It sat outside, so a Mongo blip during
+    // checkout threw out of the confirmation email and into the order-placement
+    // request, turning "the customer did not get an email" into "the order
+    // failed" for an order that had already been paid for and stored.
+    const result = await getMailTransport();
+    if (!result.ok) {
+      return { sent: false, error: describeUnavailable(result.reason as MailUnavailableReason) };
+    }
+
+    const { transporter, from } = result.transport;
+    authPassword =
+      (transporter.options as { auth?: { pass?: string } }).auth?.pass ?? "";
+
     await transporter.sendMail({
       from,
       to: message.to,
@@ -76,8 +88,7 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
   } catch (error) {
     const raw = error instanceof Error ? error.message : "The mail server rejected the message.";
     // The auth password can appear verbatim in a nodemailer auth failure.
-    const auth = (transporter.options as { auth?: { pass?: string } }).auth;
-    const safe = scrub(raw, [auth?.pass ?? ""]);
+    const safe = scrub(raw, [authPassword]);
 
     console.error(`[mail] send failed: ${safe}`);
     return { sent: false, error: safe };
@@ -90,17 +101,25 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
  * success without a network call of any kind.
  */
 export async function verifyMailConnection(): Promise<MailResult> {
-  const result = await getMailTransport();
-  if (!result.ok) {
-    return { sent: false, error: describeUnavailable(result.reason as MailUnavailableReason) };
-  }
+  // Same reasoning as `sendMail`: the settings read is I/O and can reject, and
+  // this is the function behind a button an admin presses to DIAGNOSE a problem.
+  // Throwing a raw database error at them from a connection test is the least
+  // useful moment for it.
+  let authPassword = "";
 
   try {
+    const result = await getMailTransport();
+    if (!result.ok) {
+      return { sent: false, error: describeUnavailable(result.reason as MailUnavailableReason) };
+    }
+
+    authPassword =
+      (result.transport.transporter.options as { auth?: { pass?: string } }).auth?.pass ?? "";
+
     await result.transport.transporter.verify();
     return { sent: true };
   } catch (error) {
     const raw = error instanceof Error ? error.message : "Could not reach the mail server.";
-    const auth = (result.transport.transporter.options as { auth?: { pass?: string } }).auth;
-    return { sent: false, error: scrub(raw, [auth?.pass ?? ""]) };
+    return { sent: false, error: scrub(raw, [authPassword]) };
   }
 }

@@ -6,7 +6,7 @@ import { ArrowLeft, FileText, Mail, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { canViewOrder, readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
+import { emailInvoiceRequest, fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import {
   getOrderByNumber,
   type PlacedOrder,
@@ -39,6 +39,7 @@ export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePa
   const [labels, setLabels] = useState({ tax: "", platform: "", giftwrap: "", taxRate: 0 });
   const [ready, setReady] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [emailing, setEmailing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +91,30 @@ export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePa
     if (!printing) return;
     return runBrowserPrint(() => setPrinting(false));
   }, [printing]);
+
+  /**
+   * Really sends it now.
+   *
+   * This was a toast reading "Emailing invoices will be enabled with the
+   * backend" — while the mail transport, the `invoice` template (seeded active
+   * and editable in the admin) and the order lookup it needs all already
+   * existed. The recipient is decided by the SERVER from the order, so the
+   * button cannot be used to mail anyone else.
+   */
+  async function handleEmailInvoice() {
+    if (!order || emailing) return;
+    setEmailing(true);
+    const result = await emailInvoiceRequest(order.orderNumber, {
+      email: readOrderLookupEmail(order.orderNumber) ?? getCustomerSession()?.email,
+    });
+    setEmailing(false);
+
+    if (!result.sent) {
+      toast.error("Could not email the invoice", { description: result.error });
+      return;
+    }
+    toast.success("Invoice sent", { description: `Check ${order.address.email}.` });
+  }
 
   if (!ready) {
     return (
@@ -150,16 +175,9 @@ export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePa
               Back to order
             </Button>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  toast.message("Email invoice", {
-                    description: "Emailing invoices will be enabled with the backend.",
-                  })
-                }
-              >
+              <Button variant="outline" onClick={() => void handleEmailInvoice()} disabled={emailing}>
                 <Mail className="size-4" />
-                Email invoice
+                {emailing ? "Sending…" : "Email invoice"}
               </Button>
               <Button variant="bakery" onClick={() => setPrinting(true)}>
                 <Printer className="size-4" />

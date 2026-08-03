@@ -6,6 +6,9 @@
  * a perfectly configured mail server: a link nobody can open, and a credential
  * that should never have been in a browser.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -107,5 +110,76 @@ describe("the mail password at the HTTP boundary", () => {
       smtp: { passwordSet: boolean };
     };
     expect(out.smtp.passwordSet).toBe(false);
+  });
+});
+
+describe("every seeded template either has a sender or admits it does not", () => {
+  it("wires the slugs the admin can edit to something that actually sends them", async () => {
+    const { seedEmailTemplates } = await import(
+      "@/apps/admin/communications/lib/email-templates-repository"
+    );
+    const senders = readFileSync(
+      join(process.cwd(), "features/communications/server/email.service.ts"),
+      "utf8",
+    );
+
+    // `order_shipped` and `invoice` were seeded ACTIVE and shown in the template
+    // editor while nothing sent them — an admin could word an out-for-delivery
+    // email that no customer would ever receive. Anything ACTIVE has to be
+    // sendable; a template that is genuinely not built yet belongs in `draft`,
+    // which is what the editor already uses to mean "work in progress".
+    const active = seedEmailTemplates().filter((t) => t.status === "active");
+    expect(active.length).toBeGreaterThan(0);
+
+    // `EmailTemplateSlug` is the union `sendTemplatedEmail` accepts, so
+    // membership of it IS the question "can anything send this?".
+    //
+    // The first version of this check built a RegExp per slug and the heredoc
+    // that wrote it ate the leading backslash, leaving a pattern starting with
+    // `|` — an empty alternative, which matches everything. It passed while
+    // `welcome` was still unsendable. Reading the union is not clever, and that
+    // is the point.
+    const union = senders.slice(
+      senders.indexOf("export type EmailTemplateSlug"),
+      senders.indexOf(";", senders.indexOf("export type EmailTemplateSlug")),
+    );
+    expect(union).toContain("order_confirmation");
+
+    const unsendable = active
+      .map((t) => t.slug)
+      .filter((slug) => !union.includes(`"${slug}"`));
+
+    expect(unsendable).toEqual([]);
+  });
+});
+
+describe("the template test-send", () => {
+  it("never takes its recipient from the caller", () => {
+    const controller = readFileSync(
+      join(process.cwd(), "features/communications/server/communications.controller.ts"),
+      "utf8",
+    );
+    // A free-text recipient would make this a way to send mail from the shop's
+    // domain to anyone. The SMTP test already made this decision; the template
+    // test now follows it.
+    expect(controller).toContain("service.sendTemplateTest(slug, session.email)");
+
+    const validator = readFileSync(
+      join(process.cwd(), "features/communications/server/communications.validators.ts"),
+      "utf8",
+    );
+    // The schema accepts a slug and nothing else, so there is no recipient field
+    // to smuggle one through.
+    expect(validator).toMatch(/templateTestSchema = z\.object\(\{\s*slug:/);
+  });
+
+  it("renders through the same escaping a real send uses", () => {
+    const service = readFileSync(
+      join(process.cwd(), "features/communications/server/communications.service.ts"),
+      "utf8",
+    );
+    // Two escaping implementations would mean the test proving something other
+    // than what the customer receives.
+    expect(service).toContain("toEmailHtml(");
   });
 });

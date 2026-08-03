@@ -8,6 +8,10 @@ import type {
   WhatsAppTemplateRecord,
 } from "@/types/communication";
 import type { NotificationSettings } from "@/types/notification";
+import { sendMail } from "@/lib/server/mail/send-mail";
+import { toEmailHtml } from "./email.service";
+import { renderTemplate } from "@/lib/template-render";
+import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
 
 /**
  * Communication templates (email + WhatsApp) that were client-only localStorage
@@ -93,4 +97,27 @@ export async function saveNotificationSettings(
     userAgent: ctx.userAgent,
   });
   return notificationSettingsStore.read();
+}
+
+/**
+ * Renders one stored email template with sample data and sends it.
+ *
+ * Deliberately reads the STORED template rather than anything the caller
+ * supplies: the point of a test is to prove what a real customer would receive,
+ * so testing unsaved edits would prove the wrong thing.
+ */
+export async function sendTemplateTest(
+  slug: string,
+  to: string,
+): Promise<{ sent: boolean; error?: string }> {
+  const templates = (await getTemplates("email-templates")) as EmailTemplateRecord[];
+  const template = templates.find((item) => item.slug === slug);
+  if (!template) return { sent: false, error: "That template no longer exists." };
+
+  const sample = getSampleDataForVariables(template.variables ?? []);
+  return sendMail({
+    to,
+    subject: `[Test] ${renderTemplate(template.subject, sample)}`,
+    html: toEmailHtml(renderTemplate(template.body, sample)),
+  });
 }

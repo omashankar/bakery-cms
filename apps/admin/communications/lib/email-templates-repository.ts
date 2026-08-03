@@ -27,13 +27,21 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       id: "email-welcome",
       slug: "welcome",
       name: "Welcome email",
-      description: "Sent after a customer creates an account.",
+      // DRAFT, because there is nothing to send it. Its description said "sent
+      // after a customer creates an account" and this storefront has no account
+      // creation — customers check out as guests. It was seeded ACTIVE, so an
+      // admin could open it, word it carefully, and reasonably believe new
+      // customers were receiving it. `draft` is the editor's own word for work
+      // in progress, and `abandoned_cart` below already uses it for the same
+      // honest reason. Flip it back the day a signup flow exists.
+      description: "Not sent yet — the storefront has no customer signup flow.",
       category: "transactional",
       subject: "Welcome to {{store_name}}",
       previewText: "We're glad you're here — explore our fresh cakes.",
       body: `Hi {{customer_name}},\n\nWelcome to {{store_name}}! We're excited to help you celebrate every occasion with freshly baked cakes.\n\nBrowse collections: {{support_url}}\n\nWarm regards,\n{{store_name}} Team`,
       variables: ["customer_name", "store_name", "support_url"],
       ...base,
+      status: "draft" as const,
     },
     {
       id: "email-order-confirmation",

@@ -495,3 +495,34 @@ export const fetchTransactionsPage = (query: Record<string, unknown>) =>
     "/api/orders/transactions",
     query,
   );
+
+/**
+ * Asks the server to email the customer their own invoice.
+ *
+ * The recipient is NOT sent — the server uses the address on the order, so this
+ * cannot be turned into a way to mail arbitrary people from the shop's domain.
+ * The lookup credentials are the same ones the order page already proves
+ * ownership with.
+ */
+export async function emailInvoiceRequest(
+  orderNumber: string,
+  lookup: { email?: string; phone?: string },
+): Promise<{ sent: boolean; error?: string }> {
+  const params = new URLSearchParams();
+  if (lookup.email?.trim()) params.set("email", lookup.email.trim());
+  if (lookup.phone?.trim()) params.set("phone", lookup.phone.trim());
+
+  try {
+    const res = await fetch(
+      `/api/orders/by-number/${encodeURIComponent(orderNumber)}/email-invoice?${params.toString()}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    if (res.ok) return { sent: true };
+
+    // `message`, not `error` — that is the shape of the failure envelope.
+    const json = (await res.json().catch(() => null)) as { message?: string } | null;
+    return { sent: false, error: json?.message ?? `The server refused (${res.status}).` };
+  } catch {
+    return { sent: false, error: "Could not reach the server." };
+  }
+}

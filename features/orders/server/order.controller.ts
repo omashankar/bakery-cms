@@ -105,6 +105,51 @@ export const getByNumberController = withErrorHandler(async (request: Request, c
 });
 
 /**
+ * Emails the customer their own invoice.
+ *
+ * The storefront's "Email invoice" button toasted "Emailing invoices will be
+ * enabled with the backend" — while the backend it was waiting for already
+ * existed, and the `invoice` template was seeded ACTIVE and editable in the
+ * admin. This is that backend.
+ *
+ * It sends only to the address ON THE ORDER, never to one supplied by the
+ * caller: the same ownership rule as the lookup above, and the reason the
+ * endpoint cannot be used to mail arbitrary people from the shop's domain. The
+ * caller must already be able to prove they own the order — the exact same
+ * `verifyOrderLookup` check — or be an admin.
+ */
+export const emailInvoiceController = withErrorHandler(
+  async (request: Request, ctx: NumberContext) => {
+    const { orderNumber } = await ctx.params;
+    const order = await service.getByNumber(orderNumber);
+    if (!order) throw new NotFoundError("Order not found");
+
+    const params = new URL(request.url).searchParams;
+    const lookup = {
+      email: params.get("email") ?? undefined,
+      phone: params.get("phone") ?? undefined,
+    };
+
+    let allowed = verifyOrderLookup(order, lookup);
+    if (!allowed) {
+      const session = await getSession();
+      allowed = Boolean(
+        session && ORDER_ROLES.includes(session.role as (typeof ORDER_ROLES)[number]),
+      );
+    }
+    // Same 404 as an unknown number, for the same reason as the lookup.
+    if (!allowed) throw new NotFoundError("Order not found");
+
+    const result = await service.emailInvoice(order);
+    if (!result.sent) {
+      throw new AppError(result.error ?? "Could not send the invoice email", 502);
+    }
+
+    return ok({ to: order.address.email }, "Invoice sent");
+  },
+);
+
+/**
  * A customer's own order history.
  *
  * This was unauthenticated: anyone could pass ?email= and receive that person's

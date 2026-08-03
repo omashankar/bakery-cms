@@ -103,8 +103,15 @@ export async function sendTestEmailRequest(): Promise<TestEmailResult> {
     const res = await fetch("/api/settings/smtp/test", { method: "POST" });
     if (res.ok) return { sent: true };
 
-    const json = (await res.json().catch(() => null)) as { error?: string } | null;
-    return { sent: false, error: json?.error ?? `The server refused (${res.status}).` };
+    // `message`, not `error`. The failure envelope is
+    // `{ success, message, errors }` (lib/server/http/response.ts `fail`), so
+    // reading `.error` found nothing every time and the admin was shown
+    // "The server refused (502)." instead of the provider's actual words —
+    // "Invalid login: 535 authentication failed", "connect ETIMEDOUT" — which
+    // are the only thing that says WHICH setting is wrong. The controller goes
+    // to the trouble of putting the scrubbed provider text in there.
+    const json = (await res.json().catch(() => null)) as { message?: string } | null;
+    return { sent: false, error: json?.message ?? `The server refused (${res.status}).` };
   } catch {
     return { sent: false, error: "Could not reach the server." };
   }

@@ -32,3 +32,8 @@ export const notificationSettingsSchema = z.object({
   stockAlerts: z.boolean(),
   inquiryAlerts: z.boolean(),
 });
+
+/** The template to test-send. The recipient is never taken from the caller. */
+export const templateTestSchema = z.object({
+  slug: z.string().trim().min(1),
+});

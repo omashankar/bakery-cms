@@ -16,8 +16,22 @@ import { getTemplates } from "./communications.service";
  * writes is the copy the customer receives.
  */
 
-/** The transactional templates this codebase actually triggers. */
-export type EmailTemplateSlug = "order_confirmation" | "password_reset" | "refund_processed";
+/**
+ * The transactional templates this codebase actually triggers.
+ *
+ * `order_shipped` and `invoice` were seeded ACTIVE, shown in the admin's
+ * template editor, and sent by nothing — an admin could carefully word an
+ * out-for-delivery email that no customer would ever receive. They have senders
+ * now. `welcome` and `abandoned_cart` still do not, and are marked as such in
+ * the seed rather than pretending otherwise.
+ */
+export type EmailTemplateSlug =
+  | "order_confirmation"
+  | "order_shipped"
+  | "invoice"
+  | "password_reset"
+  | "refund_processed"
+  | "admin_new_order";
 
 /**
  * Used when the stored template is missing or still a draft.
@@ -34,6 +48,37 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Hi {{customer_name}},\n\nThank you for your order {{order_number}}.\n\n" +
       "Order total: {{order_total}}\nPayment: {{payment_method}}\n" +
       "Delivery: {{delivery_date}}\n\n— {{store_name}}",
+  },
+  order_shipped: {
+    subject: "Your order {{order_number}} is on the way",
+    body:
+      "Hi {{customer_name}},\n\nOrder {{order_number}} has left the bakery and is " +
+      "out for delivery.\n\nExpected: {{delivery_date}}\nAddress: {{delivery_address}}\n\n" +
+      "Need help? Call {{store_phone}}\n\n— {{store_name}}",
+  },
+  /**
+   * The one email that goes to the SHOP rather than a customer.
+   *
+   * Nothing told the bakery an order had arrived. The customer got a
+   * confirmation, the order appeared in an admin screen nobody had open, and a
+   * cake needed baking by Saturday — the whole system was silent towards the
+   * only people who could act on it.
+   */
+  admin_new_order: {
+    subject: "New order {{order_number}} — {{order_total}}",
+    body:
+      "{{order_number}} was just placed.\n\n" +
+      "Customer: {{customer_name}} ({{customer_phone}})\n" +
+      "Total: {{order_total}} — {{payment_method}}\n" +
+      "Deliver: {{delivery_date}}\nTo: {{delivery_address}}\n\n" +
+      "Items:\n{{order_items}}\n\n{{admin_url}}",
+  },
+  invoice: {
+    subject: "Invoice for order {{order_number}}",
+    body:
+      "Hi {{customer_name}},\n\nHere is your invoice for order {{order_number}}.\n\n" +
+      "Amount: {{order_total}}\nOrder date: {{order_date}}\n\n{{invoice_url}}\n\n" +
+      "— {{store_name}}",
   },
   /**
    * A refund the gateway has accepted.
@@ -73,8 +118,14 @@ async function findTemplate(slug: EmailTemplateSlug): Promise<EmailTemplateRecor
   }
 }
 
-/** Escaped, then newlines become breaks — the bodies are plain text, not HTML. */
-function toHtml(text: string): string {
+/**
+ * Escaped, then newlines become breaks — the bodies are plain text, not HTML.
+ *
+ * Exported so a template TEST renders through the identical path a real send
+ * does. Two escaping implementations would mean the test proving something
+ * other than what the customer receives.
+ */
+export function toEmailHtml(text: string): string {
   const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -186,7 +237,7 @@ export async function sendTemplatedEmail(
   return sendMail({
     to: to.trim(),
     subject: renderTemplate(source.subject, merged),
-    html: toHtml(body),
+    html: toEmailHtml(body),
     text: body,
   });
 }

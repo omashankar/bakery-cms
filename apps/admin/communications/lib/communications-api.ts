@@ -101,3 +101,31 @@ export const fetchNotificationSettings = () =>
 /** Resolves false when the server rejected the write — callers must surface it. */
 export const replaceNotificationSettingsRequest = (settings: NotificationSettings) =>
   putJsonResult(NOTIFICATION_SETTINGS_PATH, settings);
+
+/**
+ * Really sends a test of one template, to the signed-in admin.
+ *
+ * No recipient is sent: the server takes it from the session. The dialog used to
+ * offer a free-text address, and honouring that would have turned an admin
+ * convenience into a way to send mail from the shop's domain to anyone.
+ */
+export async function sendTemplateTestRequest(
+  slug: string,
+): Promise<{ sent: boolean; to?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/communications/templates/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    });
+
+    const json = (await res.json().catch(() => null)) as
+      | { data?: { to?: string }; message?: string }
+      | null;
+
+    if (res.ok) return { sent: true, to: json?.data?.to };
+    return { sent: false, error: json?.message ?? `The server refused (${res.status}).` };
+  } catch {
+    return { sent: false, error: "Could not reach the server." };
+  }
+}
