@@ -158,15 +158,18 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "WhatsApp Templates",
-        // NOT "for order updates". Nothing in this codebase sends a WhatsApp
-        // message — the screen is a template editor with no provider behind
-        // it — and describing it next to a genuinely shipped Email entry, with
-        // SMS below it correctly flagged "coming soon", read as the one in the
-        // middle being live.
-        description: "Draft WhatsApp copy — sending not connected yet.",
+        // This read "for order updates" while nothing in the codebase could
+        // send a WhatsApp message, then "sending not connected yet" once that
+        // was said plainly. Both are now wrong: there is a Cloud API client, a
+        // connection screen and a send path on the order lifecycle.
+        //
+        // The description still stops short of "sends order updates", because
+        // whether it does depends on the shop connecting a number and Meta
+        // approving the wording — neither of which this row can know. Naming
+        // the setup step is the honest middle.
+        description: "Order updates over WhatsApp — connect a Business number to send.",
         href: routes.admin.commerce.whatsapp,
         icon: MessageCircle,
-        future: true,
       },
       {
         title: "SMS Notifications",

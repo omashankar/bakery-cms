@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { sendWhatsAppTestRequest } from "@/apps/admin/communications/lib/communications-api";
 import { renderTemplate } from "@/lib/template-render";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
 
 interface WhatsAppTemplateTestSendDialogProps {
@@ -27,12 +26,7 @@ export function WhatsAppTemplateTestSendDialog({
   template,
   onOpenChange,
 }: WhatsAppTemplateTestSendDialogProps) {
-  const [phone, setPhone] = useState("+91 98765 43210");
-
-  useEffect(() => {
-    if (!open) return;
-    setPhone("+91 98765 43210");
-  }, [open]);
+  const [sending, setSending] = useState(false);
 
   const preview = useMemo(() => {
     if (!template) return null;
@@ -41,24 +35,23 @@ export function WhatsAppTemplateTestSendDialog({
   }, [template]);
 
   async function handleSend() {
-    if (!template) return;
-    if (!phone.trim()) {
-      toast.error("Enter a phone number");
+    if (!template || sending) return;
+
+    setSending(true);
+    // A real send through Meta. This was a 900ms timer followed by a SUCCESS
+    // toast reading "WhatsApp message queued (demo)" — and "queued" is the word
+    // a real provider uses, so the parenthesis was doing a great deal of work.
+    const result = await sendWhatsAppTestRequest(template.slug);
+    setSending(false);
+
+    if (!result.sent) {
+      toast.error("Test message not sent", { description: result.error });
       return;
     }
 
-    // Nothing to send it with.
-    //
-    // This was a 900ms timer followed by a SUCCESS toast reading "WhatsApp
-    // message queued (demo)" — and "queued" is the word a real provider uses,
-    // so the parenthesis was doing a great deal of work. There is no WhatsApp
-    // provider anywhere in this codebase, so the honest outcome is a refusal
-    // that says why, not a green tick. The email equivalent of this dialog was
-    // the same sleep until its endpoint existed; this one gets the same
-    // treatment the day a provider does.
     onOpenChange(false);
-    toast.error("No WhatsApp provider is connected", {
-      description: "The template is saved, but nothing can deliver it yet.",
+    toast.success("Test WhatsApp sent", {
+      description: result.to ? `Delivered to ${result.to}.` : undefined,
     });
   }
 
@@ -69,26 +62,23 @@ export function WhatsAppTemplateTestSendDialog({
           <DialogTitle>Send test WhatsApp</DialogTitle>
           <p className="text-sm text-muted-foreground">
             {template
-              ? `Demo send for “${template.name}” using sample data. No real WhatsApp message is delivered.`
+              ? `Sends “${template.name}” with sample data to your shop's own contact number.`
               : "Select a template first."}
           </p>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
-            Connect a WhatsApp Business / BSP provider in production to submit and send approved
-            templates.
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="test-wa-phone">Send to</Label>
-            <Input
-              id="test-wa-phone"
-              type="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="+91 98765 43210"
-            />
+          {/*
+            No recipient box. There was one, defaulted to a plausible number,
+            and honouring it would have made this a way to send WhatsApp
+            messages from the shop's VERIFIED business number to any number at
+            all. The server picks the recipient — the shop's own contact number
+            from Settings → Contact — for the same reason the email test only
+            mails the signed-in admin.
+          */}
+          <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            The test goes to the contact number in Settings → Contact, and arrives in the wording
+            Meta approved for this template — not the draft below, which is your reference copy.
           </div>
 
           {preview ? (
@@ -99,11 +89,11 @@ export function WhatsAppTemplateTestSendDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
-          <Button variant="bakery" disabled={!template} onClick={handleSend}>
-            Send test
+          <Button variant="bakery" disabled={!template || sending} onClick={handleSend}>
+            {sending ? "Sending…" : "Send test"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -105,6 +105,63 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ],
       ...base,
     },
+    /**
+     * The two the shop actually sends that were not on this screen at all.
+     *
+     * Both had hardcoded fallback copy in `email.service.ts` and no template
+     * row, so they went out and the admin could not change a word. The refund
+     * one is the sharper miss: it is the only email a customer receives about
+     * their money, and the shop had no say in how it was worded.
+     */
+    {
+      id: "email-refund-processed",
+      slug: "refund_processed",
+      name: "Refund processed",
+      description: "Sent when a refund is approved and on its way back.",
+      category: "transactional",
+      subject: "Refund for order {{order_number}}",
+      previewText: "Your refund is on its way.",
+      // Deliberately says the money is on its WAY rather than that it has
+      // arrived: a card refund takes days to show on a statement, and
+      // "refunded" followed by a week of nothing generates exactly the support
+      // call this email exists to prevent.
+      body: `Hi {{customer_name}},\n\nWe have refunded {{refund_amount}} for your order {{order_number}}.\n\nIt is on its way back to the account you paid from and usually takes {{refund_eta}} to appear, depending on your bank.\n\nReference: {{refund_reference}}\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}`,
+      variables: [
+        "customer_name",
+        "order_number",
+        "refund_amount",
+        "refund_eta",
+        "refund_reference",
+        "store_email",
+        "store_name",
+      ],
+      ...base,
+    },
+    {
+      id: "email-admin-new-order",
+      slug: "admin_new_order",
+      name: "New order alert (to the shop)",
+      // The one template here whose recipient is the BAKERY, not a customer.
+      // Said plainly, because everything else on this screen goes outward and
+      // an admin editing this one should know they are writing to themselves.
+      description: "Sent to your shop's contact address when an order arrives.",
+      category: "system",
+      subject: "New order {{order_number}} — {{order_total}}",
+      previewText: "A new order just came in.",
+      body: `{{order_number}} was just placed.\n\nCustomer: {{customer_name}} ({{customer_phone}})\nTotal: {{order_total}} — {{payment_method}}\nDeliver: {{delivery_date}}\nTo: {{delivery_address}}\n\nItems:\n{{order_items}}\n\n{{admin_url}}`,
+      variables: [
+        "order_number",
+        "order_total",
+        "customer_name",
+        "customer_phone",
+        "payment_method",
+        "delivery_date",
+        "delivery_address",
+        "order_items",
+        "admin_url",
+      ],
+      ...base,
+    },
     {
       id: "email-password-reset",
       slug: "password_reset",

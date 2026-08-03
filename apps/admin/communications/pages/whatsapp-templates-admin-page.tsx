@@ -20,6 +20,8 @@ import { TemplatePreviewPanel } from "@/apps/admin/communications/components/tem
 import { TemplateStatusBadge } from "@/apps/admin/communications/components/template-status-badge";
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
 import { validateSlug } from "@/features/communications/lib/template-contract";
+import { WhatsAppConnectionCard } from "@/apps/admin/communications/components/whatsapp-connection-card";
+import { WhatsAppMetaBindingFields } from "@/apps/admin/communications/components/whatsapp-meta-binding-fields";
 import { WhatsAppTemplatePreviewDialog } from "@/apps/admin/communications/components/whatsapp-template-preview-dialog";
 import { WhatsAppTemplateTestSendDialog } from "@/apps/admin/communications/components/whatsapp-template-test-send-dialog";
 import {
@@ -30,7 +32,10 @@ import {
   saveWhatsAppTemplate,
   WHATSAPP_TEMPLATES_UPDATED_EVENT,
 } from "@/apps/admin/communications/lib/whatsapp-templates-repository";
-import { ensureCommunicationsHydrated } from "@/apps/admin/communications/lib/use-communications-server-sync";
+import {
+  ensureCommunicationsHydrated,
+  refreshWhatsAppTemplates,
+} from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   SettingsFormGate,
   SettingsHydrationNotice,
@@ -61,6 +66,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
+import type { MetaTemplateSummary } from "@/types/whatsapp-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -110,6 +116,15 @@ export function WhatsAppTemplatesAdminPage() {
   const [filters, setFilters] = useState<WhatsAppTemplateListFilters>(
     defaultWhatsAppTemplateFilters
   );
+  /**
+   * The templates Meta reported at the last sync.
+   *
+   * Not persisted: it is Meta's state, not the shop's, and a stale copy is
+   * worse than none — it would offer a name for a template that has since
+   * been deleted, which fails at send time as "template does not exist".
+   * Empty until a sync runs, and the binding field falls back to a text box.
+   */
+  const [metaTemplates, setMetaTemplates] = useState<MetaTemplateSummary[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testSendOpen, setTestSendOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -422,20 +437,30 @@ export function WhatsAppTemplatesAdminPage() {
             tone="gold"
           />
         </button>
-        <button
-          type="button"
-          className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ category: "transactional" })}
-        >
+        {/* Not a filter button, unlike its neighbours: "sendable" is not one of
+            the filters this list offers, and wiring it to the nearest one would
+            make the card lie about what the click did. */}
+        <div className="h-full w-full">
+          {/*
+            The count that matters, and the one this screen never had.
+            "Active" is the shop's own decision; a template only reaches a
+            customer once Meta has approved the wording it is bound to. Showing
+            actives alone let five published templates look ready while nothing
+            could send at all.
+          */}
           <DashboardStatCard
-            title="Transactional"
-            value={overview.transactional}
-            change="Orders & delivery"
-            changeTone="neutral"
+            title="Sendable"
+            value={overview.sendable}
+            change={
+              overview.sendable === overview.active
+                ? "Approved by Meta"
+                : `${overview.active - overview.sendable} active, not approved`
+            }
+            changeTone={overview.sendable === overview.active ? "positive" : "warning"}
             icon={Send}
             tone="neutral"
           />
-        </button>
+        </div>
       </section>
 
       <FilterPanel>
@@ -481,26 +506,31 @@ export function WhatsAppTemplatesAdminPage() {
       <SettingsHydrationNotice hydration={hydration} />
 
       {/*
-        Says the one thing this screen most needs to say.
+        This used to be a fixed amber banner reading "No WhatsApp provider is
+        connected", because none could be: there was no provider, no API call
+        and no send path anywhere in the codebase, while four of the five seeded
+        templates shipped "active" and the test dialog reported a message queued
+        after a 900ms timer.
 
-        Nothing in this codebase sends a WhatsApp message — there is no provider,
-        no API call, no webhook; the store is a template editor and nothing more.
-        Four of the five seeded templates ship "active", the stat card counted
-        them as "Ready to send", and the test-send dialog reports a message
-        queued after a 900ms timer. An admin could reasonably write and publish
-        an order-update template and expect customers to receive it.
-
-        Editing the copy now, ready for the day a provider is connected, is a
-        perfectly reasonable thing to do. Believing it is already going out is
-        not, and only this banner separates the two.
+        The card below is the connection that banner was standing in for. It
+        still says the same thing when nothing is set up — it just says it about
+        the actual stored state, and offers the fields that change it.
       */}
-      <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
-        <p className="font-medium">No WhatsApp provider is connected.</p>
-        <p className="mt-1 text-xs">
-          These templates are saved and ready, but nothing sends them yet — customers receive
-          no WhatsApp messages. Order updates currently go out by email only.
-        </p>
-      </div>
+      <WhatsAppConnectionCard
+        onSynced={(summary) => {
+          setMetaTemplates(summary?.available ?? []);
+          // The sync WRITES `approval` onto the stored templates, so the list
+          // in front of the admin is stale the moment it finishes. Re-read the
+          // server rather than patching locally: it is the only party that
+          // received Meta's answer.
+          //
+          // NOT `ensureCommunicationsHydrated`, which fetches at most once per
+          // gate and by now has settled — it would return without a request and
+          // leave every badge reading "Not checked with Meta" immediately after
+          // a sync that approved them.
+          void refreshWhatsAppTemplates().then(() => setTemplates(loadWhatsAppTemplates()));
+        }}
+      />
 
       <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
@@ -694,7 +724,14 @@ export function WhatsAppTemplatesAdminPage() {
                   <TemplateVariableChips
                     variables={draft.variables}
                     slug={draft.slug}
+                    channel="whatsapp"
                     onInsert={insertVariable}
+                  />
+
+                  <WhatsAppMetaBindingFields
+                    draft={draft}
+                    available={metaTemplates}
+                    onPatch={patchDraft}
                   />
                 </CardContent>
               </Card>

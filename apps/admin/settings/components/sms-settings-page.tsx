@@ -15,12 +15,15 @@ export function SmsSettingsPage() {
         "OTP / verification messages",
         "Per-event SMS toggles alongside email and WhatsApp",
       ]}
-      // WhatsApp is NOT available in the sense this sentence implied — its
-      // screen edits templates that nothing can deliver. Sending a reader
-      // from an honest "coming soon" page towards another unbuilt channel,
-      // described as available, is the worst kind of misdirection: they
-      // arrive believing they have found the working one.
-      note="Email is the channel that works today — see Settings → Communication. WhatsApp templates can be drafted there too, but have no provider connected yet."
+      // This page is an honest "coming soon", so what it points AT has to be
+      // honest too. It once said WhatsApp was "already available" when nothing
+      // could deliver a message, which is the worst kind of misdirection from
+      // here — the reader arrives believing they have found the working one.
+      //
+      // WhatsApp does send now, via Meta's Cloud API, but only after a shop
+      // connects a number and Meta approves the wording. So it is offered as
+      // something to set up, not as something that already works.
+      note="Email works today — see Settings → Communication. WhatsApp can send order updates too, once you connect a WhatsApp Business number under WhatsApp Templates."
     />
   );
 }

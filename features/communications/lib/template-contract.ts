@@ -69,9 +69,51 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
   ],
 };
 
-/** True when something in this codebase actually sends this slug. */
-export function isSendableSlug(slug: string): boolean {
-  return slug in TEMPLATE_VARIABLE_CONTRACT;
+/**
+ * The same contract for WhatsApp, which is a different set for a real reason.
+ *
+ * A WhatsApp template is approved by Meta as fixed wording with POSITIONAL
+ * placeholders, and every parameter costs a slot in that approved text. So these
+ * lists are shorter than their email counterparts and deliberately carry no
+ * URLs: a link inside a template body has to be approved with it, and a template
+ * whose body ends in a bare `{{5}}` URL is routinely rejected.
+ *
+ * `store_name`/`store_phone`/`store_email` are merged in by the sender here too.
+ */
+export const WHATSAPP_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
+  order_confirmation: [
+    ...STORE_VARIABLES,
+    "customer_name",
+    "order_number",
+    "order_total",
+    "delivery_date",
+  ],
+  order_ready: [...STORE_VARIABLES, "customer_name", "order_number"],
+  delivery_update: [
+    ...STORE_VARIABLES,
+    "customer_name",
+    "order_number",
+    "delivery_address",
+  ],
+};
+
+export type TemplateChannel = "email" | "whatsapp";
+
+export function contractFor(channel: TemplateChannel): Record<string, readonly string[]> {
+  return channel === "whatsapp" ? WHATSAPP_VARIABLE_CONTRACT : TEMPLATE_VARIABLE_CONTRACT;
+}
+
+/**
+ * True when something in this codebase actually sends this slug.
+ *
+ * Channel-aware because the two disagree, and defaulting to email would be the
+ * wrong answer on the WhatsApp screen rather than merely a missing one: `invoice`
+ * is wired for email and not for WhatsApp, and `order_ready` the other way
+ * round. A shared lookup would lock the wrong slugs and offer variables no
+ * sender supplies — the exact failure this file was written to end.
+ */
+export function isSendableSlug(slug: string, channel: TemplateChannel = "email"): boolean {
+  return slug in contractFor(channel);
 }
 
 /**
@@ -85,8 +127,9 @@ export function isSendableSlug(slug: string): boolean {
 export function availableVariablesFor(
   slug: string,
   declared: readonly string[],
+  channel: TemplateChannel = "email",
 ): string[] {
-  const contract = TEMPLATE_VARIABLE_CONTRACT[slug];
+  const contract = contractFor(channel)[slug];
   if (contract) return [...contract];
   return [...new Set(declared)];
 }
@@ -124,12 +167,14 @@ export function validateSlug(
   slug: string,
   originalSlug: string,
   otherSlugs: readonly string[],
+  channel: TemplateChannel = "email",
 ): SlugProblem | null {
   const trimmed = slug.trim();
+  const noun = channel === "whatsapp" ? "WhatsApp message" : "email";
 
-  if (isSendableSlug(originalSlug) && trimmed !== originalSlug) {
+  if (isSendableSlug(originalSlug, channel) && trimmed !== originalSlug) {
     return {
-      message: `"${originalSlug}" is the key this email is sent by — renaming it would stop customers receiving your version.`,
+      message: `"${originalSlug}" is the key this ${noun} is sent by — renaming it would stop customers receiving your version.`,
       locked: true,
     };
   }
@@ -152,9 +197,9 @@ export function validateSlug(
 
   // Taking over a slug the shop actually sends, from a template that did not
   // previously own it, is the hijack case.
-  if (isSendableSlug(trimmed) && !isSendableSlug(originalSlug)) {
+  if (isSendableSlug(trimmed, channel) && !isSendableSlug(originalSlug, channel)) {
     return {
-      message: `"${trimmed}" is reserved for the email the shop already sends. Choose another slug.`,
+      message: `"${trimmed}" is reserved for the ${noun} the shop already sends. Choose another slug.`,
       locked: false,
     };
   }

@@ -45,6 +45,56 @@ export function getTemplates(key: string) {
 }
 
 /**
+ * A whole-collection write from the SERVER, bypassing the admin-edit path.
+ *
+ * Used by the Meta approval sync, which is not an admin's edit of a list: it
+ * writes one server-owned field onto rows the admin never sent, so the
+ * `knownIds` reconciliation below would have nothing to reconcile against.
+ */
+export async function writeTemplates(key: string, items: unknown[]): Promise<void> {
+  await templateStoreFor(key).write(items as never);
+}
+
+/**
+ * A save may not change whether Meta approved anything.
+ *
+ * `approval` is the one field on a WhatsApp template that no admin gets to
+ * assert: it is written only by `syncMetaApprovals`, which asks Meta. The
+ * template schema does not accept it, but the schema is `passthrough` — it
+ * carries unknown keys through so that fields this server does not model yet
+ * survive a round trip — so a hand-made request could still post
+ * `approval: "approved"` and the send path would believe it.
+ *
+ * That matters because "approved" is the gate on sending. A shop could be told
+ * its wording had been reviewed, send against it, and collect rejections from
+ * Meta on live orders. So the stored value wins, and a template the server has
+ * never seen starts at `not_submitted` no matter what arrived with it.
+ *
+ * Changing the Meta NAME resets it too: the approval belonged to the old name.
+ */
+export function keepServerApproval(
+  incoming: { id?: string }[],
+  stored: { id?: string }[],
+): unknown[] {
+  const byId = new Map(
+    stored
+      .filter((item) => item.id)
+      .map((item) => [item.id as string, item as { approval?: string; metaName?: string }]),
+  );
+
+  return incoming.map((item) => {
+    const previous = item.id ? byId.get(item.id) : undefined;
+    const sameName =
+      (previous?.metaName ?? "").trim() === ((item as { metaName?: string }).metaName ?? "").trim();
+
+    return {
+      ...item,
+      approval: previous && sameName ? (previous.approval ?? "not_submitted") : "not_submitted",
+    };
+  });
+}
+
+/**
  * Saves a template collection, deleting only what the caller actually removed.
  *
  * `knownIds` is the ids the caller believed existed before its edit. Without
@@ -57,6 +107,7 @@ export function getTemplates(key: string) {
  * A caller that sends no `knownIds` is an older client, and then nothing
  * outside its list is touched — the safe reading.
  */
+
 export async function replaceTemplates(
   key: string,
   items: unknown[],
@@ -75,7 +126,9 @@ export async function replaceTemplates(
     (item) => item.id && !keepIds.has(item.id) && !removedIds.has(item.id),
   );
 
-  await store.write([...incoming, ...untouched] as never);
+  const guarded = key === "whatsapp-templates" ? keepServerApproval(incoming, stored) : incoming;
+
+  await store.write([...guarded, ...untouched] as never);
   await writeAuditLog({
     action: `communications.${key}.replace`,
     actorId: ctx.actorId ?? null,

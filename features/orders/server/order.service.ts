@@ -27,6 +27,7 @@ import {
   publicBaseUrl,
   sendTemplatedEmail,
 } from "@/features/communications/server/email.service";
+import { notifyWhatsApp } from "@/features/communications/server/whatsapp.service";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
@@ -599,6 +600,27 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     );
   }
 
+  // The same news on WhatsApp, when the shop has connected one.
+  //
+  // An ADDITION to the email, never a replacement: a shop with no WhatsApp
+  // provider is the normal state, and `notifyWhatsApp` is silent about it
+  // rather than logging a failure on every order. Note that this passes no
+  // `invoice_url` — a link has to be inside the wording Meta approved, so it
+  // cannot be supplied per-message the way it can in an email.
+  await notifyWhatsApp(
+    "order_confirmation",
+    placed.address.phone,
+    {
+      customer_name: placed.address.fullName?.trim() || "there",
+      order_number: placed.orderNumber,
+      order_total: formatCurrency(placed.totals.total, currency),
+      delivery_date: placed.deliverySlot?.date
+        ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+        : new Date(placed.estimatedDelivery).toDateString(),
+    },
+    `confirmation for ${placed.orderNumber}`,
+  );
+
   // And tell the BAKERY.
   //
   // Nothing did. The customer got a confirmation, the order appeared in an admin
@@ -742,6 +764,22 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
     await notifyOutForDelivery(updated);
   }
 
+  // "Your cake is ready" has no email behind it and does not need one — it is
+  // the kind of short, immediate note a phone is for. It exists only on
+  // WhatsApp, so a shop without a provider sends nothing here, which is what
+  // happened before this line too.
+  if (status === "ready" && updated) {
+    await notifyWhatsApp(
+      "order_ready",
+      updated.address.phone,
+      {
+        customer_name: updated.address.fullName?.trim() || "there",
+        order_number: updated.orderNumber,
+      },
+      `ready alert for ${updated.orderNumber}`,
+    );
+  }
+
   return updated;
 }
 
@@ -792,6 +830,17 @@ async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
       `[orders] Could not send the out-for-delivery email for ${order.orderNumber}: ${mail.error}`,
     );
   }
+
+  await notifyWhatsApp(
+    "delivery_update",
+    order.address.phone,
+    {
+      customer_name: order.address.fullName?.trim() || "there",
+      order_number: order.orderNumber,
+      delivery_address: address,
+    },
+    `out-for-delivery alert for ${order.orderNumber}`,
+  );
 }
 
 /**

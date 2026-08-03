@@ -74,3 +74,29 @@ export async function ensureCommunicationsHydrated(): Promise<{
     whatsapp: whatsappTemplatesHydration.hasSettled(),
   };
 }
+
+/**
+ * Re-reads the WhatsApp templates, whether or not the gate has already settled.
+ *
+ * `ensureCommunicationsHydrated` fetches at most ONCE per gate, on purpose — it
+ * exists to open the gate, not to keep a page fresh. That is the wrong rule
+ * after a Meta sync, which rewrites `approval` on the SERVER's rows and on
+ * nothing the browser holds. Calling the once-only path there returns
+ * immediately without a request, so the screen would go on showing "Not checked
+ * with Meta" and a sendable count of zero directly after a sync that approved
+ * everything — the page contradicting the button the admin just pressed.
+ *
+ * Returns null on a failed read, and then the cache is left alone: an empty
+ * result from a blip must never be mistaken for "the shop has no templates".
+ */
+export async function refreshWhatsAppTemplates(): Promise<boolean> {
+  const templates = await fetchWhatsAppTemplates();
+  if (!templates) return false;
+
+  persistServerWhatsAppTemplates(templates);
+  // Settling here too: a successful read is a successful read, whichever
+  // function made it, and a page that syncs before the layout's own hydration
+  // lands should not stay locked.
+  whatsappTemplatesHydration.markSettled();
+  return true;
+}

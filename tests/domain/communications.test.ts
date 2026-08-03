@@ -191,14 +191,22 @@ describe("one hydration gate per collection", () => {
 });
 
 describe("what these screens tell the admin", () => {
-  it("does not describe WhatsApp as a channel that sends anything", () => {
-    // There is no WhatsApp provider anywhere in this repo. The stat card said
-    // "Ready to send", the test dialog reported a message "queued", and the
-    // settings overview described the templates as being "for order updates" —
-    // three separate places implying a channel that does not exist.
+  it("describes WhatsApp by what is actually connected", () => {
+    // The stat card said "Ready to send" for any published template, the test
+    // dialog reported a message "queued" after a 900ms timer, and the settings
+    // overview described the templates as being "for order updates" — three
+    // places implying a channel that did not exist.
+    //
+    // A provider exists now, so the fixed "no provider" banner that replaced
+    // those claims would be a third wrong answer: it would keep saying no on a
+    // shop that had connected one. The screen reads the STORED connection
+    // instead, and counts a template as sendable only once Meta has approved
+    // its wording. `whatsapp-provider.test.ts` pins that arithmetic.
     const page = code("apps/admin/communications/pages/whatsapp-templates-admin-page.tsx");
     expect(page).not.toContain("Ready to send");
-    expect(page).toContain("No WhatsApp provider is connected");
+    expect(page).not.toContain("No WhatsApp provider is connected");
+    expect(page).toContain("<WhatsAppConnectionCard");
+    expect(page).toContain("overview.sendable");
 
     const dialog = code(
       "apps/admin/communications/components/whatsapp-template-test-send-dialog.tsx",

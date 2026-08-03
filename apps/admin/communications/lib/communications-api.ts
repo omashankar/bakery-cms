@@ -10,6 +10,7 @@ import type {
   WhatsAppTemplateRecord,
 } from "@/types/communication";
 import type { NotificationSettings } from "@/types/notification";
+import type { MetaSyncSummary, WhatsAppConnectionStatus } from "@/types/whatsapp-provider";
 
 interface Envelope<T> {
   success: boolean;
@@ -132,6 +133,35 @@ export const replaceNotificationSettingsRequest = (settings: NotificationSetting
   guardedPut(notificationSettingsHydration, NOTIFICATION_SETTINGS_PATH, settings);
 
 /**
+ * A POST whose failure message is worth showing.
+ *
+ * The error text these endpoints return is the whole point of pressing the
+ * button — "Meta rejected the access token", "no contact phone number is set" —
+ * so unlike `putJson` this keeps it rather than collapsing everything to false.
+ */
+async function postJson<T>(
+  path: string,
+  body?: unknown,
+): Promise<{ ok: true; data: T | null } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+
+    const json = (await res.json().catch(() => null)) as
+      | { data?: T; message?: string }
+      | null;
+
+    if (res.ok) return { ok: true, data: json?.data ?? null };
+    return { ok: false, error: json?.message ?? `The server refused (${res.status}).` };
+  } catch {
+    return { ok: false, error: "Could not reach the server." };
+  }
+}
+
+/**
  * Really sends a test of one template, to the signed-in admin.
  *
  * No recipient is sent: the server takes it from the session. The dialog used to
@@ -141,20 +171,61 @@ export const replaceNotificationSettingsRequest = (settings: NotificationSetting
 export async function sendTemplateTestRequest(
   slug: string,
 ): Promise<{ sent: boolean; to?: string; error?: string }> {
-  try {
-    const res = await fetch("/api/communications/templates/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug }),
-    });
+  const result = await postJson<{ to?: string }>("/api/communications/templates/test", { slug });
+  return result.ok ? { sent: true, to: result.data?.to } : { sent: false, error: result.error };
+}
 
-    const json = (await res.json().catch(() => null)) as
-      | { data?: { to?: string }; message?: string }
-      | null;
+const WHATSAPP_CONNECTION_PATH = "/api/communications/whatsapp/connection";
 
-    if (res.ok) return { sent: true, to: json?.data?.to };
-    return { sent: false, error: json?.message ?? `The server refused (${res.status}).` };
-  } catch {
-    return { sent: false, error: "Could not reach the server." };
-  }
+/**
+ * The connection STATUS — which fields are set, never the access token.
+ *
+ * There is deliberately no way to read the token back. It can message any
+ * customer who has ever contacted the business, from the shop's verified
+ * number, and the browser has no use for it.
+ */
+export const fetchWhatsAppConnection = () =>
+  getJson<WhatsAppConnectionStatus>(WHATSAPP_CONNECTION_PATH);
+
+/**
+ * Saves the connection. An empty `accessToken` means "keep the stored one".
+ *
+ * Not gated, and it is worth saying why, because everything else in this file
+ * is. A gate exists to stop a whole-collection REPLACE from a browser that
+ * never read the server's copy. This is a four-field form the admin has just
+ * filled in by hand, sent as itself — there is no list to clobber, and the one
+ * field it could destroy (the token) is protected server-side by the
+ * blank-means-keep rule instead.
+ */
+export async function saveWhatsAppConnectionRequest(input: {
+  phoneNumberId: string;
+  businessAccountId: string;
+  accessToken: string;
+  enabled: boolean;
+}): Promise<boolean> {
+  return putJson(WHATSAPP_CONNECTION_PATH, input);
+}
+
+/** Asks Meta who the saved credentials belong to. A real round trip. */
+export const verifyWhatsAppRequest = () =>
+  postJson<{ verifiedName: string; displayPhoneNumber: string; qualityRating: string }>(
+    "/api/communications/whatsapp/verify",
+  );
+
+/** Pulls Meta's approval statuses onto the stored templates. */
+export const syncWhatsAppTemplatesRequest = () =>
+  postJson<MetaSyncSummary>("/api/communications/whatsapp/sync");
+
+/**
+ * Really sends a test WhatsApp of one template.
+ *
+ * No recipient is sent, for the same reason as the email test: the server uses
+ * the shop's own contact number. A free-text box here would be a way to message
+ * any number at all from a verified business account.
+ */
+export async function sendWhatsAppTestRequest(
+  slug: string,
+): Promise<{ sent: boolean; to?: string; error?: string }> {
+  const result = await postJson<{ to?: string }>("/api/communications/whatsapp/test", { slug });
+  return result.ok ? { sent: true, to: result.data?.to } : { sent: false, error: result.error };
 }

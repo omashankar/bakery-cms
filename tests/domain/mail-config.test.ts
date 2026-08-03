@@ -11,6 +11,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
+import { TEMPLATE_VARIABLE_CONTRACT } from "@/features/communications/lib/template-contract";
+
 const state = vi.hoisted(() => ({
   seoBase: "" as string,
   stored: {} as Record<string, unknown>,
@@ -150,6 +153,21 @@ describe("every seeded template either has a sender or admits it does not", () =
       .filter((slug) => !union.includes(`"${slug}"`));
 
     expect(unsendable).toEqual([]);
+  });
+
+  it("gives the admin a template for every email the shop sends", () => {
+    // The other direction, and the one that was wrong for longer.
+    //
+    // `refund_processed` and `admin_new_order` were sent from hardcoded
+    // `FALLBACKS` in email.service.ts with no row in the editor at all. Nothing
+    // looked broken — the emails went out, correctly worded — but the shop had
+    // no way to change a single word of them. The refund one is the sharper
+    // miss: it is the only email a customer receives about their money.
+    const seeded = seedEmailTemplates().map((template) => template.slug);
+
+    for (const slug of Object.keys(TEMPLATE_VARIABLE_CONTRACT)) {
+      expect(seeded, `nothing in the editor for ${slug}`).toContain(slug);
+    }
   });
 });
 

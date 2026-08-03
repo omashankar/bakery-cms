@@ -21,6 +21,29 @@ function emitUpdated(): void {
   window.dispatchEvent(new Event(WHATSAPP_TEMPLATES_UPDATED_EVENT));
 }
 
+/**
+ * The Meta half of a seeded template, unfilled.
+ *
+ * `metaName` is deliberately BLANK. It has to be the name of a template the
+ * shop's own WhatsApp Business Account has had approved, and no default can
+ * guess that — a plausible-looking `order_confirmation_v1` would just fail at
+ * send time with "template does not exist", which reads like a bug in this app
+ * rather than a step nobody has done yet.
+ *
+ * `metaParameters` IS pre-filled, because it is the one part that is genuinely
+ * a suggestion: it says which values this shop would put in `{{1}}`, `{{2}}`, …
+ * and in what order, which is exactly what an admin needs in front of them when
+ * they write the template in Meta's dashboard. It is editable, and the send
+ * path uses whatever it ends up as.
+ *
+ * `approval` starts unsubmitted and can only be changed by asking Meta.
+ */
+const unlinked = {
+  metaName: "",
+  metaLanguage: "en",
+  approval: "not_submitted" as const,
+};
+
 export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
   const timestamp = nowIso();
   const base = { createdAt: timestamp, updatedAt: timestamp, status: "active" as const };
@@ -34,6 +57,8 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
       category: "utility",
       body: `Hi {{customer_name}} 👋\nWelcome to {{store_name}}! Order fresh cakes anytime.\nNeed help? Reply HELP or call {{store_phone}}.`,
       variables: ["customer_name", "store_name", "store_phone"],
+      ...unlinked,
+      metaParameters: ["customer_name", "store_name", "store_phone"],
       ...base,
     },
     {
@@ -50,6 +75,8 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
         "invoice_url",
         "store_name",
       ],
+      ...unlinked,
+      metaParameters: ["order_number", "order_total", "delivery_date"],
       ...base,
     },
     {
@@ -60,6 +87,8 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
       category: "transactional",
       body: `🎂 Great news {{customer_name}}!\nYour cake for order {{order_number}} is ready and will be dispatched soon.\n— {{store_name}}`,
       variables: ["customer_name", "order_number", "store_name"],
+      ...unlinked,
+      metaParameters: ["customer_name", "order_number"],
       ...base,
     },
     {
@@ -70,6 +99,8 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
       category: "transactional",
       body: `🚚 Order {{order_number}} is out for delivery.\nExpected today at {{delivery_address}}.\nQuestions? {{store_phone}}`,
       variables: ["order_number", "delivery_address", "store_phone"],
+      ...unlinked,
+      metaParameters: ["order_number", "delivery_address"],
       ...base,
     },
     {
@@ -80,6 +111,8 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
       category: "utility",
       body: `Hi {{customer_name}}, payment for order {{order_number}} ({{order_total}}) is still pending.\nComplete payment to confirm your slot.`,
       variables: ["customer_name", "order_number", "order_total"],
+      ...unlinked,
+      metaParameters: ["customer_name", "order_number", "order_total"],
       status: "draft",
       createdAt: timestamp,
       updatedAt: timestamp,

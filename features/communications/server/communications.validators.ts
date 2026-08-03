@@ -18,6 +18,19 @@ const whatsappTemplateSchema = z
     slug: z.string().min(1),
     name: z.string().min(1),
     body: z.string().default(""),
+    /**
+     * The Meta binding. Validated rather than passed through, because these
+     * three decide what a customer actually receives: the name selects the
+     * approved wording, and the ORDER of `metaParameters` decides which value
+     * lands in which sentence.
+     *
+     * `approval` is deliberately absent — it is written only by the sync that
+     * asks Meta, never by a client. A caller that could post "approved" could
+     * make the shop believe wording had been reviewed when it had not.
+     */
+    metaName: z.string().trim().max(512).optional(),
+    metaLanguage: z.string().trim().max(16).optional(),
+    metaParameters: z.array(z.string().trim().min(1)).max(20).optional(),
   })
   .passthrough();
 
@@ -51,4 +64,20 @@ export const notificationSettingsSchema = z.object({
 /** The template to test-send. The recipient is never taken from the caller. */
 export const templateTestSchema = z.object({
   slug: z.string().trim().min(1),
+});
+
+/**
+ * The WhatsApp connection an admin saves.
+ *
+ * `accessToken` may be empty and that is not an oversight: the form never
+ * receives the stored token back, so it posts a blank field whenever the admin
+ * did not retype one. `saveWhatsAppConnection` reads blank as "keep the stored
+ * token" — requiring it here would wipe a working token every time somebody
+ * toggled `enabled`.
+ */
+export const whatsappConnectionSchema = z.object({
+  phoneNumberId: z.string().trim().max(64).default(""),
+  businessAccountId: z.string().trim().max(64).default(""),
+  accessToken: z.string().trim().max(1024).default(""),
+  enabled: z.boolean().default(false),
 });
