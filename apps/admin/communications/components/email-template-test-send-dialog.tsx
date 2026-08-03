@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
 import { renderTemplate } from "@/lib/template-render";
-import { getSmtpSettings } from "@/features/settings/lib/settings-repository";
 import { sendTemplateTestRequest } from "@/apps/admin/communications/lib/communications-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,31 +14,43 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { routes } from "@/constants/routes";
 import type { EmailTemplateRecord } from "@/types/communication";
 
 interface EmailTemplateTestSendDialogProps {
   open: boolean;
+  /** The SAVED template — the endpoint reads the stored row, not a draft. */
   template: EmailTemplateRecord | null;
+  /** Whether the editor holds edits this test will NOT include. */
+  hasUnsavedChanges?: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function EmailTemplateTestSendDialog({
   open,
   template,
+  hasUnsavedChanges = false,
   onOpenChange,
 }: EmailTemplateTestSendDialogProps) {
   const [sending, setSending] = useState(false);
-  const [smtpEnabled, setSmtpEnabled] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setSmtpEnabled(getSmtpSettings().enabled);
-  }, [open]);
+  /*
+    There WAS a client-side SMTP precheck here, and it read localStorage.
+
+    `getSmtpSettings()` defaults to `enabled: false` when the cache is cold,
+    and nothing on this route hydrates the settings store — the public
+    settings endpoint omits `smtp` entirely, by design. So the first session
+    after an in-app login refused to send a test the server would have
+    accepted, and told the admin their SMTP was off while the SMTP page said
+    it was on. It failed safe and it was still a screen asserting server
+    state it had never read.
+
+    The server already answers this question properly, with a reason, so the
+    reason is what gets shown.
+  */
 
   const preview = useMemo(() => {
     if (!template) return null;
-    const sample = getSampleDataForVariables(template.variables);
+    const sample = getSampleDataForVariables(template.variables, { slug: template.slug });
     return {
       subject: renderTemplate(template.subject, sample),
       body: renderTemplate(template.body, sample),
@@ -49,12 +59,6 @@ export function EmailTemplateTestSendDialog({
 
   async function handleSend() {
     if (!template) return;
-    if (!smtpEnabled) {
-      toast.error("Enable SMTP before sending a test email", {
-        description: "Open SMTP settings to turn on delivery.",
-      });
-      return;
-    }
     setSending(true);
     const result = await sendTemplateTestRequest(template.slug);
     setSending(false);
@@ -89,17 +93,13 @@ export function EmailTemplateTestSendDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {!smtpEnabled ? (
-            <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
-              SMTP is off.{" "}
-              <Link
-                href={routes.admin.settings.smtp}
-                className="font-medium underline underline-offset-2"
-              >
-                Open SMTP settings
-              </Link>
-            </div>
+          {hasUnsavedChanges ? (
+            <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+              You have unsaved edits. This test sends the SAVED version shown below —
+              save first to test your changes.
+            </p>
           ) : null}
+
 
           <div className="space-y-2">
             <Label>Send to</Label>

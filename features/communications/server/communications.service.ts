@@ -56,26 +56,6 @@ const WIRED_SLUGS: Record<string, readonly string[]> = {
 };
 
 /**
- * Adds a wired template the stored collection has never had.
- *
- * The seed runs ONCE, when the collection does not exist — which is correct,
- * and which means adding a template to `seedEmailTemplates()` does nothing at
- * all for a shop that has been running. That is not a theoretical gap: the two
- * emails just made editable, `refund_processed` and `admin_new_order`, were
- * invisible on every existing shop while the tests — which exercise the seed
- * FUNCTION — passed. The fix looked complete and changed nothing.
- *
- * Only slugs the code actually SENDS are restored, and only when no row exists
- * at all. The resurrection worry does not apply to them: a wired slug with no
- * template does not mean the email stops going out, it means the hardcoded
- * fallback goes out instead and nobody can edit a word of it. Putting the row
- * back gives the shop control over an email it is already sending.
- *
- * A template the shop EDITED is never touched, because a row exists. Custom
- * templates are never touched, because they are not wired. And the write only
- * happens on the first read that finds something missing.
- */
-/**
  * Fields a stored row may predate. Widened when absent, never overwritten.
  *
  * All four arrived with the WhatsApp Meta binding. A row written before them
@@ -144,6 +124,26 @@ export function planTemplateBackfill(
   };
 }
 
+/**
+ * Adds a wired template the stored collection has never had.
+ *
+ * The seed runs ONCE, when the collection does not exist — which is correct,
+ * and which means adding a template to `seedEmailTemplates()` does nothing at
+ * all for a shop that has been running. That is not a theoretical gap: the two
+ * emails just made editable, `refund_processed` and `admin_new_order`, were
+ * invisible on every existing shop while the tests — which exercise the seed
+ * FUNCTION — passed. The fix looked complete and changed nothing.
+ *
+ * Only slugs the code actually SENDS are restored, and only when no row exists
+ * at all. The resurrection worry does not apply to them: a wired slug with no
+ * template does not mean the email stops going out, it means the hardcoded
+ * fallback goes out instead and nobody can edit a word of it. Putting the row
+ * back gives the shop control over an email it is already sending.
+ *
+ * A template the shop EDITED is never touched, because a row exists. Custom
+ * templates are never touched, because they are not wired. And the write only
+ * happens on the first read that finds something missing.
+ */
 async function backfillWiredTemplates(key: string): Promise<void> {
   const wired = WIRED_SLUGS[key];
   if (!wired) return;
@@ -315,10 +315,14 @@ export async function sendTemplateTest(
   const template = templates.find((item) => item.slug === slug);
   if (!template) return { sent: false, error: "That template no longer exists." };
 
-  const sample = getSampleDataForVariables(template.variables ?? []);
+  const sample = getSampleDataForVariables(template.variables ?? [], { slug: template.slug });
   return sendMail({
     to,
     subject: `[Test] ${renderTemplate(template.subject, sample)}`,
-    html: toEmailHtml(renderTemplate(template.body, sample)),
+    // Including the preview line, so a test shows what an inbox will.
+    html: toEmailHtml(
+      renderTemplate(template.body, sample),
+      template.previewText ? renderTemplate(template.previewText, sample) : undefined,
+    ),
   });
 }

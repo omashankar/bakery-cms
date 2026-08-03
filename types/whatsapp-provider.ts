@@ -77,6 +77,12 @@ export interface MetaSyncSummary {
   matched: { slug: string; metaName: string; approval: WhatsAppApprovalStatus }[];
   /** Linked to a Meta name that no longer exists on the business account. */
   missing: { slug: string; metaName: string }[];
+  /**
+   * Linked to a name Meta holds in SEVERAL languages, none of them the
+   * stored one. Reported rather than resolved: picking a row would send in a
+   * language the shop never chose, under an "Approved by Meta" badge.
+   */
+  ambiguous: { slug: string; metaName: string; languages: string[] }[];
   /** Everything Meta holds, so the editor can offer a real list to pick from. */
   available: MetaTemplateSummary[];
 }

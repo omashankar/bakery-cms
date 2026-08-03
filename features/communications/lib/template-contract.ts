@@ -134,6 +134,33 @@ export function availableVariablesFor(
   return [...new Set(declared)];
 }
 
+/**
+ * Variables a template declares that its sender will never supply.
+ *
+ * The contract stopped the editor OFFERING a wrong variable and stopped
+ * nothing else. An admin can still type `{{invoice_url}}` into the
+ * out-for-delivery email, and every surface then agrees it is fine: the live
+ * preview renders a real URL, and so does the test send to the admin's own
+ * inbox, because both fill from one flat table of sample data that contains
+ * every variable any template might use. The customer receives the literal
+ * text `{{invoice_url}}` — `renderTemplate` leaves an unresolved key exactly as
+ * written, and the send passes only what the contract lists.
+ *
+ * So the three surfaces have to ask the same question, and this is it. Empty
+ * for a slug nothing sends: a custom template has no contract to break.
+ */
+export function offContractVariables(
+  slug: string,
+  declared: readonly string[],
+  channel: TemplateChannel = "email",
+): string[] {
+  const contract = contractFor(channel)[slug];
+  if (!contract) return [];
+
+  const allowed = new Set(contract);
+  return [...new Set(declared)].filter((variable) => !allowed.has(variable));
+}
+
 /** The shape a slug must have to be a usable key. */
 const SLUG_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 

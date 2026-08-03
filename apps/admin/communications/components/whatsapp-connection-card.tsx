@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, PlugZap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -42,6 +42,16 @@ interface WhatsAppConnectionCardProps {
    * `approval` on the stored rows, so the page needs to reload them.
    */
   onSynced?: (summary: MetaSyncSummary | null) => void;
+  /**
+   * Reports the stored connection up, so the page header can describe the
+   * same state this card shows. Two independent reads is how a header ends
+   * up insisting sending is not connected while this card reads Connected.
+   */
+  onStatus?: (status: {
+    configured: boolean;
+    enabled: boolean;
+    displayName?: string;
+  }) => void;
 }
 
 const EMPTY_FORM = {
@@ -51,7 +61,7 @@ const EMPTY_FORM = {
   enabled: false,
 };
 
-export function WhatsAppConnectionCard({ onSynced }: WhatsAppConnectionCardProps) {
+export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectionCardProps) {
   const [status, setStatus] = useState<WhatsAppConnectionStatus | null>(null);
   // Tri-state, like every other form on this screen: "unavailable" still
   // RENDERS — fields visible, saving refused — because a boolean here blanks
@@ -60,6 +70,23 @@ export function WhatsAppConnectionCard({ onSynced }: WhatsAppConnectionCardProps
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState<"save" | "verify" | "sync" | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+
+  /**
+   * Held in a ref so the load effect can stay a one-shot.
+   *
+   * Putting the callback in the dependency array makes this card re-fetch the
+   * connection every time the parent re-renders with a new function identity —
+   * a request per keystroke in the editor above it. Leaving it OUT is what the
+   * exhaustive-deps rule warns about, and the warning is right: a parent that
+   * swapped the callback would keep being called through the old one.
+   */
+  const onStatusRef = useRef(onStatus);
+  // Assigned in an effect rather than during render: a ref write during render
+  // is not safe under concurrent rendering, which is what the lint rule is
+  // guarding. This runs after every commit, so the ref is never stale.
+  useEffect(() => {
+    onStatusRef.current = onStatus;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +98,7 @@ export function WhatsAppConnectionCard({ onSynced }: WhatsAppConnectionCardProps
         return;
       }
       setStatus(loaded);
+      onStatusRef.current?.({ configured: loaded.configured, enabled: loaded.enabled });
       setForm({
         phoneNumberId: loaded.phoneNumberId,
         businessAccountId: loaded.businessAccountId,
@@ -94,7 +122,10 @@ export function WhatsAppConnectionCard({ onSynced }: WhatsAppConnectionCardProps
     const accepted = await saveWhatsAppConnectionRequest(form);
     if (accepted) {
       const refreshed = await fetchWhatsAppConnection();
-      if (refreshed) setStatus(refreshed);
+      if (refreshed) {
+        setStatus(refreshed);
+        onStatus?.({ configured: refreshed.configured, enabled: refreshed.enabled });
+      }
       // Cleared so the field never holds a secret longer than the request that
       // carried it, and so the next save keeps what was just stored.
       setForm((current) => ({ ...current, accessToken: "" }));
@@ -121,6 +152,13 @@ export function WhatsAppConnectionCard({ onSynced }: WhatsAppConnectionCardProps
       .filter(Boolean)
       .join(" · ");
     setAccount(name || "Connected");
+    // The verified name is the friendliest thing the header can say, and only
+    // a live check knows it.
+    onStatus?.({
+      configured: true,
+      enabled: status?.enabled ?? false,
+      displayName: result.data?.verifiedName || undefined,
+    });
     toast.success("WhatsApp connected", { description: name || undefined });
   }
 

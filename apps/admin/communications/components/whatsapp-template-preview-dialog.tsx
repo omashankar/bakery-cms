@@ -35,6 +35,7 @@ export function WhatsAppTemplatePreviewDialog({
           <TemplatePreviewPanel
             body={template.body}
             variables={template.variables}
+            slug={template.slug}
             channel="whatsapp"
             embedded
           />

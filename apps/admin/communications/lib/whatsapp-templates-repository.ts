@@ -67,14 +67,14 @@ export function seedWhatsAppTemplates(): WhatsAppTemplateRecord[] {
       name: "Order confirmation",
       description: "Instant order acknowledgement.",
       category: "transactional",
-      body: `✅ Order {{order_number}} confirmed!\nAmount: {{order_total}}\nDelivery: {{delivery_date}}\nTrack: {{invoice_url}}\n— {{store_name}}`,
-      variables: [
-        "order_number",
-        "order_total",
-        "delivery_date",
-        "invoice_url",
-        "store_name",
-      ],
+      // No tracking link, and that is a platform constraint rather than an
+      // omission: a URL has to sit inside the wording Meta approved, so it
+      // cannot be passed per-message the way it can in an email. The seed
+      // carried `{{invoice_url}}` regardless — so the template this project
+      // SHIPS declared a variable its own sender does not supply, and the
+      // customer would have received the braces verbatim.
+      body: `✅ Order {{order_number}} confirmed!\nAmount: {{order_total}}\nDelivery: {{delivery_date}}\n— {{store_name}}`,
+      variables: ["order_number", "order_total", "delivery_date", "store_name"],
       ...unlinked,
       metaParameters: ["order_number", "order_total", "delivery_date"],
       ...base,
@@ -312,9 +312,25 @@ export async function deleteWhatsAppTemplate(id: string): Promise<WriteResult<bo
 }
 
 
+/**
+ * Reset, through the same gate as every other mutation.
+ *
+ * This called `persistAndSync` directly — the one write on this screen
+ * that skipped `mutateWhatsAppTemplates`, whose whole documented purpose is to
+ * await hydration BEFORE composing a payload. So the `knownIds` snapshot
+ * was taken from a cache the server had never filled: empty, meaning the
+ * server deleted nothing, kept every custom template the browser had not
+ * seen, and the admin was told "reset to defaults" over a list that had
+ * not been reset.
+ *
+ * Nothing about resetting justifies the exception. It is a whole-collection
+ * replace like the others, and it is the most destructive one.
+ */
 export async function resetWhatsAppTemplates(): Promise<WriteResult<WhatsAppTemplateRecord[]>> {
   const seeded = seedWhatsAppTemplates();
-  const persisted = await persistAndSync(seeded);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-  return { value: seeded, persisted };
+  const result = await mutateWhatsAppTemplates(seeded, () => ({ next: seeded, value: seeded }));
+  if (result.persisted) {
+    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  }
+  return result;
 }

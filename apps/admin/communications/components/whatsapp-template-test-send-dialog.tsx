@@ -17,20 +17,27 @@ import type { WhatsAppTemplateRecord } from "@/types/communication";
 
 interface WhatsAppTemplateTestSendDialogProps {
   open: boolean;
+  /** The SAVED template — the endpoint reads the stored row, not a draft. */
   template: WhatsAppTemplateRecord | null;
+  /** Whether the editor holds edits this test will NOT include. */
+  hasUnsavedChanges?: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function WhatsAppTemplateTestSendDialog({
   open,
   template,
+  hasUnsavedChanges = false,
   onOpenChange,
 }: WhatsAppTemplateTestSendDialogProps) {
   const [sending, setSending] = useState(false);
 
   const preview = useMemo(() => {
     if (!template) return null;
-    const sample = getSampleDataForVariables(template.variables);
+    const sample = getSampleDataForVariables(template.variables, {
+      slug: template.slug,
+      channel: "whatsapp",
+    });
     return renderTemplate(template.body, sample);
   }, [template]);
 
@@ -68,6 +75,13 @@ export function WhatsAppTemplateTestSendDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {hasUnsavedChanges ? (
+            <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+              You have unsaved edits. This test sends the SAVED version shown below —
+              save first to test your changes.
+            </p>
+          ) : null}
+
           {/*
             No recipient box. There was one, defaulted to a plausible number,
             and honouring it would have made this a way to send WhatsApp

@@ -1,3 +1,8 @@
+import {
+  contractFor,
+  type TemplateChannel,
+} from "@/features/communications/lib/template-contract";
+
 export const COMMON_TEMPLATE_VARIABLES = [
   "customer_name",
   "customer_email",
@@ -48,8 +53,34 @@ export const defaultTemplateSampleData: Record<string, string> = {
   admin_url: "https://bakery.demo/admin/orders/ord_1042",
 };
 
-export function getSampleDataForVariables(variables: string[]): Record<string, string> {
-  const data: Record<string, string> = { ...defaultTemplateSampleData };
+/**
+ * Sample values for a preview or a test send.
+ *
+ * `slug` is not optional decoration. Without it this returns the WHOLE table —
+ * every variable any template might use — so a preview of the out-for-delivery
+ * email renders a plausible `{{invoice_url}}` that its sender does not supply,
+ * and the test send to the admin's own inbox renders it too. Both agree the
+ * template is fine, and the customer receives the literal `{{invoice_url}}`.
+ *
+ * Given a wired slug, anything outside that sender's contract renders as
+ * `[name]` instead — visibly a placeholder, which is exactly what it is. An
+ * unwired slug has no contract to check against and keeps the old behaviour.
+ */
+export function getSampleDataForVariables(
+  variables: string[],
+  options?: { slug?: string; channel?: TemplateChannel },
+): Record<string, string> {
+  const slug = options?.slug;
+  const contract = slug ? contractFor(options?.channel ?? "email")[slug] : undefined;
+
+  const data: Record<string, string> = contract
+    ? Object.fromEntries(
+        contract
+          .filter((name) => defaultTemplateSampleData[name] !== undefined)
+          .map((name) => [name, defaultTemplateSampleData[name]]),
+      )
+    : { ...defaultTemplateSampleData };
+
   for (const variable of variables) {
     if (!data[variable]) {
       data[variable] = `[${variable}]`;

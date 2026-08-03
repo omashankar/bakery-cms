@@ -6,6 +6,7 @@ import { getTemplates, writeTemplates } from "./communications.service";
 import {
   listMetaTemplates,
   sendWhatsAppTemplate,
+  type MetaTemplateSummary,
   type WhatsAppResult,
 } from "./whatsapp-client.server";
 import { WHATSAPP_VARIABLE_CONTRACT } from "@/features/communications/lib/template-contract";
@@ -209,6 +210,93 @@ export async function notifyWhatsApp(
 
 
 /**
+ * What a sync against Meta's list would decide, as a pure function.
+ *
+ * Extracted so the matching rules can be tested with real Meta shapes rather
+ * than reasoned about. That is not bookkeeping: the ambiguity rule below was
+ * added to fix a defect that shipped, and a mutation run then showed nothing
+ * in the suite could tell the fixed version from the broken one, because
+ * reaching it required a live Graph call and a database.
+ */
+export interface MetaSyncPlan {
+  rows: WhatsAppTemplateRecord[];
+  matched: MetaSyncSummary["matched"];
+  missing: MetaSyncSummary["missing"];
+  ambiguous: MetaSyncSummary["ambiguous"];
+}
+
+export function planMetaSync(
+  templates: readonly WhatsAppTemplateRecord[],
+  listed: readonly MetaTemplateSummary[],
+): MetaSyncPlan {
+  const byName = new Map(
+    listed.map((template) => [`${template.name}|${template.language}`, template]),
+  );
+
+  /**
+   * Name-only matches, but ONLY where the name is unambiguous.
+   *
+   * The local language is routinely not the one Meta filed the template under
+   * — the seed says "en", Meta may hold it as "en_US", and the binding picker
+   * sets the name without touching the language — so the exact `name|language`
+   * key misses on the normal path, and a name-only fallback is what makes the
+   * sync work at all. It also corrects the stored language, which is worth
+   * doing: a mismatch there fails a send as "template does not exist".
+   *
+   * The danger is a name Meta holds in SEVERAL languages. A plain Map keeps
+   * whichever row paginated last, so the sync would take approval from an
+   * arbitrary one and write ITS language over the shop's — after which sends
+   * go out in a language the shop never chose, under a green "Approved by
+   * Meta" badge. Ambiguity is recorded as ambiguity and reported, never
+   * resolved by accident.
+   */
+  const byNameOnly = new Map<string, MetaTemplateSummary | null>();
+  for (const template of listed) {
+    // A second row for the same name marks it ambiguous, permanently.
+    byNameOnly.set(template.name, byNameOnly.has(template.name) ? null : template);
+  }
+
+  const matched: MetaSyncSummary["matched"] = [];
+  const missing: MetaSyncSummary["missing"] = [];
+  const ambiguous: MetaSyncSummary["ambiguous"] = [];
+
+  const rows = templates.map((template) => {
+    const metaName = template.metaName?.trim();
+    if (!metaName) return template;
+
+    const exact = byName.get(`${metaName}|${template.metaLanguage?.trim() ?? ""}`);
+    const sole = byNameOnly.get(metaName);
+    const found = exact ?? sole ?? undefined;
+
+    if (!found) {
+      // `sole === null` means Meta holds this name in more than one language
+      // and the stored language matched none of them. Guessing would send in a
+      // language nobody chose, so it is reported instead — and the approval is
+      // cleared, because nothing here can say which row was approved.
+      if (sole === null) {
+        ambiguous.push({
+          slug: template.slug,
+          metaName,
+          languages: listed.filter((row) => row.name === metaName).map((row) => row.language),
+        });
+      } else {
+        missing.push({ slug: template.slug, metaName });
+      }
+      return { ...template, approval: "not_submitted" as WhatsAppApprovalStatus };
+    }
+
+    matched.push({ slug: template.slug, metaName, approval: found.status });
+    return {
+      ...template,
+      approval: found.status,
+      // Corrected only from an unambiguous match — see `byNameOnly` above.
+      metaLanguage: found.language || template.metaLanguage || "en",
+    };
+  });
+
+  return { rows, matched, missing, ambiguous };
+}
+/**
  * Asks Meta which templates it has, and writes the answer onto the local rows.
  *
  * This is the only writer of `approval`, and that is the point. The obvious
@@ -232,53 +320,25 @@ export async function syncMetaApprovals(ctx: {
   const listed = await listMetaTemplates();
   if (!listed.ok) return { ok: false, error: listed.error };
 
-  const byName = new Map(
-    listed.templates.map((template) => [`${template.name}|${template.language}`, template]),
-  );
-  // Language is often left blank locally, so fall back to matching on name
-  // alone — a shop with one language per template is the normal case, and
-  // refusing to match it would report every template as missing.
-  const byNameOnly = new Map(listed.templates.map((template) => [template.name, template]));
-
   const templates = ((await getTemplates("whatsapp-templates")) ?? []) as WhatsAppTemplateRecord[];
-
-  const matched: MetaSyncSummary["matched"] = [];
-  const missing: MetaSyncSummary["missing"] = [];
-
-  const next = templates.map((template) => {
-    const metaName = template.metaName?.trim();
-    if (!metaName) return template;
-
-    const found =
-      byName.get(`${metaName}|${template.metaLanguage?.trim() ?? ""}`) ?? byNameOnly.get(metaName);
-
-    if (!found) {
-      missing.push({ slug: template.slug, metaName });
-      return { ...template, approval: "not_submitted" as WhatsAppApprovalStatus };
-    }
-
-    matched.push({ slug: template.slug, metaName, approval: found.status });
-    return {
-      ...template,
-      approval: found.status,
-      // Meta is authoritative on the language too — a mismatch here is a send
-      // that fails with "template does not exist" in the shop's own language.
-      metaLanguage: found.language || template.metaLanguage || "en",
-    };
-  });
-
+  const { rows: next, matched, missing, ambiguous } = planMetaSync(templates, listed.templates);
   await writeTemplates("whatsapp-templates", next);
   await writeAuditLog({
     action: "communications.whatsapp.sync",
     actorId: ctx.actorId ?? null,
     actorEmail: ctx.actorEmail,
     target: { type: "communications", id: "whatsapp-templates" },
-    metadata: { matched: matched.length, missing: missing.length, available: listed.templates.length },
+    metadata: {
+      matched: matched.length,
+      missing: missing.length,
+      ambiguous: ambiguous.length,
+      available: listed.templates.length,
+    },
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });
 
-  return { ok: true, summary: { matched, missing, available: listed.templates } };
+  return { ok: true, summary: { matched, missing, ambiguous, available: listed.templates } };
 }
 
 /**
@@ -312,7 +372,10 @@ export async function sendWhatsAppTest(
   // The record directly, not the slug, so a DRAFT can be tested. Publishing a
   // template to find out whether it sends means a customer meets any mistake
   // before the admin does.
-  const sample = getSampleDataForVariables(template.variables ?? []);
+  const sample = getSampleDataForVariables(template.variables ?? [], {
+    slug: template.slug,
+    channel: "whatsapp",
+  });
   const result = await sendWhatsAppTemplateRecord(template, to, sample);
   return { sent: result.sent, to, error: result.error };
 }

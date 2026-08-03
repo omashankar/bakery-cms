@@ -23,6 +23,7 @@ import { TemplateStatusBadge } from "@/apps/admin/communications/components/temp
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
 import {
   isSendableSlug,
+  offContractVariables,
   validateSlug,
 } from "@/features/communications/lib/template-contract";
 import {
@@ -211,6 +212,18 @@ export function EmailTemplatesAdminPage() {
     : null;
   const slugLocked = Boolean(draft && isSendableSlug(savedSelected?.slug ?? draft.slug));
 
+  /**
+   * Shown BEFORE the save is attempted, not only when it is refused.
+   *
+   * A stored template can carry one of these from before the rule existed —
+   * the WhatsApp order confirmation this project shipped did — so an admin
+   * editing something unrelated would press Save and be refused over a line
+   * they never wrote. The fix is one edit, and it is only obvious if the
+   * offending variable is named next to the body.
+   */
+  const stray = draft
+    ? offContractVariables(draft.slug, draft.variables, "email")
+    : [];
   const isDirty =
     !!draft &&
     !!savedSelected &&
@@ -265,6 +278,26 @@ export function EmailTemplatesAdminPage() {
       toast.error("Name, slug, and subject are required");
       return;
     }
+    /**
+     * A variable this template's sender will never supply.
+     *
+     * The contract used to govern only which chips were OFFERED, so a
+     * hand-typed one sailed straight through: the live preview rendered it,
+     * the test send to the admin's own inbox rendered it — both filled from
+     * one flat table holding every variable any template might use — and the
+     * customer received the literal braces, because renderTemplate leaves an
+     * unresolved key exactly as written.
+     *
+     * Refused rather than warned about, for the same reason a bad slug is:
+     * the damage lands on a customer, not on this screen.
+     */
+    if (stray.length) {
+      toast.error("Remove variables nothing will fill", {
+        description: `${stray.map((name) => `{{${name}}}`).join(", ")} would reach the customer exactly as written.`,
+      });
+      return;
+    }
+
     if (slugProblem) {
       toast.error("Fix the slug first", { description: slugProblem.message });
       return;
@@ -367,6 +400,7 @@ export function EmailTemplatesAdminPage() {
               variant="outline"
               className="w-full sm:w-auto"
               onClick={() => setResetOpen(true)}
+              disabled={hydration !== "ready"}
             >
               <RotateCcw className="size-4" />
               <span className="sm:hidden">Reset</span>
@@ -582,7 +616,7 @@ export function EmailTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem)}
+                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem) || stray.length > 0}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -702,6 +736,16 @@ export function EmailTemplatesAdminPage() {
                     />
                   </div>
 
+                  {stray.length ? (
+                    <p
+                      className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100"
+                      role="alert"
+                    >
+                      {stray.map((name) => `{{${name}}}`).join(", ")} —
+                      nothing supplies this when the email is sent, so the customer receives it exactly
+                      as written. Remove it from the body to save.
+                    </p>
+                  ) : null}
                   <TemplateVariableChips
                     variables={draft.variables}
                     slug={draft.slug}
@@ -716,6 +760,7 @@ export function EmailTemplatesAdminPage() {
                   previewText={draft.previewText}
                   body={draft.body}
                   variables={draft.variables}
+                  slug={draft.slug}
                   channel="email"
                 />
               </div>
@@ -745,7 +790,14 @@ export function EmailTemplatesAdminPage() {
       />
       <EmailTemplateTestSendDialog
         open={testSendOpen}
-        template={draft}
+        /*
+          The SAVED copy, because that is what the server sends. The dialog
+          previews what it is given and the endpoint reads the stored row, so
+          passing the draft showed the admin their unsaved edits above a
+          button that delivered something else.
+        */
+        template={savedSelected}
+        hasUnsavedChanges={isDirty}
         onOpenChange={setTestSendOpen}
       />
 

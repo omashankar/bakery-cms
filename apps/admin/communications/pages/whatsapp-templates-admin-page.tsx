@@ -19,7 +19,10 @@ import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-s
 import { TemplatePreviewPanel } from "@/apps/admin/communications/components/template-preview-panel";
 import { TemplateStatusBadge } from "@/apps/admin/communications/components/template-status-badge";
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
-import { validateSlug } from "@/features/communications/lib/template-contract";
+import {
+  offContractVariables,
+  validateSlug,
+} from "@/features/communications/lib/template-contract";
 import { WhatsAppConnectionCard } from "@/apps/admin/communications/components/whatsapp-connection-card";
 import { WhatsAppMetaBindingFields } from "@/apps/admin/communications/components/whatsapp-meta-binding-fields";
 import { WhatsAppTemplatePreviewDialog } from "@/apps/admin/communications/components/whatsapp-template-preview-dialog";
@@ -125,6 +128,18 @@ export function WhatsAppTemplatesAdminPage() {
    * Empty until a sync runs, and the binding field falls back to a text box.
    */
   const [metaTemplates, setMetaTemplates] = useState<MetaTemplateSummary[]>([]);
+  /**
+   * The stored connection, reported up by the card that fetches it.
+   *
+   * Lifted rather than fetched twice: the header has to describe the same
+   * state the card shows, and two independent reads is how they end up
+   * disagreeing.
+   */
+  const [connection, setConnection] = useState<{
+    configured: boolean;
+    enabled: boolean;
+    displayName?: string;
+  } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testSendOpen, setTestSendOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -228,6 +243,18 @@ export function WhatsAppTemplatesAdminPage() {
       )
     : null;
 
+  /**
+   * Shown BEFORE the save is attempted, not only when it is refused.
+   *
+   * A stored template can carry one of these from before the rule existed —
+   * the WhatsApp order confirmation this project shipped did — so an admin
+   * editing something unrelated would press Save and be refused over a line
+   * they never wrote. The fix is one edit, and it is only obvious if the
+   * offending variable is named next to the body.
+   */
+  const stray = draft
+    ? offContractVariables(draft.slug, draft.variables, "whatsapp")
+    : [];
   const isDirty =
     !!draft &&
     !!savedSelected &&
@@ -280,6 +307,26 @@ export function WhatsAppTemplatesAdminPage() {
       toast.error("Name, slug, and message body are required");
       return;
     }
+    /**
+     * A variable this template's sender will never supply.
+     *
+     * The contract used to govern only which chips were OFFERED, so a
+     * hand-typed one sailed straight through: the live preview rendered it,
+     * the test send to the admin's own inbox rendered it — both filled from
+     * one flat table holding every variable any template might use — and the
+     * customer received the literal braces, because renderTemplate leaves an
+     * unresolved key exactly as written.
+     *
+     * Refused rather than warned about, for the same reason a bad slug is:
+     * the damage lands on a customer, not on this screen.
+     */
+    if (stray.length) {
+      toast.error("Remove variables nothing will fill", {
+        description: `${stray.map((name) => `{{${name}}}`).join(", ")} would reach the customer exactly as written.`,
+      });
+      return;
+    }
+
     if (slugProblem) {
       toast.error("Fix the slug first", { description: slugProblem.message });
       return;
@@ -372,7 +419,21 @@ export function WhatsAppTemplatesAdminPage() {
     <AdminPage className={cn("space-y-4 sm:space-y-5", isDirty && "pb-20 md:pb-0")}>
       <AdminPageHeader
         title="WhatsApp Templates"
-        description="Draft WhatsApp message copy. Sending is not connected yet."
+        /*
+          Read from the stored connection, not asserted.
+
+          This said "Sending is not connected yet" unconditionally, which
+          was true when nothing could send and is now a flat contradiction
+          of the card 140px below it — which can read "Connected" while the
+          header says the channel does not exist.
+        */
+        description={
+          connection?.configured && connection.enabled
+            ? `Order updates go out on WhatsApp${connection.displayName ? ` from ${connection.displayName}` : ""}.`
+            : connection?.configured
+              ? "Connected, but sending is switched off below."
+              : "Draft your copy, then connect a WhatsApp Business number below to send."
+        }
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
@@ -380,6 +441,7 @@ export function WhatsAppTemplatesAdminPage() {
               variant="outline"
               className="w-full sm:w-auto"
               onClick={() => setResetOpen(true)}
+              disabled={hydration !== "ready"}
             >
               <RotateCcw className="size-4" />
               <span className="sm:hidden">Reset</span>
@@ -517,6 +579,7 @@ export function WhatsAppTemplatesAdminPage() {
         the actual stored state, and offers the fields that change it.
       */}
       <WhatsAppConnectionCard
+        onStatus={setConnection}
         onSynced={(summary) => {
           setMetaTemplates(summary?.available ?? []);
           // The sync WRITES `approval` onto the stored templates, so the list
@@ -630,7 +693,7 @@ export function WhatsAppTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem)}
+                      disabled={!isDirty || hydration !== "ready" || Boolean(slugProblem) || stray.length > 0}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -721,6 +784,16 @@ export function WhatsAppTemplatesAdminPage() {
                     </p>
                   </div>
 
+                  {stray.length ? (
+                    <p
+                      className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100"
+                      role="alert"
+                    >
+                      {stray.map((name) => `{{${name}}}`).join(", ")} —
+                      nothing supplies this at send time, and a link has to sit inside the wording Meta
+                      approved. Remove it from the body to save.
+                    </p>
+                  ) : null}
                   <TemplateVariableChips
                     variables={draft.variables}
                     slug={draft.slug}
@@ -740,6 +813,7 @@ export function WhatsAppTemplatesAdminPage() {
                 <TemplatePreviewPanel
                   body={draft.body}
                   variables={draft.variables}
+                  slug={draft.slug}
                   channel="whatsapp"
                 />
               </div>
@@ -769,7 +843,14 @@ export function WhatsAppTemplatesAdminPage() {
       />
       <WhatsAppTemplateTestSendDialog
         open={testSendOpen}
-        template={draft}
+        /*
+          The SAVED copy, because that is what the server sends. The dialog
+          previews what it is given and the endpoint reads the stored row, so
+          passing the draft showed the admin their unsaved edits above a
+          button that delivered something else.
+        */
+        template={savedSelected}
+        hasUnsavedChanges={isDirty}
         onOpenChange={setTestSendOpen}
       />
 

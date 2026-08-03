@@ -118,23 +118,45 @@ async function findTemplate(slug: EmailTemplateSlug): Promise<EmailTemplateRecor
   }
 }
 
-/**
- * Escaped, then newlines become breaks — the bodies are plain text, not HTML.
- *
- * Exported so a template TEST renders through the identical path a real send
- * does. Two escaping implementations would mean the test proving something
- * other than what the customer receives.
- */
-export function toEmailHtml(text: string): string {
-  const escaped = text
+/** Bodies are plain text, not HTML, so every character is escaped. */
+function escapeHtml(text: string): string {
+  return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
 
-  return `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#1f2937">${escaped
-    .split("\n")
-    .join("<br />")}</div>`;
+/**
+ * The HTML a customer receives. Escaped, then newlines become breaks.
+ *
+ * Exported so a template TEST renders through the identical path a real send
+ * does — two escaping implementations would mean the test proving something
+ * other than what lands in the inbox.
+ *
+ * `preheader` is the line an inbox shows next to the subject.
+ *
+ * It has a whole editor field — "Preview text" — with copy shipped for all
+ * eight seeded templates, and `template-preview-panel.tsx` renders it exactly
+ * where a mail client would. Nothing sent it. `sendTemplatedEmail` composed
+ * subject and body only, and the test send dropped it too, so no test could
+ * reveal the omission: an admin could word it, preview it, test it, and it
+ * reached no inbox on earth.
+ *
+ * Emitted the way every mail client expects — hidden in the rendered message,
+ * read by the inbox list — followed by enough zero-width whitespace to stop the
+ * body text being pulled in after it.
+ */
+export function toEmailHtml(text: string, preheader?: string): string {
+  const body = escapeHtml(text).split("\n").join("<br />");
+
+  const preheaderBlock = preheader?.trim()
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${escapeHtml(
+        preheader.trim(),
+      )}${"&#847;&zwnj;&nbsp;".repeat(30)}</div>`
+    : "";
+
+  return `${preheaderBlock}<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#1f2937">${body}</div>`;
 }
 
 /**
@@ -233,11 +255,14 @@ export async function sendTemplatedEmail(
   const merged = { ...(await storeIdentity()), ...variables };
 
   const body = renderTemplate(source.body, merged);
+  // The stored template carries a preview line; the hardcoded fallback does
+  // not, and neither shape is required to.
+  const preheader = (source as { previewText?: string }).previewText;
 
   return sendMail({
     to: to.trim(),
     subject: renderTemplate(source.subject, merged),
-    html: toEmailHtml(body),
+    html: toEmailHtml(body, preheader ? renderTemplate(preheader, merged) : undefined),
     text: body,
   });
 }

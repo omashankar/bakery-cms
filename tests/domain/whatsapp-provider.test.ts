@@ -21,6 +21,7 @@ import {
 import {
   buildParameters,
   contractCoversEverySlug,
+  planMetaSync,
 } from "@/features/communications/server/whatsapp.service";
 import {
   availableVariablesFor,
@@ -38,6 +39,7 @@ import {
 } from "@/apps/admin/communications/lib/whatsapp-template-utils";
 import { defaultTemplateSampleData } from "@/apps/admin/communications/lib/template-sample-data";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
+import type { MetaTemplateSummary } from "@/types/whatsapp-provider";
 
 function source(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -269,6 +271,109 @@ describe("the claims this screen used to make", () => {
     const page = code("apps/admin/communications/pages/whatsapp-templates-admin-page.tsx");
     expect(page).not.toContain("No WhatsApp provider is connected");
     expect(page).toContain("<WhatsAppConnectionCard");
+  });
+});
+
+describe("matching the shop's templates against Meta's list", () => {
+  const row = (overrides: Partial<WhatsAppTemplateRecord> = {}): WhatsAppTemplateRecord =>
+    template({ metaName: "order_confirmation_v1", metaLanguage: "en", ...overrides });
+
+  const meta = (name: string, language: string, status: string) =>
+    ({
+      name,
+      language,
+      status,
+      body: "Order {{1}}",
+      parameterCount: 1,
+      category: "UTILITY",
+    }) as MetaTemplateSummary;
+
+  it("takes an exact name and language match", () => {
+    const plan = planMetaSync(
+      [row({ approval: "not_submitted" })],
+      [meta("order_confirmation_v1", "en", "approved")],
+    );
+
+    expect(plan.matched).toHaveLength(1);
+    expect(plan.rows[0].approval).toBe("approved");
+    expect(plan.rows[0].metaLanguage).toBe("en");
+  });
+
+  it("corrects the language from an unambiguous name", () => {
+    // The normal path: the seed says "en" and Meta filed it as "en_US". A
+    // mismatch left uncorrected fails a send as "template does not exist".
+    const plan = planMetaSync([row()], [meta("order_confirmation_v1", "en_US", "approved")]);
+
+    expect(plan.matched).toHaveLength(1);
+    expect(plan.rows[0].metaLanguage).toBe("en_US");
+  });
+
+  it("refuses to pick when Meta holds the name in several languages", () => {
+    /**
+     * The defect this rule exists for.
+     *
+     * A plain name-keyed Map keeps whichever row paginated LAST, so the sync
+     * took approval from an arbitrary language and wrote that language over the
+     * shop's. Sends then went out in a language nobody chose — successfully,
+     * under a green "Approved by Meta" badge, which is the worst possible way
+     * to be wrong.
+     */
+    const plan = planMetaSync(
+      [row({ metaLanguage: "en" })],
+      [
+        meta("order_confirmation_v1", "hi", "approved"),
+        meta("order_confirmation_v1", "ta", "rejected"),
+      ],
+    );
+
+    expect(plan.matched).toHaveLength(0);
+    expect(plan.ambiguous).toEqual([
+      { slug: "order_confirmation", metaName: "order_confirmation_v1", languages: ["hi", "ta"] },
+    ]);
+    // The shop's own language survives, and approval is cleared rather than
+    // inherited from a row nobody chose.
+    expect(plan.rows[0].metaLanguage).toBe("en");
+    expect(plan.rows[0].approval).toBe("not_submitted");
+  });
+
+  it("still matches exactly even when the name is ambiguous", () => {
+    // Ambiguity is only a problem for the FALLBACK. If the stored language is
+    // one Meta actually holds, there is nothing to guess.
+    const plan = planMetaSync(
+      [row({ metaLanguage: "ta" })],
+      [
+        meta("order_confirmation_v1", "hi", "rejected"),
+        meta("order_confirmation_v1", "ta", "approved"),
+      ],
+    );
+
+    expect(plan.ambiguous).toHaveLength(0);
+    expect(plan.rows[0].approval).toBe("approved");
+    expect(plan.rows[0].metaLanguage).toBe("ta");
+  });
+
+  it("clears approval for a name Meta no longer has", () => {
+    // A deleted Meta template otherwise keeps its "approved" forever, and every
+    // send against it fails while the screen insists it is fine.
+    const plan = planMetaSync(
+      [row({ approval: "approved" })],
+      [meta("something_else", "en", "approved")],
+    );
+
+    expect(plan.missing).toEqual([
+      { slug: "order_confirmation", metaName: "order_confirmation_v1" },
+    ]);
+    expect(plan.rows[0].approval).toBe("not_submitted");
+  });
+
+  it("leaves an unlinked template completely alone", () => {
+    const unlinkedRow = row({ metaName: "", approval: "not_submitted" });
+    const plan = planMetaSync([unlinkedRow], [meta("order_confirmation_v1", "en", "approved")]);
+
+    expect(plan.matched).toHaveLength(0);
+    expect(plan.missing).toHaveLength(0);
+    expect(plan.ambiguous).toHaveLength(0);
+    expect(plan.rows[0]).toBe(unlinkedRow);
   });
 });
 
