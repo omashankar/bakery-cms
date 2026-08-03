@@ -76,8 +76,14 @@ export function EmailTemplateTestSendDialog({
         <DialogHeader>
           <DialogTitle>Send test email</DialogTitle>
           <p className="text-sm text-muted-foreground">
+            {/*
+              This said "No real email is delivered" — which was true when the
+              handler was a 900ms sleep, and became a lie the moment it started
+              sending. A stale reassurance is worse than none: an admin reads it
+              and stops watching their inbox.
+            */}
             {template
-              ? `Demo send for “${template.name}” using sample data. No real email is delivered.`
+              ? `Sends “${template.name}” to your own admin address, rendered with the sample data below.`
               : "Select a template first."}
           </p>
         </DialogHeader>

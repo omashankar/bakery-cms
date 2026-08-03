@@ -54,7 +54,11 @@ import { seoHydration, siteLayoutHydration } from "@/features/site-layout/lib/si
 import { catalogHydration } from "@/features/catalog/lib/catalog-api";
 import { invoiceSettingsHydration } from "@/features/commerce/lib/invoice-settings-api";
 import { mediaHydration } from "@/apps/admin/media/lib/media-api";
-import { communicationsHydration } from "@/apps/admin/communications/lib/communications-api";
+import {
+  emailTemplatesHydration,
+  whatsappTemplatesHydration,
+  notificationSettingsHydration,
+} from "@/apps/admin/communications/lib/communications-api";
 import { createHydrationGate } from "@/lib/hydration-gate";
 
 /** Stub every dual-write endpoint with a fixed HTTP outcome. */
@@ -80,7 +84,12 @@ function markHydrated() {
   siteLayoutHydration.markSettled();
   seoHydration.markSettled();
   mediaHydration.markSettled();
-  communicationsHydration.markSettled();
+  // One gate PER COLLECTION now. A single gate used to cover all three and
+  // opened only when both template fetches succeeded, so one WhatsApp blip
+  // permanently blocked email template saves.
+  emailTemplatesHydration.markSettled();
+  whatsappTemplatesHydration.markSettled();
+  notificationSettingsHydration.markSettled();
   catalogHydration.markSettled();
   // The shop's legal identity on every invoice — company name, address, GSTIN,
   // PAN, terms. It is a whole-document replace like the others and had no gate

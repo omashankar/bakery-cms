@@ -1,6 +1,9 @@
 import type { WhatsAppTemplateFormData, WhatsAppTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "@/lib/template-render";
-import { replaceWhatsAppTemplatesRequest } from "./communications-api";
+import {
+  whatsappTemplatesHydration,
+  replaceWhatsAppTemplatesRequest,
+} from "./communications-api";
 import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-whatsapp-templates";
@@ -103,10 +106,39 @@ function writeTemplates(templates: WhatsAppTemplateRecord[]): void {
   emitUpdated();
 }
 
-/** Local write first, then the server, reporting what the server did. */
+/**
+ * Local write first, then the server — and the local write is UNDONE when the
+ * server refuses.
+ *
+ * Without the rollback a refused save still changed localStorage, so the page
+ * reloaded its list from that cache, found it matched the editor, and showed
+ * "All changes saved" with the Save button greyed out — for a change the
+ * server had rejected. The admin's only warning was a toast they had already
+ * dismissed, and the next hydration silently replaced their work.
+ *
+ * Keeping the cache to things the server has actually accepted costs one save
+ * on a refusal instead of quietly losing it. `delivery-zones-repository.ts`
+ * does the same, including the concurrency guard below.
+ */
 async function persistAndSync(templates: WhatsAppTemplateRecord[]): Promise<boolean> {
+  const previous = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+
   writeTemplates(templates);
-  return replaceWhatsAppTemplatesRequest(templates);
+  const accepted = await replaceWhatsAppTemplatesRequest(templates);
+
+  // Roll back ONLY if this write is still the one in the cache. Restoring the
+  // entry snapshot unconditionally would undo a concurrent save the server had
+  // accepted in the meantime — a rejected write destroying a good one.
+  if (!accepted && typeof window !== "undefined") {
+    const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(templates);
+    if (stillOurs) {
+      if (previous === null) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, previous);
+      emitUpdated();
+    }
+  }
+
+  return accepted;
 }
 
 /** Hydration: write the server's templates into the local cache (no re-push). */
@@ -127,9 +159,12 @@ export function loadWhatsAppTemplates(): WhatsAppTemplateRecord[] {
   const version = Number(localStorage.getItem(STORAGE_VERSION_KEY) ?? 0);
   const existing = readTemplates();
 
-  if (existing.length === 0 || version < STORAGE_VERSION) {
+  // Only an ABSENT store gets the demo seed. An empty one is the shop saying it
+  // has no templates, and re-seeding over that is how the demo set kept coming
+  // back after a delete.
+  if (existing === null || version < STORAGE_VERSION) {
     const seeded =
-      existing.length > 0 ? existing.map(normalizeTemplate) : seedWhatsAppTemplates();
+      existing === null ? seedWhatsAppTemplates() : existing.map(normalizeTemplate);
     writeTemplates(seeded);
     localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
     return seeded;
@@ -142,28 +177,63 @@ export function getWhatsAppTemplateById(id: string): WhatsAppTemplateRecord | nu
   return loadWhatsAppTemplates().find((template) => template.id === id) ?? null;
 }
 
+/**
+ * Read the list AFTER hydration, then write it.
+ *
+ * The gate guarded the PUT but not the READ that composed it. Every mutation
+ * called `loadWhatsAppTemplates()` first, so an admin who clicked before the
+ * server's copy arrived built their payload from the DEMO SEED — that loader
+ * seeds it when the cache is empty. `guardedPut` then waited politely for the
+ * gate, the gate opened, and it shipped the seed as a whole-collection
+ * replace: the seed-clobber the gate exists to prevent, surviving inside it.
+ *
+ * `delivery-zones-repository.ts` documents and fixes this exact ordering; the
+ * template stores were written before that and never caught up.
+ */
+async function mutateWhatsAppTemplates<T>(
+  /** Returned when hydration never lands, so callers never see `undefined`. */
+  fallback: T,
+  mutate: (
+    current: WhatsAppTemplateRecord[],
+  ) =>
+    | { next: WhatsAppTemplateRecord[]; value: T }
+    | { value: T; next?: undefined },
+): Promise<WriteResult<T>> {
+  if (!(await whatsappTemplatesHydration.waitForSettled())) {
+    return { value: fallback, persisted: false };
+  }
+
+  const outcome = mutate(loadWhatsAppTemplates());
+  // Nothing to write is only success when nothing was asked for.
+  if (outcome.next === undefined) return { value: outcome.value, persisted: false };
+
+  return { value: outcome.value, persisted: await persistAndSync(outcome.next) };
+}
+
 export async function saveWhatsAppTemplate(
   id: string,
   data: WhatsAppTemplateFormData
 ): Promise<WriteResult<WhatsAppTemplateRecord | null>> {
-  const templates = loadWhatsAppTemplates();
-  const index = templates.findIndex((template) => template.id === id);
-  if (index === -1) return { value: null, persisted: false };
+  return mutateWhatsAppTemplates<WhatsAppTemplateRecord | null>(null, (current) => {
+    const templates = [...current];
+    const index = templates.findIndex((template) => template.id === id);
+    // Not in the SERVER's list: another admin deleted it mid-edit.
+    if (index === -1) return { value: null };
 
-  const updated: WhatsAppTemplateRecord = normalizeTemplate({
-    ...templates[index],
-    ...data,
-    id,
-    updatedAt: nowIso(),
+    const updated: WhatsAppTemplateRecord = normalizeTemplate({
+      ...templates[index],
+      ...data,
+      id,
+      updatedAt: nowIso(),
+    });
+    templates[index] = updated;
+    return { next: templates, value: updated };
   });
-  templates[index] = updated;
-  return { value: updated, persisted: await persistAndSync(templates) };
 }
 
 export async function createWhatsAppTemplate(
   data: WhatsAppTemplateFormData
 ): Promise<WriteResult<WhatsAppTemplateRecord>> {
-  const templates = loadWhatsAppTemplates();
   const timestamp = nowIso();
   const template = normalizeTemplate({
     ...data,
@@ -171,16 +241,22 @@ export async function createWhatsAppTemplate(
     createdAt: timestamp,
     updatedAt: timestamp,
   });
-  return { value: template, persisted: await persistAndSync([template, ...templates]) };
+
+  return mutateWhatsAppTemplates(template, (current) => ({
+    next: [template, ...current],
+    value: template,
+  }));
 }
 
 /** `value` is false when no such template existed, so nothing was sent. */
 export async function deleteWhatsAppTemplate(id: string): Promise<WriteResult<boolean>> {
-  const templates = loadWhatsAppTemplates();
-  const next = templates.filter((template) => template.id !== id);
-  if (next.length === templates.length) return { value: false, persisted: false };
-  return { value: true, persisted: await persistAndSync(next) };
+  return mutateWhatsAppTemplates(false, (current) => {
+    const next = current.filter((template) => template.id !== id);
+    if (next.length === current.length) return { value: false };
+    return { next, value: true };
+  });
 }
+
 
 export async function resetWhatsAppTemplates(): Promise<WriteResult<WhatsAppTemplateRecord[]>> {
   const seeded = seedWhatsAppTemplates();

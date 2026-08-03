@@ -50,38 +50,39 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
-/** Settled by this module's `*ServerSync` once the server's copy is loaded. */
-export const communicationsHydration = createHydrationGate();
+/**
+ * ONE GATE PER COLLECTION.
+ *
+ * There used to be a single `communicationsHydration` covering all three, and
+ * its sync opened it only `if (email && whatsapp)`. So a WhatsApp fetch that
+ * failed — a blip, a 500, a slow cold start past the deadline — permanently
+ * blocked EMAIL template saves for that whole session, and the admin was told
+ * "saved on this device only" for a store that was perfectly reachable. One
+ * gate vouching for collections it never read is the same mistake the
+ * admin-config gate made in the other direction (opening when ANY ONE of four
+ * arrived); both are fixed by making a gate answer for exactly what it read.
+ */
+export const emailTemplatesHydration = createHydrationGate();
+export const whatsappTemplatesHydration = createHydrationGate();
+export const notificationSettingsHydration = createHydrationGate();
 
 /**
  * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
  * stops a browser that never loaded the server's copy from overwriting it — see
  * `createHydrationGate`.
- */
-async function guardedPut(path: string, body: unknown): Promise<boolean> {
-  if (!(await communicationsHydration.waitForSettled())) return false;
-  return putJson(path, body);
-}
-
-/**
- * Awaited variant that reports whether the server actually accepted the write.
  *
- * `putJson` above is deliberately fire-and-forget, but a screen that shows a
- * "Saved" confirmation must not use it: a 401 (expired token) or 500 would leave
- * the admin believing a preference reached the server when only localStorage
- * has it, and the next device would silently show the old value.
+ * Note what this can and cannot do: it holds the REQUEST until the gate opens,
+ * and the body was composed by the caller. A caller that read its list before
+ * waiting hands over a stale payload and this dutifully ships it — which is
+ * exactly what both template repositories used to do. They wait first now.
  */
-async function putJsonResult(path: string, body: unknown): Promise<boolean> {
-  try {
-    const res = await fetch(path, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+async function guardedPut(
+  gate: { waitForSettled: () => Promise<boolean> },
+  path: string,
+  body: unknown,
+): Promise<boolean> {
+  if (!(await gate.waitForSettled())) return false;
+  return putJson(path, body);
 }
 
 const EMAIL_PATH = "/api/communications/templates/email-templates";
@@ -90,17 +91,23 @@ const NOTIFICATION_SETTINGS_PATH = "/api/communications/notification-settings";
 
 export const fetchEmailTemplates = () => getJson<EmailTemplateRecord[]>(EMAIL_PATH);
 export const replaceEmailTemplatesRequest = (items: EmailTemplateRecord[]) =>
-  guardedPut(EMAIL_PATH, items);
+  guardedPut(emailTemplatesHydration, EMAIL_PATH, items);
 
 export const fetchWhatsAppTemplates = () => getJson<WhatsAppTemplateRecord[]>(WHATSAPP_PATH);
 export const replaceWhatsAppTemplatesRequest = (items: WhatsAppTemplateRecord[]) =>
-  guardedPut(WHATSAPP_PATH, items);
+  guardedPut(whatsappTemplatesHydration, WHATSAPP_PATH, items);
 
 export const fetchNotificationSettings = () =>
   getJson<NotificationSettings>(NOTIFICATION_SETTINGS_PATH);
-/** Resolves false when the server rejected the write — callers must surface it. */
+/**
+ * Resolves false when the server rejected the write — callers must surface it.
+ *
+ * Gated like the others. This was the one PUT in this file that skipped the
+ * gate entirely, so a browser that had never read the server's notification
+ * settings could replace them with its local defaults.
+ */
 export const replaceNotificationSettingsRequest = (settings: NotificationSettings) =>
-  putJsonResult(NOTIFICATION_SETTINGS_PATH, settings);
+  guardedPut(notificationSettingsHydration, NOTIFICATION_SETTINGS_PATH, settings);
 
 /**
  * Really sends a test of one template, to the signed-in admin.

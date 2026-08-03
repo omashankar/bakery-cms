@@ -223,7 +223,17 @@ const SETTINGS_ENTRIES: GlobalSearchResult[] = [
     title: "WhatsApp Templates",
     subtitle: "Business message templates",
     href: routes.admin.commerce.whatsapp,
-    keywords: ["sms", "message", "template"],
+    // "sms" removed: it steered a search for SMS to the WhatsApp screen, which
+    // is a different unbuilt channel. SMS has its own entry now.
+    keywords: ["whatsapp", "message", "template"],
+  },
+  {
+    id: "settings-sms",
+    group: "settings",
+    title: "SMS Notifications",
+    subtitle: "Not connected yet",
+    href: routes.admin.settings.sms,
+    keywords: ["sms", "text", "twilio", "otp"],
   },
   {
     id: "commerce-invoices",

@@ -158,9 +158,15 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "WhatsApp Templates",
-        description: "WhatsApp message templates for order updates.",
+        // NOT "for order updates". Nothing in this codebase sends a WhatsApp
+        // message — the screen is a template editor with no provider behind
+        // it — and describing it next to a genuinely shipped Email entry, with
+        // SMS below it correctly flagged "coming soon", read as the one in the
+        // middle being live.
+        description: "Draft WhatsApp copy — sending not connected yet.",
         href: routes.admin.commerce.whatsapp,
         icon: MessageCircle,
+        future: true,
       },
       {
         title: "SMS Notifications",

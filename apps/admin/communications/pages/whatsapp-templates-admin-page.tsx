@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Eye,
@@ -29,6 +29,11 @@ import {
   saveWhatsAppTemplate,
   WHATSAPP_TEMPLATES_UPDATED_EVENT,
 } from "@/apps/admin/communications/lib/whatsapp-templates-repository";
+import { ensureCommunicationsHydrated } from "@/apps/admin/communications/lib/use-communications-server-sync";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 import {
   defaultWhatsAppTemplateFilters,
   EMPTY_WHATSAPP_TEMPLATE_OVERVIEW,
@@ -57,11 +62,50 @@ import { Label } from "@/components/ui/label";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
 import { cn } from "@/lib/utils";
 
+/**
+ * Whether the editor's copy differs from the one it was loaded from.
+ *
+ * `updatedAt` and `createdAt` are excluded on BOTH sides. The first attempt
+ * excluded only `updatedAt` here while `isDirty` excluded both, so a record
+ * differing solely in `createdAt` — which the client seed stamps at page-load
+ * time and the server's does not — was "edited" to the effect and "clean" to
+ * the header at the same time: the draft pinned forever under an "All changes
+ * saved" label describing a copy that was not the saved one.
+ */
+function isEdited(
+  a: WhatsAppTemplateRecord | null,
+  b: WhatsAppTemplateRecord | null,
+): boolean {
+  if (!a || !b) return false;
+  const strip = (t: WhatsAppTemplateRecord) =>
+    JSON.stringify({ ...t, updatedAt: undefined, createdAt: undefined });
+  return strip(a) !== strip(b);
+}
+
 export function WhatsAppTemplatesAdminPage() {
   const [mounted, setMounted] = useState(false);
+  // Real hydration, not "has this component rendered". The form used to be
+  // fully editable over the DEMO SEED that `loadWhatsAppTemplates` plants when the
+  // cache is empty, with `mounted` gating nothing but the stat cards.
+  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">("pending");
   const [templates, setTemplates] = useState<WhatsAppTemplateRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<WhatsAppTemplateRecord | null>(null);
+  /**
+   * The saved copy the draft was derived from.
+   *
+   * Without it there is no way to tell an edit from a baseline that moved.
+   * The first attempt at preserving edits diffed the draft against the NEW
+   * baseline — which is the same record the effect was about to adopt — so
+   * server hydration read as "the admin is typing" and the PRE-hydration
+   * draft was kept. On a cold cache that draft is the demo seed, so a page
+   * the admin had only just opened announced "Unsaved changes", refused to
+   * let them switch template, and offered to Save the seed over the shop's
+   * real copy. Strictly worse than the clobber it replaced.
+   */
+  const [draftOrigin, setDraftOrigin] = useState<WhatsAppTemplateRecord | null>(null);
+  // Read inside the updater below, which must not re-run on every keystroke.
+  const draftOriginRef = useRef<WhatsAppTemplateRecord | null>(null);
   const [filters, setFilters] = useState<WhatsAppTemplateListFilters>(
     defaultWhatsAppTemplateFilters
   );
@@ -81,9 +125,23 @@ export function WhatsAppTemplatesAdminPage() {
       });
     }
 
+    let cancelled = false;
     refresh();
     window.addEventListener(WHATSAPP_TEMPLATES_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(WHATSAPP_TEMPLATES_UPDATED_EVENT, refresh);
+
+    // Ask for the server's copy rather than waiting on the layout effect to:
+    // it never re-runs after an in-app login, and the form must adopt what
+    // arrives BEFORE it unlocks or the admin edits the seed.
+    void ensureCommunicationsHydrated().then((settled) => {
+      if (cancelled) return;
+      if (settled.whatsapp) refresh();
+      setHydration(settled.whatsapp ? "ready" : "unavailable");
+    });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(WHATSAPP_TEMPLATES_UPDATED_EVENT, refresh);
+    };
   }, []);
 
   const overview = useMemo(
@@ -104,11 +162,38 @@ export function WhatsAppTemplatesAdminPage() {
   useEffect(() => {
     if (!selectedId) {
       setDraft(null);
+      setDraftOrigin(null);
       return;
     }
     const next = templates.find((template) => template.id === selectedId) ?? null;
-    setDraft(next);
+    // Never over an edit in progress.
+    //
+    // This ran on EVERY change to `templates` — including server hydration and
+    // any save from another tab — and replaced the editor's contents outright.
+    // An admin part-way through rewriting a subject line lost it with no
+    // warning and nothing on screen to say why. Comparing against the saved
+    // copy is how the shared settings form decides the same question.
+    setDraft((current) => {
+      // A different template, or nothing open: adopt outright.
+      if (!current || current.id !== selectedId) {
+        setDraftOrigin(next);
+        return next;
+      }
+      // Untouched since it was loaded — take the server's newer copy.
+      if (!isEdited(current, draftOriginRef.current)) {
+        setDraftOrigin(next);
+        return next;
+      }
+      // Genuinely mid-edit. Keep what the admin typed; `isDirty` below
+      // compares against the new baseline, so the header and Save button
+      // describe the difference that actually matters.
+      return current;
+    });
   }, [selectedId, templates]);
+
+  useEffect(() => {
+    draftOriginRef.current = draftOrigin;
+  }, [draftOrigin]);
 
   const isDirty =
     !!draft &&
@@ -168,14 +253,25 @@ export function WhatsAppTemplatesAdminPage() {
       toast.error("Could not save template");
       return;
     }
+    // The store ROLLS BACK a refused write, so the local list is the
+    // server's again — re-read it, and only re-baseline the editor when the
+    // server actually took the change. Adopting `saved` regardless left the
+    // header reading "All changes saved" with Save greyed out, for an edit
+    // that existed nowhere.
     setTemplates(loadWhatsAppTemplates());
-    setDraft(saved);
-    reportWrite(persisted, "WhatsApp template saved");
+    if (persisted) {
+      setDraft(saved);
+      setDraftOrigin(saved);
+    }
+    reportWrite(persisted, "WhatsApp template saved", {
+      failure: "WhatsApp template was not saved — the server rejected it",
+    });
   }
 
   function handleDiscard() {
     if (!savedSelected) return;
     setDraft(savedSelected);
+    setDraftOrigin(savedSelected);
   }
 
   async function handleCreate() {
@@ -190,9 +286,17 @@ export function WhatsAppTemplatesAdminPage() {
       variables: ["customer_name"],
     });
     setTemplates(loadWhatsAppTemplates());
-    setSelectedId(created.id);
-    setDraft(created);
-    reportWrite(persisted, "Template created");
+    // A refused create rolled back too — there is no such template to
+    // select, and selecting it left the editor pointed at a record that
+    // existed in neither the list nor the server.
+    if (persisted) {
+      setSelectedId(created.id);
+      setDraft(created);
+      setDraftOrigin(created);
+    }
+    reportWrite(persisted, "Template created", {
+      failure: "Template was not created — the server rejected it",
+    });
   }
 
   async function handleDelete() {
@@ -206,22 +310,32 @@ export function WhatsAppTemplatesAdminPage() {
     const loaded = loadWhatsAppTemplates();
     setTemplates(loaded);
     setSelectedId(loaded[0]?.id ?? null);
-    reportWrite(persisted, "Template deleted");
+    // Same rollback rule: a refused delete put the template back, so the
+    // default "on this device only" would send the admin looking for a
+    // deletion that happened nowhere.
+    reportWrite(persisted, "Template deleted", {
+      failure: "Template was not deleted — the server rejected it",
+    });
   }
 
   async function handleReset() {
     const { value: seeded, persisted } = await resetWhatsAppTemplates();
     setResetOpen(false);
-    setTemplates(seeded);
-    setSelectedId(seeded[0]?.id ?? null);
-    reportWrite(persisted, "WhatsApp templates reset to defaults");
+    // Re-read rather than trusting `seeded`: a refused reset is rolled back,
+    // and showing the demo set anyway told the admin their templates were
+    // gone when the server still had them.
+    setTemplates(loadWhatsAppTemplates());
+    if (persisted) setSelectedId(seeded[0]?.id ?? null);
+    reportWrite(persisted, "WhatsApp templates reset to defaults", {
+      failure: "Reset failed — the server kept your templates",
+    });
   }
 
   return (
     <AdminPage className={cn("space-y-4 sm:space-y-5", isDirty && "pb-20 md:pb-0")}>
       <AdminPageHeader
         title="WhatsApp Templates"
-        description="Design WhatsApp message templates"
+        description="Draft WhatsApp message copy. Sending is not connected yet."
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
@@ -234,7 +348,7 @@ export function WhatsAppTemplatesAdminPage() {
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset defaults</span>
             </Button>
-            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()}>
+            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
               <span className="hidden sm:inline">New template</span>
@@ -266,7 +380,7 @@ export function WhatsAppTemplatesAdminPage() {
           <DashboardStatCard
             title="Active"
             value={overview.active}
-            change="Ready to send"
+            change="Published"
             changeTone="positive"
             icon={CheckCircle2}
             tone="bakery"
@@ -342,6 +456,31 @@ export function WhatsAppTemplatesAdminPage() {
         </div>
       </FilterPanel>
 
+      <SettingsHydrationNotice hydration={hydration} />
+
+      {/*
+        Says the one thing this screen most needs to say.
+
+        Nothing in this codebase sends a WhatsApp message — there is no provider,
+        no API call, no webhook; the store is a template editor and nothing more.
+        Four of the five seeded templates ship "active", the stat card counted
+        them as "Ready to send", and the test-send dialog reports a message
+        queued after a 900ms timer. An admin could reasonably write and publish
+        an order-update template and expect customers to receive it.
+
+        Editing the copy now, ready for the day a provider is connected, is a
+        perfectly reasonable thing to do. Believing it is already going out is
+        not, and only this banner separates the two.
+      */}
+      <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+        <p className="font-medium">No WhatsApp provider is connected.</p>
+        <p className="mt-1 text-xs">
+          These templates are saved and ready, but nothing sends them yet — customers receive
+          no WhatsApp messages. Order updates currently go out by email only.
+        </p>
+      </div>
+
+      <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
         {/* Keep the template list in view while scrolling the long editor + preview. */}
         <Card className="shadow-sm xl:sticky xl:top-24 xl:col-span-4 xl:self-start">
@@ -439,7 +578,7 @@ export function WhatsAppTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty}
+                      disabled={!isDirty || hydration !== "ready"}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -546,7 +685,7 @@ export function WhatsAppTemplatesAdminPage() {
               description="Choose a template from the list or create a new one."
               className="py-16"
               action={
-                <Button variant="bakery" onClick={() => void handleCreate()}>
+                <Button variant="bakery" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
                   <Plus className="size-4" />
                   New template
                 </Button>
@@ -555,6 +694,7 @@ export function WhatsAppTemplatesAdminPage() {
           )}
         </div>
       </div>
+      </SettingsFormGate>
 
       <WhatsAppTemplatePreviewDialog
         open={previewOpen}
@@ -612,7 +752,13 @@ export function WhatsAppTemplatesAdminPage() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={() => void handleSave()}>
+          <Button
+            variant="bakery"
+            onClick={() => void handleSave()}
+            // The desktop Save was gated on hydration and this one was not, so
+            // the whole guard was one narrow viewport away from irrelevant.
+            disabled={hydration !== "ready"}
+          >
             Save changes
           </Button>
         </AdminMobileActionBar>

@@ -15,7 +15,12 @@ export function SmsSettingsPage() {
         "OTP / verification messages",
         "Per-event SMS toggles alongside email and WhatsApp",
       ]}
-      note="Email and WhatsApp templates are already available in Settings → Communication."
+      // WhatsApp is NOT available in the sense this sentence implied — its
+      // screen edits templates that nothing can deliver. Sending a reader
+      // from an honest "coming soon" page towards another unbuilt channel,
+      // described as available, is the worst kind of misdirection: they
+      // arrive believing they have found the working one.
+      note="Email is the channel that works today — see Settings → Communication. WhatsApp templates can be drafted there too, but have no provider connected yet."
     />
   );
 }

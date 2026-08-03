@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 
 import {
-  communicationsHydration,
+  emailTemplatesHydration,
+  whatsappTemplatesHydration,
+  notificationSettingsHydration,
   fetchEmailTemplates,
   fetchWhatsAppTemplates,
   fetchNotificationSettings,
@@ -21,26 +23,54 @@ import { persistServerNotificationSettings } from "@/apps/admin/commerce/lib/not
  */
 export function useCommunicationsServerSync(): void {
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const [email, whatsapp, settings] = await Promise.all([
-        fetchEmailTemplates(),
-        fetchWhatsAppTemplates(),
-        fetchNotificationSettings(),
-      ]);
-      if (cancelled) return;
-      if (email) persistServerEmailTemplates(email);
-      if (whatsapp) persistServerWhatsAppTemplates(whatsapp);
-      if (settings) persistServerNotificationSettings(settings);
-
-      // Only NOW may a replace-all mutation send the local list — before this,
-      // that list is whatever this browser happened to hold.
-      if (email && whatsapp) communicationsHydration.markSettled();
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    void ensureCommunicationsHydrated();
   }, []);
+}
+
+/**
+ * Reads the server's copies in, opening each gate for the collection it read.
+ *
+ * ONE GATE PER COLLECTION. A single gate used to cover all three and opened only
+ * `if (email && whatsapp)` — so one failed WhatsApp fetch (a blip, a 500, a cold
+ * start past the deadline) permanently blocked EMAIL template saves for the
+ * whole session, and the admin was told "saved on this device only" about a
+ * store that was perfectly reachable. A gate now answers for exactly what it
+ * read, which is also what stops it vouching for a collection it never saw.
+ *
+ * Callable rather than mount-only, for the reason every other gate in this
+ * codebase is: this runs from a `[]`-dep effect in the admin layout, and an
+ * admin who signs in through the LOGIN FORM loads that layout while anonymous —
+ * the reads 401, and reaching the admin afterwards is a soft navigation that
+ * never remounts it. The forms call this so they can adopt the server's copy
+ * before they unlock.
+ */
+export async function ensureCommunicationsHydrated(): Promise<{
+  email: boolean;
+  whatsapp: boolean;
+}> {
+  const [email, whatsapp, settings] = await Promise.all([
+    emailTemplatesHydration.hasSettled() ? null : fetchEmailTemplates(),
+    whatsappTemplatesHydration.hasSettled() ? null : fetchWhatsAppTemplates(),
+    notificationSettingsHydration.hasSettled() ? null : fetchNotificationSettings(),
+  ]);
+
+  // Each write opens only its OWN gate. A `null` is a failed read, not an empty
+  // collection — settling on it is what would let this browser's seed be pushed.
+  if (email) {
+    persistServerEmailTemplates(email);
+    emailTemplatesHydration.markSettled();
+  }
+  if (whatsapp) {
+    persistServerWhatsAppTemplates(whatsapp);
+    whatsappTemplatesHydration.markSettled();
+  }
+  if (settings) {
+    persistServerNotificationSettings(settings);
+    notificationSettingsHydration.markSettled();
+  }
+
+  return {
+    email: emailTemplatesHydration.hasSettled(),
+    whatsapp: whatsappTemplatesHydration.hasSettled(),
+  };
 }

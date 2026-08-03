@@ -28,7 +28,6 @@ export function WhatsAppTemplateTestSendDialog({
   onOpenChange,
 }: WhatsAppTemplateTestSendDialogProps) {
   const [phone, setPhone] = useState("+91 98765 43210");
-  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -48,12 +47,18 @@ export function WhatsAppTemplateTestSendDialog({
       return;
     }
 
-    setSending(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setSending(false);
+    // Nothing to send it with.
+    //
+    // This was a 900ms timer followed by a SUCCESS toast reading "WhatsApp
+    // message queued (demo)" — and "queued" is the word a real provider uses,
+    // so the parenthesis was doing a great deal of work. There is no WhatsApp
+    // provider anywhere in this codebase, so the honest outcome is a refusal
+    // that says why, not a green tick. The email equivalent of this dialog was
+    // the same sleep until its endpoint existed; this one gets the same
+    // treatment the day a provider does.
     onOpenChange(false);
-    toast.success("WhatsApp message queued (demo)", {
-      description: `${template.name} → ${phone.trim()}`,
+    toast.error("No WhatsApp provider is connected", {
+      description: "The template is saved, but nothing can deliver it yet.",
     });
   }
 
@@ -97,8 +102,8 @@ export function WhatsAppTemplateTestSendDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" disabled={!template || sending} onClick={handleSend}>
-            {sending ? "Sending…" : "Send test"}
+          <Button variant="bakery" disabled={!template} onClick={handleSend}>
+            Send test
           </Button>
         </DialogFooter>
       </DialogContent>

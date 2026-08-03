@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Eye,
@@ -29,6 +29,11 @@ import {
   resetEmailTemplates,
   saveEmailTemplate,
 } from "@/apps/admin/communications/lib/email-templates-repository";
+import { ensureCommunicationsHydrated } from "@/apps/admin/communications/lib/use-communications-server-sync";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 import {
   defaultEmailTemplateFilters,
   EMPTY_EMAIL_TEMPLATE_OVERVIEW,
@@ -57,11 +62,50 @@ import { Label } from "@/components/ui/label";
 import type { EmailTemplateRecord } from "@/types/communication";
 import { cn } from "@/lib/utils";
 
+/**
+ * Whether the editor's copy differs from the one it was loaded from.
+ *
+ * `updatedAt` and `createdAt` are excluded on BOTH sides. The first attempt
+ * excluded only `updatedAt` here while `isDirty` excluded both, so a record
+ * differing solely in `createdAt` — which the client seed stamps at page-load
+ * time and the server's does not — was "edited" to the effect and "clean" to
+ * the header at the same time: the draft pinned forever under an "All changes
+ * saved" label describing a copy that was not the saved one.
+ */
+function isEdited(
+  a: EmailTemplateRecord | null,
+  b: EmailTemplateRecord | null,
+): boolean {
+  if (!a || !b) return false;
+  const strip = (t: EmailTemplateRecord) =>
+    JSON.stringify({ ...t, updatedAt: undefined, createdAt: undefined });
+  return strip(a) !== strip(b);
+}
+
 export function EmailTemplatesAdminPage() {
   const [mounted, setMounted] = useState(false);
+  // Real hydration, not "has this component rendered". The form used to be
+  // fully editable over the DEMO SEED that `loadEmailTemplates` plants when the
+  // cache is empty, with `mounted` gating nothing but the stat cards.
+  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">("pending");
   const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmailTemplateRecord | null>(null);
+  /**
+   * The saved copy the draft was derived from.
+   *
+   * Without it there is no way to tell an edit from a baseline that moved.
+   * The first attempt at preserving edits diffed the draft against the NEW
+   * baseline — which is the same record the effect was about to adopt — so
+   * server hydration read as "the admin is typing" and the PRE-hydration
+   * draft was kept. On a cold cache that draft is the demo seed, so a page
+   * the admin had only just opened announced "Unsaved changes", refused to
+   * let them switch template, and offered to Save the seed over the shop's
+   * real copy. Strictly worse than the clobber it replaced.
+   */
+  const [draftOrigin, setDraftOrigin] = useState<EmailTemplateRecord | null>(null);
+  // Read inside the updater below, which must not re-run on every keystroke.
+  const draftOriginRef = useRef<EmailTemplateRecord | null>(null);
   const [filters, setFilters] = useState<EmailTemplateListFilters>(defaultEmailTemplateFilters);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testSendOpen, setTestSendOpen] = useState(false);
@@ -79,9 +123,23 @@ export function EmailTemplatesAdminPage() {
       });
     }
 
+    let cancelled = false;
     refresh();
     window.addEventListener(EMAIL_TEMPLATES_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(EMAIL_TEMPLATES_UPDATED_EVENT, refresh);
+
+    // Ask for the server's copy rather than waiting on the layout effect to:
+    // it never re-runs after an in-app login, and the form must adopt what
+    // arrives BEFORE it unlocks or the admin edits the seed.
+    void ensureCommunicationsHydrated().then((settled) => {
+      if (cancelled) return;
+      if (settled.email) refresh();
+      setHydration(settled.email ? "ready" : "unavailable");
+    });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(EMAIL_TEMPLATES_UPDATED_EVENT, refresh);
+    };
   }, []);
 
   const overview = useMemo(
@@ -102,11 +160,38 @@ export function EmailTemplatesAdminPage() {
   useEffect(() => {
     if (!selectedId) {
       setDraft(null);
+      setDraftOrigin(null);
       return;
     }
     const next = templates.find((template) => template.id === selectedId) ?? null;
-    setDraft(next);
+    // Never over an edit in progress.
+    //
+    // This ran on EVERY change to `templates` — including server hydration and
+    // any save from another tab — and replaced the editor's contents outright.
+    // An admin part-way through rewriting a subject line lost it with no
+    // warning and nothing on screen to say why. Comparing against the saved
+    // copy is how the shared settings form decides the same question.
+    setDraft((current) => {
+      // A different template, or nothing open: adopt outright.
+      if (!current || current.id !== selectedId) {
+        setDraftOrigin(next);
+        return next;
+      }
+      // Untouched since it was loaded — take the server's newer copy.
+      if (!isEdited(current, draftOriginRef.current)) {
+        setDraftOrigin(next);
+        return next;
+      }
+      // Genuinely mid-edit. Keep what the admin typed; `isDirty` below
+      // compares against the new baseline, so the header and Save button
+      // describe the difference that actually matters.
+      return current;
+    });
   }, [selectedId, templates]);
+
+  useEffect(() => {
+    draftOriginRef.current = draftOrigin;
+  }, [draftOrigin]);
 
   const isDirty =
     !!draft &&
@@ -168,14 +253,25 @@ export function EmailTemplatesAdminPage() {
       toast.error("Could not save template");
       return;
     }
+    // The store ROLLS BACK a refused write, so the local list is the
+    // server's again — re-read it, and only re-baseline the editor when the
+    // server actually took the change. Adopting `saved` regardless left the
+    // header reading "All changes saved" with Save greyed out, for an edit
+    // that existed nowhere.
     setTemplates(loadEmailTemplates());
-    setDraft(saved);
-    reportWrite(persisted, "Email template saved");
+    if (persisted) {
+      setDraft(saved);
+      setDraftOrigin(saved);
+    }
+    reportWrite(persisted, "Email template saved", {
+      failure: "Email template was not saved — the server rejected it",
+    });
   }
 
   function handleDiscard() {
     if (!savedSelected) return;
     setDraft(savedSelected);
+    setDraftOrigin(savedSelected);
   }
 
   async function handleCreate() {
@@ -192,9 +288,17 @@ export function EmailTemplatesAdminPage() {
       variables: ["customer_name", "store_name"],
     });
     setTemplates(loadEmailTemplates());
-    setSelectedId(created.id);
-    setDraft(created);
-    reportWrite(persisted, "Template created");
+    // A refused create rolled back too — there is no such template to
+    // select, and selecting it left the editor pointed at a record that
+    // existed in neither the list nor the server.
+    if (persisted) {
+      setSelectedId(created.id);
+      setDraft(created);
+      setDraftOrigin(created);
+    }
+    reportWrite(persisted, "Template created", {
+      failure: "Template was not created — the server rejected it",
+    });
   }
 
   async function handleDelete() {
@@ -208,15 +312,25 @@ export function EmailTemplatesAdminPage() {
     const loaded = loadEmailTemplates();
     setTemplates(loaded);
     setSelectedId(loaded[0]?.id ?? null);
-    reportWrite(persisted, "Template deleted");
+    // Same rollback rule: a refused delete put the template back, so the
+    // default "on this device only" would send the admin looking for a
+    // deletion that happened nowhere.
+    reportWrite(persisted, "Template deleted", {
+      failure: "Template was not deleted — the server rejected it",
+    });
   }
 
   async function handleReset() {
     const { value: seeded, persisted } = await resetEmailTemplates();
     setResetOpen(false);
-    setTemplates(seeded);
-    setSelectedId(seeded[0]?.id ?? null);
-    reportWrite(persisted, "Email templates reset to defaults");
+    // Re-read rather than trusting `seeded`: a refused reset is rolled back,
+    // and showing the demo set anyway told the admin their templates were
+    // gone when the server still had them.
+    setTemplates(loadEmailTemplates());
+    if (persisted) setSelectedId(seeded[0]?.id ?? null);
+    reportWrite(persisted, "Email templates reset to defaults", {
+      failure: "Reset failed — the server kept your templates",
+    });
   }
 
   return (
@@ -236,7 +350,7 @@ export function EmailTemplatesAdminPage() {
               <span className="sm:hidden">Reset</span>
               <span className="hidden sm:inline">Reset defaults</span>
             </Button>
-            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()}>
+            <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
               <span className="hidden sm:inline">New template</span>
@@ -344,6 +458,9 @@ export function EmailTemplatesAdminPage() {
         </div>
       </FilterPanel>
 
+      <SettingsHydrationNotice hydration={hydration} />
+
+      <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
         {/* Keep the template list in view while scrolling the long editor + preview. */}
         <Card className="shadow-sm xl:sticky xl:top-24 xl:col-span-4 xl:self-start">
@@ -443,7 +560,7 @@ export function EmailTemplatesAdminPage() {
                     <Button
                       variant="bakery"
                       className="hidden md:inline-flex"
-                      disabled={!isDirty}
+                      disabled={!isDirty || hydration !== "ready"}
                       onClick={() => void handleSave()}
                     >
                       Save changes
@@ -569,7 +686,7 @@ export function EmailTemplatesAdminPage() {
               description="Choose a template from the list or create a new one."
               className="py-16"
               action={
-                <Button variant="bakery" onClick={() => void handleCreate()}>
+                <Button variant="bakery" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
                   <Plus className="size-4" />
                   New template
                 </Button>
@@ -578,6 +695,7 @@ export function EmailTemplatesAdminPage() {
           )}
         </div>
       </div>
+      </SettingsFormGate>
 
       <EmailTemplatePreviewDialog
         open={previewOpen}
@@ -635,7 +753,13 @@ export function EmailTemplatesAdminPage() {
           <Button variant="outline" onClick={handleDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" onClick={() => void handleSave()}>
+          <Button
+            variant="bakery"
+            onClick={() => void handleSave()}
+            // The desktop Save was gated on hydration and this one was not, so
+            // the whole guard was one narrow viewport away from irrelevant.
+            disabled={hydration !== "ready"}
+          >
             Save changes
           </Button>
         </AdminMobileActionBar>
