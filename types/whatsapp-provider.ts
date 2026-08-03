@@ -23,7 +23,15 @@ export interface WhatsAppConnectionStatus {
   enabled: boolean;
   phoneNumberId: string;
   businessAccountId: string;
-  /** True when a token is stored. The value itself is never sent. */
+  /**
+   * True when a token is stored. The value itself is never sent.
+   *
+   * There is deliberately NO `accessToken` field here. This interface is the
+   * shape of a response that reaches a browser, so a field for the token would
+   * be a field something could fill — and a WhatsApp access token can message
+   * any customer who has ever contacted the business, from the shop's verified
+   * number. The presence flag is all the UI needs to render.
+   */
   tokenSet: boolean;
   updatedAt: string | null;
 }

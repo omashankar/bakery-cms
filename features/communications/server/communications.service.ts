@@ -12,6 +12,10 @@ import { sendMail } from "@/lib/server/mail/send-mail";
 import { toEmailHtml } from "./email.service";
 import { renderTemplate } from "@/lib/template-render";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import {
+  TEMPLATE_VARIABLE_CONTRACT,
+  WHATSAPP_VARIABLE_CONTRACT,
+} from "@/features/communications/lib/template-contract";
 
 /**
  * Communication templates (email + WhatsApp) that were client-only localStorage
@@ -40,7 +44,126 @@ function templateStoreFor(key: string) {
   return store;
 }
 
-export function getTemplates(key: string) {
+/**
+ * Wired slugs by collection — the ones something in this codebase sends.
+ *
+ * Kept next to the backfill below because that is the only thing that reads
+ * them here; `template-contract.ts` remains the single source of the lists.
+ */
+const WIRED_SLUGS: Record<string, readonly string[]> = {
+  "email-templates": Object.keys(TEMPLATE_VARIABLE_CONTRACT),
+  "whatsapp-templates": Object.keys(WHATSAPP_VARIABLE_CONTRACT),
+};
+
+/**
+ * Adds a wired template the stored collection has never had.
+ *
+ * The seed runs ONCE, when the collection does not exist — which is correct,
+ * and which means adding a template to `seedEmailTemplates()` does nothing at
+ * all for a shop that has been running. That is not a theoretical gap: the two
+ * emails just made editable, `refund_processed` and `admin_new_order`, were
+ * invisible on every existing shop while the tests — which exercise the seed
+ * FUNCTION — passed. The fix looked complete and changed nothing.
+ *
+ * Only slugs the code actually SENDS are restored, and only when no row exists
+ * at all. The resurrection worry does not apply to them: a wired slug with no
+ * template does not mean the email stops going out, it means the hardcoded
+ * fallback goes out instead and nobody can edit a word of it. Putting the row
+ * back gives the shop control over an email it is already sending.
+ *
+ * A template the shop EDITED is never touched, because a row exists. Custom
+ * templates are never touched, because they are not wired. And the write only
+ * happens on the first read that finds something missing.
+ */
+/**
+ * Fields a stored row may predate. Widened when absent, never overwritten.
+ *
+ * All four arrived with the WhatsApp Meta binding. A row written before them
+ * has `undefined` in each, which is why the `undefined` test — rather than a
+ * falsy one — is what stops this touching an admin's own choice. An empty
+ * `metaParameters: []` is a decision; `undefined` is an absence.
+ */
+const WIDENABLE_FIELDS = ["metaName", "metaLanguage", "metaParameters", "approval"] as const;
+
+export interface BackfillPlan {
+  /** Wired rows the stored collection has never had, taken from the seed. */
+  restored: unknown[];
+  /** Every stored row, with absent new fields filled from its seed row. */
+  rows: unknown[];
+  /** How many stored rows the widening actually changed. */
+  widenedCount: number;
+  /** Nothing to do — do not write. */
+  empty: boolean;
+}
+
+/**
+ * What a backfill would change, as a pure function. See the caller for why.
+ *
+ * Separated so the decisions can be tested against the shapes a real database
+ * holds, rather than asserted at by grepping this file. The rules are narrow on
+ * purpose: restore only WIRED slugs and only when no row exists, and fill only
+ * fields that are absent.
+ */
+export function planTemplateBackfill(
+  stored: readonly unknown[],
+  seeded: readonly unknown[],
+  wired: readonly string[],
+): BackfillPlan {
+  const rowsIn = stored as { slug?: string }[];
+  const seedRows = seeded as { slug?: string }[];
+
+  const present = new Set(rowsIn.map((item) => item.slug));
+  const missing = wired.filter((slug) => !present.has(slug));
+  const restored = seedRows.filter((item) => item.slug && missing.includes(item.slug));
+
+  let widenedCount = 0;
+  const rows = rowsIn.map((item) => {
+    const defaults = seedRows.find((candidate) => candidate.slug === item.slug) as
+      | Record<string, unknown>
+      | undefined;
+    if (!defaults) return item;
+
+    const row = item as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    for (const field of WIDENABLE_FIELDS) {
+      if (row[field] === undefined && defaults[field] !== undefined) {
+        patch[field] = defaults[field];
+      }
+    }
+    if (!Object.keys(patch).length) return item;
+
+    widenedCount += 1;
+    return { ...item, ...patch };
+  });
+
+  return {
+    restored,
+    rows,
+    widenedCount,
+    empty: restored.length === 0 && widenedCount === 0,
+  };
+}
+
+async function backfillWiredTemplates(key: string): Promise<void> {
+  const wired = WIRED_SLUGS[key];
+  if (!wired) return;
+
+  const store = templateStoreFor(key);
+  const stored = ((await store.read()) ?? []) as unknown[];
+  const seeded = key === "email-templates" ? seedEmailTemplates() : seedWhatsAppTemplates();
+
+  const plan = planTemplateBackfill(stored, seeded, wired);
+  if (plan.empty) return;
+
+  await store.write([...plan.rows, ...plan.restored] as never);
+  console.info(
+    `[communications] ${key}: restored ${plan.restored.length} wired template(s)` +
+      `, filled new fields on ${plan.widenedCount} row(s)`,
+  );
+}
+
+export async function getTemplates(key: string) {
+  await backfillWiredTemplates(key);
   return templateStoreFor(key).read();
 }
 

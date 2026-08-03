@@ -14,7 +14,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { normalizePhone } from "@/features/communications/server/whatsapp-client.server";
-import { keepServerApproval } from "@/features/communications/server/communications.service";
+import {
+  keepServerApproval,
+  planTemplateBackfill,
+} from "@/features/communications/server/communications.service";
 import {
   buildParameters,
   contractCoversEverySlug,
@@ -27,6 +30,7 @@ import {
   WHATSAPP_VARIABLE_CONTRACT,
 } from "@/features/communications/lib/template-contract";
 import { seedWhatsAppTemplates } from "@/apps/admin/communications/lib/whatsapp-templates-repository";
+import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
 import {
   countUnfilledSlots,
   getWhatsAppTemplateOverview,
@@ -311,19 +315,223 @@ describe("what the screen shows after a sync", () => {
   });
 });
 
+describe("a shop that was already running", () => {
+  /**
+   * The rows a real database actually holds.
+   *
+   * Copied from the live dev cluster, which is what exposed this gap in the
+   * first place: five WhatsApp templates with no Meta fields at all, and an
+   * email collection containing neither `refund_processed` nor
+   * `admin_new_order` — while every seed-based test passed, because they
+   * exercise the seed FUNCTION and `createMongoStore` seeds once, only when the
+   * collection does not exist. Adding a template to the seed changed nothing
+   * for any shop that had ever been opened.
+   */
+  const LIVE_WHATSAPP_ROWS = [
+    { id: "wa-welcome", slug: "welcome", status: "active", body: "", variables: [] },
+    {
+      id: "wa-order-confirmation",
+      slug: "order_confirmation",
+      status: "active",
+      body: "",
+      variables: [],
+    },
+    { id: "wa-order-ready", slug: "order_ready", status: "active", body: "", variables: [] },
+    {
+      id: "wa-delivery-update",
+      slug: "delivery_update",
+      status: "active",
+      body: "",
+      variables: [],
+    },
+    {
+      id: "wa-payment-reminder",
+      slug: "payment_reminder",
+      status: "draft",
+      body: "",
+      variables: [],
+    },
+  ];
+
+  const LIVE_EMAIL_SLUGS = [
+    "welcome",
+    "order_confirmation",
+    "order_shipped",
+    "invoice",
+    "password_reset",
+    "abandoned_cart",
+  ];
+
+  it("gets the wired emails the seed gained after it was set up", () => {
+    const stored = LIVE_EMAIL_SLUGS.map((slug) => ({ id: `email-${slug}`, slug }));
+
+    const plan = planTemplateBackfill(
+      stored,
+      seedEmailTemplates(),
+      Object.keys(TEMPLATE_VARIABLE_CONTRACT),
+    );
+
+    const restoredSlugs = (plan.restored as { slug: string }[]).map((row) => row.slug).sort();
+    // Exactly the two that were sending from hardcoded fallbacks with no row
+    // for the admin to edit — including the only email a customer receives
+    // about their money.
+    expect(restoredSlugs).toEqual(["admin_new_order", "refund_processed"]);
+    expect(plan.empty).toBe(false);
+  });
+
+  it("does not resurrect a custom template the shop deleted", () => {
+    // `welcome` and `abandoned_cart` are seeded but nothing sends them, so
+    // they are not wired — a shop that deleted them must not find them back.
+    const stored = [{ id: "email-order_confirmation", slug: "order_confirmation" }];
+
+    const plan = planTemplateBackfill(
+      stored,
+      seedEmailTemplates(),
+      Object.keys(TEMPLATE_VARIABLE_CONTRACT),
+    );
+
+    const restoredSlugs = (plan.restored as { slug: string }[]).map((row) => row.slug);
+    expect(restoredSlugs).not.toContain("welcome");
+    expect(restoredSlugs).not.toContain("abandoned_cart");
+  });
+
+  it("fills the Meta fields on rows that predate them", () => {
+    const plan = planTemplateBackfill(
+      LIVE_WHATSAPP_ROWS,
+      seedWhatsAppTemplates(),
+      Object.keys(WHATSAPP_VARIABLE_CONTRACT),
+    );
+
+    // All five predate the binding, so all five gain it.
+    expect(plan.widenedCount).toBe(5);
+
+    const confirmation = (plan.rows as WhatsAppTemplateRecord[]).find(
+      (row) => row.slug === "order_confirmation",
+    );
+    expect(confirmation?.metaParameters).toEqual([
+      "order_number",
+      "order_total",
+      "delivery_date",
+    ]);
+    expect(confirmation?.approval).toBe("not_submitted");
+    // Never a guessed Meta name — that fails at send time as "template does
+    // not exist", which reads like a bug rather than a setup step.
+    expect(confirmation?.metaName).toBe("");
+  });
+
+  it("never overwrites a field the admin has already set", () => {
+    const configured = [
+      {
+        ...LIVE_WHATSAPP_ROWS[1],
+        metaName: "the_shops_own_name",
+        metaLanguage: "hi",
+        // An empty array is a DECISION — a template Meta approved with no
+        // placeholders. `undefined` is an absence. Only the second is filled.
+        metaParameters: [],
+        approval: "approved",
+      },
+    ];
+
+    const plan = planTemplateBackfill(
+      configured,
+      seedWhatsAppTemplates(),
+      Object.keys(WHATSAPP_VARIABLE_CONTRACT),
+    );
+
+    expect(plan.widenedCount).toBe(0);
+    const row = plan.rows[0] as WhatsAppTemplateRecord;
+    expect(row.metaName).toBe("the_shops_own_name");
+    expect(row.metaLanguage).toBe("hi");
+    expect(row.metaParameters).toEqual([]);
+    expect(row.approval).toBe("approved");
+  });
+
+  it("does nothing at all once there is nothing to do", () => {
+    // The write must not repeat on every read of a collection already fixed.
+    const first = planTemplateBackfill(
+      LIVE_WHATSAPP_ROWS,
+      seedWhatsAppTemplates(),
+      Object.keys(WHATSAPP_VARIABLE_CONTRACT),
+    );
+    const settled = [...first.rows, ...first.restored];
+
+    const second = planTemplateBackfill(
+      settled,
+      seedWhatsAppTemplates(),
+      Object.keys(WHATSAPP_VARIABLE_CONTRACT),
+    );
+    expect(second.empty).toBe(true);
+  });
+
+  it("runs on the read path, before anything renders the list", () => {
+    const service = code("features/communications/server/communications.service.ts");
+    expect(service).toMatch(/getTemplates[\s\S]{0,120}await backfillWiredTemplates\(key\)/);
+  });
+});
+
 describe("the access token", () => {
   it("is never read back to the browser", () => {
     const credentials = source("features/communications/server/whatsapp-credentials.server.ts");
-    // The status type the API returns carries `tokenSet`, a boolean — and no
-    // field that could hold the value.
-    const status = source("types/whatsapp-provider.ts");
-    expect(status).toContain("tokenSet: boolean");
     expect(credentials).toContain('import "server-only"');
 
     const api = code("apps/admin/communications/lib/communications-api.ts");
     expect(api).toContain("fetchWhatsAppConnection");
-    // The client type has no token field to populate.
     expect(api).not.toContain("accessToken: loaded");
+  });
+
+  it("has nowhere in the response shape to put the token", () => {
+    /**
+     * Asserting the presence of `tokenSet` was not enough, and this test exists
+     * because that gap was demonstrated rather than imagined: an agent auditing
+     * this code added `accessToken: string` to the status interface and
+     * `accessToken` to the reader that fills it — a live token leaking to the
+     * browser on every page load — and the previous assertions all still
+     * passed, because they only checked that `tokenSet` was still there.
+     *
+     * So: the field must be ABSENT from the interface a response is shaped by,
+     * and absent from the function that builds it.
+     */
+    const types = source("types/whatsapp-provider.ts");
+    const status = types.slice(
+      types.indexOf("export interface WhatsAppConnectionStatus"),
+      types.indexOf("}", types.indexOf("export interface WhatsAppConnectionStatus")),
+    );
+    expect(status).toContain("tokenSet: boolean");
+    expect(status).not.toMatch(/^\s*accessToken/m);
+
+    const credentials = source("features/communications/server/whatsapp-credentials.server.ts");
+    const reader = credentials.slice(
+      credentials.indexOf("export async function readWhatsAppConnectionStatus"),
+    );
+    const returned = reader.slice(reader.indexOf("return {"), reader.indexOf("};"));
+    expect(returned).toContain("tokenSet:");
+    // A returned PROPERTY, not the word: `configured` is legitimately derived
+    // from the local `accessToken`, and a blunt not.toContain would fail on
+    // correct code — the mistake that made the first version of this useless.
+    // Catches the shorthand `accessToken,` and the explicit `accessToken: …`.
+    expect(returned).not.toMatch(/^\s*accessToken\s*[,:]/m);
+
+    // The controller returns that status object verbatim, so the shape above
+    // is the whole guarantee.
+    const controller = code("features/communications/server/communications.controller.ts");
+    expect(controller).toContain("ok(await readWhatsAppConnectionStatus()");
+  });
+
+  it("is never written to the audit log either", () => {
+    const controller = code("features/communications/server/communications.controller.ts");
+    const audit = controller.slice(
+      controller.indexOf("communications.whatsapp.connection.update"),
+    );
+    // Both offsets measured from the START of the metadata block. Searching
+    // the whole slice for the closing brace found one that came earlier and
+    // produced an empty string, which then satisfied `not.toContain` for free.
+    const from = audit.indexOf("metadata: {");
+    const metadata = audit.slice(from, audit.indexOf("},", from));
+    // An audit trail is read by more people than the settings page is, and
+    // kept for longer. `tokenSet` records that one was set; the value is not
+    // there, and neither is its length.
+    expect(metadata).toContain("tokenSet");
+    expect(metadata).not.toContain("accessToken");
   });
 
   it("survives a save that does not retype it", () => {

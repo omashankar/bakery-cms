@@ -56,6 +56,9 @@ export async function readWhatsAppConnectionStatus(): Promise<WhatsAppConnection
     enabled: Boolean(doc?.enabled),
     phoneNumberId,
     businessAccountId: doc?.businessAccountId ?? "",
+    // A boolean, never the value. `readWhatsAppConnection` above is the only
+    // reader that returns the token, it is `server-only`, and nothing routes
+    // its result to a response.
     tokenSet: Boolean(accessToken),
     updatedAt: doc?.updatedAt ?? null,
   };
