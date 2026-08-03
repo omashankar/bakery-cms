@@ -45,9 +45,12 @@ import { routes } from "@/constants/routes";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { cn } from "@/lib/utils";
 import {
+  ensureSettingsHydrated,
   getGeneralSettings,
   getMaintenanceSettings,
+  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { settingsHydration } from "@/features/settings/lib/settings-api";
 
 type SettingsItem = {
   title: string;
@@ -261,17 +264,45 @@ const groups: SettingsGroup[] = [
 ];
 
 export function SettingsOverviewPage() {
-  const [mounted, setMounted] = useState(false);
-  const [siteName, setSiteName] = useState("Monginis");
+  // This page writes nothing, so it cannot clobber anything — but it makes two
+  // CLAIMS from the same unhydrated local store the forms do, and one of them
+  // matters. `mounted` flipped true in the same tick as a synchronous read, so
+  // before hydration landed the header named the demo shop and, worse, the
+  // maintenance banner stayed hidden: an admin was told the storefront was open
+  // while it may have been closed to every customer.
+  //
+  // Both claims now wait for the server's copy. "Loading" is a smaller lie than
+  // "everything is fine".
+  const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
+  const [siteName, setSiteName] = useState("");
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
 
   useEffect(() => {
-    const general = getGeneralSettings();
-    const maintenance = getMaintenanceSettings();
-    setSiteName(general.siteName);
-    setMaintenanceEnabled(maintenance.isEnabled);
-    setMounted(true);
+    let cancelled = false;
+
+    function read() {
+      setSiteName(getGeneralSettings().siteName);
+      setMaintenanceEnabled(getMaintenanceSettings().isEnabled);
+    }
+
+    read();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, read);
+
+    void ensureSettingsHydrated().then((settled) => {
+      if (cancelled) return;
+      if (settled) read();
+      // Only a SUCCESSFUL read may unlock the claims. When it fails they stay
+      // generic rather than reporting this browser's defaults as fact.
+      setHydrated(settled);
+    });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, read);
+    };
   }, []);
+
+  const mounted = hydrated;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5">

@@ -66,7 +66,7 @@ export function BackupSettingsPage() {
     try {
       // Reads the CURRENT server (Mongo) state for every server-backed slice,
       // falling back to localStorage — so the file reflects the durable data.
-      const snapshot = await exportAndArchiveServerBackup(
+      const { snapshot, unavailableSections } = await exportAndArchiveServerBackup(
         backupLabel.trim() || `Manual backup ${new Date().toLocaleString()}`
       );
       const blob = new Blob([JSON.stringify(snapshot.data, null, 2)], {
@@ -80,6 +80,20 @@ export function BackupSettingsPage() {
       URL.revokeObjectURL(url);
       setBackupLabel("");
       refresh();
+
+      // Says which slices are NOT the server's copy.
+      //
+      // A failed read falls back silently to whatever this browser held — the
+      // demo seed on a cold or signed-out load — and the file was still called
+      // a server backup. That file gets restored months later, over the real
+      // thing, by someone with no way left to tell which slices were ever real.
+      if (unavailableSections.length > 0) {
+        toast.warning(`Exported ${snapshot.keyCount} keys — but not all from the server`, {
+          description: `Could not read ${unavailableSections.join(", ")}. Those came from this browser instead. Reload and export again before relying on this file.`,
+        });
+        return;
+      }
+
       toast.success(`Exported and archived ${snapshot.keyCount} data keys`);
     } catch {
       toast.error("Export failed — please try again");

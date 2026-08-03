@@ -269,18 +269,39 @@ export function deleteBackupSnapshot(id: string): boolean {
   return true;
 }
 
+/** A backup, plus the slices whose server copy could not be read for it. */
+export interface ServerBackupData {
+  data: Record<string, string | null>;
+  /**
+   * Titles the server did not answer for.
+   *
+   * These fell back to whatever this browser held — which on a cold or
+   * unauthenticated load is the DEMO SEED. The fallback itself is reasonable;
+   * calling the result a server backup without saying so is not, because the
+   * file is then restored months later over the real thing by someone who has
+   * no way left to tell which slices were ever real.
+   */
+  unavailableSections: string[];
+}
+
 /**
  * Build a backup that reflects Mongo, not just this browser. Starts from the
  * localStorage snapshot, then overlays the CURRENT server value for every
- * server-backed slice (falling back to localStorage when the server has none).
+ * server-backed slice (falling back to localStorage when the server has none,
+ * and reporting which those were).
  */
-export async function buildServerBackupData(): Promise<Record<string, string | null>> {
+export async function buildServerBackup(): Promise<ServerBackupData> {
   const base = exportLocalStorageBackup();
+  const unavailableSections: string[] = [];
 
   await Promise.all(
     SERVER_BACKUP_SECTIONS.map(async (section) => {
       const server = await section.fetch();
-      if (server == null) return; // keep whatever localStorage already had
+      if (server == null) {
+        // Keep whatever localStorage had, and SAY so.
+        unavailableSections.push(section.title);
+        return;
+      }
 
       let value: unknown = server;
       if (section.mergeForExport) {
@@ -299,21 +320,39 @@ export async function buildServerBackupData(): Promise<Record<string, string | n
     })
   );
 
-  return base;
+  return { data: base, unavailableSections };
+}
+
+/** The data alone, for callers that do not surface the gaps. */
+export async function buildServerBackupData(): Promise<Record<string, string | null>> {
+  return (await buildServerBackup()).data;
 }
 
 /**
  * Push every server-backed slice found in the snapshot back through the same
  * dual-write client APIs the admin uses, so the restore persists to Mongo and
- * survives reload. localStorage is written first (immediate source of truth).
+ * survives reload.
+ *
+ * THE SERVER GOES FIRST. This used to call `importLocalStorageBackup(data)`
+ * before pushing anything, and a section the server then REFUSED was left
+ * sitting in the local cache anyway. That is not merely cosmetic: every form in
+ * this admin writes its whole section back from that cache, so the next time
+ * anyone edited one field of a refused section, the replace-all carried the
+ * rejected restore payload to the server. A restore the admin was told had
+ * failed landed later, by the back door, with nothing connecting the two.
+ *
+ * So a server-backed key is written locally only once the server has taken it.
+ * Browser-only keys — the builders, media, products, the security centre, which
+ * have no whole-value endpoint — are written either way, because for them the
+ * browser IS the destination.
  */
 export async function restoreBackupToServer(
   data: Record<string, string | null>
 ): Promise<RestoreResult> {
-  const localCount = importLocalStorageBackup(data);
-
   const serverSections: string[] = [];
   const failedSections: string[] = [];
+  const accepted: Record<string, string | null> = {};
+
   for (const section of SERVER_BACKUP_SECTIONS) {
     const raw = data[section.key];
     if (raw == null) continue;
@@ -328,9 +367,19 @@ export async function restoreBackupToServer(
     // Only count a section as restored once the SERVER has it. A restore is
     // exactly when an admin is least able to check by eye, and listing a section
     // that never landed is how a backup gets trusted that never came back.
-    if (await section.push(parsed)) serverSections.push(section.title);
-    else failedSections.push(section.title);
+    if (await section.push(parsed)) {
+      serverSections.push(section.title);
+      accepted[section.key] = raw;
+    } else {
+      failedSections.push(section.title);
+    }
   }
+
+  const browserOnly = Object.fromEntries(
+    Object.entries(data).filter(([key]) => !serverBackedKeys.includes(key)),
+  );
+
+  const localCount = importLocalStorageBackup({ ...browserOnly, ...accepted });
 
   return { localCount, serverSections, failedSections };
 }
@@ -348,9 +397,11 @@ export async function restoreBackupSnapshotToServer(
  * history, and return it. Used both for the downloadable export and for the
  * "safety" rollback point captured before an import.
  */
-export async function exportAndArchiveServerBackup(label?: string): Promise<BackupSnapshot> {
-  const data = await buildServerBackupData();
-  return createBackupSnapshot(data, label);
+export async function exportAndArchiveServerBackup(
+  label?: string,
+): Promise<{ snapshot: BackupSnapshot; unavailableSections: string[] }> {
+  const { data, unavailableSections } = await buildServerBackup();
+  return { snapshot: createBackupSnapshot(data, label), unavailableSections };
 }
 
 /** Legacy localStorage-only snapshot (kept for callers that need a sync path). */

@@ -33,12 +33,20 @@ const actionTone: Record<string, string> = {
 
 export function ActivitySettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const [entries, setEntries] = useState<ActivityLog[]>([]);
+  // Kept apart, because only ONE of them can be cleared.
+  //
+  // Both were merged into a single `entries` list, and the confirm dialog then
+  // counted it: "permanently removes all 137 logged actions ... cannot be
+  // undone", where 100 of the 137 were server AUDIT rows that Clear does not
+  // touch and that reappear on the next load. Clearing also dropped them from
+  // the list, so the screen agreed with the lie until someone reloaded.
+  const [localEntries, setLocalEntries] = useState<ActivityLog[]>([]);
+  const [serverEntries, setServerEntries] = useState<ActivityLog[]>([]);
   const [search, setSearch] = useState("");
   const [clearOpen, setClearOpen] = useState(false);
 
   useEffect(() => {
-    setEntries(getActivityLog());
+    setLocalEntries(getActivityLog());
     setMounted(true);
   }, []);
 
@@ -49,13 +57,17 @@ export function ActivitySettingsPage() {
     (async () => {
       const result = await fetchAuditLogs({ limit: 100 });
       if (cancelled || !result) return;
-      const serverEntries = result.items.map(auditToActivity);
-      setEntries((local) => mergeActivity(serverEntries, local));
+      setServerEntries(result.items.map(auditToActivity));
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const entries = useMemo(
+    () => mergeActivity(serverEntries, localEntries),
+    [serverEntries, localEntries]
+  );
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -71,7 +83,10 @@ export function ActivitySettingsPage() {
 
   async function confirmClear() {
     const { value, persisted } = await clearActivityLog();
-    setEntries(value);
+    // Only the local slice moves. The server audit rows stay on screen because
+    // they stay in the database — they used to disappear here and come back on
+    // reload, which made a partial clear look like a complete one.
+    setLocalEntries(value);
     setClearOpen(false);
 
     if (!persisted) {
@@ -81,7 +96,11 @@ export function ActivitySettingsPage() {
       return;
     }
 
-    toast.success("Activity log cleared");
+    toast.success(
+      serverEntries.length > 0
+        ? "This browser's activity cleared — the server audit trail is unchanged"
+        : "Activity log cleared"
+    );
   }
 
   return (
@@ -158,8 +177,16 @@ export function ActivitySettingsPage() {
           <DialogHeader>
             <DialogTitle>Clear activity log?</DialogTitle>
             <DialogDescription>
-              This permanently removes all {entries.length} logged actions from this browser. This
-              cannot be undone.
+              This removes the {localEntries.length} settings action
+              {localEntries.length === 1 ? "" : "s"} recorded in this browser, and cannot be
+              undone.
+              {serverEntries.length > 0 ? (
+                <>
+                  {" "}
+                  The {serverEntries.length} entries from the server audit trail are NOT removed —
+                  that is a permanent record of who changed what, and it stays.
+                </>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
