@@ -20,6 +20,7 @@ import { TemplatePreviewPanel } from "@/apps/admin/communications/components/tem
 import { TemplateStatusBadge } from "@/apps/admin/communications/components/template-status-badge";
 import { TemplateVariableChips } from "@/apps/admin/communications/components/template-variable-chips";
 import {
+  isSendableSlug,
   offContractVariables,
   validateSlug,
 } from "@/features/communications/lib/template-contract";
@@ -50,7 +51,7 @@ import {
   getWhatsAppTemplateOverview,
   type WhatsAppTemplateListFilters,
 } from "@/apps/admin/communications/lib/whatsapp-template-utils";
-import { mergeTemplateVariables } from "@/lib/template-render";
+import { deriveTemplateVariables } from "@/lib/template-render";
 import { formatTemplateCategory } from "@/apps/admin/communications/lib/template-utils";
 import {
   FilterPanel,
@@ -227,19 +228,24 @@ export function WhatsAppTemplatesAdminPage() {
   }, [draftOrigin]);
 
   /**
-   * Checked here too, even though nothing sends a WhatsApp template yet.
+   * Against the WHATSAPP contract, which the missing fourth argument did not.
    *
-   * The email screen got this and this one did not, which would have left a
-   * collection full of malformed and duplicate keys for whoever wires a
-   * provider — at which point it becomes the same silent-fallback bug the
-   * email side was just fixed for, on data that was allowed in years earlier.
-   * Nothing is locked here, because no slug is wired.
+   * This defaulted to the email channel, so the slugs the order pipeline sends
+   * on WhatsApp — order_ready, delivery_update — were not locked and could be
+   * renamed. After that the send path finds no template and returns silently,
+   * so the ready and out-for-delivery messages simply stop, with nothing on
+   * screen and nothing in the log. Meanwhile "invoice", which WhatsApp never
+   * sends, was refused here as reserved for an email.
    */
+  const slugLocked = Boolean(
+    draft && isSendableSlug(savedSelected?.slug ?? draft.slug, "whatsapp"),
+  );
   const slugProblem = draft
     ? validateSlug(
         draft.slug,
         savedSelected?.slug ?? draft.slug,
         templates.filter((t) => t.id !== draft.id).map((t) => t.slug),
+        "whatsapp",
       )
     : null;
 
@@ -290,9 +296,10 @@ export function WhatsAppTemplatesAdminPage() {
     setDraft({
       ...draft,
       ...patch,
-      variables: mergeTemplateVariables(patch.variables ?? draft.variables, [
-        patch.body ?? draft.body,
-      ]),
+      // DERIVED from the content, not accumulated onto it. See
+      // `deriveTemplateVariables` — a union here makes a variable unremovable,
+      // which locked Save with an on-screen instruction that could not work.
+      variables: deriveTemplateVariables([patch.body ?? draft.body]),
     });
   }
 
@@ -717,7 +724,15 @@ export function WhatsAppTemplatesAdminPage() {
                         value={draft.slug}
                         onChange={(event) => patchDraft({ slug: event.target.value })}
                         aria-invalid={Boolean(slugProblem)}
+                        readOnly={slugLocked}
+                        className={slugLocked ? "bg-muted" : undefined}
                       />
+                      {slugLocked ? (
+                        <p className="text-xs text-muted-foreground">
+                          This is the key the shop sends this message by — renaming it would
+                          stop customers receiving your version.
+                        </p>
+                      ) : null}
                       {slugProblem ? (
                         <p className="text-xs text-destructive" role="alert">
                           {slugProblem.message}

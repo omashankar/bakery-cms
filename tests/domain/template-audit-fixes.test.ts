@@ -19,6 +19,10 @@ import {
 } from "@/features/communications/lib/template-contract";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
 import { toEmailHtml } from "@/features/communications/server/email.service";
+import {
+  deriveTemplateVariables,
+  mergeTemplateVariables,
+} from "@/lib/template-render";
 
 function source(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -274,5 +278,45 @@ describe("every seeded template obeys its own contract", () => {
 
     // And the rule is only meaningful because some slugs are wired.
     expect(Object.keys(TEMPLATE_VARIABLE_CONTRACT).length).toBeGreaterThan(0);
+  });
+});
+
+describe("removing a variable actually removes it", () => {
+  it("derives the list from the content instead of accumulating onto it", () => {
+    // `mergeTemplateVariables` is union-only, which is right for normalising a
+    // stored record and wrong while editing: it made a variable unremovable.
+    // The editor refuses to save a template declaring a variable its sender
+    // will never supply and tells the admin to delete it from the body — and
+    // deleting it left the name in `variables`, so the refusal stood and the
+    // only escape was "Reset defaults", discarding every other edit.
+    expect(mergeTemplateVariables(["invoice_url"], ["Order {{order_number}}"])).toContain(
+      "invoice_url",
+    );
+    expect(deriveTemplateVariables(["Order {{order_number}}"])).toEqual(["order_number"]);
+  });
+
+  it("is what both editors use while typing", () => {
+    for (const page of [
+      "apps/admin/communications/pages/email-templates-admin-page.tsx",
+      "apps/admin/communications/pages/whatsapp-templates-admin-page.tsx",
+    ]) {
+      const rendered = code(page);
+      expect(rendered).toContain("deriveTemplateVariables(");
+      // The union must not be what a keystroke goes through.
+      expect(rendered).not.toMatch(/variables: mergeTemplateVariables\(/);
+    }
+  });
+});
+
+describe("a WhatsApp slug the order pipeline sends", () => {
+  it("is validated against the WhatsApp contract, not the email one", () => {
+    const page = code("apps/admin/communications/pages/whatsapp-templates-admin-page.tsx");
+    // The fourth argument defaults to "email", so `order_ready` and
+    // `delivery_update` were renameable — after which the send path finds no
+    // template and returns silently, and those messages just stop.
+    expect(page).toMatch(/validateSlug\([\s\S]{0,200}"whatsapp",\s*\r?\n\s*\)/);
+    expect(page).toContain('isSendableSlug(savedSelected?.slug ?? draft.slug, "whatsapp")');
+    // And the field says so, rather than only refusing on save.
+    expect(page).toContain("readOnly={slugLocked}");
   });
 });

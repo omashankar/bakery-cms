@@ -46,7 +46,7 @@ import {
   getEmailTemplateOverview,
   type EmailTemplateListFilters,
 } from "@/apps/admin/communications/lib/email-template-utils";
-import { mergeTemplateVariables } from "@/lib/template-render";
+import { deriveTemplateVariables } from "@/lib/template-render";
 import { formatTemplateCategory } from "@/apps/admin/communications/lib/template-utils";
 import {
   FilterPanel,
@@ -259,7 +259,10 @@ export function EmailTemplatesAdminPage() {
     setDraft({
       ...draft,
       ...patch,
-      variables: mergeTemplateVariables(patch.variables ?? draft.variables, [
+      // DERIVED from the content, not accumulated onto it. See
+      // `deriveTemplateVariables` — a union here makes a variable unremovable,
+      // which locked Save with an on-screen instruction that could not work.
+      variables: deriveTemplateVariables([
         patch.subject ?? draft.subject,
         patch.previewText ?? draft.previewText ?? "",
         patch.body ?? draft.body,
