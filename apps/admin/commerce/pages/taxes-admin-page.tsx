@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import {
-  buildDefaultTaxLabel,
   formatTaxRatePercent,
+  retagTaxLabel,
 } from "@/features/commerce/lib/tax-utils";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,12 @@ import { Switch } from "@/components/ui/switch";
 import {
   getCommerceSettings,
   saveCommerceSettings,
-  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
@@ -35,37 +39,23 @@ const SAMPLE_ITEM = {
 };
 
 export function TaxesAdminPage() {
-  const [settings, setSettings] = useState<CommerceSettings>(defaultCommerceSettings);
-  const [savedSettings, setSavedSettings] = useState<CommerceSettings>(defaultCommerceSettings);
+  // The shared section form. The hand-rolled version below it had the exact bug
+  // that hook exists for: `load()` skipped the resync while the form was dirty,
+  // which is right for protecting unsaved edits and wrong on a cold load —
+  // hydration is still in flight while these inputs are already interactive, so
+  // the admin's first keystroke PINNED the demo seed, and Save then PUT the
+  // whole commerce section from it. That section carries the delivery fees, the
+  // gift wrap, the minimum order value, the time slots and the checkout terms,
+  // none of which are on this screen. Setting a tax rate reset all of them.
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<CommerceSettings>(getCommerceSettings, defaultCommerceSettings);
   const [previewDiscount, setPreviewDiscount] = useState(50);
   const [previewDelivery, setPreviewDelivery] = useState(99);
 
-  // Snapshot for the SETTINGS_UPDATED listener so it can check dirtiness without
-  // re-subscribing on every keystroke.
-  const stateRef = useRef({ settings, savedSettings });
-  stateRef.current = { settings, savedSettings };
-
-  useEffect(() => {
-    function load() {
-      const loaded = getCommerceSettings();
-      const { settings: current, savedSettings: currentSaved } = stateRef.current;
-      // A background hydration must not clobber unsaved edits: skip the reset
-      // while the form is dirty (mid-edit); resync only when pristine.
-      if (JSON.stringify(current) !== JSON.stringify(currentSaved)) return;
-      setSettings(loaded);
-      setSavedSettings(loaded);
-    }
-    load();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, load);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, load);
-  }, []);
-
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
-
   // The banner and status line describe what checkout actually charges, so they read
   // the saved value — an unsaved toggle hasn't changed any customer's total yet.
-  const liveTaxEnabled = savedSettings.taxEnabled;
-  const taxTogglePending = settings.taxEnabled !== savedSettings.taxEnabled;
+  const liveTaxEnabled = saved.taxEnabled;
+  const taxTogglePending = settings.taxEnabled !== saved.taxEnabled;
 
   const previewTotals = useMemo(
     () =>
@@ -81,23 +71,32 @@ export function TaxesAdminPage() {
     [previewDelivery, previewDiscount, settings]
   );
 
-  function handleSave() {
-    const saved = saveCommerceSettings(settings);
-    setSettings(saved);
-    setSavedSettings(saved);
-    toast.success("Tax settings saved");
+  async function handleSave() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveCommerceSettings(settings);
+      // Only mark clean when the SERVER has it — the dirty flag is what keeps
+      // the Save button enabled, and these rules are what the storefront
+      // charges by.
+      return { value, accepted: reportSettingsWrite(persisted, "Tax settings") };
+    });
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
   }
 
   function handleTaxRateChange(percent: number) {
     const taxRate = Math.max(0, Math.min(100, percent)) / 100;
-    setSettings((prev) => ({
+    edit((prev) => ({
       ...prev,
       taxRate,
-      taxLabel: buildDefaultTaxLabel(taxRate),
+      // Keeps the shop's wording and moves the percentage inside it. Rebuilding
+      // it wholesale discarded a customised label; leaving a customised one
+      // untouched froze a stale percentage into it — and that label is now
+      // stored on every order and printed verbatim, so "Sales tax (5%)" would
+      // head a line charged at 18% forever.
+      taxLabel: retagTaxLabel(prev.taxLabel, taxRate),
     }));
   }
 
@@ -106,10 +105,15 @@ export function TaxesAdminPage() {
       <AdminPageHeader
         title="Taxes"
         description={
-          liveTaxEnabled
-            ? `${savedSettings.taxLabel} · ${formatTaxRatePercent(savedSettings.taxRate)}${
-                savedSettings.platformChargeEnabled
-                  ? ` · ${savedSettings.platformChargeLabel} ${formatCurrency(savedSettings.platformChargeAmount)}`
+          // Not before hydration. The fields below are held closed until the
+          // server's copy lands, but this line sat above them stating the demo
+          // seed — "GST (5%)" — as though it were what checkout charges.
+          hydration === "pending"
+            ? "Loading the shop's tax configuration…"
+            : liveTaxEnabled
+            ? `${saved.taxLabel} · ${formatTaxRatePercent(saved.taxRate)}${
+                saved.platformChargeEnabled
+                  ? ` · ${saved.platformChargeLabel} ${formatCurrency(saved.platformChargeAmount)}`
                   : ""
               }`
             : "Tax disabled at checkout"
@@ -126,29 +130,40 @@ export function TaxesAdminPage() {
               variant="bakery"
               className="w-full sm:w-auto"
               onClick={handleSave}
-              disabled={!isDirty}
+              // `canSave` is false until the SERVER's copy has landed, and while
+              // a write is in flight — the round-trip can take seconds on a cold
+              // read, and an enabled button through all of it invites a second
+              // click that races the first.
+              disabled={!isDirty || !canSave}
             >
-              Save tax settings
+              {isWriting ? "Saving…" : "Save tax settings"}
             </Button>
           </div>
         }
       />
 
-      {!liveTaxEnabled ? (
+      <SettingsHydrationNotice hydration={hydration} />
+
+      {/* Also gated: "Tax is off" is a claim about what checkout charges, and
+          before hydration it is a claim about the demo seed. */}
+      {hydration !== "pending" && !liveTaxEnabled ? (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
           Tax is off. Checkout, invoices, and order summaries do not show a tax line until you
           enable it below.
         </div>
       ) : null}
 
+      <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">GST / sales tax</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Calculated on taxable amount after discounts
-                {settings.taxIncludeDelivery ? ", including delivery" : ""}.
+                Calculated on subtotal after discounts
+                {settings.taxIncludeDelivery ? ", plus delivery" : ""}
+                {settings.giftWrapEnabled ? ", plus gift wrap" : ""}. Platform charge is
+                added after tax.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -162,7 +177,7 @@ export function TaxesAdminPage() {
                 <Switch
                   checked={settings.taxEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, taxEnabled: checked === true }))
+                    edit((prev) => ({ ...prev, taxEnabled: checked === true }))
                   }
                 />
               </label>
@@ -183,9 +198,13 @@ export function TaxesAdminPage() {
                     type="number"
                     min={0}
                     max={100}
-                    step={0.1}
+                    step={0.01}
                     disabled={!settings.taxEnabled}
-                    value={Math.round(settings.taxRate * 1000) / 10}
+                    // Two decimals, matching `formatTaxRatePercent` in the hint
+                    // below. At one decimal a shop that typed 8.25 had it
+                    // silently restated to 8.3, and the hint then disagreed
+                    // with the box it describes.
+                    value={Math.round(settings.taxRate * 10000) / 100}
                     onChange={(event) =>
                       handleTaxRateChange(Number(event.target.value) || 0)
                     }
@@ -201,7 +220,7 @@ export function TaxesAdminPage() {
                     disabled={!settings.taxEnabled}
                     value={settings.taxLabel}
                     onChange={(event) =>
-                      setSettings((prev) => ({ ...prev, taxLabel: event.target.value }))
+                      edit((prev) => ({ ...prev, taxLabel: event.target.value }))
                     }
                     placeholder="GST (5%)"
                   />
@@ -219,7 +238,7 @@ export function TaxesAdminPage() {
                   checked={settings.taxIncludeDelivery}
                   disabled={!settings.taxEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       taxIncludeDelivery: checked === true,
                     }))
@@ -247,7 +266,7 @@ export function TaxesAdminPage() {
                 <Switch
                   checked={settings.platformChargeEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       platformChargeEnabled: checked === true,
                     }))
@@ -263,7 +282,7 @@ export function TaxesAdminPage() {
                     disabled={!settings.platformChargeEnabled}
                     value={settings.platformChargeLabel}
                     onChange={(event) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         platformChargeLabel: event.target.value,
                       }))
@@ -279,7 +298,7 @@ export function TaxesAdminPage() {
                     disabled={!settings.platformChargeEnabled}
                     value={settings.platformChargeAmount}
                     onChange={(event) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         platformChargeAmount: Math.max(0, Number(event.target.value) || 0),
                       }))
@@ -356,6 +375,7 @@ export function TaxesAdminPage() {
           </CardContent>
         </Card>
       </div>
+      </SettingsFormGate>
     </AdminPage>
   );
 }

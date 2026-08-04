@@ -1,8 +1,12 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import * as orderRepo from "@/features/orders/server/order.repository";
-import type { PlacedOrder } from "@/features/orders/lib/orders";
-import type { CustomerSegment } from "@/types/customer";
+import {
+  buildCustomerProfiles,
+  buildCustomerRecords,
+  deriveCustomerSegment,
+  type CustomerMeta,
+} from "@/features/customers/lib/customer-profiles";
 
 import * as repo from "./customers.repository";
 import type { CustomerMetaInput } from "./customers.validators";
@@ -14,89 +18,44 @@ interface RequestCtx {
   actorEmail?: string;
 }
 
-interface CustomerRecord {
-  id: string;
-  email: string;
-  name: string;
-  phone: string;
-  orderCount: number;
-  totalSpent: number;
-  lastOrderAt: string;
-  lastOrderNumber: string;
-}
-
-// Server-side port of the pure derivation (avoids importing the client chain).
-function buildRecords(orders: PlacedOrder[]): CustomerRecord[] {
-  const map = new Map<string, CustomerRecord>();
-  for (const order of orders) {
-    const email = order.address?.email?.trim().toLowerCase();
-    if (!email) continue;
-    const existing = map.get(email);
-    const newer = existing && new Date(order.placedAt).getTime() > new Date(existing.lastOrderAt).getTime();
-    if (!existing) {
-      map.set(email, {
-        id: email,
-        email: order.address.email,
-        name: order.address.fullName,
-        phone: order.address.phone,
-        orderCount: 1,
-        totalSpent: order.totals.total,
-        lastOrderAt: order.placedAt,
-        lastOrderNumber: order.orderNumber,
-      });
-      continue;
-    }
-    map.set(email, {
-      ...existing,
-      name: order.address.fullName || existing.name,
-      phone: order.address.phone || existing.phone,
-      orderCount: existing.orderCount + 1,
-      totalSpent: existing.totalSpent + order.totals.total,
-      lastOrderAt: newer ? order.placedAt : existing.lastOrderAt,
-      lastOrderNumber: newer ? order.orderNumber : existing.lastOrderNumber,
-    });
-  }
-  return [...map.values()].sort(
-    (a, b) => new Date(b.lastOrderAt).getTime() - new Date(a.lastOrderAt).getTime(),
-  );
-}
-
-function deriveSegment(record: CustomerRecord): CustomerSegment {
-  if (record.orderCount >= 5 || record.totalSpent >= 5000) return "vip";
-  const days = Math.floor((Date.now() - new Date(record.lastOrderAt).getTime()) / 86_400_000);
-  if (days > 90) return record.orderCount >= 2 ? "at_risk" : "inactive";
-  if (record.orderCount === 1) return "new";
-  return "returning";
-}
-
-/** Customers list — derived from orders, joined with admin metadata. */
+/**
+ * Every customer, with their full profile and admin metadata.
+ *
+ * Built over EVERY order rather than a capped slice: a customer only exists as
+ * the sum of their orders, so a cap does not shorten this list — it removes
+ * older customers entirely and understates the spend of the ones left.
+ */
 export async function getCustomers() {
-  const [orders, metaMap] = await Promise.all([orderRepo.listAll(), repo.listMeta()]);
-  const records = buildRecords(orders);
-  return records.map((record) => ({
-    ...record,
-    segment: deriveSegment(record),
-    meta: metaMap.get(record.email.toLowerCase()) ?? {
-      email: record.email,
-      tags: [],
-      notes: "",
-      marketingOptIn: true,
-      blocked: false,
-      updatedAt: new Date().toISOString(),
-    },
-  }));
+  const [orders, metaMap] = await Promise.all([orderRepo.listSince(null), repo.listMeta()]);
+  // `customerKey` is how the meta store keys its rows, so the join cannot miss
+  // on stray casing or whitespace in the address the customer typed.
+  return buildCustomerProfiles(orders, (key) => metaMap.get(key) as CustomerMeta | undefined);
 }
 
-/** Customer detail — the record, their orders, and admin metadata. */
+/**
+ * Customer detail — their full profile, every order they have placed, and the
+ * admin metadata.
+ *
+ * `findByCustomerEmail` queries by address rather than paging the collection, so
+ * this sees all of a customer's history however long ago they first ordered.
+ */
 export async function getCustomer(email: string) {
   const key = decodeURIComponent(email).trim().toLowerCase();
   const [orders, meta] = await Promise.all([orderRepo.findByCustomerEmail(key), repo.getMeta(key)]);
   if (orders.length === 0) {
     // No orders — still return the meta so an admin can view/edit it.
-    return { record: null, orders: [], meta };
+    return { record: null, profile: null, orders: [], meta };
   }
-  const record = buildRecords(orders)[0];
-  return { record: { ...record, segment: deriveSegment(record) }, orders, meta };
+
+  const record = buildCustomerRecords(orders)[0];
+  const profile = buildCustomerProfiles(orders, () => meta as CustomerMeta | undefined)[0];
+
+  return {
+    record: { ...record, segment: deriveCustomerSegment(record) },
+    profile,
+    orders,
+    meta,
+  };
 }
 
 export async function saveMeta(input: CustomerMetaInput, ctx: RequestCtx) {

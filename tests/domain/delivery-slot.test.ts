@@ -5,7 +5,7 @@
  * to the customer — it must survive into the order and win over the per-item
  * dates that can be picked on a product page.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_CHECKOUT_DRAFT,
@@ -41,20 +41,30 @@ const address = {
   pincode: "400001",
 };
 
-function order(overrides: Parameters<typeof placeOrder>[0] extends infer T ? Partial<T> : never) {
+async function order(
+  overrides: Parameters<typeof placeOrder>[0] extends infer T ? Partial<T> : never
+) {
   const items = [line()];
-  return placeOrder({
+  const { order: placed } = await placeOrder({
     items,
     totals: calculateCartTotals({ items, commerceOverride: defaultCommerceSettings }),
     address,
     paymentMethod: "cod",
     ...overrides,
   });
+  return placed;
 }
 
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+  // `placeOrder` now confirms with the server and RETRIES on failure. Left
+  // unstubbed these tests would each spend the backoff before returning.
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 201 } as Response));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("hasDeliverySlot", () => {
@@ -101,8 +111,8 @@ describe("the draft carries the slot", () => {
 });
 
 describe("the order records the agreed window", () => {
-  it("stores the slot on the order", () => {
-    const placed = order({
+  it("stores the slot on the order", async () => {
+    const placed = await order({
       deliverySlot: { date: "2026-08-01", timeSlot: "2:00 PM – 4:00 PM" },
     });
 
@@ -113,17 +123,17 @@ describe("the order records the agreed window", () => {
     expect(getOrders()[0].deliverySlot?.timeSlot).toBe("2:00 PM – 4:00 PM");
   });
 
-  it("uses the chosen date as the estimated delivery", () => {
-    const placed = order({
+  it("uses the chosen date as the estimated delivery", async () => {
+    const placed = await order({
       deliverySlot: { date: "2026-08-01", timeSlot: "2:00 PM – 4:00 PM" },
     });
 
     expect(placed.estimatedDelivery.startsWith("2026-08-01")).toBe(true);
   });
 
-  it("prefers the checkout slot over a date picked on the product page", () => {
+  it("prefers the checkout slot over a date picked on the product page", async () => {
     const items = [line({ deliveryDate: "2026-09-15" })];
-    const placed = placeOrder({
+    const { order: placed } = await placeOrder({
       items,
       totals: calculateCartTotals({ items, commerceOverride: defaultCommerceSettings }),
       address,
@@ -134,9 +144,9 @@ describe("the order records the agreed window", () => {
     expect(placed.estimatedDelivery.startsWith("2026-08-01")).toBe(true);
   });
 
-  it("still falls back to the item date when no slot was chosen", () => {
+  it("still falls back to the item date when no slot was chosen", async () => {
     const items = [line({ deliveryDate: "2026-09-15" })];
-    const placed = placeOrder({
+    const { order: placed } = await placeOrder({
       items,
       totals: calculateCartTotals({ items, commerceOverride: defaultCommerceSettings }),
       address,
@@ -146,8 +156,8 @@ describe("the order records the agreed window", () => {
     expect(placed.estimatedDelivery.startsWith("2026-09-15")).toBe(true);
   });
 
-  it("ignores an unparseable slot date rather than producing an invalid order", () => {
-    const placed = order({ deliverySlot: { date: "not-a-date", timeSlot: "Morning" } });
+  it("ignores an unparseable slot date rather than producing an invalid order", async () => {
+    const placed = await order({ deliverySlot: { date: "not-a-date", timeSlot: "Morning" } });
 
     expect(placed.estimatedDelivery).toBeTruthy();
     expect(Number.isNaN(new Date(placed.estimatedDelivery).getTime())).toBe(false);

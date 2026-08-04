@@ -12,7 +12,7 @@ import {
   Upload,
   Wrench,
 } from "lucide-react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,
@@ -157,21 +157,21 @@ export function MediaLibraryPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    const count = deleteMediaFiles(deleteTarget.ids);
+    const { value: count, persisted } = await deleteMediaFiles(deleteTarget.ids);
     refresh();
     setSelectedIds((prev) => prev.filter((id) => !deleteTarget.ids.includes(id)));
     if (selectedId && deleteTarget.ids.includes(selectedId)) setSelectedId(null);
-    toast.success(`${count} file${count === 1 ? "" : "s"} deleted`);
     setDeleteTarget(null);
+    reportWrite(persisted, `${count} file${count === 1 ? "" : "s"} deleted`);
   }
 
-  function confirmMove() {
-    const count = bulkMoveMediaToFolder(selectedIds, moveFolderId);
+  async function confirmMove() {
+    const { value: count, persisted } = await bulkMoveMediaToFolder(selectedIds, moveFolderId);
     refresh();
-    toast.success(`Moved ${count} file${count === 1 ? "" : "s"}`);
     setSelectedIds([]);
+    reportWrite(persisted, `Moved ${count} file${count === 1 ? "" : "s"}`);
   }
 
   return (

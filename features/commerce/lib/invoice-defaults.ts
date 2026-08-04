@@ -13,16 +13,33 @@ export const defaultInvoiceSettings: InvoiceSettings = {
   email: contactInfo.email,
   phone: contactInfo.phone,
   website: "https://bakery.demo/store",
-  gstNumber: "27AABCM1234F1Z5",
-  panNumber: "AABCM1234F",
-  invoiceTitle: "Tax Invoice",
+  // Blank on purpose, and this is not a placeholder waiting to be filled in.
+  //
+  // These were `"27AABCM1234F1Z5"` and `"AABCM1234F"` — well-formed, plausible,
+  // and belonging to nobody. Combined with `invoiceTitle: "Tax Invoice"` and
+  // `showGstNumber: true` below, any surface that fell back to these defaults
+  // issued a customer a tax document carrying a registration number that was
+  // invented. A shop that has not entered its GSTIN must print no GSTIN; that
+  // is a document missing a field, which is recoverable, rather than a document
+  // asserting a false one, which is not.
+  gstNumber: "",
+  panNumber: "",
+  // "Tax Invoice" is a claim about what the document IS. It is the shop's to
+  // make, once it has entered a registration number — and it can, in the
+  // designer. The unconfigured default matches the Mongo model's own.
+  invoiceTitle: "Invoice",
   footerNote: "Thank you for choosing us. We hope your celebration is as sweet as our cakes.",
+  // The pricing pipeline ADDS tax on top of the subtotal — `computeTaxAmount`
+  // returns a separate `tax` and the total is `subtotal + … + tax`. The old
+  // wording, "GST is included where applicable", told the customer the opposite
+  // of what the breakdown printed directly above it.
   termsAndConditions:
-    "Goods once sold will not be taken back. Cakes are perishable — please store as advised on the packaging. GST is included where applicable.",
+    "Goods once sold will not be taken back. Cakes are perishable — please store as advised on the packaging. Taxes, where charged, are shown as a separate line above.",
   signatureName: "Store Manager",
   signatureTitle: "Authorized signatory",
   showLogo: true,
-  showGstNumber: true,
+  // Off until there is a number to show. It was on, over a fabricated default.
+  showGstNumber: false,
   showPanNumber: false,
   showPaymentDetails: true,
   showDeliveryDetails: true,

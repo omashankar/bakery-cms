@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSampleDataForVariables } from "../lib/template-sample-data";
-import { renderTemplate } from "../lib/template-render";
+import { renderTemplate } from "@/lib/template-render";
 import { cn } from "@/lib/utils";
 
 interface TemplatePreviewPanelProps {
@@ -13,6 +13,13 @@ interface TemplatePreviewPanelProps {
   previewText?: string;
   body: string;
   variables: string[];
+  /**
+   * The template being previewed. Decides which variables get real sample
+   * values: without it this panel renders the WHOLE sample table, so an
+   * off-contract {{invoice_url}} typed into the out-for-delivery email shows
+   * a plausible URL here and arrives at the customer as literal braces.
+   */
+  slug?: string;
   channel: "email" | "whatsapp";
   /** When true, render without outer Card chrome (for dialogs). */
   embedded?: boolean;
@@ -26,11 +33,15 @@ export function TemplatePreviewPanel({
   previewText,
   body,
   variables,
+  slug,
   channel,
   embedded = false,
   className,
 }: TemplatePreviewPanelProps) {
-  const sampleData = useMemo(() => getSampleDataForVariables(variables), [variables]);
+  const sampleData = useMemo(
+    () => getSampleDataForVariables(variables, { slug, channel }),
+    [variables, slug, channel],
+  );
   const renderedSubject = subject ? renderTemplate(subject, sampleData) : undefined;
   const renderedPreview = previewText ? renderTemplate(previewText, sampleData) : undefined;
   const renderedBody = renderTemplate(body, sampleData);

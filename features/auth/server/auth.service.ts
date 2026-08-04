@@ -9,6 +9,7 @@ import {
 import { setAuthCookies, clearAuthCookies } from "@/lib/server/auth/cookies";
 import { sha256, generateOtp } from "@/lib/server/auth/hash";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
+import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import {
   AuthError,
   ConflictError,
@@ -198,8 +199,27 @@ export async function forgotPassword(input: ForgotPasswordInput, ctx: RequestCtx
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   });
 
-  // TODO(Phase 12): send via SMTP. For now surface it server-side for testing.
-  console.info(`[auth] Password reset OTP for ${input.email}: ${otp}`);
+  const mail = await sendTemplatedEmail("password_reset", input.email, {
+    customer_name: user.name?.trim() || "there",
+    reset_code: otp,
+    expires_in: `${Math.round(OTP_TTL_MS / 60_000)} minutes`,
+  });
+
+  // The response to the caller is deliberately unchanged either way: saying "we
+  // couldn't email you" only for registered addresses would reveal which
+  // addresses are registered, which is exactly what the early return above
+  // avoids. So a delivery failure is an operator problem, logged for them.
+  if (!mail.sent) {
+    // Never the OTP itself. A plaintext reset code in a server log is an account
+    // takeover for anyone who can read logs — a hosting dashboard, a log
+    // aggregator, a shared ops account — and leaves no trace in the audit trail.
+    console.error(`[auth] Could not email a password reset code: ${mail.error}`);
+  }
+
+  // In development the code is worth having to hand; nowhere else.
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[auth] Password reset OTP for ${input.email}: ${otp}`);
+  }
 
   await writeAuditLog({
     action: "auth.forgot_password",

@@ -23,6 +23,15 @@ export async function create(review: ProductReview): Promise<ProductReview> {
   return review;
 }
 
+/**
+ * Newest-first, capped.
+ *
+ * getReviewOverview() counts moderation states and averages the rating over
+ * whatever this returns. The pending/rejected counts are recency-biased and so
+ * stay right, but the ALL-TIME average rating silently drifts once a shop has
+ * more than this many reviews. Move that average to a server aggregation before
+ * anyone relies on it.
+ */
 export async function listAll(limit = 2000): Promise<ProductReview[]> {
   await connectDB();
   const docs = (await ReviewModel.find()

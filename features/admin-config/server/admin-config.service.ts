@@ -38,8 +38,46 @@ function storeFor(key: string) {
   return store;
 }
 
-export function getAdminConfig(key: string) {
-  return storeFor(key).read();
+/**
+ * Purge gateway secrets from the stored blob, permanently.
+ *
+ * Refusing to WRITE credentials only protects installs that never ran the old
+ * code. Every shop that did has live secrets — Stripe's `sk_live_`, PayPal's
+ * client secret, PhonePe's salt key and the rest — sitting in this document
+ * right now, and this endpoint returned it verbatim to the browser on every
+ * admin page load and wrote it into the JSON that Settings → Backup downloads.
+ *
+ * So the read strips them AND writes the cleaned document back. Stripping on
+ * read alone would keep them out of responses while leaving them at rest, where
+ * a database dump or a future consumer would find them again.
+ */
+async function purgeGatewayCredentials(value: unknown): Promise<Record<string, unknown>> {
+  if (!value || typeof value !== "object") return {};
+
+  let found = false;
+  const cleaned: Record<string, unknown> = {};
+  for (const [id, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") continue;
+    const { credentials, ...rest } = entry as Record<string, unknown>;
+    if (credentials && typeof credentials === "object" && Object.keys(credentials).length > 0) {
+      found = true;
+    }
+    cleaned[id] = rest;
+  }
+
+  if (found) {
+    await stores["payment-gateways"].write(cleaned as never);
+    console.warn(
+      "[admin-config] Removed payment gateway credentials that an earlier version stored in the config blob. Re-enter them in Admin → Payments; they are held in a server-only collection now.",
+    );
+  }
+  return cleaned;
+}
+
+export async function getAdminConfig(key: string) {
+  const value = await storeFor(key).read();
+  if (key === "payment-gateways") return purgeGatewayCredentials(value);
+  return value;
 }
 
 export async function replaceAdminConfig(

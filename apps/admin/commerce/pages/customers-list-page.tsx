@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Download,
   IndianRupee,
+  Loader2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,15 +17,13 @@ import {
   FilterPanelSearch,
   FilterPanelToolbar,
 } from "@/components/shared/filter-panel";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
 import { CUSTOMERS_UPDATED_EVENT } from "@/apps/admin/commerce/lib/customers-repository";
+import { fetchCustomerProfiles } from "@/apps/admin/commerce/lib/customers-api";
 import {
   defaultCustomerFilters,
   exportCustomersToCsv,
   filterCustomerProfiles,
-  formatCustomerSegmentLabel,
-  getCustomerProfiles,
-  getCustomerSegmentStats,
+  formatCustomerSegmentLabel,  getCustomerSegmentStats,
   type CustomerListFilters,
   type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
@@ -51,22 +50,31 @@ const segmentOptions = ["all", "new", "returning", "vip", "at_risk", "inactive"]
 export function CustomersListPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [filters, setFilters] = useState<CustomerListFilters>(defaultCustomerFilters);
   const [page, setPage] = useState(1);
 
+  // A customer is the sum of their orders, so this cannot be built from the
+  // browser's order cache — that only ever holds the most recent slice, which
+  // silently drops older customers and understates everyone else's spend.
   useEffect(() => {
-    function refresh() {
-      ensureDemoOrders();
-      setCustomers(getCustomerProfiles());
+    let cancelled = false;
+
+    async function refresh() {
+      const result = await fetchCustomerProfiles();
+      if (cancelled) return;
+      if (result) setCustomers(result);
+      setFailed(!result);
+      // Settled either way — otherwise a failed request leaves the table
+      // spinning forever instead of admitting it has nothing to show.
       setMounted(true);
     }
 
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
+    void refresh();
     window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     return () => {
-      window.removeEventListener("bakery-orders-updated", refresh);
+      cancelled = true;
       window.removeEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     };
   }, []);
@@ -208,11 +216,22 @@ export function CustomersListPage() {
       </FilterPanel>
 
       <section className={adminShell.tableCard}>
-        {paginated.length === 0 ? (
+        {paginated.length === 0 && !mounted ? (
+          // Saying "No customers found" before the server has answered would be
+          // a guess, and a wrong one on every cold load in a shop that has them.
+          <div className="flex min-h-48 items-center justify-center py-14">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading customers</span>
+          </div>
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No customers found"
-            description="Try another filter, or wait for new storefront orders."
+            title={failed ? "Could not load customers" : "No customers found"}
+            description={
+              failed
+                ? "The server did not answer. Check your connection and reload."
+                : "Try another filter, or wait for new storefront orders."
+            }
             className="py-14"
           />
         ) : (

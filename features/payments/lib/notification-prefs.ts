@@ -31,13 +31,14 @@ function read(): PrefStore {
   }
 }
 
-function write(store: PrefStore) {
-  if (typeof window === "undefined") return;
+async function write(store: PrefStore): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   localStorage.setItem(KEY, JSON.stringify(store));
   // write() is only reached via genuine admin toggles (no seed/load path), so
   // dual-writing to the server here cannot clobber with defaults.
-  replacePaymentNotifPrefsRequest(store);
+  const persisted = await replacePaymentNotifPrefsRequest(store);
   window.dispatchEvent(new Event(NOTIF_PREFS_UPDATED_EVENT));
+  return persisted;
 }
 
 /** Hydration: apply the server's notification prefs locally (no re-push). */
@@ -56,18 +57,21 @@ export function getNotificationPref(id: string): Pref {
   };
 }
 
-export function setNotificationEnabled(id: string, enabled: boolean) {
+export function setNotificationEnabled(id: string, enabled: boolean): Promise<boolean> {
   const store = read();
   store[id] = { ...getNotificationPref(id), enabled };
-  write(store);
+  return write(store);
 }
 
-export function toggleNotificationChannel(id: string, channel: NotifChannel) {
+export function toggleNotificationChannel(
+  id: string,
+  channel: NotifChannel
+): Promise<boolean> {
   const current = getNotificationPref(id);
   const channels = current.channels.includes(channel)
     ? current.channels.filter((c) => c !== channel)
     : [...current.channels, channel];
   const store = read();
   store[id] = { ...current, channels };
-  write(store);
+  return write(store);
 }

@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import type { AppearanceSettings } from "@/types/appearance";
+import type { FormHydration } from "@/features/settings/lib/use-hydrated-form";
+import { getGeneralSettings } from "@/features/settings/lib/settings-repository";
+import { loadHeaderSettings } from "@/features/site-layout/lib/header-repository";
+import { formatCurrency } from "@/utils/format";
 import {
   defaultAppearanceSettings,
   isValidHexColor,
@@ -16,6 +20,24 @@ import {
 interface AppearancePreviewProps {
   settings: AppearanceSettings;
   isDirty?: boolean;
+  /**
+   * Whether this page has heard from the server.
+   *
+   * "Saved" is a claim ABOUT the server, so it may only be made once one has
+   * answered. On a failed read the form holds the demo seed and `isDirty` is
+   * false, which put an outline "Saved" badge inches below a notice saying the
+   * settings could not be loaded.
+   */
+  hydration?: FormHydration;
+  /**
+   * The last palette the server confirmed, used while a colour is mid-typing.
+   *
+   * Falling back to the DEMO defaults meant that deleting a character from
+   * `#6f4e37` flipped the whole preview to the demo brown, while the admin
+   * chrome around it kept the last valid palette — the two panels disagreeing
+   * about the same shop for as long as the field was invalid.
+   */
+  saved?: AppearanceSettings;
 }
 
 function previewColor(
@@ -25,11 +47,38 @@ function previewColor(
   return isValidHexColor(value) ? normalizeHexColor(value) : fallback;
 }
 
-export function AppearancePreview({ settings, isDirty = false }: AppearancePreviewProps) {
-  const primary = previewColor(settings.primaryColor, defaultAppearanceSettings.primaryColor);
-  const accent = previewColor(settings.accentColor, defaultAppearanceSettings.accentColor);
-  const surface = previewColor(settings.surfaceColor, defaultAppearanceSettings.surfaceColor);
+export function AppearancePreview({
+  settings,
+  isDirty = false,
+  hydration = "ready",
+  saved,
+}: AppearancePreviewProps) {
+  // The saved palette first, the demo default only if there is no saved one —
+  // matching what `appearance-page.tsx` does when it live-applies.
+  const base = saved ?? defaultAppearanceSettings;
+  const primary = previewColor(settings.primaryColor, base.primaryColor);
+  const accent = previewColor(settings.accentColor, base.accentColor);
+  const surface = previewColor(settings.surfaceColor, base.surfaceColor);
   const radius = settings.borderRadius === 16 ? 16 : 12;
+
+  /**
+   * The shop's OWN name, letter and currency.
+   *
+   * These were hardcoded to "M", "Monginis" and "₹1,299" — another shop's
+   * identity, in the one panel whose entire job is to show this shop what its
+   * storefront looks like. The live navbar renders `chrome.logoLetter` and
+   * `chrome.siteName`, and prices use the configured currency, so the preview
+   * was demonstrating a storefront nobody has.
+   *
+   * Read from the same client stores the rest of the admin uses. Both fall
+   * back to their own defaults, so a cold cache shows something sensible
+   * rather than an empty navbar.
+   */
+  const general = getGeneralSettings();
+  const header = loadHeaderSettings();
+  const siteName = general.siteName?.trim() || "Your bakery";
+  const logoLetter = header.logoLetter?.trim() || siteName.charAt(0).toUpperCase();
+  const samplePrice = formatCurrency(1299, general.currency);
 
   const previewStyle = {
     "--preview-primary": primary,
@@ -43,7 +92,16 @@ export function AppearancePreview({ settings, isDirty = false }: AppearancePrevi
       <CardHeader className="border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">Storefront preview</CardTitle>
-          {isDirty ? (
+          {/*
+            "Saved" is a claim about the SERVER, so it may only be made when
+            this page has heard from it. On an unavailable read the form holds
+            the demo seed and `isDirty` is false, which put an outline
+            "Saved" badge inches below a notice saying the settings could not
+            be loaded.
+          */}
+          {hydration !== "ready" ? (
+            <Badge variant="outline">Not loaded</Badge>
+          ) : isDirty ? (
             <Badge variant="warning">Unsaved</Badge>
           ) : (
             <Badge variant="outline">Saved</Badge>
@@ -64,9 +122,9 @@ export function AppearancePreview({ settings, isDirty = false }: AppearancePrevi
                   className="flex size-8 shrink-0 items-center justify-center rounded-[var(--preview-radius)] text-sm font-bold text-white"
                   style={{ backgroundColor: "var(--preview-primary)" }}
                 >
-                  M
+                  {logoLetter}
                 </div>
-                <span className="truncate font-heading text-sm font-bold">Monginis</span>
+                <span className="truncate font-heading text-sm font-bold">{siteName}</span>
               </div>
               <Button
                 size="sm"
@@ -104,7 +162,7 @@ export function AppearancePreview({ settings, isDirty = false }: AppearancePrevi
                   Bestseller
                 </Badge>
                 <span className="text-sm font-semibold text-[var(--preview-primary)]">
-                  ₹1,299
+                  {samplePrice}
                 </span>
               </div>
             </div>

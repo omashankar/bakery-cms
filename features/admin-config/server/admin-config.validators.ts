@@ -17,7 +17,23 @@ const adminProfileSchema = z
   })
   .passthrough();
 
-const paymentGatewaysSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
+/**
+ * Gateway runtime — enabled / mode / priority, and nothing secret.
+ *
+ * `credentials` is dropped rather than rejected. This blob is a whole-section
+ * replace written from the browser, and an admin whose device still holds the
+ * old shape would otherwise get a 400 on every gateway toggle until they cleared
+ * their storage. Dropping migrates them silently, and a secret that arrives here
+ * is not written down. Zod strips unknown keys by default, so this schema also
+ * refuses anything else the client invents.
+ */
+const gatewayRuntimeSchema = z.object({
+  enabled: z.boolean().optional(),
+  mode: z.enum(["test", "live"]).optional(),
+  priority: z.number().optional(),
+});
+
+const paymentGatewaysSchema = z.record(z.string(), gatewayRuntimeSchema);
 
 const paymentNotifPrefsSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
 

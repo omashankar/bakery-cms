@@ -11,6 +11,7 @@ import { formatRelativeTime } from "@/utils/format";
 import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "@/apps/admin/inquiries/components/inquiry-status-badge";
 import type { Inquiry } from "@/types/inquiry";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
 export function DashboardInquiriesPanel() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -21,8 +22,7 @@ export function DashboardInquiriesPanel() {
     }
 
     refresh();
-    window.addEventListener("bakery-inquiries-updated", refresh);
-    return () => window.removeEventListener("bakery-inquiries-updated", refresh);
+    return subscribeToAdminData(refresh);
   }, []);
 
   return (

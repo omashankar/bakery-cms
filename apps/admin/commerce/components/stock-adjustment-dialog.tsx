@@ -40,6 +40,7 @@ export function StockAdjustmentDialog({
   const [quantity, setQuantity] = useState("1");
   const [reason, setReason] = useState<AdjustStockInput["reason"]>("manual_adjustment");
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -72,8 +73,12 @@ export function StockAdjustmentDialog({
     return { nextQuantity, stockStatus };
   }, [item, quantity, type]);
 
-  function handleSubmit() {
-    if (!item) return;
+  async function handleSubmit() {
+    // "Remove 5" is a RELATIVE delta, applied relatively on both sides. A second
+    // click while the first round trip is in flight takes 5 off again, locally
+    // and on the server — the admin meant one adjustment and got two. The button
+    // is still enabled during the await, so this guard is what stops it.
+    if (!item || submitting) return;
 
     const parsedQuantity = Math.max(Number(quantity) || 0, 0);
     if (parsedQuantity <= 0 && type !== "set") {
@@ -81,16 +86,36 @@ export function StockAdjustmentDialog({
       return;
     }
 
-    const updated = adjustStock({
+    setSubmitting(true);
+    const { item: updated, persisted } = await adjustStock({
       cakeId: item.cakeId,
       type,
       quantity: parsedQuantity,
       reason,
       note: note.trim() || undefined,
     });
+    setSubmitting(false);
 
     if (!updated) {
       toast.error("Could not update stock");
+      return;
+    }
+
+    if (!persisted) {
+      // Stock is what the storefront sells against, and that number lives on the
+      // server. Saying "updated" here would leave the shop selling a cake the
+      // admin believes they have taken off the shelf.
+      //
+      // Close the dialog rather than leaving the same delta loaded: pressing
+      // Save again would apply it to the ALREADY-adjusted local copy while the
+      // server applied it to the untouched one, so a "successful" retry would
+      // end with the two further apart than before, and the toast would quote
+      // the local number.
+      toast.error("Stock changed on this device only — the server rejected it", {
+        description: "The shop is still selling against the old count. Reload and try again.",
+      });
+      onOpenChange(false);
+      onAdjusted?.();
       return;
     }
 
@@ -201,7 +226,11 @@ export function StockAdjustmentDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" onClick={handleSubmit} disabled={!item}>
+          <Button
+            variant="bakery"
+            onClick={() => void handleSubmit()}
+            disabled={!item || submitting}
+          >
             Save adjustment
           </Button>
         </DialogFooter>

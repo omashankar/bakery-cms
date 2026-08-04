@@ -75,12 +75,24 @@ export function loadNewsletterSubscribers(): NewsletterSubscriber[] {
   }
 }
 
-export function addNewsletterSubscriber(
+/**
+ * A write, plus whether the SERVER took it.
+ *
+ * The local list is a cache the next hydration overwrites, so a subscriber the
+ * server never received is one this browser thinks it signed up and who will
+ * never receive anything.
+ */
+export interface SubscriberWriteResult {
+  subscriber: NewsletterSubscriber | null;
+  persisted: boolean;
+}
+
+export async function addNewsletterSubscriber(
   email: string,
   source = "Website"
-): NewsletterSubscriber | null {
+): Promise<SubscriberWriteResult> {
   const trimmed = email.trim().toLowerCase();
-  if (!trimmed) return null;
+  if (!trimmed) return { subscriber: null, persisted: false };
 
   const subscribers = loadNewsletterSubscribers();
   const existing = subscribers.find((item) => item.email === trimmed);
@@ -97,8 +109,12 @@ export function addNewsletterSubscriber(
           persistSubscribers(next);
           return { ...existing, isActive: true };
         })();
-    subscribeRequest({ id: result.id, email: trimmed, source: result.source });
-    return result;
+    const persisted = await subscribeRequest({
+      id: result.id,
+      email: trimmed,
+      source: result.source,
+    });
+    return { subscriber: result, persisted };
   }
 
   const timestamp = nowIso();
@@ -111,17 +127,16 @@ export function addNewsletterSubscriber(
     updatedAt: timestamp,
   };
   persistSubscribers([created, ...subscribers]);
-  subscribeRequest(created);
-  return created;
+  return { subscriber: created, persisted: await subscribeRequest(created) };
 }
 
-export function updateNewsletterSubscriber(
+export async function updateNewsletterSubscriber(
   id: string,
   patch: Partial<NewsletterSubscriber>
-): NewsletterSubscriber | null {
+): Promise<SubscriberWriteResult> {
   const subscribers = loadNewsletterSubscribers();
   const index = subscribers.findIndex((item) => item.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { subscriber: null, persisted: false };
 
   const updated: NewsletterSubscriber = {
     ...subscribers[index],
@@ -131,17 +146,17 @@ export function updateNewsletterSubscriber(
   };
   subscribers[index] = updated;
   persistSubscribers(subscribers);
-  updateSubscriberRequest(id, patch);
-  return updated;
+  return { subscriber: updated, persisted: await updateSubscriberRequest(id, patch) };
 }
 
-export function deleteNewsletterSubscribers(ids: string[]): number {
+export async function deleteNewsletterSubscribers(
+  ids: string[]
+): Promise<{ count: number; persisted: boolean }> {
   const subscribers = loadNewsletterSubscribers();
   const next = subscribers.filter((item) => !ids.includes(item.id));
   const count = subscribers.length - next.length;
   persistSubscribers(next);
-  deleteSubscribersRequest(ids);
-  return count;
+  return { count, persisted: await deleteSubscribersRequest(ids) };
 }
 
 export interface NewsletterFilters {

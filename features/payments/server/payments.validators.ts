@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@/features/orders/lib/viewer-time";
 
 /** Zod contract for invoice settings (InvoiceSettingsFormData). */
 
@@ -31,3 +32,16 @@ export const invoiceSettingsSchema = z.object({
 });
 
 export type InvoiceSettingsInput = z.infer<typeof invoiceSettingsSchema>;
+
+/** Viewer timezone for day-bucketed payment analytics. */
+export const paymentAnalyticsQuerySchema = z.object({
+  // An IANA zone, not an offset: an offset is one instant's worth of
+  // information, and a DST zone has two. Unknown zones fall back to UTC
+  // rather than 500-ing a report.
+  timeZone: z
+    .string()
+    .trim()
+    .max(64)
+    .default(DEFAULT_TIME_ZONE)
+    .transform((zone) => (isValidTimeZone(zone) ? zone : DEFAULT_TIME_ZONE)),
+});

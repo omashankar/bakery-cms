@@ -28,6 +28,14 @@ export async function create(inquiry: Inquiry): Promise<Inquiry> {
   return inquiry;
 }
 
+/**
+ * Newest-first, capped.
+ *
+ * The cap is safe for the numbers the admin actually reads: the sidebar badge
+ * and dashboard card count NEW inquiries, and a new inquiry is by definition
+ * among the newest, so it is inside the window. An ALL-TIME total derived from
+ * this would be wrong past the cap — do not add one without a server count().
+ */
 export async function listAll(limit = 1000): Promise<Inquiry[]> {
   await connectDB();
   const docs = (await InquiryModel.find()

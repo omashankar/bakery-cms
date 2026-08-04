@@ -20,6 +20,7 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import {
   BACKUP_UPDATED_EVENT,
   BROWSER_ONLY_NOTE,
@@ -28,6 +29,7 @@ import {
   formatBackupSize,
   loadBackupHistory,
   restoreBackupToServer,
+  type RestoreResult,
   restoreBackupSnapshotToServer,
   serverBackedKeys,
 } from "../lib/backup-repository";
@@ -65,7 +67,7 @@ export function BackupSettingsPage() {
     try {
       // Reads the CURRENT server (Mongo) state for every server-backed slice,
       // falling back to localStorage — so the file reflects the durable data.
-      const snapshot = await exportAndArchiveServerBackup(
+      const { snapshot, unavailableSections } = await exportAndArchiveServerBackup(
         backupLabel.trim() || `Manual backup ${new Date().toLocaleString()}`
       );
       const blob = new Blob([JSON.stringify(snapshot.data, null, 2)], {
@@ -79,6 +81,20 @@ export function BackupSettingsPage() {
       URL.revokeObjectURL(url);
       setBackupLabel("");
       refresh();
+
+      // Says which slices are NOT the server's copy.
+      //
+      // A failed read falls back silently to whatever this browser held — the
+      // demo seed on a cold or signed-out load — and the file was still called
+      // a server backup. That file gets restored months later, over the real
+      // thing, by someone with no way left to tell which slices were ever real.
+      if (unavailableSections.length > 0) {
+        toast.warning(`Exported ${snapshot.keyCount} keys — but not all from the server`, {
+          description: `Could not read ${unavailableSections.join(", ")}. Those came from this browser instead. Reload and export again before relying on this file.`,
+        });
+        return;
+      }
+
       toast.success(`Exported and archived ${snapshot.keyCount} data keys`);
     } catch {
       toast.error("Export failed — please try again");
@@ -130,16 +146,39 @@ export function BackupSettingsPage() {
       // Snapshot the current DURABLE state (server + local) BEFORE the write, so
       // rolling back from history actually restores the server too.
       await exportAndArchiveServerBackup(`Before import — ${new Date().toLocaleString()}`);
+      // Open the gates FIRST. A restore writes every server-backed section,
+      // and each guarded PUT waits out the full hydration deadline when its
+      // gate is shut — sequentially. So a restore from a tab that never
+      // hydrated took minutes and then blamed the server for refusing.
+      await ensureSiteLayoutHydrated();
       const result = await restoreBackupToServer(target.data);
       refresh();
-      toast.success(
-        `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
-      );
+      reportRestore(result);
     } catch {
       toast.error("Import failed — please try again");
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * A restore is exactly when an admin is least able to check by eye. Listing a
+   * section the server refused is how a backup gets trusted that never came back.
+   */
+  function reportRestore(result: RestoreResult) {
+    if (result.failedSections.length > 0) {
+      toast.error(
+        `Restored ${result.serverSections.length} of ${result.serverSections.length + result.failedSections.length} sections to the server`,
+        {
+          description: `The server refused: ${result.failedSections.join(", ")}. Those are restored in this browser only.`,
+        }
+      );
+      return;
+    }
+
+    toast.success(
+      `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
+    );
   }
 
   async function confirmRestore() {
@@ -151,9 +190,7 @@ export function BackupSettingsPage() {
       const result = await restoreBackupSnapshotToServer(target.id);
       refresh();
       if (result) {
-        toast.success(
-          `Restored ${result.localCount} keys locally and pushed ${result.serverSections.length} sections to the server`
-        );
+        reportRestore(result);
       } else {
         toast.error("That snapshot could not be found");
       }

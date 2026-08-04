@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -179,26 +180,32 @@ export function CatalogAdminPage() {
     setSelectedIds(items.map((item) => item.id));
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (selectedIds.length === 0) return;
-    let count = 0;
-    if (activeTab === "categories") count = deleteCategories(selectedIds);
-    else if (activeTab === "flavours") count = deleteFlavours(selectedIds);
-    else if (activeTab === "occasions") count = deleteOccasions(selectedIds);
-    else count = deleteWeightOptions(selectedIds);
+    const remove =
+      activeTab === "categories"
+        ? deleteCategories
+        : activeTab === "flavours"
+          ? deleteFlavours
+          : activeTab === "occasions"
+            ? deleteOccasions
+            : deleteWeightOptions;
+
+    const { value: count, persisted } = await remove(selectedIds);
     refresh();
-    toast.success(`Deleted ${count} item${count === 1 ? "" : "s"}`);
+    reportWrite(persisted, `Deleted ${count} item${count === 1 ? "" : "s"}`);
   }
 
-  function handleReset() {
+  async function handleReset() {
     const store = resetCatalogStore();
     // Push the defaults to the server too — otherwise CatalogServerSync re-hydrates
-    // the old catalog on the next load and the reset silently reverts.
-    for (const section of CATALOG_SECTIONS) {
-      void pushCatalogSection(section, store[section]);
-    }
+    // the old catalog on the next load and the reset silently reverts. Every
+    // answer counted, so a reset the server refused is not reported as done.
+    const results = await Promise.all(
+      CATALOG_SECTIONS.map((section) => pushCatalogSection(section, store[section]))
+    );
     refresh();
-    toast.success("Catalog reset to defaults");
+    reportWrite(results.every(Boolean), "Catalog reset to defaults");
   }
 
   return (

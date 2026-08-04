@@ -27,23 +27,14 @@ export type { StoredCoupon } from "@/features/commerce/lib/coupons-repository";
 export {
   filterOrders,
   getOrderStats,
-  ensureDemoOrders,
   exportOrdersToCsv,
   defaultOrderFilters,
 } from "./lib/order-utils";
 export {
-  filterPaymentOrders,
-  getPaymentOverview,
-  exportPaymentsToCsv,
+  filterPaymentOrders,  exportPaymentsToCsv,
   defaultPaymentFilters,
 } from "./lib/payment-utils";
-export {
-  getCustomerRecords,
-  getCustomerById,
-  getOrdersForCustomerRecord,
-  getCustomerProfiles,
-  getCustomerProfileById,
-  exportCustomersToCsv,
+export {    getCustomerProfiles,  exportCustomersToCsv,
   defaultCustomerFilters,
 } from "./lib/customer-utils";
 export type { CustomerRecord, CustomerProfile } from "./lib/customer-utils";

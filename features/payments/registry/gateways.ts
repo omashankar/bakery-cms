@@ -1,13 +1,49 @@
 /**
- * Payment gateway registry (config-driven, frontend only).
+ * Payment gateway catalogue.
  *
- * Each entry is a static catalogue record. Runtime state (enabled / test-live /
- * priority / credentials) lives in payment-gateway-settings.ts. Adding a gateway =
- * adding an entry here + wiring its methods later — no UI changes needed.
+ * Each entry is a static record. Runtime state (enabled / priority) lives in
+ * payment-gateway-settings.ts; secrets live server-side in
+ * gateway-credentials.server.ts.
  *
- * `configFields` are PLACEHOLDERS for the future backend. Nothing here performs a
- * real connection. Razorpay + COD are marked `isCore` and keep their existing,
- * already-working behaviour.
+ * IMPORTANT — most of this catalogue does not work yet. Only the entries marked
+ * `isCore` can actually take money: the checkout renders exactly two methods
+ * (`razorpay` and `cod`, see registry/methods.ts), and only Razorpay has a
+ * server-side payment path. Everything else is a catalogue record waiting for an
+ * implementation.
+ *
+ * That distinction has to be VISIBLE in the admin, which it was not: every card
+ * had a working-looking enable switch, a credentials form and a "live at
+ * checkout" counter, so enabling Stripe and pasting a live secret key looked
+ * exactly like connecting a payment method — and changed nothing a customer
+ * would ever see. Use `isGatewayWired` at every point where the UI implies a
+ * gateway can charge someone.
+ *
+ * ---
+ * TO ACTUALLY SWITCH ONE ON, e.g. Stripe:
+ *
+ *   1. Build the server payment path — the real work. Follow Razorpay's shape:
+ *        features/payments/server/razorpay-payment.server.ts   (is it captured?)
+ *        features/payments/server/razorpay-refund.server.ts    (send money back)
+ *        app/api/razorpay/order|verify|webhook/route.ts
+ *      The rules those enforce are not Razorpay-specific and must hold for any
+ *      gateway: charge only what a server-side CheckoutDraft priced, verify the
+ *      capture against that draft before the order is `paid`, and record a
+ *      captured payment that could not become an order rather than dropping it.
+ *
+ *   2. Add its method to `registry/methods.ts` so the checkout can render it,
+ *      and to `PaymentMethodSettings` so it can be enabled.
+ *
+ *   3. Flip `isCore: true` here.
+ *
+ * Step 3 is what moves the card out of "Not available yet", enables its switch,
+ * lets its credentials be saved, and counts it in "live at checkout". The admin
+ * UI needs NO changes: the credentials form is generated from `configFields`
+ * (see apps/admin/commerce/components/gateway-credentials-form.tsx) and the
+ * secrets go to the shared server-side store.
+ *
+ * Razorpay has its own form only because it carries three things nothing else
+ * does — environment-variable override, a webhook secret, and a live connection
+ * check. A new gateway needing those should generalise them, not copy them.
  */
 
 export type GatewayCategory = "online" | "offline";
@@ -34,9 +70,14 @@ export interface PaymentGatewayConfig {
   processingTime: string;
   configFields: GatewayField[];
   docsUrl?: string;
-  /** Razorpay + COD — existing, real behaviour. Not a placeholder. */
+  /**
+   * This gateway is connected to a real payment path and can take money.
+   *
+   * True for Razorpay (full server-side integration) and COD (cash, no gateway).
+   * False for everything else — those are catalogue entries only.
+   */
   isCore?: boolean;
-  /** Default order in checkout / manager. */
+  /** Ordering in the admin's own gateway list. NOT the checkout order. */
   defaultPriority: number;
 }
 
@@ -74,10 +115,16 @@ export const PAYMENT_GATEWAYS: PaymentGatewayConfig[] = [
     supportedCurrencies: ["INR"],
     supportedCountries: ["IN"],
     processingTime: "On delivery",
-    configFields: [
-      { key: "maxOrderValue", label: "Max order value (₹)", type: "text", placeholder: "e.g. 5000" },
-      { key: "instructions", label: "Customer instructions", type: "text", placeholder: "Keep exact change ready" },
-    ],
+    // No fields. It carried `maxOrderValue` and `instructions`, which looked
+    // like COD settings and were neither: nothing in the checkout, the order
+    // service or the storefront ever read them. So the screen offered a "Max
+    // order value (₹)" box, saved it into the gateway CREDENTIALS store, and
+    // reported success — while orders above that value went through exactly as
+    // before and the customer was never shown the instructions.
+    //
+    // If COD ever needs a cap, it belongs in commerce settings next to the other
+    // order rules and must be enforced at checkout, not stored beside API keys.
+    configFields: [],
     isCore: true,
     defaultPriority: 2,
   },
@@ -256,4 +303,23 @@ export const PAYMENT_GATEWAYS: PaymentGatewayConfig[] = [
 
 export function getGatewayConfig(id: string): PaymentGatewayConfig | undefined {
   return PAYMENT_GATEWAYS.find((gateway) => gateway.id === id);
+}
+
+/**
+ * Can this gateway actually charge a customer today?
+ *
+ * The one question every admin control here depends on. A switch, a credentials
+ * form or a "live at checkout" count that ignores it is telling the operator
+ * something untrue about their own shop.
+ */
+export function isGatewayWired(id: string): boolean {
+  return getGatewayConfig(id)?.isCore === true;
+}
+
+/** The gateways that can take money, and the ones that are catalogue only. */
+export function splitGatewaysByReadiness() {
+  return {
+    wired: PAYMENT_GATEWAYS.filter((gateway) => gateway.isCore === true),
+    notYet: PAYMENT_GATEWAYS.filter((gateway) => gateway.isCore !== true),
+  };
 }

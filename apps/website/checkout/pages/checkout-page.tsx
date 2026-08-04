@@ -38,7 +38,7 @@ import { DeliveryAddressPicker } from "@/apps/website/checkout/components/delive
 import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
+import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import {
   clearCheckoutDraft,
   EMPTY_CHECKOUT_ADDRESS,
@@ -61,8 +61,10 @@ import {
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
-import { placeOrder } from "@/features/orders/lib/orders";
+import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
+import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
+import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
@@ -191,7 +193,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
     async function checkGateway() {
       try {
-        const response = await fetch("/api/razorpay/config");
+        const response = await fetch("/api/razorpay/availability");
         const status = await response.json();
         if (!cancelled) setOnlinePaymentReady(Boolean(status?.configured));
       } catch {
@@ -225,6 +227,16 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
+  /**
+   * An order that exists locally but which the server has not acknowledged. Held
+   * so the customer can retry the write without paying again, and so the cart is
+   * still there if they cannot.
+   */
+  const [unconfirmed, setUnconfirmed] = useState<{
+    order: PlacedOrder;
+    paymentStatus: "paid" | "cod";
+    paymentReference?: string;
+  } | null>(null);
 
   const {
     register,
@@ -390,7 +402,19 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   );
   const validCoupon = useMemo(() => revalidateCoupon(coupon, subtotal), [coupon, subtotal]);
 
-  const totals = useMemo(
+  /**
+   * The SHOP's totals, once it has priced this cart.
+   *
+   * The number below is computed in the browser from a localStorage copy of the
+   * commerce settings, so it can legitimately disagree with the shop — stale
+   * settings, a price change, a coupon that no longer applies. It is fine as a
+   * running estimate, but the customer must not be asked to pay against it: the
+   * server's number is what gets charged. When they differ, this holds the
+   * server's and the customer is asked to look again before committing.
+   */
+  const [serverTotals, setServerTotals] = useState<CartTotals | null>(null);
+
+  const localTotals = useMemo(
     () =>
       calculateCartTotals({
         items,
@@ -404,6 +428,34 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       }),
     [items, validCoupon, giftWrap, watchedCity, watchedPincode, commerce]
   );
+
+  const totals = serverTotals ?? localTotals;
+
+  /**
+   * The earliest date this address can actually be delivered on.
+   *
+   * The picker floored on the shop-wide `deliveryLeadDays` alone, so a zone the
+   * admin had configured for five days happily accepted tomorrow. The zone's own
+   * lead time is the stricter of the two and now moves the floor. The server
+   * refuses an earlier date regardless — this is so the customer never picks one
+   * only to be told no.
+   */
+  const earliestDeliveryDate = useMemo(() => {
+    const zoneDays = totals.deliveryMinDays;
+    if (typeof zoneDays !== "number" || zoneDays <= 0) return minDeliveryDate;
+
+    // Calendar arithmetic, not Date arithmetic. The first version built a LOCAL
+    // midnight and read it back through `toISOString()`, which is UTC — so in
+    // IST the floor came out a day early and the picker offered exactly the date
+    // the server refuses, with the refusal landing after the card was charged.
+    const zoneFloor = earliestDeliveryDateString(zoneDays);
+    return zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
+  }, [totals.deliveryMinDays, minDeliveryDate]);
+
+  // Anything that changes the price invalidates the shop's last answer.
+  useEffect(() => {
+    setServerTotals(null);
+  }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
 
   function persistDraft(
     patch: Partial<{
@@ -469,11 +521,24 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const finalizeOrder = (
+  /**
+   * Commit the order once the server has it — and only then.
+   *
+   * The local write is a cache. An order the server never received exists in
+   * this one browser and nowhere else: the customer has paid, holds a
+   * confirmation number, and can even track it (the tracking page reads the same
+   * cache) while the bakery never sees the order and nobody bakes the cake. So
+   * nothing here is irreversible until `persisted` comes back true — the cart
+   * stays full, the draft stays put, and the success page stays unvisited.
+   */
+  const finalizeOrder = async (
     paymentStatus: "paid" | "cod",
-    paymentReference?: string
+    paymentReference: string | undefined,
+    /** The cart the SHOP priced. Its numbers are the ones that get stored. */
+    draftId: string,
   ) => {
-    const order = placeOrder({
+    const { order, persisted, closed } = await placeOrder({
+      draftId,
       items,
       totals,
       address: getCheckoutDraft().address,
@@ -487,23 +552,87 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       orderNotes: orderNotes.trim() || undefined,
     });
 
+    if (closed) {
+      // The bakery is closed, not unreachable. The unconfirmed-order overlay
+      // below offers a retry, and a retry cannot succeed while the shop is
+      // shut — it would just send the customer round the same loop. Tell them
+      // what actually happened, in the admin's own words.
+      setPlacing(false);
+      setPayUI(null);
+      toast.error("The store is closed right now", { description: closed, duration: 10000 });
+      return;
+    }
+
+    if (!persisted) {
+      setPlacing(false);
+      // Clear the payment overlay first. It sits above the unconfirmed-order
+      // overlay, so leaving it up on a failed RETRY would strand the customer
+      // behind a "Verifying payment…" spinner with no way back to the button.
+      setPayUI(null);
+      setUnconfirmed({ order, paymentStatus, paymentReference });
+      return;
+    }
+
+    commitPlacedOrder(order);
+  };
+
+  /** The steps that must happen exactly once, and only once the server has it. */
+  const commitPlacedOrder = (order: PlacedOrder) => {
     if (validCoupon) {
-      recordCouponUsage(validCoupon.code);
+      // Deliberately not awaited or reported: the customer cannot act on a
+      // failed usage counter, and holding up their confirmation for it would be
+      // worse than an undercount the shop can reconcile.
+      void recordCouponUsage(validCoupon.code);
     }
 
     clearCart();
     clearCartPreferences();
     clearCheckoutDraft();
     setPlacing(false);
+    setUnconfirmed(null);
+    setPayUI(null);
 
     toast.success("Order placed!", {
       description: `Order ${order.orderNumber} confirmed`,
     });
 
     // The customer who just placed this order can view it without going
-    // through the track-order lookup.
-    grantOrderAccess(order.orderNumber);
+    // through the track-order lookup. Their email travels with the grant so the
+    // order pages can re-read the SERVER's copy later — that is what makes a
+    // refund or a status change visible to them at all.
+    grantOrderAccess(order.orderNumber, order.address?.email);
     router.push(`${routes.store.orderSuccess}?order=${order.orderNumber}`);
+  };
+
+  /**
+   * Re-send the order the server did not acknowledge. Retries the WRITE only —
+   * never the payment, which already succeeded.
+   *
+   * Sends the held order through `confirmOrder`, NOT back through `placeOrder`.
+   * `placeOrder` would mint a new id and order number once its 15-second
+   * duplicate window had lapsed — and it lapses in the ordinary case, because
+   * this overlay asks the customer to note their payment reference first. Since
+   * the endpoint dedupes on the id, that would have produced a second order and
+   * a second stock decrement for a single payment.
+   */
+  const retryConfirmation = async () => {
+    if (!unconfirmed || placing) return;
+    setPlacing(true);
+
+    const { order, persisted } = await confirmOrder(unconfirmed.order);
+    setPlacing(false);
+
+    if (!persisted) {
+      toast.error("Still couldn't reach the bakery", {
+        description:
+          "Your order is safe here. Try again, or contact support with the reference shown.",
+      });
+      return;
+    }
+
+    // `order`, not `unconfirmed.order` — the server may have had to issue a
+    // different order number, and that is the one the customer must be shown.
+    commitPlacedOrder(order);
   };
 
   const onPlaceOrder = async () => {
@@ -514,20 +643,54 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
     const address = getCheckoutDraft().address;
 
+    // Ask the SHOP what this cart costs, and hold on to the draft it prices.
+    // Everything downstream — the amount charged and the prices stored on the
+    // order — comes from that draft rather than from anything computed here.
+    setPlacing(true);
+    const { quote, error: quoteError } = await requestCartQuote({
+      items,
+      couponCode: validCoupon?.code,
+      giftWrap,
+      deliveryAddress: { city: address.city, pincode: address.pincode },
+      // The whole order intent, so the webhook can finish this order from the
+      // draft if the customer's browser never comes back from the gateway.
+      address,
+      deliverySlot,
+      orderNotes: orderNotes.trim() || undefined,
+    });
+
+    if (!quote) {
+      setPlacing(false);
+      toast.error("Could not price your order", {
+        description: quoteError ?? "Please refresh and try again.",
+      });
+      return;
+    }
+
+    // The shop's number is the one that will be charged, so it is the one the
+    // customer has to see before they commit to paying.
+    if (Math.abs(quote.totals.total - totals.total) >= 0.01) {
+      setServerTotals(quote.totals);
+      setPlacing(false);
+      toast.error("Prices have changed", {
+        description: `This order now comes to ${formatCurrency(quote.totals.total)}. Please review and place it again.`,
+        duration: 10000,
+      });
+      return;
+    }
+
     // Online payment — open the Razorpay modal, place the order only once verified.
     if (paymentMethod === "razorpay") {
-      setPlacing(true);
       setPayUI({ state: "redirecting" });
       try {
         const result = await openRazorpayCheckout({
-          amount: totals.total,
-          receipt: `bk-${Date.now()}`,
+          draftId: quote.draftId,
           name: address.fullName,
           email: address.email,
           phone: address.phone,
         });
         setPayUI({ state: "processing" });
-        finalizeOrder("paid", result.paymentId);
+        await finalizeOrder("paid", result.paymentId, quote.draftId);
       } catch (error) {
         setPlacing(false);
         const msg = error instanceof Error ? error.message : "Payment failed";
@@ -537,10 +700,9 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     }
 
     // Cash on Delivery
-    setPlacing(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      finalizeOrder("cod", undefined);
+      await finalizeOrder("cod", undefined, quote.draftId);
     } catch (error) {
       // Without this guard a thrown placeOrder/clearCart would leave the button
       // stuck on "Placing order…" forever (finalizeOrder never resets `placing`).
@@ -567,6 +729,45 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
   return (
     <>
+      {/*
+        The order reached this browser but not the bakery. Shown INSTEAD of the
+        success page, and it blocks: the customer needs to know their order is
+        not in yet, and if they paid, they need the reference in front of them
+        before they navigate away. Retry re-sends the order — never the payment.
+      */}
+      {unconfirmed && !payUI ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <ProcessingState
+            state="failed"
+            title="Order not confirmed yet"
+            message={
+              unconfirmed.paymentStatus === "paid"
+                ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
+                : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+            }
+            reason={
+              unconfirmed.paymentReference
+                ? `Order ${unconfirmed.order.orderNumber} · payment ${unconfirmed.paymentReference}`
+                : `Order ${unconfirmed.order.orderNumber}`
+            }
+            className="w-full max-w-md"
+            actions={[
+              {
+                label: placing ? "Retrying…" : "Retry confirmation",
+                onClick: () => void retryConfirmation(),
+                variant: "bakery",
+                icon: "retry",
+              },
+              {
+                label: "Contact support",
+                onClick: () => router.push(routes.store.contact),
+                variant: "outline",
+              },
+            ]}
+          />
+        </div>
+      ) : null}
+
       {/* Payment processing / failure overlay (solid backdrop — no glassmorphism) */}
       {payUI ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
@@ -835,7 +1036,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                           <Input
                             id="deliveryDate"
                             type="date"
-                            min={minDeliveryDate}
+                            min={earliestDeliveryDate}
                             value={deliverySlot.date}
                             aria-invalid={Boolean(slotError) && !deliverySlot.date}
                             onChange={(event) => {

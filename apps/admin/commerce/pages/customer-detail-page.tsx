@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, MapPin, Phone, Plus, Tag, X } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, MapPin, Phone, Plus, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { CustomerSegmentBadge } from "@/apps/admin/commerce/components/customer-segment-badge";
@@ -13,17 +13,14 @@ import {
   updateCustomerMarketingOptIn,
   updateCustomerNotes,
 } from "@/apps/admin/commerce/lib/customers-repository";
+import { fetchCustomerDetail } from "@/apps/admin/commerce/lib/customers-api";
 import {
   getCustomerActivity,
-  getCustomerAddresses,
-  getCustomerProfileById,
-  type CustomerProfile,
+  getCustomerAddresses,  type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
-import { getOrdersForCustomerRecord } from "@/apps/admin/commerce/lib/customer-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,48 +38,95 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [notes, setNotes] = useState("");
+  /** True while the textarea holds an edit the server has not accepted yet. */
+  const notesDirty = useRef(false);
+  /** The textarea's current text, readable after an await without going stale. */
+  const notesRef = useRef("");
+  /** Which customer the state below currently describes. */
+  const shownCustomerId = useRef<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
+  // Queried by email on the server. Filtering the browser's order cache instead
+  // would silently omit a long-standing customer's earliest orders, and with
+  // them their true order count, spend and first-order date.
   useEffect(() => {
-    function refresh() {
-      ensureDemoOrders();
-      const nextProfile = getCustomerProfileById(customerId);
-      setProfile(nextProfile);
-      if (nextProfile) {
-        setOrders(
-          getOrdersForCustomerRecord(nextProfile.email).sort(
-            (a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime()
-          )
-        );
-        setNotes(nextProfile.meta.notes);
+    let cancelled = false;
+
+    async function refresh() {
+      // Navigating to another customer must not leave the previous one on
+      // screen under the new URL while the request runs. A background refresh
+      // of the SAME customer keeps what is on screen, so it does not flash.
+      if (shownCustomerId.current !== customerId) {
+        shownCustomerId.current = customerId;
+        notesDirty.current = false;
+        notesRef.current = "";
+        setLoading(true);
+        setProfile(null);
+        setOrders([]);
+        setNotes("");
       }
+
+      const result = await fetchCustomerDetail(customerId);
+      if (cancelled) return;
+      setFailed(!result);
+      if (result) {
+        setProfile(result.profile);
+        setOrders(result.orders);
+        // Only adopt the server's notes when the field is not mid-edit, or a
+        // background refresh discards whatever the admin has typed.
+        if (result.profile && !notesDirty.current) {
+          notesRef.current = result.profile.meta.notes;
+          setNotes(result.profile.meta.notes);
+        }
+      }
+      setLoading(false);
     }
 
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
+    const onExternalChange = () => void refresh();
+
+    void refresh();
+    window.addEventListener(CUSTOMERS_UPDATED_EVENT, onExternalChange);
     return () => {
-      window.removeEventListener("bakery-orders-updated", refresh);
-      window.removeEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
+      cancelled = true;
+      window.removeEventListener(CUSTOMERS_UPDATED_EVENT, onExternalChange);
     };
   }, [customerId, refreshKey]);
 
   const addresses = useMemo(
-    () => (profile ? getCustomerAddresses(profile.email) : []),
-    [profile, refreshKey]
+    () => (profile ? getCustomerAddresses(orders) : []),
+    [profile, orders]
   );
   const activity = useMemo(
-    () => (profile ? getCustomerActivity(profile.email) : []),
-    [profile, refreshKey]
+    () => (profile ? getCustomerActivity(profile.meta, orders) : []),
+    [profile, orders]
   );
+
+  if (loading) {
+    // "Customer not found" before the request has answered would be a guess, and
+    // a wrong one every single time an admin opens a customer that does exist.
+    return (
+      <AdminPage>
+        <div className="flex min-h-64 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <span className="sr-only">Loading customer</span>
+        </div>
+      </AdminPage>
+    );
+  }
 
   if (!profile) {
     return (
       <AdminPage>
         <AdminPageHeader
-          title="Customer not found"
-          description="This customer record could not be loaded."
+          title={failed ? "Could not load this customer" : "Customer not found"}
+          description={
+            failed
+              ? "The server did not answer. Check your connection and reload."
+              : "No customer exists for this address."
+          }
           actions={
             <Button variant="outline" render={<Link href={routes.admin.customers.list} />}>
               <ArrowLeft className="size-4" />
@@ -98,32 +142,94 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     setRefreshKey((value) => value + 1);
   }
 
-  function handleSaveNotes() {
-    if (!profile) return;
-    updateCustomerNotes(profile.email, notes);
+  /**
+   * The local write always succeeds; only the server write makes it real. Saying
+   * "saved" on the strength of the former loses the admin's notes at the next
+   * hydration without ever telling them.
+   */
+  function reportUnpersisted(what: string) {
+    toast.error(`${what} on this device only — the server rejected the change.`, {
+      description: "Reload to see the server's version.",
+    });
+  }
+
+  /**
+   * A rejected write must not leave its change on screen. The local copy was
+   * already updated (that is what makes the UI instant), so the honest move is
+   * to drop it and re-read the server rather than keep a change that only this
+   * browser believes in — otherwise the next write composes from that phantom
+   * state and a retry "succeeds" while writing something else entirely.
+   */
+  function rejectWrite(what: string) {
+    reportUnpersisted(what);
     refreshProfile();
+  }
+
+  async function handleSaveNotes() {
+    if (!profile) return;
+    const sent = notes;
+    const { meta, persisted } = await updateCustomerNotes(profile.meta, sent);
+
+    if (!persisted) {
+      // Keep the text on screen and keep the field dirty — it is the only copy
+      // the admin has left, and the pending refresh must not overwrite it.
+      return rejectWrite("Notes saved");
+    }
+
+    // Only stand the field down if it still holds what we sent. A cold database
+    // connection makes this write seconds long, and anything typed meanwhile is
+    // newer than the server's copy — clearing the guard unconditionally let the
+    // next refresh replace it with the text as it was at the moment of the click.
+    if (notesRef.current === sent) notesDirty.current = false;
+
+    // Adopt what the write returned. Without this the next tag or marketing
+    // write composes from the pre-save meta and reverts the notes server-side.
+    setProfile((prev) => (prev ? { ...prev, meta } : prev));
     toast.success("Customer notes saved");
   }
 
-  function handleMarketingToggle(checked: boolean) {
+  async function handleMarketingToggle(checked: boolean) {
     if (!profile) return;
-    updateCustomerMarketingOptIn(profile.email, checked);
-    refreshProfile();
+    const current = profile.meta;
+
+    // The Switch is driven by server-sourced state, so without moving it here it
+    // does not budge until the round trip finishes — and not at all if the
+    // request hangs. Move it now; put it back if the server refuses.
+    setProfile((prev) =>
+      prev ? { ...prev, meta: { ...prev.meta, marketingOptIn: checked } } : prev
+    );
+
+    const { meta, persisted } = await updateCustomerMarketingOptIn(current, checked);
+    if (!persisted) {
+      // `current` is only a good rollback target for a single toggle — flip
+      // twice quickly and it is itself an unconfirmed optimistic value. Undo
+      // for the fast case, then let the refetch settle it against the server.
+      setProfile((prev) => (prev ? { ...prev, meta: current } : prev));
+      return rejectWrite("Marketing preference saved");
+    }
+
+    setProfile((prev) => (prev ? { ...prev, meta } : prev));
     toast.success(checked ? "Marketing opt-in enabled" : "Marketing opt-in disabled");
   }
 
-  function handleAddTag() {
+  async function handleAddTag() {
     if (!profile) return;
-    const saved = addCustomerTag(profile.email, tagInput);
+    const { meta, persisted, skipped } = await addCustomerTag(profile.meta, tagInput);
     setTagInput("");
-    setProfile((current) => (current ? { ...current, meta: saved } : current));
+    // An empty box wrote nothing, so "Tag added" would be a plain lie.
+    if (skipped) return;
+    if (!persisted) return rejectWrite("Tag added");
+
+    setProfile((current) => (current ? { ...current, meta } : current));
     toast.success("Tag added");
   }
 
-  function handleRemoveTag(tag: string) {
+  async function handleRemoveTag(tag: string) {
     if (!profile) return;
-    const saved = removeCustomerTag(profile.email, tag);
-    setProfile((current) => (current ? { ...current, meta: saved } : current));
+    const { meta, persisted } = await removeCustomerTag(profile.meta, tag);
+    if (!persisted) return rejectWrite("Tag removed");
+
+    setProfile((current) => (current ? { ...current, meta } : current));
   }
 
   return (
@@ -396,7 +502,14 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                   className={adminTextareaClassName}
                   rows={5}
                   value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
+                  onChange={(event) => {
+                    // Mark the field mid-edit so a background refresh — a tag
+                    // write, another tab, the 30s poll — cannot overwrite what
+                    // is being typed with the server's older copy.
+                    notesDirty.current = true;
+                    notesRef.current = event.target.value;
+                    setNotes(event.target.value);
+                  }}
                   placeholder="VIP wedding client, prefers eggless cakes, always requests morning delivery…"
                 />
               </div>

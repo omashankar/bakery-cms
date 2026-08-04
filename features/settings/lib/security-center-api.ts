@@ -10,15 +10,23 @@ interface Envelope<T> {
   data: T | null;
 }
 
-async function send(path: string, method: string, body?: unknown): Promise<void> {
+/**
+ * Resolves false on a network failure OR a non-2xx response.
+ *
+ * The `res.ok` check is the point. Without it this reported success for a 401
+ * (expired admin token) and a 500 alike, and the caller went on to tell an admin
+ * that a session was revoked while it was still live on the server.
+ */
+async function send(path: string, method: string, body?: unknown): Promise<boolean> {
   try {
-    await fetch(path, {
+    const res = await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    return res.ok;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -34,10 +42,30 @@ export async function fetchSecurityCenter(): Promise<SecurityCenterState | null>
   }
 }
 
-export function revokeSessionRequest(sessionId: string): void {
-  void send(`/api/security-center/sessions/${sessionId}`, "DELETE");
+export function revokeSessionRequest(sessionId: string): Promise<boolean> {
+  return send(`/api/security-center/sessions/${sessionId}`, "DELETE");
 }
 
-export function logoutAllRequest(): void {
-  void send("/api/security-center/logout-all", "POST");
+/**
+ * Signs out every session but this one, and reports how many the SERVER revoked.
+ *
+ * The count has to come from here. Counting the locally cached session list
+ * instead reports whatever that list happened to hold when the page loaded: sign
+ * in on a phone afterwards and the admin is told "No other active sessions" at
+ * the very moment one was revoked; leave a tab open past some expiries and it
+ * claims to have signed out devices that were already gone.
+ */
+export async function logoutAllRequest(): Promise<{ ok: boolean; revoked: number }> {
+  try {
+    const res = await fetch("/api/security-center/logout-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return { ok: false, revoked: 0 };
+
+    const json = (await res.json().catch(() => null)) as { data?: { revoked?: number } } | null;
+    return { ok: true, revoked: json?.data?.revoked ?? 0 };
+  } catch {
+    return { ok: false, revoked: 0 };
+  }
 }

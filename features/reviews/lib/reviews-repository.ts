@@ -181,7 +181,19 @@ export function getStorefrontReviewsForProduct(productSlug: string) {
   }));
 }
 
-export function createReview(data: ProductReviewFormData): ProductReview {
+/**
+ * A review write, plus whether the SERVER took it.
+ *
+ * The local list is a cache the next hydration overwrites. So an approval the
+ * server rejected un-approves itself on reload — and in the meantime the
+ * moderator has moved on believing the review is live (or taken down).
+ */
+export interface ReviewWriteResult {
+  review: ProductReview | null;
+  persisted: boolean;
+}
+
+export async function createReview(data: ProductReviewFormData): Promise<ReviewWriteResult> {
   const reviews = loadReviews();
   const timestamp = nowIso();
   const review: ProductReview = {
@@ -192,14 +204,31 @@ export function createReview(data: ProductReviewFormData): ProductReview {
   };
   writeReviews([review, ...reviews]);
   syncProductReviewAggregates();
-  submitReviewRequest(review);
-  return review;
+
+  if (!(await submitReviewRequest(review))) return { review, persisted: false };
+
+  // POST /api/reviews is the PUBLIC submit route, so the server forces every new
+  // review to pending and unfeatured — correctly, since a stranger must not be
+  // able to publish their own review. But the admin's "Add review" form offers
+  // Status and "Feature on the product page", and those choices were silently
+  // dropped: the row rendered approved from the local cache while the server
+  // held it pending, so it never appeared on the product page and flipped back
+  // on the next load. Apply them through the ADMIN route, which is allowed to.
+  const moderation: Partial<ProductReviewFormData> = {};
+  if (data.status !== "pending") moderation.status = data.status;
+  if (data.isFeatured) moderation.isFeatured = true;
+  if (Object.keys(moderation).length === 0) return { review, persisted: true };
+
+  return { review, persisted: await updateReviewRequest(review.id, moderation) };
 }
 
-export function updateReview(id: string, data: ProductReviewFormData): ProductReview | null {
+export async function updateReview(
+  id: string,
+  data: ProductReviewFormData
+): Promise<ReviewWriteResult> {
   const reviews = loadReviews();
   const index = reviews.findIndex((review) => review.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { review: null, persisted: false };
 
   const updated: ProductReview = {
     ...reviews[index],
@@ -210,13 +239,15 @@ export function updateReview(id: string, data: ProductReviewFormData): ProductRe
   reviews[index] = updated;
   writeReviews(reviews);
   syncProductReviewAggregates();
-  updateReviewRequest(id, data);
-  return updated;
+  return { review: updated, persisted: await updateReviewRequest(id, data) };
 }
 
-export function setReviewStatus(id: string, status: ProductReviewStatus): ProductReview | null {
+export function setReviewStatus(
+  id: string,
+  status: ProductReviewStatus
+): Promise<ReviewWriteResult> {
   const review = getReviewById(id);
-  if (!review) return null;
+  if (!review) return Promise.resolve({ review: null, persisted: false });
   return updateReview(id, {
     ...review,
     status,
@@ -224,41 +255,49 @@ export function setReviewStatus(id: string, status: ProductReviewStatus): Produc
   });
 }
 
-export function approveReviews(ids: string[]): number {
-  let count = 0;
-  const reviews = loadReviews().map((review) => {
-    if (!ids.includes(review.id)) return review;
-    count += 1;
-    return { ...review, status: "approved" as const, updatedAt: nowIso() };
-  });
-  writeReviews(reviews);
-  syncProductReviewAggregates();
-  ids.forEach((id) => updateReviewRequest(id, { status: "approved" }));
-  return count;
+export interface BulkReviewResult {
+  /** How many the server accepted. */
+  updated: number;
+  /** How many it refused — these are still in their old state on the server. */
+  failed: number;
 }
 
-export function rejectReviews(ids: string[]): number {
-  let count = 0;
-  const reviews = loadReviews().map((review) => {
-    if (!ids.includes(review.id)) return review;
-    count += 1;
-    return { ...review, status: "rejected" as const, updatedAt: nowIso() };
-  });
+async function setStatusBulk(
+  ids: string[],
+  status: "approved" | "rejected"
+): Promise<BulkReviewResult> {
+  const reviews = loadReviews().map((review) =>
+    ids.includes(review.id) ? { ...review, status, updatedAt: nowIso() } : review
+  );
   writeReviews(reviews);
   syncProductReviewAggregates();
-  ids.forEach((id) => updateReviewRequest(id, { status: "rejected" }));
-  return count;
+
+  // Every id is sent and every answer counted. `forEach` over an async call
+  // discarded all of them, so a batch in which the server refused every single
+  // write was indistinguishable from one it accepted whole.
+  const results = await Promise.all(ids.map((id) => updateReviewRequest(id, { status })));
+  const failed = results.filter((ok) => !ok).length;
+
+  return { updated: ids.length - failed, failed };
 }
 
-export function toggleReviewFeatured(id: string): ProductReview | null {
+export function approveReviews(ids: string[]): Promise<BulkReviewResult> {
+  return setStatusBulk(ids, "approved");
+}
+
+export function rejectReviews(ids: string[]): Promise<BulkReviewResult> {
+  return setStatusBulk(ids, "rejected");
+}
+
+export function toggleReviewFeatured(id: string): Promise<ReviewWriteResult> {
   const review = getReviewById(id);
-  if (!review) return null;
+  if (!review) return Promise.resolve({ review: null, persisted: false });
   return updateReview(id, { ...review, isFeatured: !review.isFeatured });
 }
 
-export function saveReviewReply(id: string, adminReply: string): ProductReview | null {
+export function saveReviewReply(id: string, adminReply: string): Promise<ReviewWriteResult> {
   const review = getReviewById(id);
-  if (!review) return null;
+  if (!review) return Promise.resolve({ review: null, persisted: false });
   return updateReview(id, {
     ...review,
     adminReply: adminReply.trim(),
@@ -266,9 +305,9 @@ export function saveReviewReply(id: string, adminReply: string): ProductReview |
   });
 }
 
-export function reportReview(id: string, reportReason: string): ProductReview | null {
+export function reportReview(id: string, reportReason: string): Promise<ReviewWriteResult> {
   const review = getReviewById(id);
-  if (!review) return null;
+  if (!review) return Promise.resolve({ review: null, persisted: false });
   return updateReview(id, {
     ...review,
     status: "reported",
@@ -276,14 +315,15 @@ export function reportReview(id: string, reportReason: string): ProductReview | 
   });
 }
 
-export function deleteReviews(ids: string[]): number {
+export async function deleteReviews(
+  ids: string[]
+): Promise<{ count: number; persisted: boolean }> {
   const reviews = loadReviews();
   const next = reviews.filter((review) => !ids.includes(review.id));
   const count = reviews.length - next.length;
   writeReviews(next);
   syncProductReviewAggregates();
-  deleteReviewsRequest(ids);
-  return count;
+  return { count, persisted: await deleteReviewsRequest(ids) };
 }
 
 export function submitStorefrontReview(input: {
@@ -293,9 +333,9 @@ export function submitStorefrontReview(input: {
   rating: number;
   title?: string;
   body: string;
-}): ProductReview | null {
+}): Promise<ReviewWriteResult> {
   const cake = loadProducts().find((item) => item.slug === input.productSlug);
-  if (!cake) return null;
+  if (!cake) return Promise.resolve({ review: null, persisted: false });
 
   return createReview({
     cakeId: cake.id,
@@ -311,7 +351,10 @@ export function submitStorefrontReview(input: {
   });
 }
 
-export function resetReviews(): ProductReview[] {
+export async function resetReviews(): Promise<{
+  reviews: ProductReview[];
+  persisted: boolean;
+}> {
   const previous = readReviews();
   const seeded = seedReviews(loadProducts());
   writeReviews(seeded);
@@ -328,20 +371,27 @@ export function resetReviews(): ProductReview[] {
   const staleIds = previous
     .map((review) => review.id)
     .filter((id) => !seededIds.has(id));
-  if (staleIds.length > 0) deleteReviewsRequest(staleIds);
 
-  seeded.forEach((review) => {
-    updateReviewRequest(review.id, {
-      status: review.status,
-      isFeatured: review.isFeatured,
-      title: review.title ?? "",
-      body: review.body,
-      rating: review.rating,
-      adminReply: review.adminReply ?? "",
-      repliedAt: review.repliedAt ?? "",
-      reportReason: review.reportReason ?? "",
-    });
-  });
+  // Every answer counted. This whole sequence used to be awaited and discarded,
+  // so "Reviews reset to demo seed" was reported even when the server refused
+  // all of it — and the next hydration brought the moderated reviews straight
+  // back, with nothing having said the reset never happened.
+  const deleted = staleIds.length > 0 ? await deleteReviewsRequest(staleIds) : true;
 
-  return seeded;
+  const patched = await Promise.all(
+    seeded.map((review) =>
+      updateReviewRequest(review.id, {
+        status: review.status,
+        isFeatured: review.isFeatured,
+        title: review.title ?? "",
+        body: review.body,
+        rating: review.rating,
+        adminReply: review.adminReply ?? "",
+        repliedAt: review.repliedAt ?? "",
+        reportReason: review.reportReason ?? "",
+      })
+    )
+  );
+
+  return { reviews: seeded, persisted: deleted && patched.every(Boolean) };
 }

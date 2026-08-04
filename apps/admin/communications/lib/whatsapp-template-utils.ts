@@ -24,6 +24,8 @@ export interface WhatsAppTemplateOverview {
   active: number;
   drafts: number;
   transactional: number;
+  /** Active, linked to a Meta template, and approved by Meta. */
+  sendable: number;
 }
 
 export const EMPTY_WHATSAPP_TEMPLATE_OVERVIEW: WhatsAppTemplateOverview = {
@@ -31,7 +33,44 @@ export const EMPTY_WHATSAPP_TEMPLATE_OVERVIEW: WhatsAppTemplateOverview = {
   active: 0,
   drafts: 0,
   transactional: 0,
+  sendable: 0,
 };
+
+/**
+ * Everything a template needs before a customer can receive it.
+ *
+ * "Active" is the shop's own decision and says nothing about whether the message
+ * can leave the building. A template can be published, carefully worded, and
+ * completely unsendable because Meta has never seen it — which is what the stat
+ * card counting actives as "Ready to send" used to imply it had ruled out.
+ */
+export function isSendable(template: WhatsAppTemplateRecord): boolean {
+  return (
+    template.status === "active" &&
+    Boolean(template.metaName?.trim()) &&
+    template.approval === "approved"
+  );
+}
+
+/**
+ * Placeholders Meta expects that the mapping does not fill.
+ *
+ * Counted over the SLOT COUNT rather than over the mapping, so a template Meta
+ * says takes three parameters while the shop has mapped two is caught. That
+ * shorter-array case is the one worth catching: Meta rejects a message whose
+ * parameter count does not match the approved body, and the error names no
+ * parameter — so it surfaces as an order that quietly received no message and a
+ * log line nobody is reading, when the count was knowable while the admin was
+ * still looking at the form.
+ */
+export function countUnfilledSlots(
+  slots: number,
+  parameters: readonly string[] | undefined,
+): number {
+  return Array.from({ length: Math.max(0, slots) }, (_, index) => parameters?.[index]).filter(
+    (value) => !value?.trim(),
+  ).length;
+}
 
 export function getWhatsAppTemplateOverview(
   templates: WhatsAppTemplateRecord[]
@@ -42,6 +81,7 @@ export function getWhatsAppTemplateOverview(
       if (template.status === "active") acc.active += 1;
       else acc.drafts += 1;
       if (template.category === "transactional") acc.transactional += 1;
+      if (isSendable(template)) acc.sendable += 1;
       return acc;
     },
     { ...EMPTY_WHATSAPP_TEMPLATE_OVERVIEW }

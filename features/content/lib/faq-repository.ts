@@ -1,4 +1,5 @@
 import type { FaqCategory, FaqItem, FaqFormData } from "@/types/content";
+import type { WriteResult } from "@/lib/write-result";
 import type { LandingFaq } from "@/constants/landing-data";
 import { faqs as seedFaqs } from "@/constants/landing-data";
 import { replaceFaqsRequest } from "./content-api";
@@ -77,10 +78,10 @@ function lowPersist(items: FaqItem[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-/** Mutation write: local + best-effort server replace-all. */
-function persist(items: FaqItem[]): void {
+/** Mutation write: local first, then the server, reporting what the server did. */
+async function persist(items: FaqItem[]): Promise<boolean> {
   lowPersist(items);
-  replaceFaqsRequest(items);
+  return replaceFaqsRequest(items);
 }
 
 /** Hydration: write the server's FAQs into the local cache (no re-push). */
@@ -153,7 +154,7 @@ export function createEmptyFaqForm(): FaqFormData {
   };
 }
 
-export function createFaq(data: FaqFormData): FaqItem {
+export async function createFaq(data: FaqFormData): Promise<WriteResult<FaqItem>> {
   const items = loadFaqs();
   const timestamp = nowIso();
   const created: FaqItem = {
@@ -162,14 +163,16 @@ export function createFaq(data: FaqFormData): FaqItem {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  persist([...items, created]);
-  return created;
+  return { value: created, persisted: await persist([...items, created]) };
 }
 
-export function updateFaq(id: string, patch: Partial<FaqFormData>): FaqItem | null {
+export async function updateFaq(
+  id: string,
+  patch: Partial<FaqFormData>
+): Promise<WriteResult<FaqItem | null>> {
   const items = loadFaqs();
   const index = items.findIndex((item) => item.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: FaqItem = {
     ...items[index],
@@ -178,19 +181,20 @@ export function updateFaq(id: string, patch: Partial<FaqFormData>): FaqItem | nu
     updatedAt: nowIso(),
   };
   items[index] = updated;
-  persist(items);
-  return updated;
+  return { value: updated, persisted: await persist(items) };
 }
 
-export function deleteFaqs(ids: string[]): number {
+export async function deleteFaqs(ids: string[]): Promise<WriteResult<number>> {
   const items = loadFaqs();
   const next = items.filter((item) => !ids.includes(item.id));
   const count = items.length - next.length;
-  persist(next);
-  return count;
+  return { value: count, persisted: await persist(next) };
 }
 
-export function bulkUpdateFaqStatus(ids: string[], status: FaqItem["status"]): number {
+export async function bulkUpdateFaqStatus(
+  ids: string[],
+  status: FaqItem["status"]
+): Promise<WriteResult<number>> {
   const items = loadFaqs();
   let count = 0;
   const next = items.map((item) => {
@@ -198,6 +202,5 @@ export function bulkUpdateFaqStatus(ids: string[], status: FaqItem["status"]): n
     count += 1;
     return { ...item, status, updatedAt: nowIso() };
   });
-  persist(next);
-  return count;
+  return { value: count, persisted: await persist(next) };
 }

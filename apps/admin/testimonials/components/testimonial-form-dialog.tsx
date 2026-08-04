@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
@@ -90,18 +91,18 @@ export function TestimonialFormDialog({
     onOpenChange(false);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name.trim() || !form.content.trim()) {
       toast.error("Name and review text are required");
       return;
     }
 
     if (isEdit && testimonialId) {
-      updateTestimonial(testimonialId, form);
-      toast.success("Testimonial updated");
+      const { persisted } = await updateTestimonial(testimonialId, form);
+      reportWrite(persisted, "Testimonial updated");
     } else {
-      createTestimonial(form);
-      toast.success("Testimonial created");
+      const { persisted } = await createTestimonial(form);
+      reportWrite(persisted, "Testimonial created");
     }
 
     onSaved();
@@ -265,7 +266,7 @@ export function TestimonialFormDialog({
             <Button
               variant="bakery"
               disabled={isEdit && !isDirty}
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
             >
               {isEdit ? "Save changes" : "Add testimonial"}
             </Button>

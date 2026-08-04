@@ -4,28 +4,43 @@ import {
   clearRazorpayConfig,
   getRazorpayStatus,
   saveRazorpayConfig,
-} from "@/apps/admin/settings/lib/razorpay-config.server";
+  verifyRazorpayCredentials,
+} from "@/lib/server/payments/razorpay-credentials";
 import { requireAdminResponse } from "@/lib/server/auth/guard";
 
-/** Returns connection status only — the secret key is never sent to the client. */
-export async function GET() {
-  return Response.json(getRazorpayStatus());
+/**
+ * Connection status only — no secret is ever in a response from this route.
+ *
+ * Now behind the same guard as POST and DELETE. It was the one unauthenticated
+ * verb here, and while it returns no secret it does return the live key id, the
+ * test/live mode and whether a webhook is configured — a free reconnaissance
+ * read of the shop's payment setup for anyone who asks.
+ */
+export async function GET(request: Request) {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
+  const status = await getRazorpayStatus();
+
+  // `?verify=1` asks Razorpay whether the keys actually work, rather than only
+  // whether two variables are non-empty. Opt-in because it is a network call:
+  // the admin screens want it, the plain status read does not.
+  if (new URL(request.url).searchParams.get("verify") === "1" && status.configured) {
+    const check = await verifyRazorpayCredentials();
+    return Response.json({ ...status, verified: check.reachable, verifyError: check.error ?? null });
+  }
+
+  return Response.json({ ...status, verified: null, verifyError: null });
 }
 
-/** Saves admin-entered keys to the server-side config file. */
+/** Saves admin-entered keys server-side (Mongo), never to the browser. */
 export async function POST(request: Request) {
   const auth = await requireAdminResponse();
   if (auth instanceof NextResponse) return auth;
 
-  const status = getRazorpayStatus();
-  if (status.envLocked) {
-    return Response.json(
-      { error: "Keys are set via environment variables (.env.local). Edit that file to change them." },
-      { status: 409 }
-    );
-  }
+  const status = await getRazorpayStatus();
 
-  let body: { keyId?: string; keySecret?: string };
+  let body: { keyId?: string; keySecret?: string; webhookSecret?: string };
   try {
     body = await request.json();
   } catch {
@@ -34,19 +49,50 @@ export async function POST(request: Request) {
 
   const keyId = (body.keyId ?? "").trim();
   const keySecret = (body.keySecret ?? "").trim();
+  const webhookSecret = (body.webhookSecret ?? "").trim();
 
-  if (!keyId || !keySecret) {
-    return Response.json({ error: "Both Key ID and Key Secret are required" }, { status: 400 });
-  }
-  if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(keyId)) {
+  // The webhook secret is independent of the API keys: a shop whose keys come
+  // from the environment still has to be able to set it here, because there is
+  // no other way in. Refusing the whole request when `envLocked` is what left
+  // the webhook permanently unconfigurable for those shops.
+  if (status.envLocked && (keyId || keySecret)) {
     return Response.json(
-      { error: "Key ID must look like rzp_test_… or rzp_live_…" },
-      { status: 400 }
+      {
+        error:
+          "API keys are set via environment variables (.env.local). Edit that file to change them.",
+      },
+      { status: 409 },
+    );
+  }
+  if (status.webhookEnvLocked && webhookSecret) {
+    return Response.json(
+      { error: "The webhook secret is set via RAZORPAY_WEBHOOK_SECRET. Edit that file to change it." },
+      { status: 409 },
     );
   }
 
-  saveRazorpayConfig(keyId, keySecret);
-  return Response.json(getRazorpayStatus());
+  if (!keyId && !keySecret && !webhookSecret) {
+    return Response.json({ error: "Nothing to save" }, { status: 400 });
+  }
+
+  // Keys are all-or-nothing: half a pair authenticates nothing. The webhook
+  // secret stands alone.
+  if ((keyId || keySecret) && !(keyId && keySecret)) {
+    return Response.json(
+      { error: "Both Key ID and Key Secret are required to change the keys" },
+      { status: 400 },
+    );
+  }
+  if (keyId && !/^rzp_(test|live)_[A-Za-z0-9]+$/.test(keyId)) {
+    return Response.json({ error: "Key ID must look like rzp_test_… or rzp_live_…" }, { status: 400 });
+  }
+
+  await saveRazorpayConfig({
+    ...(keyId ? { keyId } : {}),
+    ...(keySecret ? { keySecret } : {}),
+    ...(webhookSecret ? { webhookSecret } : {}),
+  });
+  return Response.json(await getRazorpayStatus());
 }
 
 /** Removes saved keys (disconnect). */
@@ -54,13 +100,13 @@ export async function DELETE() {
   const auth = await requireAdminResponse();
   if (auth instanceof NextResponse) return auth;
 
-  const status = getRazorpayStatus();
+  const status = await getRazorpayStatus();
   if (status.envLocked) {
     return Response.json(
       { error: "Keys are set via environment variables — cannot clear from admin." },
-      { status: 409 }
+      { status: 409 },
     );
   }
-  clearRazorpayConfig();
-  return Response.json(getRazorpayStatus());
+  await clearRazorpayConfig();
+  return Response.json(await getRazorpayStatus());
 }

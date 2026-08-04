@@ -37,6 +37,7 @@ export function EmailTemplatePreviewDialog({
             previewText={template.previewText}
             body={template.body}
             variables={template.variables}
+            slug={template.slug}
             channel="email"
             embedded
           />

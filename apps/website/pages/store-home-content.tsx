@@ -9,6 +9,7 @@ import type { HomepageProductSource } from "@/features/products/lib/homepage-cat
 import type { LandingCategory, LandingProduct } from "@/constants/landing-data";
 import type { Banner } from "@/types/media";
 import type { FaqItem, Testimonial } from "@/types/content";
+import type { StorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 
 interface StoreHomeContentProps {
   /** Sections fetched on the server, so they render into the HTML. */
@@ -22,6 +23,8 @@ interface StoreHomeContentProps {
   /** Raw testimonials + faq read from the server, so both passes render the same. */
   testimonials: Testimonial[];
   faqs: FaqItem[];
+  /** The shop's Instagram from Settings -> Social, read on the server. */
+  instagram: StorefrontInstagram | null;
   /** Set by the server from ?cmsPreview=1 — shows the draft banner. */
   isPreview?: boolean;
 }
@@ -33,6 +36,7 @@ export function StoreHomeContent({
   categories,
   testimonials,
   faqs,
+  instagram,
   isPreview = false,
 }: StoreHomeContentProps) {
   return (
@@ -42,7 +46,7 @@ export function StoreHomeContent({
           CMS preview mode — showing draft homepage content
         </div>
       ) : null}
-      {renderSections(sections, rails, banners, categories, testimonials, faqs)}
+      {renderSections(sections, rails, banners, categories, testimonials, faqs, instagram)}
     </>
   );
 }
@@ -58,7 +62,8 @@ function renderSections(
   banners: Banner[],
   categories: LandingCategory[],
   testimonials: Testimonial[],
-  faqs: FaqItem[]
+  faqs: FaqItem[],
+  instagram: StorefrontInstagram | null
 ) {
   const idxNewsletter = sections.findIndex((s) => s.type === "newsletter");
   const idxCta = sections.findIndex((s) => s.type === "cta");
@@ -74,8 +79,8 @@ function renderSections(
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
             <StaggerReveal className="grid items-stretch gap-6 lg:grid-cols-2">
-              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxNewsletter]} embedded />
-              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} section={sections[idxCta]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} instagram={instagram} section={sections[idxNewsletter]} embedded />
+              <HomepageSectionRenderer rails={rails} banners={banners} categories={categories} testimonials={testimonials} faqs={faqs} instagram={instagram} section={sections[idxCta]} embedded />
             </StaggerReveal>
           </div>
         </section>
@@ -89,6 +94,7 @@ function renderSections(
         categories={categories}
         testimonials={testimonials}
         faqs={faqs}
+        instagram={instagram}
         key={section.instanceId}
         section={section}
       />

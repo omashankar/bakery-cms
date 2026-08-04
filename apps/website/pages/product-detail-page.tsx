@@ -243,10 +243,14 @@ export function ProductDetailPage({
       price: displayPrice,
       quantity,
       weight: weight?.label,
-      // Omitted entirely when this cake has no flavour choice, so the order line
-      // never records a flavour the customer did not pick.
-      flavour: selectedFlavour || undefined,
-      shape: selectedShape,
+      // Omitted entirely when this cake has no flavour choice, or when the
+      // module is off — the picker is hidden in both cases, and an order line
+      // must not record a choice the customer was never shown. `selectedFlavour`
+      // and `selectedShape` default to the product's first option regardless of
+      // the module, so without this a shop that switched Flavour off still had
+      // "Chocolate" on every order line, invoice and confirmation email.
+      flavour: (modules.flavour && selectedFlavour) || undefined,
+      shape: modules.shape ? selectedShape : undefined,
       message: message.trim() || undefined,
       deliveryDate,
       deliveryTime,

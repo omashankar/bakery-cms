@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchSeoStore } from "@/features/site-layout/lib/site-layout-api";
+import { fetchSeoStore, seoHydration } from "@/features/site-layout/lib/site-layout-api";
 import { persistServerSeo } from "./seo-repository";
 
 /**
@@ -16,7 +16,10 @@ export function useSeoServerSync(): void {
 
     (async () => {
       const store = await fetchSeoStore();
-      if (!cancelled && store) persistServerSeo(store);
+      if (cancelled || !store) return;
+      persistServerSeo(store);
+      // The SEO store is written back whole, so only now may a mutation send it.
+      seoHydration.markSettled();
     })();
 
     return () => {

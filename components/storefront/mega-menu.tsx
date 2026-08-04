@@ -29,9 +29,15 @@ function useWeddingLinkFilter() {
 
 interface MegaMenuProps {
   isActive?: boolean;
+  /**
+   * The label from the admin's Collections nav row. It read "Shop",
+   * hardcoded, while the editor offered a label field for that row and a
+   * visibility switch — neither of which reached this component.
+   */
+  label?: string;
 }
 
-export function MegaMenu({ isActive }: MegaMenuProps) {
+export function MegaMenu({ isActive, label = "Shop" }: MegaMenuProps) {
   const filterWedding = useWeddingLinkFilter();
   const categories = filterWedding(shopMegaMenu.categories);
   const occasions = filterWedding(shopMegaMenu.occasions);
@@ -46,7 +52,7 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
             : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
         )}
       >
-        Shop
+        {label}
         <ChevronDown className="size-3.5 transition-transform group-hover:rotate-180" />
       </Link>
 
@@ -114,12 +120,20 @@ export function MegaMenu({ isActive }: MegaMenuProps) {
   );
 }
 
-export function MobileShopLinks({ onNavigate }: { onNavigate?: () => void }) {
+export function MobileShopLinks({
+  onNavigate,
+  // The mobile half of the same heading. It was hardcoded too, so the
+  // Collections row's label changed the desktop menu and not this one.
+  label = "Shop",
+}: {
+  onNavigate?: () => void;
+  label?: string;
+}) {
   const filterWedding = useWeddingLinkFilter();
   return (
     <div className="space-y-1 border-t border-border pt-3">
       <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Shop
+        {label}
       </p>
       {filterWedding(shopMegaMenu.categories).map((item) => (
         <Link

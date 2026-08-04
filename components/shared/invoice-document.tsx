@@ -1,5 +1,6 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
 import { SafeImage } from "@/components/shared/safe-image";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -11,6 +12,15 @@ interface InvoiceDocumentProps {
   order: PlacedOrder;
   settings: InvoiceSettings;
   taxLabel?: string;
+  /**
+   * The rate the shop charges TODAY.
+   *
+   * Only used to check the order's own stored rate against: when they agree the
+   * shop's current wording is printed, and when they do not the rate this order
+   * was actually charged at wins. Without it, changing the rate restated every
+   * invoice already issued.
+   */
+  currentTaxRate?: number;
   platformChargeLabel?: string;
   giftWrapLabel?: string;
   variant?: "screen" | "print";
@@ -21,6 +31,7 @@ export function InvoiceDocument({
   order,
   settings,
   taxLabel = defaultCommerceSettings.taxLabel,
+  currentTaxRate,
   platformChargeLabel = defaultCommerceSettings.platformChargeLabel,
   giftWrapLabel = defaultCommerceSettings.giftWrapLabel,
   variant = "print",
@@ -28,10 +39,15 @@ export function InvoiceDocument({
 }: InvoiceDocumentProps) {
   const breakdown = taxBreakdownFromCartTotals(order.totals, {
     taxLabel,
+    currentTaxRate,
     platformChargeLabel,
     giftWrapLabel,
     discountLabel: order.coupon ? `Discount (${order.coupon.code})` : "Discount",
   });
+
+  // Only money the gateway confirmed leaving. A refund it has accepted but not
+  // yet paid out is not something to put on an invoice as settled.
+  const refunded = settledRefundAmount(order);
 
   const addressLine = [
     order.address.addressLine1,
@@ -157,7 +173,38 @@ export function InvoiceDocument({
         </tbody>
       </table>
 
-      <TaxBreakdown values={breakdown} className="ml-auto mt-6 max-w-xs" showAllLines />
+      {/*
+        `showTaxableAmount` matters on an invoice specifically: without it the
+        document states a tax AMOUNT and nothing it was computed from, so the
+        rate lived only inside a free-text label. Printing the value the tax was
+        charged on makes the line self-checking.
+      */}
+      <TaxBreakdown
+        values={breakdown}
+        className="ml-auto mt-6 max-w-xs"
+        showAllLines
+        showTaxableAmount
+      />
+
+      {/*
+        A refunded invoice used to bill the full total and say nothing about the
+        refund — including the copy the CUSTOMER prints. The only hint was a
+        reference tacked onto the payment footnote, and only when the admin had
+        switched that footnote on. Someone reading this document to work out what
+        they owe, or what they were charged, got the wrong number.
+      */}
+      {refunded > 0 ? (
+        <div className="ml-auto mt-3 max-w-xs space-y-1 border-t border-border pt-3 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>Refunded</span>
+            <span>−{formatCurrency(refunded)}</span>
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>Net paid</span>
+            <span>{formatCurrency(Math.max(0, order.totals.total - refunded))}</span>
+          </div>
+        </div>
+      ) : null}
 
       {settings.showPaymentDetails ? (
         <div className="mt-6 rounded-lg border border-border bg-cream-50 px-4 py-3 text-xs text-muted-foreground">

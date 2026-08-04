@@ -6,6 +6,7 @@ import type { AppliedCoupon } from "./coupons";
 import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
 import {
+  fetchOrder,
   placeOrderRequest,
   updateStatusRequest,
   cancelOrderRequest,
@@ -14,9 +15,12 @@ import {
   adminNotesRequest,
   refundNotesRequest,
   requestRefundRequest,
+  type PlaceOrderResponse,
 } from "./orders-api";
 
 const ORDERS_STORAGE_KEY = "bakery-cms-orders";
+
+export const ORDERS_UPDATED_EVENT = "bakery-orders-updated";
 
 export type OrderStatus =
   | "pending"
@@ -96,7 +100,7 @@ function readOrders(): PlacedOrder[] {
 function writeOrders(orders: PlacedOrder[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
-  window.dispatchEvent(new Event("bakery-orders-updated"));
+  window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
 }
 
 function getCommerceConfig() {
@@ -182,7 +186,14 @@ function resolveEstimatedDelivery(
   return getEstimatedDelivery();
 }
 
-/** Two identical submissions this close together are a double-click, not two orders. */
+/**
+ * Two identical submissions this close together are a double-click, not two orders.
+ *
+ * This is a heuristic for accidental double-submits and NOTHING MORE. It must not
+ * be relied on as the retry path's idempotency key: past the window `placeOrder`
+ * mints a fresh id and order number, and since the endpoint dedupes on the id,
+ * that is a second order — see [confirmOrder].
+ */
 const DUPLICATE_ORDER_WINDOW_MS = 15_000;
 
 /**
@@ -212,7 +223,77 @@ function buildOrderFingerprint(input: {
   ]);
 }
 
-export function placeOrder(input: {
+/**
+ * The order, plus whether the SERVER has it.
+ *
+ * These come apart, and at checkout the difference is the whole ball game: the
+ * local write is a cache, so an order the server never received exists only in
+ * that one browser. The customer has paid, has a confirmation number, and can
+ * even track it — against their own localStorage — while the bakery never sees
+ * the order at all. Callers must not say "confirmed" on `order` alone.
+ */
+export interface PlaceOrderResult {
+  order: PlacedOrder;
+  persisted: boolean;
+  /**
+   * The shop is closed for maintenance, carrying the admin's own message.
+   *
+   * Distinct from a plain `persisted: false`, which means "we could not reach
+   * the bakery" and is worth retrying. This one will be refused every time, so
+   * the caller must say so instead of offering a retry that cannot work.
+   */
+  closed?: string;
+}
+
+/**
+ * Re-send an order the server never acknowledged, identity intact.
+ *
+ * `placeOrder` cannot serve as the retry path. Its duplicate guard only
+ * recognises a matching submission for DUPLICATE_ORDER_WINDOW_MS; past that it
+ * mints a new id and order number, and because the endpoint keys idempotency on
+ * the id, that is not a retry — it is a SECOND order with a second stock
+ * decrement, for one payment. And the window lapses in the ordinary case: the
+ * failure notice deliberately puts the payment reference in front of the customer
+ * to write down, which is exactly the pause that outlasts fifteen seconds.
+ *
+ * So the retry sends the order it already has, byte for byte.
+ */
+export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult> {
+  return adoptStoredOrder(order, await placeOrderRequest(order));
+}
+
+/**
+ * Reconcile the local copy with what the server actually stored.
+ *
+ * The server owns order-number uniqueness, so the number it returns may not be
+ * the one this browser proposed. Whatever it says is the number on the invoice,
+ * in the admin list and on the tracking page, so the local cache has to agree —
+ * otherwise the customer's confirmation matches no order in the bakery.
+ */
+function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): PlaceOrderResult {
+  if (!response.ok) return { order: local, persisted: false, closed: response.closed };
+
+  const stored = response.order;
+  if (!stored || stored.orderNumber === local.orderNumber) {
+    return { order: local, persisted: true };
+  }
+
+  const orders = readOrders();
+  const index = orders.findIndex((entry) => entry.id === local.id);
+  if (index === -1) orders.unshift(stored);
+  else orders[index] = stored;
+  writeOrders(orders);
+
+  return { order: stored, persisted: true };
+}
+
+export async function placeOrder(input: {
+  /**
+   * The cart the SERVER priced. Its prices and totals are the ones stored — the
+   * `items`/`totals` below are still sent for the local copy the customer sees
+   * immediately, but the server ignores them when a draft is present.
+   */
+  draftId?: string;
   items: CartLineItem[];
   totals: CartTotals;
   address: CheckoutAddress;
@@ -222,7 +303,7 @@ export function placeOrder(input: {
   coupon?: AppliedCoupon;
   orderNotes?: string;
   deliverySlot?: DeliverySlot;
-}): PlacedOrder {
+}): Promise<PlaceOrderResult> {
   const placedAt = new Date().toISOString();
   const paymentStatus =
     input.paymentStatus ??
@@ -237,7 +318,10 @@ export function placeOrder(input: {
       buildOrderFingerprint(existing) === fingerprint &&
       Date.now() - new Date(existing.placedAt).getTime() < DUPLICATE_ORDER_WINDOW_MS
   );
-  if (recent) return recent;
+  // Re-send rather than assume the first attempt reached the server: a customer
+  // pressing the button again is often doing so BECAUSE it did not. The POST is
+  // idempotent on the order id, so this cannot create a second order.
+  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent));
 
   const order: PlacedOrder = {
     id: newOrderId(),
@@ -263,9 +347,32 @@ export function placeOrder(input: {
 
   writeOrders([order, ...readOrders()]);
   // Durable write to the server (creates the order in Mongo + reduces stock,
-  // atomically). Sends the same id/orderNumber so both copies agree.
-  placeOrderRequest(order);
-  return order;
+  // atomically). Sends the same id so a retry cannot become a second order, and
+  // the draft id so the server prices from its own record rather than from this
+  // payload.
+  return adoptStoredOrder(order, await placeOrderRequest(order, input.draftId));
+}
+
+/**
+ * Whether the one-shot server hydration has finished (successfully or not).
+ *
+ * The local cache starts empty, so without this an admin screen cannot tell
+ * "this shop has no orders" from "the fetch is still in flight" — and would
+ * show a definitive "No orders found" during every cold load.
+ */
+let ordersSyncSettled = false;
+
+export function hasOrdersSyncSettled(): boolean {
+  return ordersSyncSettled;
+}
+
+/** Called by the sync hook once the fetch resolves, whatever the outcome. */
+export function markOrdersSyncSettled(): void {
+  if (ordersSyncSettled) return;
+  ordersSyncSettled = true;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
+  }
 }
 
 /** Hydration: replace the local order cache with the server's copy. */
@@ -294,61 +401,113 @@ export function getOrderById(id: string): PlacedOrder | null {
   return readOrders().find((order) => order.id === id) ?? null;
 }
 
-export function updateOrderStatus(
+/**
+ * The order a mutation applies to — from the local cache, or from the server
+ * when the cache does not have it.
+ *
+ * The admin lists are server-paginated over every order, so an admin routinely
+ * opens an order far older than the browser cache holds. Resolving against the
+ * cache alone made every action on such an order a silent no-op: no change, no
+ * toast, no error.
+ */
+async function resolveOrderForMutation(orderId: string): Promise<PlacedOrder | null> {
+  return getOrderById(orderId) ?? (await fetchOrder(orderId));
+}
+
+/** Apply an order to the local cache, inserting it if it was not already there. */
+/**
+ * Applies `patch` to the FRESHEST copy of the order and writes it back.
+ *
+ * `resolveOrderForMutation` may await a server read, and a second mutation can
+ * land in that window. Patching the copy read before the await would write a
+ * whole order object built from stale fields — saving admin notes would quietly
+ * revert a status change made a moment earlier. The patch is applied at write
+ * time instead, so only the field each mutation owns is touched.
+ *
+ * `fallback` is used when the order still is not cached (it came from the
+ * server), in which case there is nothing to conflict with.
+ */
+function commitOrder(
+  orderId: string,
+  fallback: PlacedOrder,
+  patch: (order: PlacedOrder) => PlacedOrder
+): PlacedOrder {
+  const orders = readOrders();
+  const index = orders.findIndex((order) => order.id === orderId);
+  const updated = patch(index === -1 ? fallback : orders[index]);
+
+  if (index === -1) orders.unshift(updated);
+  else orders[index] = updated;
+
+  writeOrders(orders);
+  return updated;
+}
+
+/**
+ * Outcome of an admin order mutation.
+ *
+ * `order` is the locally-updated copy (null when the id was unknown).
+ * `persisted` is whether the SERVER accepted the change. These come apart more
+ * often than you would think — an expired token 401s — and the difference
+ * matters: the local write is a cache, so a change the server rejected is
+ * silently reverted by the next hydration. Callers must not report success on
+ * `order` alone.
+ */
+export interface OrderMutationResult {
+  order: PlacedOrder | null;
+  persisted: boolean;
+  /**
+   * Why the server refused, when it said. Only refunds populate it today.
+   *
+   * `persisted: false` alone cannot tell "the network dropped" from "the gateway
+   * says this payment has nothing left to refund", and those need opposite
+   * responses from the admin.
+   */
+  error?: string;
+}
+
+export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === status) return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
-  const updated: PlacedOrder = {
-    ...current,
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
     status,
-    statusHistory: [...current.statusHistory, { status, at: now }],
-  };
+    statusHistory: [...order.statusHistory, { status, at: now }],
+  }));
 
-  orders[index] = updated;
-  writeOrders(orders);
-  updateStatusRequest(orderId, status);
-  return updated;
+  return { order: updated, persisted: await updateStatusRequest(orderId, status) };
 }
 
-export function updateOrderAdminNotes(
+export async function updateOrderAdminNotes(
   orderId: string,
   adminNotes: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
-  const updated: PlacedOrder = {
-    ...orders[index],
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
     adminNotes: adminNotes.trim() || undefined,
-  };
+  }));
 
-  orders[index] = updated;
-  writeOrders(orders);
-  adminNotesRequest(orderId, adminNotes);
-  return updated;
+  return { order: updated, persisted: await adminNotesRequest(orderId, adminNotes) };
 }
 
-export function updatePaymentStatus(
+export async function updatePaymentStatus(
   orderId: string,
   paymentStatus: PaymentStatus,
   paymentReference?: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  // A refund is terminal — there is nothing left to change.
   if (current.status === "refunded" || current.paymentStatus === "refunded") {
-    return current;
+    return { order: current, persisted: true };
   }
 
   const updated: PlacedOrder = {
@@ -362,38 +521,46 @@ export function updatePaymentStatus(
         : current.paymentReference),
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  paymentStatusRequest(orderId, paymentStatus, updated.paymentReference);
-  return updated;
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    paymentStatus: updated.paymentStatus,
+    paymentReference: updated.paymentReference,
+  }));
+
+  return {
+    order: committed,
+    persisted: await paymentStatusRequest(orderId, paymentStatus, committed.paymentReference),
+  };
 }
 
-export function bulkUpdatePaymentStatus(
+export async function bulkUpdatePaymentStatus(
   orderIds: string[],
   paymentStatus: PaymentStatus
-): number {
-  let count = 0;
+): Promise<BulkOrderResult> {
+  let updated = 0;
+  let failed = 0;
+
   for (const orderId of orderIds) {
     const before = getOrderById(orderId);
     if (!before || before.paymentStatus === "refunded" || before.status === "refunded") {
       continue;
     }
-    const updated = updatePaymentStatus(orderId, paymentStatus);
-    if (updated && updated.paymentStatus === paymentStatus) count += 1;
+    const result = await updatePaymentStatus(orderId, paymentStatus);
+    if (result.order?.paymentStatus !== paymentStatus) continue;
+    updated += 1;
+    if (!result.persisted) failed += 1;
   }
-  return count;
+
+  return { updated, failed };
 }
 
-export function cancelOrder(
+export async function cancelOrder(
   orderId: string,
   cancellationReason?: string
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === "cancelled" || current.status === "refunded") return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (current.status === "refunded") return { order: current, persisted: true };
 
   const now = new Date().toISOString();
   const updated: PlacedOrder = {
@@ -403,25 +570,27 @@ export function cancelOrder(
     statusHistory: [...current.statusHistory, { status: "cancelled", at: now }],
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  cancelOrderRequest(orderId, cancellationReason);
-  return updated;
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    status: "cancelled",
+    cancellationReason: updated.cancellationReason,
+    statusHistory: [...order.statusHistory, { status: "cancelled" as const, at: now }],
+  }));
+
+  return {
+    order: committed,
+    persisted: await cancelOrderRequest(orderId, cancellationReason),
+  };
 }
 
-export function refundOrder(
+export async function refundOrder(
   orderId: string,
   input: RefundOrderInput = {}
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status === "refunded") return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
 
   const now = new Date().toISOString();
-  const refundReference = `REF-${current.orderNumber.replace(/^BK-/, "")}`;
   const reason = input.reason ?? "customer_request";
 
   // Partial when a valid amount below the order total is supplied; else full.
@@ -430,110 +599,159 @@ export function refundOrder(
   const refundAmount = Math.min(Math.max(0, requested), orderTotal);
   const isPartial = refundAmount < orderTotal;
 
+  // OPTIMISTIC, and therefore deliberately modest.
+  //
+  // This used to write `completed`, mint a `REF-…` reference and flip the order
+  // to `refunded` — a full, confident record of a payout, composed in the
+  // browser before the request had even been sent. It matched what the server
+  // then wrote, so nothing looked wrong; both were fiction.
+  //
+  // The server now asks the gateway, and a gateway refund starts PENDING. So the
+  // most this can honestly claim is that a refund is under way. The reference is
+  // the gateway's and is not knowable here, and the order's own status only
+  // changes once the money has actually left. The page re-reads immediately
+  // after, which is what brings the real record.
   const refundRecord: RefundRecord = {
-    status: "completed",
+    status: "processing",
     reason,
-    reasonDetail: input.reasonDetail?.trim() || undefined,
+    reasonDetail: input.reasonDetail?.trim() || current.refundRecord?.reasonDetail,
     amount: refundAmount,
-    reference: refundReference,
-    notes: input.notes?.trim() || undefined,
+    reference: current.refundRecord?.reference,
+    notes: input.notes?.trim() || current.refundRecord?.notes,
     requestedAt: current.refundRecord?.requestedAt ?? now,
-    completedAt: now,
+    gatewayRefunds: current.refundRecord?.gatewayRefunds,
     history: [
       ...(current.refundRecord?.history ?? []),
-      { status: "processing", at: now, note: "Refund initiated" },
       {
-        status: "completed",
+        status: "processing",
         at: now,
-        note:
-          input.notes?.trim() ||
-          `${isPartial ? "Partial" : "Full"} refund completed`,
+        note: input.notes?.trim() || `${isPartial ? "Partial" : "Full"} refund sent to the gateway`,
       },
     ],
   };
 
-  const updated: PlacedOrder = {
-    ...current,
-    status: "refunded",
-    paymentStatus: "refunded",
-    refundReference,
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
     refundRecord,
-    statusHistory: [...current.statusHistory, { status: "refunded", at: now }],
-  };
+  }));
 
-  orders[index] = updated;
-  writeOrders(orders);
-  refundOrderRequest(orderId, input);
-  return updated;
+  const outcome = await refundOrderRequest(orderId, input);
+
+  // The server's refusal reason travels with the result. A refund can be
+  // declined for reasons an admin can act on — nothing left to refund, the
+  // payment was never captured, the gateway is unreachable — and every one of
+  // them used to arrive as the same bare `false`.
+  if (!outcome.ok) {
+    // Nothing moved, so the optimistic record has to go back too. Leaving it
+    // would show a refund "processing" that no gateway has ever heard of.
+    commitOrder(orderId, committed ?? current, (order) => ({
+      ...order,
+      refundRecord: current.refundRecord,
+    }));
+    return { order: current, persisted: false, error: outcome.error };
+  }
+
+  return { order: committed, persisted: true };
 }
 
-export function updateRefundNotes(orderId: string, notes: string): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
+export async function updateRefundNotes(
+  orderId: string,
+  notes: string
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (!current.refundRecord) return { order: current, persisted: true };
 
-  const current = orders[index];
-  if (!current.refundRecord) return current;
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    refundRecord: order.refundRecord
+      ? { ...order.refundRecord, notes: notes.trim() || undefined }
+      : order.refundRecord,
+  }));
 
-  const updated: PlacedOrder = {
-    ...current,
-    refundRecord: {
-      ...current.refundRecord,
-      notes: notes.trim() || undefined,
-    },
-  };
-
-  orders[index] = updated;
-  writeOrders(orders);
-  refundNotesRequest(orderId, notes);
-  return updated;
+  return { order: committed, persisted: await refundNotesRequest(orderId, notes) };
 }
 
-export function requestRefundForCancelledOrder(
+export async function requestRefundForCancelledOrder(
   orderId: string,
   input: RefundOrderInput = {}
-): PlacedOrder | null {
-  const orders = readOrders();
-  const index = orders.findIndex((order) => order.id === orderId);
-  if (index === -1) return null;
-
-  const current = orders[index];
-  if (current.status !== "cancelled" || current.refundRecord) return current;
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+  if (current.status !== "cancelled" || current.refundRecord) {
+    return { order: current, persisted: true };
+  }
 
   const now = new Date().toISOString();
   const reason = input.reason ?? "order_cancelled";
 
-  const updated: PlacedOrder = {
-    ...current,
-    refundRecord: {
-      status: "requested",
-      reason,
-      reasonDetail: input.reasonDetail?.trim() || undefined,
-      amount: current.totals.total,
-      notes: input.notes?.trim() || undefined,
-      requestedAt: now,
-      history: [{ status: "requested", at: now, note: "Refund requested" }],
-    },
+  const refundRecord: RefundRecord = {
+    status: "requested",
+    reason,
+    reasonDetail: input.reasonDetail?.trim() || undefined,
+    amount: current.totals.total,
+    notes: input.notes?.trim() || undefined,
+    requestedAt: now,
+    history: [{ status: "requested", at: now, note: "Refund requested" }],
   };
 
-  orders[index] = updated;
-  writeOrders(orders);
-  requestRefundRequest(orderId, input);
-  return updated;
+  const committed = commitOrder(orderId, current, (order) => ({
+    ...order,
+    refundRecord,
+  }));
+
+  return { order: committed, persisted: await requestRefundRequest(orderId, input) };
 }
 
-export function bulkUpdateOrderStatus(
+/** `updated` counts orders that actually changed; `failed` how many the server rejected. */
+export interface BulkOrderResult {
+  updated: number;
+  failed: number;
+}
+
+export async function bulkUpdateOrderStatus(
   orderIds: string[],
   status: OrderStatus
-): number {
-  let count = 0;
+): Promise<BulkOrderResult> {
+  if (orderIds.length === 0) return { updated: 0, failed: 0 };
 
+  const orders = readOrders();
+  const now = new Date().toISOString();
+  let touchedCache = false;
+
+  // Optimistically update the rows the cache happens to hold. The cache covers
+  // only the newest orders while the list is paginated over all of them, so this
+  // is a nicety — the server request below is what actually matters, and it goes
+  // out for EVERY selected id whether or not the cache knows about it.
   for (const orderId of orderIds) {
-    const updated = updateOrderStatus(orderId, status);
-    if (updated) count += 1;
+    const index = orders.findIndex((order) => order.id === orderId);
+    if (index === -1) continue;
+
+    const current = orders[index];
+    if (current.status === status) continue;
+
+    orders[index] = {
+      ...current,
+      status,
+      statusHistory: [...current.statusHistory, { status, at: now }],
+    };
+    touchedCache = true;
   }
 
-  return count;
+  // One write and one event for the whole batch. Going through
+  // updateOrderStatus per id would re-read and re-write storage N times and
+  // wake every subscriber (dashboard, sidebar, bell) on each one.
+  if (touchedCache) writeOrders(orders);
+
+  // Never skip an id because the LOCAL copy already shows the target status:
+  // after a rejected batch that is true of every one of them, and skipping would
+  // turn the admin's retry into a silent no-op.
+  const results = await Promise.all(
+    orderIds.map((orderId) => updateStatusRequest(orderId, status))
+  );
+
+  const failed = results.filter((persisted) => !persisted).length;
+  return { updated: orderIds.length - failed, failed };
 }
 
 export function getLatestOrder(): PlacedOrder | null {

@@ -2,14 +2,6 @@ import { getInventoryOverview } from "@/apps/admin/commerce/lib/inventory-reposi
 import { countUnreadNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
 import { countNewInquiries } from "@/apps/admin/inquiries";
 import {
-  filterOrdersByRange,
-  getPaymentBreakdown,
-  getRangeStart,
-  getReportsSummary,
-  getRevenueTrend,
-  getStatusBreakdown,
-  getTopProducts,
-  loadReportOrders,
   type PaymentBreakdownItem,
   type ReportDateRange,
   type ReportsSummary,
@@ -17,6 +9,7 @@ import {
   type StatusBreakdownItem,
   type TopProductItem,
 } from "@/apps/admin/reports/lib/reports-data";
+import type { OrderAnalyticsResponse } from "@/features/orders/lib/orders-api";
 import { routes } from "@/constants/routes";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency } from "@/utils/format";
@@ -84,22 +77,6 @@ export interface DashboardAlert {
   tone: "warning" | "destructive" | "neutral";
 }
 
-function filterOrdersByPreviousRange(
-  orders: PlacedOrder[],
-  range: DashboardDateRange
-): PlacedOrder[] {
-  const start = getRangeStart(range);
-  if (!start) return [];
-
-  const durationMs = Date.now() - start.getTime();
-  const previousStart = new Date(start.getTime() - durationMs);
-
-  return orders.filter((order) => {
-    const placedAt = new Date(order.placedAt);
-    return placedAt >= previousStart && placedAt < start;
-  });
-}
-
 export function formatDashboardDelta(current: number, previous: number): DashboardDelta {
   if (current === 0 && previous === 0) {
     return { label: "No activity in range", tone: "neutral" };
@@ -128,29 +105,35 @@ export function getActiveOrderCount(orders: PlacedOrder[]): number {
   ).length;
 }
 
-export function getDashboardCommerceAnalytics(
-  range: DashboardDateRange = "30d"
+/**
+ * Reshapes the server's analytics into what the dashboard cards render.
+ *
+ * The figures are computed server-side over every order in the range; only the
+ * dashboard's own delta wording is applied here. Previously the whole thing was
+ * computed in the browser from the cached order slice, so every card understated
+ * itself once a shop had more orders than the cache holds.
+ */
+export function toDashboardCommerceAnalytics(
+  range: DashboardDateRange,
+  response: OrderAnalyticsResponse
 ): DashboardCommerceAnalytics {
-  const orders = loadReportOrders();
-  const currentOrders = filterOrdersByRange(orders, range);
-  const previousOrders = filterOrdersByPreviousRange(orders, range);
-  const currentSummary = getReportsSummary(currentOrders);
-  const previousSummary = getReportsSummary(previousOrders);
+  const { summary, previousSummary } = response;
 
   return {
     range,
-    summary: currentSummary,
-    revenueDelta: formatDashboardDelta(currentSummary.revenue, previousSummary.revenue),
-    ordersDelta: formatDashboardDelta(currentSummary.orders, previousSummary.orders),
+    summary,
+    revenueDelta: formatDashboardDelta(summary.revenue, previousSummary.revenue),
+    ordersDelta: formatDashboardDelta(summary.orders, previousSummary.orders),
     aovDelta: formatDashboardDelta(
-      currentSummary.averageOrderValue,
+      summary.averageOrderValue,
       previousSummary.averageOrderValue
     ),
-    trend: getRevenueTrend(orders, range),
-    statusBreakdown: getStatusBreakdown(currentOrders),
-    paymentBreakdown: getPaymentBreakdown(currentOrders),
-    topProducts: getTopProducts(currentOrders, 5),
-    activeOrders: getActiveOrderCount(currentOrders),
+    trend: response.trend,
+    statusBreakdown: response.statusBreakdown,
+    paymentBreakdown: response.paymentBreakdown,
+    topProducts: response.topProducts,
+    // getReportsSummary counts exactly the statuses getActiveOrderCount does.
+    activeOrders: summary.activeOrders,
   };
 }
 

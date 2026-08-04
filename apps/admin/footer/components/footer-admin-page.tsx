@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Columns3, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { FooterColumnConfig, FooterLinkItem, FooterSettings } from "@/types/site-layout";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadFooterSettings,
   resetFooterSettings,
@@ -46,30 +51,37 @@ const SECTION_TOGGLES = [
 ] as const;
 
 export function FooterAdminPage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<FooterSettings>(defaultFooterSettings);
-  const [saved, setSaved] = useState<FooterSettings>(defaultFooterSettings);
+  // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
+  // effect read localStorage on mount and declared the form ready in the same
+  // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout
+  // effect, so on a hard load that read is still in flight and
+  // `loadFooterSettings()` answers with the DEMO FOOTER — and saving is a
+  // replace-all, so a single edit replaced every footer column and every link
+  // in them with the demo set.
+  const {
+    value: settings,
+    isDirty,
+    hydration,
+    isWriting,
+    canSave,
+    edit: setSettings,
+    discard,
+    runWrite,
+  } = useHydratedForm<FooterSettings>({
+    read: loadFooterSettings,
+    fallback: defaultFooterSettings,
+    gate: siteLayoutHydration,
+    ensureHydrated: ensureSiteLayoutHydrated,
+  });
   const [removeColumn, setRemoveColumn] = useState<FooterColumnConfig | null>(null);
   const [removeLink, setRemoveLink] = useState<{
     columnId: string;
     link: FooterLinkItem;
   } | null>(null);
 
-  useEffect(() => {
-    const loaded = loadFooterSettings();
-    setSettings(loaded);
-    setSaved(loaded);
-    setMounted(true);
-  }, []);
-
-  const isDirty = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(saved),
-    [settings, saved]
-  );
-
   const overview = useMemo(
-    () => (mounted ? getFooterOverview(settings) : EMPTY_OVERVIEW),
-    [mounted, settings]
+    () => (hydration === "pending" ? EMPTY_OVERVIEW : getFooterOverview(settings)),
+    [hydration, settings]
   );
 
   function updateColumn(columnId: string, title: string) {
@@ -143,7 +155,7 @@ export function FooterAdminPage() {
     toast.message("Link removed");
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (settings.columns.some((col) => !col.title.trim())) {
       toast.error("Every column needs a title");
       return;
@@ -156,40 +168,63 @@ export function FooterAdminPage() {
       toast.error("Every footer link needs a label and URL");
       return;
     }
-    const next = saveFooterSettings(settings);
-    setSettings(next);
-    setSaved(next);
-    toast.success("Footer settings saved");
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value: next, persisted } = await saveFooterSettings(settings);
+      // Only mark clean when the SERVER has it — the dirty flag is what keeps
+      // the Save button enabled, so adopting a rejected value removes the retry.
+      return { value: next, accepted: reportWrite(persisted, "Footer settings saved", {
+        failure: "Footer was not saved — the server rejected it",
+      }) };
+    });
   }
 
   function handleDiscard() {
-    setSettings(saved);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const next = resetFooterSettings();
-    setSettings(next);
-    setSaved(next);
-    toast.success("Footer reset to defaults");
+  async function handleReset() {
+    // Reset lives in the page header, outside the gated form, so it is
+    // reachable before hydration. It returned in silence: the admin confirmed
+    // a destructive dialog, it closed, and nothing happened or was said.
+    if (!canSave) {
+      toast.error("Saved footer hasn't loaded yet", {
+        description: "Reset is unavailable until this page can reach the server.",
+      });
+      return;
+    }
+    await runWrite(async () => {
+      const { value: next, persisted } = await resetFooterSettings();
+      return { value: next, accepted: reportWrite(persisted, "Footer reset to defaults", {
+        failure: "Footer was not reset — the server rejected it",
+      }) };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Footer"
       description={
-        mounted
+        hydration === "ready"
           ? `${overview.columns} columns · ${overview.links} links · ${overview.sectionsEnabled}/${overview.sectionsTotal} sections on`
           : "Manage footer columns and section visibility"
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only
+      // the Save button leaves the gap open: the admin edits the seed, the
+      // arriving values are skipped because the form is dirty, and Save then
+      // unlocks over it.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
       resetTitle="Reset footer?"
       resetDescription="Replace current footer settings with the default demo columns and sections."
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Footer sections</CardTitle>

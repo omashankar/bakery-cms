@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
+import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,12 @@ import { Switch } from "@/components/ui/switch";
 import {
   getCommerceSettings,
   saveCommerceSettings,
-  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import {
+  SettingsFormGate,
+  SettingsHydrationNotice,
+} from "@/apps/admin/settings/components/settings-field-error";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
@@ -38,41 +42,30 @@ const SAMPLE_ITEM = {
 const EMPTY_ZONE_STATS = { total: 0, active: 0, inactive: 0, cities: 0 };
 
 export function ShippingRulesAdminPage() {
+  // The shared section form — same reasoning as the Taxes screen. The
+  // hand-rolled `load()` below skipped the resync while dirty, so on a cold load
+  // the admin's first keystroke pinned the pre-hydration seed and Save pushed
+  // the whole commerce section from it, including the tax rate this screen does
+  // not show.
+  const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<CommerceSettings>(getCommerceSettings, defaultCommerceSettings);
   const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<CommerceSettings>(defaultCommerceSettings);
-  const [savedSettings, setSavedSettings] = useState<CommerceSettings>(defaultCommerceSettings);
   const [previewPincode, setPreviewPincode] = useState("400001");
   const [previewCity, setPreviewCity] = useState("Mumbai");
   const [zoneStats, setZoneStats] = useState(EMPTY_ZONE_STATS);
 
-  // Snapshot for the SETTINGS_UPDATED listener so it can check dirtiness without
-  // re-subscribing on every keystroke.
-  const stateRef = useRef({ settings, savedSettings });
-  stateRef.current = { settings, savedSettings };
-
   useEffect(() => {
-    function load() {
-      // Zone stats are display-only — always resync them.
+    // Zone stats are display-only, and have their own store and event — the
+    // settings form above is no longer this effect's business.
+    function loadStats() {
       setZoneStats(getDeliveryZoneStats(loadDeliveryZones()));
-      const loaded = getCommerceSettings();
-      const { settings: current, savedSettings: currentSaved } = stateRef.current;
-      // A background hydration must not clobber unsaved edits: skip the form
-      // reset while dirty (mid-edit); resync only when pristine.
-      if (JSON.stringify(current) !== JSON.stringify(currentSaved)) return;
-      setSettings(loaded);
-      setSavedSettings(loaded);
     }
-    load();
+    loadStats();
     setMounted(true);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, load);
-    window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, load);
-    return () => {
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, load);
-      window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, load);
-    };
+    window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, loadStats);
+    return () => window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, loadStats);
   }, []);
 
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const stats = mounted ? zoneStats : EMPTY_ZONE_STATS;
 
   const previewTotals = useMemo(
@@ -85,15 +78,19 @@ export function ShippingRulesAdminPage() {
     [previewCity, previewPincode, settings]
   );
 
-  function handleSave() {
-    const saved = saveCommerceSettings(settings);
-    setSettings(saved);
-    setSavedSettings(saved);
-    toast.success("Shipping rules saved");
+  async function handleSave() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveCommerceSettings(settings);
+      // Only mark clean when the SERVER has it — the dirty flag is what keeps
+      // the Save button enabled, and these rules are what the storefront
+      // charges by.
+      return { value, accepted: reportSettingsWrite(persisted, "Shipping rules") };
+    });
   }
 
   function handleReset() {
-    setSettings(savedSettings);
+    discard();
   }
 
   return (
@@ -117,13 +114,15 @@ export function ShippingRulesAdminPage() {
               variant="bakery"
               className="w-full sm:w-auto"
               onClick={handleSave}
-              disabled={!isDirty}
+              disabled={!isDirty || !canSave}
             >
-              Save rules
+              {isWriting ? "Saving…" : "Save rules"}
             </Button>
           </div>
         }
       />
+
+      <SettingsHydrationNotice hydration={hydration} />
 
       {!settings.useZoneBasedDelivery ? (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
@@ -138,6 +137,7 @@ export function ShippingRulesAdminPage() {
         </div>
       ) : null}
 
+      <SettingsFormGate hydration={hydration}>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
@@ -159,7 +159,7 @@ export function ShippingRulesAdminPage() {
                 <Switch
                   checked={settings.useZoneBasedDelivery}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, useZoneBasedDelivery: checked === true }))
+                    edit((prev) => ({ ...prev, useZoneBasedDelivery: checked === true }))
                   }
                 />
               </label>
@@ -171,7 +171,7 @@ export function ShippingRulesAdminPage() {
                   min={0}
                   value={settings.zoneFallbackDeliveryFee}
                   onChange={(event) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       zoneFallbackDeliveryFee: Math.max(0, Number(event.target.value) || 0),
                     }))
@@ -197,7 +197,7 @@ export function ShippingRulesAdminPage() {
                   min={0}
                   value={settings.deliveryFee}
                   onChange={(event) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       deliveryFee: Math.max(0, Number(event.target.value) || 0),
                     }))
@@ -212,7 +212,7 @@ export function ShippingRulesAdminPage() {
                   min={0}
                   value={settings.freeDeliveryThreshold}
                   onChange={(event) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       freeDeliveryThreshold: Math.max(0, Number(event.target.value) || 0),
                     }))
@@ -227,7 +227,7 @@ export function ShippingRulesAdminPage() {
                   min={0}
                   value={settings.minOrderValue}
                   onChange={(event) =>
-                    setSettings((prev) => ({
+                    edit((prev) => ({
                       ...prev,
                       minOrderValue: Math.max(0, Number(event.target.value) || 0),
                     }))
@@ -276,19 +276,43 @@ export function ShippingRulesAdminPage() {
               }}
             />
 
+            {/*
+              Says what actually happened, in the order it happened.
+
+              This read "No active zone matched — fallback fee applied" for every
+              case where no zone NAME came back, which included an order over the
+              free-delivery threshold: nothing had failed to match and no fee had
+              been applied, yet the operator was told both.
+            */}
             {previewTotals.deliveryZoneName ? (
               <p className="text-xs text-muted-foreground">
                 Matched zone: <span className="font-medium">{previewTotals.deliveryZoneName}</span>
                 {previewTotals.estimatedDeliveryDays
                   ? ` · Est. ${previewTotals.estimatedDeliveryDays} day(s)`
                   : ""}
+                {previewTotals.delivery === 0 ? " · free at this cart value" : ""}
               </p>
-            ) : settings.useZoneBasedDelivery ? (
+            ) : !settings.useZoneBasedDelivery ? (
+              <p className="text-xs text-muted-foreground">
+                {previewTotals.delivery === 0
+                  ? "Free at this cart value — flat fee otherwise."
+                  : "Using default flat delivery fee."}
+              </p>
+            ) : previewTotals.delivery === 0 ? (
+              // WHY it is zero, not just that it is. Attributing every zero to
+              // the threshold was wrong for the zero FALLBACK this change set
+              // made possible — the operator would have gone looking at the wrong
+              // setting.
+              <p className="text-xs text-muted-foreground">
+                No active zone matched.{" "}
+                {previewTotals.subtotal >= settings.freeDeliveryThreshold
+                  ? "This cart is over the free-delivery threshold, so nothing is charged."
+                  : "The fallback fee is set to zero, so nothing is charged."}
+              </p>
+            ) : (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 No active zone matched — fallback fee applied.
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Using default flat delivery fee.</p>
             )}
 
             <p className="text-xs text-muted-foreground">
@@ -297,6 +321,7 @@ export function ShippingRulesAdminPage() {
           </CardContent>
         </Card>
       </div>
+      </SettingsFormGate>
     </AdminPage>
   );
 }

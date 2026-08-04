@@ -1,4 +1,5 @@
 import type { Testimonial, TestimonialFormData } from "@/types/content";
+import type { WriteResult } from "@/lib/write-result";
 import type { LandingTestimonial } from "@/constants/landing-data";
 import { testimonials as seedTestimonials } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
@@ -34,10 +35,10 @@ function lowPersist(items: Testimonial[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-/** Mutation write: local + best-effort server replace-all. */
-function persist(items: Testimonial[]): void {
+/** Mutation write: local first, then the server, reporting what the server did. */
+async function persist(items: Testimonial[]): Promise<boolean> {
   lowPersist(items);
-  replaceTestimonialsRequest(items);
+  return replaceTestimonialsRequest(items);
 }
 
 /** Hydration: write the server's testimonials into the local cache (no re-push). */
@@ -132,7 +133,9 @@ export function createEmptyTestimonialForm(): TestimonialFormData {
   };
 }
 
-export function createTestimonial(data: TestimonialFormData): Testimonial {
+export async function createTestimonial(
+  data: TestimonialFormData
+): Promise<WriteResult<Testimonial>> {
   const items = loadTestimonials();
   const timestamp = nowIso();
   const created: Testimonial = {
@@ -141,17 +144,16 @@ export function createTestimonial(data: TestimonialFormData): Testimonial {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  persist([...items, created]);
-  return created;
+  return { value: created, persisted: await persist([...items, created]) };
 }
 
-export function updateTestimonial(
+export async function updateTestimonial(
   id: string,
   patch: Partial<TestimonialFormData>
-): Testimonial | null {
+): Promise<WriteResult<Testimonial | null>> {
   const items = loadTestimonials();
   const index = items.findIndex((item) => item.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: Testimonial = {
     ...items[index],
@@ -160,22 +162,20 @@ export function updateTestimonial(
     updatedAt: nowIso(),
   };
   items[index] = updated;
-  persist(items);
-  return updated;
+  return { value: updated, persisted: await persist(items) };
 }
 
-export function deleteTestimonials(ids: string[]): number {
+export async function deleteTestimonials(ids: string[]): Promise<WriteResult<number>> {
   const items = loadTestimonials();
   const next = items.filter((item) => !ids.includes(item.id));
   const count = items.length - next.length;
-  persist(next);
-  return count;
+  return { value: count, persisted: await persist(next) };
 }
 
-export function bulkUpdateTestimonialStatus(
+export async function bulkUpdateTestimonialStatus(
   ids: string[],
   status: Testimonial["status"]
-): number {
+): Promise<WriteResult<number>> {
   const items = loadTestimonials();
   let count = 0;
   const next = items.map((item) => {
@@ -183,6 +183,5 @@ export function bulkUpdateTestimonialStatus(
     count += 1;
     return { ...item, status, updatedAt: nowIso() };
   });
-  persist(next);
-  return count;
+  return { value: count, persisted: await persist(next) };
 }

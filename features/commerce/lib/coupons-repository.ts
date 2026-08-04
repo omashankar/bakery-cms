@@ -1,5 +1,6 @@
 import { specialOffers } from "@/constants/landing-data";
 import { replaceCouponsRequest } from "./commerce-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const COUPONS_STORAGE_KEY = "bakery-cms-coupons";
 
@@ -112,10 +113,10 @@ function lowWriteCoupons(coupons: StoredCoupon[]): void {
   window.dispatchEvent(new Event("bakery-coupons-updated"));
 }
 
-/** Mutation write: local + best-effort server replace-all. */
-function writeCoupons(coupons: StoredCoupon[]): void {
+/** Mutation write: local first, then the server, reporting what the server did. */
+async function writeCoupons(coupons: StoredCoupon[]): Promise<boolean> {
   lowWriteCoupons(coupons);
-  replaceCouponsRequest(coupons);
+  return replaceCouponsRequest(coupons);
 }
 
 /** Hydration: write the server's coupons into the local cache (no re-push). */
@@ -141,9 +142,9 @@ export function getCouponByCode(code: string): StoredCoupon | null {
   return readCoupons().find((coupon) => coupon.code === normalized) ?? null;
 }
 
-export function createCoupon(
+export async function createCoupon(
   input: Omit<StoredCoupon, "id" | "usageCount" | "createdAt">
-): StoredCoupon {
+): Promise<WriteResult<StoredCoupon>> {
   const coupon: StoredCoupon = {
     ...input,
     id: crypto.randomUUID(),
@@ -157,17 +158,16 @@ export function createCoupon(
     throw new Error("Coupon code already exists");
   }
 
-  writeCoupons([coupon, ...coupons]);
-  return coupon;
+  return { value: coupon, persisted: await writeCoupons([coupon, ...coupons]) };
 }
 
-export function updateCoupon(
+export async function updateCoupon(
   id: string,
   patch: Partial<Omit<StoredCoupon, "id" | "createdAt">>
-): StoredCoupon | null {
+): Promise<WriteResult<StoredCoupon | null>> {
   const coupons = readCoupons();
   const index = coupons.findIndex((coupon) => coupon.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const nextCode = patch.code?.trim().toUpperCase();
   if (nextCode && coupons.some((item, i) => i !== index && item.code === nextCode)) {
@@ -181,29 +181,33 @@ export function updateCoupon(
   };
 
   coupons[index] = updated;
-  writeCoupons(coupons);
-  return updated;
+  return { value: updated, persisted: await writeCoupons(coupons) };
 }
 
-export function deleteCoupons(ids: string[]): number {
+export async function deleteCoupons(ids: string[]): Promise<WriteResult<number>> {
   const current = readCoupons();
   const coupons = current.filter((coupon) => !ids.includes(coupon.id));
   const removed = current.length - coupons.length;
-  writeCoupons(coupons);
-  return removed;
+  return { value: removed, persisted: await writeCoupons(coupons) };
 }
 
-export function toggleCouponActive(id: string): StoredCoupon | null {
+export async function toggleCouponActive(
+  id: string
+): Promise<WriteResult<StoredCoupon | null>> {
   const coupons = readCoupons();
   const index = coupons.findIndex((coupon) => coupon.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   coupons[index] = { ...coupons[index], isActive: !coupons[index].isActive };
-  writeCoupons(coupons);
-  return coupons[index];
+  return { value: coupons[index], persisted: await writeCoupons(coupons) };
 }
 
-export function incrementCouponUsage(code: string): void {
+/**
+ * Storefront-side usage counter, fired as an order is placed. Deliberately NOT
+ * reported: the customer is not the one who can act on a failed counter write,
+ * and blocking their confirmation on it would be worse than an undercount.
+ */
+export async function incrementCouponUsage(code: string): Promise<void> {
   const coupons = readCoupons();
   const index = coupons.findIndex((coupon) => coupon.code === code.trim().toUpperCase());
   if (index === -1) return;
@@ -212,11 +216,10 @@ export function incrementCouponUsage(code: string): void {
     ...coupons[index],
     usageCount: coupons[index].usageCount + 1,
   };
-  writeCoupons(coupons);
+  await writeCoupons(coupons);
 }
 
-export function resetCoupons(): StoredCoupon[] {
+export async function resetCoupons(): Promise<WriteResult<StoredCoupon[]>> {
   const defaults = buildDefaultCoupons();
-  writeCoupons(defaults);
-  return defaults;
+  return { value: defaults, persisted: await writeCoupons(defaults) };
 }

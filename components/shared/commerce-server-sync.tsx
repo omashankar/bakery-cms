@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 
-import { fetchCoupons, fetchZones } from "@/features/commerce/lib/commerce-api";
+import {
+  couponsHydration,
+  fetchCoupons,
+  fetchZones,
+  zonesHydration,
+} from "@/features/commerce/lib/commerce-api";
 import { persistServerCoupons } from "@/features/commerce/lib/coupons-repository";
 import { persistServerZones } from "@/features/commerce/lib/delivery-zones-repository";
 
@@ -21,6 +26,15 @@ export function CommerceServerSync() {
       if (cancelled) return;
       if (coupons) persistServerCoupons(coupons);
       if (zones) persistServerZones(zones);
+
+      // Each store waits on its OWN read.
+      //
+      // One shared gate needed BOTH to succeed, so a coupons outage blocked
+      // every zone save — and the admin was told "the server rejected it" for a
+      // request the server never received. The two lists have nothing to do with
+      // each other; only the read that fills a list can vouch for writing it.
+      if (coupons) couponsHydration.markSettled();
+      if (zones) zonesHydration.markSettled();
     })();
 
     return () => {

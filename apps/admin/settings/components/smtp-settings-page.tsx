@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { sendTestEmailRequest } from "@/features/settings/lib/settings-api";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,74 +22,120 @@ import {
   saveSmtpSettings,
 } from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { SettingsHydrationNotice } from "./settings-field-error";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
 export function SmtpSettingsPage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<SmtpSettings>(defaultSmtpSettings);
-  const [savedSettings, setSavedSettings] = useState<SmtpSettings>(defaultSmtpSettings);
+  // The shared section form. This page hand-rolled it and never resynced: a
+  // one-shot `[]`-dep effect read localStorage on mount, with no
+  // SETTINGS_UPDATED_EVENT listener at all, so the form was stuck on whatever
+  // that read returned for the whole page session. `SettingsServerSync` reads
+  // the real copy from a root-layout effect, so on a hard load that read is
+  // still in flight and the local store answers with the DEMO SEED — and Save
+  // PUT the seed over the real section, which is a whole-section replace.
+  //
+  // This section is the shop's mail server: host, port, username, PASSWORD,
+  // from-address and the enabled switch. What lands is the demo seed with the
+  // password BLANK and `enabled: false`, and the mail transport short-circuits
+  // on `!enabled` — so every password reset, order confirmation and refund
+  // email stops, silently, while the admin is told "SMTP settings saved". The
+  // password is the unrecoverable part: it is write-only in this form, so it
+  // has to be fetched from the mail provider again.
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<SmtpSettings>(getSmtpSettings, defaultSmtpSettings);
+  const [testing, setTesting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    const loaded = getSmtpSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    setMounted(true);
-  }, []);
-
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   // The header status line describes what outbound email actually does, so it reads the
   // saved values — an unsaved toggle hasn't changed live behaviour yet.
-  const hostSet = Boolean(savedSettings.host.trim());
+  const hostSet = Boolean(saved.host.trim());
   const encryptionLabel =
-    savedSettings.encryption === "none" ? "None" : savedSettings.encryption.toUpperCase();
+    saved.encryption === "none" ? "None" : saved.encryption.toUpperCase();
 
-  function handleSave() {
-    const saved = saveSmtpSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("SMTP settings saved");
+  async function handleSave() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveSmtpSettings(settings);
+      // Only mark clean when the SERVER has it — the dirty flag is what keeps
+      // the Save button enabled, and greying it out would remove the only retry.
+      return { value, accepted: reportSettingsWrite(persisted, "SMTP settings") };
+    });
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSmtpSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("SMTP settings reset to defaults");
+  async function handleReset() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetSmtpSettings();
+      return { value, accepted: reportSettingsReset(persisted, "SMTP settings") };
+    });
   }
 
-  function handleTestEmail() {
-    if (!settings.enabled) {
+  /**
+   * Sends a REAL test email through the saved settings.
+   *
+   * The server reads what is stored, not what is on screen, so unsaved edits are
+   * not what gets tested — say so rather than test the wrong thing silently.
+   */
+  async function handleTestEmail() {
+    if (isDirty) {
+      toast.error("Save your changes first", {
+        description: "The test uses the saved settings, not the ones on screen.",
+      });
+      return;
+    }
+    if (!saved.enabled) {
       toast.error("Enable SMTP before sending a test email");
       return;
     }
-    toast.success("Test email queued (demo — no backend connected)");
+
+    setTesting(true);
+    const result = await sendTestEmailRequest();
+    setTesting(false);
+
+    if (!result.sent) {
+      toast.error("Test email failed", { description: result.error });
+      return;
+    }
+
+    toast.success("Test email sent", {
+      description: "Check the inbox of the account you are signed in as.",
+    });
   }
 
   return (
     <SettingsSectionShell
       title="SMTP"
       description={
-        mounted
-          ? `${savedSettings.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${savedSettings.host}` : ""}`
+        hydration === "ready"
+          ? `${saved.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${saved.host}` : ""}`
           : "Configure outbound email for inquiry notifications and newsletters."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only
+      // the Save button leaves the gap open.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
       extraActions={
-        <Button variant="outline" className="w-full sm:w-auto" onClick={handleTestEmail}>
-          Send test email
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto"
+          onClick={() => void handleTestEmail()}
+          disabled={testing}
+        >
+          {testing ? "Sending…" : "Send test email"}
         </Button>
       }
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
@@ -100,7 +151,7 @@ export function SmtpSettingsPage() {
             <Switch
               id="smtp-enabled"
               checked={settings.enabled}
-              onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, enabled: checked }))}
+              onCheckedChange={(checked) => edit((prev) => ({ ...prev, enabled: checked }))}
             />
           </div>
         </CardHeader>
@@ -110,7 +161,7 @@ export function SmtpSettingsPage() {
             <Input
               id="host"
               value={settings.host}
-              onChange={(e) => setSettings((prev) => ({ ...prev, host: e.target.value }))}
+              onChange={(e) => edit((prev) => ({ ...prev, host: e.target.value }))}
             />
           </div>
           <div className="space-y-2">
@@ -120,7 +171,7 @@ export function SmtpSettingsPage() {
               type="number"
               value={settings.port}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, port: Number(e.target.value) || 587 }))
+                edit((prev) => ({ ...prev, port: Number(e.target.value) || 587 }))
               }
             />
           </div>
@@ -129,7 +180,7 @@ export function SmtpSettingsPage() {
             <Input
               id="username"
               value={settings.username}
-              onChange={(e) => setSettings((prev) => ({ ...prev, username: e.target.value }))}
+              onChange={(e) => edit((prev) => ({ ...prev, username: e.target.value }))}
               autoComplete="off"
             />
           </div>
@@ -140,8 +191,11 @@ export function SmtpSettingsPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={settings.password}
-                onChange={(e) => setSettings((prev) => ({ ...prev, password: e.target.value }))}
-                placeholder="••••••••"
+                onChange={(e) => edit((prev) => ({ ...prev, password: e.target.value }))}
+                // Write-only now. The server redacts it on read, so this box is
+                // empty unless the admin is typing a new one — and sending an
+                // empty one back means "keep the stored password".
+                placeholder={saved.passwordSet ? "Saved — leave blank to keep it" : "••••••••"}
                 // new-password is the reliable signal that stops the browser autofilling
                 // the admin's own saved login password into the SMTP field.
                 autoComplete="new-password"
@@ -156,6 +210,11 @@ export function SmtpSettingsPage() {
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {saved.passwordSet
+                ? "A password is saved on the server. Leave this blank to keep it, or type a new one to replace it."
+                : "No password saved. An internal relay on a trusted network may not need one."}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromEmail">From email</Label>
@@ -163,7 +222,7 @@ export function SmtpSettingsPage() {
               id="fromEmail"
               type="email"
               value={settings.fromEmail}
-              onChange={(e) => setSettings((prev) => ({ ...prev, fromEmail: e.target.value }))}
+              onChange={(e) => edit((prev) => ({ ...prev, fromEmail: e.target.value }))}
             />
           </div>
           <div className="space-y-2">
@@ -171,7 +230,7 @@ export function SmtpSettingsPage() {
             <Input
               id="fromName"
               value={settings.fromName}
-              onChange={(e) => setSettings((prev) => ({ ...prev, fromName: e.target.value }))}
+              onChange={(e) => edit((prev) => ({ ...prev, fromName: e.target.value }))}
             />
           </div>
           <div className="space-y-2 lg:col-span-2">
@@ -180,7 +239,7 @@ export function SmtpSettingsPage() {
               id="encryption"
               value={settings.encryption}
               onChange={(e) =>
-                setSettings((prev) => ({
+                edit((prev) => ({
                   ...prev,
                   encryption: e.target.value as SmtpSettings["encryption"],
                 }))

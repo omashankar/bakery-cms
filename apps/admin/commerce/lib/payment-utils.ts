@@ -66,56 +66,6 @@ export function filterPaymentOrders(
   });
 }
 
-export interface PaymentOverview {
-  total: number;
-  paid: number;
-  cod: number;
-  pending: number;
-  failed: number;
-  refunded: number;
-  collected: number;
-  outstanding: number;
-}
-
-export const EMPTY_PAYMENT_OVERVIEW: PaymentOverview = {
-  total: 0,
-  paid: 0,
-  cod: 0,
-  pending: 0,
-  failed: 0,
-  refunded: 0,
-  collected: 0,
-  outstanding: 0,
-};
-
-export function getPaymentOverview(orders: PlacedOrder[]): PaymentOverview {
-  return orders.reduce<PaymentOverview>(
-    (acc, order) => {
-      acc.total += 1;
-      if (order.paymentStatus === "paid") {
-        acc.paid += 1;
-        acc.collected += order.totals.total;
-      } else if (order.paymentStatus === "cod") {
-        acc.cod += 1;
-        if (order.status === "delivered") {
-          acc.collected += order.totals.total;
-        } else if (order.status !== "cancelled" && order.status !== "refunded") {
-          acc.outstanding += order.totals.total;
-        }
-      } else if (order.paymentStatus === "pending") {
-        acc.pending += 1;
-        acc.outstanding += order.totals.total;
-      } else if (order.paymentStatus === "failed") {
-        acc.failed += 1;
-      } else if (order.paymentStatus === "refunded") {
-        acc.refunded += 1;
-      }
-      return acc;
-    },
-    { ...EMPTY_PAYMENT_OVERVIEW }
-  );
-}
-
 export function exportPaymentsToCsv(orders: PlacedOrder[]): void {
   const headers = [
     "Order",

@@ -15,8 +15,14 @@ interface RazorpayResult {
 }
 
 interface OpenOptions {
-  amount: number; // rupees
-  receipt: string;
+  /**
+   * The priced cart the SERVER holds.
+   *
+   * This used to be `amount` and `receipt` — the browser told the server what to
+   * charge, so a 5000-rupee cart could be paid, genuinely and in full, at 1
+   * rupee. The server now reads the total off the draft it priced itself.
+   */
+  draftId: string;
   name: string;
   email: string;
   phone: string;
@@ -74,7 +80,7 @@ export async function openRazorpayCheckout(options: OpenOptions): Promise<Razorp
   const orderRes = await fetch("/api/razorpay/order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount: options.amount, receipt: options.receipt }),
+    body: JSON.stringify({ draftId: options.draftId }),
   });
   const orderData = await orderRes.json();
   if (!orderRes.ok) {

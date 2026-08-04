@@ -24,6 +24,7 @@ function getCommerceLabels() {
       taxLabel: defaultCommerceSettings.taxLabel,
       platformChargeLabel: defaultCommerceSettings.platformChargeLabel,
       giftWrapLabel: defaultCommerceSettings.giftWrapLabel,
+      taxRate: defaultCommerceSettings.taxRate,
     };
   }
   const commerce = getCommerceSettings();
@@ -31,6 +32,9 @@ function getCommerceLabels() {
     taxLabel: commerce.taxLabel,
     platformChargeLabel: commerce.platformChargeLabel,
     giftWrapLabel: commerce.giftWrapLabel,
+    // Checked against the rate the ORDER stored, so a rate change cannot
+    // restate the tax line on an order already placed.
+    taxRate: commerce.taxRate,
   };
 }
 
@@ -49,6 +53,7 @@ export function OrderSummaryPanel({
     platformChargeLabel: labels.platformChargeLabel,
     giftWrapLabel: giftWrapLabel ?? labels.giftWrapLabel,
     discountLabel,
+    currentTaxRate: labels.taxRate,
   });
 
   return (

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,17 +49,19 @@ export function CouponsAdminPage() {
     [coupons, currentPage]
   );
 
-  function handleDelete() {
+  async function handleDelete() {
     if (selectedIds.length === 0) return;
-    const count = deleteCoupons(selectedIds);
+    const { value: count, persisted } = await deleteCoupons(selectedIds);
     refresh();
-    toast.success(`Deleted ${count} coupon${count === 1 ? "" : "s"}`);
+    reportWrite(persisted, `Deleted ${count} coupon${count === 1 ? "" : "s"}`);
   }
 
-  function handleToggle(coupon: StoredCoupon) {
-    toggleCouponActive(coupon.id);
+  async function handleToggle(coupon: StoredCoupon) {
+    const { persisted } = await toggleCouponActive(coupon.id);
     refresh();
-    toast.success(coupon.isActive ? "Coupon deactivated" : "Coupon activated");
+    // A coupon that is active on the server but shown inactive here is money:
+    // the storefront honours the server copy.
+    reportWrite(persisted, coupon.isActive ? "Coupon deactivated" : "Coupon activated");
   }
 
   const description = !mounted
@@ -80,9 +82,10 @@ export function CouponsAdminPage() {
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
-                resetCoupons();
-                refresh();
-                toast.success("Coupons reset to defaults");
+                void resetCoupons().then(({ persisted }) => {
+                  refresh();
+                  reportWrite(persisted, "Coupons reset to defaults");
+                });
               }}
             >
               <RotateCcw className="size-4" />

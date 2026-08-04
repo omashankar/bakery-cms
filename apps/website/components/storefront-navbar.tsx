@@ -32,9 +32,28 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   // Read on the server from MongoDB (see StorefrontChrome) — so the HTML already
   // carries the admin's real store name / logo / nav, no defaults-then-swap flash.
   const [siteName] = useState(chrome.siteName);
+  const [logo] = useState(chrome.logo);
+  // An admin can point this anywhere, and anywhere can 404 — a stale path, a
+  // deleted upload, a CDN that moved. A broken-image glyph in the header is
+  // worse than the letter mark it replaced, so fall back to it.
+  const [logoBroken, setLogoBroken] = useState(false);
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
   const [showSearch] = useState(chrome.showSearch);
+  const [cta] = useState(chrome.cta);
+
+  /**
+   * The two rows the navbar renders as something other than a plain link.
+   *
+   * Collections becomes the MegaMenu and Home is represented by the logo on
+   * desktop, so both were filtered out of the link list — and the MegaMenu
+   * and the mobile Home link were then hardcoded. The result: those two rows
+   * had a visibility switch, a label field and reorder buttons in the admin,
+   * and none of them changed anything a customer saw. `navItems` already
+   * contains only VISIBLE rows, so finding one is the visibility test.
+   */
+  const collectionsRow = navItems.find((item) => item.href === routes.store.collections);
+  const homeRow = navItems.find((item) => item.href === routes.store.home);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -143,22 +162,47 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href={routes.store.home} className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
-            <span className="font-heading text-sm font-bold text-white">
-              {logoLetter}
-            </span>
-          </div>
+          {logo && !logoBroken ? (
+            // An admin-typed URL on any host, so next/image is not usable here:
+            // it would need every such host allow-listed in next.config
+            // remotePatterns, and an un-listed one throws instead of rendering.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt={siteName}
+              onError={() => setLogoBroken(true)}
+              // The logo is in the SERVER-rendered HTML, so a 404 can resolve
+              // before the bundle has even downloaded — and React does not
+              // replay load/error events that completed before hydration. The
+              // handler above would never fire and the header would keep a
+              // broken-image glyph forever. This asks the element directly.
+              ref={(node) => {
+                if (node?.complete && node.naturalWidth === 0) setLogoBroken(true);
+              }}
+              className="size-9 rounded-xl object-contain shadow-sm"
+            />
+          ) : (
+            <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
+              <span className="font-heading text-sm font-bold text-white">
+                {logoLetter}
+              </span>
+            </div>
+          )}
           <span className="font-heading text-lg font-bold tracking-tight text-foreground">
             {siteName}
           </span>
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
-          <MegaMenu
-            isActive={
-              pathname === routes.store.collections || pathname.startsWith(`${routes.store.collections}/`)
-            }
-          />
+          {collectionsRow ? (
+            <MegaMenu
+              label={collectionsRow.label}
+              isActive={
+                pathname === routes.store.collections ||
+                pathname.startsWith(`${routes.store.collections}/`)
+              }
+            />
+          ) : null}
           {navItems
             .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
             .map((item) => {
@@ -184,6 +228,22 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-1.5">
+          {/*
+            The header CTA the admin has always been able to configure.
+            Its switch, label and link were stored, validated and shown in a
+            summary line — and rendered nowhere, so setting them changed
+            nothing a customer ever saw.
+          */}
+          {cta.show ? (
+            <Button
+              variant="bakery"
+              size="sm"
+              className="hidden lg:inline-flex"
+              render={<Link href={cta.href} />}
+            >
+              {cta.label}
+            </Button>
+          ) : null}
           {showSearch ? (
             <Button
               variant="ghost"
@@ -257,17 +317,26 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           className="border-t border-border bg-white lg:hidden"
         >
           <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobile navigation">
-            <Link
-              href={routes.store.home}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "rounded-lg px-3 py-2.5 text-sm font-medium",
-                pathname === routes.store.home ? "bg-cream-100 text-bakery-700" : "hover:bg-cream-100"
-              )}
-            >
-              Home
-            </Link>
-            <MobileShopLinks onNavigate={() => setMobileOpen(false)} />
+            {homeRow ? (
+              <Link
+                href={homeRow.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "rounded-lg px-3 py-2.5 text-sm font-medium",
+                  pathname === routes.store.home
+                    ? "bg-cream-100 text-bakery-700"
+                    : "hover:bg-cream-100"
+                )}
+              >
+                {homeRow.label}
+              </Link>
+            ) : null}
+            {collectionsRow ? (
+              <MobileShopLinks
+                label={collectionsRow.label}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ) : null}
             {navItems
               .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
               .map((item) => {

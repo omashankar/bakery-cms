@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import type { ModuleSettings } from "@/types/settings";
@@ -12,7 +16,9 @@ import {
   resetModuleSettings,
   saveModuleSettings,
 } from "@/features/settings/lib/settings-repository";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { SettingsHydrationNotice } from "./settings-field-error";
 
 type ModuleKey = keyof ModuleSettings;
 
@@ -44,60 +50,81 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
   },
 ];
 
+/**
+ * Every switch on this page, in one list — the count in the header is derived
+ * from it rather than from `Object.values(settings)`, which would silently drift
+ * the moment the stored object carries a key this page does not render.
+ */
+const MODULE_KEYS: ModuleKey[] = [
+  ...PRODUCT_MODULES.map((mod) => mod.key),
+  "weddingBuilder",
+];
+
 export function ModulesSettingsPage() {
-  const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<ModuleSettings>(defaultModuleSettings);
-  const [savedSettings, setSavedSettings] = useState<ModuleSettings>(defaultModuleSettings);
-  const [isBakery, setIsBakery] = useState(true);
+  const router = useRouter();
+  const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<ModuleSettings>(getModuleSettings, defaultModuleSettings);
+  // Business type gates the wedding module. Read alongside the section, so it
+  // is only trusted once the same hydration has landed.
+  const isBakery = hydration !== "ready" || getGeneralSettings().businessType === "bakery";
 
-  useEffect(() => {
-    const loaded = getModuleSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    setIsBakery(getGeneralSettings().businessType === "bakery");
-    setMounted(true);
-  }, []);
-
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
-  const enabledCount = Object.values(settings).filter(Boolean).length;
+  const enabledCount = MODULE_KEYS.filter((key) => settings[key]).length;
 
   function toggle(key: ModuleKey, checked: boolean) {
-    setSettings((prev) => ({ ...prev, [key]: checked }));
+    edit((prev) => ({ ...prev, [key]: checked }));
   }
 
-  function handleSave() {
-    const saved = saveModuleSettings(settings);
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Modules saved");
+  async function handleSave() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveModuleSettings(settings);
+      // Modules decide which admin sections and storefront pages exist at all,
+      // and that is read from the server copy — a local-only change shows
+      // nobody else.
+      const accepted = reportSettingsWrite(persisted, "Modules");
+      // The wedding page and builder are closed by the SERVER when the module
+      // is off, so the routes have to be re-rendered for the change to take.
+      if (accepted) router.refresh();
+      return { value, accepted };
+    });
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetModuleSettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Modules reset to defaults");
+  async function handleReset() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetModuleSettings();
+      const accepted = reportSettingsReset(persisted, "Modules");
+      if (accepted) router.refresh();
+      return { value, accepted };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Modules"
       description={
-        mounted
-          ? `${enabledCount} of ${PRODUCT_MODULES.length + 1} modules enabled`
+        hydration === "ready"
+          ? `${enabledCount} of ${MODULE_KEYS.length} modules enabled`
           : "Turn optional bakery features on or off. Disabled modules hide from the UI only."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed: flipping a
+      // switch on the seed makes the form dirty, the resync then skips it to
+      // protect that edit, and Save pushes all-six-on over the shop's real
+      // module state — which decides what exists on the storefront.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
@@ -132,7 +159,7 @@ export function ModulesSettingsPage() {
               checked={settings.weddingBuilder}
               onCheckedChange={(checked) => toggle("weddingBuilder", checked)}
             />
-            {mounted && !isBakery ? (
+            {hydration === "ready" && !isBakery ? (
               <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
                 Business type is not <span className="font-medium">Bakery</span>, so the Wedding
                 Builder and Wedding Cakes link are already hidden from the storefront and sidebar

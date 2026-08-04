@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,18 +81,18 @@ export function FaqFormDialog({ open, faqId, onOpenChange, onSaved }: FaqFormDia
     onOpenChange(false);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.question.trim() || !form.answer.trim()) {
       toast.error("Question and answer are required");
       return;
     }
 
     if (isEdit && faqId) {
-      updateFaq(faqId, form);
-      toast.success("FAQ updated");
+      const { persisted } = await updateFaq(faqId, form);
+      reportWrite(persisted, "FAQ updated");
     } else {
-      createFaq(form);
-      toast.success("FAQ created");
+      const { persisted } = await createFaq(form);
+      reportWrite(persisted, "FAQ created");
     }
 
     onSaved();
@@ -197,7 +198,7 @@ export function FaqFormDialog({ open, faqId, onOpenChange, onSaved }: FaqFormDia
             <Button
               variant="bakery"
               disabled={isEdit && !isDirty}
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
             >
               {isEdit ? "Save changes" : "Add FAQ"}
             </Button>

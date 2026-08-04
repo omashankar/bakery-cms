@@ -1,5 +1,6 @@
 import type { AppearanceSettings } from "@/types/appearance";
 import { replaceAppearanceRequest } from "@/features/site-layout/lib/site-layout-api";
+import type { WriteResult } from "@/lib/write-result";
 import {
   applyAppearanceSettings,
   defaultAppearanceSettings,
@@ -69,13 +70,51 @@ export function loadAppearanceSettings(): AppearanceSettings {
   }
 }
 
-export function saveAppearanceSettings(settings: AppearanceSettings): AppearanceSettings {
-  const next = normalizeSettings(settings);
+/**
+ * Local write first, then the server — and the local write is UNDONE when the
+ * server refuses.
+ *
+ * Without the rollback a rejected save still repainted the admin and still sat
+ * in localStorage, and nothing put it right. `ensureSiteLayoutHydrated`
+ * short-circuits once the gate has settled, so the poisoned cache survives:
+ * `appearance-theme-sync` re-reads it on every navigation, the page re-applies
+ * it on unmount — undoing Discard — and a remount adopts it as the SAVED value,
+ * at which point the screen calls a palette the server rejected "Saved".
+ *
+ * The rollback restores ONLY if this write is still the one in the cache.
+ * Restoring unconditionally would undo a concurrent save the server had
+ * accepted in between — a rejected write destroying a good one. The template
+ * repositories carry the same guard for the same reason.
+ */
+async function persistAndSync(next: AppearanceSettings): Promise<boolean> {
+  const previous = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+
   persist(next);
-  replaceAppearanceRequest(next);
   applyAppearanceSettings(next);
   notifyAppearanceUpdated();
-  return next;
+
+  const accepted = await replaceAppearanceRequest(next);
+
+  if (!accepted && typeof window !== "undefined") {
+    const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
+    if (stillOurs) {
+      if (previous === null) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, previous);
+      // Repaint from whatever the cache now holds, so the screen and the
+      // stored value agree again.
+      applyAppearanceSettings(loadAppearanceSettings());
+      notifyAppearanceUpdated();
+    }
+  }
+
+  return accepted;
+}
+
+export async function saveAppearanceSettings(
+  settings: AppearanceSettings
+): Promise<WriteResult<AppearanceSettings>> {
+  const next = normalizeSettings(settings);
+  return { value: next, persisted: await persistAndSync(next) };
 }
 
 /** Hydration: apply the server's appearance settings locally (no re-push). */
@@ -86,15 +125,36 @@ export function persistServerAppearance(settings: AppearanceSettings): void {
   notifyAppearanceUpdated();
 }
 
-export function resetAppearanceSettings(): AppearanceSettings {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
-    persist(defaultAppearanceSettings);
-  }
-  replaceAppearanceRequest(defaultAppearanceSettings);
-  applyAppearanceSettings(defaultAppearanceSettings);
-  notifyAppearanceUpdated();
-  return defaultAppearanceSettings;
+/**
+ * Reset goes through the same path, and that matters more here than anywhere.
+ *
+ * This wiped the cache to the demo defaults and repainted before asking the
+ * server. A refusal therefore left the admin looking at the demo palette with
+ * their real one gone from this browser — the most destructive action on the
+ * screen was the one with no way back.
+ */
+export async function resetAppearanceSettings(): Promise<WriteResult<AppearanceSettings>> {
+  const persisted = await persistAndSync(defaultAppearanceSettings);
+
+  /**
+   * On refusal, hand back what is ACTUALLY in place — not what was attempted.
+   *
+   * `runWrite` commits `current: value` unconditionally and only guards `saved`,
+   * so returning the defaults regardless left the form showing the demo palette
+   * over a cache the rollback had just restored to the shop's real one. The
+   * screen then said "Appearance was not reset — nothing was changed" while
+   * every colour field read demo brown, Save sat enabled because the form now
+   * differed from `saved`, and one click would have pushed those demo colours
+   * to the storefront for real.
+   *
+   * A SAVE keeps the attempted value on refusal, deliberately: that is the
+   * admin's own edit and they should be able to retry it. A reset is not an
+   * edit, so there is nothing to preserve.
+   */
+  return {
+    value: persisted ? defaultAppearanceSettings : loadAppearanceSettings(),
+    persisted,
+  };
 }
 
 export function syncAppearanceTheme(): AppearanceSettings {

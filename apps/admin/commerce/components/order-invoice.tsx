@@ -33,6 +33,9 @@ export function OrderInvoice({
     taxLabel: taxLabel ?? defaultCommerceSettings.taxLabel,
     platformChargeLabel: platformChargeLabel ?? defaultCommerceSettings.platformChargeLabel,
     giftWrapLabel: giftWrapLabel ?? defaultCommerceSettings.giftWrapLabel,
+    // Only to check the order's OWN stored rate against, so a later rate change
+    // cannot restate an invoice that was already issued.
+    taxRate: defaultCommerceSettings.taxRate,
   });
 
   useEffect(() => {
@@ -43,6 +46,7 @@ export function OrderInvoice({
         taxLabel: taxLabel ?? commerce.taxLabel,
         platformChargeLabel: platformChargeLabel ?? commerce.platformChargeLabel,
         giftWrapLabel: giftWrapLabel ?? commerce.giftWrapLabel,
+        taxRate: commerce.taxRate,
       });
     }
 
@@ -61,6 +65,7 @@ export function OrderInvoice({
         order={order}
         settings={invoiceSettings}
         taxLabel={commerceLabels.taxLabel}
+        currentTaxRate={commerceLabels.taxRate}
         platformChargeLabel={commerceLabels.platformChargeLabel}
         giftWrapLabel={commerceLabels.giftWrapLabel}
         variant="print"

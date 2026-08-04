@@ -82,7 +82,19 @@ export interface SmtpSettings {
   host: string;
   port: number;
   username: string;
+  /**
+   * Write-only. The server redacts this on read, so in a browser it is either
+   * blank or something the admin has just typed — and a blank one sent back
+   * means "keep the stored password" rather than "clear it".
+   */
   password: string;
+  /**
+   * Whether the SERVER holds a password, without saying what it is.
+   *
+   * The same shape as the payment gateway's credential status: the browser is
+   * told which fields are set, never their values.
+   */
+  passwordSet?: boolean;
   fromEmail: string;
   fromName: string;
   encryption: "tls" | "ssl" | "none";

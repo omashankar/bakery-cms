@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./payments.service";
-import { invoiceSettingsSchema } from "./payments.validators";
+import { invoiceSettingsSchema, paymentAnalyticsQuerySchema } from "./payments.validators";
 
 const PAYMENT_ROLES = ["owner", "admin"] as const;
 
@@ -14,9 +14,11 @@ export const transactionsController = withErrorHandler(async () => {
   return ok(await service.getTransactions(), "Transactions");
 });
 
-export const analyticsController = withErrorHandler(async () => {
+export const analyticsController = withErrorHandler(async (request: Request) => {
   await requireRole(...PAYMENT_ROLES);
-  return ok(await service.getAnalytics(), "Payment analytics");
+  const params = Object.fromEntries(new URL(request.url).searchParams);
+  const { timeZone } = validate(paymentAnalyticsQuerySchema, params);
+  return ok(await service.getAnalytics(timeZone), "Payment analytics");
 });
 
 export const getInvoiceSettingsController = withErrorHandler(async () => {

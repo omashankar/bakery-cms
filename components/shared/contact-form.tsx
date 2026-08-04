@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,7 @@ export function ContactForm({
     const form = event.currentTarget;
     const data = new FormData(form);
 
-    createInquiryFromForm({
+    const { persisted } = await createInquiryFromForm({
       type: inquiryType,
       name: String(data.get("name") ?? ""),
       email: String(data.get("email") ?? ""),
@@ -47,6 +48,18 @@ export function ContactForm({
     });
 
     await new Promise((resolve) => setTimeout(resolve, 400));
+
+    if (!persisted) {
+      // The thank-you page promises someone will be in touch. An enquiry that
+      // only reached this browser reaches nobody, so the form stays put — with
+      // what they typed still in it — rather than sending them away reassured.
+      setIsSubmitting(false);
+      toast.error("We couldn't send your message", {
+        description: "Please check your connection and try again.",
+      });
+      return;
+    }
+
     router.push(routes.store.thankYou);
   }
 

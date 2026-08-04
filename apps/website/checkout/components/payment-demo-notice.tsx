@@ -23,7 +23,7 @@ export function PaymentDemoNotice() {
 
     async function loadMode() {
       try {
-        const response = await fetch("/api/razorpay/config");
+        const response = await fetch("/api/razorpay/availability");
         const status = await response.json();
         if (cancelled) return;
         if (!status?.configured) setMode("unconfigured");

@@ -39,6 +39,7 @@ import {
   REVIEWS_UPDATED_EVENT,
   resetReviews,
   saveReviewReply,
+  setReviewStatus,
   toggleReviewFeatured,
   updateReview,
 } from "@/features/reviews/lib/reviews-repository";
@@ -123,39 +124,62 @@ export function ReviewsAdminPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function handleSaveReview(data: ProductReviewFormData, id?: string) {
-    if (id) {
-      updateReview(id, data);
-      toast.success("Review updated");
-    } else {
-      createReview(data);
-      toast.success("Review added");
+  /**
+   * A moderation decision only counts once the server has it — an approval is
+   * what puts a review in front of customers, and that read comes from Mongo.
+   * The local list is a cache the next hydration overwrites, so silence on a
+   * rejected write means the moderator moves on believing it is done.
+   */
+  function reportUnpersisted(what: string) {
+    toast.error(`${what} on this device only — the server rejected it`, {
+      description: "Reload to see the server's version.",
+    });
+  }
+
+  /** The per-row actions, all reporting on the SERVER rather than the cache. */
+  async function applyRowWrite(work: Promise<{ persisted: boolean }>, success: string) {
+    const { persisted } = await work;
+    refresh();
+    if (!persisted) return reportUnpersisted(success);
+    toast.success(success);
+  }
+
+  async function handleSaveReview(data: ProductReviewFormData, id?: string) {
+    const { persisted } = id ? await updateReview(id, data) : await createReview(data);
+    refresh();
+    setSelectedIds([]);
+
+    if (!persisted) return reportUnpersisted(id ? "Review updated" : "Review added");
+    toast.success(id ? "Review updated" : "Review added");
+  }
+
+  async function handleBulkStatus(action: "approve" | "reject") {
+    if (selectedIds.length === 0) return;
+    const { updated, failed } =
+      action === "approve" ? await approveReviews(selectedIds) : await rejectReviews(selectedIds);
+    refresh();
+    setSelectedIds([]);
+
+    const verb = action === "approve" ? "Approved" : "Rejected";
+    if (failed > 0) {
+      // Counted per id, so a partly-rejected batch says so instead of claiming
+      // the whole selection went through.
+      toast.error(`${verb} ${updated} of ${updated + failed} — the server refused ${failed}`, {
+        description: "Those are unchanged on the server. Reload and try again.",
+      });
+      return;
     }
-    refresh();
-    setSelectedIds([]);
+
+    toast.success(`${verb} ${updated} review${updated === 1 ? "" : "s"}`);
   }
 
-  function handleBulkApprove() {
+  async function handleBulkDelete() {
     if (selectedIds.length === 0) return;
-    const count = approveReviews(selectedIds);
+    const { count, persisted } = await deleteReviews(selectedIds);
     refresh();
     setSelectedIds([]);
-    toast.success(`Approved ${count} review${count === 1 ? "" : "s"}`);
-  }
 
-  function handleBulkReject() {
-    if (selectedIds.length === 0) return;
-    const count = rejectReviews(selectedIds);
-    refresh();
-    setSelectedIds([]);
-    toast.success(`Rejected ${count} review${count === 1 ? "" : "s"}`);
-  }
-
-  function handleBulkDelete() {
-    if (selectedIds.length === 0) return;
-    const count = deleteReviews(selectedIds);
-    refresh();
-    setSelectedIds([]);
+    if (!persisted) return reportUnpersisted("Deleted");
     toast.success(`Deleted ${count} review${count === 1 ? "" : "s"}`);
   }
 
@@ -171,9 +195,11 @@ export function ReviewsAdminPage() {
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
-                resetReviews();
-                refresh();
-                toast.success("Reviews reset to demo seed");
+                void resetReviews().then(({ persisted }) => {
+                  refresh();
+                  if (!persisted) return reportUnpersisted("Reviews reset");
+                  toast.success("Reviews reset to demo seed");
+                });
               }}
             >
               <RotateCcw className="size-4" />
@@ -308,15 +334,19 @@ export function ReviewsAdminPage() {
               {selectedIds.length} selected
             </span>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={handleBulkApprove}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleBulkStatus("approve")}
+              >
                 <Check className="size-4" />
                 Approve
               </Button>
-              <Button size="sm" variant="outline" onClick={handleBulkReject}>
+              <Button size="sm" variant="outline" onClick={() => void handleBulkStatus("reject")}>
                 <X className="size-4" />
                 Reject
               </Button>
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+              <Button size="sm" variant="destructive" onClick={() => void handleBulkDelete()}>
                 <Trash2 className="size-4" />
                 Delete
               </Button>
@@ -419,11 +449,12 @@ export function ReviewsAdminPage() {
                             variant="outline"
                             size="sm"
                             className="h-8"
-                            onClick={() => {
-                              approveReviews([review.id]);
-                              refresh();
-                              toast.success("Review approved");
-                            }}
+                            onClick={() =>
+                              void applyRowWrite(
+                                setReviewStatus(review.id, "approved"),
+                                "Review approved"
+                              )
+                            }
                           >
                             Approve
                           </Button>
@@ -433,11 +464,12 @@ export function ReviewsAdminPage() {
                             variant="outline"
                             size="sm"
                             className="h-8"
-                            onClick={() => {
-                              rejectReviews([review.id]);
-                              refresh();
-                              toast.success("Review rejected");
-                            }}
+                            onClick={() =>
+                              void applyRowWrite(
+                                setReviewStatus(review.id, "rejected"),
+                                "Review rejected"
+                              )
+                            }
                           >
                             Reject
                           </Button>
@@ -446,11 +478,12 @@ export function ReviewsAdminPage() {
                           variant="outline"
                           size="sm"
                           className="h-8"
-                          onClick={() => {
-                            toggleReviewFeatured(review.id);
-                            refresh();
-                            toast.success(review.isFeatured ? "Unfeatured" : "Featured");
-                          }}
+                          onClick={() =>
+                            void applyRowWrite(
+                              toggleReviewFeatured(review.id),
+                              review.isFeatured ? "Unfeatured" : "Featured"
+                            )
+                          }
                         >
                           <Star className="size-3.5" />
                           {review.isFeatured ? "Unfeature" : "Feature"}
@@ -508,11 +541,9 @@ export function ReviewsAdminPage() {
         onOpenChange={(open) => {
           if (!open) setReplyReview(null);
         }}
-        onSave={(reviewId, reply) => {
-          saveReviewReply(reviewId, reply);
-          refresh();
-          toast.success("Reply saved");
-        }}
+        onSave={(reviewId, reply) =>
+          void applyRowWrite(saveReviewReply(reviewId, reply), "Reply saved")
+        }
       />
     </AdminPage>
   );

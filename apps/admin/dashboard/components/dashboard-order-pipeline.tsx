@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
@@ -9,27 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import {
-  EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
-  getDashboardCommerceAnalytics,
-  type DashboardDateRange,
+  type DashboardCommerceAnalytics,
 } from "../lib/dashboard-analytics";
 
 interface DashboardOrderPipelineProps {
-  range: DashboardDateRange;
+  analytics: DashboardCommerceAnalytics;
 }
 
-export function DashboardOrderPipeline({ range }: DashboardOrderPipelineProps) {
-  const [breakdown, setBreakdown] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS.statusBreakdown);
-
-  useEffect(() => {
-    function refresh() {
-      setBreakdown(getDashboardCommerceAnalytics(range).statusBreakdown);
-    }
-
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, [range]);
+export function DashboardOrderPipeline({ analytics }: DashboardOrderPipelineProps) {
+  const breakdown = analytics.statusBreakdown;
 
   const total = breakdown.reduce((sum, item) => sum + item.count, 0);
   const maxCount = Math.max(...breakdown.map((item) => item.count), 1);

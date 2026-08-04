@@ -269,7 +269,10 @@ export function createPage(data: CmsPageFormData): CmsPage {
   return created;
 }
 
-export function updatePage(id: string, patch: Partial<CmsPageFormData>): CmsPage | null {
+export async function updatePage(
+  id: string,
+  patch: Partial<CmsPageFormData>
+): Promise<CmsPage | null> {
   const pages = loadPages();
   const index = pages.findIndex((page) => page.id === id);
   if (index === -1) return null;
@@ -287,7 +290,10 @@ export function updatePage(id: string, patch: Partial<CmsPageFormData>): CmsPage
   persist(pages);
 
   if (updated.status === "published") {
-    upsertSeoRouteForPath(getStorefrontPageUrl(updated.slug), updated.title, {
+    // Awaited so the SEO row is written before the caller navigates away. The
+    // storefront renders its meta tags from the server copy, so a route entry
+    // that never landed leaves a published page with no title or description.
+    await upsertSeoRouteForPath(getStorefrontPageUrl(updated.slug), updated.title, {
       metaTitle: updated.seo?.metaTitle ?? `${updated.title} | Monginis`,
       metaDescription: updated.seo?.metaDescription ?? updated.description,
       metaKeywords: updated.seo?.metaKeywords ?? [],

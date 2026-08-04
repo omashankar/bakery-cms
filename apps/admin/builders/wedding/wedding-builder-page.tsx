@@ -358,7 +358,7 @@ export function WeddingBuilderPage() {
       return;
     }
     if (confirm.type === "reset") {
-      confirmReset();
+      void confirmReset();
       return;
     }
     removeSection(confirm.id);

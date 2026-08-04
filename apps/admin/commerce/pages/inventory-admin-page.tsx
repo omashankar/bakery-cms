@@ -45,6 +45,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
+import { inventoryHydration } from "@/apps/admin/commerce/lib/inventory-api";
+import { ensureInventoryHydrated } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
+import { SettingsFormGate, SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 
@@ -66,8 +70,28 @@ export function InventoryAdminPage() {
   const [filters, setFilters] = useState<InventoryListFilters>(defaultInventoryFilters);
   const [page, setPage] = useState(1);
   const [adjustTarget, setAdjustTarget] = useState<InventoryItem | null>(null);
-  const [settings, setSettings] = useState<InventorySettings>(defaultInventorySettings);
-  const [savedSettings, setSavedSettings] = useState<InventorySettings>(defaultInventorySettings);
+  // The settings block, through the shared hydrated form.
+  //
+  // `saveInventorySettingsRequest` is a whole-document PUT and, until now, was
+  // the only replace-all writer in the codebase with no hydration gate at all.
+  // The form read localStorage on mount and was interactive over it, so a
+  // browser whose read had not landed held the defaults — and one save replaced
+  // the shop's low-stock thresholds and alert switches with them. Nobody
+  // notices that until the alerts stop arriving.
+  const {
+    value: settings,
+    isDirty: settingsDirty,
+    hydration,
+    isWriting: savingSettings,
+    canSave,
+    edit: editSettings,
+    runWrite,
+  } = useHydratedForm<InventorySettings>({
+    read: getInventorySettings,
+    fallback: defaultInventorySettings,
+    gate: inventoryHydration,
+    ensureHydrated: ensureInventoryHydrated,
+  });
 
   const overview = useMemo(
     () => (mounted ? getInventoryOverview() : EMPTY_OVERVIEW),
@@ -83,12 +107,8 @@ export function InventoryAdminPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const settingsDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   useEffect(() => {
-    const loaded = getInventorySettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
     setMounted(true);
     setRefreshKey(1);
 
@@ -109,19 +129,44 @@ export function InventoryAdminPage() {
     setRefreshKey((value) => value + 1);
   }
 
-  function handleSaveSettings() {
-    const saved = saveInventorySettings(settings);
-    setSettings(saved);
-    setSavedSettings(saved);
-    toast.success("Inventory settings saved");
-    bump();
+  async function handleSaveSettings() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { settings: value, persisted } = await saveInventorySettings(settings);
+      bump();
+
+      if (!persisted) {
+        // These thresholds drive the low-stock alerts the whole team works off.
+        // Local-only means this browser warns and nobody else does. The saved
+        // baseline stays put — it used to move regardless, so a REJECTED save
+        // greyed the button out and removed the only retry.
+        toast.error("Settings saved on this device only — the server rejected them", {
+          description: "Reload to see the server's version.",
+        });
+        return { value, accepted: false };
+      }
+
+      toast.success("Inventory settings saved");
+      return { value, accepted: true };
+    });
   }
 
-  function handleToggleUnlimited(item: InventoryItem) {
-    const updated = setUnlimitedStock(item.cakeId, !item.unlimitedStock);
+  async function handleToggleUnlimited(item: InventoryItem) {
+    const { item: updated, persisted } = await setUnlimitedStock(
+      item.cakeId,
+      !item.unlimitedStock
+    );
     if (!updated) return;
-    toast.success(updated.unlimitedStock ? "Unlimited stock enabled" : "Unlimited stock disabled");
     bump();
+
+    if (!persisted) {
+      toast.error("Changed on this device only — the server rejected it", {
+        description: "The shop is still selling against the old setting.",
+      });
+      return;
+    }
+
+    toast.success(updated.unlimitedStock ? "Unlimited stock enabled" : "Unlimited stock disabled");
   }
 
   return (
@@ -183,6 +228,8 @@ export function InventoryAdminPage() {
             <CardTitle className="text-base">Settings</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+            <SettingsHydrationNotice hydration={hydration} />
+            <SettingsFormGate hydration={hydration}>
             <div className="space-y-1.5">
               <Label htmlFor="default-threshold" className="text-xs text-muted-foreground">
                 Low stock warning threshold
@@ -193,7 +240,7 @@ export function InventoryAdminPage() {
                 min={1}
                 value={settings.defaultLowStockThreshold}
                 onChange={(event) =>
-                  setSettings((prev) => ({
+                  editSettings((prev) => ({
                     ...prev,
                     defaultLowStockThreshold: Math.max(Number(event.target.value) || 1, 1),
                   }))
@@ -205,19 +252,20 @@ export function InventoryAdminPage() {
               <Switch
                 checked={settings.trackStockHistory}
                 onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, trackStockHistory: checked === true }))
+                  editSettings((prev) => ({ ...prev, trackStockHistory: checked === true }))
                 }
               />
             </label>
             <Button
               variant="bakery"
               className="mt-auto w-full"
-              onClick={handleSaveSettings}
-              disabled={!settingsDirty}
+              onClick={() => void handleSaveSettings()}
+              disabled={!settingsDirty || !canSave}
             >
               <Settings2 className="size-4" />
-              Save settings
+              {savingSettings ? "Saving…" : "Save settings"}
             </Button>
+            </SettingsFormGate>
           </CardContent>
         </Card>
 
@@ -377,7 +425,7 @@ export function InventoryAdminPage() {
                             size="sm"
                             variant={item.unlimitedStock ? "bakery" : "outline"}
                             className="h-8"
-                            onClick={() => handleToggleUnlimited(item)}
+                            onClick={() => void handleToggleUnlimited(item)}
                             aria-label={
                               item.unlimitedStock
                                 ? "Unlimited stock on — click to set a limit"
@@ -451,7 +499,7 @@ export function InventoryAdminPage() {
                           size="sm"
                           variant={item.unlimitedStock ? "bakery" : "outline"}
                           className="h-8 flex-1"
-                          onClick={() => handleToggleUnlimited(item)}
+                          onClick={() => void handleToggleUnlimited(item)}
                           aria-label={
                             item.unlimitedStock
                               ? "Unlimited stock on — click to set a limit"

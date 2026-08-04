@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
+  Loader2,
   Eye,
   FileText,
   IndianRupee,
@@ -18,20 +19,19 @@ import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-
 import { InvoiceDesignPanel } from "@/apps/admin/commerce/components/invoice-design-panel";
 import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { InvoicePreviewDialog } from "@/apps/admin/commerce/components/invoice-preview-dialog";
-import { ensureDemoOrders } from "@/apps/admin/commerce/lib/order-utils";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import {
   defaultInvoiceListFilters,
   EMPTY_INVOICE_OVERVIEW,
   exportInvoicesToCsv,
-  filterInvoiceOrders,
-  getInvoiceOverview,
   type InvoiceListFilters,
+  type InvoiceOverview,
 } from "@/apps/admin/commerce/lib/invoice-utils";
 import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
 } from "@/features/commerce/lib/invoice-settings-repository";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -48,21 +48,29 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
-import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { fetchInvoicesPage } from "@/features/orders/lib/orders-api";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { InvoiceSettings } from "@/types/invoice";
 
 const PAGE_SIZE = 10;
+/** Matches the server's max page size — one request, no client-side paging loop. */
+const EXPORT_LIMIT = 500;
 
 type InvoiceTab = "invoices" | "design";
 
 export function InvoicesAdminPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<InvoiceTab>("invoices");
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [overview, setOverview] = useState<InvoiceOverview>(EMPTY_INVOICE_OVERVIEW);
   const [filters, setFilters] = useState<InvoiceListFilters>(defaultInvoiceListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -72,52 +80,102 @@ export function InvoicesAdminPage() {
     useState<InvoiceSettings>(defaultInvoiceSettings);
   const [commerceLabels, setCommerceLabels] = useState({
     taxLabel: defaultCommerceSettings.taxLabel,
+    taxRate: defaultCommerceSettings.taxRate,
     platformChargeLabel: defaultCommerceSettings.platformChargeLabel,
     giftWrapLabel: defaultCommerceSettings.giftWrapLabel,
   });
 
   useEffect(() => {
-    function refreshOrders() {
-      ensureDemoOrders();
-      setOrders(getOrders());
-    }
+    let cancelled = false;
+
     function refreshSettings() {
       setInvoiceSettings(loadInvoiceSettings());
       const commerce = getCommerceSettings();
       setCommerceLabels({
         taxLabel: commerce.taxLabel,
+        taxRate: commerce.taxRate,
         platformChargeLabel: commerce.platformChargeLabel,
         giftWrapLabel: commerce.giftWrapLabel,
       });
     }
 
-    refreshOrders();
     refreshSettings();
-    setMounted(true);
 
-    window.addEventListener("bakery-orders-updated", refreshOrders);
+    // Ask for the server's copy rather than waiting on the admin layout to.
+    //
+    // `loadInvoiceSettings()` SEEDS demo constants when localStorage is empty,
+    // and this page PRINTS invoices from what it returns. The customer's copy
+    // is now resolved server-side, so an admin printing before hydration landed
+    // would hand out a document that disagrees with the customer's about who
+    // issued it — the exact split this work set out to close, reopened from the
+    // other side. The layout's sync runs from a `[]`-dep effect that never
+    // re-runs after an in-app login, which is why waiting is not enough.
+    void ensureInvoiceSettingsHydrated().then((settled) => {
+      if (!cancelled && settled) refreshSettings();
+    });
+
     window.addEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     return () => {
-      window.removeEventListener("bakery-orders-updated", refreshOrders);
+      cancelled = true;
       window.removeEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refreshSettings);
       window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshSettings);
     };
   }, []);
+
+  // Rows AND counters from one server snapshot over every order. Filtering the
+  // browser cache meant paging through only the most recent slice, and a card
+  // could report a total the list below could not reach.
+  // One debounced key for filters AND page. The search box is undebounced
+  // and each request filters the whole orders collection server-side, so
+  // keying the fetch straight off the input turned a six-letter name into
+  // six full-collection queries, five of them already stale on arrival.
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  // The request uses the CLAMPED page. Filters or a mutation can shrink the
+  // result set under the page the admin is on; asking for the raw page then
+  // returns nothing and hides the pager, stranding them with no way back.
+  const liveKey = JSON.stringify({ filters, page: currentPage });
+  const requestKey = useDebouncedValue(liveKey, 250);
+  // `loading` is re-armed only when the DEBOUNCED key changes, so for the first
+  // 250ms after a filter change the fetch has not started yet and the old,
+  // already wrong result is still on screen — asserted as "No invoices found"
+  // rather than shown as pending.
+  const pending = loading || requestKey !== liveKey;
+  const request = JSON.parse(requestKey) as {
+    filters: Record<string, unknown>;
+    page: number;
+  };
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // Re-armed on EVERY request, not just the first: without this a refilter
+      // asserts "none found" over the old empty list while the new one loads.
+      setLoading(true);
+      const result = await fetchInvoicesPage({ ...request.filters, page: request.page, limit: PAGE_SIZE });
+      if (cancelled) return;
+      if (result) {
+        setOrders(result.items);
+        setTotal(result.total);
+        setOverview(result.overview);
+      }
+      setFailed(!result);
+      setLoading(false);
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestKey]);
 
   useEffect(() => {
     if (!printOrder) return;
     return runBrowserPrint(() => setPrintOrder(null));
   }, [printOrder]);
 
-  const filtered = useMemo(() => filterInvoiceOrders(orders, filters), [orders, filters]);
-  const overview = useMemo(
-    () => (mounted ? getInvoiceOverview(orders) : EMPTY_INVOICE_OVERVIEW),
-    [orders, mounted]
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginated = orders;
   const pageIds = paginated.map((order) => order.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
@@ -142,17 +200,94 @@ export function InvoicesAdminPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function handleExport() {
-    const target =
-      selectedIds.length > 0
-        ? orders.filter((order) => selectedIds.includes(order.id))
-        : filtered;
-    if (target.length === 0) {
+  /**
+   * The exportable slice of the current filters, straight from the server — the
+   * page in front of the admin holds only PAGE_SIZE rows. Asked for the full
+   * EXPORT_LIMIT rather than `Math.min(total, …)`, because `total` is whatever
+   * the last page load reported and the collection moves underneath it.
+   */
+  async function loadForExport() {
+    setExporting(true);
+    // The DEBOUNCED filters, matching the rows on screen and the count beside
+    // them — not the live inputs, which may be a keystroke ahead of both.
+    const result = await fetchInvoicesPage({ ...request.filters, page: 1, limit: EXPORT_LIMIT });
+    setExporting(false);
+    return result;
+  }
+
+  async function handleExport() {
+    if (exporting) return;
+
+    if (selectedIds.length > 0) {
+      const onThisPage = orders.filter((order) => selectedIds.includes(order.id));
+
+      // A selection SURVIVES paging — only a filter change or Clear resets it —
+      // so it routinely covers rows the current page does not hold. Writing out
+      // just the visible ones would drop the rest without saying so.
+      if (onThisPage.length === selectedIds.length) {
+        exportInvoicesToCsv(onThisPage);
+        toast.success(`Exported ${onThisPage.length} invoice${onThisPage.length === 1 ? "" : "s"}`);
+        return;
+      }
+
+      const wider = await loadForExport();
+      // Merge rather than replace: the visible rows are already in hand, so a
+      // failed or short widening should cost the admin the rows it could not
+      // reach — not the ones on screen in front of them.
+      const byId = new Map(onThisPage.map((order) => [order.id, order]));
+      for (const order of wider?.items ?? []) {
+        if (selectedIds.includes(order.id)) byId.set(order.id, order);
+      }
+
+      const target = [...byId.values()];
+      if (target.length === 0) {
+        toast.error("Could not load the selected invoices to export");
+        return;
+      }
+
+      exportInvoicesToCsv(target);
+      if (target.length < selectedIds.length) {
+        // Distinguish "the request failed" from "the range does not reach them".
+        // Advising an admin to narrow their filters when the fetch simply 500'd
+        // sends them off to solve the wrong problem.
+        toast.warning(`Exported ${target.length} of ${selectedIds.length} selected invoices`, {
+          description: wider
+            ? "The rest fall outside the exportable range — narrow the filters."
+            : "The rest could not be loaded. Check your connection and try again.",
+        });
+        return;
+      }
+      toast.success(`Exported ${target.length} invoice${target.length === 1 ? "" : "s"}`);
+      return;
+    }
+
+    // `total` is 0 both when there are genuinely no invoices and when the page
+    // load failed before it ever learned the count. Only the first is a reason to
+    // refuse; the second gets the export fetch, which may well work.
+    if (total === 0 && !failed) {
       toast.error("No invoices to export");
       return;
     }
-    exportInvoicesToCsv(target);
-    toast.success(`Exported ${target.length} invoice${target.length === 1 ? "" : "s"}`);
+
+    const result = await loadForExport();
+    if (!result || result.items.length === 0) {
+      toast.error("Could not load invoices to export");
+      return;
+    }
+
+    exportInvoicesToCsv(result.items);
+
+    // The server's own count, not the card's — `total` is from the last page
+    // this screen loaded, and invoices raised since then would be silently
+    // omitted from both the export and the warning about the omission.
+    if (result.total > result.items.length) {
+      toast.warning(`Exported the newest ${result.items.length} of ${result.total} invoices`, {
+        description: "Narrow the filters to export the rest.",
+      });
+      return;
+    }
+
+    toast.success(`Exported ${result.items.length} invoice${result.items.length === 1 ? "" : "s"}`);
   }
 
   function handlePrint(order: PlacedOrder) {
@@ -210,6 +345,14 @@ export function InvoicesAdminPage() {
 
       {tab === "invoices" ? (
         <div className="print:hidden space-y-4 sm:space-y-5">
+          {/*
+            These count EVERY order, not the filtered list below them — they are
+            filter shortcuts, so a count that collapsed to the current filter
+            would read zero the moment you used one. "all time" says so, because
+            the number sitting above a filtered list otherwise reads as a count
+            of what is on screen. The Transaction Center makes the same
+            distinction explicitly; this one made it silently.
+          */}
           <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
               type="button"
@@ -219,7 +362,7 @@ export function InvoicesAdminPage() {
               <DashboardStatCard
                 title="Paid"
                 value={overview.paid}
-                change="Prepaid orders"
+                change="Prepaid orders · all time"
                 changeTone="positive"
                 icon={IndianRupee}
                 tone="bakery"
@@ -233,7 +376,7 @@ export function InvoicesAdminPage() {
               <DashboardStatCard
                 title="COD"
                 value={overview.cod}
-                change="Pay on delivery"
+                change="Pay on delivery · all time"
                 changeTone="neutral"
                 icon={Wallet}
                 tone="gold"
@@ -320,10 +463,17 @@ export function InvoicesAdminPage() {
               </div>
             ) : null}
 
-            {paginated.length === 0 ? (
+            {paginated.length === 0 && pending ? (
+              // Asserting there are none before the server has answered is a
+              // guess, and a wrong one on every cold load in a shop that has them.
+              <div className="flex min-h-48 items-center justify-center py-14">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <span className="sr-only">Loading invoices</span>
+              </div>
+            ) : paginated.length === 0 ? (
               <EmptyState
                 icon={Receipt}
-                title="No invoices found"
+                title={failed ? "Could not load invoices" : "No invoices found"}
                 description="Place a checkout order, or clear filters to see all invoices."
                 className="py-14"
               />
@@ -524,6 +674,7 @@ export function InvoicesAdminPage() {
             order={printOrder}
             settings={invoiceSettings}
             taxLabel={commerceLabels.taxLabel}
+            currentTaxRate={commerceLabels.taxRate}
             platformChargeLabel={commerceLabels.platformChargeLabel}
             giftWrapLabel={commerceLabels.giftWrapLabel}
             variant="print"
@@ -536,6 +687,7 @@ export function InvoicesAdminPage() {
         order={previewOrder}
         settings={invoiceSettings}
         taxLabel={commerceLabels.taxLabel}
+        currentTaxRate={commerceLabels.taxRate}
         platformChargeLabel={commerceLabels.platformChargeLabel}
         giftWrapLabel={commerceLabels.giftWrapLabel}
         onOpenChange={(open) => {

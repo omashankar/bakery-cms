@@ -1,5 +1,6 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
+import { resetMailTransport } from "@/lib/server/mail/transport";
 import {
   defaultAnalyticsSettings,
   defaultCommerceSettings,
@@ -10,6 +11,7 @@ import {
   defaultSecuritySettings,
   defaultSmtpSettings,
   defaultSocialLinks,
+  isSafeSocialUrl,
 } from "@/features/settings/lib/settings-utils";
 import type { BusinessType } from "@/types/settings";
 
@@ -71,10 +73,19 @@ export async function getPublicSettings() {
       logo: json.general?.logo,
       favicon: json.general?.favicon,
       currency: json.general?.currency,
+      // Not a secret, and the storefront needs it: every date it renders is
+      // formatted in the store's timezone, not the visitor's machine zone.
+      timezone: json.general?.timezone,
       businessType,
     },
     contact: json.contact,
-    social: (json.social ?? []).filter((s: { isActive?: boolean }) => s.isActive),
+    // Active AND renderable. This payload feeds any client that asks, so the
+    // href guard belongs at the boundary rather than only in the surfaces that
+    // happen to render it today — the field was free text for the life of the
+    // project, so what is at rest can still be a `javascript:` URL.
+    social: (json.social ?? [])
+      .filter((s: { isActive?: boolean }) => s.isActive)
+      .filter((s: { href?: string }) => isSafeSocialUrl(s.href ?? "")),
     commerce: json.commerce,
     maintenance: {
       isEnabled: json.maintenance?.isEnabled ?? false,
@@ -93,8 +104,39 @@ export async function getLabels() {
   return resolveLabels(businessType, json.labelOverrides ?? {});
 }
 
+/**
+ * A blank mail password means "keep the one you have".
+ *
+ * The controller stops the stored password reaching the browser, so the admin
+ * form no longer holds it — which means every SMTP save would otherwise arrive
+ * with an empty password and wipe the shop's real credential. Correcting the
+ * From-name would silently stop all outbound mail.
+ *
+ * It also covers a restore: a backup taken after this change carries no
+ * password, and restoring one must not blank a working configuration. To
+ * actually CLEAR the password an admin sets the section back to defaults, which
+ * goes through `resetSection` and does not come here.
+ */
+async function keepStoredMailPassword(section: string, value: unknown): Promise<unknown> {
+  if (section !== "smtp") return value;
+
+  const incoming = value as { password?: unknown } | null;
+  if (typeof incoming?.password === "string" && incoming.password) return value;
+
+  const current = (await repo.getOrCreateSettings()).toJSON() as {
+    smtp?: { password?: string };
+  };
+  const stored = current.smtp?.password;
+  if (!stored) return value;
+
+  return { ...(incoming ?? {}), password: stored };
+}
+
 export async function updateSection(section: string, value: unknown, ctx: RequestCtx) {
-  const doc = await repo.updateSection(section, value);
+  const doc = await repo.updateSection(section, await keepStoredMailPassword(section, value));
+  // The mail transport is cached across requests, so new credentials must not
+  // keep failing against the old ones.
+  if (section === "smtp") resetMailTransport();
   await writeAuditLog({
     action: `settings.update.${section}`,
     actorId: ctx.actorId ?? null,
@@ -109,6 +151,7 @@ export async function updateSection(section: string, value: unknown, ctx: Reques
 export async function resetSection(section: string, ctx: RequestCtx) {
   if (!(section in SECTION_DEFAULTS)) throw new NotFoundError("Unknown settings section");
   const doc = await repo.updateSection(section, SECTION_DEFAULTS[section]);
+  if (section === "smtp") resetMailTransport();
   await writeAuditLog({
     action: `settings.reset.${section}`,
     actorId: ctx.actorId ?? null,

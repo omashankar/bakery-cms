@@ -43,14 +43,27 @@ export function InquiryDetailPanel({
     }
   }
 
-  function saveStatus(status: InquiryStatus) {
-    const updated = updateInquiry(current.id, { status });
+  /**
+   * The local write always lands; only the server one is real. Staying silent on
+   * a rejection leaves the moderator believing a reply status or note is on the
+   * record, when the next hydration will drop it.
+   */
+  async function save(patch: Partial<Inquiry>, what: string) {
+    const { inquiry: updated, persisted } = await updateInquiry(current.id, patch);
     if (updated) onUpdate(updated);
+    if (!persisted) {
+      toast.error(`${what} saved on this device only — the server rejected it`, {
+        description: "Reload to see the server's version.",
+      });
+    }
+  }
+
+  function saveStatus(status: InquiryStatus) {
+    void save({ status }, "Status");
   }
 
   function saveNotes(notes: string) {
-    const updated = updateInquiry(current.id, { notes });
-    if (updated) onUpdate(updated);
+    void save({ notes }, "Notes");
   }
 
   return (

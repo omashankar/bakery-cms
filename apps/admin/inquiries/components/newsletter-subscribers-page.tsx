@@ -83,14 +83,23 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
     );
   }
 
-  function toggleActive(subscriber: NewsletterSubscriber) {
-    const updated = updateNewsletterSubscriber(subscriber.id, {
+  async function toggleActive(subscriber: NewsletterSubscriber) {
+    const { subscriber: updated, persisted } = await updateNewsletterSubscriber(subscriber.id, {
       isActive: !subscriber.isActive,
     });
-    if (updated) {
-      refresh();
-      toast.success(updated.isActive ? "Subscriber activated" : "Subscriber deactivated");
+    if (!updated) return;
+    refresh();
+
+    if (!persisted) {
+      // This flag decides who gets the next campaign, and that send reads the
+      // server. A local-only deactivation still receives mail.
+      toast.error("Changed on this device only — the server rejected it", {
+        description: "Reload to see the server's version.",
+      });
+      return;
     }
+
+    toast.success(updated.isActive ? "Subscriber activated" : "Subscriber deactivated");
   }
 
   async function copyEmails() {
@@ -107,12 +116,20 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
     }
   }
 
-  function confirmDelete() {
-    const count = deleteNewsletterSubscribers(selectedIds);
+  async function confirmDelete() {
+    const { count, persisted } = await deleteNewsletterSubscribers(selectedIds);
     refresh();
     setSelectedIds([]);
-    toast.success(`${count} subscriber${count === 1 ? "" : "s"} removed`);
     setDeleteOpen(false);
+
+    if (!persisted) {
+      toast.error("Removed on this device only — the server rejected it", {
+        description: "They are still subscribed. Reload and try again.",
+      });
+      return;
+    }
+
+    toast.success(`${count} subscriber${count === 1 ? "" : "s"} removed`);
   }
 
   const copyButton = (

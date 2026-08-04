@@ -38,6 +38,13 @@ export async function subscribe(sub: NewsletterSubscriber): Promise<NewsletterSu
   return toSub(doc);
 }
 
+/**
+ * Newest-first, capped.
+ *
+ * The subscriber list is browsed, not totalled, so the cap truncates a page
+ * rather than corrupting a figure. A "total subscribers" stat added on top of
+ * this would be wrong past the cap and would look perfectly plausible.
+ */
 export async function listAll(limit = 5000): Promise<NewsletterSubscriber[]> {
   await connectDB();
   const docs = (await NewsletterModel.find()

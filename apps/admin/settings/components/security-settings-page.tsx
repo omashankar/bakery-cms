@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
+import {
   AlertTriangle,
   Laptop,
   LogOut,
@@ -56,6 +60,8 @@ import {
   toggleDeviceTrust,
 } from "@/features/settings/lib/security-center-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { SettingsHydrationNotice } from "./settings-field-error";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
@@ -69,10 +75,20 @@ function clamp(value: number, { min, max }: { min: number; max: number }): numbe
 
 export function SecuritySettingsPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  // The shared section form. This page hand-rolled it and never resynced: a
+  // one-shot `[]`-dep effect read localStorage on mount, with no
+  // SETTINGS_UPDATED_EVENT listener at all, so the form was stuck on whatever
+  // that read returned for the whole page session. `SettingsServerSync` reads
+  // the real copy from a root-layout effect, so on a hard load that read is
+  // still in flight and the local store answers with the DEMO SEED — and Save
+  // PUT the seed over the real section, which is a whole-section replace.
+  //
+  // This section is the session timeout, the lockout policy, the
+  // strong-password rule and 2FA. What lands loosens a policy the shop had
+  // deliberately tightened, and nothing on any screen says it happened.
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<SecuritySettings>(getSecuritySettings, defaultSecuritySettings);
   const [tab, setTab] = useState<SecurityTab>("policies");
-  const [settings, setSettings] = useState<SecuritySettings>(defaultSecuritySettings);
-  const [savedSettings, setSavedSettings] = useState<SecuritySettings>(defaultSecuritySettings);
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -88,11 +104,9 @@ export function SecuritySettingsPage() {
   }
 
   useEffect(() => {
-    const loaded = getSecuritySettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
+    // The security CENTRE — login history, sessions, devices — has its own
+    // store and its own event. The settings form above is the hook's business.
     refreshCenter();
-    setMounted(true);
 
     function handleUpdate() {
       refreshCenter();
@@ -102,41 +116,60 @@ export function SecuritySettingsPage() {
     return () => window.removeEventListener(SECURITY_CENTER_UPDATED_EVENT, handleUpdate);
   }, []);
 
-  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
-
-  function handleSave() {
-    const saved = saveSecuritySettings({
-      ...settings,
-      sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
-      maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
+  async function handleSave() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveSecuritySettings({
+        ...settings,
+        sessionTimeoutMinutes: clamp(settings.sessionTimeoutMinutes, SESSION_TIMEOUT),
+        maxLoginAttempts: clamp(settings.maxLoginAttempts, LOGIN_ATTEMPTS),
+      });
+      return { value, accepted: reportSettingsWrite(persisted, "Security settings") };
     });
-    setSavedSettings(saved);
-    setSettings(saved);
-    toast.success("Security settings saved");
   }
 
   function handleDiscard() {
-    setSettings(savedSettings);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSecuritySettings();
-    setSettings(loaded);
-    setSavedSettings(loaded);
-    toast.success("Security settings reset to defaults");
+  async function handleReset() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetSecuritySettings();
+      return { value, accepted: reportSettingsReset(persisted, "Security settings") };
+    });
   }
 
-  function handleRevokeSession(sessionId: string) {
-    if (revokeSession(sessionId)) {
+  /**
+   * These report on an ACCESS CONTROL, so they say nothing until the server has
+   * acted. A revocation the server refused leaves the session live; claiming
+   * otherwise is the one outcome an admin cannot recover from, because they stop
+   * looking.
+   */
+  async function handleRevokeSession(sessionId: string) {
+    if (await revokeSession(sessionId)) {
       refreshCenter();
       toast.success("Session revoked");
+      return;
     }
+
+    toast.error("Could not revoke that session", {
+      description: "It is still active. Check your connection and try again.",
+    });
   }
 
-  function handleLogoutAll() {
-    const removed = logoutAllDevices();
+  async function handleLogoutAll() {
+    const { removed, persisted } = await logoutAllDevices();
     refreshCenter();
+
+    if (!persisted) {
+      toast.error("Could not sign out the other devices", {
+        description: "They are still signed in. Check your connection and try again.",
+      });
+      return;
+    }
+
     toast.success(
       removed > 0
         ? `Signed out ${removed} other device${removed === 1 ? "" : "s"}`
@@ -147,11 +180,24 @@ export function SecuritySettingsPage() {
   async function confirmLogoutEverywhere() {
     // Revoke OTHER devices (fires with the current cookie) AND this device's own
     // session/cookie, so "everywhere" truly includes the current browser.
-    logoutAllDevices();
-    await logoutRequest().catch(() => undefined);
+    const { persisted } = await logoutAllDevices();
+    const selfLoggedOut = await logoutRequest()
+      .then(() => true)
+      .catch(() => false);
     clearDemoSession();
     setLogoutEverywhereOpen(false);
-    toast.success("Signed out on all devices");
+
+    // This browser is signed out either way — the local session is cleared and
+    // we are leaving for the login page — so the only thing worth reporting is
+    // whether the OTHER devices really went with it.
+    if (persisted && selfLoggedOut) {
+      toast.success("Signed out on all devices");
+    } else {
+      toast.error("Signed out here, but some devices may still be signed in", {
+        description: "Sign in again and retry from Security settings.",
+      });
+    }
+
     router.push(routes.auth.login);
   }
 
@@ -159,23 +205,38 @@ export function SecuritySettingsPage() {
     clearFailedLoginAttempts();
     refreshCenter();
     setClearFailedOpen(false);
-    toast.success("Failed attempts cleared");
+    // The failed-attempt list is DERIVED from the auth.login audit trail on every
+    // load, and an audit trail is not something an admin should be able to erase.
+    // Clearing it here only hides it in this browser until the next reload —
+    // "Failed attempts cleared" promised a deletion that never happens.
+    toast.message("Hidden on this device", {
+      description: "These come from the audit log and will reappear when you reload.",
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Security"
       description={
-        mounted
-          ? `${settings.sessionTimeoutMinutes}m timeout · 2FA ${settings.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
-          : "Session policies, login history, active devices, and access controls (demo)."
+        // The SAVED policy, not the draft. This read the working copy, so
+        // dragging the timeout slider or flipping 2FA restated the header as
+        // though the change were already in effect — on the one screen where
+        // what is actually enforced is the whole question.
+        hydration === "ready"
+          ? `${saved.sessionTimeoutMinutes}m timeout · 2FA ${saved.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+          : "Session policies, login history, active devices, and access controls."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Gating only the
+      // Save button leaves the gap open.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={!canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as SecurityTab)}
@@ -213,7 +274,7 @@ export function SecuritySettingsPage() {
                     max={SESSION_TIMEOUT.max}
                     value={settings.sessionTimeoutMinutes}
                     onChange={(e) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         sessionTimeoutMinutes: Number(e.target.value) || 60,
                       }))
@@ -229,7 +290,7 @@ export function SecuritySettingsPage() {
                     max={LOGIN_ATTEMPTS.max}
                     value={settings.maxLoginAttempts}
                     onChange={(e) =>
-                      setSettings((prev) => ({
+                      edit((prev) => ({
                         ...prev,
                         maxLoginAttempts: Number(e.target.value) || 5,
                       }))
@@ -252,7 +313,7 @@ export function SecuritySettingsPage() {
                   description="Require 8+ chars with mixed case and numbers."
                   checked={settings.requireStrongPasswords}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, requireStrongPasswords: checked }))
+                    edit((prev) => ({ ...prev, requireStrongPasswords: checked }))
                   }
                 />
                 <PolicySwitch
@@ -260,7 +321,7 @@ export function SecuritySettingsPage() {
                   description="OTP verification on login (demo toggle)."
                   checked={settings.twoFactorEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, twoFactorEnabled: checked }))
+                    edit((prev) => ({ ...prev, twoFactorEnabled: checked }))
                   }
                 />
                 <PolicySwitch
@@ -268,7 +329,7 @@ export function SecuritySettingsPage() {
                   description="Email alert when a new device signs in."
                   checked={settings.loginNotifications}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, loginNotifications: checked }))
+                    edit((prev) => ({ ...prev, loginNotifications: checked }))
                   }
                 />
               </CardContent>
@@ -363,7 +424,7 @@ export function SecuritySettingsPage() {
 
         <TabsContent value="sessions" className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleLogoutAll}>
+            <Button variant="outline" size="sm" onClick={() => void handleLogoutAll()}>
               <LogOut className="size-4" />
               Sign out other devices
             </Button>
@@ -413,7 +474,7 @@ export function SecuritySettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRevokeSession(session.id)}
+                        onClick={() => void handleRevokeSession(session.id)}
                       >
                         Revoke
                       </Button>
@@ -469,7 +530,14 @@ export function SecuritySettingsPage() {
                       onClick={() => {
                         toggleDeviceTrust(device.id);
                         refreshCenter();
-                        toast.success("Device trust updated");
+                        // There is no server-side notion of device trust — the
+                        // list is derived per request and every row comes back
+                        // trusted. So this is a note to yourself on this browser,
+                        // and it resets on reload. Say so, rather than reporting
+                        // a security control that does not exist.
+                        toast.message("Marked on this device only", {
+                          description: "Device trust is not stored — it resets when you reload.",
+                        });
                       }}
                     >
                       {device.trusted ? "Mark untrusted" : "Mark trusted"}
@@ -514,7 +582,7 @@ export function SecuritySettingsPage() {
             <Button variant="outline" onClick={() => setLogoutEverywhereOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmLogoutEverywhere}>
+            <Button variant="destructive" onClick={() => void confirmLogoutEverywhere()}>
               Sign out everywhere
             </Button>
           </DialogFooter>

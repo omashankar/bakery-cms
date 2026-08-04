@@ -44,6 +44,11 @@ export const adminNavSections: AdminNavSection[] = [
     title: "Sales",
     items: [
       { label: "Orders", href: routes.admin.orders.list, icon: "ShoppingBag" },
+      // Payments had no sidebar entry at all — gateway keys, transactions and
+      // refunds were reachable only two levels inside Settings, or by knowing
+      // the URL. An admin looking for "where do I put my Razorpay key" had
+      // nowhere to click. It belongs beside Orders: same money, same day-to-day.
+      { label: "Payments", href: routes.admin.commerce.payments, icon: "CreditCard" },
       { label: "Customers", href: routes.admin.customers.list, icon: "Users" },
       // Inquiries uses in-page tabs (All / Wedding / Contact / Newsletter) — no submenu.
       { label: "Inquiries", href: routes.admin.inquiries.overview, icon: "MessageSquare" },

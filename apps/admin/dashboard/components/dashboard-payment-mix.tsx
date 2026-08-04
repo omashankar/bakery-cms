@@ -1,48 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { CreditCard } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/utils/format";
 import {
-  EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
-  getDashboardCommerceAnalytics,
   getDashboardRangeLabel,
-  type DashboardDateRange,
+  type DashboardCommerceAnalytics,
 } from "../lib/dashboard-analytics";
 
 interface DashboardPaymentMixProps {
-  range: DashboardDateRange;
+  analytics: DashboardCommerceAnalytics;
 }
 
-export function DashboardPaymentMix({ range }: DashboardPaymentMixProps) {
-  const [items, setItems] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS.paymentBreakdown);
-
-  useEffect(() => {
-    function refresh() {
-      setItems(getDashboardCommerceAnalytics(range).paymentBreakdown);
-    }
-
-    refresh();
-    window.addEventListener("bakery-orders-updated", refresh);
-    return () => window.removeEventListener("bakery-orders-updated", refresh);
-  }, [range]);
+export function DashboardPaymentMix({ analytics }: DashboardPaymentMixProps) {
+  const items = analytics.paymentBreakdown;
 
   const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
   const maxRevenue = Math.max(...items.map((item) => item.revenue), 1);
 
   return (
-    <Card className="h-full shadow-sm">
+    <Card className="flex h-full flex-col shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <CreditCard className="size-4 text-primary" />
           Payment mix
         </CardTitle>
         <CardDescription>
-          Methods for {getDashboardRangeLabel(range).toLowerCase()}
+          Methods for {getDashboardRangeLabel(analytics.range).toLowerCase()}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex-1 space-y-3">
         {items.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border bg-muted/50 px-4 py-8 text-center text-sm text-muted-foreground">
             No payment data in this period.

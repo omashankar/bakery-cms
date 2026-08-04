@@ -45,9 +45,12 @@ import { routes } from "@/constants/routes";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { cn } from "@/lib/utils";
 import {
+  ensureSettingsHydrated,
   getGeneralSettings,
   getMaintenanceSettings,
+  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { settingsHydration } from "@/features/settings/lib/settings-api";
 
 type SettingsItem = {
   title: string;
@@ -155,7 +158,16 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "WhatsApp Templates",
-        description: "WhatsApp message templates for order updates.",
+        // This read "for order updates" while nothing in the codebase could
+        // send a WhatsApp message, then "sending not connected yet" once that
+        // was said plainly. Both are now wrong: there is a Cloud API client, a
+        // connection screen and a send path on the order lifecycle.
+        //
+        // The description still stops short of "sends order updates", because
+        // whether it does depends on the shop connecting a number and Meta
+        // approving the wording — neither of which this row can know. Naming
+        // the setup step is the honest middle.
+        description: "Order updates over WhatsApp — connect a Business number to send.",
         href: routes.admin.commerce.whatsapp,
         icon: MessageCircle,
       },
@@ -173,7 +185,11 @@ const groups: SettingsGroup[] = [
     items: [
       {
         title: "Appearance",
-        description: "Theme colours, fonts, and storefront styling.",
+        // Not "fonts" — there is no font control. The Appearance screen has
+        // a preset, three colours and a corner radius; the typography card on
+        // it is a read-only specimen of the fonts already in the design
+        // system, not a chooser.
+        description: "Theme colours, corner style, and the storefront palette.",
         href: routes.admin.appearance,
         icon: Palette,
       },
@@ -261,16 +277,54 @@ const groups: SettingsGroup[] = [
 ];
 
 export function SettingsOverviewPage() {
+  // This page writes nothing, so it cannot clobber anything — but it makes two
+  // CLAIMS from the same unhydrated local store the forms do, and one of them
+  // matters. `mounted` flipped true in the same tick as a synchronous read, so
+  // before hydration landed the header named the demo shop and, worse, the
+  // maintenance banner stayed hidden: an admin was told the storefront was open
+  // while it may have been closed to every customer.
+  //
+  // Both claims now wait for the server's copy. "Loading" is a smaller lie than
+  // "everything is fine".
+  // TWO different questions, and conflating them blanked this page.
+  //
+  //  - `mounted`: has the client rendered? The section list below is static
+  //    navigation — it has nothing to do with settings values, and gating it on
+  //    anything else leaves an admin staring at four grey rectangles. Its only
+  //    job is avoiding a server/client mismatch on first paint.
+  //  - `hydrated`: has the SERVER's copy arrived? Only the two CLAIMS wait on
+  //    this — the shop's name, and whether maintenance mode is on.
   const [mounted, setMounted] = useState(false);
-  const [siteName, setSiteName] = useState("Monginis");
+  const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
+  const [siteName, setSiteName] = useState("");
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
 
   useEffect(() => {
-    const general = getGeneralSettings();
-    const maintenance = getMaintenanceSettings();
-    setSiteName(general.siteName);
-    setMaintenanceEnabled(maintenance.isEnabled);
+    let cancelled = false;
+
+    function read() {
+      setSiteName(getGeneralSettings().siteName);
+      setMaintenanceEnabled(getMaintenanceSettings().isEnabled);
+    }
+
+    read();
     setMounted(true);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, read);
+
+    void ensureSettingsHydrated().then((settled) => {
+      if (cancelled) return;
+      if (settled) read();
+      // Only a SUCCESSFUL read may unlock the claims. `ensureSettingsHydrated`
+      // reports false when the FULL admin read failed even if the public subset
+      // landed — so this legitimately stays false, and the claims stay generic
+      // rather than reporting this browser's defaults as fact.
+      setHydrated(settled);
+    });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, read);
+    };
   }, []);
 
   return (
@@ -278,7 +332,8 @@ export function SettingsOverviewPage() {
       <AdminPageHeader
         title="Settings"
         description={
-          mounted
+          // The shop's NAME is a claim, so it waits for the server's copy.
+          hydrated && siteName
             ? `The control center for ${siteName} — store, commerce, communication, website, and security.`
             : "The control center for this bakery."
         }
@@ -295,14 +350,20 @@ export function SettingsOverviewPage() {
         }
       />
 
-      {mounted && maintenanceEnabled ? (
+      {/*
+        Also a claim, and the one that matters: showing nothing here means "the
+        storefront is open". Before hydration that would be the local seed
+        talking, so the banner waits for the server rather than reassuring an
+        admin whose shop may be closed to every customer.
+      */}
+      {hydrated && maintenanceEnabled ? (
         <Link
           href={routes.admin.settings.maintenance}
           className="flex items-center gap-3 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 transition-colors hover:bg-amber-100/80 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
         >
           <AlertTriangle className="size-4 shrink-0" />
           <span className="min-w-0 flex-1">
-            Maintenance mode is on — storefront is paused.
+            Maintenance mode is on — visitors cannot reach the store.
           </span>
           <ChevronRight className="size-4 shrink-0 opacity-50" />
         </Link>

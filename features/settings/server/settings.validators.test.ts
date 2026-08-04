@@ -36,6 +36,48 @@ describe("settings validators", () => {
     ).toBe(true);
   });
 
+  it("general rejects a logo or favicon that is not safe to render", () => {
+    const base = {
+      siteName: "My Shop",
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      businessType: "bakery" as const,
+    };
+
+    // Both fields reach an href/src attribute — the favicon a `<link rel="icon">`
+    // in the root layout, the logo an `<img>` in the storefront navbar.
+    expect(generalSchema.safeParse({ ...base, logo: "javascript:alert(1)" }).success).toBe(false);
+    expect(generalSchema.safeParse({ ...base, favicon: "javascript:alert(1)" }).success).toBe(
+      false,
+    );
+    // Protocol-relative: a silent off-site fetch from a field that looks like a path.
+    expect(generalSchema.safeParse({ ...base, logo: "//evil.example/logo.svg" }).success).toBe(
+      false,
+    );
+
+    expect(generalSchema.safeParse({ ...base, logo: "" }).success).toBe(true);
+    expect(generalSchema.safeParse({ ...base, logo: "/images/logo.svg" }).success).toBe(true);
+    expect(generalSchema.safeParse({ ...base, logo: "https://cdn.example/logo.svg" }).success).toBe(
+      true,
+    );
+  });
+
+  it("general rejects a currency or timezone outside the supported set", () => {
+    const base = {
+      siteName: "My Shop",
+      timezone: "Asia/Kolkata",
+      currency: "INR",
+      businessType: "bakery" as const,
+    };
+
+    // `Intl.NumberFormat` throws a RangeError on an unknown currency code, and
+    // every price in the app runs through it — an unchecked write here would
+    // take the storefront down.
+    expect(generalSchema.safeParse({ ...base, currency: "XYZ" }).success).toBe(false);
+    expect(generalSchema.safeParse({ ...base, timezone: "Mars/Olympus" }).success).toBe(false);
+    expect(generalSchema.safeParse({ ...base, currency: "USD" }).success).toBe(true);
+  });
+
   it("commerce rejects a tax rate above 1 (100%)", () => {
     const base = {
       deliveryFee: 0,

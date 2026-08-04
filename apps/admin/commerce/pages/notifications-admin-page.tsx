@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -20,7 +20,6 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { NotificationListItem } from "@/apps/admin/commerce/components/notification-list-item";
-import { INVENTORY_UPDATED_EVENT } from "@/apps/admin/commerce/lib/inventory-repository";
 import {
   defaultNotificationFilters,
   filterNotifications,
@@ -28,26 +27,24 @@ import {
   groupNotificationsByDay,
 } from "@/apps/admin/commerce/lib/notification-utils";
 import {
+  buildNotificationOverview,
   clearReadNotifications,
   defaultNotificationSettings,
   dismissNotification,
-  getNotificationOverview,
   getNotificationSettings,
-  loadNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  NOTIFICATIONS_UPDATED_EVENT,
   saveNotificationSettings,
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
-import { INQUIRIES_UPDATED_EVENT } from "@/features/inquiries/lib/inquiries-repository";
+import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import {
   isWeddingEnabled,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import type {
+  AdminNotification,
   NotificationListFilters,
-  NotificationOverview,
   NotificationSettings,
   NotificationType,
 } from "@/types/notification";
@@ -58,15 +55,6 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
-
-const EMPTY_OVERVIEW: NotificationOverview = {
-  total: 0,
-  unread: 0,
-  orderCount: 0,
-  paymentCount: 0,
-  stockCount: 0,
-  inquiryCount: 0,
-};
 
 const typeOptions = [
   "all",
@@ -103,9 +91,7 @@ const preferenceItems = [
 ];
 
 export function NotificationsAdminPage() {
-  const [mounted, setMounted] = useState(false);
   const [weddingEnabled, setWeddingEnabled] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const sync = () => setWeddingEnabled(isWeddingEnabled());
@@ -115,19 +101,16 @@ export function NotificationsAdminPage() {
   }, []);
   const [filters, setFilters] = useState<NotificationListFilters>(defaultNotificationFilters);
   const [page, setPage] = useState(1);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [settings, setSettings] = useState<NotificationSettings>(defaultNotificationSettings);
   const [savedSettings, setSavedSettings] = useState<NotificationSettings>(
     defaultNotificationSettings
   );
+  const [saving, setSaving] = useState(false);
 
-  const notifications = useMemo(
-    () => (mounted ? loadNotifications() : []),
-    [mounted, refreshKey]
-  );
-  const overview = useMemo(
-    () => (mounted ? getNotificationOverview() : EMPTY_OVERVIEW),
-    [mounted, refreshKey]
-  );
+  // Counted from the same snapshot the list renders, so the cards can never
+  // disagree with what is below them.
+  const overview = useMemo(() => buildNotificationOverview(notifications), [notifications]);
   const filtered = useMemo(
     () => filterNotifications(notifications, filters),
     [notifications, filters]
@@ -138,28 +121,27 @@ export function NotificationsAdminPage() {
   const grouped = useMemo(() => groupNotificationsByDay(paginated), [paginated]);
   const settingsDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
+  // Read the live dirty flag inside the listener without making it an effect
+  // dependency — the effect subscribes once, but must see the current value.
+  const settingsDirtyRef = useRef(settingsDirty);
+  useEffect(() => {
+    settingsDirtyRef.current = settingsDirty;
+  }, [settingsDirty]);
+
   useEffect(() => {
     function refresh() {
-      syncNotifications();
-      setRefreshKey((value) => value + 1);
+      setNotifications(syncNotifications());
+
+      // Server hydration lands after mount. Adopting its preferences then would
+      // silently discard toggles the admin has flipped but not saved yet.
+      if (settingsDirtyRef.current) return;
       const loaded = getNotificationSettings();
       setSettings(loaded);
       setSavedSettings(loaded);
-      setMounted(true);
     }
 
     refresh();
-    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
-    window.addEventListener("bakery-orders-updated", refresh);
-    window.addEventListener(INVENTORY_UPDATED_EVENT, refresh);
-    window.addEventListener(INQUIRIES_UPDATED_EVENT, refresh);
-
-    return () => {
-      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
-      window.removeEventListener("bakery-orders-updated", refresh);
-      window.removeEventListener(INVENTORY_UPDATED_EVENT, refresh);
-      window.removeEventListener(INQUIRIES_UPDATED_EVENT, refresh);
-    };
+    return subscribeToAdminData(refresh);
   }, []);
 
   function updateFilters(patch: Partial<NotificationListFilters>) {
@@ -172,14 +154,23 @@ export function NotificationsAdminPage() {
   }
 
   function bump() {
-    setRefreshKey((value) => value + 1);
+    setNotifications(syncNotifications());
   }
 
-  function handleSaveSettings() {
-    const saved = saveNotificationSettings(settings);
-    setSettings(saved);
-    setSavedSettings(saved);
+  async function handleSaveSettings() {
+    setSaving(true);
+    const persisted = await saveNotificationSettings(settings);
+    setSaving(false);
     bump();
+
+    if (!persisted) {
+      // Applied locally, but the server refused it — say so rather than leaving
+      // the admin to discover on another device that the toggle never stuck.
+      toast.error("Applied on this device only — the server rejected the change.");
+      return;
+    }
+
+    setSavedSettings(settings);
     toast.success("Notification preferences saved");
   }
 
@@ -403,9 +394,9 @@ export function NotificationsAdminPage() {
               variant="bakery"
               className="w-full"
               onClick={handleSaveSettings}
-              disabled={!settingsDirty}
+              disabled={!settingsDirty || saving}
             >
-              Save preferences
+              {saving ? "Saving..." : "Save preferences"}
             </Button>
           </CardContent>
         </Card>

@@ -12,7 +12,7 @@ import {
   Quote,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,
@@ -178,20 +178,21 @@ export function FaqAdminPage() {
     setFormOpen(true);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    const count = deleteFaqs(deleteTarget.ids);
+    const { value: count, persisted } = await deleteFaqs(deleteTarget.ids);
     refresh();
     setSelectedIds((prev) => prev.filter((id) => !deleteTarget.ids.includes(id)));
-    toast.success(`${count} question${count === 1 ? "" : "s"} deleted`);
     setDeleteTarget(null);
+    reportWrite(persisted, `${count} question${count === 1 ? "" : "s"} deleted`);
   }
 
-  function applyBulkStatus(status: FaqItem["status"]) {
+  async function applyBulkStatus(status: FaqItem["status"]) {
     if (selectedIds.length === 0) return;
-    bulkUpdateFaqStatus(selectedIds, status);
+    const { persisted } = await bulkUpdateFaqStatus(selectedIds, status);
     refresh();
-    toast.success(
+    reportWrite(
+      persisted,
       status === "published"
         ? "Selected FAQs published"
         : status === "draft"

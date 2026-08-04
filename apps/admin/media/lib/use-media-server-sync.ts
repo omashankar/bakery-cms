@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchMediaFiles, fetchMediaFolders } from "./media-api";
+import { fetchMediaFiles, fetchMediaFolders, mediaHydration } from "./media-api";
 import { persistServerMedia } from "./media-repository";
 import { persistServerMediaFolders } from "./media-folders";
 
@@ -20,6 +20,10 @@ export function useMediaServerSync(): void {
       if (cancelled) return;
       if (files) persistServerMedia(files);
       if (folders) persistServerMediaFolders(folders);
+
+      // Only NOW may a replace-all mutation send the local list — before this,
+      // that list is whatever this browser happened to hold.
+      if (files && folders) mediaHydration.markSettled();
     })();
 
     return () => {

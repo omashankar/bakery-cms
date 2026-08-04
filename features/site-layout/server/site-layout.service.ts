@@ -4,7 +4,9 @@ import { NotFoundError } from "@/lib/server/http/errors";
 import { seedStore as seedSeoStore } from "@/features/seo/lib/seo-repository";
 import { defaultHeaderSettings } from "@/features/site-layout/lib/header-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
-import { defaultAppearanceSettings } from "@/apps/admin/appearance/lib/appearance-utils";
+// From the domain module, not the admin's UI layer — a server service reaching
+// into `apps/` was the architecture rule this file had been breaking.
+import { defaultAppearanceSettings } from "@/features/site-layout/lib/appearance-tokens";
 import type { SeoStore } from "@/types/seo";
 import type { HeaderSettings, FooterSettings } from "@/types/site-layout";
 import type { AppearanceSettings } from "@/types/appearance";
@@ -45,13 +47,19 @@ export async function replaceSiteLayout(
   ctx: { ip: string; userAgent: string; actorId?: string | null; actorEmail?: string },
 ) {
   const store = storeFor(key);
+  // Read BEFORE the write. This is a whole-value replace, so without the
+  // previous copy the audit trail cannot say what the header, footer or
+  // palette used to be — and the moment that is needed is after a bad
+  // restore, when nobody remembers. Every sibling service logs identifying
+  // metadata; this one logged an empty object.
+  const before = await store.read();
   await store.write(value as never);
   await writeAuditLog({
     action: `site-layout.${key}.replace`,
     actorId: ctx.actorId ?? null,
     actorEmail: ctx.actorEmail,
     target: { type: "site-layout", id: key },
-    metadata: {},
+    metadata: { before, after: value },
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });

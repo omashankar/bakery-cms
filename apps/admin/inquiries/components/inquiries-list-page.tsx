@@ -161,14 +161,25 @@ export function InquiriesListPage({
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    const count = deleteInquiries(deleteTarget.ids);
+    const { count, persisted } = await deleteInquiries(deleteTarget.ids);
     refresh();
     setSelectedIds((prev) => prev.filter((id) => !deleteTarget.ids.includes(id)));
     if (selectedId && deleteTarget.ids.includes(selectedId)) setSelectedId(null);
-    toast.success(`${count} inquiry${count === 1 ? "" : "ies"} deleted`);
     setDeleteTarget(null);
+
+    if (!persisted) {
+      // They are gone from this screen but not from the server, so they will be
+      // back on the next reload. Saying "deleted" invites the admin to assume a
+      // customer enquiry has been dealt with.
+      toast.error("Deleted on this device only — the server rejected it", {
+        description: "Reload to see the server's version.",
+      });
+      return;
+    }
+
+    toast.success(`${count} inquiry${count === 1 ? "" : "ies"} deleted`);
   }
 
   const body = (

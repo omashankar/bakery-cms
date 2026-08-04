@@ -1,8 +1,6 @@
 /** Reports feature module — Phase 19 */
 export { ReportsPage } from "./components/reports-page";
-export {
-  loadReportOrders,
-  getReportsSummary,
+export {  getReportsSummary,
   getRevenueTrend,
   getTopProducts,
   getTopCustomers,

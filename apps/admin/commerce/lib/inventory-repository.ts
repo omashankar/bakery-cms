@@ -67,12 +67,14 @@ export function getInventorySettings(): InventorySettings {
   }
 }
 
-export function saveInventorySettings(settings: InventorySettings): InventorySettings {
-  if (typeof window === "undefined") return settings;
+export async function saveInventorySettings(
+  settings: InventorySettings
+): Promise<{ settings: InventorySettings; persisted: boolean }> {
+  if (typeof window === "undefined") return { settings, persisted: false };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  saveInventorySettingsRequest(settings);
+  const persisted = await saveInventorySettingsRequest(settings);
   emitInventoryUpdated();
-  return settings;
+  return { settings, persisted };
 }
 
 /**
@@ -179,15 +181,28 @@ export interface AdjustStockInput {
   note?: string;
 }
 
-export function adjustStock({
+/**
+ * An inventory write, plus whether the SERVER took it.
+ *
+ * Stock is the number the storefront sells against, and it lives in Mongo. A
+ * local-only adjustment means the admin sees the count they set while the shop
+ * keeps selling against the old one — it oversells, and the next hydration
+ * silently reverts their change. So callers must not report success on `item`.
+ */
+export interface InventoryWriteResult {
+  item: InventoryItem | null;
+  persisted: boolean;
+}
+
+export async function adjustStock({
   cakeId,
   type,
   quantity,
   reason = "manual_adjustment",
   note,
-}: AdjustStockInput): InventoryItem | null {
+}: AdjustStockInput): Promise<InventoryWriteResult> {
   const cake = getProductById(cakeId);
-  if (!cake) return null;
+  if (!cake) return { item: null, persisted: false };
 
   const quantityBefore = cake.stockQuantity;
   let quantityAfter = quantityBefore;
@@ -211,7 +226,7 @@ export function adjustStock({
     ...stockFields,
   });
 
-  if (!updated) return null;
+  if (!updated) return { item: null, persisted: false };
 
   appendStockHistory({
     id: `stock-${Date.now()}`,
@@ -227,15 +242,21 @@ export function adjustStock({
   });
 
   // Durable write to the server (updates the Mongo product stock + history).
-  adjustStockRequest({ cakeId, type, quantity, reason, note });
+  const persisted = await adjustStockRequest({ cakeId, type, quantity, reason, note });
 
   emitInventoryUpdated();
-  return getInventoryItems().find((item) => item.cakeId === cakeId) ?? null;
+  return {
+    item: getInventoryItems().find((item) => item.cakeId === cakeId) ?? null,
+    persisted,
+  };
 }
 
-export function setUnlimitedStock(cakeId: string, unlimited: boolean): InventoryItem | null {
+export async function setUnlimitedStock(
+  cakeId: string,
+  unlimited: boolean
+): Promise<InventoryWriteResult> {
   const cake = getProductById(cakeId);
-  if (!cake) return null;
+  if (!cake) return { item: null, persisted: false };
 
   const stockFields = resolveStockFields({
     ...cake,
@@ -247,10 +268,13 @@ export function setUnlimitedStock(cakeId: string, unlimited: boolean): Inventory
     ...stockFields,
   });
 
-  setUnlimitedRequest(cakeId, unlimited);
+  const persisted = await setUnlimitedRequest(cakeId, unlimited);
 
   emitInventoryUpdated();
-  return getInventoryItems().find((item) => item.cakeId === cakeId) ?? null;
+  return {
+    item: getInventoryItems().find((item) => item.cakeId === cakeId) ?? null,
+    persisted,
+  };
 }
 
 export type InventoryStockFilter = "all" | StockStatus | "unlimited";

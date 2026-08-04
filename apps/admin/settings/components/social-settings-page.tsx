@@ -1,8 +1,11 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  reportSettingsReset,
+  reportSettingsWrite,
+} from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,98 +13,147 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { SocialMark } from "@/components/shared/social-mark";
+import { cn } from "@/lib/utils";
 import type { SocialLinkSettings } from "@/types/settings";
-import { defaultSocialLinks, socialPlatformOptions } from "@/features/settings/lib/settings-utils";
+import {
+  createSocialLinkId,
+  defaultSocialLinks,
+  isSafeSocialUrl,
+  socialPlatformOptions,
+} from "@/features/settings/lib/settings-utils";
 import {
   getSocialLinks,
   resetSocialLinks,
   saveSocialLinks,
 } from "@/features/settings/lib/settings-repository";
+import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 
 function createSocialLink(): SocialLinkSettings {
   return {
-    id: `social-${Date.now()}`,
+    // Not `social-${Date.now()}`: two rows added in the same millisecond shared
+    // an id, and `updateLink` matches on it — so editing one edited both.
+    id: createSocialLinkId(),
     platform: "Instagram",
-    href: "https://",
+    href: "",
     label: "New link",
-    isActive: true,
+    // Starts hidden. A new row has no URL yet, and an active row without one is
+    // invalid — so seeding it active would block Save for the whole section the
+    // instant "Add link" is clicked.
+    isActive: false,
+  };
+}
+
+/**
+ * Per-row errors, so the admin is told WHICH row is wrong, not just that one is.
+ *
+ * Mirrors `socialSchema` exactly, including that the URL rule applies to ACTIVE
+ * rows only — a client rule that is merely close to the server's is worse than
+ * none, because the difference surfaces as "the server rejected it", which reads
+ * like an outage rather than a field to fix.
+ *
+ * Every field is read defensively: the Mongoose sub-schema declares these as
+ * bare `String` with no default, so a row at rest can genuinely be missing one,
+ * and this runs during render — an unguarded `.trim()` would crash the page
+ * rather than show a message.
+ */
+function validateLink(link: SocialLinkSettings) {
+  const href = link.href ?? "";
+  const label = link.label ?? "";
+  const platform = link.platform ?? "";
+
+  return {
+    href:
+      !link.isActive || isSafeSocialUrl(href)
+        ? ""
+        : "An active link needs the full profile URL, starting with https://",
+    label: label.trim() ? "" : "Label is required — it is the link's screen-reader name.",
+    platform: (socialPlatformOptions as readonly string[]).includes(platform)
+      ? ""
+      : `"${platform}" is not one of the supported platforms — pick one from the list.`,
   };
 }
 
 export function SocialSettingsPage() {
-  const [mounted, setMounted] = useState(false);
-  const [links, setLinks] = useState<SocialLinkSettings[]>(defaultSocialLinks);
-  const [savedLinks, setSavedLinks] = useState<SocialLinkSettings[]>(defaultSocialLinks);
+  const { settings: links, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+    useSettingsSection<SocialLinkSettings[]>(getSocialLinks, defaultSocialLinks);
 
-  useEffect(() => {
-    const loaded = getSocialLinks();
-    setLinks(loaded);
-    setSavedLinks(loaded);
-    setMounted(true);
-  }, []);
-
-  const isDirty = JSON.stringify(links) !== JSON.stringify(savedLinks);
+  const errors = links.map(validateLink);
+  const hasErrors = errors.some((error) => error.href || error.label || error.platform);
   const activeCount = links.filter((link) => link.isActive).length;
 
   function updateLink(id: string, patch: Partial<SocialLinkSettings>) {
-    setLinks((prev) => prev.map((link) => (link.id === id ? { ...link, ...patch } : link)));
+    edit((prev) => prev.map((link) => (link.id === id ? { ...link, ...patch } : link)));
   }
 
-  function handleSave() {
-    const saved = saveSocialLinks(links);
-    setSavedLinks(saved);
-    setLinks(saved);
-    toast.success("Social links saved");
+  async function handleSave() {
+    if (hasErrors || !canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await saveSocialLinks(links);
+      return { value, accepted: reportSettingsWrite(persisted, "Social links") };
+    });
   }
 
   function handleDiscard() {
-    setLinks(savedLinks);
+    discard();
     toast.message("Discarded unsaved changes");
   }
 
-  function handleReset() {
-    const loaded = resetSocialLinks();
-    setLinks(loaded);
-    setSavedLinks(loaded);
-    toast.success("Social links reset to defaults");
+  async function handleReset() {
+    if (!canSave) return;
+    await runWrite(async () => {
+      const { value, persisted } = await resetSocialLinks();
+      return { value, accepted: reportSettingsReset(persisted, "Social links") };
+    });
   }
 
   return (
     <SettingsSectionShell
       title="Social"
       description={
-        mounted
+        hydration === "ready"
           ? `${activeCount} active of ${links.length} link${links.length === 1 ? "" : "s"}`
           : "Manage social profile links displayed in the site footer."
       }
       isDirty={isDirty}
-      mounted={mounted}
+      // Behind the skeleton until the SERVER's copy has landed. Editing the seed
+      // makes the form dirty, the resync then skips it to protect that edit, and
+      // Save replaces the shop's real profile links with the demo ones.
+      mounted={hydration !== "pending"}
+      isSaving={isWriting}
+      saveDisabled={hasErrors || !canSave}
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
     >
+      <SettingsHydrationNotice hydration={hydration} />
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
             <CardTitle className="text-base">Social profiles</CardTitle>
-            <CardDescription>Inactive links are hidden from the public footer.</CardDescription>
+            <CardDescription>
+              Inactive links are hidden from the public footer. Turn them all off and the footer
+              shows no social row at all.
+            </CardDescription>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setLinks((prev) => [...prev, createSocialLink()])}
+            onClick={() => edit((prev) => [...prev, createSocialLink()])}
           >
             <Plus className="size-4" />
             Add link
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {links.map((link) => (
+          {links.map((link, index) => (
             <div key={link.id} className="space-y-3 rounded-xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant={link.isActive ? "default" : "secondary"}>
+                  <Badge variant={link.isActive ? "default" : "secondary"} className="gap-1.5">
+                    <SocialMark platform={link.platform ?? ""} className="size-3.5" />
                     {link.platform}
                   </Badge>
                   {!link.isActive ? (
@@ -122,9 +174,12 @@ export function SocialSettingsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setLinks((prev) => prev.filter((item) => item.id !== link.id))}
-                    disabled={links.length <= 1}
-                    aria-label="Remove social link"
+                    onClick={() => edit((prev) => prev.filter((item) => item.id !== link.id))}
+                    // Removable even when it is the last one. The schema accepts
+                    // an empty list and the footer handles it, so blocking here
+                    // trapped an admin whose ONLY row was one `migrate()` had
+                    // flagged: not deletable, not saveable, no way forward.
+                    aria-label={`Remove ${link.platform ?? "social"} link`}
                   >
                     <Trash2 className="size-4 text-destructive" />
                   </Button>
@@ -135,33 +190,53 @@ export function SocialSettingsPage() {
                   <Label htmlFor={`platform-${link.id}`}>Platform</Label>
                   <AdminSelect
                     id={`platform-${link.id}`}
-                    value={link.platform}
+                    value={link.platform ?? ""}
+                    aria-invalid={Boolean(errors[index].platform)}
+                    aria-describedby={
+                      errors[index].platform ? `platform-${link.id}-error` : undefined
+                    }
+                    className={cn(errors[index].platform && "border-destructive")}
                     onChange={(e) => updateLink(link.id, { platform: e.target.value })}
                   >
+                    {/* A stored platform outside the list still has to be
+                        selectable, or the picker silently shows "Instagram"
+                        while the row holds something else and the save 422s. */}
+                    {errors[index].platform ? (
+                      <option value={link.platform ?? ""}>{link.platform || "—"}</option>
+                    ) : null}
                     {socialPlatformOptions.map((platform) => (
                       <option key={platform} value={platform}>
                         {platform}
                       </option>
                     ))}
                   </AdminSelect>
+                  <FieldError id={`platform-${link.id}-error`} message={errors[index].platform} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`label-${link.id}`}>Label</Label>
                   <Input
                     id={`label-${link.id}`}
-                    value={link.label}
+                    value={link.label ?? ""}
+                    aria-invalid={Boolean(errors[index].label)}
+                    aria-describedby={errors[index].label ? `label-${link.id}-error` : undefined}
+                    className={cn(errors[index].label && "border-destructive")}
                     onChange={(e) => updateLink(link.id, { label: e.target.value })}
                   />
+                  <FieldError id={`label-${link.id}-error`} message={errors[index].label} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor={`url-${link.id}`}>URL</Label>
                 <Input
                   id={`url-${link.id}`}
-                  value={link.href}
+                  value={link.href ?? ""}
+                  aria-invalid={Boolean(errors[index].href)}
+                  aria-describedby={errors[index].href ? `url-${link.id}-error` : undefined}
+                  className={cn(errors[index].href && "border-destructive")}
                   onChange={(e) => updateLink(link.id, { href: e.target.value })}
-                  placeholder="https://"
+                  placeholder="https://instagram.com/yourshop"
                 />
+                <FieldError id={`url-${link.id}-error`} message={errors[index].href} />
               </div>
             </div>
           ))}

@@ -3,26 +3,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ExternalLink, Info } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowLeft, Info } from "lucide-react";
+import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
   getGatewayRuntime,
-  saveGatewayCredentials,
   setGatewayEnabled,
-  setGatewayMode,
-  type GatewayMode,
 } from "@/features/payments/lib/payment-gateway-settings";
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
+import {
+  RazorpayKeysForm,
+  type RazorpayStatus,
+} from "@/apps/admin/commerce/components/razorpay-keys-card";
+import { GatewayCredentialsForm } from "@/apps/admin/commerce/components/gateway-credentials-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
-import { cn } from "@/lib/utils";
 
 interface GatewayConfigPageProps {
   gatewayId: string;
@@ -31,37 +30,56 @@ interface GatewayConfigPageProps {
 export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   const config = getGatewayConfig(gatewayId);
   const [enabled, setEnabled] = useState(false);
-  const [mode, setMode] = useState<GatewayMode>("test");
-  const [creds, setCreds] = useState<Record<string, string>>({});
-  const [mounted, setMounted] = useState(false);
+  // Reported up by the Razorpay form so the card header can show one badge,
+  // instead of the form drawing a second one inside its own card.
+  const [razorpayStatus, setRazorpayStatus] = useState<RazorpayStatus | null>(null);
 
   useEffect(() => {
     if (!config) return;
     const runtime = getGatewayRuntime(config.id);
     setEnabled(runtime.enabled);
-    setMode(runtime.mode);
-    setCreds(runtime.credentials);
-    setMounted(true);
   }, [config]);
 
   if (!config) return notFound();
 
   const isRazorpay = config.id === "razorpay";
+  // Can this gateway actually charge anyone? Ten of twelve cannot.
+  const wired = config.isCore === true;
 
-  function handleToggle(next: boolean) {
+  // Which gateway is on — this decides how customers pay, and checkout reads the
+  // SERVER copy. A local-only change means the admin believes they switched
+  // gateways and nothing switched.
+  async function handleToggle(next: boolean) {
     setEnabled(next);
-    setGatewayEnabled(config!.id, next);
+    reportWrite(
+      await setGatewayEnabled(config!.id, next),
+      next ? "Gateway enabled" : "Gateway disabled"
+    );
   }
-  function handleMode(next: GatewayMode) {
-    setMode(next);
-    setGatewayMode(config!.id, next);
-  }
-  function handleSave() {
-    saveGatewayCredentials(config!.id, creds);
-    toast.success("Gateway settings saved", {
-      description: "Placeholder config — backend integration wires this later.",
-    });
-  }
+
+  const statusBadge = !wired ? (
+    <Badge variant="outline" className="shrink-0">
+      Not available yet
+    </Badge>
+  ) : isRazorpay && razorpayStatus ? (
+    !razorpayStatus.configured ? (
+      <Badge className="shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+        No keys
+      </Badge>
+    ) : razorpayStatus.verified === true ? (
+      <Badge variant="accent" className="shrink-0">
+        Connected{razorpayStatus.testMode === true ? " · Test" : razorpayStatus.testMode === false ? " · Live" : ""}
+      </Badge>
+    ) : razorpayStatus.verified === false ? (
+      <Badge variant="destructive" className="shrink-0">
+        Keys rejected
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="shrink-0">
+        Unverified
+      </Badge>
+    )
+  ) : null;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
@@ -79,6 +97,12 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         {/* Config */}
         <div className="space-y-4">
+          {/*
+            ONE card for the whole connection: name, status, switch and the
+            credential fields. The keys form used to render its own Card in here,
+            so this page showed a card inside a card — two borders, two headings,
+            and the connection state said twice in two different vocabularies.
+          */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -86,89 +110,72 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
                 <div>
                   <CardTitle className="text-base">Connection</CardTitle>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {enabled ? "Enabled at checkout" : "Disabled"}
+                    {!wired
+                      ? "Not available yet"
+                      : enabled
+                        ? "Enabled at checkout"
+                        : "Disabled — customers will not see it"}
                   </p>
                 </div>
               </div>
-              <Switch checked={enabled} onCheckedChange={handleToggle} aria-label="Enable gateway" />
+              <div className="flex items-center gap-3">
+                {statusBadge}
+                <Switch
+                  checked={wired && enabled}
+                  onCheckedChange={handleToggle}
+                  disabled={!wired}
+                  aria-label="Enable gateway"
+                />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {config.category === "online" ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">Environment</span>
-                  <div className="inline-flex overflow-hidden rounded-lg border border-border text-xs">
-                    {(["test", "live"] as GatewayMode[]).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => handleMode(m)}
-                        className={cn(
-                          "px-3 py-1.5 font-medium capitalize transition-colors",
-                          mode === m
-                            ? "bg-bakery-700 text-white"
-                            : "bg-card text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {m} mode
-                      </button>
-                    ))}
+              {!wired ? (
+                // The honest state for ten of the twelve entries in this
+                // catalogue. Only Razorpay and COD reach a customer: the
+                // checkout renders exactly two methods. Every other card used to
+                // offer a working-looking switch and a credentials form, so
+                // pasting a live Stripe secret here looked identical to
+                // connecting a payment method — and changed nothing.
+                <div className="flex items-start gap-3 rounded-xl border border-border bg-muted p-4 text-sm">
+                  <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="text-muted-foreground">
+                    <p className="font-medium text-foreground">Not available yet</p>
+                    <p className="mt-1">
+                      {config.name} is not connected to a payment path, so it cannot take money
+                      and does not appear at checkout. There is nothing to configure here yet —
+                      entering keys would not make it work.
+                    </p>
+                    <p className="mt-2">
+                      Today this shop can charge through{" "}
+                      <Link href={routes.admin.commerce.gateway("razorpay")} className="font-medium text-bakery-700 hover:underline">
+                        Razorpay
+                      </Link>{" "}
+                      and take Cash on Delivery.
+                    </p>
                   </div>
                 </div>
-              ) : null}
-
-              {isRazorpay ? (
-                <div className="flex items-start gap-2 rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
-                  <Info className="mt-0.5 size-4 shrink-0 text-bakery-700" />
-                  <p>
-                    Razorpay keys are managed securely on the server. Add or update them from{" "}
-                    <Link href={routes.admin.commerce.payments} className="font-medium text-bakery-700 hover:underline">
-                      Payments → Payment Gateway
-                    </Link>{" "}
-                    (keys never touch the browser).
-                  </p>
-                </div>
+              ) : isRazorpay ? (
+                // Razorpay keys, on the Razorpay page — their only home. This was
+                // a notice saying "manage them from Payments → Payment Gateway",
+                // a redirect served to someone already standing in the right
+                // place; the Payments screen links HERE now.
+                //
+                // Its own form rather than the shared one below, because it has
+                // three things nothing else does: environment-variable override,
+                // a webhook secret, and a live connection check.
+                <RazorpayKeysForm onStatusChange={setRazorpayStatus} />
+              ) : config.configFields.length > 0 ? (
+                // Every future gateway lands here. Registry-driven, so switching
+                // one on needs no new screen — see GatewayCredentialsForm.
+                <GatewayCredentialsForm config={config} />
               ) : (
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {config.configFields.map((field) => (
-                      <div key={field.key} className="space-y-2">
-                        <Label htmlFor={field.key}>
-                          {field.label}
-                          {field.required ? <span className="text-destructive"> *</span> : null}
-                        </Label>
-                        <Input
-                          id={field.key}
-                          type={field.type}
-                          placeholder={field.placeholder}
-                          value={creds[field.key] ?? ""}
-                          onChange={(e) =>
-                            setCreds((c) => ({ ...c, [field.key]: e.target.value }))
-                          }
-                          autoComplete="off"
-                          disabled={!mounted}
-                        />
-                        {field.helper ? (
-                          <p className="text-xs text-muted-foreground">{field.helper}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="bakery" onClick={handleSave}>
-                      Save settings
-                    </Button>
-                    {config.docsUrl ? (
-                      <Button variant="ghost" render={<a href={config.docsUrl} target="_blank" rel="noopener noreferrer" />}>
-                        <ExternalLink className="size-4" />
-                        Get keys
-                      </Button>
-                    ) : null}
-                  </div>
-                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                    <Info className="mt-0.5 size-3.5 shrink-0" />
-                    Configuration is a frontend placeholder. Real processing is wired when the
-                    backend is added.
-                  </p>
+                // COD: real, and nothing to configure. No keys, no gateway.
+                <div className="flex items-start gap-3 rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    Nothing to configure — the customer pays the delivery rider in cash. Use the
+                    switch above to offer it at checkout.
+                  </span>
                 </div>
               )}
             </CardContent>

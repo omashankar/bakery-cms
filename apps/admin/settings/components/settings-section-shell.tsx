@@ -30,6 +30,12 @@ interface SettingsSectionShellProps {
   saveDisabled?: boolean;
   /** Override the desktop save label when "Save changes" is ambiguous. */
   saveLabel?: string;
+  /**
+   * A save is in flight. The round-trip can take seconds on a cold serverless
+   * read, and an enabled, unlabelled button through all of it reads as "nothing
+   * happened" and invites a second click that races the first.
+   */
+  isSaving?: boolean;
 }
 
 /** Calm settings chrome: title, status line, Reset / Discard / Save — no KPI farm. */
@@ -47,6 +53,7 @@ export function SettingsSectionShell({
   resetDescription = "Replace this section with the demo defaults. Other settings sections are not changed.",
   saveDisabled = false,
   saveLabel = "Save changes",
+  isSaving = false,
 }: SettingsSectionShellProps) {
   const [resetOpen, setResetOpen] = useState(false);
 
@@ -91,10 +98,11 @@ export function SettingsSectionShell({
               variant="bakery"
               className="hidden md:inline-flex"
               onClick={onSave}
-              disabled={!isDirty || saveDisabled}
+              disabled={!isDirty || saveDisabled || isSaving}
+              aria-busy={isSaving}
             >
               <Save className="size-4" />
-              {saveLabel}
+              {isSaving ? "Saving…" : saveLabel}
             </Button>
           </div>
         }
@@ -111,9 +119,15 @@ export function SettingsSectionShell({
           <Button variant="outline" className="flex-1" onClick={onDiscard}>
             Discard
           </Button>
-          <Button variant="bakery" className="flex-1" onClick={onSave} disabled={saveDisabled}>
+          <Button
+            variant="bakery"
+            className="flex-1"
+            onClick={onSave}
+            disabled={saveDisabled || isSaving}
+            aria-busy={isSaving}
+          >
             <Save className="size-4" />
-            Save
+            {isSaving ? "Saving…" : "Save"}
           </Button>
         </AdminMobileActionBar>
       ) : null}

@@ -1,9 +1,17 @@
 /**
  * Client-side admin-config API (admin profile, payment gateways, payment
  * notification prefs, custom code). Whole-blob replace-all dual-write + hydrate.
- * Best-effort — never throws. Admin-guarded endpoints, so reads return null for
+ * Never throws; every write reports whether the server took it. Admin-guarded endpoints, so reads return null for
  * non-admins. The SEED/first-load is never pushed; only genuine saves are.
  */
+import { createHydrationGate } from "@/lib/hydration-gate";
+
+/**
+ * Opened by `useAdminConfigServerSync` once the server's blobs have been read
+ * into the local caches. Until then no replace-all write may go out.
+ */
+export const adminConfigHydration = createHydrationGate();
+
 interface Envelope<T> {
   success: boolean;
   data: T | null;
@@ -20,18 +28,38 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
-function putJson(path: string, body: unknown): void {
-  void (async () => {
-    try {
-      await fetch(path, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      // best-effort
-    }
-  })();
+/**
+ * Whether the SERVER accepted the write. Resolves false on a network failure OR
+ * a non-2xx response; never throws.
+ *
+ * This used to be fire-and-forget — it launched the request into a floating
+ * async IIFE and returned void, so a 401 from an expired admin token and a 500
+ * were both indistinguishable from success. Every caller then reported "saved"
+ * for a change that lives only in this browser and that the next hydration
+ * silently reverts.
+ */
+async function putJson(path: string, body: unknown): Promise<boolean> {
+  // Every write here is a whole-blob REPLACE, sent from a local copy. Until that
+  // local copy has been filled from the server, sending it overwrites the
+  // server's real config with whatever this device happens to hold — and
+  // hydration is async, fired once on entering the admin, so an admin who
+  // toggles a gateway in the first second sends an empty or partial blob and
+  // wipes every other gateway's saved settings.
+  //
+  // The settings API already learned this (`pushSection` waits on
+  // `settingsHydration`); this path never did.
+  if (!(await adminConfigHydration.waitForSettled())) return false;
+
+  try {
+    const res = await fetch(path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 const url = (key: string) => `/api/admin-config/${key}`;

@@ -16,6 +16,7 @@ import {
 import { countMediaUsage } from "./media-usage";
 import { fileNameFromUrl, isPersistableMediaUrl } from "./media-utils";
 import { replaceMediaFilesRequest } from "./media-api";
+import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-media-library";
 const STORAGE_VERSION_KEY = "bakery-cms-media-library-version";
@@ -190,14 +191,15 @@ function lowPersistMedia(files: MediaFile[]): void {
  * small URLs; the graceful-degrade path stores data URIs, so avoid a very large
  * library of un-uploaded images (a Mongo document is capped at 16MB).
  */
-function persistMedia(files: MediaFile[]): void {
+async function persistMedia(files: MediaFile[]): Promise<boolean> {
   lowPersistMedia(files);
-  replaceMediaFilesRequest(files);
+  return replaceMediaFilesRequest(files);
 }
 
-export function saveMediaFiles(files: MediaFile[]): void {
-  persistMedia(files);
+export async function saveMediaFiles(files: MediaFile[]): Promise<boolean> {
+  const persisted = await persistMedia(files);
   notifyMediaUpdated();
+  return persisted;
 }
 
 /** Hydration: write the server's media files into the local cache (no re-push).
@@ -221,10 +223,10 @@ export function getMediaStats(files: MediaFile[] = loadMediaFiles()) {
   };
 }
 
-export function addMediaFile(
+export async function addMediaFile(
   file: Omit<MediaFile, "id" | "createdAt" | "updatedAt">,
   folderId = UPLOADS_FOLDER_ID
-): MediaFile {
+): Promise<WriteResult<MediaFile>> {
   const files = loadMediaFiles();
   const timestamp = nowIso();
   const created: MediaFile = {
@@ -234,15 +236,18 @@ export function addMediaFile(
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  persistMedia([created, ...files]);
+  const persisted = await persistMedia([created, ...files]);
   notifyMediaUpdated();
-  return created;
+  return { value: created, persisted };
 }
 
-export function updateMediaFile(id: string, patch: Partial<MediaFile>): MediaFile | null {
+export async function updateMediaFile(
+  id: string,
+  patch: Partial<MediaFile>
+): Promise<WriteResult<MediaFile | null>> {
   const files = loadMediaFiles();
   const index = files.findIndex((file) => file.id === id);
-  if (index === -1) return null;
+  if (index === -1) return { value: null, persisted: false };
 
   const updated: MediaFile = {
     ...files[index],
@@ -251,12 +256,15 @@ export function updateMediaFile(id: string, patch: Partial<MediaFile>): MediaFil
     updatedAt: nowIso(),
   };
   files[index] = updated;
-  persistMedia(files);
+  const persisted = await persistMedia(files);
   notifyMediaUpdated();
-  return updated;
+  return { value: updated, persisted };
 }
 
-export function bulkMoveMediaToFolder(ids: string[], folderId: string): number {
+export async function bulkMoveMediaToFolder(
+  ids: string[],
+  folderId: string
+): Promise<WriteResult<number>> {
   const files = loadMediaFiles();
   let count = 0;
   const next = files.map((file) => {
@@ -264,20 +272,21 @@ export function bulkMoveMediaToFolder(ids: string[], folderId: string): number {
     count += 1;
     return { ...file, folderId, updatedAt: nowIso() };
   });
-  if (count > 0) {
-    persistMedia(next);
-    notifyMediaUpdated();
-  }
-  return count;
+  // Nothing moved means nothing was sent, so nothing could fail to persist.
+  if (count === 0) return { value: 0, persisted: true };
+
+  const persisted = await persistMedia(next);
+  notifyMediaUpdated();
+  return { value: count, persisted };
 }
 
-export function deleteMediaFiles(ids: string[]): number {
+export async function deleteMediaFiles(ids: string[]): Promise<WriteResult<number>> {
   const files = loadMediaFiles();
   const next = files.filter((file) => !ids.includes(file.id));
   const count = files.length - next.length;
-  persistMedia(next);
+  const persisted = await persistMedia(next);
   if (count > 0) notifyMediaUpdated();
-  return count;
+  return { value: count, persisted };
 }
 
 export { countMediaUsage, getMediaUsageDetails } from "./media-usage";

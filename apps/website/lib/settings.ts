@@ -1,15 +1,11 @@
-import {
-  brandInfo,
-  businessHours,
-  contactInfo,
-  socialLinks,
-} from "@/constants/landing-data";
+import { brandInfo, businessHours, contactInfo } from "@/constants/landing-data";
 import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
   isWeddingEnabled,
 } from "@/features/settings/lib/settings-repository";
+import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
 import type { BusinessType } from "@/types/settings";
 
@@ -50,18 +46,19 @@ export function isStorefrontWeddingEnabled(): boolean {
   return isWeddingEnabled();
 }
 
+/**
+ * The client twin of `getStorefrontChrome`'s social read. Kept in step with it
+ * deliberately: no demo fallback when the shop has turned every profile off
+ * (that pointed visitors at accounts the shop does not own), and every href
+ * re-checked, because the schema only constrains future writes and this renders
+ * into an `<a href>`.
+ */
 export function getStorefrontSocialLinks() {
-  const active = getActiveSocialLinks();
-  if (active.length === 0) {
-    return socialLinks.map((link) => ({
+  return getActiveSocialLinks()
+    .filter((link) => isSafeSocialUrl(link.href ?? ""))
+    .map((link) => ({
       platform: link.platform,
       href: link.href,
-      label: link.label,
+      label: link.label?.trim() || link.platform,
     }));
-  }
-  return active.map((link) => ({
-    platform: link.platform,
-    href: link.href,
-    label: link.label,
-  }));
 }
