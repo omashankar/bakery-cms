@@ -220,7 +220,13 @@ describe("admin forms that replace a whole document in their own store", () => {
   });
 
   it.each(REPLACE_ALL_FORMS)("$name blocks saving until hydration too", ({ file }) => {
-    expect(source(file)).toMatch(/(saveDisabled=\{[^}]*|disabled=\{[^}]*|if \(!)canSave|hydration !== "ready"/);
+    // The alternation used to split at the TOP level, so the final branch —
+    // the bare literal `hydration !== "ready"` — matched anywhere in the
+    // file, including a comment. The test passed for a form with no gate at
+    // all. Both names now have to appear in one of the three guard shapes.
+    expect(source(file)).toMatch(
+      /(saveDisabled=\{[^}]*|disabled=\{[^}]*|if \(!)(canSave|hydration !== "ready")/,
+    );
   });
 });
 

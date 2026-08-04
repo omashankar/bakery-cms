@@ -20,6 +20,7 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import {
   BACKUP_UPDATED_EVENT,
   BROWSER_ONLY_NOTE,
@@ -145,6 +146,11 @@ export function BackupSettingsPage() {
       // Snapshot the current DURABLE state (server + local) BEFORE the write, so
       // rolling back from history actually restores the server too.
       await exportAndArchiveServerBackup(`Before import — ${new Date().toLocaleString()}`);
+      // Open the gates FIRST. A restore writes every server-backed section,
+      // and each guarded PUT waits out the full hydration deadline when its
+      // gate is shut — sequentially. So a restore from a tab that never
+      // hydrated took minutes and then blamed the server for refusing.
+      await ensureSiteLayoutHydrated();
       const result = await restoreBackupToServer(target.data);
       refresh();
       reportRestore(result);

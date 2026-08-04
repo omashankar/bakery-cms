@@ -62,6 +62,9 @@ export function AppearancePage() {
   // storefront theme.
   const {
     value: settings,
+    // The last palette the SERVER confirmed. The preview falls back to it while
+    // a colour field is mid-typing, instead of to the demo defaults.
+    saved,
     isDirty,
     hydration,
     isWriting,
@@ -151,6 +154,11 @@ export function AppearancePage() {
         accepted: reportWrite(
           persisted,
           "Appearance saved — storefront uses these colors (light only)",
+          {
+            // The store rolls the local change back, so "saved on this
+            // device only" would be wrong: the change is nowhere.
+            failure: "Appearance was not saved — the server rejected it",
+          },
         ),
       };
     });
@@ -162,10 +170,24 @@ export function AppearancePage() {
   }
 
   async function handleReset() {
-    if (!canSave) return;
+    // The Reset button lives in the page header, outside the gated form, so
+    // it is reachable before hydration. It used to return here in silence:
+    // the admin confirmed a destructive dialog, the dialog closed, and
+    // nothing happened or was said.
+    if (!canSave) {
+      toast.error("Saved appearance hasn't loaded yet", {
+        description: "Reset is unavailable until this page can reach the server.",
+      });
+      return;
+    }
     await runWrite(async () => {
       const { value, persisted } = await resetAppearanceSettings();
-      return { value, accepted: reportWrite(persisted, "Appearance reset to defaults") };
+      return {
+        value,
+        accepted: reportWrite(persisted, "Appearance reset to defaults", {
+          failure: "Appearance was not reset — the server rejected it",
+        }),
+      };
     });
   }
 
@@ -344,7 +366,12 @@ export function AppearancePage() {
         </div>
 
         <div className="xl:sticky xl:top-20 xl:self-start">
-          <AppearancePreview settings={settings} isDirty={isDirty} />
+          <AppearancePreview
+            settings={settings}
+            isDirty={isDirty}
+            hydration={hydration}
+            saved={saved}
+          />
         </div>
       </div>
     </SettingsSectionShell>

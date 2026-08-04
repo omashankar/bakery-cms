@@ -29,7 +29,16 @@ export function StorefrontLayoutShell({
     <div
       className={cn("flex min-h-screen flex-col bg-white text-foreground", className)}
       data-storefront-theme="light"
-      style={{ colorScheme: "light" }}
+      /*
+        The shop's palette in the FIRST paint.
+        Nothing server-rendered it, so every visitor got the hardcoded defaults
+        from globals.css until a client fetch resolved and repainted — invisible
+        to a shop on the default palette, and a flash of demo brown on every
+        cold load for any shop that had picked its own colours. Spread AFTER
+        colorScheme so an empty map (unreadable stored palette, or a database
+        outage) simply leaves the stylesheet defaults standing.
+      */
+      style={{ colorScheme: "light", ...chrome.appearance } as React.CSSProperties}
     >
       <div className="contents print:hidden">
         <MaintenanceBanner maintenance={maintenance} />

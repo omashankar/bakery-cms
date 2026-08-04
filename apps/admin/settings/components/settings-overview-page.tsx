@@ -185,7 +185,11 @@ const groups: SettingsGroup[] = [
     items: [
       {
         title: "Appearance",
-        description: "Theme colours, fonts, and storefront styling.",
+        // Not "fonts" — there is no font control. The Appearance screen has
+        // a preset, three colours and a corner radius; the typography card on
+        // it is a read-only specimen of the fonts already in the design
+        // system, not a chooser.
+        description: "Theme colours, corner style, and the storefront palette.",
         href: routes.admin.appearance,
         icon: Palette,
       },

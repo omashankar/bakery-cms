@@ -9,6 +9,11 @@ import {
 } from "@/constants/landing-data";
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import type { HeaderNavItem, HeaderSettings, FooterSettings } from "@/types/site-layout";
+import {
+  appearanceCssVariables,
+  defaultAppearanceSettings,
+} from "@/features/site-layout/lib/appearance-tokens";
+import type { AppearanceSettings } from "@/types/appearance";
 
 /**
  * The "chrome" (navbar + footer) data for the storefront, read on the SERVER
@@ -28,6 +33,20 @@ export interface StorefrontChrome {
   businessHours: { day: string; hours: string }[];
   socialLinks: { platform: string; href: string; label: string }[];
   footer: FooterSettings;
+  /**
+   * The shop palette as CSS custom properties, for the FIRST paint.
+   *
+   * Nothing server-rendered these, so every visitor was painted the hardcoded
+   * defaults in globals.css until a client fetch resolved and repainted. Those
+   * defaults are byte-identical to the demo preset, so a shop on defaults saw
+   * nothing wrong — and a shop with its own colours showed every visitor the
+   * demo brown first, on every cold load. The comment at the top of this file
+   * already claimed this problem was solved for the header and footer.
+   *
+   * Empty when the stored palette is unusable, which leaves the CSS defaults
+   * standing rather than writing half a theme.
+   */
+  appearance: Record<string, string>;
 }
 
 function fallbackChrome(): StorefrontChrome {
@@ -50,15 +69,19 @@ function fallbackChrome(): StorefrontChrome {
     // but these would be live links to somebody else's profiles.
     socialLinks: [],
     footer: defaultFooterSettings,
+    // Nothing, so the stylesheet defaults stand. Writing the demo palette
+    // here would paint a database outage as a deliberate rebrand.
+    appearance: {},
   };
 }
 
 export async function getStorefrontChrome(): Promise<StorefrontChrome> {
   try {
-    const [settingsRaw, headerRaw, footerRaw] = await Promise.all([
+    const [settingsRaw, headerRaw, footerRaw, appearanceRaw] = await Promise.all([
       getSettings(),
       getSiteLayout("header"),
       getSiteLayout("footer"),
+      getSiteLayout("appearance"),
     ]);
 
     const settings = settingsRaw as unknown as Record<string, unknown>;
@@ -118,6 +141,14 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
           label: s.label?.trim() || s.platform,
         })),
       footer,
+      // Re-derived from the stored value rather than trusted: the schema
+      // only constrains future writes, so a row at rest can hold a colour
+      // that was allowed in years earlier. `appearanceCssVariables` returns
+      // nothing for a palette it cannot use.
+      appearance: appearanceCssVariables(
+        { ...defaultAppearanceSettings, ...((appearanceRaw ?? {}) as Partial<AppearanceSettings>) },
+        { forceSemantics: true },
+      ),
     };
   } catch {
     return fallbackChrome();
