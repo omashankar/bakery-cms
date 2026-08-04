@@ -5,6 +5,8 @@ import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
+import { StorefrontScriptTags } from "@/components/shared/storefront-scripts";
+import type { StorefrontScripts } from "@/features/settings/server/storefront-scripts.server";
 import { cn } from "@/lib/utils";
 
 interface StorefrontLayoutShellProps {
@@ -12,6 +14,22 @@ interface StorefrontLayoutShellProps {
   className?: string;
   /** Navbar + footer data read from MongoDB on the server. */
   chrome: StorefrontChrome;
+  /**
+   * Analytics tags and custom code, read on the server.
+   *
+   * Both screens stored these, validated them and summarised them, and
+   * nothing emitted them — there was no next/script import in the repo.
+   */
+  scripts: StorefrontScripts;
+  /**
+   * The organisation JSON-LD from the SEO screen.
+   *
+   * That field is validated on the admin side and BLOCKS the whole section's
+   * Save when the JSON is malformed — a gate on a value nothing emitted. A
+   * shop could not save its SEO settings because of a stray comma in a script
+   * no search engine was ever shown.
+   */
+  organizationSchema?: string;
   /**
    * Read on the server. Only reaches here when the viewer is EXEMPT — a closed
    * shop is replaced by the maintenance screen before this renders.
@@ -24,6 +42,8 @@ export function StorefrontLayoutShell({
   children,
   className,
   chrome,
+  scripts,
+  organizationSchema,
   maintenance,
 }: StorefrontLayoutShellProps) {
   return (
@@ -49,6 +69,13 @@ export function StorefrontLayoutShell({
         fetch landed, and stayed that way for the session if it failed.
       */}
       <AppearanceStyleTag tokens={chrome.appearance} />
+      <StorefrontScriptTags scripts={scripts} />
+      {organizationSchema?.trim() ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: organizationSchema }}
+        />
+      ) : null}
       <div className="contents print:hidden">
         <MaintenanceBanner maintenance={maintenance} />
         <StorefrontBannerStrip />

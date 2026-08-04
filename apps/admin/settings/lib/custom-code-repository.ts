@@ -31,13 +31,31 @@ export function loadCustomCode(): CustomCode {
  */
 export async function saveCustomCode(code: CustomCode): Promise<boolean> {
   if (typeof window === "undefined") return false;
+
+  const previous = localStorage.getItem(STORAGE_KEY);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(code));
   } catch {
     return false;
   }
-  const persisted = await replaceCustomCodeRequest(code);
   window.dispatchEvent(new Event(CUSTOM_CODE_UPDATED_EVENT));
+
+  const persisted = await replaceCustomCodeRequest(code);
+
+  // Undo the local write when the server refuses. `ensureAdminConfigHydrated`
+  // returns early once it has settled, so nothing re-read the server for the
+  // rest of the session — a refused CLEAR left the browser believing the
+  // shop had no custom code at all. Restored only if this write is still the
+  // one in the cache, so a concurrent accepted save is not destroyed.
+  if (!persisted) {
+    const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(code);
+    if (stillOurs) {
+      if (previous === null) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, previous);
+      window.dispatchEvent(new Event(CUSTOM_CODE_UPDATED_EVENT));
+    }
+  }
+
   return persisted;
 }
 

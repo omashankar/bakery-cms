@@ -2,13 +2,27 @@ import { z } from "zod";
 
 /** Lenient site-layout schemas — validate the shape, pass the rest through. */
 
+/**
+ * The fields the admin screen and the metadata builder actually read.
+ *
+ * `label`, `updatedAt`, `noIndex` and `noFollow` were unconstrained. The SEO
+ * table sorts on `label.localeCompare(...)`, so a restored backup missing it
+ * threw on every load of that screen; the sitemap stamps `lastModified` from
+ * `updatedAt`, and `new Date(undefined)` is an Invalid Date; and a missing
+ * `noIndex` silently changes whether a page is offered to crawlers. Reachable
+ * through backup restore, which posts a hand-editable file to this endpoint.
+ */
 const seoRouteSchema = z
   .object({
     id: z.string().min(1),
     routeKey: z.string().min(1),
     path: z.string().min(1),
+    label: z.string().default(""),
     metaTitle: z.string().default(""),
     metaDescription: z.string().default(""),
+    noIndex: z.boolean().default(false),
+    noFollow: z.boolean().default(false),
+    updatedAt: z.string().default(() => new Date().toISOString()),
   })
   .passthrough();
 

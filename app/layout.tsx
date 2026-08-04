@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 import { Inter, Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import { ThemeBlockingScript } from "@/components/theme-blocking-script";
@@ -37,12 +38,21 @@ const geistMono = Geist_Mono({
  * the configured favicon could never win.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const { siteName, siteDescription, favicon } = await getSiteIdentity();
+  const [{ siteName, siteDescription, favicon }, seo] = await Promise.all([
+    getSiteIdentity(),
+    getSeoStoreServer(),
+  ]);
+
+  const googleSiteVerification = seo.global.googleSiteVerification?.trim();
 
   return {
     title: { default: siteName, template: `%s | ${siteName}` },
     description: siteDescription,
     icons: { icon: favicon },
+    // The SEO screen has a plainly labelled "Google site verification" field,
+    // saved with "Global SEO settings saved" and read by nothing — so a shop
+    // pasting the token Search Console gave them stayed unverified.
+    verification: googleSiteVerification ? { google: googleSiteVerification } : undefined,
   };
 }
 

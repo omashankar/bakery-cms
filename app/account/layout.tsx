@@ -1,5 +1,7 @@
 import { StorefrontLayoutShell } from "@/layouts/storefront-layout";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
+import { getStorefrontScripts } from "@/features/settings/server/storefront-scripts.server";
+import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 import { MaintenanceScreen } from "@/apps/website/components/maintenance-screen";
 import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
@@ -13,7 +15,11 @@ export default async function AccountLayout({
   // otherwise "the store is closed" still left order history, saved addresses
   // and the wishlist reachable at a different URL.
   const maintenance = await getMaintenanceState();
-  const chrome = await getStorefrontChrome();
+  const [chrome, scripts, seo] = await Promise.all([
+    getStorefrontChrome(),
+    getStorefrontScripts(),
+    getSeoStoreServer(),
+  ]);
 
   if (maintenance.isClosed) {
     // The maintenance screen IS the storefront while the shop is closed, and
@@ -28,7 +34,12 @@ export default async function AccountLayout({
   }
 
   return (
-    <StorefrontLayoutShell chrome={chrome} maintenance={maintenance}>
+    <StorefrontLayoutShell
+      chrome={chrome}
+      scripts={scripts}
+      organizationSchema={seo.global.organizationSchemaJson}
+      maintenance={maintenance}
+    >
       {children}
     </StorefrontLayoutShell>
   );

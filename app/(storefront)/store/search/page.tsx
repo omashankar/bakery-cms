@@ -2,10 +2,19 @@ import type { Metadata } from "next";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { Suspense } from "react";
 import { SearchPage } from "@/apps/website";
-import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
+import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata: Metadata = buildRouteMetadata("store-search");
+/**
+ * Per request, not at module load.
+ *
+ * `export const metadata = ...` is evaluated once when this module loads, so
+ * it could never reflect what the admin saved — and the builder it called
+ * read a module variable that only client code writes, i.e. the demo seed.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  return buildRouteMetadataServer("store-search");
+}
 
 export default async function Page() {
   const catalog = await getStorefrontProductCards();

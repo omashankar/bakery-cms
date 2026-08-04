@@ -1,5 +1,7 @@
 import { StorefrontLayoutShell } from "@/layouts/storefront-layout";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
+import { getStorefrontScripts } from "@/features/settings/server/storefront-scripts.server";
+import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 import { MaintenanceScreen } from "@/apps/website/components/maintenance-screen";
 import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
@@ -44,9 +46,18 @@ export default async function StorefrontLayout({
 
   // Read navbar + footer data from MongoDB on the server so the store name, nav,
   // contact and footer render real in the HTML (no defaults-then-hydrate flash).
-  const chrome = await getStorefrontChrome();
+  const [chrome, scripts, seo] = await Promise.all([
+    getStorefrontChrome(),
+    getStorefrontScripts(),
+    getSeoStoreServer(),
+  ]);
   return (
-    <StorefrontLayoutShell chrome={chrome} maintenance={maintenance}>
+    <StorefrontLayoutShell
+      chrome={chrome}
+      scripts={scripts}
+      organizationSchema={seo.global.organizationSchemaJson}
+      maintenance={maintenance}
+    >
       {children}
     </StorefrontLayoutShell>
   );

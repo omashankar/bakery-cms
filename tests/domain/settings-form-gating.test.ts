@@ -220,12 +220,15 @@ describe("admin forms that replace a whole document in their own store", () => {
   });
 
   it.each(REPLACE_ALL_FORMS)("$name blocks saving until hydration too", ({ file }) => {
-    // The alternation used to split at the TOP level, so the final branch —
-    // the bare literal `hydration !== "ready"` — matched anywhere in the
-    // file, including a comment. The test passed for a form with no gate at
-    // all. Both names now have to appear in one of the three guard shapes.
+    // Two rounds of narrowing. The alternation first split at the TOP level, so
+    // the bare literal `hydration !== "ready"` matched anywhere in the file,
+    // including a comment — the test passed for a form with no gate at all.
+    // Then `if \(!` remained, which a click-handler early return satisfies:
+    // `saveDisabled={!canSave}` could be deleted from the JSX and this still
+    // passed, leaving a button that looks available and refuses after the click.
+    // Only the BUTTON guards count now.
     expect(source(file)).toMatch(
-      /(saveDisabled=\{[^}]*|disabled=\{[^}]*|if \(!)(canSave|hydration !== "ready")/,
+      /(saveDisabled=\{[^}]*|disabled=\{[^}]*)(canSave|hydration !== "ready")/,
     );
   });
 });

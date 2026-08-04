@@ -272,7 +272,14 @@ export function AdminProfilePage() {
                 <Button variant="outline" onClick={resetForm} disabled={saving || !isDirty}>
                   Cancel
                 </Button>
-                <Button variant="bakery" onClick={handleSave} disabled={saving || !isDirty}>
+                {/* Gated on hydration, not only inside the handler: a button
+                    that looks available and refuses after the click tells the
+                    admin nothing about why. */}
+                <Button
+                  variant="bakery"
+                  onClick={handleSave}
+                  disabled={saving || !isDirty || !canSave}
+                >
                   {saving ? <Loader2 className="size-4 animate-spin" /> : null}
                   {saving ? "Saving…" : "Save changes"}
                 </Button>

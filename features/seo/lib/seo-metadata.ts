@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
-import { getGlobalSeo, getRouteSeo } from "./seo-repository";
+import type { GlobalSeoSettings, SeoRouteEntry, SeoStore } from "@/types/seo";
+import { getGlobalSeo, loadSeoStore } from "./seo-repository";
 
 export const TITLE_IDEAL_MAX = 60;
 export const DESCRIPTION_IDEAL_MAX = 160;
@@ -45,9 +45,18 @@ export function resolveRouteTitle(entry: SeoRouteEntry, global?: GlobalSeoSettin
   return `${entry.metaTitle} ${suffix}`.trim();
 }
 
-export function buildRouteMetadata(routeKey: string): Metadata {
-  const global = getGlobalSeo();
-  const entry = getRouteSeo(routeKey);
+/**
+ * The metadata for one route, from a store handed in.
+ *
+ * Split out because the client and the SERVER get the store from different
+ * places and must produce identical metadata from it. `buildRouteMetadata`
+ * below reads the client cache; `buildRouteMetadataServer` reads MongoDB. Two
+ * implementations of this arithmetic is how a page title and its canonical URL
+ * end up disagreeing about the same route.
+ */
+export function buildRouteMetadataFrom(store: SeoStore, routeKey: string): Metadata {
+  const global = store.global;
+  const entry = store.routes.find((route) => route.routeKey === routeKey) ?? null;
   if (!entry) {
     return {
       title: { absolute: global.siteName },
@@ -98,6 +107,19 @@ export function buildRouteMetadata(routeKey: string): Metadata {
       creator: global.twitterCreator,
     },
   };
+}
+
+/**
+ * The client-side wrapper, for anything rendering from the browser cache.
+ *
+ * Every STOREFRONT page used to call this from a module-level
+ * `export const metadata = ...`, which Next evaluates once when the module
+ * loads — so it could never read a database even if the reader worked. It
+ * did not: on the server `getGlobalSeo()` answers from a module variable that
+ * only client code ever writes, i.e. the demo seed, forever.
+ */
+export function buildRouteMetadata(routeKey: string): Metadata {
+  return buildRouteMetadataFrom(loadSeoStore(), routeKey);
 }
 
 export function filterSeoRoutes(

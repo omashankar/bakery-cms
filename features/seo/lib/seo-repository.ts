@@ -17,7 +17,7 @@ function nowIso(): string {
 const defaultOgImage =
   "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1200&h=630&fit=crop";
 
-function seedGlobal(): GlobalSeoSettings {
+export function seedGlobal(): GlobalSeoSettings {
   return {
     siteName: brandInfo.name,
     titleSuffix: `| ${brandInfo.name}`,
@@ -228,14 +228,54 @@ export function persistServerSeo(store: SeoStore): void {
   persist(store);
 }
 
+/**
+ * Local write first, then the server — and the local write is UNDONE when
+ * the server refuses.
+ *
+ * Without this a rejected save stayed in localStorage, and nothing put it
+ * right: `ensureSeoHydrated` short-circuits once the gate has settled, so the
+ * poisoned copy survived the session and a remount adopted it as the SAVED
+ * one — the screen presenting a value the server had rejected. Worse here
+ * than elsewhere, because `upsertSeoRouteForPath` re-sends the whole store
+ * automatically whenever a CMS page is published, so the rejected copy would
+ * be pushed again by an unrelated action.
+ *
+ * The rollback restores ONLY if this write is still the one in the cache —
+ * restoring unconditionally would undo a concurrent save the server had
+ * accepted in between.
+ */
+async function persistAndSync(next: SeoStore): Promise<boolean> {
+  const previous = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+  const previousServerStore = serverStore;
+
+  persist(next);
+  serverStore = next;
+  const accepted = await replaceSeoRequest(next);
+
+  if (!accepted) {
+    serverStore = previousServerStore;
+    if (typeof window !== "undefined") {
+      const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
+      if (stillOurs) {
+        if (previous === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, previous);
+        window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
+      }
+    }
+  }
+
+  return accepted;
+}
+
 export async function saveGlobalSeo(
   global: GlobalSeoSettings
 ): Promise<WriteResult<GlobalSeoSettings>> {
   const store = loadSeoStore();
   const next = { ...store, global };
-  persist(next);
-  serverStore = next;
-  return { value: global, persisted: await replaceSeoRequest(next) };
+  const persisted = await persistAndSync(next);
+  // On refusal, hand back what is actually in place — `runWrite` commits the
+  // returned value as the working copy regardless of acceptance.
+  return { value: persisted ? global : loadSeoStore().global, persisted };
 }
 
 export function getSeoRoutes(): SeoRouteEntry[] {
@@ -260,19 +300,25 @@ export async function updateSeoRoute(
     updatedAt: nowIso(),
   };
   store.routes[index] = updated;
-  persist(store);
-  serverStore = store;
-  return { value: updated, persisted: await replaceSeoRequest(store) };
+  const persisted = await persistAndSync(store);
+  return {
+    value: persisted ? updated : (loadSeoStore().routes[index] ?? null),
+    persisted,
+  };
 }
 
+/**
+ * Reset through the same path, and it matters most here.
+ *
+ * This wiped the cache to the demo seed BEFORE asking the server and returned
+ * that seed whether or not it was taken. A refused reset therefore left the
+ * editor showing the seed with the shop's real SEO gone from that browser —
+ * and the next CMS page publish re-sent it to the database automatically.
+ */
 export async function resetSeoStore(): Promise<WriteResult<SeoStore>> {
   const seeded = seedStore();
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
-    persist(seeded);
-  }
-  serverStore = seeded;
-  return { value: seeded, persisted: await replaceSeoRequest(seeded) };
+  const persisted = await persistAndSync(seeded);
+  return { value: persisted ? seeded : loadSeoStore(), persisted };
 }
 
 export async function upsertSeoRouteForPath(
