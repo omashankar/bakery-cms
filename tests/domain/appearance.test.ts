@@ -10,7 +10,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+beforeEach(() => {
+  vi.resetModules();
+  localStorage.clear();
+  document.documentElement.style.removeProperty("--brand-primary");
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.doUnmock("@/features/settings/server/settings.service");
+  vi.doUnmock("@/features/site-layout/server/site-layout.service");
+});
 
 import {
   appearanceCssVariables,
@@ -99,31 +111,120 @@ describe("the customer's first paint", () => {
     expect(layout).toMatch(/colorScheme: "light",\s*\.\.\.chrome\.appearance/);
   });
 
-  it("falls back to nothing rather than to the demo palette", () => {
-    // The fallback runs when the database is unreachable. Writing the demo
-    // colours there would paint an outage as a deliberate rebrand.
-    const chrome = code("apps/website/lib/storefront-chrome.server.ts");
-    const fallback = chrome.slice(chrome.indexOf("function fallbackChrome"));
-    expect(fallback.slice(0, fallback.indexOf("}\n"))).toContain("appearance: {}");
+  it("carries the STORED palette, not the default one", async () => {
+    // The source-grep version of this could not tell the two branches apart:
+    // it sliced on `indexOf("}\n")`, which is -1 in a CRLF file, so it
+    // searched the whole file and passed with fallbackChrome and
+    // getStorefrontChrome swapped. This calls the function.
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getSettings: async () => ({ general: {}, contact: {}, social: [] }),
+    }));
+    vi.doMock("@/features/site-layout/server/site-layout.service", () => ({
+      getSiteLayout: async (key: string) =>
+        key === "appearance"
+          ? { primaryColor: "#123456", accentColor: "#abcdef", surfaceColor: "#fefefe", borderRadius: 16, preset: "custom" }
+          : {},
+    }));
+
+    const { getStorefrontChrome } = await import(
+      "@/apps/website/lib/storefront-chrome.server"
+    );
+    const chrome = await getStorefrontChrome();
+
+    expect(chrome.appearance["--brand-primary"]).toBe("#123456");
+    expect(chrome.appearance["--radius"]).toBe("16px");
+  });
+
+  it("renders nothing rather than the demo palette when the read fails", async () => {
+    // An outage must not be painted as a deliberate rebrand.
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getSettings: async () => { throw new Error("mongo down"); },
+    }));
+    vi.doMock("@/features/site-layout/server/site-layout.service", () => ({
+      getSiteLayout: async () => { throw new Error("mongo down"); },
+    }));
+
+    const { getStorefrontChrome } = await import(
+      "@/apps/website/lib/storefront-chrome.server"
+    );
+    const chrome = await getStorefrontChrome();
+
+    expect(chrome.appearance).toEqual({});
   });
 });
 
 describe("a refused save", () => {
-  it("is rolled back locally, only if the cache is still ours", () => {
-    const store = code("apps/admin/appearance/lib/appearance-repository.ts");
+  it("puts the shop's palette back in the cache and on the page", async () => {
+    // Greps could spell the rollback without ever entering it: replacing the
+    // body with a plain re-persist of the rejected palette passed 850 tests.
+    const { saveAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
+      "@/apps/admin/appearance/lib/appearance-repository"
+    );
+    const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
+    siteLayoutHydration.markSettled();
 
-    // It persisted, repainted and notified BEFORE asking the server, and
-    // nothing put it back. `ensureSiteLayoutHydrated` short-circuits once the
-    // gate has settled, so the poisoned cache survived: re-read on every
-    // navigation, re-applied on unmount (undoing Discard), and adopted as the
-    // SAVED value on remount — at which point the screen called a palette the
-    // server had rejected "Saved".
-    expect(store).toContain("async function persistAndSync");
-    expect(store).toMatch(/const stillOurs = localStorage\.getItem\(STORAGE_KEY\) === JSON\.stringify\(next\)/);
-    expect(store).toMatch(/if \(!accepted && typeof window !== "undefined"\)/);
-    // Restoring unconditionally would undo a concurrent save the server had
-    // accepted — a rejected write destroying a good one.
-    expect(store).toMatch(/if \(stillOurs\)/);
+    const real = { ...defaultAppearanceSettings, primaryColor: "#111111" };
+    localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(real));
+
+    // The server refuses.
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 401 }));
+
+    const result = await saveAppearanceSettings({
+      ...defaultAppearanceSettings,
+      primaryColor: "#999999",
+    });
+
+    expect(result.persisted).toBe(false);
+    // The cache holds the shop's palette again, not the rejected one.
+    const cached = JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) ?? "{}");
+    expect(cached.primaryColor).toBe("#111111");
+    // And so does the page.
+    expect(
+      document.documentElement.style.getPropertyValue("--brand-primary"),
+    ).toBe("#111111");
+  });
+
+  it("leaves a concurrent save that the server DID accept alone", async () => {
+    // Restoring the entry snapshot unconditionally would undo a good write.
+    const { saveAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
+      "@/apps/admin/appearance/lib/appearance-repository"
+    );
+    const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
+    siteLayoutHydration.markSettled();
+
+    localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ ...defaultAppearanceSettings, primaryColor: "#111111" }));
+
+    // While this save is in flight, another one lands and is accepted.
+    vi.stubGlobal("fetch", async () => {
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ ...defaultAppearanceSettings, primaryColor: "#222222" }));
+      return new Response(null, { status: 401 });
+    });
+
+    await saveAppearanceSettings({ ...defaultAppearanceSettings, primaryColor: "#999999" });
+
+    const cached = JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) ?? "{}");
+    // The concurrent write survives — the refusal did not destroy it.
+    expect(cached.primaryColor).toBe("#222222");
+  });
+
+  it("hands the form back what is actually in place, not what was attempted", async () => {
+    // The regression this pass found. `runWrite` commits `current: value`
+    // unconditionally, so returning the defaults regardless left every colour
+    // field reading demo brown under a toast saying "nothing was changed" —
+    // with Save enabled over the shop's real palette.
+    const { resetAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
+      "@/apps/admin/appearance/lib/appearance-repository"
+    );
+    const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
+    siteLayoutHydration.markSettled();
+
+    localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ ...defaultAppearanceSettings, primaryColor: "#111111" }));
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 401 }));
+
+    const result = await resetAppearanceSettings();
+
+    expect(result.persisted).toBe(false);
+    expect(result.value.primaryColor).toBe("#111111");
   });
 
   it("routes reset through the same path", () => {
@@ -195,25 +296,48 @@ describe("what this screen claims", () => {
 });
 
 describe("the server side", () => {
-  it("only accepts values that are actually colours", () => {
-    const validators = code("features/site-layout/server/site-layout.validators.ts");
-    // `z.string().min(1)` accepted "red" or a whole CSS declaration, and
-    // `appearanceCssVariables` drops the WHOLE palette when one field is
-    // unusable — so one bad value silently reverted the shop to the stylesheet
-    // defaults. Reachable through backup restore, which JSON-parses an uploaded
-    // file straight into this endpoint.
-    expect(validators).toMatch(/const hexColor = z/);
-    expect(validators).toContain("primaryColor: hexColor");
-    expect(validators).toContain("accentColor: hexColor");
-    expect(validators).toContain("surfaceColor: hexColor");
-    expect(validators).toMatch(/borderRadius: z\.union\(\[z\.literal\(12\), z\.literal\(16\)\]\)/);
+  it("only accepts values that are actually colours", async () => {
+    // The grep version matched the DECLARATION, so `const hexColor =
+    // z.string();` — the exact hole this closed — kept it green. Parse instead.
+    const { siteLayoutSchemas } = await import(
+      "@/features/site-layout/server/site-layout.validators"
+    );
+    const schema = siteLayoutSchemas.appearance;
+
+    const good = {
+      primaryColor: "#6f4e37",
+      accentColor: "#d4a373",
+      surfaceColor: "#faf8f4",
+      borderRadius: 12,
+    };
+    expect(schema.safeParse(good).success).toBe(true);
+
+    // One bad value drops the WHOLE palette at render time, so the shop
+    // silently reverts to the stylesheet defaults. Reachable through backup
+    // restore, which parses an uploaded file straight into this endpoint.
+    for (const field of ["primaryColor", "accentColor", "surfaceColor"]) {
+      for (const bad of ["red", "", "#ggg", "#6f4e37; background:url(x)"]) {
+        expect(
+          schema.safeParse({ ...good, [field]: bad }).success,
+          `${field} accepted ${JSON.stringify(bad)}`,
+        ).toBe(false);
+      }
+    }
+
+    // The editor offers exactly two radii.
+    expect(schema.safeParse({ ...good, borderRadius: 16 }).success).toBe(true);
+    expect(schema.safeParse({ ...good, borderRadius: 20 }).success).toBe(false);
   });
 
   it("records what the value used to be", () => {
     const service = code("features/site-layout/server/site-layout.service.ts");
     // A whole-value replace logged `metadata: {}`, so after a bad restore the
     // audit trail could not say what the palette had been.
-    expect(service).toContain("const before = await store.read();");
+    // The ORDER is the whole point: moving the read below the write logs the
+    // new value as `before`, which is worse than logging nothing.
+    expect(service).toMatch(
+      /const before = await store\.read\(\);[\s\S]{0,120}await store\.write\(/,
+    );
     expect(service).toContain("metadata: { before, after: value }");
   });
 
@@ -225,5 +349,51 @@ describe("the server side", () => {
     expect(page).toMatch(
       /await ensureSiteLayoutHydrated\(\);\s*\r?\n\s*const result = await restoreBackupToServer/,
     );
+  });
+});
+
+describe("everything that escapes the shell", () => {
+  it("gets the palette on :root as well, from the server", () => {
+    // The shell's inline style covers its own subtree and nothing else.
+    // Sonner's toaster and every Base UI popup render through a PORTAL on
+    // document.body, so they read the tokens from :root — which only the
+    // client wrote. Those surfaces painted the stylesheet defaults until a
+    // fetch landed, and for the whole session if it failed.
+    const layout = code("layouts/storefront-layout.tsx");
+    expect(layout).toContain("<AppearanceStyleTag tokens={chrome.appearance} />");
+
+    const tag = code("components/shared/appearance-style-tag.tsx");
+    expect(tag).toContain(":root{");
+    // Nothing at all for an empty palette, so the stylesheet defaults stand.
+    expect(tag).toMatch(/if \(!entries\.length\) return null;/);
+  });
+
+  it("covers the maintenance screen and the 404, which render outside it", () => {
+    // The maintenance screen IS the storefront while the shop is closed.
+    for (const layout of ["app/(storefront)/layout.tsx", "app/account/layout.tsx"]) {
+      const rendered = code(layout);
+      expect(rendered).toMatch(/<AppearanceStyleTag tokens=\{chrome\.appearance\} \/>/);
+      expect(rendered).toMatch(/\.\.\.chrome\.appearance/);
+    }
+
+    const notFound = code("app/not-found.tsx");
+    expect(notFound).toContain("await getStorefrontChrome()");
+    expect(notFound).toContain("...chrome.appearance");
+  });
+
+  it("does not let a cold cache repaint over correct server values", () => {
+    // `loadAppearanceSettings()` answers with the DEFAULTS when localStorage is
+    // empty — which is every first-time visitor. Applying that over a
+    // server-painted page turns a flash of the default palette into a flash of
+    // the WRONG one, which is strictly worse than the bug being fixed.
+    const sync = code("components/shared/appearance-theme-sync.tsx");
+    expect(sync).toContain("serverAlreadyPainted()");
+    expect(sync).toMatch(
+      /if \(!fromCache && serverAlreadyPainted\(\) && !siteLayoutHydration\.hasSettled\(\)\)/,
+    );
+    // The theme CLASS is unrelated to the palette and must still be applied.
+    expect(sync).toMatch(/if \(lightLocked\) applyThemeToDocument\("light"\);/);
+    // Cache-backed callers pass true: by then there is a real palette.
+    expect(sync).toMatch(/onAppearanceUpdated\(\) \{\s*\r?\n\s*sync\(true\);/);
   });
 });

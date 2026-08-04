@@ -134,9 +134,26 @@ export function persistServerAppearance(settings: AppearanceSettings): void {
  * screen was the one with no way back.
  */
 export async function resetAppearanceSettings(): Promise<WriteResult<AppearanceSettings>> {
+  const persisted = await persistAndSync(defaultAppearanceSettings);
+
+  /**
+   * On refusal, hand back what is ACTUALLY in place — not what was attempted.
+   *
+   * `runWrite` commits `current: value` unconditionally and only guards `saved`,
+   * so returning the defaults regardless left the form showing the demo palette
+   * over a cache the rollback had just restored to the shop's real one. The
+   * screen then said "Appearance was not reset — nothing was changed" while
+   * every colour field read demo brown, Save sat enabled because the form now
+   * differed from `saved`, and one click would have pushed those demo colours
+   * to the storefront for real.
+   *
+   * A SAVE keeps the attempted value on refusal, deliberately: that is the
+   * admin's own edit and they should be able to retry it. A reset is not an
+   * edit, so there is nothing to preserve.
+   */
   return {
-    value: defaultAppearanceSettings,
-    persisted: await persistAndSync(defaultAppearanceSettings),
+    value: persisted ? defaultAppearanceSettings : loadAppearanceSettings(),
+    persisted,
   };
 }
 

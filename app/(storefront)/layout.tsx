@@ -1,4 +1,5 @@
 import { StorefrontLayoutShell } from "@/layouts/storefront-layout";
+import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
 import { MaintenanceScreen } from "@/apps/website/components/maintenance-screen";
 import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
@@ -30,7 +31,15 @@ export default async function StorefrontLayout({
   const maintenance = await getMaintenanceState();
   if (maintenance.isClosed) {
     const chrome = await getStorefrontChrome();
-    return <MaintenanceScreen siteName={chrome.siteName} message={maintenance.message} />;
+    // The maintenance screen IS the storefront while the shop is closed, and
+    // it renders outside the shell — so it was the one customer-facing page
+    // still painting the demo palette on its first paint.
+    return (
+      <div style={{ colorScheme: "light", ...chrome.appearance } as React.CSSProperties}>
+        <AppearanceStyleTag tokens={chrome.appearance} />
+        <MaintenanceScreen siteName={chrome.siteName} message={maintenance.message} />
+      </div>
+    );
   }
 
   // Read navbar + footer data from MongoDB on the server so the store name, nav,

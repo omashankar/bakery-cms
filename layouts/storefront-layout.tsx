@@ -4,6 +4,7 @@ import { StorefrontBannerStrip } from "@/apps/website/components/storefront-bann
 import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
+import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
 import { cn } from "@/lib/utils";
 
 interface StorefrontLayoutShellProps {
@@ -40,6 +41,14 @@ export function StorefrontLayoutShell({
       */
       style={{ colorScheme: "light", ...chrome.appearance } as React.CSSProperties}
     >
+      {/*
+        And on :root, for everything that escapes this div.
+        Sonner's toaster and every Base UI popup render through a PORTAL on
+        document.body, so they read the tokens from :root — which only the
+        client wrote. Those surfaces painted the stylesheet defaults until a
+        fetch landed, and stayed that way for the session if it failed.
+      */}
+      <AppearanceStyleTag tokens={chrome.appearance} />
       <div className="contents print:hidden">
         <MaintenanceBanner maintenance={maintenance} />
         <StorefrontBannerStrip />

@@ -23,6 +23,17 @@ export const defaultAppearanceSettings: AppearanceSettings = {
   borderRadius: 12,
 };
 
+/**
+ * Marks a page whose palette the SERVER already painted.
+ *
+ * `AppearanceThemeSync` checks for it before applying the localStorage copy:
+ * a visitor on their FIRST load has no cache, and `loadAppearanceSettings`
+ * answers with the DEFAULTS — which would be painted straight over correct
+ * server-rendered values. That would turn a flash of the default palette into
+ * a flash of the WRONG one, which is worse.
+ */
+export const APPEARANCE_SSR_STYLE_ID = "appearance-tokens";
+
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export function isValidHexColor(value: string): boolean {
