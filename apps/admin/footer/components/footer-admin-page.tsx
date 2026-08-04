@@ -173,7 +173,9 @@ export function FooterAdminPage() {
       const { value: next, persisted } = await saveFooterSettings(settings);
       // Only mark clean when the SERVER has it — the dirty flag is what keeps
       // the Save button enabled, so adopting a rejected value removes the retry.
-      return { value: next, accepted: reportWrite(persisted, "Footer settings saved") };
+      return { value: next, accepted: reportWrite(persisted, "Footer settings saved", {
+        failure: "Footer was not saved — the server rejected it",
+      }) };
     });
   }
 
@@ -183,10 +185,20 @@ export function FooterAdminPage() {
   }
 
   async function handleReset() {
-    if (!canSave) return;
+    // Reset lives in the page header, outside the gated form, so it is
+    // reachable before hydration. It returned in silence: the admin confirmed
+    // a destructive dialog, it closed, and nothing happened or was said.
+    if (!canSave) {
+      toast.error("Saved footer hasn't loaded yet", {
+        description: "Reset is unavailable until this page can reach the server.",
+      });
+      return;
+    }
     await runWrite(async () => {
       const { value: next, persisted } = await resetFooterSettings();
-      return { value: next, accepted: reportWrite(persisted, "Footer reset to defaults") };
+      return { value: next, accepted: reportWrite(persisted, "Footer reset to defaults", {
+        failure: "Footer was not reset — the server rejected it",
+      }) };
     });
   }
 

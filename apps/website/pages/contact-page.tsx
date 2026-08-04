@@ -14,9 +14,22 @@ interface ContactPageProps {
   /** Contact details read from MongoDB on the server. Falls back to the client
    *  settings repo only if a caller omits it. */
   contact?: StorefrontContact;
+  /**
+   * The footer screen's "Show map" switch.
+   *
+   * It was stored, counted in that screen's "N/4 sections on" summary, and
+   * read by nothing: the only map on the site gated on the embed URL alone,
+   * so turning the switch off changed the count and left the map up.
+   */
+  showMap?: boolean;
 }
 
-export function ContactPage({ defaultSubject, contact }: ContactPageProps) {
+export function ContactPage({
+  defaultSubject,
+  contact,
+  // Defaults to true so a caller that does not pass it behaves as before.
+  showMap = true,
+}: ContactPageProps) {
   const resolved: StorefrontContact = contact ?? {
     ...getStorefrontContactInfo(),
     businessHours: getStorefrontBusinessHours(),
@@ -117,7 +130,10 @@ export function ContactPage({ defaultSubject, contact }: ContactPageProps) {
               when there is a map: an admin who clears the field means "no map",
               and the band used to fall back to the demo pin, advertising
               somebody else's address as the shop's. */}
-          {contactInfo.mapEmbedUrl ? (
+          {/* The footer screen's "Show map" switch decides this. It was stored,
+              counted in that screen's "N/4 sections on" line, and read by
+              nothing — the only map on the site gated on the URL alone. */}
+          {showMap && contactInfo.mapEmbedUrl ? (
             <ScrollReveal className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
               <iframe
                 title="Bakery location"

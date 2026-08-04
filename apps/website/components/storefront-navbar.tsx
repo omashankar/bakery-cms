@@ -40,6 +40,20 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
   const [showSearch] = useState(chrome.showSearch);
+  const [cta] = useState(chrome.cta);
+
+  /**
+   * The two rows the navbar renders as something other than a plain link.
+   *
+   * Collections becomes the MegaMenu and Home is represented by the logo on
+   * desktop, so both were filtered out of the link list — and the MegaMenu
+   * and the mobile Home link were then hardcoded. The result: those two rows
+   * had a visibility switch, a label field and reorder buttons in the admin,
+   * and none of them changed anything a customer saw. `navItems` already
+   * contains only VISIBLE rows, so finding one is the visibility test.
+   */
+  const collectionsRow = navItems.find((item) => item.href === routes.store.collections);
+  const homeRow = navItems.find((item) => item.href === routes.store.home);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -180,11 +194,15 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
-          <MegaMenu
-            isActive={
-              pathname === routes.store.collections || pathname.startsWith(`${routes.store.collections}/`)
-            }
-          />
+          {collectionsRow ? (
+            <MegaMenu
+              label={collectionsRow.label}
+              isActive={
+                pathname === routes.store.collections ||
+                pathname.startsWith(`${routes.store.collections}/`)
+              }
+            />
+          ) : null}
           {navItems
             .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
             .map((item) => {
@@ -210,6 +228,22 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-1.5">
+          {/*
+            The header CTA the admin has always been able to configure.
+            Its switch, label and link were stored, validated and shown in a
+            summary line — and rendered nowhere, so setting them changed
+            nothing a customer ever saw.
+          */}
+          {cta.show ? (
+            <Button
+              variant="bakery"
+              size="sm"
+              className="hidden lg:inline-flex"
+              render={<Link href={cta.href} />}
+            >
+              {cta.label}
+            </Button>
+          ) : null}
           {showSearch ? (
             <Button
               variant="ghost"
@@ -283,17 +317,26 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           className="border-t border-border bg-white lg:hidden"
         >
           <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobile navigation">
-            <Link
-              href={routes.store.home}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "rounded-lg px-3 py-2.5 text-sm font-medium",
-                pathname === routes.store.home ? "bg-cream-100 text-bakery-700" : "hover:bg-cream-100"
-              )}
-            >
-              Home
-            </Link>
-            <MobileShopLinks onNavigate={() => setMobileOpen(false)} />
+            {homeRow ? (
+              <Link
+                href={homeRow.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "rounded-lg px-3 py-2.5 text-sm font-medium",
+                  pathname === routes.store.home
+                    ? "bg-cream-100 text-bakery-700"
+                    : "hover:bg-cream-100"
+                )}
+              >
+                {homeRow.label}
+              </Link>
+            ) : null}
+            {collectionsRow ? (
+              <MobileShopLinks
+                label={collectionsRow.label}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ) : null}
             {navItems
               .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
               .map((item) => {

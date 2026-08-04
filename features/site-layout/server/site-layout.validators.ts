@@ -19,8 +19,25 @@ const seoSchema = z
   })
   .passthrough();
 
+/**
+ * The two fields the STOREFRONT reads that nothing validated.
+ *
+ * `selectVisibleNavItems` filters on `item.isVisible` and sorts on
+ * `sortOrder`. Neither was in the schema, so a payload without them was
+ * accepted — and `undefined` is falsy, so every link vanished from the
+ * customer's navbar while the admin's cache-merged view still showed them all.
+ * A missing `sortOrder` makes the comparator return NaN, which is an unstable
+ * sort rather than an error. Reachable through backup restore, which posts a
+ * hand-editable file straight to this endpoint.
+ */
 const headerNavSchema = z
-  .object({ id: z.string().min(1), label: z.string(), href: z.string() })
+  .object({
+    id: z.string().min(1),
+    label: z.string(),
+    href: z.string(),
+    isVisible: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+  })
   .passthrough();
 
 const headerSchema = z
@@ -30,8 +47,30 @@ const headerSchema = z
   })
   .passthrough();
 
+/**
+ * `links` is what the footer actually renders, and it was unvalidated.
+ *
+ * `landing-footer.tsx` does `column.links.map(...)` with no guard, and it
+ * renders inside the storefront shell — OUTSIDE the try/catch in
+ * `storefront-chrome.server.ts`. So a stored column without `links` threw
+ * during render on EVERY storefront route, and the admin's own footer screen
+ * died on the same value, leaving no way to correct it from the UI.
+ *
+ * `.default([])` rather than `.min(1)`: a column with no links is a legitimate
+ * heading, and rejecting it would be inventing a rule.
+ */
 const footerColumnSchema = z
-  .object({ id: z.string().min(1), title: z.string() })
+  .object({
+    id: z.string().min(1),
+    title: z.string(),
+    links: z
+      .array(
+        z
+          .object({ id: z.string().min(1), label: z.string(), href: z.string() })
+          .passthrough(),
+      )
+      .default([]),
+  })
   .passthrough();
 
 const footerSchema = z

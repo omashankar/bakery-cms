@@ -27,6 +27,16 @@ export interface StorefrontChrome {
   logo: string;
   logoLetter: string;
   showSearch: boolean;
+  /**
+   * The header's call-to-action button.
+   *
+   * The admin screen has had a whole card for this — a switch, a label and a
+   * link — since before this type existed, and none of the three ever
+   * travelled: `StorefrontChrome` had no field and the navbar rendered no
+   * button. The screen said so twice, in the summary line and in the card's
+   * own helper text ("Order inquiry button on desktop").
+   */
+  cta: { show: boolean; label: string; href: string };
   navItems: HeaderNavItem[];
   brand: { name: string; tagline: string; description: string };
   contact: { address: string; phone: string; email: string };
@@ -55,6 +65,11 @@ function fallbackChrome(): StorefrontChrome {
     logo: "",
     logoLetter: defaultHeaderSettings.logoLetter,
     showSearch: defaultHeaderSettings.showSearch,
+    cta: {
+      show: defaultHeaderSettings.showCta,
+      label: defaultHeaderSettings.ctaLabel,
+      href: defaultHeaderSettings.ctaHref,
+    },
     navItems: selectVisibleNavItems(defaultHeaderSettings.nav),
     brand: { name: brandInfo.name, tagline: brandInfo.tagline, description: brandInfo.description },
     contact: {
@@ -98,8 +113,22 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
       label: string;
       isActive?: boolean;
     }[];
-    const header = (headerRaw as unknown as HeaderSettings) ?? defaultHeaderSettings;
-    const footer = (footerRaw as unknown as FooterSettings) ?? defaultFooterSettings;
+    /**
+     * Merged field by field, not substituted whole.
+     *
+     * `?? default` only helps when the ENTIRE record is missing. A record
+     * stored before a field existed has it `undefined`, and the admin form
+     * merges defaults over that while this did not — so the same shop saw a
+     * block switched ON in the editor and hidden on its own site.
+     */
+    const header: HeaderSettings = {
+      ...defaultHeaderSettings,
+      ...((headerRaw ?? {}) as Partial<HeaderSettings>),
+    };
+    const footer: FooterSettings = {
+      ...defaultFooterSettings,
+      ...((footerRaw ?? {}) as Partial<FooterSettings>),
+    };
 
     const activeSocial = social.filter((s) => s.isActive);
     const name = general.siteName || brandInfo.name;
@@ -112,6 +141,12 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
       logo: (general.logo ?? "").trim(),
       logoLetter: header.logoLetter || defaultHeaderSettings.logoLetter,
       showSearch: header.showSearch ?? defaultHeaderSettings.showSearch,
+      cta: {
+        show: header.showCta ?? defaultHeaderSettings.showCta,
+        // An empty label would render a button with no accessible name.
+        label: header.ctaLabel?.trim() || defaultHeaderSettings.ctaLabel,
+        href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
+      },
       navItems: selectVisibleNavItems(header.nav ?? []),
       brand: {
         name,
@@ -140,7 +175,20 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
           // keeps the link announceable instead of unnamed.
           label: s.label?.trim() || s.platform,
         })),
-      footer,
+      /**
+       * Re-checked at READ time, because the schema only constrains future
+       * writes. `landing-footer` does `column.links.map(...)` unguarded and
+       * renders INSIDE the storefront shell — outside this try/catch — so a
+       * column stored without `links` threw on every storefront route, and
+       * the admin's own footer screen died on the same value.
+       */
+      footer: {
+        ...footer,
+        columns: (Array.isArray(footer.columns) ? footer.columns : []).map((column) => ({
+          ...column,
+          links: Array.isArray(column?.links) ? column.links : [],
+        })),
+      },
       // Re-derived from the stored value rather than trusted: the schema
       // only constrains future writes, so a row at rest can hold a colour
       // that was allowed in years earlier. `appearanceCssVariables` returns

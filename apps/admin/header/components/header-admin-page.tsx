@@ -135,7 +135,9 @@ export function HeaderAdminPage() {
       const { value: next, persisted } = await saveHeaderSettings(settings);
       // Only mark clean when the SERVER has it — the dirty flag is what keeps
       // the Save button enabled, so adopting a rejected value removes the retry.
-      return { value: next, accepted: reportWrite(persisted, "Header settings saved") };
+      return { value: next, accepted: reportWrite(persisted, "Header settings saved", {
+        failure: "Header was not saved — the server rejected it",
+      }) };
     });
   }
 
@@ -145,10 +147,25 @@ export function HeaderAdminPage() {
   }
 
   async function handleReset() {
-    if (!canSave) return;
+    // Reset lives in the page header, outside the gated form, so it is
+    // reachable before hydration. It returned in silence: the admin confirmed
+    // a destructive dialog, it closed, and nothing happened or was said.
+    if (!canSave) {
+      toast.error("Saved header hasn't loaded yet", {
+        description: "Reset is unavailable until this page can reach the server.",
+      });
+      return;
+    }
     await runWrite(async () => {
       const { value: next, persisted } = await resetHeaderSettings();
-      return { value: next, accepted: reportWrite(persisted, "Header reset to defaults") };
+      return {
+        value: next,
+        accepted: reportWrite(persisted, "Header reset to defaults", {
+          // The store rolls the local change back, so the default copy
+          // ("saved on this device only") would be wrong: it is nowhere.
+          failure: "Header was not reset — the server rejected it",
+        }),
+      };
     });
   }
 
