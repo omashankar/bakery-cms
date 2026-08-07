@@ -48,9 +48,14 @@ export function selectHomepageCategories(
           name: category.name,
           slug: category.slug,
           image: category.image ?? "",
-          count:
-            category.cakeCount ??
-            published.filter((cake) => cake.categoryId === category.id).length,
+          // Counted, never declared.
+          //
+          // This was `category.cakeCount ?? <the real count>`, so a number typed
+          // into the category form OVERRODE the shop's actual catalogue — and
+          // the seed had typed one for nine of them. Measured on a real shop:
+          // the homepage advertised "48 cakes" under Birthday and 271 across all
+          // categories, while the whole shop held 25 products.
+          count: published.filter((cake) => cake.categoryId === category.id).length,
         }) satisfies LandingCategory
     )
     .filter((category) => category.image)

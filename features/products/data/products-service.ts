@@ -1,4 +1,8 @@
-import { mapAdminProductToStorefront } from "@/features/products/lib/product-mapper";
+import {
+  mapAdminProductToStorefront,
+  type CategoryNames,
+} from "@/features/products/lib/product-mapper";
+import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { mutateProducts, readProducts } from "@/features/products/data/products-store.server";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
@@ -18,6 +22,27 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * The shop's own category names, from the database.
+ *
+ * Without this the mapper falls back to `getCategoryById`, which reads a
+ * localStorage-backed store — on the server that is `defaultCatalogStore`, the
+ * DEMO taxonomy. Every server-rendered product page resolved its category
+ * against the shipped list, so a renamed category never reached a customer and
+ * a shop-added one rendered as the generic "Cakes".
+ */
+async function categoryNames(): Promise<CategoryNames> {
+  try {
+    const catalog = await getCatalog();
+    return new Map(
+      (catalog.categories as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]),
+    );
+  } catch {
+    // A catalog read that fails must not take the product page down with it.
+    return new Map();
+  }
+}
+
 export async function getProducts(): Promise<Product[]> {
   return readProducts();
 }
@@ -34,10 +59,10 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
 /** Published products in the shape the storefront renders. */
 export async function getStorefrontProducts(): Promise<LandingProduct[]> {
-  const products = await readProducts();
+  const [products, names] = await Promise.all([readProducts(), categoryNames()]);
   return products
     .filter((product) => product.status === "published")
-    .map(mapAdminProductToStorefront);
+    .map((product) => mapAdminProductToStorefront(product, names));
 }
 
 /**
@@ -74,7 +99,7 @@ export async function getStorefrontProductBySlug(
 ): Promise<LandingProduct | null> {
   const product = await getProductBySlug(slug);
   if (!product || product.status !== "published") return null;
-  return mapAdminProductToStorefront(product);
+  return mapAdminProductToStorefront(product, await categoryNames());
 }
 
 // Mutations go through mutateProducts so the read and the write happen under one
@@ -140,10 +165,10 @@ export async function deleteProduct(id: string): Promise<boolean> {
 export async function getHomepageRails(
   maxCount = 8
 ): Promise<Record<HomepageProductSource, LandingProduct[]>> {
-  const products = await readProducts();
+  const [products, names] = await Promise.all([readProducts(), categoryNames()]);
   const all = products
     .filter((product) => product.status === "published")
-    .map(mapAdminProductToStorefront);
+    .map((product) => mapAdminProductToStorefront(product, names));
 
   const sources: HomepageProductSource[] = [
     "featured",

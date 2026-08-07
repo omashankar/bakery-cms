@@ -9,7 +9,6 @@ import {
   Tags,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import {
   FilterPanel,
@@ -23,6 +22,7 @@ import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
+  CATALOG_UPDATED_EVENT,
   deleteCategories,
   deleteFlavours,
   deleteOccasions,
@@ -30,7 +30,11 @@ import {
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
-import { pushCatalogSection, CATALOG_SECTIONS } from "@/features/catalog/lib/catalog-api";
+import {
+  CATALOG_HYDRATION_EVENT,
+  catalogHydrationStatus,
+} from "@/features/catalog/lib/catalog-api";
+import { loadProducts } from "@/features/products/lib/products-repository";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -77,6 +81,15 @@ export function CatalogAdminPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">("pending");
+
+  /**
+   * Every section here is a replace-all, so nothing may be published until the
+   * server's taxonomy has arrived. The buttons are disabled rather than left
+   * live with a guard inside the handler — a button that looks available and
+   * does nothing is the same lie in a different place.
+   */
+  const canWrite = hydration === "ready";
 
   const store = useMemo(
     () => (mounted ? loadCatalogStore() : EMPTY_STORE),
@@ -85,6 +98,26 @@ export function CatalogAdminPage() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // The taxonomy arrives from the server AFTER this screen has already read
+  // localStorage. Without these listeners the page rendered whatever the cache
+  // held at mount for the whole visit — the shipped defaults on a fresh
+  // browser — and selecting a row from that list addressed an id the server had
+  // never heard of.
+  useEffect(() => {
+    const sync = () => {
+      setHydration(catalogHydrationStatus());
+      setRefreshKey((value) => value + 1);
+      setSelectedIds([]);
+    };
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    window.addEventListener(CATALOG_HYDRATION_EVENT, sync);
+    return () => {
+      window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+      window.removeEventListener(CATALOG_HYDRATION_EVENT, sync);
+    };
   }, []);
 
   // Flavours/Weights are optional bakery modules — hide those tabs when off.
@@ -130,6 +163,19 @@ export function CatalogAdminPage() {
       return label.toLowerCase().includes(query) || slug.toLowerCase().includes(query);
     });
   }, [activeTab, search, store]);
+
+  // How many published products are really in each category. `cakeCount` on the
+  // category is a hand-typed number that agreed with nothing: the seed claimed
+  // 48 cakes under Birthday and 271 across all categories, in a shop with 25.
+  const productsByCategory = useMemo(() => {
+    if (!mounted) return new Map<string, number>();
+    const tally = new Map<string, number>();
+    for (const cake of loadProducts()) {
+      if (cake.status !== "published") continue;
+      tally.set(cake.categoryId, (tally.get(cake.categoryId) ?? 0) + 1);
+    }
+    return tally;
+  }, [mounted, refreshKey]);
 
   const counts = {
     categories: store.categories.length,
@@ -180,8 +226,31 @@ export function CatalogAdminPage() {
     setSelectedIds(items.map((item) => item.id));
   }
 
+  /** Products that would be orphaned by deleting the current selection. */
+  function orphanCount(): number {
+    if (activeTab !== "categories") return 0;
+    return selectedIds.reduce((n, id) => n + (productsByCategory.get(id) ?? 0), 0);
+  }
+
   async function handleDelete() {
     if (selectedIds.length === 0) return;
+
+    // Nothing reassigns or blocks a product whose category is deleted. It keeps
+    // pointing at an id nothing resolves, so the storefront labels it the
+    // generic "Cakes" and the admin category filter can never find it again.
+    // Three of this shop's products are already in that state.
+    const orphans = orphanCount();
+    if (orphans > 0) {
+      const noun = orphans === 1 ? "cake is" : "cakes are";
+      const which = selectedIds.length === 1 ? "category" : "categories";
+      const ok = window.confirm(
+        `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
+          "They will keep pointing at a category that no longer exists: the shop " +
+          "will show them as plain “Cakes”, and the category filter here will " +
+          "never find them again.\n\nDelete anyway?"
+      );
+      if (!ok) return;
+    }
     const remove =
       activeTab === "categories"
         ? deleteCategories
@@ -197,15 +266,25 @@ export function CatalogAdminPage() {
   }
 
   async function handleReset() {
-    const store = resetCatalogStore();
-    // Push the defaults to the server too — otherwise CatalogServerSync re-hydrates
-    // the old catalog on the next load and the reset silently reverts. Every
-    // answer counted, so a reset the server refused is not reported as done.
-    const results = await Promise.all(
-      CATALOG_SECTIONS.map((section) => pushCatalogSection(section, store[section]))
+    // One click on "Reset defaults" replaced all four taxonomies in the database
+    // with the shipped ones, unconfirmed. Everything a shop had named — its
+    // categories, occasions, flavours and weight tiers — gone, and every product
+    // left pointing at ids that no longer existed.
+    const ok = window.confirm(
+      `This replaces all four lists — ${counts.categories} categories, ` +
+        `${counts.occasions} occasions, ${counts.flavours} flavours and ` +
+        `${counts.weights} weights — with the ones this software ships with.\n\n` +
+        "Anything you have named here is lost, and cakes using those values will " +
+        "point at entries that no longer exist.\n\nReset the whole catalog?"
     );
+    if (!ok) return;
+
+    // Server first: it owns the defaults and records the reset in the audit log.
+    // The cache follows only what it accepted, so a refused reset leaves this
+    // browser holding the taxonomy that is really in place.
+    const { persisted } = await resetCatalogStore();
     refresh();
-    reportWrite(results.every(Boolean), "Catalog reset to defaults");
+    reportWrite(persisted, "Catalog reset to defaults");
   }
 
   return (
@@ -225,6 +304,7 @@ export function CatalogAdminPage() {
             <Button
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
+              disabled={!canWrite}
               onClick={handleReset}
             >
               <RotateCcw className="size-4" />
@@ -235,6 +315,7 @@ export function CatalogAdminPage() {
               <Button
                 variant="bakery"
                 className="min-w-0 flex-1 sm:flex-none"
+                disabled={!canWrite}
                 onClick={openCreate}
               >
                 <Plus className="size-4" />
@@ -245,6 +326,27 @@ export function CatalogAdminPage() {
           </div>
         }
       />
+
+      {/*
+        Say which list this is. Until the server answers, the rows below are the
+        ones this software ships with — that was true before and the screen
+        showed them as though they were the shop's own, with every button live.
+      */}
+      {mounted && hydration !== "ready" ? (
+        <p
+          className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            hydration === "unavailable"
+              ? "border-destructive/30 bg-destructive/5 text-destructive"
+              : "border-border bg-muted text-muted-foreground"
+          )}
+          role="status"
+        >
+          {hydration === "unavailable"
+            ? "Could not load this shop's catalog. You are looking at the built-in defaults — reload the page before changing anything."
+            : "Loading this shop's catalog…"}
+        </p>
+      ) : null}
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
@@ -308,7 +410,7 @@ export function CatalogAdminPage() {
             <span className="text-sm text-muted-foreground">
               {selectedIds.length} selected
             </span>
-            <Button size="sm" variant="destructive" onClick={handleDelete}>
+            <Button size="sm" variant="destructive" disabled={!canWrite} onClick={handleDelete}>
               <Trash2 className="size-4" />
               Delete
             </Button>
@@ -359,8 +461,8 @@ export function CatalogAdminPage() {
                     const detail =
                       activeTab === "weights" && "modifier" in item
                         ? `+₹${item.modifier} · serves ${item.serves}`
-                        : activeTab === "categories" && "cakeCount" in item
-                          ? `${item.cakeCount ?? 0} cakes`
+                        : activeTab === "categories"
+                          ? `${productsByCategory.get(item.id) ?? 0} cakes`
                           : slug
                             ? `/${slug}`
                             : "—";
@@ -413,8 +515,8 @@ export function CatalogAdminPage() {
                 const detail =
                   activeTab === "weights" && "modifier" in item
                     ? `+₹${item.modifier} · serves ${item.serves}`
-                    : activeTab === "categories" && "cakeCount" in item
-                      ? `${item.cakeCount ?? 0} cakes`
+                    : activeTab === "categories"
+                      ? `${productsByCategory.get(item.id) ?? 0} cakes`
                       : slug
                         ? `/${slug}`
                         : null;

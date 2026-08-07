@@ -99,7 +99,7 @@ describe("the advertised rating is computed on the server", () => {
     const fn = bodyOf(products, "export async function setReviewAggregate(");
 
     expect(fn).toContain("ProductModel.updateOne");
-    expect(fn).toMatch(/\$set:\s*\{\s*rating:.*reviewCount:/s);
+    expect(fn).toMatch(/\$set:\s*\{\s*rating:[\s\S]*reviewCount:/);
     // replaceOne here would carry a stale snapshot of every other field.
     expect(fn).not.toContain("replaceOne");
     expect(fn).not.toContain("replaceAll");

@@ -2,7 +2,11 @@
 
 import { useEffect } from "react";
 
-import { catalogHydration, fetchCatalog } from "@/features/catalog/lib/catalog-api";
+import {
+  catalogHydration,
+  fetchCatalog,
+  setCatalogHydrationStatus,
+} from "@/features/catalog/lib/catalog-api";
 import {
   loadCatalogStore,
   saveCatalogStore,
@@ -23,7 +27,14 @@ export function CatalogServerSync() {
 
     (async () => {
       const server = await fetchCatalog();
-      if (!server || cancelled) return;
+      if (cancelled) return;
+
+      if (!server) {
+        // Say so. The screen was left rendering the shipped defaults as though
+        // they were the shop's own, with every button live.
+        setCatalogHydrationStatus("unavailable");
+        return;
+      }
 
       const current = loadCatalogStore();
       saveCatalogStore({
@@ -37,6 +48,7 @@ export function CatalogServerSync() {
       // Only NOW may a replace-all mutation send the local taxonomy — before
       // this, it is whatever this browser happened to hold.
       catalogHydration.markSettled();
+      setCatalogHydrationStatus("ready");
     })();
 
     return () => {
