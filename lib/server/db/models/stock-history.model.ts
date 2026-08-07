@@ -24,6 +24,12 @@ const stockHistorySchema = new mongoose.Schema({
 
 applyBaseTransform(stockHistorySchema);
 
+// `listHistory` sorts by createdAt and pages through it — for one cake, or for
+// the whole shop. Without these the History view is a full collection scan plus
+// an in-memory sort on every admin load, and this table only ever grows.
+stockHistorySchema.index({ createdAt: -1 });
+stockHistorySchema.index({ cakeId: 1, createdAt: -1 });
+
 export type StockHistoryDoc = InferSchemaType<typeof stockHistorySchema>;
 
 export const StockHistoryModel: Model<StockHistoryDoc> =

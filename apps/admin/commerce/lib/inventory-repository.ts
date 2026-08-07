@@ -205,20 +205,26 @@ export async function adjustStock({
   if (!cake) return { item: null, persisted: false };
 
   const quantityBefore = cake.stockQuantity;
-  let quantityAfter = quantityBefore;
 
-  if (type === "add") {
-    quantityAfter = quantityBefore + Math.max(quantity, 0);
-  } else if (type === "remove") {
-    quantityAfter = Math.max(quantityBefore - Math.max(quantity, 0), 0);
-  } else {
-    quantityAfter = Math.max(quantity, 0);
-  }
+  // The SERVER first, and it does the arithmetic.
+  //
+  // This used to compute the new figure here, write it to the local cache, add a
+  // local history row, and only then ask the server. A refusal left all of it in
+  // place: a stock level the shop does not have, and an audit row for an
+  // adjustment that never happened — with the count reverting on the next
+  // hydration, after the admin had moved on believing it was set.
+  const applied = await adjustStockRequest({ cakeId, type, quantity, reason, note });
+  if (!applied) return { item: null, persisted: false };
+
+  // Its number, not ours. They differ the moment an order or a second admin
+  // touches the same row, and only one of them is what the shop will sell
+  // against.
+  const quantityAfter = applied.stockQuantity;
 
   const stockFields = resolveStockFields({
     ...cake,
     stockQuantity: quantityAfter,
-    unlimitedStock: false,
+    unlimitedStock: applied.unlimitedStock,
   });
 
   const updated = updateProduct(cakeId, {
@@ -226,8 +232,10 @@ export async function adjustStock({
     ...stockFields,
   });
 
-  if (!updated) return { item: null, persisted: false };
+  if (!updated) return { item: null, persisted: true };
 
+  // The server writes its own history row. This one is the local mirror of it,
+  // so it records the figure the server landed on.
   appendStockHistory({
     id: `stock-${Date.now()}`,
     cakeId: cake.id,
@@ -241,13 +249,10 @@ export async function adjustStock({
     createdAt: nowIso(),
   });
 
-  // Durable write to the server (updates the Mongo product stock + history).
-  const persisted = await adjustStockRequest({ cakeId, type, quantity, reason, note });
-
   emitInventoryUpdated();
   return {
     item: getInventoryItems().find((item) => item.cakeId === cakeId) ?? null,
-    persisted,
+    persisted: true,
   };
 }
 

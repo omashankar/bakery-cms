@@ -180,6 +180,77 @@ export async function replaceOne(id: string, product: Product): Promise<Product 
   return doc ? toProduct(doc) : null;
 }
 
+/**
+ * Move a product's stock in one atomic step, and report where it moved from.
+ *
+ * The admin adjustment used to read `stockQuantity`, do the arithmetic in JS and
+ * write the ABSOLUTE result. An order placed in that window was erased: the
+ * cakes left the shop and the number went back to what the admin had been
+ * looking at. `$inc` on the same field, inside a transaction, is exactly what
+ * order placement does — so the two writers were racing on the one number a shop
+ * cannot afford to get wrong.
+ *
+ * "set" is absolute BY DEFINITION — the admin is declaring a counted figure — so
+ * it is the one type that is allowed to overwrite. The pre-image still comes
+ * back from the same operation, so the history row records what was really
+ * replaced rather than a value read moments earlier.
+ */
+export async function applyStockDelta(
+  id: string,
+  type: "add" | "remove" | "set",
+  quantity: number,
+): Promise<{ before: number; after: number; product: Product } | null> {
+  await connectDB();
+
+  const current = { $ifNull: ["$stockQuantity", 0] };
+  const nextQuantity =
+    type === "add"
+      ? { $add: [current, quantity] }
+      : type === "remove"
+        ? { $max: [0, { $subtract: [current, quantity] }] }
+        : quantity;
+
+  // An aggregation-pipeline update: the new value is computed by the database
+  // from the row it is writing, so nothing can slip in between the read and the
+  // write. `before` is the document as it was, from the same operation.
+  //
+  // Through `ProductModel.collection` rather than the model. Mongoose casts an
+  // update against the schema, and a pipeline is an ARRAY of stages, not a set
+  // of field assignments — it rejected the whole call, which surfaced as a 500
+  // on every stock adjustment. The raw driver takes it as written.
+  const doc = (await ProductModel.collection.findOneAndUpdate(
+    { _id: id as unknown as never },
+    [{ $set: { stockQuantity: nextQuantity, unlimitedStock: false } }],
+    { returnDocument: "before" },
+  )) as unknown as Raw | null;
+
+  if (!doc) return null;
+
+  const product = toProduct(doc);
+  const before = product.stockQuantity ?? 0;
+  const after =
+    type === "add" ? before + quantity : type === "remove" ? Math.max(0, before - quantity) : quantity;
+
+  return { before, after, product };
+}
+
+/**
+ * Set the derived status, but only while the quantity is still the one it was
+ * derived from — otherwise a sale landing in between would be labelled by a
+ * status computed for a number that is no longer there.
+ */
+export async function setStockStatusFor(
+  id: string,
+  quantity: number,
+  stockStatus: Product["stockStatus"],
+): Promise<void> {
+  await connectDB();
+  await ProductModel.updateOne(
+    { _id: id, stockQuantity: quantity },
+    { $set: { stockStatus, updatedAt: new Date().toISOString() } },
+  );
+}
+
 export async function deleteOne(id: string): Promise<boolean> {
   await connectDB();
   return (await ProductModel.deleteOne({ _id: id })).deletedCount > 0;
