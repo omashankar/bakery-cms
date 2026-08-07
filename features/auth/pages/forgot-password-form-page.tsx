@@ -23,7 +23,7 @@ export function ForgotPasswordFormPage() {
   const router = useRouter();
   const [sent, setSent] = useState(false);
   const { register, handleSubmit, formState } = useForm<ForgotPasswordForm>({
-    defaultValues: { email: "admin@bakery.com" },
+    defaultValues: { email: "sumanom7014106@gmail.com" },
   });
 
   const onSubmit = async (data: ForgotPasswordForm) => {
@@ -61,7 +61,7 @@ export function ForgotPasswordFormPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="admin@bakery.com"
+            placeholder="sumanom7014106@gmail.com"
             disabled={sent}
             {...register("email", { required: "Email is required" })}
           />

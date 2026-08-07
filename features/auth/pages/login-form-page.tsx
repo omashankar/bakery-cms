@@ -35,7 +35,7 @@ export function LoginFormPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { register, control, handleSubmit, formState } = useForm<LoginForm>({
     defaultValues: {
-      email: "admin@bakery.com",
+      email: "sumanom7014106@gmail.com",
       password: "",
       rememberMe: true,
     },
@@ -91,7 +91,7 @@ export function LoginFormPage() {
               type="email"
               autoComplete="email"
               inputMode="email"
-              placeholder="you@bakery.com"
+              placeholder="sumanom7014106@gmail.com"
               className={cn(fieldClass, "pl-11")}
               aria-invalid={!!formState.errors.email}
               aria-describedby={formState.errors.email ? "email-error" : undefined}

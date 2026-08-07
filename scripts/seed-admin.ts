@@ -59,7 +59,7 @@ async function main() {
   }
 
   // 2. Admin user — create only if missing.
-  const email = (process.env.ADMIN_EMAIL || "admin@bakery.com").toLowerCase();
+  const email = (process.env.ADMIN_EMAIL || "sumanom7014106@gmail.com").toLowerCase();
   const password = process.env.ADMIN_PASSWORD || "Admin@12345";
 
   const existing = await UserModel.findOne({ email });

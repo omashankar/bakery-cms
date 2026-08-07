@@ -59,7 +59,7 @@ function write(data: StoredProfile): boolean {
 
 /** Fully-resolved profile (session email + saved fields + sensible defaults). */
 export function getAdminProfile(): AdminProfile {
-  const email = getDemoSession()?.email ?? "owner@bakery.com";
+  const email = getDemoSession()?.email ?? "sumanom7014106@gmail.com";
   const saved = read();
 
   // Seed created/last-login once so the demo shows realistic values.
