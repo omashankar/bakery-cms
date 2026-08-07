@@ -147,6 +147,9 @@ export function CommerceSettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">

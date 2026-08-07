@@ -22,9 +22,23 @@ function baseOptions() {
   };
 }
 
-export async function setAuthCookies(accessToken: string, refreshToken: string): Promise<void> {
+/**
+ * `accessTtl` keeps the cookie and the token it carries in step.
+ *
+ * These were the same value by construction until the access token started
+ * taking a configured lifetime. After that they diverged for every value but
+ * the default: the token said one thing and the browser threw the cookie away
+ * at another, so the setting changed nothing an honest client could feel while
+ * still lengthening the window for a replayed token. Defaulted, so callers
+ * that do not know the policy keep working.
+ */
+export async function setAuthCookies(
+  accessToken: string,
+  refreshToken: string,
+  accessTtl: string = ACCESS_TTL,
+): Promise<void> {
   const store = await cookies();
-  store.set(ACCESS_COOKIE, accessToken, { ...baseOptions(), expires: ttlToDate(ACCESS_TTL) });
+  store.set(ACCESS_COOKIE, accessToken, { ...baseOptions(), expires: ttlToDate(accessTtl) });
   store.set(REFRESH_COOKIE, refreshToken, { ...baseOptions(), expires: ttlToDate(REFRESH_TTL) });
 }
 

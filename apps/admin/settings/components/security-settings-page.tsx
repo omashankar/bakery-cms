@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { SECURITY_RANGES } from "@/features/settings/server/settings.validators";
 import {
   reportSettingsReset,
   reportSettingsWrite,
@@ -65,9 +66,16 @@ import { useSettingsSection } from "@/features/settings/lib/use-settings-section
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
-/** Shared by the number inputs and the save-time clamp so the two cannot drift apart. */
-const SESSION_TIMEOUT = { min: 15, max: 480 } as const;
-const LOGIN_ATTEMPTS = { min: 3, max: 10 } as const;
+/**
+ * The SERVER's ranges, not the page's own.
+ *
+ * These were 15–480 and 3–10 while the schema allowed 1–1440 and 1–20 and
+ * the policy helpers clamped to something else again — so an admin could
+ * pick a number the page offered, watch it save, and have a different one
+ * enforced. One source now, exported from the validator that decides.
+ */
+const SESSION_TIMEOUT = SECURITY_RANGES.sessionTimeoutMinutes;
+const LOGIN_ATTEMPTS = SECURITY_RANGES.maxLoginAttempts;
 
 function clamp(value: number, { min, max }: { min: number; max: number }): number {
   return Math.min(max, Math.max(min, value));
@@ -243,6 +251,9 @@ export function SecuritySettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
       <Tabs
@@ -270,7 +281,12 @@ export function SecuritySettingsPage() {
             <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Session &amp; access</CardTitle>
-                <CardDescription>Controls how admin sessions behave in this demo.</CardDescription>
+                {/* Not "in this demo": the timeout and the attempt limit are
+                    enforced on every sign-in now, and calling them a demo
+                    invites an owner to ignore them. */}
+                <CardDescription>
+                  How long a session lasts and how many sign-in attempts an address gets.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -312,7 +328,11 @@ export function SecuritySettingsPage() {
               <CardHeader>
                 <CardTitle className="text-base">Policies</CardTitle>
                 <CardDescription>
-                  Toggle security features for future backend integration.
+                  {/* This sat above three switches, two of which are now
+                      disabled and labelled "Not built yet" and one of which
+                      is enforced on every password change — so the sentence
+                      was wrong about all three. */}
+                  Password rules are enforced. The two below are not built yet.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -381,7 +401,7 @@ export function SecuritySettingsPage() {
                         <span className="text-sm font-medium">{entry.email}</span>
                       </div>
                       <p className="text-sm text-muted-foreground">{entry.deviceLabel}</p>
-                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress}</p>
+                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatRelativeTime(entry.timestamp)}
@@ -426,7 +446,7 @@ export function SecuritySettingsPage() {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{entry.email}</p>
                       <p className="text-sm text-muted-foreground">{entry.reason}</p>
-                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress}</p>
+                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatRelativeTime(entry.timestamp)}
@@ -480,7 +500,7 @@ export function SecuritySettingsPage() {
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {session.email} · IP {session.ipAddress}
+                        {session.email} · IP {session.ipAddress || "unknown"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Last active {formatRelativeTime(session.lastActiveAt)}
@@ -537,7 +557,7 @@ export function SecuritySettingsPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        IP {device.ipAddress} · Last seen {formatRelativeTime(device.lastSeenAt)}
+                        IP {device.ipAddress || "unknown"} · Last seen {formatRelativeTime(device.lastSeenAt)}
                       </p>
                     </div>
                     <Button

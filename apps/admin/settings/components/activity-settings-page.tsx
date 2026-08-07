@@ -138,7 +138,18 @@ export function ActivitySettingsPage() {
             <div className="divide-y divide-border rounded-xl border border-border">
               {filtered.length === 0 ? (
                 <p className="p-6 text-center text-sm text-muted-foreground">
-                  No matching activity.
+                  {/*
+                    Two different nothings. The seeded demo rows meant this
+                    panel was never empty on a fresh shop, so the only copy
+                    written for it assumed a search — and once those
+                    fabricated rows were removed, a brand-new shop opened its
+                    activity log and read "No matching activity" with an
+                    empty search box, which reads like a broken filter
+                    rather than a log with nothing in it yet.
+                  */}
+                  {entries.length === 0
+                    ? "No activity recorded yet — actions you take in the admin will appear here."
+                    : "No matching activity."}
                 </p>
               ) : (
                 filtered.map((entry) => (

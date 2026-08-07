@@ -208,6 +208,9 @@ export function AppearancePage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
       saveDisabled={!hasValidAppearanceColors(settings) || !canSave}
       resetTitle="Reset appearance?"
       resetDescription="Restore the Monginis Classic preset and default radius. Custom colors will be lost."

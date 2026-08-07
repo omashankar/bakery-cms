@@ -127,12 +127,36 @@ export const socialSchema = z.array(
     }),
 );
 
+/**
+ * One range per field, because there were three.
+ *
+ * The zod bounds said 1–1440 and 1–20, the Security screen's inputs said
+ * 15–480 and 3–10, and the server's clamp said 5–15 and 3–20. A shop could
+ * save a value the screen offered, have the API accept it, and get something
+ * else enforced — while the screen read the saved number back as though it
+ * were in force.
+ *
+ * Exported so the page and the policy helpers use these and cannot drift.
+ */
+export const SECURITY_RANGES = {
+  sessionTimeoutMinutes: { min: 5, max: 1440 },
+  maxLoginAttempts: { min: 3, max: 20 },
+} as const;
+
 export const securitySchema = z.object({
-  sessionTimeoutMinutes: z.number().int().min(1).max(1440),
+  sessionTimeoutMinutes: z
+    .number()
+    .int()
+    .min(SECURITY_RANGES.sessionTimeoutMinutes.min)
+    .max(SECURITY_RANGES.sessionTimeoutMinutes.max),
   requireStrongPasswords: z.boolean(),
   twoFactorEnabled: z.boolean(),
   loginNotifications: z.boolean(),
-  maxLoginAttempts: z.number().int().min(1).max(20),
+  maxLoginAttempts: z
+    .number()
+    .int()
+    .min(SECURITY_RANGES.maxLoginAttempts.min)
+    .max(SECURITY_RANGES.maxLoginAttempts.max),
 });
 
 export const smtpSchema = z.object({

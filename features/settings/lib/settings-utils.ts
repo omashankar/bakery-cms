@@ -23,11 +23,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function daysAgo(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
 
 export const defaultGeneralSettings: GeneralSettings = {
   siteName: brandInfo.name,

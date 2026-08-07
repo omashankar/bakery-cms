@@ -221,6 +221,9 @@ export function FooterAdminPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
       resetTitle="Reset footer?"
       resetDescription="Replace current footer settings with the default demo columns and sections."
     >

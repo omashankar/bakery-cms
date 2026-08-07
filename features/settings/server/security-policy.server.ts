@@ -22,13 +22,29 @@ export async function getSecurityPolicy(): Promise<SecuritySettings> {
   try {
     const settings = (await getSettings()) as { security?: Partial<SecuritySettings> };
     return { ...defaultSecuritySettings, ...(settings.security ?? {}) };
-  } catch {
+  } catch (error) {
+    // Loud, because this silently downgrades the shop to the shipped policy.
+    // A shop that had tightened its limits gets the defaults back with no
+    // trace anywhere — the failure mode is invisible precisely where being
+    // invisible is worst.
+    console.error(
+      `[security] policy read failed, falling back to defaults: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
     return defaultSecuritySettings;
   }
 }
 
 /**
- * How many failed sign-ins an address may make before it is throttled.
+ * How many sign-in ATTEMPTS an address may make per minute before it is
+ * throttled.
+ *
+ * Not "failed" attempts, which is what this said and what the screen still
+ * implies: `rateLimit` counts every POST to the login route from that IP,
+ * successful ones included. Said plainly because the difference matters to a
+ * shop behind one NAT — several staff signing in legitimately share the
+ * budget.
  *
  * Clamped rather than trusted: the schema constrains future writes and this
  * value gates authentication, so a stored 0 (locking everyone out) or a stored

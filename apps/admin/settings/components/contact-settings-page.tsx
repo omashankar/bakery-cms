@@ -134,6 +134,9 @@ export function ContactSettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 lg:grid-cols-2">

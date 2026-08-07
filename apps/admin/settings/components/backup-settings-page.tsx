@@ -20,7 +20,6 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
-import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import {
   BACKUP_UPDATED_EVENT,
   BROWSER_ONLY_NOTE,
@@ -145,12 +144,30 @@ export function BackupSettingsPage() {
     try {
       // Snapshot the current DURABLE state (server + local) BEFORE the write, so
       // rolling back from history actually restores the server too.
-      await exportAndArchiveServerBackup(`Before import — ${new Date().toLocaleString()}`);
-      // Open the gates FIRST. A restore writes every server-backed section,
-      // and each guarded PUT waits out the full hydration deadline when its
-      // gate is shut — sequentially. So a restore from a tab that never
-      // hydrated took minutes and then blamed the server for refusing.
-      await ensureSiteLayoutHydrated();
+      const before = await exportAndArchiveServerBackup(
+        `Before import — ${new Date().toLocaleString()}`,
+      );
+
+      /**
+       * The safety net has to be checked before the fall.
+       *
+       * `handleExport` already warns when a section could not be read from the
+       * server and came from this browser instead. This path did not — so the
+       * one snapshot an admin would roll back to could quietly be the local
+       * cache, or the demo seed, taken moments before a destructive restore
+       * overwrote the real thing. Refusing is right: an import is undoable
+       * only if the thing before it was real.
+       */
+      if (before.unavailableSections.length > 0) {
+        toast.error("Import stopped — the pre-import snapshot is incomplete", {
+          description: `Could not read ${before.unavailableSections.join(", ")} from the server, so there would be nothing to roll back to. Reload and try again.`,
+        });
+        return;
+      }
+
+      // `restoreBackupToServer` opens every gate it can itself now, so the
+      // call site no longer has to remember to — which is what made it possible
+      // to get this wrong in the first place.
       const result = await restoreBackupToServer(target.data);
       refresh();
       reportRestore(result);
@@ -167,10 +184,22 @@ export function BackupSettingsPage() {
    */
   function reportRestore(result: RestoreResult) {
     if (result.failedSections.length > 0) {
+      /**
+       * Two different failures, two different remedies.
+       *
+       * A guarded PUT refuses before any request leaves the browser when its
+       * hydration gate is shut, and that is indistinguishable from the server
+       * saying no — so a restore from a cold or signed-out tab blamed the
+       * server for sections it never contacted, and told the admin they were
+       * "restored in this browser only", which is a claim about a place the
+       * data is not.
+       */
       toast.error(
         `Restored ${result.serverSections.length} of ${result.serverSections.length + result.failedSections.length} sections to the server`,
         {
-          description: `The server refused: ${result.failedSections.join(", ")}. Those are restored in this browser only.`,
+          description: result.gatesOpen
+            ? `The server refused: ${result.failedSections.join(", ")}. Those are not restored anywhere — try again.`
+            : `Could not send: ${result.failedSections.join(", ")}. This tab has not finished loading the current settings, so nothing was sent for them. Reload and import again.`,
         }
       );
       return;

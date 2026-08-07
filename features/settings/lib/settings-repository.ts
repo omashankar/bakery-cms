@@ -187,6 +187,18 @@ async function updateStore(
   // same hydration has landed.
   const hydrated = await ensureSettingsHydrated();
 
+  /**
+   * The cache exactly as it stands, so a refused write can be undone.
+   *
+   * Without this a rejected save stayed in localStorage, and every settings
+   * form writes its whole section back from that cache — so the next edit to
+   * one unrelated field carried the rejected payload to the server. A change
+   * the admin was told had failed landed later, by the back door. The
+   * appearance, header, footer and SEO stores all carry this guard now.
+   */
+  const previousRaw =
+    typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+
   const current = loadSettings();
   let next = mergeAppSettings({ ...current, ...patch });
   if (activity) {
@@ -206,6 +218,7 @@ async function updateStore(
   // after burning the gate's 8-second timeout each time, with the Save button
   // sitting there enabled and unlabelled. Report the failure now instead.
   if (!hydrated && sections.length > 0) {
+    rollBackCache(previousRaw, saved);
     return { value: saved, persisted: false };
   }
 
@@ -215,7 +228,35 @@ async function updateStore(
 
   // A patch touching no server-backed section (the activity log) has nothing
   // that could fail, so it is trivially persisted.
-  return { value: saved, persisted: results.every(Boolean) };
+  const persisted = results.every(Boolean);
+  if (!persisted) rollBackCache(previousRaw, saved);
+
+  // The attempted value goes back to the FORM even on refusal: it is the
+  // admin's own typing and they must be able to retry it. Only the cache is
+  // undone — that is the copy every other form reads its section from.
+  return { value: saved, persisted };
+}
+
+/**
+ * Undoes a refused write in the CACHE, leaving the caller's value alone.
+ *
+ * Every settings form writes its whole section back from this cache, so a
+ * rejected payload left there reaches the server by the back door on the next
+ * edit to an unrelated field — a change the admin was told had failed,
+ * landing later. The form keeps the attempted value so the admin can retry;
+ * the cache must not.
+ *
+ * Restores only if this write is still the one in the cache: undoing
+ * unconditionally would destroy a concurrent save the server had accepted.
+ */
+function rollBackCache(previousRaw: string | null, attempted: AppSettings): void {
+  if (typeof window === "undefined") return;
+
+  const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(attempted);
+  if (!stillOurs) return;
+
+  if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
+  else localStorage.setItem(STORAGE_KEY, previousRaw);
 }
 
 export function getGeneralSettings(): GeneralSettings {
@@ -383,20 +424,40 @@ export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLo
 }
 
 /** Section-scoped resets — do not wipe sibling settings slices. */
-export function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
-  return saveGeneralSettings({ ...defaultGeneralSettings });
+export async function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
+  const result = await saveGeneralSettings({ ...defaultGeneralSettings });
+  // A reset is not the admin's typing, so nothing needs preserving — hand
+  // back what is actually in place. `runWrite` commits the returned value
+  // as the working copy regardless of acceptance, so returning the defaults
+  // left the form showing them over a reset the server had refused.
+  return result.persisted ? result : { ...result, value: getGeneralSettings() };
 }
 
-export function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
-  return saveContactSettings({ ...defaultContactSettings });
+export async function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
+  const result = await saveContactSettings({ ...defaultContactSettings });
+  // A reset is not the admin's typing, so nothing needs preserving — hand
+  // back what is actually in place. `runWrite` commits the returned value
+  // as the working copy regardless of acceptance, so returning the defaults
+  // left the form showing them over a reset the server had refused.
+  return result.persisted ? result : { ...result, value: getContactSettings() };
 }
 
-export function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
-  return saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link })));
+export async function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
+  const result = await saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link })));
+  // A reset is not the admin's typing, so nothing needs preserving — hand
+  // back what is actually in place. `runWrite` commits the returned value
+  // as the working copy regardless of acceptance, so returning the defaults
+  // left the form showing them over a reset the server had refused.
+  return result.persisted ? result : { ...result, value: getSocialLinks() };
 }
 
-export function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
-  return saveSecuritySettings({ ...defaultSecuritySettings });
+export async function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
+  const result = await saveSecuritySettings({ ...defaultSecuritySettings });
+  // A reset is not the admin's typing, so nothing needs preserving — hand
+  // back what is actually in place. `runWrite` commits the returned value
+  // as the working copy regardless of acceptance, so returning the defaults
+  // left the form showing them over a reset the server had refused.
+  return result.persisted ? result : { ...result, value: getSecuritySettings() };
 }
 
 export function resetSmtpSettings(): Promise<SettingsWriteResult<SmtpSettings>> {

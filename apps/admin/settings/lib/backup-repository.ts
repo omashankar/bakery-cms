@@ -93,12 +93,22 @@ function replacer<T>(fn: (value: T) => Promise<boolean>): (value: unknown) => Pr
   return (value) => fn(value as T);
 }
 
+/**
+ * False when there was nothing recognisable to send.
+ *
+ * `[].every(Boolean)` is `true`, so a payload whose keys match no known
+ * section reported a successful push having contacted the server zero
+ * times — and the restore then listed it among the sections it had
+ * restored. On the one screen where an admin cannot check by eye, that is
+ * the worst direction to be wrong in.
+ */
 async function pushSettingsSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
+  const present = SERVER_SECTIONS.filter((section) => record[section] !== undefined);
+  if (present.length === 0) return false;
+
   const results = await Promise.all(
-    SERVER_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
-      pushSection(section, record[section])
-    )
+    present.map((section) => pushSection(section, record[section]))
   );
   return results.every(Boolean);
 }
@@ -213,6 +223,16 @@ export interface RestoreResult {
   serverSections: string[];
   /** Titles the server refused — restored in this browser only. */
   failedSections: string[];
+  /**
+   * Whether every hydration gate opened before the push.
+   *
+   * A guarded PUT refuses before any request leaves the browser when its
+   * gate is shut, and that refusal is indistinguishable from the server
+   * saying no — so a restore from a cold or signed-out tab blamed the
+   * server for sections it never contacted. The screen needs to tell those
+   * two apart, because they have completely different remedies.
+   */
+  gatesOpen: boolean;
 }
 
 function nowIso(): string {
@@ -363,20 +383,27 @@ export async function buildServerBackupData(): Promise<Record<string, string | n
  * Failures are ignored on purpose: a gate that will not open is exactly the
  * case the per-section refusal reporting already handles honestly.
  */
-async function openEveryGate(): Promise<void> {
-  await Promise.allSettled([
+async function openEveryGate(): Promise<boolean> {
+  const results = await Promise.allSettled([
     ensureSettingsHydrated(),
     ensureSiteLayoutHydrated(),
     ensureSeoHydrated(),
     ensureAdminConfigHydrated(),
     ensureInvoiceSettingsHydrated(),
   ]);
+
+  // An opener that rejected, or resolved false, means its gate is still
+  // shut — and every write behind it will refuse without contacting the
+  // server.
+  return results.every(
+    (result) => result.status === "fulfilled" && result.value !== false,
+  );
 }
 
 export async function restoreBackupToServer(
   data: Record<string, string | null>
 ): Promise<RestoreResult> {
-  await openEveryGate();
+  const gatesOpen = await openEveryGate();
 
   const serverSections: string[] = [];
   const failedSections: string[] = [];
@@ -410,7 +437,7 @@ export async function restoreBackupToServer(
 
   const localCount = importLocalStorageBackup({ ...browserOnly, ...accepted });
 
-  return { localCount, serverSections, failedSections };
+  return { localCount, serverSections, failedSections, gatesOpen };
 }
 
 export async function restoreBackupSnapshotToServer(

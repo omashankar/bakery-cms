@@ -115,6 +115,9 @@ export function CustomCodeSettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
       saveLabel="Save code"
       resetTitle="Clear custom code?"
       resetDescription="Remove all custom CSS and JavaScript. The storefront returns to its default styling."

@@ -128,10 +128,8 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
 
   // The shop's configured session timeout, finally applied. Every session was
   // 15 minutes regardless of what the Security screen said.
-  const accessToken = await signAccessToken(
-    { sub: userId, role, email },
-    accessTokenTtl(await getSecurityPolicy()),
-  );
+  const accessTtl = accessTokenTtl(await getSecurityPolicy());
+  const accessToken = await signAccessToken({ sub: userId, role, email }, accessTtl);
   const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) });
 
   await repo.createRefreshToken({
@@ -141,7 +139,8 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
     expiresAt: ttlToDate(REFRESH_TTL),
   });
 
-  await setAuthCookies(accessToken, refreshToken);
+  // The cookie carries the same lifetime as the token inside it.
+  await setAuthCookies(accessToken, refreshToken, accessTtl);
   return { accessToken, refreshToken, sessionId: String(session._id) };
 }
 
@@ -193,9 +192,10 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   await repo.revokeRefreshToken(String(stored._id));
   await repo.touchSession(claims.sid).catch(() => undefined);
 
+  const accessTtl = accessTokenTtl(policy);
   const accessToken = await signAccessToken(
     { sub: claims.sub, role: user.role, email: user.email },
-    accessTokenTtl(policy),
+    accessTtl,
   );
   const newRefresh = await signRefreshToken({ sub: claims.sub, sid: claims.sid });
   await repo.createRefreshToken({
@@ -204,7 +204,7 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
     tokenHash: sha256(newRefresh),
     expiresAt: ttlToDate(REFRESH_TTL),
   });
-  await setAuthCookies(accessToken, newRefresh);
+  await setAuthCookies(accessToken, newRefresh, accessTtl);
 
   return toPublicUser(user);
 }

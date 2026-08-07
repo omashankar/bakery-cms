@@ -92,6 +92,9 @@ export function AnalyticsSettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
       <Card className="shadow-sm">

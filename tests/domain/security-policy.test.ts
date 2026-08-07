@@ -287,3 +287,240 @@ describe("the regressions the first attempt introduced", () => {
     expect(notice).toContain("8+ with mixed case and a number");
   });
 });
+
+describe("the reset schema, not only the change schema", () => {
+  it("applies the same rule on the path a locked-out user takes", async () => {
+    // Only `changePasswordSchema` was exercised, so reverting
+    // `resetPasswordSchema.password` to a bare length check passed. The reset
+    // path is the one that matters most here: it is the screen someone reaches
+    // when they cannot get in at all.
+    const { resetPasswordSchema } = await import("@/features/auth/server/auth.validators");
+
+    const parse = (password: string) =>
+      resetPasswordSchema.safeParse({
+        email: "a@b.com",
+        otp: "123456",
+        password,
+        confirmPassword: password,
+      }).success;
+
+    expect(parse("Abcdefg1")).toBe(true);
+    expect(parse("abcdefg1")).toBe(false);
+    expect(parse("ABCDEFG1")).toBe(false);
+    expect(parse("Abcdefgh")).toBe(false);
+  });
+});
+
+describe("the activity list", () => {
+  it("keeps the server's entries rather than the browser's", async () => {
+    // `toContain("fetchAuditLogs")` matched the import line, so a merge that
+    // simply returned the local list passed. The server trail is the durable,
+    // cross-device one — dropping it would put the admin back to whatever this
+    // browser happened to hold.
+    const { mergeActivity } = await import("@/features/audit/lib/audit-activity");
+
+    const server = [
+      { id: "s1", action: "updated", entity: "orders", userId: "a@b.com", timestamp: "2026-01-02T00:00:00.000Z" },
+    ];
+    const local = [
+      { id: "l1", action: "updated", entity: "settings", userId: "admin", timestamp: "2026-01-01T00:00:00.000Z" },
+    ];
+
+    const merged = mergeActivity(server, local);
+
+    expect(merged.map((entry) => entry.id)).toContain("s1");
+    expect(merged.map((entry) => entry.id)).toContain("l1");
+    // Newest first, so the server's recent entry leads.
+    expect(merged[0].id).toBe("s1");
+  });
+
+  it("does not show the same action twice", async () => {
+    const { mergeActivity } = await import("@/features/audit/lib/audit-activity");
+    const entry = {
+      id: "same",
+      action: "updated",
+      entity: "orders",
+      userId: "a@b.com",
+      timestamp: "2026-01-02T00:00:00.000Z",
+    };
+
+    expect(mergeActivity([entry], [entry])).toHaveLength(1);
+  });
+});
+
+describe("the security centre's own lists", () => {
+  it("invents no login history, devices or sessions", async () => {
+    const { loadSecurityCenter } = await import(
+      "@/features/settings/lib/security-center-repository"
+    );
+    const state = loadSecurityCenter();
+
+    // These shipped with invented rows carrying real-looking IP addresses and
+    // timestamps a couple of hours old, rendered exactly like the real ones. An
+    // owner scanning their login history for something they did not recognise
+    // was reading fiction, on the one screen that exists to be believed.
+    expect(state.loginHistory).toEqual([]);
+    expect(state.failedAttempts).toEqual([]);
+    expect(state.activeSessions).toEqual([]);
+    expect(state.devices).toEqual([]);
+  });
+});
+
+describe("one range per field", () => {
+  it("is what the schema, the page and the clamp all use", async () => {
+    const { SECURITY_RANGES, securitySchema } = await import(
+      "@/features/settings/server/settings.validators"
+    );
+
+    // The zod bounds said 1–1440 and 1–20, the page's inputs said 15–480 and
+    // 3–10, and the clamp said something else again — so a value the screen
+    // offered could be accepted and then quietly changed.
+    const base = {
+      requireStrongPasswords: true,
+      twoFactorEnabled: false,
+      loginNotifications: true,
+      maxLoginAttempts: 5,
+      sessionTimeoutMinutes: 60,
+    };
+
+    expect(
+      securitySchema.safeParse({
+        ...base,
+        sessionTimeoutMinutes: SECURITY_RANGES.sessionTimeoutMinutes.min - 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      securitySchema.safeParse({
+        ...base,
+        maxLoginAttempts: SECURITY_RANGES.maxLoginAttempts.min - 1,
+      }).success,
+    ).toBe(false);
+
+    const page = code("apps/admin/settings/components/security-settings-page.tsx");
+    expect(page).toContain("SECURITY_RANGES.sessionTimeoutMinutes");
+    expect(page).toContain("SECURITY_RANGES.maxLoginAttempts");
+  });
+});
+
+describe("the pieces that hold a session open", () => {
+  it("does not renew on a timer with nobody there", () => {
+    const hook = code("features/auth/lib/use-session-refresh.ts");
+
+    // The interval fired unconditionally off a thirty-day refresh cookie, so an
+    // admin tab left open on a shared terminal renewed itself every ten minutes
+    // for a month — which made the shop's own session timeout unreachable by
+    // construction, because the server's idle check can only fire if the client
+    // stops asking.
+    expect(hook).toContain("PRESENCE_WINDOW_MS");
+    expect(hook).toMatch(/if \(requirePresence && now - lastSeen > PRESENCE_WINDOW_MS\) return;/);
+    // The timer requires presence; a mount or a focus is itself the evidence.
+    expect(hook).toContain("setInterval(() => tick(true)");
+    expect(hook).toContain("tick(false); // renew immediately");
+  });
+
+  it("gives the cookie the same life as the token inside it", () => {
+    const cookies = code("lib/server/auth/cookies.ts");
+    // These were equal by construction until the token took a configured
+    // lifetime; after that the browser threw the cookie away on a different
+    // schedule from the one the token was signed with.
+    expect(cookies).toMatch(/accessTtl: string = ACCESS_TTL/);
+    expect(cookies).toContain("expires: ttlToDate(accessTtl)");
+
+    const service = code("features/auth/server/auth.service.ts");
+    expect(service).toContain("setAuthCookies(accessToken, refreshToken, accessTtl)");
+    expect(service).toContain("setAuthCookies(accessToken, newRefresh, accessTtl)");
+  });
+
+  it("says out loud when it falls back to the shipped policy", () => {
+    const policy = code("features/settings/server/security-policy.server.ts");
+    // A failed settings read silently downgraded a shop that had tightened its
+    // limits, with no trace anywhere.
+    expect(policy).toMatch(/console\.error\(/);
+    expect(policy).toContain("policy read failed, falling back to defaults");
+  });
+});
+
+describe("a restore that could not send", () => {
+  it("does not blame the server for it", () => {
+    const repo = code("apps/admin/settings/lib/backup-repository.ts");
+    // A guarded PUT refuses before any request leaves the browser when its gate
+    // is shut, which is indistinguishable from the server saying no.
+    expect(repo).toContain("gatesOpen: boolean;");
+    expect(repo).toMatch(/async function openEveryGate\(\): Promise<boolean>/);
+    expect(repo).toMatch(/result\.status === "fulfilled" && result\.value !== false/);
+
+    const page = code("apps/admin/settings/components/backup-settings-page.tsx");
+    expect(page).toContain("result.gatesOpen");
+    // The old copy claimed a place the data is not.
+    expect(page).not.toContain("Those are restored in this browser only.");
+  });
+
+  it("refuses to import when the rollback point is incomplete", () => {
+    const page = code("apps/admin/settings/components/backup-settings-page.tsx");
+    // An import is undoable only if the snapshot taken before it was real.
+    expect(page).toContain("before.unavailableSections.length > 0");
+    expect(page).toContain("the pre-import snapshot is incomplete");
+  });
+
+  it("does not report a push that sent nothing", () => {
+    const repo = code("apps/admin/settings/lib/backup-repository.ts");
+    // `[].every(Boolean)` is true, so a payload matching no known section
+    // reported success having contacted the server zero times.
+    expect(repo).toMatch(/if \(present\.length === 0\) return false;/);
+  });
+});
+
+describe("a refused settings write", () => {
+  it("is undone in the cache but kept in the form", () => {
+    const repo = code("features/settings/lib/settings-repository.ts");
+    // Every settings form writes its whole section back from this cache, so a
+    // rejected payload left there was re-sent on the next unrelated edit.
+    expect(repo).toContain("function rollBackCache(");
+    expect(repo).toMatch(/const stillOurs = localStorage\.getItem\(STORAGE_KEY\) === JSON\.stringify\(attempted\)/);
+    expect(repo).toMatch(/if \(!persisted\) rollBackCache\(previousRaw, saved\);/);
+    // The attempted value still goes back to the caller — it is the admin's
+    // typing and they must be able to retry it.
+    expect(repo).toContain("return { value: saved, persisted };");
+  });
+
+  it("hands a refused RESET back what is actually in place", () => {
+    const repo = code("features/settings/lib/settings-repository.ts");
+    // A reset is not typing, so there is nothing to preserve — and `runWrite`
+    // commits the returned value as the working copy regardless of acceptance.
+    expect(repo).toMatch(/return result\.persisted \? result : \{ \.\.\.result, value: getSecuritySettings\(\) \}/);
+  });
+});
+
+describe("Reset before hydration", () => {
+  it("is disabled rather than silently doing nothing", () => {
+    const shell = code("apps/admin/settings/components/settings-section-shell.tsx");
+    expect(shell).toContain("resetDisabled");
+    expect(shell).toContain("disabled={resetDisabled}");
+
+    // And every page that has a hydration gate passes it.
+    const page = code("apps/admin/settings/components/security-settings-page.tsx");
+    expect(page).toContain("resetDisabled={!canSave}");
+  });
+});
+
+describe("a login this browser records", () => {
+  it("does not invent an IP address for it", () => {
+    const repo = code("features/settings/lib/security-center-repository.ts");
+
+    // This was `"103.45.128." + a random number`. Every login the client
+    // recorded carried a fabricated address that looks exactly like a real one,
+    // in the list an owner scans for a sign-in they do not recognise. The
+    // browser does not know its own public address, so it must not claim to —
+    // the real one is on the server's audit trail, which the page merges in.
+    expect(repo).not.toContain("103.45.128.");
+    expect(repo).toContain("const UNKNOWN_IP");
+
+    const page = code("apps/admin/settings/components/security-settings-page.tsx");
+    // And an empty value has to read as unknown, not as a blank after "IP ".
+    // Counted, not merely present: one `toMatch` covered four render sites, so
+    // three of them could be reverted and it still passed — the same shape that
+    // let a dropped prop through on the storefront navbar.
+    const shown = page.match(/ipAddress \|\| "unknown"/g) ?? [];
+    expect(shown.length).toBe(4);
+  });
+});
