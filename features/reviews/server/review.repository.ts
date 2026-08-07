@@ -93,6 +93,40 @@ export async function listApprovedByProduct(productSlug: string): Promise<Produc
   return docs.map(toReview);
 }
 
+/**
+ * The star rating and review count a product should be advertising.
+ *
+ * Computed in the database over EVERY approved review, not in a browser over a
+ * cached page of them. A shop past the list cap would otherwise advertise an
+ * average of its most recent reviews.
+ *
+ * Returns zeroes when nothing is approved — which is a real answer, not a
+ * missing one. The client-side version skipped that case, so a product whose
+ * last approved review was rejected kept advertising the old score forever.
+ */
+export async function approvedAggregate(
+  productSlug: string,
+): Promise<{ count: number; average: number }> {
+  await connectDB();
+  const rows = (await ReviewModel.aggregate([
+    { $match: { productSlug, status: "approved" } },
+    { $group: { _id: null, count: { $sum: 1 }, average: { $avg: "$rating" } } },
+  ])) as Array<{ count: number; average: number }>;
+
+  const row = rows[0];
+  if (!row) return { count: 0, average: 0 };
+  return { count: row.count, average: Math.round(row.average * 10) / 10 };
+}
+
+/** Product slugs touched by a set of review ids — needed before they are deleted. */
+export async function slugsForIds(ids: string[]): Promise<string[]> {
+  await connectDB();
+  const docs = (await ReviewModel.find({ _id: { $in: ids } })
+    .select({ productSlug: 1 })
+    .lean()) as unknown as Array<{ productSlug: string }>;
+  return [...new Set(docs.map((doc) => doc.productSlug))];
+}
+
 export async function findById(id: string): Promise<ProductReview | null> {
   await connectDB();
   const doc = (await ReviewModel.findById(id).lean()) as unknown as Raw | null;

@@ -7,9 +7,7 @@ import {
   formatShelfLife,
 } from "@/features/products/lib/variant-utils";
 import type { ProductVariantGroup } from "@/types/product";
-import {
-  getStorefrontReviewsForProduct,
-} from "@/features/reviews/lib/reviews-repository";
+import { fetchApprovedReviews } from "@/features/reviews/lib/reviews-api";
 
 export interface ProductReview {
   id: string;
@@ -78,9 +76,37 @@ export function getDeliveryTimeSlots(): string[] {
   return slots.filter((slot) => slot.trim().length > 0);
 }
 
-export function getProductReviews(cake: LandingProduct): ProductReview[] {
+/**
+ * The reviews a customer sees, from the server.
+ *
+ * This read `getStorefrontReviewsForProduct` — the visitor's own localStorage —
+ * so no moderation decision ever reached a customer, and a first-time visitor
+ * with empty storage was shown a machine-generated set attributed to invented
+ * people. Nothing on the storefront called the public reviews endpoint at all.
+ *
+ * Null means the read failed; the caller keeps whatever it was showing rather
+ * than replacing a real list with an empty one.
+ */
+export async function getProductReviews(
+  cake: LandingProduct
+): Promise<ProductReview[] | null> {
   if (typeof window === "undefined") return [];
-  return getStorefrontReviewsForProduct(cake.slug);
+
+  const stored = await fetchApprovedReviews(cake.slug);
+  if (!stored) return null;
+
+  // The endpoint already sorts featured-first, then newest.
+  return stored.map((review) => ({
+    id: review.id,
+    author: review.authorName,
+    rating: review.rating,
+    text: review.body,
+    title: review.title,
+    date: review.createdAt,
+    adminReply: review.adminReply,
+    repliedAt: review.repliedAt,
+    isFeatured: review.isFeatured,
+  }));
 }
 
 export function getMinDeliveryDate(): string {

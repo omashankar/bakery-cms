@@ -1,38 +1,20 @@
-import { loadProducts, updateProduct } from "@/features/products/lib/products-repository";
-import type { Product } from "@/types/product";
+import { loadProducts } from "@/features/products/lib/products-repository";
 import type {
   ProductReview,
   ProductReviewFormData,
   ProductReviewStatus,
 } from "@/types/review";
 import {
+  fetchReviews,
   submitReviewRequest,
   updateReviewRequest,
   deleteReviewsRequest,
 } from "./reviews-api";
 
 const STORAGE_KEY = "bakery-cms-product-reviews";
-const STORAGE_VERSION_KEY = "bakery-cms-product-reviews-version";
-const REVIEWS_STORAGE_VERSION = 1;
 
 export const REVIEWS_UPDATED_EVENT = "bakery-reviews-updated";
 
-const sampleBodies = [
-  "Absolutely delicious! Fresh, moist, and beautifully decorated. Will order again.",
-  "Delivered on time and tasted amazing. The whole family loved it.",
-  "Great flavour and presentation. Slightly sweeter than expected but still excellent.",
-  "Perfect for our celebration. Looked exactly like the photos online.",
-  "Soft sponge and rich frosting. One of the best cakes we have ordered.",
-];
-
-const sampleAuthors = [
-  "Priya Sharma",
-  "Rahul Mehta",
-  "Ananya Patel",
-  "Vikram Singh",
-  "Neha Kapoor",
-  "Arjun Desai",
-];
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -43,44 +25,10 @@ function emitReviewsUpdated(): void {
   window.dispatchEvent(new Event(REVIEWS_UPDATED_EVENT));
 }
 
-function seedReviews(cakes: Product[]): ProductReview[] {
-  const published = cakes.filter((cake) => cake.status === "published");
-  const reviews: ProductReview[] = [];
-  let index = 0;
-
-  for (const cake of published.slice(0, 12)) {
-    const reviewCount = Math.min(Math.max(cake.reviewCount || 2, 1), 3);
-
-    for (let i = 0; i < reviewCount; i += 1) {
-      const timestamp = new Date(Date.now() - (index + 2) * 86400000 * 5).toISOString();
-      const rating = i === 0 ? Math.round(cake.rating) : 4 + (index % 2);
-      reviews.push({
-        id: `review-seed-${cake.slug}-${i}`,
-        cakeId: cake.id,
-        productSlug: cake.slug,
-        cakeName: cake.name,
-        authorName: sampleAuthors[index % sampleAuthors.length],
-        authorEmail: `${sampleAuthors[index % sampleAuthors.length].split(" ")[0]?.toLowerCase()}@demo.com`,
-        rating: Math.min(5, Math.max(1, rating)),
-        title: i === 0 ? "Loved it!" : undefined,
-        body: sampleBodies[index % sampleBodies.length],
-        status: index % 7 === 0 ? "pending" : index % 11 === 0 ? "reported" : "approved",
-        isFeatured: index % 9 === 0,
-        reportReason: index % 11 === 0 ? "Customer flagged inappropriate language (demo)" : undefined,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
-      index += 1;
-    }
-  }
-
-  return reviews;
-}
-
 function readReviews(): ProductReview[] {
-  if (typeof window === "undefined") {
-    return seedReviews(loadProducts());
-  }
+  // No storage on the server, and nothing to invent — the reviews collection is
+  // the only source. Callers here are all admin-side and hydrate from it.
+  if (typeof window === "undefined") return [];
 
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
@@ -104,52 +52,34 @@ export function persistServerReviews(reviews: ProductReview[]): void {
   writeReviews(reviews);
 }
 
-export function syncProductReviewAggregates(): void {
-  const reviews = readReviews();
-  const approvedByProduct = new Map<string, ProductReview[]>();
+// The product rating is computed on the SERVER now, over every approved review,
+// and written to the product document — see `refreshProductRating` in
+// features/reviews/server/review.service.ts.
+//
+// `syncProductReviewAggregates` used to live here. It computed the right average
+// and then handed it to `updateProduct`, which only writes localStorage — so the
+// moderator's own screen showed the corrected score while every customer kept
+// seeing the seeded one, and nothing surfaced the difference. It also skipped
+// products with zero approved reviews, so rejecting the last review left the old
+// score advertised forever.
 
-  for (const review of reviews) {
-    if (review.status !== "approved") continue;
-    const list = approvedByProduct.get(review.productSlug) ?? [];
-    list.push(review);
-    approvedByProduct.set(review.productSlug, list);
-  }
-
-  for (const cake of loadProducts()) {
-    const approved = approvedByProduct.get(cake.slug) ?? [];
-    if (approved.length === 0) continue;
-
-    const reviewCount = approved.length;
-    const rating =
-      Math.round((approved.reduce((sum, item) => sum + item.rating, 0) / reviewCount) * 10) /
-      10;
-
-    if (cake.reviewCount === reviewCount && cake.rating === rating) continue;
-
-    const { id, createdAt, updatedAt, ...form } = cake;
-    updateProduct(id, {
-      ...form,
-      reviewCount,
-      rating,
-    });
-  }
-}
-
+/**
+ * The admin's cached review list. A CACHE — never a source of reviews.
+ *
+ * This used to invent reviews whenever the cache was empty, from the product's
+ * own rating and a table of sample names. Two things followed: empty meant "not
+ * seeded yet", so a moderator who deleted every review saw the fabrication
+ * reappear and be pushed back to the server; and the storefront read the same
+ * function, so a first-time visitor — whose storage is empty by definition — was
+ * shown reviews signed with invented customer names.
+ *
+ * The server seeds a demo shop once, which is the right place for it. Empty here
+ * now means empty, and the list fills when `useReviewsServerSync` hydrates it.
+ */
 export function loadReviews(): ProductReview[] {
-  if (typeof window === "undefined") return seedReviews(loadProducts());
+  if (typeof window === "undefined") return [];
 
-  const storedVersion = Number(localStorage.getItem(STORAGE_VERSION_KEY) ?? 0);
-  const existing = readReviews();
-
-  if (existing.length === 0 || storedVersion < REVIEWS_STORAGE_VERSION) {
-    const seeded = existing.length > 0 ? existing : seedReviews(loadProducts());
-    writeReviews(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(REVIEWS_STORAGE_VERSION));
-    syncProductReviewAggregates();
-    return seeded;
-  }
-
-  return existing.sort(
+  return readReviews().sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
@@ -203,7 +133,6 @@ export async function createReview(data: ProductReviewFormData): Promise<ReviewW
     updatedAt: timestamp,
   };
   writeReviews([review, ...reviews]);
-  syncProductReviewAggregates();
 
   const stored = await submitReviewRequest(review);
   if (!stored) return { review, persisted: false };
@@ -248,7 +177,6 @@ export async function updateReview(
   };
   reviews[index] = updated;
   writeReviews(reviews);
-  syncProductReviewAggregates();
   return { review: updated, persisted: await updateReviewRequest(id, data) };
 }
 
@@ -280,7 +208,6 @@ async function setStatusBulk(
     ids.includes(review.id) ? { ...review, status, updatedAt: nowIso() } : review
   );
   writeReviews(reviews);
-  syncProductReviewAggregates();
 
   // Every id is sent and every answer counted. `forEach` over an async call
   // discarded all of them, so a batch in which the server refused every single
@@ -332,7 +259,6 @@ export async function deleteReviews(
   const next = reviews.filter((review) => !ids.includes(review.id));
   const count = reviews.length - next.length;
   writeReviews(next);
-  syncProductReviewAggregates();
   return { count, persisted: await deleteReviewsRequest(ids) };
 }
 
@@ -361,47 +287,26 @@ export function submitStorefrontReview(input: {
   });
 }
 
-export async function resetReviews(): Promise<{
+/**
+ * Throw away this browser's cached list and take the server's.
+ *
+ * This was `resetReviews`, and it did something else entirely: it rebuilt a
+ * fabricated demo list from the products, then DELETED from the server every
+ * review that was not part of that fabrication. One unconfirmed click on a
+ * button labelled "Reset demo" permanently destroyed every genuine customer
+ * review the shop had ever received, and then reported success.
+ *
+ * A reset on a cached screen should mean "discard what this browser thinks and
+ * ask again", which is what this does. Nothing is deleted. The demo seed is the
+ * server's business and happens once per shop.
+ */
+export async function reloadReviewsFromServer(): Promise<{
   reviews: ProductReview[];
   persisted: boolean;
 }> {
-  const previous = readReviews();
-  const seeded = seedReviews(loadProducts());
-  writeReviews(seeded);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(REVIEWS_STORAGE_VERSION));
-  syncProductReviewAggregates();
+  const fromServer = await fetchReviews();
+  if (!fromServer) return { reviews: loadReviews(), persisted: false };
 
-  // Persist the reset to the server via the SAME dual-write requests the CRUD
-  // uses, so the reset survives an admin reload (otherwise the server-sync
-  // hydration re-applies the old moderated state and the reset appears to
-  // revert). Reviews have no bulk replace endpoint, so mirror the per-item CRUD:
-  // delete rows that are no longer seeds, then PATCH every seed back to its
-  // demo state (status/featured/reply/report), which the server already holds.
-  const seededIds = new Set(seeded.map((review) => review.id));
-  const staleIds = previous
-    .map((review) => review.id)
-    .filter((id) => !seededIds.has(id));
-
-  // Every answer counted. This whole sequence used to be awaited and discarded,
-  // so "Reviews reset to demo seed" was reported even when the server refused
-  // all of it — and the next hydration brought the moderated reviews straight
-  // back, with nothing having said the reset never happened.
-  const deleted = staleIds.length > 0 ? await deleteReviewsRequest(staleIds) : true;
-
-  const patched = await Promise.all(
-    seeded.map((review) =>
-      updateReviewRequest(review.id, {
-        status: review.status,
-        isFeatured: review.isFeatured,
-        title: review.title ?? "",
-        body: review.body,
-        rating: review.rating,
-        adminReply: review.adminReply ?? "",
-        repliedAt: review.repliedAt ?? "",
-        reportReason: review.reportReason ?? "",
-      })
-    )
-  );
-
-  return { reviews: seeded, persisted: deleted && patched.every(Boolean) };
+  writeReviews(fromServer);
+  return { reviews: fromServer, persisted: true };
 }

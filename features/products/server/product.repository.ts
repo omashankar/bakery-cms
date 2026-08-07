@@ -87,6 +87,25 @@ export async function reset(): Promise<void> {
  * plus a fresh `updatedAt`, without rewriting the whole document. Returns the
  * updated product, or null if the id does not exist.
  */
+/**
+ * Write the review aggregate onto a product, addressed by slug.
+ *
+ * Separate from `patchFields` because reviews only know the slug, and because
+ * this must never go through the read-modify-write path: it runs while an admin
+ * may be saving that product, and a full-document write would carry a stale
+ * snapshot of everything else.
+ */
+export async function setReviewAggregate(
+  slug: string,
+  aggregate: { count: number; average: number },
+): Promise<void> {
+  await connectDB();
+  await ProductModel.updateOne(
+    { slug },
+    { $set: { rating: aggregate.average, reviewCount: aggregate.count } },
+  );
+}
+
 export async function patchFields(
   id: string,
   fields: Partial<Product>,

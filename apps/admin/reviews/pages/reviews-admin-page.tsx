@@ -37,7 +37,7 @@ import {
   loadReviews,
   rejectReviews,
   REVIEWS_UPDATED_EVENT,
-  resetReviews,
+  reloadReviewsFromServer,
   saveReviewReply,
   setReviewStatus,
   toggleReviewFeatured,
@@ -195,16 +195,19 @@ export function ReviewsAdminPage() {
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
-                void resetReviews().then(({ persisted }) => {
+                void reloadReviewsFromServer().then(({ persisted }) => {
                   refresh();
-                  if (!persisted) return reportUnpersisted("Reviews reset");
-                  toast.success("Reviews reset to demo seed");
+                  if (!persisted) {
+                    toast.error("Could not reach the server — showing the cached list");
+                    return;
+                  }
+                  toast.success("Reloaded from the server");
                 });
               }}
             >
               <RotateCcw className="size-4" />
-              <span className="sm:hidden">Reset</span>
-              <span className="hidden sm:inline">Reset demo</span>
+              <span className="sm:hidden">Reload</span>
+              <span className="hidden sm:inline">Reload from server</span>
             </Button>
             <Button
               variant="bakery"

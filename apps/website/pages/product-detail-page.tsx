@@ -222,12 +222,23 @@ export function ProductDetailPage({
   }, [cake.slug]);
 
   useEffect(() => {
-    function refreshReviews() {
-      setReviews(getProductReviews(cake));
+    // The list now comes from the server, so this is async and can land after
+    // the visitor has navigated on. `cancelled` keeps one product's reviews from
+    // arriving under another product's page.
+    let cancelled = false;
+
+    async function refreshReviews() {
+      const fetched = await getProductReviews(cake);
+      // Null is a failed read, not an empty list — leave what is on screen.
+      if (!cancelled && fetched) setReviews(fetched);
     }
-    refreshReviews();
+
+    void refreshReviews();
     window.addEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
-    return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
+    };
   }, [cake]);
 
   const handleAddToCart = (redirectToCart = false) => {
@@ -608,7 +619,14 @@ export function ProductDetailPage({
                   <ProductReviewForm
                     productSlug={cake.slug}
                     cakeName={cake.name}
-                    onSubmitted={() => setReviews(getProductReviews(cake))}
+                    onSubmitted={() => {
+                      // A new review is pending, so this re-read normally comes
+                      // back unchanged — which is the honest outcome. It runs so
+                      // that anything approved since the page loaded appears.
+                      void getProductReviews(cake).then((next) => {
+                        if (next) setReviews(next);
+                      });
+                    }}
                   />
                   {reviews.length === 0 ? (
                     <p className="text-sm text-muted-foreground">

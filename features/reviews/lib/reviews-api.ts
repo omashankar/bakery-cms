@@ -70,6 +70,33 @@ export function deleteReviewsRequest(ids: string[]): Promise<boolean> {
   return send("/api/reviews", "DELETE", { ids });
 }
 
+/**
+ * Public: the approved reviews for one product, from the server.
+ *
+ * The storefront used to read this list out of the VISITOR's own localStorage,
+ * which meant two things at once: a moderator's approvals and takedowns never
+ * reached anybody, and a first-time visitor — whose storage is empty — was shown
+ * a fabricated set seeded from the product's own rating, signed with invented
+ * names. This endpoint already existed and returns exactly what the page needs.
+ *
+ * Returns null on failure so the caller can leave the previous list alone rather
+ * than render "no reviews yet" over a network blip.
+ */
+export async function fetchApprovedReviews(
+  productSlug: string
+): Promise<ProductReview[] | null> {
+  try {
+    const res = await fetch(`/api/reviews?productSlug=${encodeURIComponent(productSlug)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Envelope<ProductReview[]>;
+    return json.success ? (json.data ?? []) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Admin: fetch all reviews (401 → null for non-admins). */
 export async function fetchReviews(): Promise<ProductReview[] | null> {
   try {
