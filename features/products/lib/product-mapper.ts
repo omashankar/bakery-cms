@@ -13,14 +13,31 @@ export const DEFAULT_PRODUCT_SHAPES = ["Round", "Square", "Heart"] as const;
  * shop that renamed a category still showed the shipped name, and a category the
  * shop had added resolved to nothing and rendered as the generic "Cakes".
  */
-export type CategoryNames = ReadonlyMap<string, string>;
+export interface TaxonomyNames {
+  categories?: ReadonlyMap<string, string>;
+  /** Occasion names by id — the storefront occasion filter had no data at all. */
+  occasions?: ReadonlyMap<string, string>;
+}
+
+/** @deprecated kept so existing call sites read naturally. */
+export type CategoryNames = TaxonomyNames;
 
 export function mapAdminProductToStorefront(
   cake: Product,
-  categoryNames?: CategoryNames
+  names?: TaxonomyNames
 ): LandingProduct {
   const category =
-    categoryNames?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "Cakes";
+    names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "Cakes";
+
+  // The occasions this cake is actually tagged with. The storefront filter used
+  // to search the name, category and description for the word "Wedding" instead,
+  // so a cake tagged Wedding was missed unless it happened to say so in prose,
+  // and anything mentioning it in passing was included.
+  const occasions = names?.occasions
+    ? cake.occasionIds
+        .map((id) => names.occasions?.get(id))
+        .filter((name): name is string => Boolean(name))
+    : undefined;
 
   return {
     id: cake.id,
@@ -31,6 +48,7 @@ export function mapAdminProductToStorefront(
     compareAtPrice: cake.compareAtPrice,
     image: cake.images[0] ?? "",
     category,
+    occasions,
     badge: cake.isFeatured
       ? "Featured"
       : cake.isBestSeller
@@ -60,11 +78,11 @@ export function mapAdminProductToStorefront(
 
 export function getPublishedStorefrontProducts(
   cakes: Product[],
-  categoryNames?: CategoryNames
+  names?: TaxonomyNames
 ): LandingProduct[] {
   return cakes
     .filter((cake) => cake.status === "published")
     // Not `.map(mapAdminProductToStorefront)`: map passes the INDEX as the
     // second argument, which would land in `categoryNames`.
-    .map((cake) => mapAdminProductToStorefront(cake, categoryNames));
+    .map((cake) => mapAdminProductToStorefront(cake, names));
 }

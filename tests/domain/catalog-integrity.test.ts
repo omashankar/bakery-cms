@@ -220,7 +220,7 @@ describe("server-rendered products use the shop's own category names", () => {
   it("the mapper accepts the real names", () => {
     const source = read("features/products/lib/product-mapper.ts");
     const fn = bodyOf(source, "export function mapAdminProductToStorefront(");
-    expect(fn).toContain("categoryNames?.get(cake.categoryId)");
+    expect(fn).toContain("names?.categories?.get(cake.categoryId)");
   });
 
   it("the server service supplies them from the database", () => {

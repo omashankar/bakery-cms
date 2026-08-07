@@ -1,6 +1,6 @@
 import {
   mapAdminProductToStorefront,
-  type CategoryNames,
+  type TaxonomyNames,
 } from "@/features/products/lib/product-mapper";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readProducts } from "@/features/products/data/products-store.server";
@@ -32,15 +32,15 @@ function nowIso(): string {
  * against the shipped list, so a renamed category never reached a customer and
  * a shop-added one rendered as the generic "Cakes".
  */
-async function categoryNames(): Promise<CategoryNames> {
+async function categoryNames(): Promise<TaxonomyNames> {
   try {
     const catalog = await getCatalog();
-    return new Map(
-      (catalog.categories as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]),
-    );
+    const byId = (rows: unknown) =>
+      new Map((rows as Array<{ id: string; name: string }>).map((r) => [r.id, r.name]));
+    return { categories: byId(catalog.categories), occasions: byId(catalog.occasions) };
   } catch {
     // A catalog read that fails must not take the product page down with it.
-    return new Map();
+    return {};
   }
 }
 

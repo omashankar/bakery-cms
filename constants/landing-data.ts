@@ -19,6 +19,8 @@ export interface LandingProduct {
   reviewCount?: number;
   isEggless?: boolean;
   flavours?: string[];
+  /** Occasion names this cake is tagged with, for the storefront filter. */
+  occasions?: string[];
   inStock?: boolean;
   shapes?: string[];
   allowsMessage?: boolean;

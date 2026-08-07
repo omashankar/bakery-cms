@@ -21,7 +21,7 @@ import {
   adminCategories,
   adminFlavours,
   adminOccasions,
-  getDefaultWeights,
+  rederiveWeights,
 } from "@/features/products/lib/catalog-options";
 import { slugify } from "@/features/products/lib/product-utils";
 import { createEmptyProductForm } from "@/features/products/lib/products-repository";
@@ -66,6 +66,9 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
+  // Once the admin types a meta title of their own, the name stops driving it.
+  // In edit mode the stored value is already theirs.
+  const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
@@ -116,7 +119,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugTouched ? prev.slug : slugify(name),
       seo: {
         ...prev.seo,
-        metaTitle: prev.seo.metaTitle || `${name} | Monginis`,
+        // Tracks the name until the admin edits the meta title themselves.
+        //
+        // This was `prev.seo.metaTitle || `${name} | Monginis``, so the FIRST
+        // keystroke made it truthy and the `||` short-circuited for every one
+        // after: typing "Rose Truffle Delight" left the SEO tab, the search
+        // preview card and the stored record all reading "R | Monginis". The
+        // brand was hard-coded too, in a CMS meant to run more than one shop.
+        metaTitle: metaTitleTouched ? prev.seo.metaTitle : name,
       },
     }));
   }
@@ -125,7 +135,11 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     setForm((prev) => ({
       ...prev,
       price,
-      weights: getDefaultWeights(price),
+      // Only re-derive the tiers the admin has not priced by hand. Replacing
+      // them wholesale meant editing the base price by one rupee silently
+      // discarded every weight price that had been typed in — the tiers the
+      // customer actually pays.
+      weights: rederiveWeights(prev.weights, price, prev.price),
     }));
   }
 
@@ -287,8 +301,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     id="shortDescription"
                     value={form.shortDescription ?? ""}
                     onChange={(e) => patchForm({ shortDescription: e.target.value })}
-                    placeholder="One-line summary for cards"
+                    placeholder="One line, shown in Google results"
                   />
+                  {/*
+                    The placeholder said "One-line summary for cards" and no card
+                    rendered it — nothing did. It is now the meta description
+                    this cake's page ships when the SEO tab is left blank, which
+                    is a real destination, so the hint says that instead.
+                  */}
+                  <p className="text-xs text-muted-foreground">
+                    Used as the search-result description when the SEO tab is empty.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Full description</Label>
@@ -709,9 +732,10 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   <Input
                     id="metaTitle"
                     value={form.seo.metaTitle ?? ""}
-                    onChange={(e) =>
-                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } })
-                    }
+                    onChange={(e) => {
+                      setMetaTitleTouched(true);
+                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } });
+                    }}
                   />
                 </div>
                 <div className="space-y-2">

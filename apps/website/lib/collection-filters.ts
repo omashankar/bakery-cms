@@ -1,6 +1,14 @@
 import type { LandingProduct } from "@/constants/landing-data";
-import { getFlavours, getOccasions } from "@/features/catalog/lib/catalog-repository";
-import { defaultFlavours, defaultOccasions } from "@/features/catalog/lib/catalog-utils";
+import {
+  getFlavours,
+  getOccasions,
+  getWeightOptions,
+} from "@/features/catalog/lib/catalog-repository";
+import {
+  defaultFlavours,
+  defaultOccasions,
+  defaultWeightOptions,
+} from "@/features/catalog/lib/catalog-utils";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
@@ -38,9 +46,23 @@ export function getFilterFlavourOptions(): string[] {
   return getFlavours().map((item) => item.name);
 }
 
+/**
+ * The weight tiers this shop actually sells.
+ *
+ * This was the hard-coded list `["0.5 kg", "1 kg", "1.5 kg"]`, so a shop that
+ * added a 2 kg tier — or renamed its tiers, or removed one — had a filter panel
+ * offering sizes it does not sell and hiding the ones it does. The Catalog
+ * screen's whole Weights tab reached this list not at all.
+ */
 export function getFilterWeightOptions(): string[] {
-  return ["0.5 kg", "1 kg", "1.5 kg"];
+  const options = getWeightOptions().map((option) => option.label);
+  return options.length > 0 ? options : DEFAULT_FILTER_WEIGHT_OPTIONS;
 }
+
+/** Stable for SSR and the first client paint, like the occasion/flavour ones. */
+export const DEFAULT_FILTER_WEIGHT_OPTIONS: string[] = defaultWeightOptions.map(
+  (option) => option.label
+);
 
 /**
  * Stable occasion / flavour defaults for SSR and the client's first paint —
@@ -51,8 +73,27 @@ export function getFilterWeightOptions(): string[] {
 export const DEFAULT_FILTER_OCCASION_OPTIONS: string[] = defaultOccasions.map((item) => item.name);
 export const DEFAULT_FILTER_FLAVOUR_OPTIONS: string[] = defaultFlavours.map((item) => item.name);
 
+/**
+ * Match the occasions the cake is TAGGED with.
+ *
+ * This searched the name, category and description for the occasion word, so
+ * the Occasions checkboxes on the product form reached nobody: a cake tagged
+ * Wedding was missed unless its prose happened to say "wedding", and a
+ * birthday cake whose description mentioned "perfect after a wedding" was
+ * offered under Wedding.
+ *
+ * Untagged products fall back to the old text search rather than vanishing —
+ * the shipped demo catalogue carries no occasion ids.
+ */
 function matchesOccasion(cake: LandingProduct, occasions: string[]): boolean {
   if (occasions.length === 0) return true;
+
+  const tagged = cake.occasions ?? [];
+  if (tagged.length > 0) {
+    const owned = new Set(tagged.map((name) => name.toLowerCase()));
+    return occasions.some((occasion) => owned.has(occasion.toLowerCase()));
+  }
+
   const haystack = `${cake.name} ${cake.category} ${cake.description}`.toLowerCase();
   return occasions.some((occasion) => haystack.includes(occasion.toLowerCase()));
 }
@@ -64,12 +105,25 @@ function matchesFlavour(cake: LandingProduct, flavours: string[]): boolean {
   return flavours.some((flavour) => haystack.includes(flavour.toLowerCase()));
 }
 
+/**
+ * Match the weight tiers the cake is actually SOLD in.
+ *
+ * This filtered on price bands — "1.5 kg" meant "costs at least 1400" — which
+ * has nothing to do with weight. An expensive small cake was offered under
+ * 1.5 kg and a cheap large one was hidden from it, and the bands only knew the
+ * three hard-coded labels, so any tier a shop added matched nothing at all.
+ *
+ * Products with no tiers keep matching, so a shop selling single-size cakes
+ * does not disappear the moment a customer touches the filter.
+ */
 function matchesWeight(cake: LandingProduct, weights: string[]): boolean {
   if (weights.length === 0) return true;
-  if (weights.includes("1.5 kg") && cake.price >= 1400) return true;
-  if (weights.includes("1 kg") && cake.price >= 900 && cake.price < 1600) return true;
-  if (weights.includes("0.5 kg") && cake.price < 1100) return true;
-  return false;
+
+  const tiers = cake.weights ?? [];
+  if (tiers.length === 0) return true;
+
+  const owned = new Set(tiers.map((tier) => tier.label.trim().toLowerCase()));
+  return weights.some((weight) => owned.has(weight.trim().toLowerCase()));
 }
 
 export function applyCollectionFilters(
