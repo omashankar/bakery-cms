@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -56,6 +59,48 @@ vi.mock("@/features/orders/server/order.repository", () => ({
       record?.status === "processing" &&
       (record.gatewayRefunds ?? []).some((r) => r.status === "pending");
     return unsettled ? [{ ...state.db.order }] : [];
+  },
+  /**
+   * The slot is claimed BEFORE the gateway is called, so the mock has to model
+   * both halves — otherwise a test could pass against a service that pays out
+   * and only then discovers it lost the race.
+   */
+  claimRefundAttempt: async (
+    id: string,
+    expectedVersion: number,
+    attempt: { amount: number; at: string },
+  ) => {
+    const record = state.db.order?.refundRecord as
+      | { version?: number; pendingAttempt?: unknown }
+      | undefined;
+    const current = record?.version ?? 0;
+    if (id !== ORDER_ID || current !== expectedVersion) return null;
+    // An attempt already in flight blocks a second one.
+    if (record?.pendingAttempt) return null;
+
+    state.db.order = {
+      ...state.db.order,
+      refundRecord: { ...(record ?? {}), version: expectedVersion + 1, pendingAttempt: attempt },
+    };
+    return { ...state.db.order };
+  },
+  releaseRefundAttempt: async (id: string, claimedVersion: number, hadRecord: boolean) => {
+    const record = state.db.order?.refundRecord as { version?: number } | undefined;
+    if (id !== ORDER_ID || (record?.version ?? 0) !== claimedVersion) return;
+
+    if (!hadRecord) {
+      const { refundRecord: _gone, ...order } = state.db.order as Record<string, unknown>;
+      void _gone;
+      state.db.order = order;
+      return;
+    }
+
+    const { pendingAttempt: _drop, ...rest } = (record ?? {}) as Record<string, unknown>;
+    void _drop;
+    state.db.order = {
+      ...state.db.order,
+      refundRecord: { ...rest, version: claimedVersion - 1 },
+    };
   },
   compareAndSetRefund: async (
     id: string,
@@ -247,6 +292,133 @@ describe("the refund lifecycle", () => {
 
     await expect(service.refund(ORDER_ID, {}, CTX)).rejects.toThrow(/ETIMEDOUT/);
     expect(h.db.order.refundRecord).toBeUndefined();
+  });
+
+  /**
+   * The slot has to be taken BEFORE the gateway is asked.
+   *
+   * The compare-and-set used to run at the end, after the payout. Two admins
+   * refunding ₹500 each on a ₹1,000 payment both passed `planRefund` — Razorpay
+   * caps at what it captured and ₹500 + ₹500 is inside ₹1,000 — so both payouts
+   * happened and the loser's write was simply dropped. The shop was ₹500 down
+   * with nothing recorded.
+   */
+  it("a concurrent refund is refused before any money moves", async () => {
+    const { h, service } = await harness();
+
+    const [first, second] = await Promise.allSettled([
+      service.refund(ORDER_ID, { amount: 500 }, CTX),
+      service.refund(ORDER_ID, { amount: 500 }, CTX),
+    ]);
+
+    const outcomes = [first.status, second.status].sort();
+    expect(outcomes).toEqual(["fulfilled", "rejected"]);
+
+    // THE ASSERTION THAT MATTERS: the gateway was asked once, not twice.
+    expect(h.refundCalls).toHaveLength(1);
+    expect(h.refundCalls[0].amount).toBe(500);
+
+    const rejected = (first.status === "rejected" ? first : second) as PromiseRejectedResult;
+    expect(String(rejected.reason?.message)).toMatch(/at the same moment|already in progress/);
+  });
+
+  it("a refusal hands the slot back, so the retry a 503 invites can succeed", async () => {
+    const { h, service } = await harness();
+    h.gateway.unavailable = "The payment gateway could not be reached";
+
+    await expect(service.refund(ORDER_ID, { amount: 500 }, CTX)).rejects.toThrow(/could not be reached/);
+
+    // Nothing recorded, and no claim left behind to block the retry.
+    expect(h.db.order.refundRecord).toBeUndefined();
+
+    h.gateway.unavailable = undefined;
+    await service.refund(ORDER_ID, { amount: 500 }, CTX);
+    expect(h.refundCalls).toHaveLength(2);
+  });
+
+  it("every write moves the version, so no holder of an older one can overwrite", async () => {
+    const { h, service } = await harness();
+    await service.refund(ORDER_ID, { amount: 500 }, CTX);
+
+    // The claim took version 1. Recording the outcome has to move it again — the
+    // webhook settle path reads an order and compare-and-sets on the version it
+    // saw, so a copy read between the claim and the write would otherwise still
+    // match and overwrite the admin's record.
+    const record = h.db.order.refundRecord as { version?: number };
+    expect(record.version).toBe(2);
+    expect(record).not.toHaveProperty("pendingAttempt");
+  });
+
+  it("a retry arriving while an attempt is still open is refused, not paid again", async () => {
+    const { h, service } = await harness({
+      // The shape left behind when a request died between asking the gateway and
+      // writing the answer down.
+      refundRecord: {
+        version: 1,
+        status: "processing",
+        reason: "customer_request",
+        amount: 0,
+        history: [],
+        pendingAttempt: { amount: 500, at: "2026-01-01T00:00:00.000Z" },
+      },
+    });
+
+    await expect(service.refund(ORDER_ID, { amount: 500 }, CTX)).rejects.toThrow(
+      /already in progress/,
+    );
+    expect(h.refundCalls).toHaveLength(0);
+  });
+
+  /**
+   * The repository is MOCKED in this file, so the mock proves the service uses
+   * the claim correctly and proves nothing about the query that implements it.
+   * These read the real one.
+   *
+   * Found because four mutations to `order.repository.ts` survived a mutation
+   * run against the tests above — every one of them invisible behind the mock.
+   */
+  describe("the claim's actual query", () => {
+    const source = readFileSync(
+      path.join(process.cwd(), "features/orders/server/order.repository.ts"),
+      "utf8",
+    );
+    const bodyOf = (signature: string) => {
+      const start = source.indexOf(signature);
+      expect(start, `not found: ${signature}`).toBeGreaterThan(-1);
+      const rest = source.slice(start);
+      return rest
+        .slice(0, rest.indexOf("\n}"))
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^[ \t]*\/\/.*$/gm, "");
+    };
+
+    it("only takes the slot at the version it expects", () => {
+      const fn = bodyOf("export async function claimRefundAttempt(");
+      // Without this, two concurrent claims both succeed and both pay out.
+      expect(fn).toContain('$expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, expectedVersion] }');
+    });
+
+    it("refuses to take a slot that is already in flight", () => {
+      const fn = bodyOf("export async function claimRefundAttempt(");
+      // A retry arriving while the first attempt is open must not pay again.
+      expect(fn).toContain('"refundRecord.pendingAttempt": { $exists: false }');
+    });
+
+    it("moves the version and records the attempt in the same write", () => {
+      const fn = bodyOf("export async function claimRefundAttempt(");
+      expect(fn).toContain('"refundRecord.version": expectedVersion + 1');
+      expect(fn).toContain('"refundRecord.pendingAttempt": attempt');
+    });
+
+    it("releases by restoring exactly what the claim found", () => {
+      const fn = bodyOf("export async function releaseRefundAttempt(");
+      // An order that had no refund record must not be left with a bare one —
+      // the screens read the record's existence as "a refund was attempted".
+      expect(fn).toContain('{ $unset: { refundRecord: "" } }');
+      expect(fn).toContain('"refundRecord.version": claimedVersion - 1');
+      // And the release is itself version-guarded.
+      expect(fn).toContain('$expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, claimedVersion] }');
+    });
   });
 
   it("refuses a second refund once the whole order is back", async () => {

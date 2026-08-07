@@ -485,6 +485,75 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
  * (Razorpay itself caps the total refundable, so losing this race cannot cause a
  * double gateway payout — the danger is a payout that no record accounts for.)
  */
+/**
+ * Take the refund slot before any money moves.
+ *
+ * Bumps `refundRecord.version` and records the attempt, both under the same
+ * compare-and-set the final write uses. A concurrent request reads the old
+ * version, loses this, and is refused having paid out nothing.
+ *
+ * Returns null when the slot is already taken — either by a request in flight or
+ * by one that has moved the version on.
+ */
+export async function claimRefundAttempt(
+  id: string,
+  expectedVersion: number,
+  attempt: { amount: number; at: string; actorEmail?: string },
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    {
+      _id: id,
+      $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, expectedVersion] },
+      // Nothing may be in flight. A retry arriving while the first attempt is
+      // still open must not pay a second time.
+      "refundRecord.pendingAttempt": { $exists: false },
+    },
+    {
+      $set: {
+        "refundRecord.version": expectedVersion + 1,
+        "refundRecord.pendingAttempt": attempt,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
+/**
+ * Give the refund slot back after an attempt that moved no money.
+ *
+ * Puts the record back exactly as the claim found it. Nothing can have been
+ * written in between — the claim held the slot exclusively — so winding the
+ * version back is safe, and it is what lets the retry a 503 invites succeed.
+ *
+ * An order that had no refund record before keeps having none: leaving a bare
+ * `{ version: 1 }` behind would say a refund had been attempted where the
+ * screens read the record's existence as exactly that.
+ */
+export async function releaseRefundAttempt(
+  id: string,
+  claimedVersion: number,
+  hadRecord: boolean,
+): Promise<void> {
+  await connectDB();
+  const filter = {
+    _id: id,
+    $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, claimedVersion] },
+  };
+
+  await OrderModel.updateOne(
+    filter,
+    hadRecord
+      ? {
+          $set: { "refundRecord.version": claimedVersion - 1 },
+          $unset: { "refundRecord.pendingAttempt": "" },
+        }
+      : { $unset: { refundRecord: "" } },
+  );
+}
+
 export async function compareAndSetRefund(
   id: string,
   expectedVersion: number,

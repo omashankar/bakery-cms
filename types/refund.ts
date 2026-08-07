@@ -97,4 +97,28 @@ export interface RefundRecord {
    * whichever path gets there.
    */
   couponReleased?: boolean;
+  /**
+   * A payout this shop has asked the gateway for and not yet written down.
+   *
+   * The refund used to call the gateway first and take the optimistic-concurrency
+   * lock afterwards, so the lock protected the RECORD and not the MONEY. Two
+   * admins refunding ₹1,000 each on a ₹2,000 payment both passed `planRefund` —
+   * Razorpay caps the total at what it captured, and ₹1,000 + ₹1,000 is within
+   * ₹2,000 — so both payouts happened and the second write lost the compare-and-
+   * set. The shop refunded ₹2,000 having intended ₹1,000, and only one of the
+   * two was ever recorded.
+   *
+   * The slot is claimed BEFORE the gateway call now. A concurrent request loses
+   * the claim and is refused with nothing having moved, and a retry that arrives
+   * while an attempt is still open is refused rather than paying again.
+   *
+   * It is cleared by the write that records the outcome. One left behind means
+   * the request died between asking and recording: the money may or may not have
+   * moved, and a human has to look.
+   */
+  pendingAttempt?: {
+    amount: number;
+    at: string;
+    actorEmail?: string;
+  };
 }

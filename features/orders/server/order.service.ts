@@ -991,6 +991,38 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   const reason = (input.reason as RefundRecord["reason"]) ?? "customer_request";
   let appended: GatewayRefund | null = null;
 
+  // CLAIM THE SLOT BEFORE THE MONEY MOVES.
+  //
+  // The compare-and-set used to run at the END, after the gateway had already
+  // paid out — so it protected the RECORD and not the MONEY. Two admins
+  // refunding ₹1,000 each on a ₹2,000 payment both passed `planRefund`, because
+  // Razorpay's own cap is the captured total and ₹1,000 + ₹1,000 is inside it.
+  // Both payouts happened; the second write lost the CAS and answered 409 for a
+  // refund that had really been made. The shop was ₹1,000 down with no record.
+  //
+  // Now the loser of the race is refused here, having moved nothing. A retry
+  // arriving while an attempt is still open is refused for the same reason.
+  if (existing?.pendingAttempt) {
+    throw new AppError(
+      `A refund of ${formatRefundAmount(existing.pendingAttempt.amount)} for this order is already in progress. ` +
+        "Check the refund history before trying again — the money may already have moved.",
+      409,
+    );
+  }
+
+  const claimed = await repo.claimRefundAttempt(id, priorVersion, {
+    amount: plan.amount,
+    at: now,
+    actorEmail: ctx.actorEmail,
+  });
+
+  if (!claimed) {
+    throw new AppError(
+      "Another refund for this order was started at the same moment. Reload and check the refund history before retrying.",
+      409,
+    );
+  }
+
   if (plan.kind === "gateway") {
     // THE MONEY MOVES HERE. Everything above decides whether it should, and
     // everything below only writes down what happened. Before this call existed,
@@ -1008,10 +1040,20 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
         // Accepted but unidentifiable. The money may well be moving and we have
         // nothing to record it against; the refund webhook will recognise it and
         // attach it. Loud, because it needs a human to confirm.
+        //
+        // The claim STAYS. This is the one case where retrying could pay twice,
+        // and an operator has to reconcile before anything else is attempted.
         console.error(
-          `[orders] Razorpay accepted a refund for ${order.orderNumber} but returned no refund id.`,
+          `[orders] Razorpay accepted a refund for ${order.orderNumber} but returned no refund id. ` +
+            "The refund attempt is left open deliberately — reconcile before retrying.",
         );
+      } else {
+        // The gateway said no, or could not be reached. Nothing moved, so the
+        // slot has to go back: a claim left behind here would block the retry
+        // that a 503 explicitly invites.
+        await repo.releaseRefundAttempt(id, priorVersion + 1, Boolean(existing));
       }
+
       throw new AppError(
         outcome.refused ?? outcome.unavailable ?? "The refund was not accepted by the gateway.",
         outcome.refused ? 409 : 503,
@@ -1053,7 +1095,12 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   const releaseCouponNow = fully && settled && !existing?.couponReleased;
 
   const refundRecord: RefundRecord = {
-    version: priorVersion + 1,
+    // The claim took priorVersion + 1; recording the outcome moves it on again,
+    // so a request holding either number cannot overwrite this.
+    version: priorVersion + 2,
+    // `pendingAttempt` is deliberately absent: writing the whole record clears
+    // it, which is what marks this attempt finished. One left behind means the
+    // request died between asking the gateway and writing the answer down.
     status: recordStatus,
     reason,
     reasonDetail: input.reasonDetail?.trim() || existing?.reasonDetail,
@@ -1084,7 +1131,10 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   // Only a settled, complete refund flips the order itself. A refund the gateway
   // has accepted but not yet paid out is `processing`, and saying "refunded"
   // then would be the same lie in a different field.
-  const updated = await repo.compareAndSetRefund(id, priorVersion, {
+  // Compare against the version the CLAIM took, not the one read at the start —
+  // the claim already moved it. Nothing else can be holding this number, so this
+  // write cannot lose a race for a payout that has already happened.
+  const updated = await repo.compareAndSetRefund(id, priorVersion + 1, {
     refundRecord,
     refundReference: refundRecord.reference,
     ...(fully && settled
