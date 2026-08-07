@@ -6,7 +6,7 @@ export function AuthDemoNotice() {
         case and a digit as well. A sign-in hint that understates the rule
         sends someone to a refusal.
       */}
-      Demo · any email · password 8+ with mixed case and a number
+      Demo · any email · password 8+ with letters and numbers
     </p>
   );
 }

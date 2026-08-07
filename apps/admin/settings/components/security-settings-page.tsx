@@ -343,7 +343,7 @@ export function SecuritySettingsPage() {
                   // numbers; the rule matches the sentence now. The switch is
                   // fixed rather than removed because turning it OFF would be
                   // a request to weaken the shop, which is not worth building.
-                  description="Always on: 8+ characters with mixed case and a number."
+                  description="Always on: at least 8 characters, with letters and numbers."
                   alwaysOn
                   checked={settings.requireStrongPasswords}
                   onCheckedChange={(checked) =>

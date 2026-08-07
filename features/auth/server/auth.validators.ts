@@ -8,13 +8,17 @@ import { z } from "zod";
 const email = z.string().trim().toLowerCase().pipe(z.email("Please enter a valid email"));
 
 /**
- * The rule the Security screen has always DESCRIBED.
+ * The rule, and every sentence describing it, in step.
  *
- * That screen says "Require 8+ chars with mixed case and numbers" next to a
- * toggle, and the rule was a bare length check — so a password of eight
- * identical letters passed while the admin read that mixed case and digits
- * were required. Stating a protection you do not apply is the failure here,
- * not the missing characters.
+ * This was a bare length check under a screen promising mixed case and
+ * numbers, so eight identical letters passed while the admin read that more
+ * was required — stating a protection you do not apply. It then briefly
+ * required an uppercase letter, which nothing on the reset screen mentioned.
+ *
+ * It is now letters and numbers, at least eight of them, which is what the
+ * reset card and the Security screen both say. Case is not required: an
+ * uppercase rule buys very little against a long password and costs a real
+ * person a failed reset when they are already locked out.
  *
  * Applied to the paths that SET a password — registration, reset, change —
  * and never to login, where an existing password must keep working.
@@ -23,8 +27,7 @@ const strongPassword = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(100, "Password is too long")
-  .regex(/[a-z]/, "Include a lowercase letter")
-  .regex(/[A-Z]/, "Include an uppercase letter")
+  .regex(/[a-zA-Z]/, "Include a letter")
   .regex(/[0-9]/, "Include a number");
 
 export const loginSchema = z.object({

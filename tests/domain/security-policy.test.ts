@@ -135,9 +135,13 @@ describe("the password rule matches the sentence next to it", () => {
       }).success;
 
     expect(ok("Abcdefg1")).toBe(true);
+    // Case is not required — an uppercase rule buys little against a long
+    // password and costs a real person a failed reset while locked out.
+    expect(ok("abcdefg1")).toBe(true);
+    // Letters alone and digits alone are still refused.
     expect(ok("aaaaaaaa")).toBe(false);
-    expect(ok("AAAAAAAA")).toBe(false);
-    expect(ok("Abcdefgh")).toBe(false);
+    expect(ok("12345678")).toBe(false);
+    // And eight is still the floor.
     expect(ok("Abc1")).toBe(false);
   });
 
@@ -162,7 +166,7 @@ describe("controls that nothing enforces", () => {
     // passed. Each switch has to carry its own flag.
     expect(page).toMatch(/description="Not built yet — sign-in asks for a password only\."\s*\r?\n\s*notBuilt/);
     expect(page).toMatch(/description="Not built yet — no email is sent on a new sign-in\."\s*\r?\n\s*notBuilt/);
-    expect(page).toMatch(/description="Always on: 8\+ characters with mixed case and a number\."\s*\r?\n\s*alwaysOn/);
+    expect(page).toMatch(/description="Always on: at least 8 characters, with letters and numbers\."\s*\r?\n\s*alwaysOn/);
 
     // And the old copy that implied they worked is gone.
     expect(page).not.toContain("OTP verification on login (demo toggle).");
@@ -172,7 +176,9 @@ describe("controls that nothing enforces", () => {
   it("no longer claims a password rule it does not apply", () => {
     const page = code("apps/admin/settings/components/security-settings-page.tsx");
     expect(page).not.toContain("Require 8+ chars with mixed case and numbers.");
-    expect(page).toContain("Always on: 8+ characters with mixed case and a number.");
+    // The sentence and the rule move together, or this screen is back to
+    // describing a protection it does not apply.
+    expect(page).toContain("Always on: at least 8 characters, with letters and numbers.");
   });
 });
 
@@ -261,14 +267,15 @@ describe("the regressions the first attempt introduced", () => {
     // uppercase letter, and the client rule was `minLength: 8` — so a password
     // typed to match the sentence on screen was refused, to somebody who is
     // already locked out and holding a ten-minute OTP.
-    expect(page).not.toContain("Use at least 8 characters with letters and numbers.");
-    expect(page).toContain("an uppercase letter, a lowercase letter and a number");
+    // The card and the rule say the same thing — that is the whole point of
+    // this test, whatever the rule happens to be.
+    expect(page).toContain("At least 8 characters, with letters and numbers.");
     // Checked client-side too, so the answer arrives without a round trip.
     // The `validate` KEY, not just the regex body: renaming it to anything
     // else leaves those characters on the page and stops react-hook-form
     // ever calling it, which is the whole point of the assertion.
     expect(page).toMatch(
-      /validate: \(value: string\) =>[\s\S]{0,200}\/\[A-Z\]\/\.test\(value\)/,
+      /validate: \(value: string\) =>[\s\S]{0,200}\/\[0-9\]\/\.test\(value\)/,
     );
   });
 
@@ -284,7 +291,7 @@ describe("the regressions the first attempt introduced", () => {
   it("does not advertise a password rule the server never accepted", () => {
     const notice = code("features/auth/components/auth-demo-notice.tsx");
     expect(notice).not.toContain("password 6+ characters");
-    expect(notice).toContain("8+ with mixed case and a number");
+    expect(notice).toContain("8+ with letters and numbers");
   });
 });
 
@@ -305,9 +312,11 @@ describe("the reset schema, not only the change schema", () => {
       }).success;
 
     expect(parse("Abcdefg1")).toBe(true);
-    expect(parse("abcdefg1")).toBe(false);
-    expect(parse("ABCDEFG1")).toBe(false);
+    expect(parse("abcdefg1")).toBe(true);
+    expect(parse("ABCDEFG1")).toBe(true);
+    // Still refused: no digit, and no letter.
     expect(parse("Abcdefgh")).toBe(false);
+    expect(parse("12345678")).toBe(false);
   });
 });
 

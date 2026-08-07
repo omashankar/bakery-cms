@@ -69,7 +69,7 @@ export function ResetPasswordFormPage() {
       // `strongPassword` also requires an uppercase letter, so a password
       // typed to match this sentence was refused — on the one screen a user
       // reaches when they are already locked out.
-      description="At least 8 characters, with an uppercase letter, a lowercase letter and a number."
+      description="At least 8 characters, with letters and numbers."
       footer={
         <Link
           href={routes.auth.login}
@@ -94,10 +94,8 @@ export function ResetPasswordFormPage() {
                 // Checked here too, so the answer arrives before a round
                 // trip rather than as a refusal from the server.
                 validate: (value: string) =>
-                  (/[a-z]/.test(value) &&
-                    /[A-Z]/.test(value) &&
-                    /[0-9]/.test(value)) ||
-                  "Include an uppercase letter, a lowercase letter and a number",
+                  (/[a-zA-Z]/.test(value) && /[0-9]/.test(value)) ||
+                  "Include letters and numbers",
               })}
             />
             <button
