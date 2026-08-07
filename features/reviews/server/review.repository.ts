@@ -133,6 +133,17 @@ export async function findById(id: string): Promise<ProductReview | null> {
   return doc ? toReview(doc) : null;
 }
 
+/**
+ * Fields an admin can legitimately empty, as opposed to leave alone.
+ *
+ * Clearing one was impossible. The client sent `reportReason: undefined` when
+ * approving a reported review, `JSON.stringify` drops undefined keys, so the
+ * body never carried it and `$set` never touched it — the moderation flag stayed
+ * on the server forever while the admin's own screen showed it gone. The client
+ * now sends "" and this turns that into an `$unset`.
+ */
+const CLEARABLE_FIELDS = ["reportReason", "adminReply", "repliedAt", "title"] as const;
+
 export async function patch(
   id: string,
   fields: Partial<ProductReview>,
@@ -140,11 +151,22 @@ export async function patch(
   await connectDB();
   const { id: _drop, ...rest } = fields;
   void _drop;
-  const doc = (await ReviewModel.findByIdAndUpdate(
-    id,
-    { $set: { ...rest, updatedAt: new Date().toISOString() } },
-    { new: true },
-  ).lean()) as unknown as Raw | null;
+
+  const set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  const unset: Record<string, "">= {};
+
+  for (const [key, value] of Object.entries(rest)) {
+    const clearable = (CLEARABLE_FIELDS as readonly string[]).includes(key);
+    if (clearable && (value === "" || value === null)) unset[key] = "";
+    else if (value !== undefined) set[key] = value;
+  }
+
+  const update: Record<string, unknown> = { $set: set };
+  if (Object.keys(unset).length > 0) update.$unset = unset;
+
+  const doc = (await ReviewModel.findByIdAndUpdate(id, update, {
+    new: true,
+  }).lean()) as unknown as Raw | null;
   return doc ? toReview(doc) : null;
 }
 

@@ -34,20 +34,26 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The cache is a starting point, never the answer.
+    //
+    // This returned as soon as localStorage had the product, and product saves
+    // do not write that cache — so the screen whose whole job is "show me what I
+    // just changed" showed the version from before the edit. The server is asked
+    // every time; the cached copy only fills the gap while the request is in
+    // flight, so the page does not flash empty.
     const cached = getProductById(cakeId);
-    if (cached) {
-      setCake(cached);
-      return;
-    }
-    // Cache miss (just created, or edited on another device) — read it straight
-    // from the server before giving up and redirecting to the list.
+    if (cached) setCake(cached);
+
     fetchProduct(cakeId)
       .then((found) => {
         if (!cancelled) setCake(found);
       })
       .catch(() => {
-        if (!cancelled) router.replace(routes.admin.cakes.list);
+        // Only give up if there was nothing to show in the first place.
+        if (!cancelled && !cached) router.replace(routes.admin.cakes.list);
       });
+
     return () => {
       cancelled = true;
     };

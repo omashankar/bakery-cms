@@ -2,6 +2,7 @@ import { ok, created } from "@/lib/server/http/response";
 import { withErrorHandler } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { requireRole } from "@/lib/server/auth/dal";
+import { rateLimit } from "@/lib/server/http/rate-limit";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./review.service";
@@ -25,8 +26,16 @@ export const listReviewsController = withErrorHandler(async (request: Request) =
 });
 
 export const submitReviewController = withErrorHandler(async (request: Request) => {
+  const ctx = requestContext(request);
+
+  // Unauthenticated, and every submission lands in the moderation queue. Without
+  // a limit one script can bury a shop's real reviews under thousands of rows —
+  // the codebase has this helper and applies it to login and password reset,
+  // which are the only other public write paths.
+  rateLimit(`review:${ctx.ip}`, { limit: 5, windowMs: 60_000 });
+
   const input = validate(submitReviewSchema, await readJson(request));
-  const review = await service.submitReview(input, requestContext(request));
+  const review = await service.submitReview(input, ctx);
   return created(review, "Review submitted");
 });
 

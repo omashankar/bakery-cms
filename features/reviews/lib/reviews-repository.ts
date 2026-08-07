@@ -20,6 +20,13 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Unique within this browser, which `Date.now()` alone is not. */
+function newLocalId(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function emitReviewsUpdated(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(REVIEWS_UPDATED_EVENT));
@@ -121,6 +128,15 @@ export function getStorefrontReviewsForProduct(productSlug: string) {
 export interface ReviewWriteResult {
   review: ProductReview | null;
   persisted: boolean;
+  /**
+   * Stored, but one follow-up step did not land.
+   *
+   * The admin "Add review" form is two writes: the public submit, then an
+   * admin PATCH for status and feature. When only the second failed this used
+   * to report `persisted: false` — "nothing was saved" — and the obvious
+   * response is to submit again, which creates a duplicate review.
+   */
+  partial?: "moderation";
 }
 
 export async function createReview(data: ProductReviewFormData): Promise<ReviewWriteResult> {
@@ -128,7 +144,11 @@ export async function createReview(data: ProductReviewFormData): Promise<ReviewW
   const timestamp = nowIso();
   const review: ProductReview = {
     ...data,
-    id: `review-${Date.now()}`,
+    // `review-${Date.now()}` gave two reviews added in the same millisecond the
+    // SAME id, so the second overwrote the first in the cache and a bulk action
+    // over both addressed one row. The server mints the real id; this only has
+    // to be unique until the response lands.
+    id: `review-${newLocalId()}`,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -158,7 +178,14 @@ export async function createReview(data: ProductReviewFormData): Promise<ReviewW
   if (data.isFeatured) moderation.isFeatured = true;
   if (Object.keys(moderation).length === 0) return { review, persisted: true };
 
-  return { review, persisted: await updateReviewRequest(review.id, moderation) };
+  const moderated = await updateReviewRequest(review.id, moderation);
+  if (moderated) return { review, persisted: true };
+
+  // The review IS stored — only the status/feature step failed. Reporting
+  // `persisted: false` said "nothing was saved", and the obvious response to
+  // that is to submit the form again, which creates a second review. The row is
+  // pending; say so, and let the admin approve it from the list.
+  return { review, persisted: true, partial: "moderation" };
 }
 
 export async function updateReview(
@@ -189,7 +216,11 @@ export function setReviewStatus(
   return updateReview(id, {
     ...review,
     status,
-    reportReason: status === "reported" ? review.reportReason : undefined,
+    // "" clears it, `undefined` does not: `JSON.stringify` drops undefined keys,
+    // so the PATCH body never carried the field and the server's `$set` never
+    // touched it. Approving a reported review cleared the flag on this screen
+    // and left it in the database, where the next hydration brought it back.
+    reportReason: status === "reported" ? review.reportReason : "",
   });
 }
 
@@ -204,16 +235,28 @@ async function setStatusBulk(
   ids: string[],
   status: "approved" | "rejected"
 ): Promise<BulkReviewResult> {
-  const reviews = loadReviews().map((review) =>
-    ids.includes(review.id) ? { ...review, status, updatedAt: nowIso() } : review
-  );
-  writeReviews(reviews);
-
   // Every id is sent and every answer counted. `forEach` over an async call
   // discarded all of them, so a batch in which the server refused every single
   // write was indistinguishable from one it accepted whole.
   const results = await Promise.all(ids.map((id) => updateReviewRequest(id, { status })));
+
+  // Only the ones it took. The whole selection used to be written to the cache
+  // optimistically and never rolled back, so rows the server refused rendered in
+  // their new state — moderated, in the moderator's view, and untouched in the
+  // shop — until a reload silently put them back.
+  //
+  // Counted from the answers rather than from the set, so a duplicate id in the
+  // selection cannot make the report disagree with the number of writes made.
   const failed = results.filter((ok) => !ok).length;
+  const accepted = new Set(ids.filter((_, index) => results[index]));
+
+  if (accepted.size > 0) {
+    writeReviews(
+      loadReviews().map((review) =>
+        accepted.has(review.id) ? { ...review, status, updatedAt: nowIso() } : review
+      )
+    );
+  }
 
   return { updated: ids.length - failed, failed };
 }

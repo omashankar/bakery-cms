@@ -191,7 +191,10 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       ...resolveStockFields(form),
       ...syncLegacyFlagsFromVariants(
         form.variantGroups,
-        getDefaultVariantSelections(form.variantGroups)
+        getDefaultVariantSelections(form.variantGroups),
+        // Without the form's own flags, a product with no egg variant group
+        // had its "Eggless" tick overwritten with false on every save.
+        { isEggless: form.isEggless, isPhotoCake: form.isPhotoCake },
       ),
     };
 
@@ -214,11 +217,34 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     if (redirectToList) router.push(routes.admin.cakes.list);
   }
 
+  /**
+   * Open the cake as a customer sees it.
+   *
+   * The storefront route serves published products only, so this opened a 404
+   * for every draft and for anything not yet saved — a button labelled Preview
+   * that could not preview the two things an admin most wants to check. The
+   * admin preview screen renders the same product from the server and works for
+   * both, so an unpublished cake goes there instead.
+   */
   function openPreview() {
     if (!form.slug) {
       toast.error("Add a slug before previewing");
       return;
     }
+
+    if (mode === "add" || !cakeId) {
+      toast.error("Save the cake first", {
+        description: "There is nothing to preview until it exists.",
+      });
+      return;
+    }
+
+    if (form.status !== "published") {
+      // A draft has no public page; show the admin preview rather than a 404.
+      router.push(routes.admin.cakes.preview(cakeId));
+      return;
+    }
+
     window.open(routes.store.cake(form.slug), "_blank", "noopener,noreferrer");
   }
 

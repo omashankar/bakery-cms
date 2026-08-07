@@ -145,11 +145,24 @@ export function ReviewsAdminPage() {
   }
 
   async function handleSaveReview(data: ProductReviewFormData, id?: string) {
-    const { persisted } = id ? await updateReview(id, data) : await createReview(data);
+    const { persisted, partial } = id
+      ? await updateReview(id, data)
+      : await createReview(data);
     refresh();
     setSelectedIds([]);
 
     if (!persisted) return reportUnpersisted(id ? "Review updated" : "Review added");
+
+    // Adding a review is two writes. When only the status/feature step fails the
+    // review IS stored — saying "nothing was saved" invites a second submission
+    // and a duplicate row.
+    if (partial === "moderation") {
+      toast.warning("Review added, but it is still pending", {
+        description: "The status could not be applied. Approve it from the list.",
+      });
+      return;
+    }
+
     toast.success(id ? "Review updated" : "Review added");
   }
 

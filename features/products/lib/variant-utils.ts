@@ -241,13 +241,32 @@ export function setGroupDefaultBySemantic(
  *   is deliberately "Standard design" (the print is a paid upsell), so deriving
  *   this from the default selection would make it permanently false.
  */
+/**
+ * Derive the legacy flags from the variant data — but only where there IS any.
+ *
+ * `isEggless` was derived unconditionally, so a product with no egg variant
+ * group had the tick overwritten with `false` on save: the admin ticked
+ * "Eggless", saved, and it came back unticked, with the eggless filter and badge
+ * never applying. Most products have no such group.
+ *
+ * `current` is what the form holds. Where the variants cannot answer, it stands.
+ */
 export function syncLegacyFlagsFromVariants(
   groups: ProductVariantGroup[],
-  selections: Record<string, string>
+  selections: Record<string, string>,
+  current?: { isEggless?: boolean; isPhotoCake?: boolean }
 ): { isEggless: boolean; isPhotoCake: boolean } {
+  // Groups are addressed by `type`, which is what `isSelectionSemantic` matches
+  // on — not by a `semantic` field, which groups do not carry.
+  const hasEggGroup = groups.some((group) => group.type === "egg");
+
   return {
-    isEggless: isSelectionSemantic(groups, "egg", "eggless", selections),
-    isPhotoCake: offersSemantic(groups, "photo-print"),
+    isEggless: hasEggGroup
+      ? isSelectionSemantic(groups, "egg", "eggless", selections)
+      : (current?.isEggless ?? false),
+    // Photo printing is an offer, not a selection: if no group offers it, the
+    // admin's own tick is the only statement there is.
+    isPhotoCake: offersSemantic(groups, "photo-print") || (current?.isPhotoCake ?? false),
   };
 }
 

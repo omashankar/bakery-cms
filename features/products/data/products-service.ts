@@ -5,6 +5,7 @@ import {
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readProducts } from "@/features/products/data/products-store.server";
 import * as productRepo from "@/features/products/server/product.repository";
+import { purgeProductTraces } from "@/features/products/server/product-cascade.server";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import {
@@ -157,8 +158,28 @@ export async function updateProduct(
   });
 }
 
+/**
+ * Delete a product and everything that only existed because of it.
+ *
+ * Its reviews and stock-history rows used to stay behind, keyed by a slug and an
+ * id nothing resolves. They still counted toward the review aggregate and the
+ * History view, and — because the slug is free again — a NEW cake created with
+ * the same slug inherited the deleted product's reviews and star rating.
+ *
+ * Best-effort on the cascade: a product the admin asked to remove must not
+ * survive because a follow-up cleanup failed.
+ */
 export async function deleteProduct(id: string): Promise<boolean> {
-  return productRepo.deleteOne(id);
+  const existing = await getProductById(id);
+  const removed = await productRepo.deleteOne(id);
+  if (!removed || !existing) return removed;
+
+  try {
+    await purgeProductTraces(existing.slug, existing.id);
+  } catch (error) {
+    console.error(`[products] could not clean up after deleting ${existing.slug}`, error);
+  }
+  return true;
 }
 
 /** Publish or archive many products in one statement. */
