@@ -18,6 +18,13 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * One product. Unpublished ones are admin-only — see the note on the collection
+ * GET; a per-id read was the same leak with a guessable address.
+ *
+ * An anonymous caller gets 404 rather than 403 for a draft, so the endpoint does
+ * not confirm that an unreleased product exists.
+ */
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
@@ -25,6 +32,12 @@ export async function GET(_request: Request, context: RouteContext) {
     const product = await getProductById(id);
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    if (product.status !== "published") {
+      const auth = await requireProductAdmin();
+      if (auth instanceof NextResponse) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
     }
     return NextResponse.json({ product });
   } catch {

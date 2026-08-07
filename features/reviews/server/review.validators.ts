@@ -3,12 +3,26 @@ import { z } from "zod";
 const reviewStatus = z.enum(["pending", "approved", "rejected", "reported"]);
 
 /**
- * Public submit. The storefront builds the record and dual-writes it, so
- * id/timestamps are accepted; status/isFeatured are forced server-side (a public
- * submission can never self-approve or self-feature).
+ * Public submit. Anonymous — so it decides nothing about its own identity.
+ *
+ * `id`, `createdAt` and `updatedAt` used to be accepted here because the
+ * storefront built the record locally and dual-wrote it. Three separate powers
+ * came with that, and this endpoint has no session to justify any of them:
+ *
+ *   - `id` reached a repository that upserted on it, so an anonymous POST
+ *     carrying an existing id REWROTE that review — and since status is forced
+ *     back to "pending", rewriting an approved one also removed it from the
+ *     storefront. Seeded ids are `review-seed-<product-slug>-<n>`.
+ *   - `createdAt` is the sort key for both the storefront list and the
+ *     moderation queue, so a submitter could pin themselves to the top of each.
+ *
+ * All three are now minted server-side. The response carries the created review,
+ * which is where the caller gets the authoritative id.
+ *
+ * status/isFeatured were already forced server-side — a public submission can
+ * never self-approve or self-feature.
  */
 export const submitReviewSchema = z.object({
-  id: z.string().min(1).optional(),
   cakeId: z.string().optional(),
   productSlug: z.string().min(1),
   cakeName: z.string().optional(),
@@ -17,8 +31,6 @@ export const submitReviewSchema = z.object({
   rating: z.number().min(1).max(5),
   title: z.string().optional(),
   body: z.string().min(1),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
 });
 
 /** Admin moderation patch. */

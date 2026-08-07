@@ -89,7 +89,8 @@ async function ensureSeeded(): Promise<void> {
 export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): Promise<ProductReview> {
   const now = new Date().toISOString();
   const review: ProductReview = {
-    id: input.id ?? `review-${randomUUID()}`,
+    // Minted here, never taken from the body. See `submitReviewSchema`.
+    id: `review-${randomUUID()}`,
     cakeId: input.cakeId ?? "",
     productSlug: input.productSlug,
     cakeName: input.cakeName ?? "",
@@ -101,8 +102,8 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
     // Forced — a public submission is never pre-approved or featured.
     status: "pending",
     isFeatured: false,
-    createdAt: input.createdAt ?? now,
-    updatedAt: input.updatedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await repo.create(review);

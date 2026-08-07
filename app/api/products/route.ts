@@ -15,15 +15,37 @@ import type { ProductFormData } from "@/types/product";
  * than touching the store directly. The storefront renders on the server and
  * calls the service directly — no HTTP hop needed.
  *
- * Data now lives in MongoDB (via products-service → the store). Reads are open;
- * writes require an authenticated admin and pass server-side Zod validation.
- * The response shape stays `{ products }` / `{ product }` / `{ error }` so the
- * existing product client keeps working.
+ * Data now lives in MongoDB (via products-service → the store). Writes require an
+ * authenticated admin and pass server-side Zod validation. The response shape
+ * stays `{ products }` / `{ product }` / `{ error }` so the existing product
+ * client keeps working.
  */
 
+/**
+ * Signed-in admins get the whole catalogue; everyone else gets what the shop has
+ * actually published.
+ *
+ * This was open, and `getProducts()` returns every document unfiltered — so an
+ * anonymous `curl /api/products` handed out drafts and archived items in full:
+ * unreleased ranges, draft pricing, `compareAtPrice`, and the internal
+ * `allergens` / `careInstructions` copy. `proxy.ts` excludes `/api` from its
+ * matcher, so nothing gated it above either. The storefront itself only ever
+ * renders `status === "published"` (products-service.ts), which is the line this
+ * endpoint now draws too.
+ *
+ * Refusing anonymous reads outright is not an option: the storefront's client
+ * cache reads this route.
+ */
 export async function GET() {
   try {
-    return NextResponse.json({ products: await getProducts() });
+    const products = await getProducts();
+    const auth = await requireProductAdmin();
+    if (auth instanceof NextResponse) {
+      return NextResponse.json({
+        products: products.filter((product) => product.status === "published"),
+      });
+    }
+    return NextResponse.json({ products });
   } catch {
     return NextResponse.json({ error: "Failed to load products" }, { status: 500 });
   }

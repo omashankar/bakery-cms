@@ -205,7 +205,17 @@ export async function createReview(data: ProductReviewFormData): Promise<ReviewW
   writeReviews([review, ...reviews]);
   syncProductReviewAggregates();
 
-  if (!(await submitReviewRequest(review))) return { review, persisted: false };
+  const stored = await submitReviewRequest(review);
+  if (!stored) return { review, persisted: false };
+
+  // The server mints the id, so the local row has to adopt it. Without this the
+  // moderation PATCH below addresses an id the server has never heard of, and
+  // every later edit or delete of this review from the admin list misses too —
+  // the row would look editable and quietly change nothing.
+  if (stored.id !== review.id) {
+    review.id = stored.id;
+    writeReviews([review, ...reviews]);
+  }
 
   // POST /api/reviews is the PUBLIC submit route, so the server forces every new
   // review to pending and unfeatured — correctly, since a stranger must not be
