@@ -77,7 +77,11 @@ export const brandInfo = {
 export const contactInfo = {
   address: "123 Baker Street, Mumbai, Maharashtra 400001",
   phone: "+91 1800-123-4567",
-  email: "hello@monginis.com",
+  // A real, reachable address. `hello@monginis.com` is a domain this project
+  // does not own, and it is the fallback the storefront shows whenever
+  // Settings → Contact is empty — so a customer clicking "email us" was
+  // writing to nobody.
+  email: "sumanom7014106@gmail.com",
   mapEmbedUrl:
     "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3771.626326424726!2d72.8776559!3d19.0759837!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c6306644edc1%3A0x5da4ed8f8d648c69!2sMumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin",
 };

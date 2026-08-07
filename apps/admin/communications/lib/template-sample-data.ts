@@ -29,7 +29,7 @@ export const defaultTemplateSampleData: Record<string, string> = {
   payment_method: "UPI",
   store_name: "Monginis Bakery",
   store_phone: "+91 98765 43210",
-  store_email: "hello@monginis.demo",
+  store_email: "sumanom7014106@gmail.com",
   support_url: "https://bakery.demo/store/contact",
   reset_link: "https://bakery.demo/account/reset-password?token=demo",
   invoice_url: "https://bakery.demo/store/order/BK-1042",

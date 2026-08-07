@@ -77,9 +77,12 @@ export const defaultSecuritySettings: SecuritySettings = {
 export const defaultSmtpSettings: SmtpSettings = {
   host: "smtp.example.com",
   port: 587,
-  username: "noreply@monginis.com",
+  username: "sumanom7014106@gmail.com",
   password: "",
-  fromEmail: "hello@monginis.com",
+  // The address mail goes out AS. A relay will only send from an address it
+  // has verified, so this is a starting point rather than a working config —
+  // but it is one somebody owns, which the monginis.com placeholder was not.
+  fromEmail: "sumanom7014106@gmail.com",
   fromName: brandInfo.name,
   encryption: "tls",
   enabled: false,
