@@ -12,6 +12,7 @@ import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import {
   accessTokenTtl,
   getSecurityPolicy,
+  sessionTimeoutMs,
 } from "@/features/settings/server/security-policy.server";
 import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import {
@@ -163,14 +164,38 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   const user = await repo.findUserById(claims.sub);
   if (!user || user.status !== "active") throw new AuthError("Account unavailable");
 
+  const policy = await getSecurityPolicy();
+
+  /**
+   * The shop's configured session timeout, enforced HERE.
+   *
+   * The first attempt at this expressed the timeout by lengthening the access
+   * token, which was worse than doing nothing: `getSession` verifies the JWT
+   * alone — no session-row read, no revocation list — so the token's lifetime
+   * IS the revocation lag. Raising it widened the window in which a revoked or
+   * stolen token still works, while "Revoke session" and "Log out everywhere"
+   * both reported success.
+   *
+   * The rotation is the right place: it is the moment a session either
+   * continues or does not, so refusing here ends it for a real client without
+   * giving a replayed token a single extra second.
+   */
+  const session = await repo.findSessionById(claims.sid).catch(() => null);
+  if (session) {
+    const idleMs = Date.now() - new Date(session.lastSeenAt).getTime();
+    if (idleMs > sessionTimeoutMs(policy)) {
+      await repo.deleteSession(claims.sid).catch(() => undefined);
+      throw new AuthError("Session timed out");
+    }
+  }
+
   // Rotate: revoke the used token, issue a fresh pair.
   await repo.revokeRefreshToken(String(stored._id));
+  await repo.touchSession(claims.sid).catch(() => undefined);
 
-  // A refresh re-reads the policy, so shortening the timeout takes effect on
-  // the next rotation rather than only for new sign-ins.
   const accessToken = await signAccessToken(
     { sub: claims.sub, role: user.role, email: user.email },
-    accessTokenTtl(await getSecurityPolicy()),
+    accessTokenTtl(policy),
   );
   const newRefresh = await signRefreshToken({ sub: claims.sub, sid: claims.sid });
   await repo.createRefreshToken({

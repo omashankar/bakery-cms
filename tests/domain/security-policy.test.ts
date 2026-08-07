@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// jose signs with WebCrypto, and jsdom hands it a Uint8Array from a different
+// realm — "payload must be an instance of Uint8Array". Nothing in this file
+// needs a DOM: it is pure policy functions and source assertions.
 /**
  * The Security screen's policy fields, and whether anything obeys them.
  *
@@ -15,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import {
   accessTokenTtl,
   loginAttemptLimit,
+  sessionTimeoutMs,
 } from "@/features/settings/server/security-policy.server";
 import { defaultSecuritySettings } from "@/features/settings/lib/settings-utils";
 import type { SecuritySettings } from "@/types/settings";
@@ -35,23 +41,24 @@ const policy = (over: Partial<SecuritySettings> = {}): SecuritySettings => ({
 });
 
 describe("the configured session timeout", () => {
-  it("becomes the access-token lifetime", () => {
+  it("shortens the access token, and only ever shortens it", () => {
     delete process.env.JWT_ACCESS_TTL;
-    // Every session was 15 minutes whatever the screen said.
-    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 45 }))).toBe("45m");
+    // Every session was 15 minutes whatever the screen said — so a shop
+    // asking for less now gets less.
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 5 }))).toBe("5m");
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 10 }))).toBe("10m");
   });
 
   it("is clamped at both ends, because it gates authentication", () => {
     delete process.env.JWT_ACCESS_TTL;
-    // A one-minute token logs the admin out mid-form; a one-year one is not a
-    // timeout. The schema constrains future writes; this value is read on every
-    // sign-in, so a stored extreme must not be honoured just for having been
-    // stored once.
+    // A one-minute token logs the admin out mid-form. The upper end is the
+    // revocation lag, so it is a ceiling rather than the configured value —
+    // see the regression test below.
     expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 1 }))).toBe("5m");
-    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 999_999 }))).toBe("1440m");
-    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: NaN }))).toBe(
-      `${defaultSecuritySettings.sessionTimeoutMinutes}m`,
-    );
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 999_999 }))).toBe("15m");
+    // A non-numeric stored value must not produce `NaNm`, which jose would
+    // reject at signing time — on every sign-in.
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: NaN }))).toBe("15m");
   });
 
   it("still lets the environment win", () => {
@@ -62,12 +69,29 @@ describe("the configured session timeout", () => {
     delete process.env.JWT_ACCESS_TTL;
   });
 
-  it("is what the sign-in path actually applies", () => {
+  it("reaches the signed token, not just the call site", async () => {
+    // The grep version of this counted call sites, and `code()` strips only
+    // whole-line comments — so a trailing `// TODO: restore accessTokenTtl(…)`
+    // satisfied it while the behaviour was gutted. Sign a token and read it.
+    process.env.JWT_ACCESS_SECRET = "test-secret-for-ttl-assertions";
+    const { signAccessToken } = await import("@/lib/server/auth/jwt");
+    const { decodeJwt } = await import("jose");
+
+    const token = await signAccessToken(
+      { sub: "u1", role: "owner", email: "a@b.com" },
+      accessTokenTtl(policy({ sessionTimeoutMinutes: 7 })),
+    );
+    const claims = decodeJwt(token);
+
+    expect((claims.exp as number) - (claims.iat as number)).toBe(7 * 60);
+  });
+
+  it("applies it on the refresh rotation too", () => {
     const service = code("features/auth/server/auth.service.ts");
+    // Shortening the timeout should take effect without waiting for a fresh
+    // login — the rotation re-reads the policy.
     expect(service).toContain("accessTokenTtl(await getSecurityPolicy())");
-    // Both the initial sign-in and the refresh rotation, so shortening the
-    // timeout takes effect without waiting for a fresh login.
-    expect(service.match(/accessTokenTtl\(await getSecurityPolicy\(\)\)/g)?.length).toBe(2);
+    expect(service).toContain("accessTokenTtl(policy)");
   });
 });
 
@@ -133,7 +157,12 @@ describe("controls that nothing enforces", () => {
     // something. These two change nothing, so they cannot be flipped.
     expect(page).toContain("Not built yet — sign-in asks for a password only.");
     expect(page).toContain("Not built yet — no email is sent on a new sign-in.");
-    expect(page).toMatch(/disabled=\{notBuilt \|\| alwaysOn\}/);
+    // The call sites, not the definition: the regex matched `PolicySwitch`
+    // itself, so both props could be dropped from every usage and this still
+    // passed. Each switch has to carry its own flag.
+    expect(page).toMatch(/description="Not built yet — sign-in asks for a password only\."\s*\r?\n\s*notBuilt/);
+    expect(page).toMatch(/description="Not built yet — no email is sent on a new sign-in\."\s*\r?\n\s*notBuilt/);
+    expect(page).toMatch(/description="Always on: 8\+ characters with mixed case and a number\."\s*\r?\n\s*alwaysOn/);
 
     // And the old copy that implied they worked is gone.
     expect(page).not.toContain("OTP verification on login (demo toggle).");
@@ -163,5 +192,98 @@ describe("the activity log", () => {
     const page = code("apps/admin/settings/components/activity-settings-page.tsx");
     expect(page).toContain("fetchAuditLogs");
     expect(page).toContain("auditToActivity");
+  });
+});
+
+describe("the header sentence an owner scans", () => {
+  it("does not claim a second factor that does not exist", () => {
+    const page = code("apps/admin/settings/components/security-settings-page.tsx");
+
+    // A shop with `twoFactorEnabled: true` stored — saved before the toggle was
+    // disabled — read "2FA on" in the header while the switch below it said
+    // "Not built yet". Two contradictory statements on one screen, and the
+    // false one was the summary.
+    expect(page).not.toContain('2FA ${saved.twoFactorEnabled ? "on" : "off"}');
+    // What IS enforced takes the place.
+    expect(page).toContain("${saved.maxLoginAttempts} login attempts/min");
+  });
+
+  it("still reads the SAVED policy, not the draft", () => {
+    const page = code("apps/admin/settings/components/security-settings-page.tsx");
+    // Dragging the timeout slider restated the header as though the change were
+    // already in effect, on the one screen where what is enforced is the whole
+    // question.
+    expect(page).toContain("${saved.sessionTimeoutMinutes}m timeout");
+    expect(page).not.toContain("${settings.sessionTimeoutMinutes}m timeout");
+  });
+});
+
+describe("the regressions the first attempt introduced", () => {
+  it("never lets the configured timeout LENGTHEN the access token", () => {
+    delete process.env.JWT_ACCESS_TTL;
+
+    // `getSession` verifies the JWT and nothing else — no session-row read, no
+    // revocation list — so the token's lifetime IS the revocation lag: the
+    // window in which "Revoke session", "Log out everywhere" and a password
+    // change all report success while a stolen token keeps working.
+    //
+    // The first version of this let the configured timeout raise it from 15
+    // minutes to 60 by default. A security control that made the shop less safe.
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 60 }))).toBe("15m");
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 1440 }))).toBe("15m");
+
+    // Shortening is the direction that helps, so it still works.
+    expect(accessTokenTtl(policy({ sessionTimeoutMinutes: 5 }))).toBe("5m");
+  });
+
+  it("expresses the timeout on the session instead", () => {
+    expect(sessionTimeoutMs(policy({ sessionTimeoutMinutes: 60 }))).toBe(60 * 60_000);
+    expect(sessionTimeoutMs(policy({ sessionTimeoutMinutes: 1 }))).toBe(5 * 60_000);
+    expect(sessionTimeoutMs(policy({ sessionTimeoutMinutes: 99_999 }))).toBe(1440 * 60_000);
+  });
+
+  it("enforces it where a session continues or does not", () => {
+    const service = code("features/auth/server/auth.service.ts");
+    // The rotation is the moment a session either continues or ends, so
+    // refusing there ends it for a real client without giving a replayed token
+    // a single extra second.
+    expect(service).toContain("sessionTimeoutMs(policy)");
+    expect(service).toMatch(/if \(idleMs > sessionTimeoutMs\(policy\)\)/);
+    expect(service).toContain("repo.deleteSession(claims.sid)");
+    // And a continuing session restarts the idle window.
+    expect(service).toContain("repo.touchSession(claims.sid)");
+  });
+
+  it("does not dead-end a password reset", () => {
+    const page = code("features/auth/pages/reset-password-form-page.tsx");
+
+    // The card said "letters and numbers" while the server also wanted an
+    // uppercase letter, and the client rule was `minLength: 8` — so a password
+    // typed to match the sentence on screen was refused, to somebody who is
+    // already locked out and holding a ten-minute OTP.
+    expect(page).not.toContain("Use at least 8 characters with letters and numbers.");
+    expect(page).toContain("an uppercase letter, a lowercase letter and a number");
+    // Checked client-side too, so the answer arrives without a round trip.
+    // The `validate` KEY, not just the regex body: renaming it to anything
+    // else leaves those characters on the page and stops react-hook-form
+    // ever calling it, which is the whole point of the assertion.
+    expect(page).toMatch(
+      /validate: \(value: string\) =>[\s\S]{0,200}\/\[A-Z\]\/\.test\(value\)/,
+    );
+  });
+
+  it("lets a field error reach the user at all", () => {
+    const api = code("features/auth/lib/auth-api.ts");
+    // A validation failure puts the useful sentence in `errors` and leaves
+    // `message` as the constant "Validation failed", so every auth screen
+    // showed a toast naming no rule.
+    expect(api).toContain("json?.errors");
+    expect(api).toMatch(/fieldMessage \|\| json\?\.message/);
+  });
+
+  it("does not advertise a password rule the server never accepted", () => {
+    const notice = code("features/auth/components/auth-demo-notice.tsx");
+    expect(notice).not.toContain("password 6+ characters");
+    expect(notice).toContain("8+ with mixed case and a number");
   });
 });

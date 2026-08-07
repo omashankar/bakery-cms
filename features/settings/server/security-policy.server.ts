@@ -42,20 +42,58 @@ export function loginAttemptLimit(policy: SecuritySettings): number {
 }
 
 /**
+ * The longest an access token may live, whatever the shop configures.
+ *
+ * `getSession` verifies the JWT and nothing else — no session-row read, no
+ * revocation list — so an access token cannot be revoked before it expires.
+ * That makes this number the REVOCATION LAG: the window in which "Revoke
+ * session", "Log out everywhere" and a password change all report success while
+ * a stolen token keeps working.
+ *
+ * The first version of this function let the configured timeout raise it, which
+ * widened that window from 15 minutes to 60 by default — a security control
+ * that made the shop less safe. It may only ever shorten it.
+ */
+const MAX_ACCESS_TTL_MINUTES = 15;
+
+/**
  * The access-token lifetime, as a JWT TTL string.
  *
  * `JWT_ACCESS_TTL` stays authoritative when it is set: an operator pinning it
  * through the environment is making a deployment decision, and a shop admin
- * should not silently override it. Otherwise the configured value wins.
+ * should not silently override it.
  *
- * Clamped to a range where both ends are still a session: a one-minute token
- * would log the admin out mid-form, and a one-year one is not a timeout.
+ * A shop asking for a SHORTER session gets it. One asking for a longer one gets
+ * the ceiling — the session still ends when they asked, enforced on the session
+ * row by `sessionExpiredAt` below, but the unrevocable token stays short.
  */
 export function accessTokenTtl(policy: SecuritySettings): string {
   if (process.env.JWT_ACCESS_TTL?.trim()) return process.env.JWT_ACCESS_TTL.trim();
 
   const configured = Number(policy.sessionTimeoutMinutes);
-  if (!Number.isFinite(configured)) return `${defaultSecuritySettings.sessionTimeoutMinutes}m`;
+  if (!Number.isFinite(configured)) return `${MAX_ACCESS_TTL_MINUTES}m`;
 
-  return `${Math.min(1440, Math.max(5, Math.trunc(configured)))}m`;
+  const minutes = Math.min(MAX_ACCESS_TTL_MINUTES, Math.max(5, Math.trunc(configured)));
+  return `${minutes}m`;
+}
+
+/**
+ * Whether a session started this long ago has run past the configured timeout.
+ *
+ * This is where "session timeout" actually means something. The access token is
+ * deliberately capped above, so lengthening it cannot express a 4-hour session —
+ * and the cookie's own expiry only governs a cooperating browser. Checked on
+ * every refresh instead: the rotation is the moment a session either continues
+ * or does not, and refusing there ends it for a real client without widening
+ * the window for a replayed token.
+ *
+ * Clamped the same way the screen is: 5 minutes is the shortest usable session,
+ * and a day is the longest that is still a timeout.
+ */
+export function sessionTimeoutMs(policy: SecuritySettings): number {
+  const configured = Number(policy.sessionTimeoutMinutes);
+  const minutes = Number.isFinite(configured)
+    ? Math.min(1440, Math.max(5, Math.trunc(configured)))
+    : defaultSecuritySettings.sessionTimeoutMinutes;
+  return minutes * 60_000;
 }

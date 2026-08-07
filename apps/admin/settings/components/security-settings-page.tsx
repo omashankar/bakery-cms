@@ -222,8 +222,16 @@ export function SecuritySettingsPage() {
         // dragging the timeout slider or flipping 2FA restated the header as
         // though the change were already in effect — on the one screen where
         // what is actually enforced is the whole question.
+        //
+        // 2FA is deliberately gone from this line. A shop with
+        // `twoFactorEnabled: true` stored — saved before the toggle was
+        // disabled — would read "2FA on" here while the switch below it says
+        // "Not built yet". The header is the sentence an owner scans, and
+        // claiming a second factor that does not exist is the one thing this
+        // screen must never do. The attempt limit IS enforced, so it takes the
+        // place.
         hydration === "ready"
-          ? `${saved.sessionTimeoutMinutes}m timeout · 2FA ${saved.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+          ? `${saved.sessionTimeoutMinutes}m timeout · ${saved.maxLoginAttempts} login attempts/min · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
           : "Session policies, login history, active devices, and access controls."
       }
       isDirty={isDirty}

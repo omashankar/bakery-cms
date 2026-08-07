@@ -20,7 +20,23 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   });
   const json = (await res.json().catch(() => null)) as Envelope<T> | null;
   if (!res.ok || !json?.success) {
-    throw new Error(json?.message || "Request failed. Please try again.");
+    /**
+     * The FIELD message first, then the envelope's.
+     *
+     * A validation failure puts the useful sentence in `errors` and leaves
+     * `message` as the constant "Validation failed", so every auth screen
+     * showed a toast that named no rule. That was survivable while the
+     * password rule was a bare length check the form already enforced —
+     * and became a dead end the moment the server started asking for more
+     * than the form did: a locked-out user, holding a ten-minute OTP,
+     * rejected without being told why.
+     */
+    const fieldMessage = Array.isArray(json?.errors)
+      ? json.errors.find((entry) => entry?.message)?.message
+      : undefined;
+    throw new Error(
+      fieldMessage || json?.message || "Request failed. Please try again.",
+    );
   }
   return json.data as T;
 }
