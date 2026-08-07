@@ -260,6 +260,11 @@ describe("storefront projections", () => {
     // Dropped to keep the RSC payload small.
     expect(card?.description).toBe("");
     expect(card?.variantGroups).toBeUndefined();
-    expect(card?.weights).toBeUndefined();
+
+    // `weights` is NOT dropped any more. The collections page filters this
+    // projection on the client, and the weight filter matches tier labels — with
+    // no tiers on the card it matched every product, so the filter did nothing.
+    // Only the labels travel; the per-tier prices do not.
+    expect(card?.weights?.every((tier) => tier.price === 0)).toBe(true);
   });
 });

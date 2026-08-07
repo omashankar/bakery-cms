@@ -210,6 +210,27 @@ describe("collection filters use the product's real data", () => {
     expect(result).toHaveLength(1);
   });
 
+  it("the card projection carries what the filters filter on", () => {
+    // The collections page filters the CARD projection on the client, and the
+    // fields these filters read were not in it — so the occasion filter fell
+    // back to searching prose, "Eggless only" fell back to matching the category
+    // NAME, and the weight filter matched everything because no card carried a
+    // tier to match against. Fixing the filters reached nobody without this.
+    const source = stripComments(read("features/products/data/products-service.ts"));
+    const start = source.indexOf("function toCard(");
+    const fn = source.slice(start, source.indexOf("\n}", start));
+
+    for (const field of ["occasions", "isEggless", "flavours", "weights"]) {
+      expect(fn, `toCard must carry ${field} or the filter that reads it is dead`).toContain(
+        `${field}: product.${field}`,
+      );
+    }
+
+    // Still a projection, not the whole product — that is the point of it.
+    expect(fn).not.toContain("...product");
+    expect(fn).toContain('description: ""');
+  });
+
   it("offers the shop's own weight labels, not three hard-coded ones", () => {
     const source = stripComments(read("apps/website/lib/collection-filters.ts"));
     expect(source).toContain("getWeightOptions().map((option) => option.label)");

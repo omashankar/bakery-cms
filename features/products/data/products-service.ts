@@ -68,12 +68,23 @@ export async function getStorefrontProducts(): Promise<LandingProduct[]> {
 }
 
 /**
- * Card-shaped projection: only the fields a product rail renders.
+ * Card-shaped projection: what a card RENDERS, plus what the filter panel FILTERS ON.
  *
  * Rails are handed to a Client Component, so every field crosses the wire in the
  * RSC payload. Sending whole products would ship descriptions, variant groups
- * and weight tables that no card displays — fine at 25 products, ruinous at
+ * and full weight tables that no card displays — fine at 25 products, ruinous at
  * 5,000.
+ *
+ * But the collections page filters this projection on the client, and the fields
+ * its filters read were not in it. So the occasion filter fell back to searching
+ * the prose, the flavour filter did too, "Eggless only" fell back to matching
+ * the category NAME, and the weight filter — which now matches real tiers —
+ * matched everything, because no card carried any tiers to match against.
+ *
+ * The four fields below are what those filters need, kept as small as they can
+ * be: occasion names are short strings, and the weight tiers are reduced to
+ * their labels, since the filter compares labels and the card shows no prices
+ * per tier.
  */
 function toCard(product: LandingProduct): LandingProduct {
   return {
@@ -89,6 +100,11 @@ function toCard(product: LandingProduct): LandingProduct {
     reviewCount: product.reviewCount,
     inStock: product.inStock,
     description: "", // required by the type; never rendered on a card
+    // Filter inputs.
+    occasions: product.occasions,
+    isEggless: product.isEggless,
+    flavours: product.flavours,
+    weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),
   };
 }
 

@@ -57,9 +57,16 @@ async function seedIfEmpty(): Promise<void> {
     }
   }
 
-  // Set the flag either way. A shop that already has products has clearly been
-  // past this point, and must not be seeded if it is ever emptied later.
-  await seededFlag.write({ done: true });
+  // The flag means "this shop is past the seeding decision", so it is only set
+  // once that is TRUE. Setting it unconditionally would let a seed that failed
+  // for a real reason — a validation error, a dropped connection — leave a brand
+  // new shop permanently empty, having recorded that it was seeded.
+  //
+  // A shop that already had products is past the decision by definition, and
+  // must not be seeded if it is ever emptied later.
+  if ((await ProductModel.estimatedDocumentCount()) > 0) {
+    await seededFlag.write({ done: true });
+  }
 }
 
 /** All products, newest first, seeding the collection on first use. */
@@ -124,6 +131,10 @@ function ensureUniqueSlugIndex(): Promise<void> {
         await ProductModel.collection.createIndex({ slug: 1 }, { unique: true, name: "slug_1" });
       }
     } catch (error) {
+      // Clear the memo so the next write tries again. Caching the failure meant
+      // one transient error — a blip while the index built — left the process
+      // running without slug uniqueness for its entire lifetime, silently.
+      uniqueSlugIndex = null;
       console.error(
         "[products] could not enforce a unique slug index — duplicate slugs are possible",
         error,
