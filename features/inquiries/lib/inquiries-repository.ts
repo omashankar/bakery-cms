@@ -247,7 +247,19 @@ export async function addInquiry(
     updatedAt: timestamp,
   };
   persistInquiries([created, ...inquiries]);
-  return { inquiry: created, persisted: await createInquiryRequest(created) };
+
+  const stored = await createInquiryRequest(created);
+  if (!stored) return { inquiry: created, persisted: false };
+
+  // The server mints the id, so the local row adopts it. Without this every
+  // later admin edit or delete of this enquiry addresses an id the server has
+  // never heard of — the row looks editable and quietly changes nothing.
+  if (stored.id !== created.id) {
+    created.id = stored.id;
+    persistInquiries([created, ...inquiries]);
+  }
+
+  return { inquiry: created, persisted: true };
 }
 
 export async function updateInquiry(
