@@ -6,7 +6,7 @@ import {
   updateProduct,
 } from "@/features/products/data/products-service";
 import { productFormSchema } from "@/features/products/server/product.validators";
-import { slugExists } from "@/features/products/server/product.repository";
+import { isDuplicateSlugError } from "@/features/products/server/product.repository";
 import { requireProductAdmin } from "@/features/products/server/guard";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
@@ -62,11 +62,6 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   try {
-    // Slug must stay unique across OTHER products.
-    if (await slugExists(body.slug, id)) {
-      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
-    }
-
     const updated = await updateProduct(id, body);
     if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -79,7 +74,12 @@ export async function PUT(request: Request, context: RouteContext) {
       ...requestContext(request),
     });
     return NextResponse.json({ product: updated });
-  } catch {
+  } catch (error) {
+    // The unique index decides, not a scan-then-write that two requests can both
+    // pass. See the note on `isDuplicateSlugError`.
+    if (isDuplicateSlugError(error)) {
+      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
 }

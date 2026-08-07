@@ -3,7 +3,8 @@ import {
   type CategoryNames,
 } from "@/features/products/lib/product-mapper";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
-import { mutateProducts, readProducts } from "@/features/products/data/products-store.server";
+import { readProducts } from "@/features/products/data/products-store.server";
+import * as productRepo from "@/features/products/server/product.repository";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import {
@@ -102,57 +103,71 @@ export async function getStorefrontProductBySlug(
   return mapAdminProductToStorefront(product, await categoryNames());
 }
 
-// Mutations go through mutateProducts so the read and the write happen under one
-// lock. See products-store.server.ts for why splitting them loses updates.
-
-let idCounter = 0;
+/**
+ * Mutations address ONE document.
+ *
+ * They used to go through `mutateProducts`: read the whole collection, change
+ * one entry, and write every document back. An in-process queue serialised those
+ * against each other, but two writers are not in it — order placement, which
+ * does `$inc` on `stockQuantity` inside a transaction, and inventory
+ * adjustments, which use `patchFields`. So a cake sold during an admin's save
+ * had its stock restored by that save: three cakes gone, stock unchanged, and
+ * the shop overselling with nothing to show for it. Bulk Publish over ten rows
+ * did it ten times.
+ */
 
 function nextId(): string {
-  // Date.now() alone collides when two products are created in the same tick.
-  idCounter += 1;
-  return `product-${Date.now()}-${idCounter}`;
+  // `Date.now()` plus a per-process counter collides across instances: two
+  // servers minting an id in the same millisecond both start their counter at 1.
+  const unique =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `product-${unique}`;
 }
 
 export async function createProduct(data: ProductFormData): Promise<Product> {
-  return mutateProducts((products) => {
-    const timestamp = nowIso();
-    const product: Product = {
-      ...data,
-      id: nextId(),
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    return { next: [product, ...products], result: product };
-  });
+  const timestamp = nowIso();
+  return productRepo.insertOne({
+    ...data,
+    id: nextId(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  } as Product);
 }
 
 export async function updateProduct(
   id: string,
   data: ProductFormData
 ): Promise<Product | null> {
-  return mutateProducts((products) => {
-    const index = products.findIndex((product) => product.id === id);
-    if (index === -1) return { next: products, result: null };
+  const existing = await getProductById(id);
+  if (!existing) return null;
 
-    const updated: Product = {
-      ...products[index],
-      ...data,
-      id,
-      updatedAt: nowIso(),
-    };
-
-    const next = [...products];
-    next[index] = updated;
-    return { next, result: updated };
+  return productRepo.replaceOne(id, {
+    ...existing,
+    ...data,
+    id,
+    // `rating` and `reviewCount` are owned by the reviews aggregate, which
+    // writes them directly. Letting an edit form carry its stale copy back would
+    // undo a moderation decision made since this form was opened.
+    rating: existing.rating,
+    reviewCount: existing.reviewCount,
+    createdAt: existing.createdAt,
+    updatedAt: nowIso(),
   });
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
-  return mutateProducts((products) => {
-    const next = products.filter((product) => product.id !== id);
-    return { next, result: next.length !== products.length };
-  });
+  return productRepo.deleteOne(id);
+}
+
+/** Publish or archive many products in one statement. */
+export async function setProductStatus(
+  ids: string[],
+  status: Product["status"]
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  return productRepo.setStatusMany(ids, status);
 }
 
 /**

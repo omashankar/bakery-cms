@@ -19,10 +19,43 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+    // The server sends per-field detail in `errors` and the route sends a
+    // summary in `error`. Only the summary was read, so a product rejected for
+    // one bad field toasted a bare "Validation failed" and the admin had no way
+    // to learn which field, or why.
+    const detail = Array.isArray(payload?.errors)
+      ? payload.errors
+          .map((item: { path?: unknown; message?: unknown }) => {
+            const path = Array.isArray(item?.path) ? item.path.join(".") : item?.path;
+            return path ? `${path}: ${item?.message}` : String(item?.message ?? "");
+          })
+          .filter(Boolean)
+          .join("; ")
+      : "";
+
+    throw new Error(detail || payload?.error || `Request failed (${response.status})`);
   }
 
   return payload as T;
+}
+
+/**
+ * Publish or archive many products at once.
+ *
+ * Not `updateProductRequest` per row: that sends a full product body built from
+ * the browser's list, so every field another admin changed since that list
+ * loaded is written back to its old value. This changes the status and nothing
+ * else.
+ */
+export async function setProductStatusRequest(
+  ids: string[],
+  status: Product["status"]
+): Promise<number> {
+  const { updated } = await request<{ updated: number }>("/api/products/status", {
+    method: "POST",
+    body: JSON.stringify({ ids, status }),
+  });
+  return updated;
 }
 
 export async function fetchProducts(): Promise<Product[]> {

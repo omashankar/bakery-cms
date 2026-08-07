@@ -42,7 +42,7 @@ import { adminCategories } from "@/features/products/lib/catalog-options";
 import {
   deleteProductRequest,
   fetchProducts,
-  updateProductRequest,
+  setProductStatusRequest,
 } from "@/features/products/data/products-client";
 import {
   defaultProductListFilters,
@@ -193,24 +193,38 @@ export function ProductsListPage() {
     );
   }
 
-  /** Applies a status to every selected product, reporting partial failures. */
+  /**
+   * Applies a status to every selected product.
+   *
+   * This used to PUT a whole product body per cake, rebuilt from this list —
+   * which is a snapshot. Anything another admin had edited since the page
+   * loaded, and any stock movement from an order in the meantime, was written
+   * back to its old value. Now the request carries the ids and the status, and
+   * the server sets that one field.
+   */
   async function applyBulkStatus(status: EntityStatus, verb: string) {
-    const targets = cakes.filter((cake) => selectedIds.includes(cake.id));
-    const results = await Promise.allSettled(
-      targets.map((cake) => {
-        const { id: _id, createdAt: _c, updatedAt: _u, ...data } = cake;
-        return updateProductRequest(cake.id, { ...data, status });
-      })
-    );
+    const ids = cakes.filter((cake) => selectedIds.includes(cake.id)).map((cake) => cake.id);
 
-    const ok = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.length - ok;
+    try {
+      const updated = await setProductStatusRequest(ids, status);
+      await refresh();
+      setSelectedIds([]);
 
-    await refresh();
-    setSelectedIds([]);
-
-    if (ok > 0) toast.success(`${ok} cake${ok === 1 ? "" : "s"} ${verb}`);
-    if (failed > 0) toast.error(`${failed} cake${failed === 1 ? "" : "s"} failed to ${verb === "published" ? "publish" : "archive"}`);
+      if (updated > 0) toast.success(`${updated} cake${updated === 1 ? "" : "s"} ${verb}`);
+      // Fewer rows changed than were selected: something was deleted or already
+      // in that state. Say so rather than reporting the number asked for.
+      const missed = ids.length - updated;
+      if (missed > 0) {
+        toast.error(`${missed} cake${missed === 1 ? " was" : "s were"} not updated`);
+      }
+    } catch (error) {
+      await refresh();
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not ${verb === "published" ? "publish" : "archive"} the selected cakes`
+      );
+    }
   }
 
   function handleBulkPublish() {

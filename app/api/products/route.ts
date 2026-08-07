@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createProduct, getProducts } from "@/features/products/data/products-service";
 import { productFormSchema } from "@/features/products/server/product.validators";
 import { requireProductAdmin } from "@/features/products/server/guard";
+import { isDuplicateSlugError } from "@/features/products/server/product.repository";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
 import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
@@ -66,11 +67,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existing = await getProducts();
-    if (existing.some((product) => product.slug === body.slug)) {
-      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
-    }
-
+    // No pre-flight scan. Reading the collection and then writing is a check two
+    // concurrent requests can both pass, and the slug is the storefront's
+    // product URL — a collision leaves one cake unreachable. The unique index
+    // decides, and its refusal becomes the 409.
     const product = await createProduct(body);
     await writeAuditLog({
       action: "product.create",
@@ -80,7 +80,10 @@ export async function POST(request: Request) {
       ...requestContext(request),
     });
     return NextResponse.json({ product }, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (isDuplicateSlugError(error)) {
+      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }
 }

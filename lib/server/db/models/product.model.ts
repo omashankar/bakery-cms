@@ -16,7 +16,11 @@ const productSchema = new mongoose.Schema(
   {
     _id: { type: String },
     name: { type: String, required: true },
-    slug: { type: String, required: true, index: true },
+    // Unique in the DATABASE, not just checked in JS. The route scanned for a
+    // clashing slug and then wrote, which two requests can both pass — and the
+    // slug is the storefront's product URL, so a collision means one of the two
+    // cakes is unreachable and the other answers for it.
+    slug: { type: String, required: true, unique: true, index: true },
     description: { type: String, default: "" },
     shortDescription: { type: String },
     price: { type: Number, default: 0 },
