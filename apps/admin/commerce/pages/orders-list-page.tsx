@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
+import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -218,8 +219,24 @@ export function OrdersListPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
+  /**
+   * Selected orders whose status this action cannot change.
+   *
+   * Cancelled and refunded orders have checkboxes like any other row, and the
+   * status tabs let an admin filter to exactly those — so select-all here used
+   * to write a refunded order back to `delivered`. The server refuses that now;
+   * this stops the screen offering it in the first place, and says why.
+   */
+  const lockedSelection = useMemo(
+    () =>
+      orders.filter(
+        (order) => selectedIds.includes(order.id) && isTerminalOrderStatus(order.status)
+      ),
+    [orders, selectedIds]
+  );
+
   async function handleBulkStatusUpdate() {
-    if (selectedIds.length === 0 || applying) return;
+    if (selectedIds.length === 0 || applying || lockedSelection.length > 0) return;
 
     setApplying(true);
     // Named apart from the `failed` fetch state above — they mean different things.
@@ -519,10 +536,17 @@ export function OrdersListPage() {
                 size="sm"
                 variant="outline"
                 onClick={handleBulkStatusUpdate}
-                disabled={applying}
+                disabled={applying || lockedSelection.length > 0}
               >
                 {applying ? "Applying..." : "Apply"}
               </Button>
+              {lockedSelection.length > 0 ? (
+                <span className="text-xs text-destructive">
+                  {lockedSelection.length} cancelled or refunded order
+                  {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
+                  cannot be changed.
+                </span>
+              ) : null}
               <Button size="sm" variant="outline" onClick={handleExport}>
                 Export
               </Button>

@@ -20,6 +20,7 @@ import {
 } from "@/features/payments/server/razorpay-refund.server";
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
+import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
 import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { priceCart, UnknownProductError } from "@/features/checkout/server/pricing.server";
@@ -741,6 +742,19 @@ async function requireOrder(id: string): Promise<PlacedOrder> {
 export async function updateStatus(id: string, status: OrderStatus, ctx: RequestCtx) {
   const order = await requireOrder(id);
   if (order.status === status) return order;
+
+  // The rule lives HERE, not on a dropdown.
+  //
+  // There was no server-side transition check at all: `isTerminalOrderStatus`
+  // had a single caller, a `disabled` prop on the detail page's select. The
+  // Orders list gives every row a checkbox including under the Cancelled and
+  // Refunded tabs, so select-all → bulk status → Apply wrote a refunded order
+  // back to `delivered`. Its total then re-entered the Revenue card having
+  // already been paid back, it re-entered the fulfilment queue, and cancelling
+  // it a second time put its stock back a second time — the shop oversold what
+  // it had never got back.
+  const refusal = orderStatusTransitionError(order.status, status);
+  if (refusal) throw new AppError(refusal, 409);
 
   const now = new Date().toISOString();
   const updated = await repo.patch(id, {
