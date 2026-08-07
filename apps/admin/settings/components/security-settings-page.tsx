@@ -310,7 +310,13 @@ export function SecuritySettingsPage() {
               <CardContent className="space-y-6">
                 <PolicySwitch
                   title="Strong passwords"
-                  description="Require 8+ chars with mixed case and numbers."
+                  // Always on, and now actually applied. The rule was a bare
+                  // length check while this line claimed mixed case and
+                  // numbers; the rule matches the sentence now. The switch is
+                  // fixed rather than removed because turning it OFF would be
+                  // a request to weaken the shop, which is not worth building.
+                  description="Always on: 8+ characters with mixed case and a number."
+                  alwaysOn
                   checked={settings.requireStrongPasswords}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, requireStrongPasswords: checked }))
@@ -318,7 +324,8 @@ export function SecuritySettingsPage() {
                 />
                 <PolicySwitch
                   title="Two-factor authentication"
-                  description="OTP verification on login (demo toggle)."
+                  description="Not built yet — sign-in asks for a password only."
+                  notBuilt
                   checked={settings.twoFactorEnabled}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, twoFactorEnabled: checked }))
@@ -326,7 +333,8 @@ export function SecuritySettingsPage() {
                 />
                 <PolicySwitch
                   title="Login notifications"
-                  description="Email alert when a new device signs in."
+                  description="Not built yet — no email is sent on a new sign-in."
+                  notBuilt
                   checked={settings.loginNotifications}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, loginNotifications: checked }))
@@ -597,11 +605,24 @@ function PolicySwitch({
   description,
   checked,
   onCheckedChange,
+  notBuilt,
+  alwaysOn,
 }: {
   title: string;
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /**
+   * Nothing enforces this one yet.
+   *
+   * A switch an owner can flip is a promise that flipping it changes
+   * something. Leaving these live let someone turn on a protection that does
+   * not exist and walk away believing their shop was covered — which is worse
+   * than the feature simply being absent.
+   */
+  notBuilt?: boolean;
+  /** Enforced unconditionally — the switch shows it, and cannot turn it off. */
+  alwaysOn?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -609,7 +630,12 @@ function PolicySwitch({
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={title} />
+      <Switch
+        checked={alwaysOn ? true : notBuilt ? false : checked}
+        onCheckedChange={onCheckedChange}
+        disabled={notBuilt || alwaysOn}
+        aria-label={title}
+      />
     </div>
   );
 }

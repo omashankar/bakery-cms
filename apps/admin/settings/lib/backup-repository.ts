@@ -6,6 +6,11 @@ import {
   importLocalStorageBackup,
 } from "@/features/settings/lib/settings-repository";
 import { mergeAppSettings } from "@/features/settings/lib/settings-utils";
+import { ensureSettingsHydrated } from "@/features/settings/lib/settings-repository";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { ensureSeoHydrated } from "@/features/site-layout/lib/site-layout-hydration";
+import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import {
   fetchFullSettings,
   pushSection,
@@ -346,9 +351,33 @@ export async function buildServerBackupData(): Promise<Record<string, string | n
  * have no whole-value endpoint — are written either way, because for them the
  * browser IS the destination.
  */
+/**
+ * Opens every gate a restore will push through, before it pushes anything.
+ *
+ * Each guarded PUT waits out the full hydration deadline when its gate is
+ * shut, and a restore writes sixteen sections in sequence — so a restore from
+ * a tab that never hydrated took minutes and then reported the server as
+ * having refused, which it never did. Opening them here rather than at the
+ * call site means the function cannot be used wrongly.
+ *
+ * Failures are ignored on purpose: a gate that will not open is exactly the
+ * case the per-section refusal reporting already handles honestly.
+ */
+async function openEveryGate(): Promise<void> {
+  await Promise.allSettled([
+    ensureSettingsHydrated(),
+    ensureSiteLayoutHydrated(),
+    ensureSeoHydrated(),
+    ensureAdminConfigHydrated(),
+    ensureInvoiceSettingsHydrated(),
+  ]);
+}
+
 export async function restoreBackupToServer(
   data: Record<string, string | null>
 ): Promise<RestoreResult> {
+  await openEveryGate();
+
   const serverSections: string[] = [];
   const failedSections: string[] = [];
   const accepted: Record<string, string | null> = {};

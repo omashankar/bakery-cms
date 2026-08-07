@@ -2,6 +2,10 @@ import { ok } from "@/lib/server/http/response";
 import { withErrorHandler } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { rateLimit } from "@/lib/server/http/rate-limit";
+import {
+  getSecurityPolicy,
+  loginAttemptLimit,
+} from "@/features/settings/server/security-policy.server";
 import { requireSession, getCurrentUser } from "@/lib/server/auth/dal";
 import { getRefreshCookie } from "@/lib/server/auth/cookies";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -22,7 +26,12 @@ import {
 
 export const loginController = withErrorHandler(async (request: Request) => {
   const ctx = requestContext(request);
-  rateLimit(`login:${ctx.ip}`, { limit: 10, windowMs: 60_000 });
+  // The shop's own "Max login attempts", not a hardcoded ten. That number
+  // sat on the Security screen with nothing reading it, so an owner who set
+  // three got ten. Clamped in `loginAttemptLimit`, because this value gates
+  // authentication and a stored 0 would lock everyone out.
+  const policy = await getSecurityPolicy();
+  rateLimit(`login:${ctx.ip}`, { limit: loginAttemptLimit(policy), windowMs: 60_000 });
 
   const input = validate(loginSchema, await readJson(request));
   const user = await service.login(input, ctx);

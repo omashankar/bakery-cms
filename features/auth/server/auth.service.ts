@@ -9,6 +9,10 @@ import {
 import { setAuthCookies, clearAuthCookies } from "@/lib/server/auth/cookies";
 import { sha256, generateOtp } from "@/lib/server/auth/hash";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
+import {
+  accessTokenTtl,
+  getSecurityPolicy,
+} from "@/features/settings/server/security-policy.server";
 import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import {
   AuthError,
@@ -121,7 +125,12 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
     expiresAt: ttlToDate(REFRESH_TTL),
   });
 
-  const accessToken = await signAccessToken({ sub: userId, role, email });
+  // The shop's configured session timeout, finally applied. Every session was
+  // 15 minutes regardless of what the Security screen said.
+  const accessToken = await signAccessToken(
+    { sub: userId, role, email },
+    accessTokenTtl(await getSecurityPolicy()),
+  );
   const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) });
 
   await repo.createRefreshToken({
@@ -157,7 +166,12 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   // Rotate: revoke the used token, issue a fresh pair.
   await repo.revokeRefreshToken(String(stored._id));
 
-  const accessToken = await signAccessToken({ sub: claims.sub, role: user.role, email: user.email });
+  // A refresh re-reads the policy, so shortening the timeout takes effect on
+  // the next rotation rather than only for new sign-ins.
+  const accessToken = await signAccessToken(
+    { sub: claims.sub, role: user.role, email: user.email },
+    accessTokenTtl(await getSecurityPolicy()),
+  );
   const newRefresh = await signRefreshToken({ sub: claims.sub, sid: claims.sid });
   await repo.createRefreshToken({
     userId: claims.sub,

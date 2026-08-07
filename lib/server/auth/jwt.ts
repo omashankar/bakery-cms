@@ -37,11 +37,23 @@ function secretFor(type: TokenType): Uint8Array {
 export const ACCESS_TTL = process.env.JWT_ACCESS_TTL || "15m";
 export const REFRESH_TTL = process.env.JWT_REFRESH_TTL || "30d";
 
-export async function signAccessToken(claims: Omit<AccessClaims, "type">): Promise<string> {
+/**
+ * `ttl` lets the caller apply the shop's configured session timeout.
+ *
+ * The Security screen has had a "Session timeout" field since before this
+ * function existed, and nothing read it — every session was 15 minutes
+ * whatever the admin chose. Defaulted rather than required so that the paths
+ * which do not know the policy (a token refresh deep in a request) keep
+ * working unchanged.
+ */
+export async function signAccessToken(
+  claims: Omit<AccessClaims, "type">,
+  ttl: string = ACCESS_TTL,
+): Promise<string> {
   return new SignJWT({ ...claims, type: "access" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(ACCESS_TTL)
+    .setExpirationTime(ttl)
     .sign(secretFor("access"));
 }
 

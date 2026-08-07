@@ -144,50 +144,22 @@ export const defaultCommerceSettings: CommerceSettings = {
   },
 };
 
-export const seedActivityLog: ActivityLog[] = [
-  {
-    id: "act-1",
-    action: "published",
-    entity: "homepage",
-    userId: "admin",
-    timestamp: daysAgo(1),
-    details: "Homepage builder snapshot published",
-  },
-  {
-    id: "act-2",
-    action: "updated",
-    entity: "appearance",
-    userId: "admin",
-    timestamp: daysAgo(2),
-    details: "Theme colors and border radius updated",
-  },
-  {
-    id: "act-3",
-    action: "created",
-    entity: "cake",
-    entityId: "cake-12",
-    userId: "admin",
-    timestamp: daysAgo(3),
-    details: "Added Chocolate Truffle Delight",
-  },
-  {
-    id: "act-4",
-    action: "updated",
-    entity: "seo",
-    userId: "admin",
-    timestamp: daysAgo(4),
-    details: "Global SEO defaults saved",
-  },
-  {
-    id: "act-5",
-    action: "received",
-    entity: "inquiry",
-    entityId: "inq-3",
-    userId: "system",
-    timestamp: daysAgo(5),
-    details: "New wedding inquiry submitted",
-  },
-];
+/**
+ * Empty, and it has to be.
+ *
+ * This shipped three fabricated rows — "Homepage builder snapshot published",
+ * "Theme colors and border radius updated" — attributed to "admin" with
+ * plausible timestamps. The Activity Log page MERGES them with the real server
+ * audit trail and renders both identically, so a fresh shop opened its audit
+ * log and read three things that never happened, indistinguishable from the
+ * ones that did.
+ *
+ * An audit trail is worth exactly what it can be trusted for. Demo data in one
+ * is not a placeholder; it is a false record. The page already handles an empty
+ * list, and the real trail fills it from the first admin action.
+ */
+export const seedActivityLog: ActivityLog[] = [];
+
 
 export const defaultAppSettings: AppSettings = {
   general: defaultGeneralSettings,

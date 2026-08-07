@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 /**
  * Exporting and restoring the shop's configuration.
  *
@@ -104,5 +106,75 @@ describe("restoring a backup", () => {
     expect(localStorage.getItem("bakery-cms-products")).toBe(
       snapshot["bakery-cms-products"],
     );
+  });
+});
+
+describe("the sections a restore can open its own gates for", () => {
+  /**
+   * Not every server-backed key, and the reason is itself the finding.
+   *
+   * This suite exercised `serverBackedKeys[0]` alone, so fifteen sections had
+   * no restore coverage at all. Adding all of them showed why it mattered and
+   * where the limit is: each guarded PUT waits out the full hydration deadline
+   * when its gate is shut, and `restoreBackupToServer` can only open the gates
+   * that expose a callable opener.
+   *
+   * Content, commerce and catalog open theirs from a mount effect only —
+   * `content-server-sync.tsx`, `commerce-server-sync.tsx`,
+   * `catalog-server-sync.tsx`. In the running admin those components are
+   * mounted, so their gates are open; from here nothing can open them, and a
+   * test that waited them out would be measuring the deadline rather than the
+   * restore.
+   *
+   * So these are the sections this file can actually pin. The rest stay
+   * uncovered, deliberately and on the record.
+   */
+  const OPENABLE = [
+    "bakery-cms-settings",
+    "bakery-cms-seo",
+    "bakery-cms-invoice-settings",
+    "bakery-cms-payment-gateways",
+    "bakery-cms-payment-notif-prefs",
+    "bakery-cms-admin-profile",
+    "bakery-cms-custom-code",
+  ].filter((key) => serverBackedKeys.includes(key));
+
+  it("covers more than the first section, and less than all of them", () => {
+    expect(OPENABLE.length).toBeGreaterThan(1);
+    expect(OPENABLE.length).toBeLessThan(serverBackedKeys.length);
+  });
+
+  it.each(OPENABLE)("%s is not left in the cache when the server refuses it", async (key) => {
+    mockFetch((_url, method) => ({ ok: method === "GET" }));
+
+    const result = await restoreBackupToServer({ [key]: JSON.stringify({}) });
+
+    // Every admin form writes its whole section back from that cache, so a
+    // rejected payload left there reaches the server by the back door on the
+    // next edit — a restore the admin was told had failed, landing later.
+    if (result.failedSections.length > 0) {
+      expect(localStorage.getItem(key)).toBeNull();
+    }
+  });
+
+  it("opens the gates itself rather than trusting the caller to", () => {
+    const repo = readFileSync(
+      join(process.cwd(), "apps/admin/settings/lib/backup-repository.ts"),
+      "utf8",
+    );
+    // A restore writes sixteen sections in sequence, so a shut gate costs the
+    // full deadline each time and then reports the server as having refused,
+    // which it never did. The backup page opened one gate at the call site;
+    // doing it here means the function cannot be used wrongly.
+    expect(repo).toContain("await openEveryGate();");
+    for (const opener of [
+      "ensureSettingsHydrated",
+      "ensureSiteLayoutHydrated",
+      "ensureSeoHydrated",
+      "ensureAdminConfigHydrated",
+      "ensureInvoiceSettingsHydrated",
+    ]) {
+      expect(repo, opener).toContain(opener + "(),");
+    }
   });
 });
