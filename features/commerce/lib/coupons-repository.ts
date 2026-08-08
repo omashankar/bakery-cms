@@ -202,22 +202,17 @@ export async function toggleCouponActive(
   return { value: coupons[index], persisted: await writeCoupons(coupons) };
 }
 
-/**
- * Storefront-side usage counter, fired as an order is placed. Deliberately NOT
- * reported: the customer is not the one who can act on a failed counter write,
- * and blocking their confirmation on it would be worse than an undercount.
- */
-export async function incrementCouponUsage(code: string): Promise<void> {
-  const coupons = readCoupons();
-  const index = coupons.findIndex((coupon) => coupon.code === code.trim().toUpperCase());
-  if (index === -1) return;
-
-  coupons[index] = {
-    ...coupons[index],
-    usageCount: coupons[index].usageCount + 1,
-  };
-  await writeCoupons(coupons);
-}
+// A storefront-side `incrementCouponUsage` lived here and is gone.
+//
+// It bumped one counter in the local cache and then PUT THE WHOLE LIST to
+// `/api/coupons` — a replace-all — from a customer's checkout. A visitor whose
+// cache was stale or partial replaced the shop's coupons with it, deleting every
+// code added since that cache was filled. The counter is not worth a
+// whole-collection write from a browser under any circumstances.
+//
+// `placeOrder` already counts the redemption server-side with an atomic `$inc`,
+// against the code the shop itself resolved rather than the one the client
+// claimed — see `incrementCouponUsage` in features/commerce/server.
 
 export async function resetCoupons(): Promise<WriteResult<StoredCoupon[]>> {
   const defaults = buildDefaultCoupons();

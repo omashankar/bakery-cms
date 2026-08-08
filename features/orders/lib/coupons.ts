@@ -1,7 +1,6 @@
 import {
   getActiveCoupons,
   getCouponByCode,
-  incrementCouponUsage,
 } from "@/features/commerce/lib/coupons-repository";
 import type { CartTotals } from "./cart-totals";
 
@@ -108,9 +107,15 @@ export function applyCouponCode(
   return evaluateCoupon(definition ? [definition as CouponRule] : [], normalized, subtotal);
 }
 
-export function recordCouponUsage(code: string): Promise<void> {
-  return incrementCouponUsage(code);
-}
+// `recordCouponUsage` lived here and is gone.
+//
+// It called the browser's `incrementCouponUsage`, which read the local coupon
+// cache, bumped one counter and PUT THE WHOLE LIST back to `/api/coupons` — a
+// replace-all, fired from a customer's checkout. A visitor whose cache was stale
+// or partial replaced the shop's coupons with it.
+//
+// It was also a second count: `placeOrder` already increments the redemption
+// server-side, atomically, against the code the shop itself resolved.
 
 export function getCouponHint(): string {
   return `Try ${getAvailableCouponCodes().slice(0, 3).join(", ")}`;

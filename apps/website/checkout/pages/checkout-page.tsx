@@ -55,7 +55,7 @@ import {
   getMinDeliveryDate,
 } from "@/apps/website/lib/product-details";
 import type { AppliedCoupon } from "@/features/orders/lib/coupons";
-import { recordCouponUsage, revalidateCoupon } from "@/features/orders/lib/coupons";
+import { revalidateCoupon } from "@/features/orders/lib/coupons";
 import {
   hasBlockingCartIssues,
   validateCartAgainstCatalog,
@@ -578,12 +578,15 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
   /** The steps that must happen exactly once, and only once the server has it. */
   const commitPlacedOrder = (order: PlacedOrder) => {
-    if (validCoupon) {
-      // Deliberately not awaited or reported: the customer cannot act on a
-      // failed usage counter, and holding up their confirmation for it would be
-      // worse than an undercount the shop can reconcile.
-      void recordCouponUsage(validCoupon.code);
-    }
+    // The coupon redemption is NOT counted here.
+    //
+    // `placeOrder` already does it, atomically, against the code the shop itself
+    // resolved — `recordCouponRedemption` in order.service. This fired a second
+    // count from the browser, and it did it by PUTting the visitor's entire
+    // cached coupon list to `/api/coupons`, a whole-collection replace. On a
+    // browser whose cache was stale or partial that replaced the shop's coupons
+    // with it, deleting every code added since that cache was filled — from a
+    // customer's checkout.
 
     clearCart();
     clearCartPreferences();
