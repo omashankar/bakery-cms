@@ -831,6 +831,31 @@ export async function emailInvoice(order: PlacedOrder): Promise<{ sent: boolean;
   });
 }
 
+/**
+ * Tell a customer their order was cancelled, and what happens to their money.
+ *
+ * `refund_note` is the honest part. Whether anything is coming back depends on
+ * whether anything was taken, and that is the first thing they will ask.
+ */
+async function notifyOrderCancelled(order: PlacedOrder, holdsPayment: boolean): Promise<void> {
+  const { general } = (await getSettings()) as unknown as { general: GeneralSettings };
+
+  const mail = await sendTemplatedEmail("order_cancelled", order.address.email, {
+    customer_name: order.address.fullName?.trim() || "there",
+    order_number: order.orderNumber,
+    order_total: formatCurrency(order.totals.total, general?.currency),
+    refund_note: holdsPayment
+      ? "You paid for this order, so a refund is on its way. It usually takes 5–7 working days to reach your account."
+      : "No payment was taken for this order, so there is nothing to refund.",
+  });
+
+  if (!mail.sent) {
+    console.error(
+      `[orders] Could not send the cancellation email for ${order.orderNumber}: ${mail.error}`,
+    );
+  }
+}
+
 async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
   const address = [
     order.address.addressLine1,
@@ -941,11 +966,24 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   // Cancelling does not move money. A paid order cancelled here still has the
   // customer's payment sitting in the gateway account, and this is the state
   // `requestRefund` expects — so say so rather than leaving it to be noticed.
-  if (order.paymentStatus === "paid") {
+  const holdsPayment = order.paymentStatus === "paid";
+  if (holdsPayment) {
     console.info(
       `[orders] Cancelled ${order.orderNumber} still holds a captured payment — it needs a refund.`,
     );
   }
+
+  // TELL THE CUSTOMER.
+  //
+  // Cancelling wrote a status, put the stock back and released the coupon, and
+  // sent nothing at all. The customer found out by the cake never arriving —
+  // and if they had paid, their money was sitting in the gateway with nothing
+  // anywhere saying so. Every other status change they care about has an email;
+  // the one they most need was the one that did not.
+  //
+  // Awaited but never allowed to fail the cancellation: the order IS cancelled,
+  // and reporting that as a failure would have an operator do it twice.
+  await notifyOrderCancelled(updated, holdsPayment);
 
   await releaseCoupon(order);
 

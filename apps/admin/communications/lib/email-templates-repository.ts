@@ -86,6 +86,27 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ...base,
     },
     {
+      id: "email-order-cancelled",
+      slug: "order_cancelled",
+      name: "Order cancelled",
+      description: "Sent when the shop cancels an order.",
+      category: "transactional",
+      subject: "Your order {{order_number}} has been cancelled",
+      previewText: "We have cancelled your order.",
+      // `refund_note` carries the money question, because the answer differs:
+      // a paid order has a refund coming and a COD one never took anything.
+      body: `Hi {{customer_name}},\n\nWe're sorry — order {{order_number}} ({{order_total}}) has been cancelled.\n\n{{refund_note}}\n\nIf this was not expected, please call us on {{store_phone}} and we will put it right.\n\n— {{store_name}}`,
+      variables: [
+        "customer_name",
+        "order_number",
+        "order_total",
+        "refund_note",
+        "store_phone",
+        "store_name",
+      ],
+      ...base,
+    },
+    {
       id: "email-invoice",
       slug: "invoice",
       name: "Invoice email",

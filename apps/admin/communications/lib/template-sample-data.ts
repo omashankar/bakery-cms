@@ -45,6 +45,7 @@ export const defaultTemplateSampleData: Record<string, string> = {
   // test-send landed in their inbox the same way.
   reset_code: "482913",
   expires_in: "10 minutes",
+  refund_note: "You paid for this order, so a refund is on its way. It usually takes 5–7 working days to reach your account.",
   refund_amount: "₹1,468",
   refund_eta: "5–7 working days",
   refund_reference: "rfnd_PmXq82Kd10Lb",

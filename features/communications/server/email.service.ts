@@ -28,6 +28,7 @@ import { getTemplates } from "./communications.service";
 export type EmailTemplateSlug =
   | "order_confirmation"
   | "order_shipped"
+  | "order_cancelled"
   | "invoice"
   | "password_reset"
   | "refund_processed"
@@ -72,6 +73,21 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Total: {{order_total}} — {{payment_method}}\n" +
       "Deliver: {{delivery_date}}\nTo: {{delivery_address}}\n\n" +
       "Items:\n{{order_items}}\n\n{{admin_url}}",
+  },
+  /**
+   * The one status change a customer is never glad to read, and was never sent.
+   *
+   * A fallback matters here for the usual reason: an unpublished or deleted
+   * template would otherwise mean a cancelled customer hears nothing at all,
+   * which is the state this template exists to end.
+   */
+  order_cancelled: {
+    subject: "Your order {{order_number}} has been cancelled",
+    body:
+      "Hi {{customer_name}},\n\nWe are sorry — order {{order_number}} " +
+      "({{order_total}}) has been cancelled.\n\n{{refund_note}}\n\n" +
+      "If this was not expected, please call us on {{store_phone}}.\n\n" +
+      "— {{store_name}}",
   },
   invoice: {
     subject: "Invoice for order {{order_number}}",
