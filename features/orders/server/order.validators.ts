@@ -138,8 +138,23 @@ export const refundSchema = z.object({
   amount: z.number().positive("A refund has to be for more than zero.").optional(),
 });
 
+/**
+ * Marking how a payment stands. NOT a way to say it was refunded.
+ *
+ * `refunded` was settable here, and this endpoint only patches a field — no
+ * gateway is contacted, no refund record is written, no money moves. So an
+ * order could be marked payment-refunded with nothing behind it: the Refund
+ * Centre found no record to show, the Payments page stopped counting the money
+ * as collected, and the customer had been sent nothing.
+ *
+ * It is exactly the reasoning `statusSchema` already applies to `cancelled` and
+ * `refunded` — those have their own endpoints because they move stock and money
+ * — and this schema was the hole left beside it.
+ */
 export const paymentSchema = z.object({
-  paymentStatus: z.enum(["cod", "paid", "pending", "failed", "refunded"]),
+  paymentStatus: z.enum(["cod", "paid", "pending", "failed"], {
+    message: "Use the refund action to refund a payment — it moves money.",
+  }),
   paymentReference: z.string().optional(),
 });
 

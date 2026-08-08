@@ -59,18 +59,21 @@ export async function getCustomer(email: string) {
 }
 
 export async function saveMeta(input: CustomerMetaInput, ctx: RequestCtx) {
-  const saved = await repo.upsertMeta(input.email, {
-    tags: input.tags,
-    notes: input.notes,
-    marketingOptIn: input.marketingOptIn,
-    blocked: input.blocked,
-  });
+  // Only what arrived. Naming every field wrote each one whether or not the
+  // request mentioned it, so a note-only save also stamped tags, marketing
+  // opt-in and blocked back to whatever the caller's stale copy held.
+  const { email, ...patch } = input;
+  const fields = Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined),
+  );
+
+  const saved = await repo.upsertMeta(email, fields);
   await writeAuditLog({
     action: "customer.meta.update",
     actorId: ctx.actorId ?? null,
     actorEmail: ctx.actorEmail,
     target: { type: "customer", id: input.email },
-    metadata: { tags: input.tags.length, blocked: input.blocked },
+    metadata: { fields: Object.keys(fields) },
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });
