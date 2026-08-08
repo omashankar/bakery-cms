@@ -179,6 +179,25 @@ function HeroSlideView({ slide, priority }: { slide: HeroSlide; priority?: boole
   );
 }
 
+/**
+ * The slide to show, given an index that may have outlived the list.
+ *
+ * `index` is component state and survives a shrinking `slides` prop. Autoplay
+ * walks it to the last slide within seconds while the admin's cursor is over the
+ * editor panel, so deleting the last slide left `slides[index]` undefined and the
+ * very next line — `slide.badge` inside HeroSlideView — threw. That happens in
+ * the builder's live preview, which has no error boundary, so the crash unmounted
+ * the builder and took every unsaved edit with it.
+ *
+ * Pulled out as a function because this repo has no React renderer in its test
+ * setup: this is the part that can be pinned by a test.
+ */
+export function activeSlideIndex(index: number, count: number): number {
+  if (count <= 0) return 0;
+  if (index < 0) return 0;
+  return index < count ? index : count - 1;
+}
+
 export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -202,7 +221,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   if (count === 0) return null;
 
-  const active = slides[index];
+  // Clamped, because the slide list changes under this component while an admin
+  // edits it — see activeSlideIndex.
+  const activeIndex = activeSlideIndex(index, count);
+  const active = slides[activeIndex];
 
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -210,7 +232,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const onTouchEnd = (event: React.TouchEvent) => {
     if (touchStartX.current === null || !multi) return;
     const delta = (event.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
-    if (Math.abs(delta) > SWIPE_THRESHOLD) go(index + (delta < 0 ? 1 : -1));
+    if (Math.abs(delta) > SWIPE_THRESHOLD) go(activeIndex + (delta < 0 ? 1 : -1));
     touchStartX.current = null;
   };
 
@@ -227,8 +249,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     >
       <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* key forces a fresh mount per slide so the staggered entrance replays */}
-        <div key={index} className="col-start-1 row-start-1">
-          <HeroSlideView slide={active} priority={index === 0} />
+        <div key={activeIndex} className="col-start-1 row-start-1">
+          <HeroSlideView slide={active} priority={activeIndex === 0} />
         </div>
       </div>
 
@@ -237,7 +259,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           {/* Sits fully outside the content column (in the page gutter), vertically centred */}
           <button
             type="button"
-            onClick={() => go(index - 1)}
+            onClick={() => go(activeIndex - 1)}
             aria-label="Previous slide"
             className="absolute top-1/2 left-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
           >
@@ -245,7 +267,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           </button>
           <button
             type="button"
-            onClick={() => go(index + 1)}
+            onClick={() => go(activeIndex + 1)}
             aria-label="Next slide"
             className="absolute top-1/2 right-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(100%+1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
           >
@@ -259,10 +281,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 type="button"
                 onClick={() => setIndex(i)}
                 aria-label={`Go to slide ${i + 1}`}
-                aria-current={i === index}
+                aria-current={i === activeIndex}
                 className={cn(
                   "h-2 rounded-full transition-all duration-300",
-                  i === index
+                  i === activeIndex
                     ? "w-7 bg-bakery-700"
                     : "w-2 bg-bakery-200 hover:bg-bakery-300"
                 )}
