@@ -311,6 +311,24 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
   const description = contentString(c, "description");
   const buttonLabel = contentString(c, "buttonLabel", "Get Directions");
 
+  // Nothing to show means nothing to show. Rendering the heading alone left a
+  // shop advertising "Find a Store Near You" above an empty panel — the seeded
+  // copy is still in most stored layouts, so on a shop that has not filled in
+  // its address that heading is the last thing that should survive. The builder
+  // says why instead, so the admin is not left guessing.
+  if (!location) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+          This section shows your shop&apos;s address and opening hours from
+          Settings → Contact. Until you set a real address there it stays hidden
+          on the live homepage — the shipped example address is in Mumbai.
+        </div>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell {...props}>
       <div className="grid gap-8 rounded-2xl border border-border bg-white p-6 sm:p-8 lg:grid-cols-2 lg:items-center lg:gap-12">
@@ -325,67 +343,54 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
             <h2 className="font-heading text-3xl sm:text-4xl font-bold">{title}</h2>
             <p className="text-muted-foreground">{description}</p>
           </div>
-          {location?.mapUrl ? (
-            <Button
-              variant="bakery"
-              className="h-11"
-              render={
-                <a href={location.mapUrl} target="_blank" rel="noopener noreferrer" />
-              }
-            >
-              <MapPin className="size-4" />
-              {buttonLabel}
-            </Button>
-          ) : null}
+          <Button
+            variant="bakery"
+            className="h-11"
+            render={<a href={location.mapUrl} target="_blank" rel="noopener noreferrer" />}
+          >
+            <MapPin className="size-4" />
+            {buttonLabel}
+          </Button>
         </div>
 
         <div className="space-y-3">
-          {location ? (
-            <>
-              <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
-                  <Store className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1 space-y-1">
-                  {location.address ? (
-                    <p className="text-sm font-medium text-foreground">{location.address}</p>
-                  ) : null}
-                  {location.phone ? (
-                    <a
-                      href={`tel:${location.phone.replace(/\s+/g, "")}`}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-bakery-700"
-                    >
-                      <Phone className="size-3" />
-                      {location.phone}
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-
-              {location.hours.length > 0 ? (
-                <div className="rounded-xl border border-border bg-cream-50 p-4">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <Clock className="size-3.5 text-bakery-700" />
-                    Opening hours
-                  </p>
-                  <dl className="space-y-1">
-                    {location.hours.map((entry) => (
-                      <div key={entry.day} className="flex justify-between gap-3 text-xs">
-                        <dt className="text-muted-foreground">{entry.day}</dt>
-                        <dd className="font-medium text-foreground">{entry.hours}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
+              <Store className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium text-foreground">{location.address}</p>
+              {location.phone ? (
+                <a
+                  href={`tel:${location.phone.replace(/\s+/g, "")}`}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-bakery-700"
+                >
+                  <Phone className="size-3" />
+                  {location.phone}
+                </a>
               ) : null}
-            </>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-cream-50 p-6 text-center text-sm text-muted-foreground">
-              {props.interactive
-                ? "This shows your shop's address and opening hours from Settings → Contact. Fill those in and they appear here."
-                : "Contact us for our address and opening hours."}
             </div>
-          )}
+          </div>
+
+          {/* Only the shop's own hours. The three shipped rows are dropped as a
+              set upstream — printing seeded opening times is a claim about when
+              a stranger can turn up at the door. */}
+          {location.hours.length > 0 ? (
+            <div className="rounded-xl border border-border bg-cream-50 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Clock className="size-3.5 text-bakery-700" />
+                Opening hours
+              </p>
+              <dl className="space-y-1">
+                {location.hours.map((entry) => (
+                  <div key={entry.day} className="flex justify-between gap-3 text-xs">
+                    <dt className="text-muted-foreground">{entry.day}</dt>
+                    <dd className="font-medium text-foreground">{entry.hours}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
         </div>
       </div>
     </SectionShell>
@@ -886,15 +891,15 @@ function OffersSection(props: HomepageSectionRendererProps) {
             className="overflow-hidden rounded-xl border border-border bg-white"
           >
             <div className="relative aspect-[3/2] bg-muted">
-              <Image src={offer.image} alt={offer.title} fill className="object-cover" sizes="33vw" />
+              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
               <Badge variant="gold" className="absolute top-3 left-3">
                 {offer.discount}
               </Badge>
             </div>
             <div className="space-y-3 p-5">
-              {/* A coupon's label is often the discount itself ("20% OFF"), which
-                  the badge already shows — printing it twice reads as a mistake. */}
-              {offer.title && offer.title !== offer.discount ? (
+              {/* Empty when the coupon's label just repeats the discount the badge
+                  already shows — see sameCopy in coupon-offers.ts. */}
+              {offer.title ? (
                 <h3 className="font-heading text-lg font-semibold">{offer.title}</h3>
               ) : null}
               <p className="text-sm text-muted-foreground">{offer.description}</p>

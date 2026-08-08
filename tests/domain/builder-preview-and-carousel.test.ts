@@ -5,7 +5,12 @@ import { activeSlideIndex, type HeroSlide } from "@/features/cms-sections/hero-c
 const requireRole = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/server/auth/dal", () => ({ requireRole }));
 
+const getSettings = vi.hoisted(() => vi.fn());
+vi.mock("@/features/settings/server/settings.service", () => ({ getSettings }));
+
 import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
+import { getStorefrontLocation } from "@/apps/website/lib/storefront-location.server";
+import { contactInfo, businessHours } from "@/constants/landing-data";
 
 /**
  * `/store?cmsPreview=1` and `/store/wedding-cakes?cmsPreview=wedding` rendered
@@ -45,6 +50,92 @@ describe("who may see an unpublished draft", () => {
     });
 
     expect(await canPreviewDraft()).toBe(false);
+  });
+});
+
+/**
+ * The store locator says where the shop is. It used to say where three invented
+ * Mumbai outlets were, 1.2 / 3.5 / 6.8 km from wherever the customer happened to
+ * be, above a pincode box that searched nothing.
+ *
+ * The trap in replacing that with Settings → Contact is that the settings
+ * singleton is CREATED holding the shipped demo values — "123 Baker Street,
+ * Mumbai" and three demo opening-hours rows — so an "is it filled in?" check can
+ * never fail, and three invented outlets become one invented outlet.
+ */
+describe("the shop's real address", () => {
+  beforeEach(() => {
+    getSettings.mockReset();
+  });
+
+  const REAL = {
+    address: "7 Nehru Place, New Delhi 110019",
+    phone: "+91 98111 22233",
+    businessHours: [{ day: "Every day", hours: "8am – 8pm" }],
+  };
+
+  it("shows a shop that has set its own address", async () => {
+    getSettings.mockResolvedValue({ contact: REAL });
+
+    const location = await getStorefrontLocation();
+
+    expect(location?.address).toBe(REAL.address);
+    expect(location?.phone).toBe(REAL.phone);
+    expect(location?.hours).toEqual([{ day: "Every day", hours: "8am – 8pm" }]);
+    // Built from the address, never from the admin-typed mapEmbedUrl.
+    expect(location?.mapUrl).toContain(encodeURIComponent(REAL.address));
+  });
+
+  it("shows nothing for a shop still carrying the shipped demo address", async () => {
+    getSettings.mockResolvedValue({
+      contact: {
+        address: contactInfo.address,
+        phone: contactInfo.phone,
+        businessHours: businessHours.map((entry) => ({ ...entry })),
+      },
+    });
+
+    expect(await getStorefrontLocation()).toBeNull();
+  });
+
+  it("still shows nothing when only the phone is real", async () => {
+    // This is the live shop: a seeded Mumbai address with a genuine phone number
+    // beside it. Verified against the running app — it produced a panel headed
+    // "Find a Store Near You" containing one tel: link and nothing else.
+    getSettings.mockResolvedValue({
+      contact: {
+        address: contactInfo.address,
+        phone: "07627014106",
+        businessHours: businessHours.map((entry) => ({ ...entry })),
+      },
+    });
+
+    expect(await getStorefrontLocation()).toBeNull();
+  });
+
+  it("drops the shipped opening hours but keeps a shop's own", async () => {
+    getSettings.mockResolvedValue({
+      contact: { ...REAL, businessHours: businessHours.map((entry) => ({ ...entry })) },
+    });
+
+    expect((await getStorefrontLocation())?.hours).toEqual([]);
+  });
+
+  it("never puts the admin-typed map URL in the page", async () => {
+    getSettings.mockResolvedValue({
+      contact: { ...REAL, mapEmbedUrl: "javascript:alert(1)" },
+    });
+
+    const location = await getStorefrontLocation();
+
+    expect(location?.mapUrl.startsWith("https://www.google.com/maps/")).toBe(true);
+    expect(location?.mapUrl).not.toContain("javascript");
+  });
+
+  it("shows nothing rather than failing the homepage when settings cannot be read", async () => {
+    getSettings.mockRejectedValue(new Error("mongo down"));
+
+    expect(await getStorefrontLocation()).toBeNull();
   });
 });
 

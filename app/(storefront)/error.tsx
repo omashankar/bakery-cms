@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
@@ -21,6 +22,22 @@ export default function StorefrontError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
+  /**
+   * `reset` alone cannot recover from the failure this page exists for.
+   *
+   * It clears the boundary's error state and re-renders the SAME children —
+   * and for a server-render failure those children are a result that already
+   * threw, so it throws again on the same tick and the visitor sees the identical
+   * screen with no sign anything happened. `router.refresh()` refetches the RSC
+   * payload first, so the retry is a real one.
+   */
+  function retry() {
+    router.refresh();
+    reset();
+  }
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-6 py-16 text-center">
       <div className="space-y-3">
@@ -33,7 +50,7 @@ export default function StorefrontError({
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Button variant="bakery" onClick={reset}>
+        <Button variant="bakery" onClick={retry}>
           Try again
         </Button>
         <Button variant="outline" render={<Link href={routes.store.home} />}>

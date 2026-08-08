@@ -10,7 +10,7 @@ import { getStorefrontLocation } from "@/apps/website/lib/storefront-location.se
 import { getContent } from "@/features/content/server/content.service";
 import { getCoupons } from "@/features/commerce/server/commerce.service";
 import { getSettings } from "@/features/settings/server/settings.service";
-import type { GeneralSettings } from "@/types/settings";
+import type { ContactSettings, GeneralSettings } from "@/types/settings";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
@@ -35,6 +35,15 @@ interface StoreHomePageProps {
  * the content lands in the initial HTML rather than streaming in after it.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
+  // Read ONCE and shared with the two helpers that need it. Each of them used to
+  // fetch the settings singleton for itself, so one homepage render made three
+  // round trips to the same document — and ran its `migrate()` pass three times
+  // concurrently, all racing to save the same repair.
+  const settings = (await getSettings()) as {
+    general?: GeneralSettings;
+    contact?: ContactSettings;
+  };
+
   const [
     sections,
     rails,
@@ -46,7 +55,6 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     instagram,
     coupons,
     storeLocation,
-    settings,
   ] = await Promise.all([
     isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
     getHomepageRails(),
@@ -59,17 +67,14 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     getContent("faq"),
     // The shop's real Instagram, for the same reason: the gallery section used
     // to hardcode a demo handle and ignore Settings → Social entirely.
-    getStorefrontInstagram(),
+    getStorefrontInstagram(settings),
     // The offers row advertised a hardcoded BDAY20 that checkout would refuse.
     // Coupons are read here for the same reason as everything else on this list:
     // reading them in the client section would put the demo seed in the HTML.
     getCoupons(),
     // The store locator invented a pincode search over three hardcoded Mumbai
     // outlets; this is the shop's real address and hours.
-    getStorefrontLocation(),
-    // For the shop's currency: there is no `<html>` on the server for the
-    // formatter to read a locale from, so a flat-discount badge has to be told.
-    getSettings(),
+    getStorefrontLocation(settings),
   ]);
   const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "all");
   // Categories computed on the server too, so the category sections render the
@@ -90,7 +95,7 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
       faqs={(faqsRaw ?? []) as FaqItem[]}
       instagram={instagram}
       offers={selectStorefrontOffers(coupons, 12, {
-        currency: ((settings as { general?: GeneralSettings }).general ?? {}).currency,
+        currency: settings.general?.currency,
       })}
       storeLocation={storeLocation}
       isPreview={isPreview}

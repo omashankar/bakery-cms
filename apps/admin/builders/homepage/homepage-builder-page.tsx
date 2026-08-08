@@ -11,6 +11,7 @@ import {
   resetHomepage,
   restoreHomepageRevision,
   saveHomepageDraft,
+  BuilderRequestError,
   type HomepageRevision,
 } from "@/features/cms-sections/data/homepage-sections-client";
 import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder-version-history-panel";
@@ -18,10 +19,7 @@ import {
   fromScheduleInputValue,
   toScheduleInputValue,
 } from "@/apps/admin/builders/shared/schedule-time";
-import {
-  useLatest,
-  useUnsavedChangesGuard,
-} from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
+import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {
   createSectionInstance,
@@ -83,8 +81,21 @@ export function HomepageBuilderPage() {
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
 
-  // What is on screen right now, readable after an await — see settleDirty.
-  const latestSections = useLatest(sections);
+  /**
+   * What is on screen right now, readable after an await — see settleDirty.
+   *
+   * Written synchronously at every point that replaces the section list, not
+   * from an effect. React flushes passive effects in a macrotask while a
+   * resolved fetch continues in a microtask, so an effect-written ref can still
+   * hold the pre-edit array when a save settles — and settleDirty would then
+   * clear the unsaved flag over keystrokes that were never sent.
+   */
+  const latestSections = useRef<HomepageSectionInstance[]>([]);
+
+  function applySections(next: HomepageSectionInstance[]) {
+    latestSections.current = next;
+    setSections(next);
+  }
 
   /**
    * The store version this builder last saw.
@@ -95,6 +106,31 @@ export function HomepageBuilderPage() {
    * done in between, and Publish pushed that stale copy to the live storefront.
    */
   const versionRef = useRef<number | undefined>(undefined);
+
+  /**
+   * A refused write.
+   *
+   * A 409 means the stored layout moved on after this tab loaded it. The
+   * admin's work stays on screen and stays flagged unsaved, and the version
+   * ref is brought up to date so a SECOND, deliberate save can go through.
+   * Without that the ref stayed pinned at the number the conflict rejected and
+   * every later save in the tab conflicted too — the tab could never save
+   * again, holding work that existed nowhere else.
+   */
+  function reportWriteFailure(error: unknown, fallback: string) {
+    if (error instanceof BuilderRequestError && error.status === 409) {
+      if (typeof error.currentVersion === "number") {
+        versionRef.current = error.currentVersion;
+      }
+      toast.warning("This layout changed somewhere else", {
+        description:
+          "Your edits are still here and still unsaved. Reload to see the other version, or save again to replace it.",
+        duration: 10000,
+      });
+      return;
+    }
+    toast.error(error instanceof Error ? error.message : fallback);
+  }
 
   /**
    * Clear the unsaved flag only if what was just persisted is still what is on
@@ -137,7 +173,7 @@ export function HomepageBuilderPage() {
         const state = await fetchHomepageState();
         versionRef.current = state.version ?? 0;
         const draft = sortSections(state.draft.sections);
-        setSections(draft);
+        applySections(draft);
         setSelectedId(draft[0]?.instanceId ?? null);
         setPublishMeta(deriveHomepageMeta(state));
         setScheduledPublishAt(toScheduleInputValue(state.draft.scheduledPublishAt));
@@ -172,7 +208,9 @@ export function HomepageBuilderPage() {
   }, [sections, listFilter]);
 
   const updateSections = useCallback((next: HomepageSectionInstance[]) => {
-    setSections(sortSections(next));
+    const sorted = sortSections(next);
+    latestSections.current = sorted;
+    setSections(sorted);
     setIsDirty(true);
   }, []);
 
@@ -276,7 +314,7 @@ export function HomepageBuilderPage() {
       toast.success("Homepage draft saved");
     } catch (error) {
       // Keep isDirty set so the unsaved-changes guard still protects the work.
-      toast.error(error instanceof Error ? error.message : "Could not save the draft");
+      reportWriteFailure(error, "Could not save the draft");
     } finally {
       setIsSaving(false);
     }
@@ -294,7 +332,7 @@ export function HomepageBuilderPage() {
       await refreshMeta();
       toast.success("Homepage published to storefront");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not publish");
+      reportWriteFailure(error, "Could not publish");
     } finally {
       setIsSaving(false);
     }
@@ -304,6 +342,10 @@ export function HomepageBuilderPage() {
     const payload = sections;
     setScheduledPublishAt(value);
     setIsDirty(true);
+    // Gated like every other write. Preview and the schedule field were not,
+    // so a second write could start while the first was in flight carrying the
+    // same expectedVersion — and the builder conflicted with itself.
+    setIsSaving(true);
     try {
       const { version } = await saveHomepageDraft(
         payload,
@@ -325,7 +367,9 @@ export function HomepageBuilderPage() {
         toast.message("Schedule cleared");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update the schedule");
+      reportWriteFailure(error, "Could not update the schedule");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -334,7 +378,15 @@ export function HomepageBuilderPage() {
     // click's transient activation lasts, and two round trips can outlive it —
     // after which open() returns null silently, so Preview did nothing at all
     // and the catch never ran.
-    const previewWindow = window.open("", "_blank", "noopener,noreferrer");
+    // Opened WITHOUT "noopener": per the HTML spec the open steps return null
+    // when noopener is set (and noreferrer implies it), so the handle was always
+    // null — the tab was created, orphaned at about:blank on every click, and the
+    // real navigation still fell through to a post-await window.open, which is
+    // exactly the transient-activation problem this was meant to avoid. The
+    // opener reference is severed by hand instead, which is the documented way
+    // to keep the security property and the handle.
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) previewWindow.opener = null;
     const payload = sections;
     try {
       // Preview reads the draft from the server, so it has to be saved first.
@@ -354,14 +406,14 @@ export function HomepageBuilderPage() {
       }
     } catch (error) {
       previewWindow?.close();
-      toast.error(error instanceof Error ? error.message : "Could not open preview");
+      reportWriteFailure(error, "Could not open preview");
     }
   }
 
   async function handleRestoreRevision(revisionId: string) {
     try {
       const snapshot = await restoreHomepageRevision(revisionId);
-      setSections(sortSections(snapshot.sections));
+      applySections(sortSections(snapshot.sections));
       // A restore is a SERVER write, not a local edit. Flagging it unsaved put a
       // Discard button on screen that could not undo it — clicking it re-fetched
       // the very draft that had just been restored and reported "Discarded
@@ -383,7 +435,7 @@ export function HomepageBuilderPage() {
     try {
       const state = await resetHomepage();
       versionRef.current = state.version ?? versionRef.current;
-      setSections(state.draft.sections);
+      applySections(state.draft.sections);
       setSelectedId(state.draft.sections[0]?.instanceId ?? null);
       setIsDirty(false);
       setConfirm(null);
@@ -402,7 +454,7 @@ export function HomepageBuilderPage() {
       const state = await fetchHomepageState();
       versionRef.current = state.version ?? 0;
       const draft = sortSections(state.draft.sections);
-      setSections(draft);
+      applySections(draft);
       setSelectedId((current) =>
         current && draft.some((section) => section.instanceId === current)
           ? current

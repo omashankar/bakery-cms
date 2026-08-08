@@ -45,8 +45,32 @@ const OFFER_PHOTOS = [
  */
 export function couponDiscountLabel(coupon: StoredCoupon, currency?: string): string {
   if (coupon.percentOff) return `${coupon.percentOff}% OFF`;
-  if (coupon.flatOff) return `${formatCurrency(coupon.flatOff, currency)} OFF`;
+  if (coupon.flatOff) return `${money(coupon.flatOff, currency)} OFF`;
   return "Special Offer";
+}
+
+/**
+ * A currency code Intl will accept, or nothing.
+ *
+ * `formatCurrency` resolves its argument with `??`, so an empty string or a
+ * legacy non-ISO value read straight out of Settings is NOT replaced by the shop
+ * default — it reaches `new Intl.NumberFormat(...)`, which throws `RangeError:
+ * Invalid currency code`. The storefront calls this from an async server
+ * component, so one bad settings value would take down the whole homepage and
+ * the wedding page for every visitor.
+ */
+function usableCurrency(currency?: string): string | undefined {
+  const code = currency?.trim().toUpperCase();
+  return code && /^[A-Z]{3}$/.test(code) ? code : undefined;
+}
+
+/** Formatting must never be the reason a page fails to render. */
+function money(amount: number, currency?: string): string {
+  try {
+    return formatCurrency(amount, usableCurrency(currency));
+  } catch {
+    return String(amount);
+  }
 }
 
 /**
@@ -66,20 +90,35 @@ export function isLiveCoupon(coupon: StoredCoupon, now = Date.now()): boolean {
   return true;
 }
 
+/**
+ * Two pieces of copy that say the same thing, allowing for formatting.
+ *
+ * A coupon's label is usually the discount itself, which the card's badge
+ * already shows — so the title is dropped when it repeats it. Comparing the
+ * strings directly was not enough: the badge is built with `formatCurrency`, so
+ * a coupon labelled "₹2000 OFF" sat under a badge reading "₹2,000 OFF" and both
+ * rendered, one comma apart. Seen on the live homepage before this.
+ */
+function sameCopy(a: string, b: string): boolean {
+  const normalise = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalise(a) === normalise(b);
+}
+
 export function couponToOffer(
   coupon: StoredCoupon,
   index = 0,
   currency?: string
 ): LandingOffer {
+  const discount = couponDiscountLabel(coupon, currency);
   return {
     id: coupon.id,
-    title: coupon.label,
+    title: sameCopy(coupon.label, discount) ? "" : coupon.label,
     description: coupon.description,
-    discount: couponDiscountLabel(coupon, currency),
+    discount,
     code: coupon.code,
     // The condition checkout will hold them to, in the words the card shows.
     minSpend: coupon.minSubtotal
-      ? `On orders over ${formatCurrency(coupon.minSubtotal, currency)}`
+      ? `On orders over ${money(coupon.minSubtotal, currency)}`
       : undefined,
     image: unsplash(OFFER_PHOTOS[index % OFFER_PHOTOS.length], 600, 400),
     // Only a real end date. The previous mapper substituted "2026-12-31" for a

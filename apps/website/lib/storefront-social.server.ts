@@ -25,9 +25,15 @@ export interface StorefrontInstagram {
   handle: string;
 }
 
-export async function getStorefrontInstagram(): Promise<StorefrontInstagram | null> {
+/** `settings` may be passed in by a caller that has already read it. */
+export async function getStorefrontInstagram(
+  preRead?: unknown,
+): Promise<StorefrontInstagram | null> {
   try {
-    const settings = (await getSettings()) as unknown as Record<string, unknown>;
+    const settings = (preRead ?? (await getSettings())) as unknown as Record<
+      string,
+      unknown
+    >;
     const social = (Array.isArray(settings.social) ? settings.social : []) as {
       platform?: string;
       href?: string;

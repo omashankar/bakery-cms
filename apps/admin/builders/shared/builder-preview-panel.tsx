@@ -42,6 +42,20 @@ export function BuilderPreviewPanel<T extends BuilderSectionListItem>({
       </div>
       <div
         ref={containerRef}
+        data-builder-preview
+        // A preview is a picture of the page, not the page.
+        //
+        // These are the real storefront sections, so the panel is full of real
+        // links — a product card is a <Link> stretched across the whole card,
+        // and every category tile, offer and CTA is one too. Clicking any of
+        // them navigated the admin out of the builder to the storefront, taking
+        // every unsaved edit with it. Cancelling the click here leaves the
+        // section-select handler on the wrapper to run as normal.
+        onClickCapture={(event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("a[href]")) event.preventDefault();
+        }}
         className="panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted"
       >
         <StorefrontLightFrame className="mx-auto min-h-full max-w-5xl shadow-sm">

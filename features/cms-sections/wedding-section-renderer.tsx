@@ -311,15 +311,15 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
         {offers.map((offer) => (
           <article key={offer.id} className="h-full overflow-hidden rounded-xl border border-border bg-white">
             <div className="relative aspect-[16/10] bg-muted">
-              <Image src={offer.image} alt={offer.title} fill className="object-cover" sizes="300px" />
+              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="300px" />
               <Badge className="absolute top-3 left-3" variant="gold">
                 {offer.discount}
               </Badge>
             </div>
             <div className="p-4">
-              {/* A coupon's label is often the discount itself, which the badge
-                  already shows — printing it twice reads as a mistake. */}
-              {offer.title && offer.title !== offer.discount ? (
+              {/* Empty when the coupon's label just repeats the discount the badge
+                  already shows — see sameCopy in coupon-offers.ts. */}
+              {offer.title ? (
                 <h3 className="font-heading font-semibold">{offer.title}</h3>
               ) : null}
               <p className="mt-1 text-sm text-muted-foreground">{offer.description}</p>

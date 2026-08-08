@@ -1,19 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
-/**
- * Keeps a ref pointing at the latest render's value.
- *
- * Used to answer "is what I just saved still what is on screen?" after an await.
- */
-export function useLatest<T>(value: T): { readonly current: T } {
-  const ref = useRef(value);
-  useEffect(() => {
-    ref.current = value;
-  }, [value]);
-  return ref;
-}
+import { useEffect } from "react";
 
 const MESSAGE = "You have unsaved changes to this layout. Leave without saving?";
 
@@ -36,8 +23,20 @@ const MESSAGE = "You have unsaved changes to this layout. Leave without saving?"
  * CAPTURE-phase click listener, which runs before the Link's own handler, so
  * cancelling it there cancels the navigation.
  *
- * Deliberately not caught: `router.push` from code, which dispatches no click.
- * Nothing in the builder navigates that way.
+ * NOT caught, and worth being honest about: navigation issued from code rather
+ * than from a link. The admin header's command palette (Ctrl+K) and its logout
+ * dialog both call `router.push`, which dispatches no click — those two exits
+ * still lose unsaved work. Closing them means the NavigationBlocker context the
+ * Next docs describe, which is a change to the whole admin shell rather than to
+ * the builder.
+ *
+ * Also not caught, on purpose: anything inside the builder's own preview panel.
+ * The preview renders real storefront sections, which are full of links — a
+ * product card is a `<Link>` stretched over the whole card — so without that
+ * exemption an admin clicking a card in their own preview got a leave-the-page
+ * prompt, and enough of those in a row make a browser suppress dialogs
+ * altogether, at which point `confirm()` returns false and this guard would
+ * silently deaden every link in the admin.
  */
 export function useUnsavedChangesGuard(isDirty: boolean): void {
   useEffect(() => {
@@ -58,6 +57,10 @@ export function useUnsavedChangesGuard(isDirty: boolean): void {
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
       if (!(anchor instanceof HTMLAnchorElement)) return;
+
+      // The builder's own preview is not a way out of the builder — the panel
+      // stops those clicks navigating at all.
+      if (anchor.closest("[data-builder-preview]")) return;
 
       // Preview opens in a new tab; it takes nothing away from this one.
       if (anchor.target && anchor.target !== "_self") return;

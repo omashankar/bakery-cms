@@ -12,6 +12,26 @@ import type {
  * on the server and reads the store directly.
  */
 
+/**
+ * A refused write, carrying what the server said about it.
+ *
+ * A 409 answers with the version the store is on now. Throwing a bare Error
+ * discarded it, and the builder's version ref stayed pinned at the number the
+ * conflict rejected — so every subsequent save in that tab conflicted too and
+ * the admin could not save again at all, in a tab still holding their work.
+ */
+export class BuilderRequestError extends Error {
+  readonly status: number;
+  readonly currentVersion?: number;
+
+  constructor(message: string, status: number, currentVersion?: number) {
+    super(message);
+    this.name = "BuilderRequestError";
+    this.status = status;
+    this.currentVersion = currentVersion;
+  }
+}
+
 async function request<T>(init?: RequestInit): Promise<T> {
   const response = await fetch("/api/homepage-sections", {
     ...init,
@@ -20,7 +40,11 @@ async function request<T>(init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+    throw new BuilderRequestError(
+      payload?.error ?? `Request failed (${response.status})`,
+      response.status,
+      typeof payload?.currentVersion === "number" ? payload.currentVersion : undefined,
+    );
   }
   return payload as T;
 }

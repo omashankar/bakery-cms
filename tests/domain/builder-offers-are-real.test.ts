@@ -117,6 +117,68 @@ describe("storefront offers come from real coupons", () => {
     expect(usd.discount).not.toContain("₹");
   });
 
+  it("does not print the discount twice when the label just repeats it", () => {
+    // Seen on the live homepage: badge "₹2,000 OFF" above a title "₹2000 OFF".
+    // The badge is built with formatCurrency, so a plain string comparison let a
+    // single thousands separator through.
+    const [flat] = selectStorefrontOffers(
+      [
+        coupon({
+          id: "a",
+          code: "WED2026",
+          label: "₹2000 OFF",
+          flatOff: 2000,
+          percentOff: undefined,
+        }),
+      ],
+      1,
+      { now: NOW, currency: "INR" },
+    );
+
+    expect(flat.discount).toBe("₹2,000 OFF");
+    expect(flat.title).toBe("");
+  });
+
+  it("keeps a label that says something the badge does not", () => {
+    const [named] = selectStorefrontOffers(
+      [coupon({ id: "a", code: "BDAY20", label: "Birthday Special", percentOff: 20 })],
+      1,
+      { now: NOW },
+    );
+
+    expect(named.title).toBe("Birthday Special");
+    expect(named.discount).toBe("20% OFF");
+  });
+
+  it("survives a currency the shop's settings should never have held", () => {
+    // `formatCurrency` resolves with `??`, so an empty string or a legacy value
+    // reaches Intl.NumberFormat and throws RangeError — inside an async server
+    // component, which would take the whole homepage down for every visitor.
+    const flat = coupon({
+      id: "a",
+      code: "SAVE500",
+      flatOff: 500,
+      percentOff: undefined,
+      minSubtotal: 5000,
+    });
+
+    for (const currency of ["", "  ", "rupees", "INRR", "12", "₹"]) {
+      const run = () => selectStorefrontOffers([flat], 1, { now: NOW, currency });
+      expect(run, `currency=${JSON.stringify(currency)}`).not.toThrow();
+      const [offer] = run();
+      expect(offer.discount).toContain("OFF");
+      expect(offer.minSpend).toBeTruthy();
+    }
+  });
+
+  it("accepts a lowercase or padded currency code", () => {
+    const flat = coupon({ id: "a", code: "S", flatOff: 500, percentOff: undefined });
+
+    expect(
+      selectStorefrontOffers([flat], 1, { now: NOW, currency: " usd " })[0].discount,
+    ).toContain("$");
+  });
+
   it("never invents an expiry date for an open-ended coupon", () => {
     const [offer] = selectStorefrontOffers([coupon({ id: "a", code: "OPEN10" })], 1, {
       now: NOW,

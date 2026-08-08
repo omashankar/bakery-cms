@@ -48,14 +48,32 @@ function chosen(value: string | undefined, placeholder: string): string {
   return trimmed && trimmed !== placeholder.trim() ? trimmed : "";
 }
 
-export async function getStorefrontLocation(): Promise<StorefrontLocation | null> {
+/**
+ * `settings` may be passed in by a caller that has already read it.
+ *
+ * The homepage was making three round trips to the same singleton document per
+ * request — this helper, the Instagram helper, and the page itself for the
+ * currency — each of which also runs the settings `migrate()` pass, so three of
+ * those raced to repair and save the same document.
+ */
+export async function getStorefrontLocation(
+  settings?: { contact?: ContactSettings },
+): Promise<StorefrontLocation | null> {
   try {
-    const settings = (await getSettings()) as { contact?: ContactSettings };
-    const contact = settings.contact;
+    const resolved =
+      settings ?? ((await getSettings()) as { contact?: ContactSettings });
+    const contact = resolved.contact;
 
     const address = chosen(contact?.address, contactInfo.address);
     const phone = chosen(contact?.phone, contactInfo.phone);
-    if (!address && !phone) return null;
+
+    // The ADDRESS is what makes this section mean anything: it is headed "visit
+    // us" and its job is to say where. A phone on its own produced a panel with
+    // one tel: link under a heading promising directions — verified against the
+    // running shop, whose settings hold the seeded Mumbai address and a real
+    // phone number. Without a real address there is nothing truthful to show and
+    // the section does not render.
+    if (!address) return null;
 
     const storedHours = Array.isArray(contact?.businessHours) ? contact.businessHours : [];
     // The seeded rows go the same way, and only as a set: a shop that edited one
