@@ -1,3 +1,4 @@
+import { downloadCsv, toCsv } from "@/utils/csv";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { settledRefundAmount, type RefundListFilters } from "@/features/orders/lib/order-overviews";
 import type { RefundReasonCode, RefundStatus } from "@/types/refund";
@@ -69,19 +70,9 @@ export function exportRefundsToCsv(orders: PlacedOrder[]): void {
     order.refundRecord?.completedAt ?? "—",
   ]);
 
-  const csv = [headers, ...rows]
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-    )
-    .join("\n");
+  const csv = toCsv([headers, ...rows]);
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `bakery-refunds-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadCsv(`bakery-refunds-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }
 
 // Filters + counters live in the domain layer so the SERVER can run them over

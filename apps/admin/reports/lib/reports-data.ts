@@ -1,3 +1,4 @@
+import { downloadCsv, toCsv } from "@/utils/csv";
 /**
  * Admin-side entry point for report analytics.
  *
@@ -104,15 +105,7 @@ export function exportReportsCsv(
     ...payments.map((item) => [item.label, String(item.count), String(item.revenue)]),
   ];
 
-  const csv = lines
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
+  const csv = toCsv(lines);
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `bakery-reports-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadCsv(`bakery-reports-${range}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }

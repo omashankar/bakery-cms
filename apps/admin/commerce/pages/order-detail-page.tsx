@@ -483,6 +483,11 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         open={refundOpen}
         orderNumber={order.orderNumber}
         totalLabel={formatCurrency(order.totals.total)}
+        // Without this the dialog has no ceiling to validate a partial refund
+        // against, so it accepts any amount and the refusal comes from the
+        // gateway after the operator has typed it. The Refund Centre passed it;
+        // this screen did not.
+        orderTotal={order.totals.total}
         onOpenChange={setRefundOpen}
         onConfirm={handleRefund}
       />

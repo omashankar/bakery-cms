@@ -1,3 +1,4 @@
+import { downloadCsv, toCsv } from "@/utils/csv";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import type {
   CustomerActivityItem,
@@ -252,17 +253,9 @@ export function exportCustomersToCsv(customers: CustomerProfile[]): void {
     customer.meta.notes,
   ]);
 
-  const csv = [headers, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
+  const csv = toCsv([headers, ...rows]);
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `bakery-customers-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadCsv(`bakery-customers-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }
 
 /**
