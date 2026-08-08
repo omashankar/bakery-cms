@@ -63,7 +63,15 @@ export function loadBanners(): Banner[] {
 
   try {
     const parsed = JSON.parse(raw) as Banner[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // An empty list is an ANSWER, not a missing one.
+    //
+    // This used to re-seed whenever the stored array was empty, so an admin who
+    // deleted every banner saw all three shipped demo banners again on the next
+    // reload. Local-only writing does not save it: the admin page reads this list
+    // into its state, and every mutation here is a replace-all that sends the
+    // whole list — so their next save pushed the demo banners to the server and
+    // put them back on the storefront. Only a missing or non-array value seeds.
+    if (!Array.isArray(parsed)) {
       persist(defaultBanners);
       localStorage.setItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
       return defaultBanners;

@@ -73,10 +73,15 @@ export function loadTestimonials(): Testimonial[] {
 
   try {
     const parsed = JSON.parse(raw) as Testimonial[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // An empty list is an ANSWER, not a missing one.
+    //
+    // Re-seeding on an empty array was the bug the local-only write was meant to
+    // contain, and containing it was not enough: the admin page reads this list
+    // into its state and every mutation is a replace-all that sends the whole
+    // list, so the demo testimonials came back on screen and the admin's next
+    // save pushed them to the server. Only a missing or non-array value seeds.
+    if (!Array.isArray(parsed)) {
       const seeded = seedFromLanding();
-      // Local-only: re-seeding must NOT push defaults back to the server, or an
-      // admin who deleted every testimonial would have them resurrected on reload.
       lowPersist(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
       return seeded;

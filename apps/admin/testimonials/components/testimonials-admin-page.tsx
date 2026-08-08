@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { contentHydration } from "@/features/content/lib/content-api";
 import {
   Archive,
   FileCheck2,
@@ -111,7 +112,25 @@ export function TestimonialsAdminPage() {
   }
 
   useEffect(() => {
+    // Read the local cache, then read it AGAIN once the server's copy has
+    // landed in it.
+    //
+    // This list is whatever this browser happens to hold. On a device that has
+    // never opened this page — a second laptop, a new profile, cleared site
+    // data — that is the shipped demo seed, and the page kept showing it: the
+    // hydration write lands in localStorage a moment later but nothing re-read
+    // it. Because every mutation here is a replace-all that sends the whole
+    // list, the admin's next save then pushed those demo rows to the server and
+    // destroyed the shop's real ones. The hydration gate already refuses a write
+    // sent BEFORE the server copy arrives; this is the other half of it.
     refresh();
+    let cancelled = false;
+    void contentHydration.waitForSettled().then((settled) => {
+      if (settled && !cancelled) refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => filterTestimonials(items, filters), [items, filters]);

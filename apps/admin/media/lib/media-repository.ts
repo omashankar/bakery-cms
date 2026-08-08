@@ -106,11 +106,25 @@ function dedupeByUrl(files: MediaFile[]): MediaFile[] {
   });
 }
 
+/**
+ * Bring a stored library up to the current version.
+ *
+ * This used to append the WHOLE fresh seed — `[...userFiles, ...freshSeed]` —
+ * so every version bump reinstated every demo file the admin had deleted, and
+ * kept doing it on each future bump. A migration exists to repair what the shop
+ * has, not to reverse its decisions.
+ *
+ * A seed file the shop still holds is refreshed from the current seed (that is
+ * what the migration is for: the shipped image URLs changed). One it deleted
+ * stays deleted.
+ */
 function repairMediaLibrary(existing: MediaFile[]): MediaFile[] {
-  const freshSeed = seedMedia();
-  const userFiles = existing.filter((file) => !file.id.startsWith("media-seed-"));
-  const { files: normalizedUsers } = normalizeMediaFiles(userFiles);
-  return dedupeByUrl([...normalizedUsers, ...freshSeed]);
+  const fresh = new Map(seedMedia().map((file) => [file.id, file]));
+  const repaired = existing.map((file) =>
+    file.id.startsWith("media-seed-") ? fresh.get(file.id) ?? file : file,
+  );
+  const { files: normalized } = normalizeMediaFiles(repaired);
+  return dedupeByUrl(normalized);
 }
 
 function seedMedia(): MediaFile[] {
@@ -146,10 +160,16 @@ export function loadMediaFiles(): MediaFile[] {
 
   try {
     const parsed = JSON.parse(raw) as MediaFile[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // An empty library is an ANSWER, not a missing one.
+    //
+    // This re-seeded roughly forty demo files whenever the stored array was
+    // empty, so an admin who cleared the library got the whole demo set back on
+    // the next load. Writing the re-seed locally did not contain it: every
+    // mutation here is a replace-all that sends the whole list, so their next
+    // upload pushed the demo library to the server as well. Only a missing or
+    // unreadable value seeds.
+    if (!Array.isArray(parsed)) {
       const seeded = seedMedia();
-      // Local-only: re-seeding must NOT push defaults back to the server, or an
-      // admin who cleared the media library would have it resurrected on reload.
       lowPersistMedia(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
       return seeded;
@@ -202,10 +222,19 @@ export async function saveMediaFiles(files: MediaFile[]): Promise<boolean> {
   return persisted;
 }
 
-/** Hydration: write the server's media files into the local cache (no re-push).
- * Skips an empty server list so it never wipes the local seed on first run. */
+/**
+ * Hydration: write the server's media files into the local cache (no re-push).
+ *
+ * It used to return early on an empty server list, to protect the local seed on
+ * a first run. That made an emptied library impossible to synchronise: admin A
+ * deletes every file, admin B opens the library on another device, the fetch
+ * returns `[]`, this bailed, and B kept the whole stale list on screen. B's next
+ * save then PUT that list back — restoring records whose Cloudinary assets the
+ * delete had already destroyed, so the library filled with permanently broken
+ * images. An empty server list is the server's answer and is written like any
+ * other.
+ */
 export function persistServerMedia(files: MediaFile[]): void {
-  if (files.length === 0) return;
   lowPersistMedia(files);
   notifyMediaUpdated();
 }

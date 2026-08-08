@@ -102,10 +102,10 @@ export function loadFaqs(): FaqItem[] {
 
   try {
     const parsed = JSON.parse(raw) as FaqItem[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // An empty list is an ANSWER, not a missing one — see banners-repository.ts
+    // for the full account. Only a missing or non-array value seeds.
+    if (!Array.isArray(parsed)) {
       const seeded = seedFromLanding();
-      // Local-only: re-seeding must NOT push defaults back to the server, or an
-      // admin who deleted every FAQ would have them resurrected on reload.
       lowPersist(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
       return seeded;
