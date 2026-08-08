@@ -78,12 +78,21 @@ interface Snapshot {
   scheduledPublishAt?: string;
 }
 
+interface Written {
+  snapshot: Snapshot;
+  version: number;
+}
+
 interface BuilderApi {
   what: string;
-  getState: () => Promise<{ draft: Snapshot; published: Snapshot }>;
-  saveDraft: (sections: AnySection[], scheduledPublishAt?: string | null) => Promise<Snapshot>;
-  publish: (sections: AnySection[]) => Promise<Snapshot>;
-  reset: () => Promise<unknown>;
+  getState: () => Promise<{ draft: Snapshot; published: Snapshot; version?: number }>;
+  saveDraft: (
+    sections: AnySection[],
+    scheduledPublishAt?: string | null,
+    expectedVersion?: number,
+  ) => Promise<Written>;
+  publish: (sections: AnySection[], expectedVersion?: number) => Promise<Written>;
+  reset: () => Promise<{ version?: number }>;
   listRevisions: () => Promise<{ id: string; label: string; sections: AnySection[] }[]>;
   restore: (revisionId: string) => Promise<Snapshot | null>;
   resetStore: () => Promise<void>;
@@ -193,5 +202,73 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
 
     expect(await builder.restore("rev-does-not-exist")).toBeNull();
     expect(titleOf((await builder.getState()).draft.sections)).toBe("keep-me");
+  });
+
+  describe("two people editing at once", () => {
+    it("refuses a save composed against a state that has moved on", async () => {
+      // Admin A opens the builder and reads version N.
+      const opened = (await builder.getState()).version ?? 0;
+
+      // Admin B saves in the meantime.
+      await builder.saveDraft(await layout("B's work"), null, opened);
+
+      // A clicks Save with the array they loaded fifteen minutes ago. This used
+      // to succeed and replace B's work, with a green toast for both of them.
+      await expect(
+        builder.saveDraft(await layout("A's stale copy"), null, opened),
+      ).rejects.toThrow(/changed somewhere else/);
+
+      expect(titleOf((await builder.getState()).draft.sections)).toBe("B's work");
+    });
+
+    it("refuses a publish composed against a state that has moved on", async () => {
+      // Worse than a stale save: it writes the stale array to `published` too,
+      // so the storefront goes back in time for every visitor.
+      const opened = (await builder.getState()).version ?? 0;
+      await builder.saveDraft(await layout("B's work"), null, opened);
+
+      await expect(
+        builder.publish(await layout("A's stale copy"), opened),
+      ).rejects.toThrow(/changed somewhere else/);
+
+      expect(titleOf((await builder.getState()).published.sections)).not.toBe(
+        "A's stale copy",
+      );
+    });
+
+    it("tells the caller what the version is now, so it can say so", async () => {
+      const opened = (await builder.getState()).version ?? 0;
+      const { version: moved } = await builder.saveDraft(await layout("B"), null, opened);
+
+      await expect(
+        builder.saveDraft(await layout("A"), null, opened),
+      ).rejects.toMatchObject({ currentVersion: moved });
+    });
+
+    it("lets the same admin save again with the version their last write returned", async () => {
+      const opened = (await builder.getState()).version ?? 0;
+      const first = await builder.saveDraft(await layout("one"), null, opened);
+      const second = await builder.saveDraft(await layout("two"), null, first.version);
+
+      expect(second.version).toBe(first.version + 1);
+      expect(titleOf((await builder.getState()).draft.sections)).toBe("two");
+    });
+
+    it("moves the counter on every write, including reset and restore", async () => {
+      // A write that left the counter alone would be invisible to the next save.
+      const start = (await builder.getState()).version ?? 0;
+
+      const published = await builder.publish(await layout("published"));
+      expect(published.version).toBeGreaterThan(start);
+
+      const afterReset = await builder.reset();
+      expect(afterReset.version ?? 0).toBeGreaterThan(published.version);
+
+      const [revision] = await builder.listRevisions();
+      await builder.restore(revision.id);
+      expect((await builder.getState()).version ?? 0).toBeGreaterThan(
+        afterReset.version ?? 0,
+      );
+    });
   });
 });

@@ -48,25 +48,31 @@ export async function fetchWeddingState(): Promise<WeddingBuilderState> {
   return state;
 }
 
+/** A write's result, carrying the version to send with the next one. */
+export interface WeddingWriteResult {
+  snapshot: WeddingBuilderSnapshot;
+  version: number;
+}
+
 export async function saveWeddingDraftRequest(
   sections: WeddingSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<WeddingBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: WeddingBuilderSnapshot }>({
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<WeddingWriteResult> {
+  return request<WeddingWriteResult>({
     method: "PUT",
-    body: JSON.stringify({ sections, scheduledPublishAt }),
+    body: JSON.stringify({ sections, scheduledPublishAt, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function publishWedding(
-  sections: WeddingSectionInstance[]
-): Promise<WeddingBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: WeddingBuilderSnapshot }>({
+  sections: WeddingSectionInstance[],
+  expectedVersion?: number
+): Promise<WeddingWriteResult> {
+  return request<WeddingWriteResult>({
     method: "POST",
-    body: JSON.stringify({ sections }),
+    body: JSON.stringify({ sections, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function resetWedding(): Promise<WeddingBuilderState> {

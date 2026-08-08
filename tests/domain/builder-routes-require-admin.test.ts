@@ -22,20 +22,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const guard = vi.hoisted(() => ({ requireAdminResponse: vi.fn() }));
 vi.mock("@/lib/server/auth/guard", () => guard);
 
-const state = { draft: { sections: [], updatedAt: "" }, published: { sections: [], updatedAt: "" } };
+const state = {
+  draft: { sections: [], updatedAt: "" },
+  published: { sections: [], updatedAt: "" },
+  version: 3,
+};
+const written = { snapshot: state.draft, version: 4 };
 
 vi.mock("@/features/cms-sections/data/homepage-sections.server", () => ({
   getHomepageState: vi.fn(async () => state),
-  publishSections: vi.fn(async () => state.draft),
+  publishSections: vi.fn(async () => written),
   resetHomepageSections: vi.fn(async () => state),
-  saveDraftSections: vi.fn(async () => state.draft),
+  saveDraftSections: vi.fn(async () => written),
 }));
 
 vi.mock("@/features/cms-sections/data/wedding-sections.server", () => ({
   getWeddingState: vi.fn(async () => state),
-  publishWeddingSections: vi.fn(async () => state.draft),
+  publishWeddingSections: vi.fn(async () => written),
   resetWeddingSections: vi.fn(async () => state),
-  saveWeddingDraft: vi.fn(async () => state.draft),
+  saveWeddingDraft: vi.fn(async () => written),
 }));
 
 import * as homepageRoute from "@/app/api/homepage-sections/route";
@@ -100,5 +105,13 @@ describe.each(ROUTES)("$what", ({ route }) => {
     await route.GET();
 
     expect(guard.requireAdminResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands back the version a write landed on, so the next one can carry it", async () => {
+    signedIn();
+
+    const body = await (await route.PUT(put({ sections: [] }))).json();
+
+    expect(body.version).toBe(4);
   });
 });

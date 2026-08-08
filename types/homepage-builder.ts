@@ -73,4 +73,15 @@ export interface HomepageBuilderSnapshot {
 export interface HomepageBuilderState {
   draft: HomepageBuilderSnapshot;
   published: HomepageBuilderSnapshot;
+  /**
+   * Bumped by every write, so a save can say which state it was composed
+   * against.
+   *
+   * The builder is replace-all: it PUTs the whole section array. With nothing to
+   * compare against, a tab left open at 09:00 and saved at 09:15 silently
+   * replaced everything done in between — and Publish pushed that stale copy to
+   * the live storefront. Absent on documents written before this existed, which
+   * reads as version 0.
+   */
+  version?: number;
 }

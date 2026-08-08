@@ -5,6 +5,11 @@ import {
   appendRevision,
   findRevisionSections,
 } from "@/features/cms-sections/lib/builder-revision-utils";
+import {
+  assertVersion,
+  nextVersion,
+  type VersionedSnapshot,
+} from "@/features/cms-sections/lib/builder-conflict";
 import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   HomepageBuilderSnapshot,
@@ -75,6 +80,7 @@ async function readWithSchedule(): Promise<HomepageStoreState> {
       draft: { ...snapshot },
       published: snapshot,
       revisions: appendRevision(current.revisions, snapshot.sections, "Scheduled publish"),
+      version: nextVersion(current),
     };
     return { next, result: next };
   });
@@ -130,33 +136,57 @@ export async function restoreHomepageRevision(
       // Monday came and went with nothing published.
       state.draft.scheduledPublishAt
     );
-    return { next: { ...state, draft }, result: draft };
+    return {
+      next: { ...state, draft, version: nextVersion(state) },
+      result: draft,
+    };
   });
 }
 
+/**
+ * Save the draft.
+ *
+ * `expectedVersion` is what the builder read when it loaded. Without it this is
+ * replace-all with nothing to compare against: a tab open since 09:00 and saved
+ * at 09:15 quietly replaced everything done in between, and both admins got a
+ * green "draft saved".
+ */
 export async function saveDraftSections(
   sections: HomepageSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<HomepageBuilderSnapshot> {
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<VersionedSnapshot<HomepageBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const draft = createSnapshot(sections, scheduledPublishAt ?? undefined);
-    return { next: { ...state, draft }, result: draft };
+    const version = nextVersion(state);
+    return {
+      next: { ...state, draft, version },
+      result: { snapshot: draft, version },
+    };
   });
 }
 
 export async function publishSections(
-  sections: HomepageSectionInstance[]
-): Promise<HomepageBuilderSnapshot> {
+  sections: HomepageSectionInstance[],
+  expectedVersion?: number
+): Promise<VersionedSnapshot<HomepageBuilderSnapshot>> {
   return store.mutate((state) => {
+    // Checked here above all: publishing a stale array puts the storefront back
+    // in time for every visitor AND destroys the other admin's saved draft in
+    // the same write.
+    assertVersion(state, expectedVersion);
     const snapshot = createSnapshot(sections);
+    const version = nextVersion(state);
     return {
       // Publishing clears any pending schedule — it has just happened.
       next: {
         draft: { ...snapshot },
         published: snapshot,
         revisions: appendRevision(state.revisions, snapshot.sections, "Homepage publish"),
+        version,
       },
-      result: snapshot,
+      result: { snapshot, version },
     };
   });
 }
@@ -178,6 +208,7 @@ export async function resetHomepageSections(): Promise<HomepageBuilderState> {
   return store.mutate((state) => {
     const draft = createSnapshot();
     const published = createSnapshot();
+    const version = nextVersion(state);
     return {
       next: {
         draft,
@@ -187,8 +218,9 @@ export async function resetHomepageSections(): Promise<HomepageBuilderState> {
           state.published.sections,
           "Before reset to defaults"
         ),
+        version,
       },
-      result: { draft, published },
+      result: { draft, published, version },
     };
   });
 }

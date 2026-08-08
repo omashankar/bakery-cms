@@ -5,6 +5,11 @@ import {
   appendRevision,
   findRevisionSections,
 } from "@/features/cms-sections/lib/builder-revision-utils";
+import {
+  assertVersion,
+  nextVersion,
+  type VersionedSnapshot,
+} from "@/features/cms-sections/lib/builder-conflict";
 import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   WeddingBuilderSnapshot,
@@ -79,6 +84,7 @@ async function readWithSchedule(): Promise<WeddingStoreState> {
       draft: { ...snapshot },
       published: snapshot,
       revisions: appendRevision(current.revisions, snapshot.sections, "Scheduled publish"),
+      version: nextVersion(current),
     };
     return { next, result: next };
   });
@@ -117,32 +123,46 @@ export async function restoreWeddingRevision(
     // Sorted, and the pending schedule carried over — see the homepage store for
     // why each matters.
     const draft = createSnapshot(sortSections(sections), state.draft.scheduledPublishAt);
-    return { next: { ...state, draft }, result: draft };
+    return {
+      next: { ...state, draft, version: nextVersion(state) },
+      result: draft,
+    };
   });
 }
 
+/** `expectedVersion` is what the builder read on load — see the homepage store. */
 export async function saveWeddingDraft(
   sections: WeddingSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<WeddingBuilderSnapshot> {
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<VersionedSnapshot<WeddingBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const draft = createSnapshot(sections, scheduledPublishAt ?? undefined);
-    return { next: { ...state, draft }, result: draft };
+    const version = nextVersion(state);
+    return {
+      next: { ...state, draft, version },
+      result: { snapshot: draft, version },
+    };
   });
 }
 
 export async function publishWeddingSections(
-  sections: WeddingSectionInstance[]
-): Promise<WeddingBuilderSnapshot> {
+  sections: WeddingSectionInstance[],
+  expectedVersion?: number
+): Promise<VersionedSnapshot<WeddingBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const snapshot = createSnapshot(sections);
+    const version = nextVersion(state);
     return {
       next: {
         draft: { ...snapshot },
         published: snapshot,
         revisions: appendRevision(state.revisions, snapshot.sections, "Wedding publish"),
+        version,
       },
-      result: snapshot,
+      result: { snapshot, version },
     };
   });
 }
@@ -156,6 +176,7 @@ export async function resetWeddingSections(): Promise<WeddingBuilderState> {
   return store.mutate((state) => {
     const draft = createSnapshot();
     const published = createSnapshot();
+    const version = nextVersion(state);
     return {
       next: {
         draft,
@@ -165,8 +186,9 @@ export async function resetWeddingSections(): Promise<WeddingBuilderState> {
           state.published.sections,
           "Before reset to defaults"
         ),
+        version,
       },
-      result: { draft, published },
+      result: { draft, published, version },
     };
   });
 }

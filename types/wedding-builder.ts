@@ -29,6 +29,8 @@ export interface WeddingBuilderSnapshot {
 export interface WeddingBuilderState {
   draft: WeddingBuilderSnapshot;
   published: WeddingBuilderSnapshot;
+  /** Bumped by every write — see HomepageBuilderState.version. */
+  version?: number;
 }
 
 export interface WeddingSectionRegistryEntry {

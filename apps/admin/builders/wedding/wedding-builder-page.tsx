@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   createWeddingSectionInstance,
@@ -84,6 +84,13 @@ export function WeddingBuilderPage() {
   const latestSections = useLatest(sections);
 
   /**
+   * The store version this builder last saw — see the homepage builder. Sent
+   * with every write so the server can refuse one composed against a state that
+   * has since moved on.
+   */
+  const versionRef = useRef<number | undefined>(undefined);
+
+  /**
    * Clear the unsaved flag only if what was just persisted is still what is on
    * screen. See the homepage builder for the full account — anything typed while
    * a save was in flight was declared saved without being in the request body.
@@ -102,7 +109,9 @@ export function WeddingBuilderPage() {
 
   const refreshMeta = useCallback(async () => {
     try {
-      const meta = deriveWeddingMeta(await fetchWeddingState());
+      const state = await fetchWeddingState();
+      versionRef.current = state.version ?? 0;
+      const meta = deriveWeddingMeta(state);
       setPublishMeta(meta);
       setScheduledPublishAt(toScheduleInputValue(meta.scheduledPublishAt));
     } catch {
@@ -115,6 +124,7 @@ export function WeddingBuilderPage() {
     async function load() {
       try {
         const state = await fetchWeddingState();
+        versionRef.current = state.version ?? 0;
         const draft = sortSections(state.draft.sections);
         setSections(draft);
         setSelectedId(draft[0]?.instanceId ?? null);
@@ -244,7 +254,12 @@ export function WeddingBuilderPage() {
     const payload = sections;
     setIsSaving(true);
     try {
-      await saveWeddingDraftRequest(payload, fromScheduleInputValue(scheduledPublishAt));
+      const { version } = await saveWeddingDraftRequest(
+        payload,
+        fromScheduleInputValue(scheduledPublishAt),
+        versionRef.current
+      );
+      versionRef.current = version;
       settleDirty(payload);
       await refreshMeta();
       toast.success("Wedding page draft saved");
@@ -260,7 +275,8 @@ export function WeddingBuilderPage() {
     const payload = sections;
     setIsSaving(true);
     try {
-      await publishWedding(payload);
+      const { version } = await publishWedding(payload, versionRef.current);
+      versionRef.current = version;
       setScheduledPublishAt("");
       settleDirty(payload);
       setConfirm(null);
@@ -278,7 +294,12 @@ export function WeddingBuilderPage() {
     setScheduledPublishAt(value);
     setIsDirty(true);
     try {
-      await saveWeddingDraftRequest(payload, fromScheduleInputValue(value));
+      const { version } = await saveWeddingDraftRequest(
+        payload,
+        fromScheduleInputValue(value),
+        versionRef.current
+      );
+      versionRef.current = version;
       // The schedule write persists the whole draft, so nothing is unsaved after
       // it — see the homepage builder.
       settleDirty(payload);
@@ -301,7 +322,12 @@ export function WeddingBuilderPage() {
     const payload = sections;
     try {
       // Preview reads the draft from the server, so it has to be saved first.
-      await saveWeddingDraftRequest(payload, fromScheduleInputValue(scheduledPublishAt));
+      const { version } = await saveWeddingDraftRequest(
+        payload,
+        fromScheduleInputValue(scheduledPublishAt),
+        versionRef.current
+      );
+      versionRef.current = version;
       settleDirty(payload);
       await refreshMeta();
       const url = `${routes.store.weddingCakes}?cmsPreview=wedding`;
@@ -335,6 +361,7 @@ export function WeddingBuilderPage() {
     setIsSaving(true);
     try {
       const state = await resetWedding();
+      versionRef.current = state.version ?? versionRef.current;
       setSections(state.draft.sections);
       setSelectedId(state.draft.sections[0]?.instanceId ?? null);
       setIsDirty(false);
@@ -352,6 +379,7 @@ export function WeddingBuilderPage() {
     try {
       // Re-read the saved draft from the server and throw away local edits.
       const state = await fetchWeddingState();
+      versionRef.current = state.version ?? 0;
       const draft = sortSections(state.draft.sections);
       setSections(draft);
       setSelectedId((current) =>

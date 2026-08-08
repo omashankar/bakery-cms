@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { sortSections } from "@/features/cms-sections/lib/homepage-store";
 import {
@@ -87,6 +87,16 @@ export function HomepageBuilderPage() {
   const latestSections = useLatest(sections);
 
   /**
+   * The store version this builder last saw.
+   *
+   * Sent with every write so the server can refuse one composed against a state
+   * that has since moved on. Without it the builder is replace-all with nothing
+   * to compare: a tab open since 09:00 and saved at 09:15 replaced everything
+   * done in between, and Publish pushed that stale copy to the live storefront.
+   */
+  const versionRef = useRef<number | undefined>(undefined);
+
+  /**
    * Clear the unsaved flag only if what was just persisted is still what is on
    * screen.
    *
@@ -110,7 +120,9 @@ export function HomepageBuilderPage() {
 
   const refreshMeta = useCallback(async () => {
     try {
-      const meta = deriveHomepageMeta(await fetchHomepageState());
+      const state = await fetchHomepageState();
+      versionRef.current = state.version ?? 0;
+      const meta = deriveHomepageMeta(state);
       setPublishMeta(meta);
       setScheduledPublishAt(toScheduleInputValue(meta.scheduledPublishAt));
     } catch {
@@ -123,6 +135,7 @@ export function HomepageBuilderPage() {
     async function load() {
       try {
         const state = await fetchHomepageState();
+        versionRef.current = state.version ?? 0;
         const draft = sortSections(state.draft.sections);
         setSections(draft);
         setSelectedId(draft[0]?.instanceId ?? null);
@@ -252,7 +265,12 @@ export function HomepageBuilderPage() {
     const payload = sections;
     setIsSaving(true);
     try {
-      await saveHomepageDraft(payload, fromScheduleInputValue(scheduledPublishAt));
+      const { version } = await saveHomepageDraft(
+        payload,
+        fromScheduleInputValue(scheduledPublishAt),
+        versionRef.current
+      );
+      versionRef.current = version;
       settleDirty(payload);
       await refreshMeta();
       toast.success("Homepage draft saved");
@@ -268,7 +286,8 @@ export function HomepageBuilderPage() {
     const payload = sections;
     setIsSaving(true);
     try {
-      await publishHomepage(payload);
+      const { version } = await publishHomepage(payload, versionRef.current);
+      versionRef.current = version;
       setScheduledPublishAt("");
       settleDirty(payload);
       setConfirm(null);
@@ -286,7 +305,12 @@ export function HomepageBuilderPage() {
     setScheduledPublishAt(value);
     setIsDirty(true);
     try {
-      await saveHomepageDraft(payload, fromScheduleInputValue(value));
+      const { version } = await saveHomepageDraft(
+        payload,
+        fromScheduleInputValue(value),
+        versionRef.current
+      );
+      versionRef.current = version;
       // The schedule write persists the whole draft, so nothing is unsaved after
       // it. Leaving the flag set left a standing "Unsaved" badge and armed the
       // leave-site prompt over a draft that was on the server — which trains an
@@ -314,7 +338,12 @@ export function HomepageBuilderPage() {
     const payload = sections;
     try {
       // Preview reads the draft from the server, so it has to be saved first.
-      await saveHomepageDraft(payload, fromScheduleInputValue(scheduledPublishAt));
+      const { version } = await saveHomepageDraft(
+        payload,
+        fromScheduleInputValue(scheduledPublishAt),
+        versionRef.current
+      );
+      versionRef.current = version;
       settleDirty(payload);
       await refreshMeta();
       const url = `${routes.store.home}?cmsPreview=1`;
@@ -353,6 +382,7 @@ export function HomepageBuilderPage() {
     setIsSaving(true);
     try {
       const state = await resetHomepage();
+      versionRef.current = state.version ?? versionRef.current;
       setSections(state.draft.sections);
       setSelectedId(state.draft.sections[0]?.instanceId ?? null);
       setIsDirty(false);
@@ -370,6 +400,7 @@ export function HomepageBuilderPage() {
     try {
       // Re-read the saved draft from the server and throw away local edits.
       const state = await fetchHomepageState();
+      versionRef.current = state.version ?? 0;
       const draft = sortSections(state.draft.sections);
       setSections(draft);
       setSelectedId((current) =>

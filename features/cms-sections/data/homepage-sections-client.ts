@@ -53,25 +53,36 @@ export async function fetchHomepageState(): Promise<HomepageBuilderState> {
   return state;
 }
 
+/**
+ * A write's result, carrying the version to send with the next one.
+ *
+ * The builder is replace-all, so every write has to say which state it was
+ * composed against — otherwise a stale tab silently replaces work it never saw.
+ */
+export interface HomepageWriteResult {
+  snapshot: HomepageBuilderSnapshot;
+  version: number;
+}
+
 export async function saveHomepageDraft(
   sections: HomepageSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<HomepageBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: HomepageBuilderSnapshot }>({
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<HomepageWriteResult> {
+  return request<HomepageWriteResult>({
     method: "PUT",
-    body: JSON.stringify({ sections, scheduledPublishAt }),
+    body: JSON.stringify({ sections, scheduledPublishAt, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function publishHomepage(
-  sections: HomepageSectionInstance[]
-): Promise<HomepageBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: HomepageBuilderSnapshot }>({
+  sections: HomepageSectionInstance[],
+  expectedVersion?: number
+): Promise<HomepageWriteResult> {
+  return request<HomepageWriteResult>({
     method: "POST",
-    body: JSON.stringify({ sections }),
+    body: JSON.stringify({ sections, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function resetHomepage(): Promise<HomepageBuilderState> {

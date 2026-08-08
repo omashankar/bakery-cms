@@ -6,6 +6,7 @@ import {
   resetHomepageSections,
   saveDraftSections,
 } from "@/features/cms-sections/data/homepage-sections.server";
+import { BuilderConflictError } from "@/features/cms-sections/lib/builder-conflict";
 import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
@@ -31,6 +32,21 @@ interface SectionsBody {
   sections?: HomepageSectionInstance[];
   scheduledPublishAt?: string | null;
   action?: "publish" | "reset";
+  /** The version the builder read on load — see builder-conflict.ts. */
+  expectedVersion?: number;
+}
+
+/**
+ * A save composed against a state that has since moved on.
+ *
+ * Answered 409 rather than 200-with-a-silent-overwrite, and carries the current
+ * version so the client can say what happened instead of guessing.
+ */
+function conflict(error: BuilderConflictError) {
+  return NextResponse.json(
+    { error: error.message, currentVersion: error.currentVersion },
+    { status: 409 },
+  );
 }
 
 async function parseBody(request: Request): Promise<SectionsBody | null> {
@@ -63,9 +79,14 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const snapshot = await saveDraftSections(body.sections, body.scheduledPublishAt);
-    return NextResponse.json({ snapshot });
-  } catch {
+    const { snapshot, version } = await saveDraftSections(
+      body.sections,
+      body.scheduledPublishAt,
+      body.expectedVersion,
+    );
+    return NextResponse.json({ snapshot, version });
+  } catch (error) {
+    if (error instanceof BuilderConflictError) return conflict(error);
     return NextResponse.json({ error: "Failed to save draft" }, { status: 500 });
   }
 }
@@ -89,8 +110,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "sections array is required" }, { status: 400 });
     }
 
-    return NextResponse.json({ snapshot: await publishSections(body.sections) });
-  } catch {
+    const { snapshot, version } = await publishSections(body.sections, body.expectedVersion);
+    return NextResponse.json({ snapshot, version });
+  } catch (error) {
+    if (error instanceof BuilderConflictError) return conflict(error);
     return NextResponse.json({ error: "Failed to publish" }, { status: 500 });
   }
 }
