@@ -134,11 +134,23 @@ export function getCustomerActivity(
     }
 
     if (order.status === "cancelled") {
+      // WHEN it was cancelled, from the status history — the same place the
+      // "delivered" entry above reads its own timestamp.
+      //
+      // This used `order.placedAt`, so a cancellation always sorted next to the
+      // order it undid rather than where it happened. On a timeline whose whole
+      // job is sequence, an order placed in January and cancelled in June read
+      // as cancelled in January, and the entries in between looked like they
+      // came after it.
+      const cancelled = [...order.statusHistory]
+        .reverse()
+        .find((event) => event.status === "cancelled");
+
       items.push({
         id: `cancelled-${order.id}`,
         type: "order_cancelled",
         title: `Order ${order.orderNumber} cancelled`,
-        at: order.placedAt,
+        at: cancelled?.at ?? order.placedAt,
         href: routes.admin.orders.detail(order.id),
       });
     }

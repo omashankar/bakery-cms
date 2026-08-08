@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 import { formatCurrency } from "@/utils/format";
 
@@ -31,6 +32,8 @@ interface UnclaimedPayment {
 export function UnclaimedPaymentsAlert() {
   const [items, setItems] = useState<UnclaimedPayment[]>([]);
   const [amount, setAmount] = useState(0);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +48,26 @@ export function UnclaimedPaymentsAlert() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
+
+  /**
+   * Record that the operator sent this payment back at the gateway.
+   *
+   * Only the server's answer clears the row. Removing it optimistically would
+   * hide money from the one alert that exists to make it impossible to miss.
+   */
+  async function markRefunded(id: string) {
+    setMarking(id);
+    try {
+      const res = await fetch(`/api/payments/unclaimed/${id}/refunded`, { method: "POST" });
+      if (res.ok) setReloadKey((key) => key + 1);
+      else toast.error("Could not record that — reload and try again.");
+    } catch {
+      toast.error("Could not reach the server.");
+    } finally {
+      setMarking(null);
+    }
+  }
 
   if (items.length === 0) return null;
 
@@ -79,6 +101,21 @@ export function UnclaimedPaymentsAlert() {
                     No contact details — look this payment up in the Razorpay dashboard.
                   </p>
                 )}
+                {/*
+                  The only way off this list used to be attaching an order — and
+                  a payment that has been refunded can never have one, so the
+                  money went back and the row stayed here forever, counted in the
+                  total above. The refund itself happens at the gateway; this
+                  records that it did.
+                */}
+                <button
+                  type="button"
+                  className="mt-2 text-xs font-medium text-destructive underline underline-offset-2 disabled:opacity-50"
+                  disabled={marking === item.id}
+                  onClick={() => void markRefunded(item.id)}
+                >
+                  {marking === item.id ? "Recording…" : "I refunded this at the gateway"}
+                </button>
               </li>
             ))}
           </ul>
