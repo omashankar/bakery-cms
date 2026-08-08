@@ -246,3 +246,84 @@ describe("filterInvoiceOrders", () => {
     expect(filterInvoiceOrders([referenced], invoiceFilters({ search: "asha" }), NOW)).toHaveLength(1);
   });
 });
+
+/**
+ * "Pending amount" is money the shop OWES BACK.
+ *
+ * Every cancelled order counted, including a COD order cancelled before
+ * delivery — where the customer handed over nothing. A shop that cancels a few
+ * COD orders a day read a liability of thousands it does not owe anyone and
+ * cannot pay out.
+ */
+describe("getRefundOverview pending amount", () => {
+  it("counts a cancelled order whose payment was captured", () => {
+    const paid = order({ id: "paid", status: "cancelled", paymentStatus: "paid" });
+    expect(getRefundOverview([paid]).pendingAmount).toBe(1000);
+  });
+
+  it("does NOT count a cancelled COD order that never collected a rupee", () => {
+    const cod = order({ id: "cod", status: "cancelled", paymentStatus: "cod" });
+    expect(getRefundOverview([cod]).pendingAmount).toBe(0);
+    // It is still a refund CASE — it just owes nothing.
+    expect(getRefundOverview([cod]).cancelledCount).toBe(1);
+  });
+
+  it("does not count one whose payment is still pending or failed", () => {
+    const pending = order({ id: "p", status: "cancelled", paymentStatus: "pending" });
+    const failed = order({ id: "f", status: "cancelled", paymentStatus: "failed" });
+    expect(getRefundOverview([pending, failed]).pendingAmount).toBe(0);
+  });
+
+  it("still counts what is left on a partly refunded order", () => {
+    const partly = order({
+      id: "part",
+      status: "cancelled",
+      paymentStatus: "paid",
+      refundRecord: {
+        status: "completed",
+        reason: "customer_request",
+        amount: 400,
+        history: [],
+        gatewayRefunds: [{ id: "r1", amount: 400, status: "processed", createdAt: "" }],
+      },
+    } as unknown as Partial<PlacedOrder>);
+
+    expect(getRefundOverview([partly]).pendingAmount).toBe(600);
+  });
+
+  it("owes nothing pending on an order that is already refunded", () => {
+    // A `refunded` order is in the refunded bucket, not the pending one — the
+    // pending set is cancelled + requested + processing.
+    const refunded = order({ id: "r", status: "refunded", paymentStatus: "refunded" });
+    const overview = getRefundOverview([refunded]);
+
+    expect(overview.pendingAmount).toBe(0);
+    expect(overview.refundedCount).toBe(1);
+  });
+
+  it("counts a cancelled order already marked payment-refunded", () => {
+    // `paymentStatus` can be set on its own through the payment endpoint, so an
+    // order can sit in the pending set carrying "refunded" — money that was
+    // definitely taken, and whose unsettled part is definitely still owed.
+    // Treating that as "never collected" hides a real liability.
+    const marked = order({ id: "m", status: "cancelled", paymentStatus: "refunded" });
+    expect(getRefundOverview([marked]).pendingAmount).toBe(1000);
+  });
+
+  it("still counts an in-flight refund on a paid order", () => {
+    // `processing` IS pending — the money has been asked for and not landed.
+    const processing = order({
+      id: "proc",
+      status: "confirmed",
+      paymentStatus: "paid",
+      refundRecord: {
+        status: "processing",
+        reason: "customer_request",
+        amount: 0,
+        history: [],
+      },
+    } as unknown as Partial<PlacedOrder>);
+
+    expect(getRefundOverview([processing]).pendingAmount).toBe(1000);
+  });
+});

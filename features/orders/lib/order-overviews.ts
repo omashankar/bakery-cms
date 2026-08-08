@@ -127,10 +127,26 @@ export function getRefundOverview(orders: PlacedOrder[]): RefundOverview {
   for (const order of [...cancelled, ...requested, ...processing]) {
     pendingCases.set(order.id, order);
   }
-  const pendingAmount = [...pendingCases.values()].reduce(
-    (sum, order) => sum + Math.max(0, order.totals.total - settledRefundAmount(order)),
-    0
-  );
+
+  // Money can only be owed back if it was taken.
+  //
+  // Every cancelled order counted, including a COD order cancelled before
+  // delivery — where the customer handed over nothing. A shop that cancels a few
+  // COD orders a day read a "Pending amount" of thousands it does not owe anyone
+  // and cannot pay out, on a card that reads as a liability.
+  //
+  // `paid` covers a captured online payment and a COD order marked paid at the
+  // door; `refunded` is one that was paid and has since been sent back, and its
+  // unsettled remainder is still owed.
+  const collected = (order: PlacedOrder) =>
+    order.paymentStatus === "paid" || order.paymentStatus === "refunded";
+
+  const pendingAmount = [...pendingCases.values()]
+    .filter(collected)
+    .reduce(
+      (sum, order) => sum + Math.max(0, order.totals.total - settledRefundAmount(order)),
+      0
+    );
 
   return {
     totalCases: cases.length,

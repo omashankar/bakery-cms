@@ -70,6 +70,21 @@ export function PaymentsAdminPage() {
   const a =
     overviews?.payments ?? getPaymentAnalytics(orders, Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+  /**
+   * Say when a figure is the fallback.
+   *
+   * `serverBacked` existed and was used on exactly ONE of the eight cards.
+   * The other seven, and both charts, rendered figures computed over this
+   * browser's order cache — which holds the most recent slice — under labels
+   * that read as the whole shop, with nothing to say otherwise. A shop with
+   * more orders than the cache read smaller numbers everywhere and had no way
+   * to tell.
+   */
+  const note = (whenServer: string) =>
+    serverBacked ? whenServer : "recent orders only — reconnecting";
+  const noteTone = (whenServer?: "positive" | "warning") =>
+    serverBacked ? whenServer : ("warning" as const);
+
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       {/* No header action: "View transactions" here duplicated the Transactions
@@ -105,7 +120,8 @@ export function PaymentsAdminPage() {
             // TODAY's count. The subtitle read `collectedOrders`, which is the
             // all-time figure — so a card headed "Today's collection" printed a
             // lifetime order count underneath a one-day amount.
-            change={`${mounted ? a.todayCount : 0} orders collected today`}
+            change={note(`${mounted ? a.todayCount : 0} orders collected today`)}
+            changeTone={noteTone()}
             icon={IndianRupee}
             tone="bakery"
           />
@@ -116,22 +132,24 @@ export function PaymentsAdminPage() {
             // over this browser's order cache, which holds the most recent slice
             // — so a shop with more orders than that read a smaller number under
             // a label promising every one of them, with nothing to say so.
-            change={serverBacked ? "all time" : "recent orders only — reconnecting"}
-            changeTone={serverBacked ? undefined : "warning"}
+            change={note("all time")}
+            changeTone={noteTone()}
             icon={TrendingUp}
             tone="gold"
           />
           <DashboardStatCard
             title="Online"
             value={formatCurrency(mounted ? a.onlineAmount : 0)}
-            change="card / UPI / wallet"
+            change={note("card / UPI / wallet")}
+            changeTone={noteTone()}
             icon={CreditCard}
             tone="gold"
           />
           <DashboardStatCard
             title="Offline (COD)"
             value={formatCurrency(mounted ? a.offlineAmount : 0)}
-            change="cash on delivery"
+            change={note("cash on delivery")}
+            changeTone={noteTone()}
             icon={Banknote}
             tone="neutral"
           />
@@ -144,37 +162,53 @@ export function PaymentsAdminPage() {
           <DashboardStatCard
             title="Success rate"
             value={`${mounted ? a.successRate : 0}%`}
-            change={mounted ? `${a.failedCount} failed` : ""}
-            changeTone={mounted && a.failedCount > 0 ? "warning" : "positive"}
+            change={note(mounted ? `${a.failedCount} failed` : "")}
+            changeTone={noteTone(mounted && a.failedCount > 0 ? "warning" : "positive")}
             icon={TrendingUp}
             tone="bakery"
           />
           <DashboardStatCard
             title="Pending"
             value={String(mounted ? a.pendingCount : 0)}
-            change={formatCurrency(mounted ? a.pendingAmount : 0)}
-            changeTone={mounted && a.pendingCount > 0 ? "warning" : "positive"}
+            change={note(formatCurrency(mounted ? a.pendingAmount : 0))}
+            changeTone={noteTone(mounted && a.pendingCount > 0 ? "warning" : "positive")}
             icon={Wallet}
             tone="gold"
           />
           <DashboardStatCard
             title="Refunds"
             value={String(mounted ? a.refundCount : 0)}
-            change={`${mounted ? a.refundRate : 0}% · ${formatCurrency(mounted ? a.refundAmount : 0)}`}
+            change={note(`${mounted ? a.refundRate : 0}% · ${formatCurrency(mounted ? a.refundAmount : 0)}`)}
+            changeTone={noteTone()}
             icon={RotateCcw}
             tone="neutral"
           />
           <DashboardStatCard
             title="Avg order value"
             value={formatCurrency(mounted ? a.aov : 0)}
-            change={`top: ${mounted ? a.topMethodLabel : "—"}`}
+            change={note(`top: ${mounted ? a.topMethodLabel : "—"}`)}
+            changeTone={noteTone()}
             icon={Receipt}
             tone="neutral"
           />
         </div>
       </section>
 
-      {/* Charts */}
+      {/*
+        Charts. Both are drawn from the same figures as the cards, so when those
+        are the fallback these are too — and a chart says even less about where
+        its data came from than a number does.
+      */}
+      {mounted && !serverBacked ? (
+        <p
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          role="status"
+        >
+          Showing this browser&apos;s most recent orders — the server did not answer.
+          Totals and charts below are lower than the shop&apos;s real figures.
+        </p>
+      ) : null}
+
       <section className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
