@@ -121,6 +121,24 @@ function isCountableRevenue(order: PlacedOrder): boolean {
 }
 
 /**
+ * What the shop KEPT from an order, not what it billed.
+ *
+ * Every revenue figure here summed `totals.total` and excluded whole statuses.
+ * But an order only becomes `refunded` when the refund is BOTH full and settled,
+ * so a partial refund leaves it `delivered` forever and its full total kept
+ * counting: a ₹2,000 order refunded ₹1,500 for a quality complaint reported
+ * ₹2,000 across the summary, the trend, the payment mix, top products, top
+ * customers and the city breakdown.
+ *
+ * `refundRecord.amount` is the TOTAL refunded across every attempt, which is
+ * what makes this a subtraction rather than a per-attempt walk.
+ */
+function keptRevenue(order: PlacedOrder): number {
+  if (!isCountableRevenue(order)) return 0;
+  return Math.max(0, order.totals.total - (order.refundRecord?.amount ?? 0));
+}
+
+/**
  * "Jul", or "Jul 25" when the chart spans more than one year.
  *
  * An all-time trend runs from the first order ever placed, so a bare month name
@@ -242,7 +260,7 @@ export function formatReportDelta(current: number, previous: number): ReportDelt
 
 export function getReportsSummary(orders: PlacedOrder[]): ReportsSummary {
   const countable = orders.filter(isCountableRevenue);
-  const revenue = countable.reduce((sum, order) => sum + order.totals.total, 0);
+  const revenue = countable.reduce((sum, order) => sum + keptRevenue(order), 0);
   const itemsSold = countable.reduce(
     (sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
     0
@@ -358,9 +376,7 @@ export function getRevenueTrend(
     if (!bucket) continue;
 
     bucket.orders += 1;
-    if (isCountableRevenue(order)) {
-      bucket.revenue += order.totals.total;
-    }
+    bucket.revenue += keptRevenue(order);
   }
 
   return Array.from(buckets.values());
@@ -384,9 +400,7 @@ export function getStatusBreakdown(orders: PlacedOrder[]): StatusBreakdownItem[]
       return {
         status,
         count: matched.length,
-        revenue: matched
-          .filter(isCountableRevenue)
-          .reduce((sum, order) => sum + order.totals.total, 0),
+        revenue: matched.reduce((sum, order) => sum + keptRevenue(order), 0),
       };
     })
     .filter((item) => item.count > 0);
@@ -408,9 +422,7 @@ export function getPaymentBreakdown(orders: PlacedOrder[]): PaymentBreakdownItem
 
     const current = map.get(key) ?? { key, label, count: 0, revenue: 0 };
     current.count += 1;
-    if (isCountableRevenue(order)) {
-      current.revenue += order.totals.total;
-    }
+    current.revenue += keptRevenue(order);
     map.set(key, current);
   }
 
@@ -421,6 +433,19 @@ export function getTopProducts(orders: PlacedOrder[], limit = 5): TopProductItem
   const map = new Map<string, TopProductItem>();
 
   for (const order of orders.filter(isCountableRevenue)) {
+    // A partial refund cannot be attributed to one line, so it is shared across
+    // them in proportion to what each contributed. Without this, "top products
+    // by revenue" stayed gross while every other figure on the screen went net,
+    // and the two disagreed about the same orders.
+    //
+    // Only the REFUND is shared — not the order total, which carries delivery
+    // and tax that were never a product's revenue. Scaling by
+    // `keptRevenue / gross` inflated every unrefunded line by the delivery fee,
+    // which the existing top-products test caught immediately.
+    const gross = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const refunded = order.refundRecord?.amount ?? 0;
+    const share = gross > 0 ? Math.max(0, 1 - refunded / gross) : 0;
+
     for (const item of order.items) {
       const current = map.get(item.productSlug) ?? {
         slug: item.productSlug,
@@ -429,7 +454,7 @@ export function getTopProducts(orders: PlacedOrder[], limit = 5): TopProductItem
         revenue: 0,
       };
       current.quantity += item.quantity;
-      current.revenue += item.price * item.quantity;
+      current.revenue += item.price * item.quantity * share;
       map.set(item.productSlug, current);
     }
   }
@@ -451,7 +476,7 @@ export function getTopCustomers(orders: PlacedOrder[], limit = 5): TopCustomerIt
       revenue: 0,
     };
     current.orders += 1;
-    current.revenue += order.totals.total;
+    current.revenue += keptRevenue(order);
     map.set(email, current);
   }
 
@@ -468,7 +493,7 @@ export function getCityBreakdown(orders: PlacedOrder[], limit = 5): CityBreakdow
     const key = city.toLowerCase();
     const current = map.get(key) ?? { city, orders: 0, revenue: 0 };
     current.orders += 1;
-    current.revenue += order.totals.total;
+    current.revenue += keptRevenue(order);
     map.set(key, current);
   }
 

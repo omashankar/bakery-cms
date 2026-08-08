@@ -416,7 +416,31 @@ export async function stats(): Promise<OrderStatsSummary> {
   await connectDB();
 
   const rows = (await OrderModel.aggregate([
-    { $group: { _id: "$status", count: { $sum: 1 }, revenue: { $sum: "$totals.total" } } },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        // What the shop KEPT, not what it billed.
+        //
+        // This summed `totals.total` and then excluded whole statuses. But an
+        // order only becomes `refunded` when the refund is BOTH full and
+        // settled, so a partial refund leaves it `delivered` forever — and its
+        // full total kept counting. A ₹2,000 order refunded ₹1,500 for a quality
+        // complaint reported ₹2,000 of revenue against ₹500 actually kept, on
+        // this card and in every report.
+        //
+        // The transactions aggregation already nets `amount - refundedAmount`;
+        // this one did not, so the two screens disagreed about the same money.
+        revenue: {
+          $sum: {
+            $subtract: [
+              { $ifNull: ["$totals.total", 0] },
+              { $ifNull: ["$refundRecord.amount", 0] },
+            ],
+          },
+        },
+      },
+    },
   ])) as Array<{ _id: OrderStatus | null; count: number; revenue: number }>;
 
   const summary: OrderStatsSummary = {
