@@ -875,9 +875,23 @@ async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
  * report counted those redemptions forever. Best effort: a miscount is a
  * reporting problem, and failing a cancellation over it would be far worse.
  */
-async function releaseCoupon(order: PlacedOrder) {
+/**
+ * Give a coupon redemption back. Once per order, whichever path gets there.
+ *
+ * Cancelling releases it and so does a full settled refund — and refunding a
+ * cancelled order is the ordinary sequence, so both ran and the customer's
+ * single-use code came back twice. The refund tracked its own
+ * `refundRecord.couponReleased`; cancellation never saw that flag and had none
+ * of its own.
+ *
+ * The claim is on the ORDER, so it is the same claim for both paths.
+ */
+async function releaseCoupon(order: PlacedOrder): Promise<void> {
   const code = order.coupon?.code;
   if (!code) return;
+
+  if (!(await repo.claimCouponRelease(order.id))) return;
+
   try {
     await releaseCouponRedemption(code);
   } catch (error) {
@@ -895,16 +909,27 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   if (order.status === "cancelled" || order.status === "refunded") return order;
 
   const now = new Date().toISOString();
-  const updated = await repo.patch(id, {
+
+  // THE STATUS CHANGE IS THE GUARD.
+  //
+  // This was a read, a check and a patch — three steps — with a comment saying
+  // the check kept the work below from running twice. It did not: a
+  // double-clicked Cancel, or two operators on the same order, both read
+  // `confirmed`, both passed, and both restored the stock and released the
+  // coupon. A three-cake order ended up six on the shelf.
+  const updated = await repo.cancelIfActive(id, {
     status: "cancelled",
     cancellationReason: cancellationReason?.trim() || undefined,
     statusHistory: [...order.statusHistory, { status: "cancelled", at: now }],
   });
 
+  // Someone else cancelled it between the read and the write. They are doing
+  // the work below; this request must not repeat any of it.
+  if (!updated) return await requireOrder(id);
+
   // The cakes are back on the shelf. Nothing in this repo ever added stock, so
   // a cancelled order used to destroy inventory permanently — the shop's own
-  // counts drifted down every time it corrected a mistake. The early return
-  // above is what keeps this from running twice.
+  // counts drifted down every time it corrected a mistake.
   //
   // Not for a DELIVERED order, though: those cakes have left the building. Adding
   // them back invents stock, and `createOrderWithStockReduction` will then

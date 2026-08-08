@@ -54,6 +54,15 @@ const orderSchema = new mongoose.Schema(
     deliverySlot: { type: mongoose.Schema.Types.Mixed },
     adminNotes: { type: String },
     cancellationReason: { type: String },
+    /**
+     * The coupon redemption has been handed back for this order.
+     *
+     * On the ORDER rather than on the refund record, because two paths release
+     * it — cancellation and a full settled refund — and refunding a cancelled
+     * order is the ordinary sequence. The refund tracked its own flag, which
+     * cancellation never saw, so the customer's single-use code came back twice.
+     */
+    couponReleased: { type: Boolean },
     refundReference: { type: String },
     refundRecord: { type: mongoose.Schema.Types.Mixed },
     createdAt: { type: String },

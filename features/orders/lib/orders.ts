@@ -58,6 +58,14 @@ export interface PlacedOrder {
   deliverySlot?: DeliverySlot;
   adminNotes?: string;
   cancellationReason?: string;
+  /**
+   * The coupon redemption has been handed back for this order.
+   *
+   * Claimed atomically, on the order rather than on the refund record, because
+   * cancellation and a full settled refund both release it — and refunding a
+   * cancelled order is the ordinary sequence.
+   */
+  couponReleased?: boolean;
   refundReference?: string;
   refundRecord?: RefundRecord;
 }

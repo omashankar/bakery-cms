@@ -519,6 +519,51 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
  * Returns null when the slot is already taken — either by a request in flight or
  * by one that has moved the version on.
  */
+/**
+ * Cancel, but only if this request is the one that does it.
+ *
+ * The service read the order, checked `status !== "cancelled"`, and patched —
+ * three separate steps, with a comment claiming the check kept the side effects
+ * from running twice. It did not: a double-clicked Cancel, or two operators on
+ * the same order, both read `confirmed`, both passed, and both went on to
+ * restore the stock and hand the coupon back. A three-cake order ended up six on
+ * the shelf and the customer's single-use code was returned twice.
+ *
+ * The status change IS the guard now. Null means someone else did it, and the
+ * caller must do none of the follow-on work.
+ */
+export async function cancelIfActive(
+  id: string,
+  fields: Partial<PlacedOrder>,
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, status: { $nin: ["cancelled", "refunded"] } },
+    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
+/**
+ * Hand a coupon redemption back once, whoever gets there first.
+ *
+ * Cancelling releases the coupon, and so does a full settled refund — and a
+ * cancelled order being refunded is the ordinary path, so both ran and the
+ * customer's single-use code came back twice. The refund tracked its own
+ * `refundRecord.couponReleased`, which cancellation never saw.
+ *
+ * Returns true only for the request that actually claimed it.
+ */
+export async function claimCouponRelease(id: string): Promise<boolean> {
+  await connectDB();
+  const res = await OrderModel.updateOne(
+    { _id: id, couponReleased: { $ne: true } },
+    { $set: { couponReleased: true } },
+  );
+  return (res.modifiedCount ?? 0) > 0;
+}
+
 export async function claimRefundAttempt(
   id: string,
   expectedVersion: number,
