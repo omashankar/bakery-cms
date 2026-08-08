@@ -554,6 +554,30 @@ export async function releaseRefundAttempt(
   );
 }
 
+/**
+ * Write the operator's note and nothing else.
+ *
+ * Saving a note used to read the order, spread the whole `refundRecord` and
+ * write it back through a plain patch — outside the version protocol entirely.
+ * A webhook settle landing between that read and that write was erased: the
+ * record went back to `processing`, and `stockRestored` and `couponReleased`
+ * reverted with it. The next settle then put the stock back and released the
+ * coupon a SECOND time.
+ *
+ * One field, addressed directly. There is nothing here to lose a race with.
+ */
+export async function setRefundNotes(id: string, notes: string | undefined): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, refundRecord: { $exists: true } },
+    notes
+      ? { $set: { "refundRecord.notes": notes, updatedAt: new Date().toISOString() } }
+      : { $unset: { "refundRecord.notes": "" }, $set: { updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function compareAndSetRefund(
   id: string,
   expectedVersion: number,

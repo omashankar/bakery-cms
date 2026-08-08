@@ -1068,8 +1068,25 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
         await repo.releaseRefundAttempt(id, priorVersion + 1, Boolean(existing));
       }
 
+      // Say whether the money moved, because only this code knows.
+      //
+      // The Refund Centre used to append "No money has moved. Nothing was
+      // recorded." to EVERY refusal — including this one, where the gateway
+      // accepted a payout it would not name. That is the single case where the
+      // money is most likely already gone, and the screen was the most confident
+      // it had not.
+      if (outcome.ok) {
+        throw new AppError(
+          "The gateway accepted a refund but did not identify it. The money may already be on its way — " +
+            "check the refund in your gateway dashboard before trying again.",
+          503,
+        );
+      }
+
       throw new AppError(
-        outcome.refused ?? outcome.unavailable ?? "The refund was not accepted by the gateway.",
+        outcome.refused
+          ? `${outcome.refused} No money has moved.`
+          : `${outcome.unavailable ?? "The payment gateway could not be reached."} No money has moved — try again.`,
         outcome.refused ? 409 : 503,
       );
     }
@@ -1467,21 +1484,38 @@ export async function settleGatewayRefund(input: {
 
 export async function updateRefundNotes(id: string, notes: RefundNotesInput["notes"], ctx: RequestCtx) {
   const order = await requireOrder(id);
-  if (!order.refundRecord) return order;
+  if (!order.refundRecord) {
+    // Returning the order unchanged made the endpoint answer 200 with the note
+    // discarded — the admin typed it, saw it accepted, and it was never stored.
+    throw new AppError("This order has no refund to add notes to.", 409);
+  }
 
-  const updated = await repo.patch(id, {
-    refundRecord: {
-      ...order.refundRecord,
-      notes: notes.trim() || undefined,
-    },
-  });
+  // ONE FIELD. This used to spread the whole `refundRecord` into a plain patch,
+  // outside the version protocol: a webhook settle landing between the read and
+  // the write was erased, taking `stockRestored` and `couponReleased` with it,
+  // and the next settle then restored the stock and released the coupon again.
+  const updated = await repo.setRefundNotes(id, notes.trim() || undefined);
+  if (!updated) throw new AppError("This order has no refund to add notes to.", 409);
+
   await audit(ctx, "order.refund.notes", id);
   return updated;
 }
 
 export async function requestRefund(id: string, input: RefundRequestInput, ctx: RequestCtx) {
   const order = await requireOrder(id);
-  if (order.status !== "cancelled" || order.refundRecord) return order;
+
+  // Both refusals used to be `return order`, so the controller answered 200
+  // "Refund requested" having recorded nothing. The admin logged the request,
+  // closed the ticket, and no refund was ever queued.
+  if (order.status !== "cancelled") {
+    throw new AppError(
+      "A refund can only be requested for a cancelled order. Cancel it first, or use Refund to pay one out directly.",
+      409,
+    );
+  }
+  if (order.refundRecord) {
+    throw new AppError("A refund has already been requested for this order.", 409);
+  }
 
   const now = new Date().toISOString();
   const reason = (input.reason as RefundRecord["reason"]) ?? "order_cancelled";

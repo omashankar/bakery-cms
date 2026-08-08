@@ -293,14 +293,15 @@ export function RefundCenterAdminPage() {
     setSelectedId(updated.id);
 
     if (!persisted) {
-      // The server's own words. This used to say "Refund recorded on this device
-      // only — the server rejected it", which was wrong twice: nothing was
-      // recorded anywhere, and it named no cause. The reasons are all things an
-      // admin can act on — nothing left to refund, the payment was never
-      // captured, this COD order was never delivered, the gateway is down.
-      toast.error(refundError ?? "The refund was not accepted.", {
-        description: "No money has moved. Nothing was recorded.",
-      });
+      // The server's own words, and ONLY those.
+      //
+      // This appended "No money has moved. Nothing was recorded." to every
+      // refusal. It is not true of all of them: a gateway that accepts a payout
+      // and returns no id has almost certainly moved the money, and a refund
+      // already in flight may have too — and those are exactly the two the
+      // screen was most confident about. Whether the money moved is something
+      // only the refund path knows, so it says so in the message itself.
+      toast.error(refundError ?? "The refund was not accepted.");
       return;
     }
 

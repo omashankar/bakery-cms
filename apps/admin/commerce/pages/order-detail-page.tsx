@@ -137,12 +137,30 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   async function handleRefund(input: RefundOrderInput) {
     if (!order) return;
-    const { order: updated, persisted } = await refundOrder(order.id, input);
+    const { order: updated, persisted, error } = await refundOrder(order.id, input);
     if (!updated) return reportUnreachable();
     setOrder(updated);
-    if (!persisted) return reportUnpersisted("Refund recorded");
-    toast.success("Refund recorded", {
-      description: updated.refundReference,
+
+    if (!persisted) {
+      // The server's reason, not a generic one.
+      //
+      // This called `reportUnpersisted("Refund recorded")`, which toasts
+      // "Refund recorded on this device only — the server rejected the change.
+      // Reload to see the server's version." Both halves were wrong: the write
+      // path ROLLS BACK on refusal, so nothing was recorded anywhere, and the
+      // server's actual explanation — nothing left to refund, the payment was
+      // never captured, the gateway is down and this is worth retrying — was
+      // thrown away. An admin read "recorded", closed the ticket, and no refund
+      // was ever made. The Refund Centre was fixed for exactly this; this screen
+      // was not.
+      toast.error(error ?? "The refund was not accepted.");
+      return;
+    }
+
+    toast.success("Refund sent to the gateway", {
+      description:
+        updated.refundReference ??
+        "It usually settles in a few days. This screen updates when the gateway confirms.",
     });
   }
 
