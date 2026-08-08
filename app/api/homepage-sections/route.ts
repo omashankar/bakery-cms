@@ -10,10 +10,21 @@ import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
 /**
- * Homepage builder endpoint.
+ * Homepage builder endpoint — owner/admin only, on every verb.
  *
  * The builder is a client app, so it saves through here. The storefront renders
  * on the server and reads the store directly — no HTTP hop needed.
+ *
+ * That last sentence is exactly why the GET is guarded. It used to be open,
+ * justified as storefront data, but the storefront never calls it: it calls
+ * `getHomepageState()` in-process. The only caller of this URL is the admin
+ * builder. What an anonymous `curl` got back was `state.draft` — every headline,
+ * image and price the admin was still working on, plus `draft.scheduledPublishAt`,
+ * the exact minute an unannounced campaign was set to go live — and, once the
+ * shop had published once, the inline `revisions` log with it. The sibling route
+ * at /api/builders/homepage/revisions had already reasoned about this and
+ * guarded its own read, noting that unlike this one it was "builder-internal
+ * data, not storefront copy". A draft is not storefront copy either.
  */
 
 interface SectionsBody {
@@ -31,6 +42,9 @@ async function parseBody(request: Request): Promise<SectionsBody | null> {
 }
 
 export async function GET() {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     return NextResponse.json({ state: await getHomepageState() });
   } catch {

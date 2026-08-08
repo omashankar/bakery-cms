@@ -20,6 +20,14 @@ import {
   type WeddingRevision,
 } from "@/features/cms-sections/data/wedding-sections-client";
 import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder-version-history-panel";
+import {
+  fromScheduleInputValue,
+  toScheduleInputValue,
+} from "@/apps/admin/builders/shared/schedule-time";
+import {
+  useLatest,
+  useUnsavedChangesGuard,
+} from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { routes } from "@/constants/routes";
 import type { WeddingSectionInstance, WeddingSectionType } from "@/types/wedding-builder";
 import { AddSectionDialog } from "../shared/add-section-dialog";
@@ -41,6 +49,7 @@ import { cn } from "@/lib/utils";
 type ConfirmAction =
   | { type: "publish" }
   | { type: "reset" }
+  | { type: "discard" }
   | { type: "remove"; id: string };
 
 type ListFilter = "all" | "visible" | "hidden";
@@ -71,6 +80,18 @@ export function WeddingBuilderPage() {
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
 
+  // What is on screen right now, readable after an await — see settleDirty.
+  const latestSections = useLatest(sections);
+
+  /**
+   * Clear the unsaved flag only if what was just persisted is still what is on
+   * screen. See the homepage builder for the full account — anything typed while
+   * a save was in flight was declared saved without being in the request body.
+   */
+  function settleDirty(payload: WeddingSectionInstance[]) {
+    if (latestSections.current === payload) setIsDirty(false);
+  }
+
   const refreshRevisions = useCallback(async () => {
     try {
       setRevisions(await fetchWeddingRevisions());
@@ -83,11 +104,7 @@ export function WeddingBuilderPage() {
     try {
       const meta = deriveWeddingMeta(await fetchWeddingState());
       setPublishMeta(meta);
-      setScheduledPublishAt(
-        meta.scheduledPublishAt
-          ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
-          : ""
-      );
+      setScheduledPublishAt(toScheduleInputValue(meta.scheduledPublishAt));
     } catch {
       // Leave the last known status on screen rather than blanking it.
     }
@@ -102,11 +119,7 @@ export function WeddingBuilderPage() {
         setSections(draft);
         setSelectedId(draft[0]?.instanceId ?? null);
         setPublishMeta(deriveWeddingMeta(state));
-        setScheduledPublishAt(
-          state.draft.scheduledPublishAt
-            ? new Date(state.draft.scheduledPublishAt).toISOString().slice(0, 16)
-            : ""
-        );
+        setScheduledPublishAt(toScheduleInputValue(state.draft.scheduledPublishAt));
       } catch {
         toast.error("Could not load the wedding builder");
       }
@@ -117,15 +130,9 @@ export function WeddingBuilderPage() {
     void load();
   }, [refreshRevisions]);
 
-  useEffect(() => {
-    if (!isDirty) return;
-    function onBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [isDirty]);
+  // Covers a sidebar click as well as a reload — the previous beforeunload-only
+  // guard never fired on an App Router transition.
+  useUnsavedChangesGuard(isDirty);
 
   const selectedSection = useMemo(
     () => sections.find((section) => section.instanceId === selectedId) ?? null,
@@ -234,13 +241,11 @@ export function WeddingBuilderPage() {
   }
 
   async function handleSaveDraft() {
+    const payload = sections;
     setIsSaving(true);
     try {
-      await saveWeddingDraftRequest(
-        sections,
-        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-      );
-      setIsDirty(false);
+      await saveWeddingDraftRequest(payload, fromScheduleInputValue(scheduledPublishAt));
+      settleDirty(payload);
       await refreshMeta();
       toast.success("Wedding page draft saved");
     } catch (error) {
@@ -252,11 +257,12 @@ export function WeddingBuilderPage() {
   }
 
   async function confirmPublish() {
+    const payload = sections;
     setIsSaving(true);
     try {
-      await publishWedding(sections);
+      await publishWedding(payload);
       setScheduledPublishAt("");
-      setIsDirty(false);
+      settleDirty(payload);
       setConfirm(null);
       await refreshMeta();
       toast.success("Wedding page published to storefront");
@@ -268,10 +274,14 @@ export function WeddingBuilderPage() {
   }
 
   async function handleScheduleChange(value: string) {
+    const payload = sections;
     setScheduledPublishAt(value);
     setIsDirty(true);
     try {
-      await saveWeddingDraftRequest(sections, value ? new Date(value).toISOString() : null);
+      await saveWeddingDraftRequest(payload, fromScheduleInputValue(value));
+      // The schedule write persists the whole draft, so nothing is unsaved after
+      // it — see the homepage builder.
+      settleDirty(payload);
       await refreshMeta();
       if (value) {
         toast.message("Publish scheduled", {
@@ -286,30 +296,32 @@ export function WeddingBuilderPage() {
   }
 
   async function handlePreview() {
-    // Preview reads the draft from the server, so it has to be saved first.
+    // Opened before the awaits — see the homepage builder for why.
+    const previewWindow = window.open("", "_blank", "noopener,noreferrer");
+    const payload = sections;
     try {
-      await saveWeddingDraftRequest(
-        sections,
-        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-      );
-      setIsDirty(false);
+      // Preview reads the draft from the server, so it has to be saved first.
+      await saveWeddingDraftRequest(payload, fromScheduleInputValue(scheduledPublishAt));
+      settleDirty(payload);
       await refreshMeta();
+      const url = `${routes.store.weddingCakes}?cmsPreview=wedding`;
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.replace(url);
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     } catch (error) {
+      previewWindow?.close();
       toast.error(error instanceof Error ? error.message : "Could not open preview");
-      return;
     }
-    window.open(
-      `${routes.store.weddingCakes}?cmsPreview=wedding`,
-      "_blank",
-      "noopener,noreferrer"
-    );
   }
 
   async function handleRestoreRevision(revisionId: string) {
     try {
       const snapshot = await restoreWeddingRevision(revisionId);
       setSections(sortSections(snapshot.sections));
-      setIsDirty(true);
+      // A restore is a SERVER write, not a local edit — see the homepage builder.
+      setIsDirty(false);
       setHistoryOpen(false);
       await refreshMeta();
       toast.success("Revision restored into draft");
@@ -319,6 +331,8 @@ export function WeddingBuilderPage() {
   }
 
   async function confirmReset() {
+    // The dialog button is `disabled={isSaving}`, which reset never set.
+    setIsSaving(true);
     try {
       const state = await resetWedding();
       setSections(state.draft.sections);
@@ -329,6 +343,8 @@ export function WeddingBuilderPage() {
       toast.message("Wedding page reset to defaults");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not reset the wedding page");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -359,6 +375,11 @@ export function WeddingBuilderPage() {
     }
     if (confirm.type === "reset") {
       void confirmReset();
+      return;
+    }
+    if (confirm.type === "discard") {
+      setConfirm(null);
+      void handleDiscard();
       return;
     }
     removeSection(confirm.id);
@@ -396,7 +417,9 @@ export function WeddingBuilderPage() {
           onSaveDraft={handleSaveDraft}
           onPublish={() => setConfirm({ type: "publish" })}
           onReset={() => setConfirm({ type: "reset" })}
-          onDiscard={handleDiscard}
+          // Discard destroys the whole unsaved session with no undo, and sat one
+          // place along from Preview wired straight to onClick. It asks now.
+          onDiscard={() => setConfirm({ type: "discard" })}
           onPreview={handlePreview}
           onOpenHistory={() => setHistoryOpen(true)}
           scheduledPublishAt={scheduledPublishAt}
@@ -554,14 +577,20 @@ export function WeddingBuilderPage() {
                 ? "Publish wedding page?"
                 : confirm?.type === "reset"
                   ? "Reset wedding page?"
-                  : "Remove section?"}
+                  : confirm?.type === "discard"
+                    ? "Discard unsaved changes?"
+                    : "Remove section?"}
             </DialogTitle>
             <p className="text-sm text-muted-foreground">
               {confirm?.type === "publish"
                 ? "This updates the live /store/wedding-cakes page for everyone."
                 : confirm?.type === "reset"
-                  ? "Draft and published wedding page will be replaced with defaults."
-                  : "Removed from the current draft. Save or publish to keep the change."}
+                  ? // The dialog used to promise strictly less than Reset does —
+                    // see the homepage builder.
+                    "Draft and published wedding page will be replaced with defaults. The layout that is live now is saved to Version History first, so you can restore it."
+                  : confirm?.type === "discard"
+                    ? "Every change you have made since the last save will be thrown away. This cannot be undone."
+                    : "Removed from the current draft. Save or publish to keep the change."}
             </p>
           </DialogHeader>
           <DialogFooter>
@@ -569,11 +598,7 @@ export function WeddingBuilderPage() {
               Cancel
             </Button>
             <Button
-              variant={
-                confirm?.type === "reset" || confirm?.type === "remove"
-                  ? "destructive"
-                  : "bakery"
-              }
+              variant={confirm?.type === "publish" ? "bakery" : "destructive"}
               onClick={runConfirm}
               disabled={isSaving}
             >
@@ -581,7 +606,9 @@ export function WeddingBuilderPage() {
                 ? "Publish"
                 : confirm?.type === "reset"
                   ? "Reset"
-                  : "Remove"}
+                  : confirm?.type === "discard"
+                    ? "Discard"
+                    : "Remove"}
             </Button>
           </DialogFooter>
         </DialogContent>

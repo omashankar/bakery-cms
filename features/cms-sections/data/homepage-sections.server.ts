@@ -119,7 +119,17 @@ export async function restoreHomepageRevision(
   return store.mutate((state) => {
     const sections = findRevisionSections(state.revisions, revisionId);
     if (!sections) return { next: state, result: null };
-    const draft = createSnapshot(sections);
+    const draft = createSnapshot(
+      // Sorted here so the builder's own sortSections on the response is a no-op
+      // and what it shows is byte-identical to what is stored. Otherwise it sits
+      // flagged clean while holding different `order` values.
+      sortSections(sections),
+      // Carried over. A restore rebuilt the draft with no second argument, so
+      // opening History on Friday to compare against last month's layout erased
+      // the Monday 09:00 launch the admin had already scheduled — silently, and
+      // Monday came and went with nothing published.
+      state.draft.scheduledPublishAt
+    );
     return { next: { ...state, draft }, result: draft };
   });
 }
@@ -151,10 +161,35 @@ export async function publishSections(
   });
 }
 
+/**
+ * Back to the registry defaults.
+ *
+ * The mutator used to ignore its `state` and return `{ draft, published }` only.
+ * `createMongoStore.mutate` writes with `$set: { data: value }`, replacing the
+ * whole document — so every publish snapshot the shop had ever taken went with
+ * it, and an admin who reset intending to restore last month's layout from
+ * Version History afterwards found it empty. Reset was the one action in the
+ * builder that destroyed data no amount of re-doing the work could bring back.
+ *
+ * The history is kept, and the layout that was live is captured into it first,
+ * so Reset is now recoverable in one click.
+ */
 export async function resetHomepageSections(): Promise<HomepageBuilderState> {
-  return store.mutate(() => {
-    const next = { draft: createSnapshot(), published: createSnapshot() };
-    return { next, result: next };
+  return store.mutate((state) => {
+    const draft = createSnapshot();
+    const published = createSnapshot();
+    return {
+      next: {
+        draft,
+        published,
+        revisions: appendRevision(
+          state.revisions,
+          state.published.sections,
+          "Before reset to defaults"
+        ),
+      },
+      result: { draft, published },
+    };
   });
 }
 

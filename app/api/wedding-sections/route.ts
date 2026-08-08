@@ -9,7 +9,12 @@ import {
 import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { WeddingSectionInstance } from "@/types/wedding-builder";
 
-/** Wedding builder endpoint — mirrors /api/homepage-sections. */
+/**
+ * Wedding builder endpoint — mirrors /api/homepage-sections, owner/admin only on
+ * every verb including the read. See that file for why the GET is guarded: the
+ * storefront reads the store in-process and never calls this URL, so the open
+ * read only ever served the unpublished draft to anonymous callers.
+ */
 
 interface SectionsBody {
   sections?: WeddingSectionInstance[];
@@ -26,6 +31,9 @@ async function parseBody(request: Request): Promise<SectionsBody | null> {
 }
 
 export async function GET() {
+  const auth = await requireAdminResponse();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     return NextResponse.json({ state: await getWeddingState() });
   } catch {

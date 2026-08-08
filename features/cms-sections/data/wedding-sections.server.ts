@@ -114,7 +114,9 @@ export async function restoreWeddingRevision(
   return store.mutate((state) => {
     const sections = findRevisionSections(state.revisions, revisionId);
     if (!sections) return { next: state, result: null };
-    const draft = createSnapshot(sections);
+    // Sorted, and the pending schedule carried over — see the homepage store for
+    // why each matters.
+    const draft = createSnapshot(sortSections(sections), state.draft.scheduledPublishAt);
     return { next: { ...state, draft }, result: draft };
   });
 }
@@ -145,10 +147,27 @@ export async function publishWeddingSections(
   });
 }
 
+/**
+ * Back to the registry defaults, keeping the revision log and capturing the
+ * layout that was live so the reset can be undone — see the homepage store for
+ * the full account of what this used to destroy.
+ */
 export async function resetWeddingSections(): Promise<WeddingBuilderState> {
-  return store.mutate(() => {
-    const next = { draft: createSnapshot(), published: createSnapshot() };
-    return { next, result: next };
+  return store.mutate((state) => {
+    const draft = createSnapshot();
+    const published = createSnapshot();
+    return {
+      next: {
+        draft,
+        published,
+        revisions: appendRevision(
+          state.revisions,
+          state.published.sections,
+          "Before reset to defaults"
+        ),
+      },
+      result: { draft, published },
+    };
   });
 }
 

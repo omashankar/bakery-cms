@@ -14,6 +14,14 @@ import {
   type HomepageRevision,
 } from "@/features/cms-sections/data/homepage-sections-client";
 import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder-version-history-panel";
+import {
+  fromScheduleInputValue,
+  toScheduleInputValue,
+} from "@/apps/admin/builders/shared/schedule-time";
+import {
+  useLatest,
+  useUnsavedChangesGuard,
+} from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {
   createSectionInstance,
@@ -44,6 +52,7 @@ import { cn } from "@/lib/utils";
 type ConfirmAction =
   | { type: "publish" }
   | { type: "reset" }
+  | { type: "discard" }
   | { type: "remove"; id: string };
 
 type ListFilter = "all" | "visible" | "hidden";
@@ -74,6 +83,23 @@ export function HomepageBuilderPage() {
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
 
+  // What is on screen right now, readable after an await — see settleDirty.
+  const latestSections = useLatest(sections);
+
+  /**
+   * Clear the unsaved flag only if what was just persisted is still what is on
+   * screen.
+   *
+   * This ran unconditionally, so anything typed while a save was in flight — a
+   * Mongo round trip, easily a second against a remote cluster — was declared
+   * saved without ever having been in the request body. The badge cleared, the
+   * Save button greyed out, and the unsaved-changes guard unregistered, so the
+   * admin closed the tab and lost every character typed after the click.
+   */
+  function settleDirty(payload: HomepageSectionInstance[]) {
+    if (latestSections.current === payload) setIsDirty(false);
+  }
+
   const refreshRevisions = useCallback(async () => {
     try {
       setRevisions(await fetchHomepageRevisions());
@@ -86,11 +112,7 @@ export function HomepageBuilderPage() {
     try {
       const meta = deriveHomepageMeta(await fetchHomepageState());
       setPublishMeta(meta);
-      setScheduledPublishAt(
-        meta.scheduledPublishAt
-          ? new Date(meta.scheduledPublishAt).toISOString().slice(0, 16)
-          : ""
-      );
+      setScheduledPublishAt(toScheduleInputValue(meta.scheduledPublishAt));
     } catch {
       // Leave the last known status on screen rather than blanking it.
     }
@@ -105,11 +127,7 @@ export function HomepageBuilderPage() {
         setSections(draft);
         setSelectedId(draft[0]?.instanceId ?? null);
         setPublishMeta(deriveHomepageMeta(state));
-        setScheduledPublishAt(
-          state.draft.scheduledPublishAt
-            ? new Date(state.draft.scheduledPublishAt).toISOString().slice(0, 16)
-            : ""
-        );
+        setScheduledPublishAt(toScheduleInputValue(state.draft.scheduledPublishAt));
       } catch {
         toast.error("Could not load the homepage builder");
       }
@@ -120,15 +138,9 @@ export function HomepageBuilderPage() {
     void load();
   }, [refreshRevisions]);
 
-  useEffect(() => {
-    if (!isDirty) return;
-    function onBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [isDirty]);
+  // Covers a sidebar click as well as a reload — the previous beforeunload-only
+  // guard never fired on an App Router transition.
+  useUnsavedChangesGuard(isDirty);
 
   const selectedSection = useMemo(
     () => sections.find((section) => section.instanceId === selectedId) ?? null,
@@ -237,13 +249,11 @@ export function HomepageBuilderPage() {
   }
 
   async function handleSaveDraft() {
+    const payload = sections;
     setIsSaving(true);
     try {
-      await saveHomepageDraft(
-        sections,
-        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-      );
-      setIsDirty(false);
+      await saveHomepageDraft(payload, fromScheduleInputValue(scheduledPublishAt));
+      settleDirty(payload);
       await refreshMeta();
       toast.success("Homepage draft saved");
     } catch (error) {
@@ -255,11 +265,12 @@ export function HomepageBuilderPage() {
   }
 
   async function confirmPublish() {
+    const payload = sections;
     setIsSaving(true);
     try {
-      await publishHomepage(sections);
+      await publishHomepage(payload);
       setScheduledPublishAt("");
-      setIsDirty(false);
+      settleDirty(payload);
       setConfirm(null);
       await refreshMeta();
       toast.success("Homepage published to storefront");
@@ -271,10 +282,16 @@ export function HomepageBuilderPage() {
   }
 
   async function handleScheduleChange(value: string) {
+    const payload = sections;
     setScheduledPublishAt(value);
     setIsDirty(true);
     try {
-      await saveHomepageDraft(sections, value ? new Date(value).toISOString() : null);
+      await saveHomepageDraft(payload, fromScheduleInputValue(value));
+      // The schedule write persists the whole draft, so nothing is unsaved after
+      // it. Leaving the flag set left a standing "Unsaved" badge and armed the
+      // leave-site prompt over a draft that was on the server — which trains an
+      // admin to dismiss that prompt.
+      settleDirty(payload);
       await refreshMeta();
       if (value) {
         toast.message("Publish scheduled", {
@@ -289,16 +306,25 @@ export function HomepageBuilderPage() {
   }
 
   async function handlePreview() {
+    // Opened before the awaits: a browser only honours window.open while the
+    // click's transient activation lasts, and two round trips can outlive it —
+    // after which open() returns null silently, so Preview did nothing at all
+    // and the catch never ran.
+    const previewWindow = window.open("", "_blank", "noopener,noreferrer");
+    const payload = sections;
     try {
       // Preview reads the draft from the server, so it has to be saved first.
-      await saveHomepageDraft(
-        sections,
-        scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null
-      );
-      setIsDirty(false);
+      await saveHomepageDraft(payload, fromScheduleInputValue(scheduledPublishAt));
+      settleDirty(payload);
       await refreshMeta();
-      window.open(`${routes.store.home}?cmsPreview=1`, "_blank", "noopener,noreferrer");
+      const url = `${routes.store.home}?cmsPreview=1`;
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.replace(url);
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     } catch (error) {
+      previewWindow?.close();
       toast.error(error instanceof Error ? error.message : "Could not open preview");
     }
   }
@@ -307,7 +333,12 @@ export function HomepageBuilderPage() {
     try {
       const snapshot = await restoreHomepageRevision(revisionId);
       setSections(sortSections(snapshot.sections));
-      setIsDirty(true);
+      // A restore is a SERVER write, not a local edit. Flagging it unsaved put a
+      // Discard button on screen that could not undo it — clicking it re-fetched
+      // the very draft that had just been restored and reported "Discarded
+      // unsaved changes", while the draft it was meant to bring back had been
+      // overwritten the moment the restore was confirmed.
+      setIsDirty(false);
       setHistoryOpen(false);
       await refreshMeta();
       toast.success("Revision restored into draft");
@@ -317,6 +348,9 @@ export function HomepageBuilderPage() {
   }
 
   async function confirmReset() {
+    // The dialog button is `disabled={isSaving}`, which reset never set — so it
+    // stayed live through its own request and a second click fired a second one.
+    setIsSaving(true);
     try {
       const state = await resetHomepage();
       setSections(state.draft.sections);
@@ -327,6 +361,8 @@ export function HomepageBuilderPage() {
       toast.message("Homepage reset to defaults");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not reset the homepage");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -357,6 +393,11 @@ export function HomepageBuilderPage() {
     }
     if (confirm.type === "reset") {
       void confirmReset();
+      return;
+    }
+    if (confirm.type === "discard") {
+      setConfirm(null);
+      void handleDiscard();
       return;
     }
     removeSection(confirm.id);
@@ -394,7 +435,11 @@ export function HomepageBuilderPage() {
           onSaveDraft={handleSaveDraft}
           onPublish={() => setConfirm({ type: "publish" })}
           onReset={() => setConfirm({ type: "reset" })}
-          onDiscard={handleDiscard}
+          // Discard destroys more than any other button here — the whole unsaved
+          // session, with no undo — and it sat one place along from Preview,
+          // wired straight to onClick while removing a single section asked
+          // first. It asks now.
+          onDiscard={() => setConfirm({ type: "discard" })}
           onPreview={handlePreview}
           onOpenHistory={() => setHistoryOpen(true)}
           scheduledPublishAt={scheduledPublishAt}
@@ -552,14 +597,21 @@ export function HomepageBuilderPage() {
                 ? "Publish homepage?"
                 : confirm?.type === "reset"
                   ? "Reset homepage?"
-                  : "Remove section?"}
+                  : confirm?.type === "discard"
+                    ? "Discard unsaved changes?"
+                    : "Remove section?"}
             </DialogTitle>
             <p className="text-sm text-muted-foreground">
               {confirm?.type === "publish"
                 ? "This updates the live /store homepage for everyone."
                 : confirm?.type === "reset"
-                  ? "Draft and published homepage will be replaced with defaults."
-                  : "Removed from the current draft. Save or publish to keep the change."}
+                  ? // The dialog used to promise strictly less than Reset does:
+                    // it wiped the whole revision log too, so the History panel
+                    // an admin was counting on to undo it came back empty.
+                    "Draft and published homepage will be replaced with defaults. The layout that is live now is saved to Version History first, so you can restore it."
+                  : confirm?.type === "discard"
+                    ? "Every change you have made since the last save will be thrown away. This cannot be undone."
+                    : "Removed from the current draft. Save or publish to keep the change."}
             </p>
           </DialogHeader>
           <DialogFooter>
@@ -567,11 +619,7 @@ export function HomepageBuilderPage() {
               Cancel
             </Button>
             <Button
-              variant={
-                confirm?.type === "reset" || confirm?.type === "remove"
-                  ? "destructive"
-                  : "bakery"
-              }
+              variant={confirm?.type === "publish" ? "bakery" : "destructive"}
               onClick={runConfirm}
               disabled={isSaving}
             >
@@ -579,7 +627,9 @@ export function HomepageBuilderPage() {
                 ? "Publish"
                 : confirm?.type === "reset"
                   ? "Reset"
-                  : "Remove"}
+                  : confirm?.type === "discard"
+                    ? "Discard"
+                    : "Remove"}
             </Button>
           </DialogFooter>
         </DialogContent>
