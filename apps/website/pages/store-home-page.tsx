@@ -6,8 +6,13 @@ import {
 import { getHomepageRails, getProducts } from "@/features/products/data/products-service";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { getStorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
+import { getStorefrontLocation } from "@/apps/website/lib/storefront-location.server";
 import { getContent } from "@/features/content/server/content.service";
+import { getCoupons } from "@/features/commerce/server/commerce.service";
+import { getSettings } from "@/features/settings/server/settings.service";
+import type { GeneralSettings } from "@/types/settings";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
+import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
 import type { Banner } from "@/types/media";
 import type { FaqItem, Testimonial } from "@/types/content";
@@ -30,21 +35,42 @@ interface StoreHomePageProps {
  * the content lands in the initial HTML rather than streaming in after it.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
-  const [sections, rails, bannersRaw, products, catalog, testimonialsRaw, faqsRaw, instagram] =
-    await Promise.all([
-      isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
-      getHomepageRails(),
-      // Read banners/testimonials/faq from MongoDB on the server so those sections
-      // render the SAME content in the HTML and on hydration (no localStorage race).
-      getContent("banners"),
-      getProducts(),
-      getCatalog(),
-      getContent("testimonials"),
-      getContent("faq"),
-      // The shop's real Instagram, for the same reason: the gallery section used
-      // to hardcode a demo handle and ignore Settings → Social entirely.
-      getStorefrontInstagram(),
-    ]);
+  const [
+    sections,
+    rails,
+    bannersRaw,
+    products,
+    catalog,
+    testimonialsRaw,
+    faqsRaw,
+    instagram,
+    coupons,
+    storeLocation,
+    settings,
+  ] = await Promise.all([
+    isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
+    getHomepageRails(),
+    // Read banners/testimonials/faq from MongoDB on the server so those sections
+    // render the SAME content in the HTML and on hydration (no localStorage race).
+    getContent("banners"),
+    getProducts(),
+    getCatalog(),
+    getContent("testimonials"),
+    getContent("faq"),
+    // The shop's real Instagram, for the same reason: the gallery section used
+    // to hardcode a demo handle and ignore Settings → Social entirely.
+    getStorefrontInstagram(),
+    // The offers row advertised a hardcoded BDAY20 that checkout would refuse.
+    // Coupons are read here for the same reason as everything else on this list:
+    // reading them in the client section would put the demo seed in the HTML.
+    getCoupons(),
+    // The store locator invented a pincode search over three hardcoded Mumbai
+    // outlets; this is the shop's real address and hours.
+    getStorefrontLocation(),
+    // For the shop's currency: there is no `<html>` on the server for the
+    // formatter to read a locale from, so a flat-discount badge has to be told.
+    getSettings(),
+  ]);
   const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "all");
   // Categories computed on the server too, so the category sections render the
   // same in the HTML and on hydration.
@@ -63,6 +89,10 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
       testimonials={(testimonialsRaw ?? []) as Testimonial[]}
       faqs={(faqsRaw ?? []) as FaqItem[]}
       instagram={instagram}
+      offers={selectStorefrontOffers(coupons, 12, {
+        currency: ((settings as { general?: GeneralSettings }).general ?? {}).currency,
+      })}
+      storeLocation={storeLocation}
       isPreview={isPreview}
     />
   );

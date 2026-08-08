@@ -1,6 +1,8 @@
-import type { LandingProduct, LandingCategory } from "@/constants/landing-data";
+import type { LandingProduct, LandingCategory, LandingOffer } from "@/constants/landing-data";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { getCategories } from "@/features/catalog/lib/catalog-repository";
+import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
+import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
 import { getAllProducts } from "@/features/products/lib/product-catalog";
 import {
   buildHomepageProducts,
@@ -64,4 +66,15 @@ export function selectHomepageCategories(
 
 export function getHomepageCategories(maxCount = 6): LandingCategory[] {
   return selectHomepageCategories(loadProducts(), getCategories(), maxCount);
+}
+
+/**
+ * Browser-side offers, for the builder preview only.
+ *
+ * The storefront reads coupons on the server and passes the cards down; this is
+ * the fallback the admin's preview panel uses, exactly as `getHomepageProducts`
+ * and `getHomepageCategories` above are.
+ */
+export function getHomepageOffers(maxCount = 3): LandingOffer[] {
+  return selectStorefrontOffers(getActiveCoupons(), maxCount);
 }

@@ -59,6 +59,12 @@ export interface LandingOffer {
   description: string;
   discount: string;
   code?: string;
+  /**
+   * The minimum spend the code needs, already formatted — shown on the card so
+   * an offer with a condition does not send a customer to a checkout that
+   * refuses it.
+   */
+  minSpend?: string;
   image: string;
   expiresAt: string;
 }

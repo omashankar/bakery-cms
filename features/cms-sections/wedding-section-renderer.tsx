@@ -11,6 +11,7 @@ import {
   Palette,
   Quote,
   Star,
+  Tag,
   Truck,
 } from "lucide-react";
 import { ContactForm } from "@/components/shared/contact-form";
@@ -279,6 +280,25 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
   const maxCount = contentNumber(c, "maxCount", 3);
   const offers = (props.weddingOffers ?? getWeddingOffers(maxCount)).slice(0, maxCount);
 
+  // Same rule as the homepage offers row: with no live coupon there is no offer
+  // to make, so the storefront omits the section rather than heading an empty
+  // grid. The builder says why, so the admin is not left guessing.
+  if (offers.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props} noReveal>
+        <SectionHeader
+          title={contentString(c, "title", "Wedding Offers")}
+          description={contentString(c, "description")}
+        />
+        <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No active coupons, so this section is hidden on the live wedding page.
+          Add one under Commerce → Coupons and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -297,8 +317,26 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
               </Badge>
             </div>
             <div className="p-4">
-              <h3 className="font-heading font-semibold">{offer.title}</h3>
+              {/* A coupon's label is often the discount itself, which the badge
+                  already shows — printing it twice reads as a mistake. */}
+              {offer.title && offer.title !== offer.discount ? (
+                <h3 className="font-heading font-semibold">{offer.title}</h3>
+              ) : null}
               <p className="mt-1 text-sm text-muted-foreground">{offer.description}</p>
+              {/* The code was never shown here, so a customer could read a real
+                  wedding discount and have no way to claim it. The homepage twin
+                  has always shown it. */}
+              {offer.code ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
+                  <Tag className="size-3.5 text-gold-700" />
+                  <span className="font-mono text-sm font-semibold text-gold-800">
+                    {offer.code}
+                  </span>
+                  {offer.minSpend ? (
+                    <span className="text-xs text-gold-800/80">{offer.minSpend}</span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </article>
         ))}
@@ -313,6 +351,25 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
   // Prefer the server-provided snapshot (SSR → identical on hydration); fall back
   // to the client store only in the builder preview, which never server-renders.
   const cakes = (props.weddingProducts ?? getWeddingCollectionProducts(maxCount)).slice(0, maxCount);
+
+  // No wedding cakes in the catalogue means no collection to show. The grid used
+  // to fill itself from demo data rather than say so — see
+  // selectWeddingCollectionProducts.
+  if (cakes.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props} noReveal>
+        <h2 className="font-heading mb-2 text-2xl font-bold">
+          {contentString(c, "title", "Wedding Collections")}
+        </h2>
+        <p className="mb-8 text-muted-foreground">{contentString(c, "description")}</p>
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No published cakes in a wedding category, so this section is hidden on
+          the live page. Add one under Products and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props} noReveal>

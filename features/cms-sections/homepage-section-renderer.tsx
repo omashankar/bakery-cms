@@ -14,7 +14,6 @@ import {
   MapPin,
   Phone,
   Quote,
-  Search,
   Send,
   Star,
   Store,
@@ -38,9 +37,9 @@ import {
   galleryCaptions,
   galleryImages,
   instagramPosts,
-  specialOffers,
   weddingCakes,
   type LandingCategory,
+  type LandingOffer,
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
@@ -58,12 +57,12 @@ import {
   getHomepageProducts,
   type HomepageProductSource,
   getHomepageCategories,
+  getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
 import {
   isWeddingEnabled,
@@ -93,6 +92,24 @@ interface HomepageSectionRendererProps {
   /** Raw testimonials + faq read on the server (absent in the builder preview). */
   testimonials?: Testimonial[];
   faqs?: FaqItem[];
+  /**
+   * The shop's live coupons as offer cards, read on the server. When absent
+   * (admin builder preview) the offers section falls back to the browser coupon
+   * cache. It never falls back to the hardcoded demo offers — see
+   * features/commerce/lib/coupon-offers.ts for why.
+   */
+  offers?: LandingOffer[];
+  /**
+   * The shop's real address, phone and hours from Settings → Contact, read on
+   * the server. Absent in the builder preview, where the locator says so rather
+   * than inventing outlets.
+   */
+  storeLocation?: {
+    address: string;
+    phone: string;
+    mapUrl: string;
+    hours: { day: string; hours: string }[];
+  } | null;
   /**
    * The shop's Instagram from Settings → Social, read on the server. Absent in
    * the admin builder preview, where the section falls back to its own content.
@@ -264,47 +281,35 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function StoreLocatorForm({ buttonLabel }: { buttonLabel: string }) {
-  const [pincode, setPincode] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!pincode.trim()) return;
-    setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    toast.success("Stores found", {
-      description: `Showing outlets near ${pincode}.`,
-    });
-    setLoading(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-      <Input
-        value={pincode}
-        onChange={(event) => setPincode(event.target.value)}
-        inputMode="numeric"
-        placeholder="Enter your pincode"
-        aria-label="Pincode"
-        className="h-11 flex-1 bg-white"
-      />
-      <Button type="submit" variant="bakery" disabled={loading} className="h-11 shrink-0">
-        <Search className="size-4" />
-        {loading ? "Searching…" : buttonLabel}
-      </Button>
-    </form>
-  );
-}
-
-const locatorStores = [
-  { name: "Monginis — Andheri West", address: "Shop 4, Link Road, Mumbai", distance: "1.2 km" },
-  { name: "Monginis — Bandra", address: "Hill Road, Bandra West, Mumbai", distance: "3.5 km" },
-  { name: "Monginis — Powai", address: "Central Avenue, Powai, Mumbai", distance: "6.8 km" },
-];
-
+/**
+ * Where to find the shop.
+ *
+ * This section used to be entirely fictional. A pincode box waited 600ms and
+ * toasted "Stores found — showing outlets near <whatever they typed>" having
+ * searched nothing, beside three hardcoded Mumbai outlets at fixed distances of
+ * 1.2 / 3.5 / 6.8 km. A customer in Delhi was told three shops in Mumbai were
+ * around the corner. The NewsletterSection further down this same file was fixed
+ * for exactly this — a form that said "Subscribed!" and wrote nothing — and the
+ * fix stopped at that form.
+ *
+ * There is no outlet list in this CMS to search: Settings → Contact holds one
+ * address, one phone and one set of opening hours. So this shows those, and the
+ * search that never happened is gone.
+ */
 function StoreLocatorSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const location = props.storeLocation ?? null;
+
+  // The heading, description and button label are the admin's own words, shown
+  // as typed. An earlier attempt here swapped the shipped copy at render time,
+  // which meant an admin who deliberately typed "Find a Store Near You" saw
+  // something else on the storefront — and saw it differ from their own editor
+  // field two inches away in the builder preview. The seeded wording is fixed
+  // where it belongs, in the registry defaults, so new sections and resets get
+  // honest copy and existing content stays the admin's.
+  const title = contentString(c, "title");
+  const description = contentString(c, "description");
+  const buttonLabel = contentString(c, "buttonLabel", "Get Directions");
 
   return (
     <SectionShell {...props}>
@@ -317,30 +322,70 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
             <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
               {contentString(c, "overline")}
             </p>
-            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{contentString(c, "title")}</h2>
-            <p className="text-muted-foreground">{contentString(c, "description")}</p>
+            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{title}</h2>
+            <p className="text-muted-foreground">{description}</p>
           </div>
-          <StoreLocatorForm buttonLabel={contentString(c, "buttonLabel", "Find Stores")} />
+          {location?.mapUrl ? (
+            <Button
+              variant="bakery"
+              className="h-11"
+              render={
+                <a href={location.mapUrl} target="_blank" rel="noopener noreferrer" />
+              }
+            >
+              <MapPin className="size-4" />
+              {buttonLabel}
+            </Button>
+          ) : null}
         </div>
 
         <div className="space-y-3">
-          {locatorStores.map((store) => (
-            <div
-              key={store.name}
-              className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4"
-            >
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
-                <Store className="size-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{store.name}</p>
-                <p className="text-xs text-muted-foreground">{store.address}</p>
+          {location ? (
+            <>
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
+                  <Store className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  {location.address ? (
+                    <p className="text-sm font-medium text-foreground">{location.address}</p>
+                  ) : null}
+                  {location.phone ? (
+                    <a
+                      href={`tel:${location.phone.replace(/\s+/g, "")}`}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-bakery-700"
+                    >
+                      <Phone className="size-3" />
+                      {location.phone}
+                    </a>
+                  ) : null}
+                </div>
               </div>
-              <span className="shrink-0 text-xs font-medium text-bakery-700">
-                {store.distance}
-              </span>
+
+              {location.hours.length > 0 ? (
+                <div className="rounded-xl border border-border bg-cream-50 p-4">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <Clock className="size-3.5 text-bakery-700" />
+                    Opening hours
+                  </p>
+                  <dl className="space-y-1">
+                    {location.hours.map((entry) => (
+                      <div key={entry.day} className="flex justify-between gap-3 text-xs">
+                        <dt className="text-muted-foreground">{entry.day}</dt>
+                        <dd className="font-medium text-foreground">{entry.hours}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border bg-cream-50 p-6 text-center text-sm text-muted-foreground">
+              {props.interactive
+                ? "This shows your shop's address and opening hours from Settings → Contact. Fill those in and they appear here."
+                : "Contact us for our address and opening hours."}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </SectionShell>
@@ -440,6 +485,19 @@ function WeddingSection(props: HomepageSectionRendererProps) {
 
   const c = props.section.content;
   const showcase = weddingCakes[0];
+  /**
+   * Never set, versus cleared on purpose — two different things.
+   *
+   * The key being absent means the section was created before it had an image
+   * field, so the showcase photo stands in. The key being present and empty is
+   * the "Clear image" button in the media field, and it has to mean cleared:
+   * falling back there would put a stock Unsplash cake back on the live homepage
+   * the moment an admin removed the demo photo, which is the opposite of what
+   * they asked for.
+   */
+  const storedImage = c.imageUrl;
+  const teaserImage =
+    typeof storedImage === "string" ? storedImage.trim() : showcase?.image ?? "";
 
   if (!weddingEnabled) return null;
 
@@ -486,26 +544,33 @@ function WeddingSection(props: HomepageSectionRendererProps) {
         <ScrollReveal delay={120} className="relative mx-auto w-full max-w-lg lg:max-w-none">
           <div className="rounded-[2rem] border border-border bg-white p-2.5 shadow-md">
             <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-cream-100 sm:aspect-[4/3] lg:aspect-square">
-              <Image
-                src={contentString(c, "imageUrl", showcase?.image ?? "")}
-                alt="Wedding cake"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 45vw"
-              />
+              {/* An empty string is a string, so `contentString`'s fallback never
+                  fired for a CLEARED field — and the media field's "Clear image"
+                  button sets exactly that. The result was `src=""`: next/image
+                  does not throw, it just ships an empty grey panel to every
+                  visitor. The wedding renderer's twin guards this the same way. */}
+              {teaserImage ? (
+                <Image
+                  src={teaserImage}
+                  alt="Wedding cake"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 45vw"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  {props.interactive ? "Choose an image for this section." : null}
+                </div>
+              )}
             </div>
           </div>
-          {showcase ? (
-            <div className="absolute right-5 bottom-5 rounded-2xl border border-border bg-white/95 p-4 shadow-sm">
-              <div className="mb-1 flex gap-0.5 text-gold-300">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="size-3 fill-current" />
-                ))}
-              </div>
-              <p className="text-sm font-semibold text-foreground">{showcase.name}</p>
-              <p className="text-sm font-bold text-bakery-700">{formatCurrency(showcase.price)}</p>
-            </div>
-          ) : null}
+          {/* A floating card used to sit here naming a specific cake, quoting a
+              specific price and awarding it five filled stars — all three read
+              from the hardcoded `weddingCakes[0]`, not from the catalogue and not
+              from any review. The price never followed the product: an admin who
+              repriced that cake still had the old figure on their homepage, with
+              no field anywhere in the builder to correct it. The teaser links to
+              the wedding page, where the real cakes carry their real prices. */}
         </ScrollReveal>
       </div>
     </SectionShell>
@@ -781,6 +846,31 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
 function OffersSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 3);
+  // The shop's live coupons, read on the server. This row used to map the
+  // hardcoded `specialOffers`, so it advertised BDAY20 whether or not the coupon
+  // existed, was still active, or still gave 20% — and checkout refused the code
+  // it had just shown the customer.
+  const offers = (props.offers ?? getHomepageOffers(maxCount)).slice(0, maxCount);
+
+  // A shop with no live coupon has no special offers. Saying so in the builder
+  // is useful; saying it to a customer under a "Special Offers" heading is not,
+  // so on the storefront the section simply does not appear.
+  if (offers.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+        <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No active coupons, so this section is hidden on the live homepage. Add
+          one under Commerce → Coupons and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -790,7 +880,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         description={contentString(c, "description")}
       />
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        {specialOffers.slice(0, maxCount).map((offer) => (
+        {offers.map((offer) => (
           <article
             key={offer.id}
             className="overflow-hidden rounded-xl border border-border bg-white"
@@ -802,12 +892,21 @@ function OffersSection(props: HomepageSectionRendererProps) {
               </Badge>
             </div>
             <div className="space-y-3 p-5">
-              <h3 className="font-heading text-lg font-semibold">{offer.title}</h3>
+              {/* A coupon's label is often the discount itself ("20% OFF"), which
+                  the badge already shows — printing it twice reads as a mistake. */}
+              {offer.title && offer.title !== offer.discount ? (
+                <h3 className="font-heading text-lg font-semibold">{offer.title}</h3>
+              ) : null}
               <p className="text-sm text-muted-foreground">{offer.description}</p>
               {offer.code ? (
-                <div className="flex items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
                   <Tag className="size-3.5 text-gold-700" />
                   <span className="font-mono text-sm font-semibold text-gold-800">{offer.code}</span>
+                  {/* The condition checkout holds them to. Without it the card
+                      sends a small basket to a checkout that refuses the code. */}
+                  {offer.minSpend ? (
+                    <span className="text-xs text-gold-800/80">{offer.minSpend}</span>
+                  ) : null}
                 </div>
               ) : null}
               <Button variant="bakery" className="w-full" render={<Link href={routes.store.collections} />}>

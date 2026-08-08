@@ -6,6 +6,8 @@ import {
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { getCoupons } from "@/features/commerce/server/commerce.service";
 import { getContent } from "@/features/content/server/content.service";
+import { getSettings } from "@/features/settings/server/settings.service";
+import type { GeneralSettings } from "@/types/settings";
 import {
   selectWeddingCollectionProducts,
   selectWeddingOffers,
@@ -25,19 +27,24 @@ interface WeddingPageProps {
  * store-home-page.tsx for the full reasoning.
  */
 export async function WeddingPage({ isPreview = false }: WeddingPageProps) {
-  const [sections, products, coupons, testimonialsRaw, faqsRaw] = await Promise.all([
-    isPreview ? getDraftWeddingSections() : getPublishedWeddingSections(),
-    getStorefrontProductCards(),
-    getCoupons(),
-    getContent("testimonials"),
-    getContent("faq"),
-  ]);
+  const [sections, products, coupons, testimonialsRaw, faqsRaw, settings] =
+    await Promise.all([
+      isPreview ? getDraftWeddingSections() : getPublishedWeddingSections(),
+      getStorefrontProductCards(),
+      getCoupons(),
+      getContent("testimonials"),
+      getContent("faq"),
+      // The shop's currency, for a flat-discount badge — see the homepage.
+      getSettings(),
+    ]);
 
   return (
     <WeddingPageContent
       sections={sections}
       weddingProducts={selectWeddingCollectionProducts(products, 24)}
-      weddingOffers={selectWeddingOffers(coupons, 12)}
+      weddingOffers={selectWeddingOffers(coupons, 12, {
+        currency: ((settings as { general?: GeneralSettings }).general ?? {}).currency,
+      })}
       testimonials={(testimonialsRaw ?? []) as Testimonial[]}
       faqs={(faqsRaw ?? []) as FaqItem[]}
       isPreview={isPreview}

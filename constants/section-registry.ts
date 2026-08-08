@@ -410,12 +410,15 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     label: "Store Locator",
     icon: "MapPin",
     defaultBackground: "cream",
+    // Was "Find a Store Near You" / "Over 300 outlets across India" / "Find
+    // Stores" — copy for a chain, shipped to every shop that installs this CMS,
+    // above a locator that searched nothing and listed three fixed Mumbai
+    // addresses. This CMS stores one address; the section shows it.
     defaultContent: {
       overline: "Visit Us",
-      title: "Find a Store Near You",
-      description:
-        "Over 300 outlets across India — freshly baked treats, always close by.",
-      buttonLabel: "Find Stores",
+      title: "Visit Our Bakery",
+      description: "Here is where to find us, and when we are open.",
+      buttonLabel: "Get Directions",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
