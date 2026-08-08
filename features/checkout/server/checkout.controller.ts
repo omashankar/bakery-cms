@@ -3,7 +3,7 @@ import { withErrorHandler, AppError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 
-import { priceCart, UnknownProductError } from "./pricing.server";
+import { priceCart, UnknownProductError, UnknownWeightError } from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
 import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
@@ -106,6 +106,14 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
     if (error instanceof UnknownProductError) {
       throw new AppError("One of the items is no longer available.", 409, [
         { field: "items", message: `Unknown product: ${error.slug}` },
+      ]);
+    }
+    // Same class of disagreement: the cart is asking for a size this shop does
+    // not sell. Pricing it at the smallest tier while keeping the requested
+    // label is how a 2 kg cake gets sold for the price of a 0.5 kg one.
+    if (error instanceof UnknownWeightError) {
+      throw new AppError("One of the items is no longer available in that size.", 409, [
+        { field: "items", message: `Unknown weight on ${error.slug}: ${error.weight}` },
       ]);
     }
     throw error;

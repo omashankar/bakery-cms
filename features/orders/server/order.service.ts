@@ -23,7 +23,11 @@ import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
 import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
-import { priceCart, UnknownProductError } from "@/features/checkout/server/pricing.server";
+import {
+  priceCart,
+  UnknownProductError,
+  UnknownWeightError,
+} from "@/features/checkout/server/pricing.server";
 import {
   publicBaseUrl,
   sendTemplatedEmail,
@@ -160,6 +164,12 @@ async function repriceForPlacement(input: PlaceOrderInput) {
   } catch (error) {
     if (error instanceof UnknownProductError) {
       throw new AppError("One of the items is no longer available.", 409);
+    }
+    // A size the shop does not sell. Refused for the same reason a missing slug
+    // is: the alternative is charging the smallest tier's price for whatever
+    // size the line still says, and then baking that size.
+    if (error instanceof UnknownWeightError) {
+      throw new AppError("One of the items is no longer available in that size.", 409);
     }
     throw error;
   }
