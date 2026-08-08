@@ -57,21 +57,29 @@ export function persistServerSubscribers(subscribers: NewsletterSubscriber[]): v
   persistSubscribers(subscribers);
 }
 
+/**
+ * The admin's cached subscriber list. A CACHE — never a source of subscribers.
+ *
+ * Empty used to mean "not seeded yet": `parsed.length > 0 ? parsed : seed()`.
+ * So an admin who cleared the list watched 15 demo subscribers reappear on the
+ * next read, and the Total and Active stat cards counted them as real people
+ * the shop could mail.
+ *
+ * The SERVER seeds a demo shop once, against a flag that survives deletions.
+ * Empty here now means empty, and the list fills when
+ * `useNewsletterServerSync` hydrates it.
+ */
 export function loadNewsletterSubscribers(): NewsletterSubscriber[] {
-  if (typeof window === "undefined") return seedSubscribers();
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedSubscribers();
-    persistSubscribers(seeded);
-    return seeded;
-  }
+  if (typeof window === "undefined") return [];
 
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
     const parsed = JSON.parse(raw) as NewsletterSubscriber[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedSubscribers();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return seedSubscribers();
+    return [];
   }
 }
 

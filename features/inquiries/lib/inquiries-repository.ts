@@ -197,21 +197,34 @@ export function persistServerInquiries(inquiries: Inquiry[]): void {
   persistInquiries(inquiries);
 }
 
+/**
+ * The admin's cached enquiry list. A CACHE — never a source of enquiries.
+ *
+ * Empty used to mean "not seeded yet": `parsed.length > 0 ? parsed : seed()`.
+ * So an admin who cleared the list watched the 12 demo enquiries reappear on
+ * the next read, and the counts and badges counted them. There is no way to
+ * have no enquiries.
+ *
+ * The SERVER seeds a demo shop once, against a flag that survives deletions —
+ * `ensureSeeded` in inquiry.service.ts. That is the right place for the
+ * decision: one shop, once, visible to everyone. Empty here now means empty,
+ * and the list fills when `useInquiriesServerSync` hydrates it.
+ *
+ * The `getItem` call is inside the try because it throws in a browser that
+ * denies storage — private mode, blocked cookies — and an admin screen must
+ * fall back to the server rather than crash.
+ */
 export function loadInquiries(): Inquiry[] {
-  if (typeof window === "undefined") return seedInquiries();
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedInquiries();
-    persistInquiries(seeded);
-    return seeded;
-  }
+  if (typeof window === "undefined") return [];
 
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
     const parsed = JSON.parse(raw) as Inquiry[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedInquiries();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return seedInquiries();
+    return [];
   }
 }
 
