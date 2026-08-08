@@ -20,13 +20,31 @@ function toItem<T>(raw: Record<string, unknown>): T {
 
 // ---- Coupons ----
 
+const COUPONS_SEED_KEY = "coupons";
+
 export async function listCoupons(): Promise<StoredCoupon[]> {
   await connectDB();
-  if ((await CouponModel.estimatedDocumentCount()) === 0) {
+  // Seed ONCE, not "whenever empty".
+  //
+  // The same bug the zones below were fixed for, left in place here in the same
+  // file. "Empty" cannot tell a brand new shop from one that deliberately
+  // deleted every coupon, so clearing them resurrected the demo codes on the
+  // very next read — and a coupon is not a display row: `getCoupons` is what
+  // `priceCart` resolves a code against, so WELCOME10 came back from the dead
+  // and took 10% off a live checkout. The admin saw "Deleted 4 coupons",
+  // reloaded, and the same four were back.
+  if (
+    (await CouponModel.estimatedDocumentCount()) === 0 &&
+    !(await hasSeeded(COUPONS_SEED_KEY))
+  ) {
     try {
       await CouponModel.insertMany(buildDefaultCoupons().map(stripDoc) as CouponDoc[], { ordered: false });
+      // Inside the try, for the reason spelled out on the zones seed: marking
+      // outside it records "already seeded" over a collection that stayed empty
+      // after a transient write failure, and no code path could ever seed it.
+      await markSeeded(COUPONS_SEED_KEY);
     } catch {
-      /* concurrent seed */
+      /* concurrent seed, or a transient write failure — retry on the next read */
     }
   }
   const docs = (await CouponModel.find().sort({ createdAt: -1 }).lean()) as unknown as Record<string, unknown>[];
@@ -35,6 +53,10 @@ export async function listCoupons(): Promise<StoredCoupon[]> {
 
 export async function replaceCoupons(coupons: StoredCoupon[]): Promise<void> {
   await connectDB();
+  // Any deliberate write settles the seeding question, including a write of
+  // none — deleting every coupon is exactly the case the marker exists for.
+  await markSeeded(COUPONS_SEED_KEY);
+
   const keepIds = coupons.map((c) => c.id);
   const ops: Parameters<typeof CouponModel.bulkWrite>[0] = coupons.map((c) => ({
     replaceOne: { filter: { _id: c.id }, replacement: stripDoc(c) as CouponDoc, upsert: true },
