@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { sortSections } from "@/features/cms-sections/lib/homepage-store";
+import { sortSections } from "@/features/cms-sections/lib/section-utils";
 import {
   deriveHomepageMeta,
   fetchHomepageRevisions,

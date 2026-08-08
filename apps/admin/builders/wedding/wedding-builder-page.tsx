@@ -8,7 +8,7 @@ import {
   WEDDING_SECTION_REGISTRY,
 } from "@/constants/wedding-section-registry";
 import { WeddingSectionRenderer } from "@/features/cms-sections/wedding-section-renderer";
-import { sortSections } from "@/features/cms-sections/lib/wedding-store";
+import { sortSections } from "@/features/cms-sections/lib/section-utils";
 import {
   deriveWeddingMeta,
   fetchWeddingRevisions,

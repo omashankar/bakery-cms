@@ -114,4 +114,42 @@ describe.each(ROUTES)("$what", ({ route }) => {
 
     expect(body.version).toBe(4);
   });
+
+  describe("what it will store", () => {
+    const good = {
+      instanceId: "s-1",
+      type: "hero",
+      order: 0,
+      isVisible: true,
+      background: "white",
+      content: { title: "Cakes" },
+    };
+
+    it("refuses a section with no content rather than 500ing the storefront later", async () => {
+      signedIn();
+      const bare = { ...good } as Partial<typeof good>;
+      delete bare.content;
+
+      const saved = await route.PUT(put({ sections: [bare] }));
+      const published = await route.POST(put({ sections: [bare] }));
+
+      expect(saved.status).toBe(400);
+      expect(published.status).toBe(400);
+      expect((await saved.json()).error).toMatch(/content/);
+    });
+
+    it("still accepts a well-formed layout on both verbs", async () => {
+      signedIn();
+
+      expect((await route.PUT(put({ sections: [good] }))).status).toBe(200);
+      expect((await route.POST(put({ sections: [good] }))).status).toBe(200);
+    });
+
+    it("checks the caller before it checks the payload", async () => {
+      // A 400 would tell an anonymous caller their JSON was nearly right.
+      signedOut();
+
+      expect((await route.PUT(put({ sections: "nonsense" }))).status).toBe(401);
+    });
+  });
 });

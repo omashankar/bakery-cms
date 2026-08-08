@@ -1,58 +1,20 @@
+/**
+ * The shape of a stored builder revision.
+ *
+ * This file used to hold a localStorage revision log — read, push, restore,
+ * capped at 8 — from when the page builders lived entirely in the editing
+ * browser. Revisions moved to the builder's Mongo document (see
+ * features/cms-sections/lib/builder-revision-utils.ts, capped at 20), and those
+ * three functions were left behind with exactly one caller each: the localStorage
+ * stores, which had themselves become unreachable. Both are gone; only the type
+ * they all agreed on is real.
+ *
+ * It stays here rather than moving next to the server helpers because six modules
+ * import it from this path and the type has not changed.
+ */
 export interface BuilderRevision<TSection> {
   id: string;
   label: string;
   savedAt: string;
   sections: TSection[];
-}
-
-const MAX_REVISIONS = 8;
-
-function readRevisions<TSection>(storageKey: string): BuilderRevision<TSection>[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(storageKey);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as BuilderRevision<TSection>[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeRevisions<TSection>(
-  storageKey: string,
-  revisions: BuilderRevision<TSection>[]
-): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(storageKey, JSON.stringify(revisions.slice(0, MAX_REVISIONS)));
-}
-
-export function listBuilderRevisions<TSection>(storageKey: string): BuilderRevision<TSection>[] {
-  return readRevisions<TSection>(storageKey);
-}
-
-export function pushBuilderRevision<TSection>(
-  storageKey: string,
-  sections: TSection[],
-  label?: string
-): BuilderRevision<TSection>[] {
-  const revision: BuilderRevision<TSection> = {
-    id: `rev-${Date.now()}`,
-    label: label ?? `Published ${new Date().toLocaleString()}`,
-    savedAt: new Date().toISOString(),
-    sections: JSON.parse(JSON.stringify(sections)) as TSection[],
-  };
-
-  const next = [revision, ...readRevisions<TSection>(storageKey)].slice(0, MAX_REVISIONS);
-  writeRevisions(storageKey, next);
-  return next;
-}
-
-export function restoreBuilderRevision<TSection>(
-  storageKey: string,
-  revisionId: string
-): TSection[] | null {
-  const revision = readRevisions<TSection>(storageKey).find((item) => item.id === revisionId);
-  if (!revision) return null;
-  return JSON.parse(JSON.stringify(revision.sections)) as TSection[];
 }

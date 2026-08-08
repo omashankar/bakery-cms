@@ -7,6 +7,7 @@ import {
   saveDraftSections,
 } from "@/features/cms-sections/data/homepage-sections.server";
 import { BuilderConflictError } from "@/features/cms-sections/lib/builder-conflict";
+import { parseSectionsPayload } from "@/features/cms-sections/lib/section-payload";
 import { requireAdminResponse } from "@/lib/server/auth/guard";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
@@ -74,13 +75,19 @@ export async function PUT(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await parseBody(request);
-  if (!body || !Array.isArray(body.sections)) {
-    return NextResponse.json({ error: "sections array is required" }, { status: 400 });
+  if (!body) {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  // Shape-checked before it reaches the store: the storefront renders these
+  // on the server, so a malformed section is a 500 on the live page.
+  const parsed = parseSectionsPayload<HomepageSectionInstance>(body.sections);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
   try {
     const { snapshot, version } = await saveDraftSections(
-      body.sections,
+      parsed.sections,
       body.scheduledPublishAt,
       body.expectedVersion,
     );
@@ -106,11 +113,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ state: await resetHomepageSections() });
     }
 
-    if (!Array.isArray(body.sections)) {
-      return NextResponse.json({ error: "sections array is required" }, { status: 400 });
+    const parsed = parseSectionsPayload<HomepageSectionInstance>(body.sections);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const { snapshot, version } = await publishSections(body.sections, body.expectedVersion);
+    const { snapshot, version } = await publishSections(
+      parsed.sections,
+      body.expectedVersion,
+    );
     return NextResponse.json({ snapshot, version });
   } catch (error) {
     if (error instanceof BuilderConflictError) return conflict(error);
