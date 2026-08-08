@@ -46,6 +46,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
@@ -118,13 +119,32 @@ function RefundCaseDetail({
           {order.refundRecord ? (
             <div className="rounded-lg border border-border bg-muted/80 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
+                {/*
+                  "Refunded" is what has actually been PAID OUT.
+
+                  This printed `refundRecord.amount` — the total asked for across
+                  every attempt — under the word "refunded". A gateway refund
+                  starts `pending` and settles at the bank's pace, so the moment
+                  an operator issued one this screen said the money was back with
+                  the customer. It is the screen they open to answer exactly that
+                  question, and it answered it wrong for as long as the payout
+                  took.
+                */}
                 <p className="font-semibold text-foreground">
-                  {formatCurrency(order.refundRecord.amount)} refunded
+                  {settledRefundAmount(order) > 0
+                    ? `${formatCurrency(settledRefundAmount(order))} refunded`
+                    : `${formatCurrency(order.refundRecord.amount)} sent to the gateway`}
                 </p>
                 <Badge variant={order.refundRecord.amount < order.totals.total ? "outline" : "accent"}>
                   {order.refundRecord.amount < order.totals.total ? "Partial" : "Full"}
                 </Badge>
               </div>
+              {settledRefundAmount(order) < order.refundRecord.amount ? (
+                <p className="mt-0.5 text-xs text-warning">
+                  {formatCurrency(order.refundRecord.amount - settledRefundAmount(order))} is still
+                  with the gateway — it has not reached the customer yet.
+                </p>
+              ) : null}
               {order.refundRecord.amount < order.totals.total ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Remaining {formatCurrency(order.totals.total - order.refundRecord.amount)} of{" "}

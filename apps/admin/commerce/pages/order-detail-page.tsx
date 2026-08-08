@@ -52,30 +52,52 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The cache is a starting point, never the answer.
+    //
+    // This returned as soon as localStorage had the order, and that cache holds
+    // only the most recent page of orders written by whatever this browser last
+    // did. So an order refunded on another device, settled by a webhook, or
+    // cancelled by a colleague rendered here in its old state for the whole
+    // visit — on the one screen an operator opens to find out what happened to
+    // it. The server is asked every time; the cached copy only fills the gap
+    // while the request is in flight, so the page does not flash empty.
     const current = getOrderById(orderId);
     if (current) {
       setOrder(current);
       setAdminNotes(current.adminNotes ?? "");
-      setLoading(false);
-    } else {
-      // Not in the local cache yet (deep link, or placed on another device) —
-      // read it straight from the server before deciding it doesn't exist.
-      // `fetchOrder` resolves null on any failure, so it cannot reject.
-      void fetchOrder(orderId).then((fetched) => {
-        if (cancelled) return;
-        if (fetched) {
-          setOrder(fetched);
-          setAdminNotes(fetched.adminNotes ?? "");
-        }
-        setLoading(false);
-      });
     }
 
+    // `fetchOrder` resolves null on any failure, so it cannot reject.
+    void fetchOrder(orderId).then((fetched) => {
+      if (cancelled) return;
+      if (fetched) {
+        setOrder(fetched);
+        setAdminNotes(fetched.adminNotes ?? "");
+      }
+      setLoading(false);
+    });
+
+    // After any write, take the SERVER's version.
+    //
+    // This re-read the local cache, which is where the optimistic copy of the
+    // write that just happened lives. So after a refund the screen kept showing
+    // the record the client had composed — including one the server had refused
+    // and the write path had already rolled back — instead of what the order
+    // actually holds. The cached read stays as the immediate paint; the fetch
+    // corrects it.
     function refresh() {
       const next = getOrderById(orderId);
-      if (!next) return;
-      setOrder(next);
-      setAdminNotes(next.adminNotes ?? "");
+      if (next) {
+        setOrder(next);
+        setAdminNotes(next.adminNotes ?? "");
+      }
+
+      void fetchOrder(orderId).then((fetched) => {
+        if (cancelled || !fetched) return;
+        setOrder(fetched);
+        setAdminNotes(fetched.adminNotes ?? "");
+      });
     }
 
     window.addEventListener("bakery-orders-updated", refresh);
