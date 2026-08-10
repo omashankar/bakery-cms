@@ -12,6 +12,7 @@ import {
   saveWhatsAppConnection,
 } from "./whatsapp-credentials.server";
 import { verifyWhatsAppConnection } from "./whatsapp-client.server";
+import { allowlisted } from "@/lib/server/http/allowlist";
 import {
   templateSchemas,
   notificationSettingsSchema,
@@ -34,7 +35,7 @@ export const replaceTemplatesController = withErrorHandler(async (request: Reque
   const session = await requireRole(...COMMS_ROLES);
   const { key } = await ctx.params;
 
-  const schema = templateSchemas[key as keyof typeof templateSchemas];
+  const schema = allowlisted(templateSchemas, key);
   if (!schema) throw new NotFoundError("Unknown template collection");
 
   const parsed = validate(schema, await readJson(request));

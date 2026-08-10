@@ -6,6 +6,7 @@ import { seedFromLanding as seedTestimonials } from "@/features/content/lib/test
 import { seedFromLanding as seedFaqs } from "@/features/content/lib/faq-repository";
 import type { Banner } from "@/types/media";
 import type { Testimonial, FaqItem } from "@/types/content";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 /**
  * Content collections (banners, testimonials, FAQ) that were client-only
@@ -23,7 +24,7 @@ export type ContentKey = keyof typeof stores;
 export const CONTENT_KEYS = Object.keys(stores) as ContentKey[];
 
 function storeFor(key: string) {
-  const store = stores[key as ContentKey];
+  const store = allowlisted(stores, key);
   if (!store) throw new NotFoundError("Unknown content collection");
   return store;
 }

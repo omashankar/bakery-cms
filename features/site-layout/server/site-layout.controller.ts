@@ -6,6 +6,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./site-layout.service";
 import { siteLayoutSchemas } from "./site-layout.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 const LAYOUT_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
@@ -20,7 +21,7 @@ export const replaceSiteLayoutController = withErrorHandler(async (request: Requ
   const session = await requireRole(...LAYOUT_ROLES);
   const { key } = await ctx.params;
 
-  const schema = siteLayoutSchemas[key as keyof typeof siteLayoutSchemas];
+  const schema = allowlisted(siteLayoutSchemas, key);
   if (!schema) throw new NotFoundError("Unknown site-layout section");
 
   const value = validate(schema, await readJson(request));

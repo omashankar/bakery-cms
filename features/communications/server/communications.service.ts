@@ -12,6 +12,7 @@ import { sendMail } from "@/lib/server/mail/send-mail";
 import { toEmailHtml } from "./email.service";
 import { renderTemplate } from "@/lib/template-render";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { allowlisted } from "@/lib/server/http/allowlist";
 import {
   TEMPLATE_VARIABLE_CONTRACT,
   WHATSAPP_VARIABLE_CONTRACT,
@@ -39,7 +40,7 @@ export type TemplateKey = keyof typeof templateStores;
 export const TEMPLATE_KEYS = Object.keys(templateStores) as TemplateKey[];
 
 function templateStoreFor(key: string) {
-  const store = templateStores[key as TemplateKey];
+  const store = allowlisted(templateStores, key);
   if (!store) throw new NotFoundError("Unknown template collection");
   return store;
 }

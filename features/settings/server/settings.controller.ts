@@ -8,6 +8,7 @@ import { sendTestEmail } from "@/lib/server/mail/send-test-email";
 
 import * as service from "./settings.service";
 import { sectionSchemas, type SettingsSection } from "./settings.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 /** Roles allowed to read/write settings (owner + legacy admin). */
 const SETTINGS_ROLES = ["owner", "admin"] as const;
@@ -98,10 +99,8 @@ export const updateSectionController = withErrorHandler(
      * "Settings reset" for a section that does not exist and wrote an audit row
      * saying so.
      */
-    if (!Object.hasOwn(sectionSchemas, section)) {
-      throw new NotFoundError("Unknown settings section");
-    }
-    const schema = sectionSchemas[section as SettingsSection];
+    const schema = allowlisted(sectionSchemas, section);
+    if (!schema) throw new NotFoundError("Unknown settings section");
 
     const value = validate(schema, await readJson(request));
     const ctx = requestContext(request);

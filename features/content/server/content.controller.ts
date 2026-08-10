@@ -7,6 +7,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./content.service";
 import { contentSchemas } from "./content.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 const CONTENT_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
@@ -33,7 +34,7 @@ export const replaceContentController = withErrorHandler(async (request: Request
   const session = await requireRole(...CONTENT_ROLES);
   const { key } = await ctx.params;
 
-  const schema = contentSchemas[key as keyof typeof contentSchemas];
+  const schema = allowlisted(contentSchemas, key);
   if (!schema) throw new NotFoundError("Unknown content collection");
 
   const items = validate(schema, await readJson(request));
