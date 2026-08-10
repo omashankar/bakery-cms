@@ -7,6 +7,13 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { mergeAppSettings } from "@/features/settings/lib/settings-utils";
 import { ensureSettingsHydrated } from "@/features/settings/lib/settings-repository";
+import {
+  fetchEmailTemplates,
+  fetchWhatsAppTemplates,
+  restoreEmailTemplatesRequest,
+  restoreWhatsAppTemplatesRequest,
+} from "@/apps/admin/communications/lib/communications-api";
+import { ensureCommunicationsHydrated } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { ensureSeoHydrated } from "@/features/site-layout/lib/site-layout-hydration";
 import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
@@ -196,6 +203,35 @@ const SERVER_BACKUP_SECTIONS: ServerBackupSection[] = [
     // deletes nothing, leaving codes the backup does not contain live and
     // redeemable.
     push: replacer(restoreCouponsRequest),
+  },
+  /**
+   * The two template collections, which were missing from this list entirely.
+   *
+   * Both have a whole-value server endpoint, and `exportLocalStorageBackup()`
+   * copies every `bakery-cms*` key — so the templates were IN the file and not
+   * in `serverBackedKeys`. A restore therefore dropped them into the
+   * browser-only bucket and wrote them straight to localStorage, pushing
+   * nothing. That is the back door this file exists to close: the admin
+   * templates screen composes its next save from that cache, so the FIRST
+   * unrelated template edit shipped the whole restored set to Mongo — a
+   * restore the admin was told was local, landing later, over wording the shop
+   * had since replaced.
+   *
+   * Restore-style pushes, like coupons and zones above: the current server ids
+   * go up as `knownIds`, so a template the backup does not contain is actually
+   * removed rather than left behind sending old wording.
+   */
+  {
+    key: "bakery-cms-email-templates",
+    title: "Email templates",
+    fetch: fetchEmailTemplates,
+    push: replacer(restoreEmailTemplatesRequest),
+  },
+  {
+    key: "bakery-cms-whatsapp-templates",
+    title: "WhatsApp templates",
+    fetch: fetchWhatsAppTemplates,
+    push: replacer(restoreWhatsAppTemplatesRequest),
   },
   {
     key: "bakery-cms-invoice-settings",
@@ -423,6 +459,10 @@ async function openEveryGate(): Promise<boolean> {
     ensureSeoHydrated(),
     ensureAdminConfigHydrated(),
     ensureInvoiceSettingsHydrated(),
+    // The template gates, now that the two collections round-trip through
+    // the server. Without this every template push waits out its full
+    // deadline and then reports the server as having refused, which it never did.
+    ensureCommunicationsHydrated().then((r) => r.email && r.whatsapp),
   ]);
 
   // An opener that rejected, or resolved false, means its gate is still

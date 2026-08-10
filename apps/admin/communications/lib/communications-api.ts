@@ -287,3 +287,32 @@ export async function sendWhatsAppTestRequest(
   const result = await postJson<{ to?: string }>("/api/communications/whatsapp/test", { slug });
   return result.ok ? { sent: true, to: result.data?.to } : { sent: false, error: result.error };
 }
+
+/**
+ * A RESTORE of a template collection, not a save.
+ *
+ * `replaceEmailTemplatesRequest(items)` with no `knownIds` deletes nothing —
+ * that is deliberate, so an ordinary save from a stale tab cannot remove a
+ * template another admin added. A restore means the opposite: the file IS the
+ * intended state, and a template the backup does not contain must go, or the
+ * shop is left sending wording it thought it had replaced.
+ *
+ * The CURRENT server ids are read first and sent as the known set, exactly as
+ * `restoreCouponsRequest` and `restoreZonesRequest` do. A failed read returns
+ * false rather than falling back to a blind replace.
+ */
+export async function restoreEmailTemplatesRequest(
+  items: EmailTemplateRecord[],
+): Promise<boolean> {
+  const current = await fetchEmailTemplates();
+  if (current === null) return false;
+  return replaceEmailTemplatesRequest(items, current.map((item) => item.id));
+}
+
+export async function restoreWhatsAppTemplatesRequest(
+  items: WhatsAppTemplateRecord[],
+): Promise<boolean> {
+  const current = await fetchWhatsAppTemplates();
+  if (current === null) return false;
+  return replaceWhatsAppTemplatesRequest(items, current.map((item) => item.id));
+}

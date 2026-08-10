@@ -194,19 +194,26 @@ export async function writeTemplates(key: string, items: unknown[]): Promise<voi
  * Meta on live orders. So the stored value wins, and a template the server has
  * never seen starts at `not_submitted` no matter what arrived with it.
  *
- * Changing the Meta NAME resets it too: the approval belonged to the old name.
+ * Changing the Meta NAME OR LANGUAGE resets it too: the approval belonged to
+ * the old pair.
  */
+/** The fields this function actually reads. Named, so a caller cannot pass a
+ *  binding it will silently ignore. */
+interface ApprovalCarrier {
+  id?: string;
+  metaName?: string;
+  metaLanguage?: string;
+  approval?: string;
+}
+
 export function keepServerApproval(
-  incoming: { id?: string }[],
-  stored: { id?: string }[],
+  incoming: ApprovalCarrier[],
+  stored: ApprovalCarrier[],
 ): unknown[] {
   const byId = new Map(
     stored
       .filter((item) => item.id)
-      .map((item) => [
-        item.id as string,
-        item as { approval?: string; metaName?: string; metaLanguage?: string },
-      ]),
+      .map((item) => [item.id as string, item] as const),
   );
 
   /**
@@ -221,13 +228,12 @@ export function keepServerApproval(
    * language straight to Meta, which has approved nothing under it. Every send
    * is rejected, and the screen still shows the template as approved.
    */
-  const identity = (value: { metaName?: string; metaLanguage?: string } | undefined) =>
+  const identity = (value: ApprovalCarrier | undefined) =>
     `${(value?.metaName ?? "").trim()}|${(value?.metaLanguage ?? "").trim()}`;
 
   return incoming.map((item) => {
     const previous = item.id ? byId.get(item.id) : undefined;
-    const sameBinding =
-      identity(previous) === identity(item as { metaName?: string; metaLanguage?: string });
+    const sameBinding = identity(previous) === identity(item);
 
     return {
       ...item,

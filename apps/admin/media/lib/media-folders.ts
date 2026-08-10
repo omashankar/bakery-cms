@@ -1,5 +1,6 @@
 import type { MediaFolder } from "@/types/media";
 import { replaceMediaFoldersRequest } from "./media-api";
+import { MEDIA_UPDATED_EVENT } from "./media-utils";
 import type { WriteResult } from "@/lib/write-result";
 
 const FOLDERS_STORAGE_KEY = "bakery-cms-media-folders";
@@ -78,6 +79,17 @@ export async function saveMediaFolders(
 /** Hydration: write the server's folders into the local cache (no re-push). */
 export function persistServerMediaFolders(folders: MediaFolder[]): void {
   persist(folders);
+  /**
+   * Announced on its own, rather than depending on a sibling's write order.
+   *
+   * This wrote silently and relied on `persistServerMedia` — which does
+   * dispatch — happening afterwards. Ordering is now correct in the sync, but a
+   * write nobody is told about is a trap for the next caller: the folder
+   * sidebar is only ever redrawn by this event.
+   */
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(MEDIA_UPDATED_EVENT));
+  }
 }
 
 /** Trimmed and case-folded, so "cakes" and "Cakes " are the same folder name. */

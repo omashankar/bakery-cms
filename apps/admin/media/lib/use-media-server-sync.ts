@@ -18,8 +18,19 @@ export function useMediaServerSync(): void {
     (async () => {
       const [files, folders] = await Promise.all([fetchMediaFiles(), fetchMediaFolders()]);
       if (cancelled) return;
-      if (files) persistServerMedia(files);
+      /**
+       * FOLDERS FIRST.
+       *
+       * `persistServerMedia` dispatches MEDIA_UPDATED_EVENT synchronously, and
+       * the media page's listener calls `refresh()`, which re-reads BOTH files
+       * and folders. Writing files first therefore fired that read while
+       * localStorage still held the pre-hydration folder list — and
+       * `persistServerMediaFolders` dispatches nothing of its own, so nothing
+       * ever re-read them. The sidebar sat on the local seed for the rest of
+       * the session while the files beside it were the server's.
+       */
       if (folders) persistServerMediaFolders(folders);
+      if (files) persistServerMedia(files);
 
       // Only NOW may a replace-all mutation send the local list — before this,
       // that list is whatever this browser happened to hold.
