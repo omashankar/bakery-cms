@@ -26,9 +26,53 @@ const seoRouteSchema = z
   })
   .passthrough();
 
+/**
+ * The two GLOBAL fields with the same problem the route fields above had.
+ *
+ * `global` validated `siteName` and passed everything else through, so:
+ *
+ *  - `canonicalBaseUrl` could be any type at all, and three consumers call
+ *    `.replace(/\/$/, "")` on it with no guard — `app/robots.ts`,
+ *    `sitemap-generator.ts` and `seo-metadata.ts`. Stored as `null`, robots.txt
+ *    and sitemap.xml both answer 500. (`email.service.ts` reads the same field
+ *    with `?.trim()` and a fallback; one careful consumer and three that assume.)
+ *  - `allowIndexing` could be any type, and `app/robots.ts` does
+ *    `if (!global.allowIndexing)`. Stored as `null`, robots.txt serves
+ *    `Disallow: /` — the whole shop withdrawn from every search engine, silently.
+ *
+ * Both confirmed live. Reachable the same way the route fields were: the backup
+ * restore posts a hand-editable JSON file straight to this endpoint.
+ *
+ * `canonicalBaseUrl` is checked as a URL rather than merely a string, because
+ * "monginis.com" without a scheme is an ordinary thing to type and produces a
+ * `Sitemap: monginis.com/sitemap.xml` line no crawler can use — broken in a way
+ * nobody sees.
+ */
+const seoGlobalSchema = z
+  .object({
+    siteName: z.string().min(1),
+    canonicalBaseUrl: z
+      .string()
+      .trim()
+      .refine(
+        (value) => {
+          if (!value) return true;
+          try {
+            return ["http:", "https:"].includes(new URL(value).protocol);
+          } catch {
+            return false;
+          }
+        },
+        "Use a full address, including https://",
+      )
+      .default(""),
+    allowIndexing: z.boolean().default(true),
+  })
+  .passthrough();
+
 const seoSchema = z
   .object({
-    global: z.object({ siteName: z.string().min(1) }).passthrough(),
+    global: seoGlobalSchema,
     routes: z.array(seoRouteSchema),
   })
   .passthrough();
