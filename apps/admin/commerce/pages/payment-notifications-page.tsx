@@ -42,7 +42,24 @@ const ICONS: Record<NotifIcon, typeof Bell> = {
   ServerCrash,
 };
 
-const CHANNELS: NotifChannel[] = ["in_app", "email", "sms"];
+const CHANNELS: NotifChannel[] = ["in_app", "email", "whatsapp"];
+
+/**
+ * The events that have a sender behind them today.
+ *
+ * The other five are defined here, shown with a sample message, and produced
+ * by no code path at all — there is no payment-failed email anywhere, and the
+ * only refund mail goes out on COMPLETION, not on initiation. Saying so beats
+ * a switch that silently governs nothing.
+ */
+const WIRED_EVENTS = new Set([
+  "cust_payment_success",
+  "cust_refund_completed",
+  "cust_invoice_generated",
+  "admin_payment_received",
+  "admin_payment_failed",
+  "admin_cod_confirmation",
+]);
 
 function TemplateRow({ template }: { template: NotificationTemplate }) {
   const [pref, setPref] = useState(() => getNotificationPref(template.id));
@@ -63,8 +80,13 @@ function TemplateRow({ template }: { template: NotificationTemplate }) {
             <Icon className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {template.event}
+              {WIRED_EVENTS.has(template.id) ? null : (
+                <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium normal-case text-muted-foreground">
+                  no sender yet
+                </span>
+              )}
             </p>
             <p className="mt-0.5 font-medium text-foreground">{template.title}</p>
             <p className="mt-1 text-sm text-muted-foreground">{template.message}</p>
@@ -127,8 +149,14 @@ export function PaymentNotificationsPage() {
       />
 
       <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
-        These are delivery preferences. Actual sending (email / SMS) is wired when the backend is
-        added — in-app notifications already appear in the bell menu.
+        {/* This said "Actual sending is wired when the backend is added", while
+            the page header promised the switches chose what notifies customers
+            — so the same screen both claimed and denied that they worked. The
+            email switches are read by the senders now; the events without one
+            are labelled rather than left looking live. */}
+        Email notifications follow these switches. In-app notifications appear in
+        the bell menu. Events marked <em>no sender yet</em> are defined but not
+        produced by anything, so their switches have nothing to govern.
       </div>
 
       {groups.map((group) => {

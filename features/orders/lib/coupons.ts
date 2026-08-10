@@ -1,3 +1,4 @@
+import { hasExpired } from "@/lib/expiry-date";
 import {
   getActiveCoupons,
   getCouponByCode,
@@ -58,7 +59,9 @@ export function evaluateCoupon(
     return { ok: false, message: "Invalid coupon code" };
   }
 
-  if (definition.expiresAt && new Date(definition.expiresAt).getTime() < now) {
+  // Fails closed on an unparseable value: `NaN < now` is false, so a coupon
+  // with expiresAt "31/12/2026" used to be permanently live.
+  if (hasExpired(definition.expiresAt, now)) {
     return { ok: false, message: "This coupon has expired" };
   }
 

@@ -18,7 +18,20 @@ const couponSchema = z
     isActive: z.boolean(),
     usageCount: z.number().min(0),
     createdAt: z.string(),
-    expiresAt: z.string().optional(),
+    /**
+     * A real instant, or nothing.
+     *
+     * This was a bare string, and both expiry checks did
+     * `new Date(value).getTime() < now` — which is `NaN < now`, i.e. false —
+     * so a coupon stored with "31/12/2026" or "soon" was permanently live.
+     * The endpoint takes the whole collection, so any client could set it.
+     */
+    expiresAt: z
+      .string()
+      .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+        message: "Expiry must be a valid date",
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -40,6 +53,26 @@ const deliveryZoneSchema = z
   .passthrough();
 
 export const couponsArraySchema = z.array(couponSchema);
+
+/**
+ * A coupon save, with what the caller believed existed when it started.
+ *
+ * Same shape and the same reason as the zones schema below — and coupons were
+ * the one collection left without it. A blind replace-all asserts "these are all
+ * the coupons there are", so a save from a tab opened before another admin
+ * created a code silently deleted that code. Both admins were told it worked,
+ * and a discount customers may already have been given stopped existing.
+ *
+ * A bare array is still accepted, and then nothing outside the incoming list is
+ * touched, which is the safe reading.
+ */
+export const couponsReplaceSchema = z.union([
+  couponsArraySchema.transform((coupons) => ({ coupons, knownIds: null as string[] | null })),
+  z.object({
+    coupons: couponsArraySchema,
+    knownIds: z.array(z.string()),
+  }),
+]);
 export const deliveryZonesArraySchema = z.array(deliveryZoneSchema);
 
 /**

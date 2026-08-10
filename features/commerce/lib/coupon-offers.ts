@@ -1,5 +1,6 @@
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import type { LandingOffer } from "@/constants/landing-data";
+import { hasExpired } from "@/lib/expiry-date";
 import { formatCurrency } from "@/utils/format";
 import type { StoredCoupon } from "./coupons-repository";
 
@@ -86,7 +87,7 @@ function money(amount: number, currency?: string): string {
  */
 export function isLiveCoupon(coupon: StoredCoupon, now = Date.now()): boolean {
   if (!coupon.isActive) return false;
-  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < now) return false;
+  if (hasExpired(coupon.expiresAt, now)) return false;
   return true;
 }
 

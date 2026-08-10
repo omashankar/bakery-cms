@@ -33,6 +33,7 @@ import {
   sendTemplatedEmail,
 } from "@/features/communications/server/email.service";
 import { notifyWhatsApp } from "@/features/communications/server/whatsapp.service";
+import { isNotificationEnabled } from "@/features/payments/server/notification-prefs.server";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
@@ -592,20 +593,27 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // an unsupplied one renders as the literal `{{invoice_url}}` in the customer's
   // inbox, which is how this was caught.
   const base = await publicBaseUrl();
-  const mail = await sendTemplatedEmail("order_confirmation", placed.address.email, {
-    customer_name: placed.address.fullName?.trim() || "there",
-    order_number: placed.orderNumber,
-    order_total: formatCurrency(placed.totals.total, currency),
-    payment_method: placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
-    delivery_date: placed.deliverySlot?.date
-      ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
-      : new Date(placed.estimatedDelivery).toDateString(),
-    invoice_url: base
-      ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
-      : "Reply to this email and we will send your invoice.",
-  });
+  // The Payment Notifications screen calls this "Payment Success". Its switches
+  // stored a preference that nothing read, so an admin who turned this off
+  // because customers complained about volume got a green toast and the next
+  // order sent it anyway.
+  const mail = (await isNotificationEnabled("cust_payment_success", "email"))
+    ? await sendTemplatedEmail("order_confirmation", placed.address.email, {
+        customer_name: placed.address.fullName?.trim() || "there",
+        order_number: placed.orderNumber,
+        order_total: formatCurrency(placed.totals.total, currency),
+        payment_method:
+          placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
+        delivery_date: placed.deliverySlot?.date
+          ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+          : new Date(placed.estimatedDelivery).toDateString(),
+        invoice_url: base
+          ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
+          : "Reply to this email and we will send your invoice.",
+      })
+    : null;
 
-  if (!mail.sent) {
+  if (mail && !mail.sent) {
     console.error(
       `[orders] Could not email the confirmation for ${placed.orderNumber}: ${mail.error}`
     );
@@ -664,6 +672,8 @@ async function notifyShopOfOrder(
     .map((item) => `  ${item.quantity} x ${item.name}`)
     .join("\n");
 
+  // "Payment Received" on the Payment Notifications screen.
+  if (!(await isNotificationEnabled("admin_payment_received", "email"))) return;
   const mail = await sendTemplatedEmail("admin_new_order", shopEmail, {
     order_number: order.orderNumber,
     order_total: formatCurrency(order.totals.total, currency),
@@ -819,6 +829,11 @@ export async function emailInvoice(order: PlacedOrder): Promise<{ sent: boolean;
   const settings = (await getSettings()) as Record<string, unknown>;
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
   const base = await publicBaseUrl();
+
+  // "Invoice Generated" on the Payment Notifications screen.
+  if (!(await isNotificationEnabled("cust_invoice_generated", "email"))) {
+    return { sent: false, error: "Invoice emails are switched off in notification settings." };
+  }
 
   return sendTemplatedEmail("invoice", order.address.email, {
     customer_name: order.address.fullName?.trim() || "there",
@@ -1295,6 +1310,10 @@ function formatRefundAmount(amount: number): string {
 async function sendRefundEmail(order: PlacedOrder, amount: number, settled: boolean) {
   const email = order.address?.email;
   if (!email) return;
+
+  // "Refund Completed" on the Payment Notifications screen — a switch that
+  // stored a preference nothing read.
+  if (!(await isNotificationEnabled("cust_refund_completed", "email"))) return;
 
   const settings = await getSettings().catch(() => null);
   const currency = (settings?.general as GeneralSettings | undefined)?.currency;

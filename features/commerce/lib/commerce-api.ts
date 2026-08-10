@@ -73,7 +73,38 @@ async function guardedPut(
 }
 
 export const fetchCoupons = () => getJson<StoredCoupon[]>("/api/coupons");
-export const replaceCouponsRequest = (coupons: StoredCoupon[]) => guardedPut(couponsHydration, "/api/coupons", coupons);
+/**
+ * `knownIds` is what this browser believed existed before the edit.
+ *
+ * Without it a replace-all asserts "these are all the coupons", so a stale tab
+ * deletes a code another admin created — and a coupon is a discount customers
+ * may already have been given. Delivery zones and the message templates both
+ * send the same thing for the same reason.
+ */
+export const replaceCouponsRequest = (coupons: StoredCoupon[], knownIds?: string[]) =>
+  guardedPut(
+    couponsHydration,
+    "/api/coupons",
+    knownIds ? { coupons, knownIds } : coupons,
+  );
+
+/**
+ * A backup restore, which genuinely means "make the server look like this".
+ *
+ * `replaceCouponsRequest` without `knownIds` deletes nothing — the safe reading
+ * for an ordinary save from a possibly-stale tab, and the wrong one here: a
+ * restore that cannot remove a coupon silently leaves codes the backup does not
+ * contain, live and redeemable, and reports success. So the CURRENT server ids
+ * are read first and sent as the known set.
+ */
+export async function restoreCouponsRequest(coupons: StoredCoupon[]): Promise<boolean> {
+  const current = await fetchCoupons();
+  if (current === null) return false;
+  return replaceCouponsRequest(
+    coupons,
+    current.map((coupon) => coupon.id),
+  );
+}
 
 export const fetchZones = () => getJson<DeliveryZone[]>("/api/delivery-zones");
 /**

@@ -1,5 +1,7 @@
 "use client";
 
+import { hasExpired } from "@/lib/expiry-date";
+import { formatDate } from "@/utils/format";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -165,6 +167,14 @@ export function CouponsAdminPage() {
                         <p className="font-mono text-sm font-semibold">{coupon.code}</p>
                         <Badge variant="secondary">{coupon.label}</Badge>
                         {!coupon.isActive ? <Badge variant="outline">Inactive</Badge> : null}
+                        {/* An expired coupon used to render with a green Active
+                            switch and nothing else — expiresAt was captured by
+                            the form and enforced at checkout but shown nowhere,
+                            so an admin looking at the screen saw a live code
+                            while customers were being refused. */}
+                        {hasExpired(coupon.expiresAt) ? (
+                          <Badge variant="destructive">Expired</Badge>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">{coupon.description}</p>
                       <p className="mt-2 text-xs text-muted-foreground">
@@ -175,6 +185,11 @@ export function CouponsAdminPage() {
                             : "No discount configured"}
                         {coupon.minSubtotal ? ` · Min ${coupon.minSubtotal.toLocaleString("en-IN")}` : ""}
                         {` · Used ${coupon.usageCount} times`}
+                        {coupon.expiresAt
+                          ? ` · ${hasExpired(coupon.expiresAt) ? "Expired" : "Expires"} ${formatDate(
+                              coupon.expiresAt,
+                            )}`
+                          : ""}
                       </p>
                     </div>
                   </div>
