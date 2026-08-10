@@ -1,6 +1,7 @@
 import type { LandingProduct } from "@/constants/landing-data";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import {
   createDefaultVariantGroups,
   formatPreparationTime,
@@ -109,12 +110,25 @@ export async function getProductReviews(
   }));
 }
 
+/**
+ * The earliest date the shop will bake for, as `YYYY-MM-DD`.
+ *
+ * This built a LOCAL instant and read it back in UTC — `date.setDate(...)` then
+ * `toISOString()`. East of UTC those disagree: at 01:00 IST with a one-day lead
+ * time, local tomorrow is still today in UTC, so the picker offered TODAY as
+ * the earliest date and pre-selected it. West of UTC it errs the other way and
+ * refuses a date the shop would have accepted.
+ *
+ * `delivery-date.ts` was written for precisely this and its header says so;
+ * checkout already used `earliestDeliveryDateString` for the ZONE floor while
+ * the shop-wide floor beside it still came from here. The product page had no
+ * second opinion at all — it sets both the input's `min` and the delivery date
+ * carried into the cart from this one value.
+ */
 export function getMinDeliveryDate(): string {
   const leadDays =
     typeof window !== "undefined"
       ? getCommerceSettings().deliveryLeadDays
       : defaultCommerceSettings.deliveryLeadDays;
-  const date = new Date();
-  date.setDate(date.getDate() + Math.max(leadDays, 0));
-  return date.toISOString().split("T")[0] ?? "";
+  return earliestDeliveryDateString(leadDays);
 }

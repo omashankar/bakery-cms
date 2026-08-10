@@ -2,6 +2,7 @@ import {
   fractionDigits,
   getActiveLocale,
   localeForCurrency,
+  usableCurrencyCode,
 } from "@/features/settings/lib/active-locale";
 
 /**
@@ -18,7 +19,26 @@ export function formatCurrency(
   currency?: string,
   locale?: string
 ): string {
-  const resolved = currency ?? getActiveLocale().currency;
+  /**
+   * The EXPLICIT currency gets the same filter the ambient one already has.
+   *
+   * `getActiveLocale()` runs every value through `resolve()`, precisely so a
+   * settings document written before the Zod enum existed — the model stores it
+   * as a bare `String`, so "Rs" is a real possibility — cannot reach `Intl`.
+   * The explicit argument skipped that with a bare `??`, and the server always
+   * passes one: it reads `general.currency` straight out of the document.
+   *
+   * A `RangeError: Invalid currency code` from here is not a formatting glitch.
+   * It fires while building the WhatsApp notification arguments in `placeOrder`
+   * — after the order is committed and the card is charged — so the customer
+   * got a 500 on a paid order, no confirmation of any kind was sent, and the
+   * bakery was never told. It also turned a legitimate 409 "below the minimum
+   * order" refusal into a masked 500, and blanked the Appearance admin screen
+   * mid-render. The coupon offers module already wraps this in `usableCurrency`
+   * plus a try/catch for exactly this reason; doing it here means no caller has
+   * to remember.
+   */
+  const resolved = usableCurrencyCode(currency) ?? getActiveLocale().currency;
   const digits = fractionDigits(resolved);
 
   return new Intl.NumberFormat(locale ?? localeForCurrency(resolved), {

@@ -219,11 +219,27 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     [ready, commerce.paymentMethods, onlinePaymentReady]
   );
 
+  /**
+   * Keep the SELECTED method among the ones still on offer.
+   *
+   * This only ever handled one case — the Razorpay gateway turning out to have
+   * no keys — and left the general one. The page starts from
+   * `defaultCommerceSettings`, where every method is enabled, and pins the
+   * selection to the first of them: Cash on Delivery. Hydration then brings the
+   * shop's real settings, `availablePaymentOptions` re-filters and the COD
+   * radio disappears from the screen — but nothing moved the selection, so an
+   * ordinary first-time customer submitted `cod` to a shop that had switched it
+   * off, and a COD order lands as `confirmed`: a cake the bakery is expected to
+   * bake and hand over for cash it decided it would no longer take.
+   *
+   * Nothing to do while the list is empty — that is the pre-hydration instant,
+   * not a shop that accepts no payment at all.
+   */
   useEffect(() => {
-    if (onlinePaymentReady !== false || paymentMethod !== "razorpay") return;
-    const fallback = availablePaymentOptions[0]?.value ?? "cod";
-    setPaymentMethod(fallback);
-  }, [onlinePaymentReady, paymentMethod, availablePaymentOptions]);
+    if (availablePaymentOptions.length === 0) return;
+    if (availablePaymentOptions.some((option) => option.value === paymentMethod)) return;
+    setPaymentMethod(availablePaymentOptions[0].value);
+  }, [paymentMethod, availablePaymentOptions]);
 
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
@@ -236,6 +252,12 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     order: PlacedOrder;
     paymentStatus: "paid" | "cod";
     paymentReference?: string;
+    /**
+     * The shop's own maintenance notice, when THAT is why this could not be
+     * confirmed. Retrying cannot help until the shop reopens, so the overlay
+     * says so and does not offer a button that would only loop.
+     */
+    closed?: string;
   } | null>(null);
 
   const {
@@ -559,6 +581,26 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       // what actually happened, in the admin's own words.
       setPlacing(false);
       setPayUI(null);
+
+      /**
+       * Unless they have already been charged.
+       *
+       * This branch was added after the one below it and skipped what that one
+       * exists for. `finalizeOrder("paid", …)` is only reached once Razorpay
+       * has CAPTURED — so an admin flipping maintenance on while the modal was
+       * open left a customer who had genuinely paid looking at a toast, with
+       * the payment reference in scope and thrown away. It is not even lost
+       * money: the webhook places the order regardless, under an order number
+       * it mints itself, so the bakery holds a paid order the customer has
+       * never seen the number of. The reference is the only thing that ties the
+       * two together, and they need it in front of them before they navigate
+       * away.
+       */
+      if (paymentStatus === "paid" || paymentReference) {
+        setUnconfirmed({ order, paymentStatus, paymentReference, closed });
+        return;
+      }
+
       toast.error("The store is closed right now", { description: closed, duration: 10000 });
       return;
     }
@@ -742,11 +784,13 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <ProcessingState
             state="failed"
-            title="Order not confirmed yet"
+            title={unconfirmed.closed ? "Your payment went through" : "Order not confirmed yet"}
             message={
-              unconfirmed.paymentStatus === "paid"
-                ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
-                : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+              unconfirmed.closed
+                ? `The shop closed while your payment was going through, so we could not confirm the order here. Your payment is safe and the bakery has it — quote the reference below when you get in touch. ${unconfirmed.closed}`
+                : unconfirmed.paymentStatus === "paid"
+                  ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
+                  : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
             }
             reason={
               unconfirmed.paymentReference
@@ -755,12 +799,18 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
             }
             className="w-full max-w-md"
             actions={[
-              {
-                label: placing ? "Retrying…" : "Retry confirmation",
-                onClick: () => void retryConfirmation(),
-                variant: "bakery",
-                icon: "retry",
-              },
+              // No retry while the shop is shut: it cannot succeed, and a
+              // button that only loops is worse than no button.
+              ...(unconfirmed.closed
+                ? []
+                : [
+                    {
+                      label: placing ? "Retrying…" : "Retry confirmation",
+                      onClick: () => void retryConfirmation(),
+                      variant: "bakery" as const,
+                      icon: "retry" as const,
+                    },
+                  ]),
               {
                 label: "Contact support",
                 onClick: () => router.push(routes.store.contact),

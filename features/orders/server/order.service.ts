@@ -294,7 +294,20 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // `deliveryLeadDays`, which knows nothing about zones, and `min` on an input
   // is a suggestion to a browser rather than a rule. So a five-day zone accepted
   // tomorrow, and a direct POST accepted today.
-  const leadDays = Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays);
+  //
+  // And the SHOP-WIDE floor, which the server had still never heard of. Only
+  // the matched zone's `minDeliveryDays` was checked here — but a zone quote
+  // only carries that field when `useZoneBasedDelivery` is on AND a zone
+  // matched, and it defaults to off. So on an ordinary shop this was
+  // `Number(undefined)` → NaN, and `isBeforeLeadTime` treats a non-finite lead
+  // as unconstrained: the bakery's "we need 3 days" was enforced by an `<input
+  // min=…>` and nothing else. Even with zones on, a zone configured at 1 day
+  // silently overrode a shop-wide 3. The browser already takes the stricter of
+  // the two; the server takes it now as well.
+  const leadDays = Math.max(
+    Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays) || 0,
+    Number(commerce.deliveryLeadDays) || 0,
+  );
   if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
     throw new AppError(
       `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
@@ -325,6 +338,34 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   if (minimum.below) {
     throw new AppError(
       `This shop's minimum order is ${formatCurrency(commerce.minOrderValue, currency)}. Please add ${formatCurrency(minimum.shortfall, currency)} more to continue.`,
+      409,
+    );
+  }
+
+  /**
+   * A method the shop actually offers.
+   *
+   * `commerce.paymentMethods` was read in four places and every one of them was
+   * in the browser. Not just a devtools hole either: the checkout page starts
+   * from `defaultCommerceSettings`, where every method is on, and pins the
+   * selected method to the first one that local copy allows — "cod". Hydration
+   * then arrives and removes the COD radio from the screen, but nothing resets
+   * the SELECTION, so an ordinary first-time customer submits `cod` to a shop
+   * that switched it off and the server takes it.
+   *
+   * Cash on Delivery is the one that hurts: a disabled card or UPI still needs
+   * a priced draft and a captured payment to land as paid, but a COD order goes
+   * straight to `confirmed` — a cake the bakery is expected to make and hand
+   * over for cash it decided it would no longer accept.
+   *
+   * Only for a cart that was never quoted, for the same reason the minimum is:
+   * refusing here would strand a customer whose card the gateway has already
+   * captured because an admin changed a switch in between. The quote endpoint
+   * refuses it before any money moves.
+   */
+  if (!draft && commerce.paymentMethods?.[input.paymentMethod] === false) {
+    throw new AppError(
+      "That payment method is not available at this shop. Please choose another.",
       409,
     );
   }
