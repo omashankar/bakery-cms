@@ -171,6 +171,58 @@ describe("the CMS pages store", () => {
     });
   });
 
+  describe("where a new page lands in the order", () => {
+    it("goes last, counted from what the shop actually has", async () => {
+      // The form defaulted this from the browser cache — the four-page demo
+      // seed, never the real list — so a shop with twenty pages defaulted every
+      // new page to 5 and they collided in the middle of the admin's order.
+      for (const page of await getPages()) await deletePage(page.id);
+      for (const order of [1, 2, 3, 4, 5, 6, 7]) {
+        await createPage({
+          title: `p${order}`,
+          slug: `p${order}`,
+          status: "draft",
+          sortOrder: order,
+        } as never);
+      }
+
+      const created = await createPage({
+        title: "newest",
+        slug: "newest",
+        status: "draft",
+        sortOrder: 0,
+      } as never);
+
+      expect(created.sortOrder).toBe(8);
+    });
+
+    it("keeps a position the admin typed", async () => {
+      const created = await createPage({
+        title: "second",
+        slug: "second",
+        status: "draft",
+        sortOrder: 2,
+      } as never);
+
+      expect(created.sortOrder).toBe(2);
+    });
+
+    it("treats a missing or nonsensical order as 'last'", async () => {
+      for (const page of await getPages()) await deletePage(page.id);
+      await createPage({ title: "a", slug: "a", status: "draft", sortOrder: 4 } as never);
+
+      for (const bad of [undefined, 0, -3, Number.NaN]) {
+        const created = await createPage({
+          title: `x${String(bad)}`,
+          slug: `x${String(bad)}`,
+          status: "draft",
+          sortOrder: bad,
+        } as never);
+        expect(created.sortOrder).toBeGreaterThan(4);
+      }
+    });
+  });
+
   it("keeps a shop's own pages once it has any", async () => {
     for (const page of await getPages()) await deletePage(page.id);
 

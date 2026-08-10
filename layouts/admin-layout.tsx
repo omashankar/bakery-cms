@@ -19,6 +19,7 @@ import { useInvoiceSettingsServerSync } from "@/features/commerce/lib/use-invoic
 import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useMediaUsageSync } from "@/apps/admin/media/lib/use-media-usage-sync";
+import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
 import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
 import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
@@ -55,6 +56,8 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   // Load every server-held place a media URL can be referenced, so the library
   // can tell an unused file from one it simply has not looked for yet.
   useMediaUsageSync();
+  // Hydrate the CMS pages so the admin global search finds the real ones.
+  usePagesServerSync();
   // Hydrate email/WhatsApp templates + notification settings from the server.
   useCommunicationsServerSync();
   // Hydrate inquiries (contact-form submissions) from the server.

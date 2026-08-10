@@ -179,10 +179,24 @@ export function loadPages(): CmsPage[] {
 
   try {
     const parsed = JSON.parse(raw) as CmsPage[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedPages();
+    // An empty list is an answer — a shop that deleted every page must not
+    // see the four demo pages again on the next read.
+    return Array.isArray(parsed) ? parsed : seedPages();
   } catch {
     return seedPages();
   }
+}
+
+/**
+ * Hydration: write the server's pages into this browser cache (no re-push).
+ *
+ * Nothing ever did this, so the cache was the shipped demo seed forever — and
+ * the admin's global search read it. Every page the shop had actually created
+ * was unfindable, and a page it had deleted still appeared in the results,
+ * navigating to an editor that bounced straight back with "Page not found".
+ */
+export function persistServerPages(pages: CmsPage[]): void {
+  persist(pages);
 }
 
 export function getPublishedPages(): CmsPage[] {
@@ -247,7 +261,10 @@ export function createEmptyPageForm(): CmsPageFormData {
     heroImage: "",
     status: "draft",
     isSystem: false,
-    sortOrder: loadPages().length + 1,
+    // 0 means "put it last" — the SERVER works out where that is. This used
+    // to read the browser cache, which is the demo seed and never the shop's
+    // real page list, so every new page defaulted to the same number.
+    sortOrder: 0,
     seo: {
       metaTitle: "",
       metaDescription: "",

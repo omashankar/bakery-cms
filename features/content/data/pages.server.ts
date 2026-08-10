@@ -108,8 +108,22 @@ export async function getPageForStorefront(
 export async function createPage(data: CmsPageFormData): Promise<CmsPage> {
   return store.mutate((pages) => {
     const timestamp = nowIso();
+    // The server knows how many pages there are; the browser did not.
+    //
+    // `createEmptyPageForm` defaulted sortOrder to `loadPages().length + 1` from
+    // the browser cache, which was the four-page demo seed and never the real
+    // list — so a shop with twenty pages defaulted every new one to 5, landing
+    // them in the middle of the admin's ordered list and colliding with each
+    // other. A positive value the admin typed is still theirs.
+    const requested = Number(data.sortOrder);
+    const sortOrder =
+      Number.isFinite(requested) && requested > 0
+        ? requested
+        : pages.reduce((max, page) => Math.max(max, page.sortOrder ?? 0), 0) + 1;
+
     const page = {
       ...data,
+      sortOrder,
       id: `page-${Date.now()}`,
       createdAt: timestamp,
       updatedAt: timestamp,
