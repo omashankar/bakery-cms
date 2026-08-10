@@ -331,6 +331,19 @@ export async function changePassword(
 
   await repo.updateUserPassword(userId, await hashPassword(input.newPassword));
   await repo.revokeRefreshTokensByUser(userId);
+  /**
+   * And the session ROWS, exactly as `resetPassword` does — its comment says
+   * "invalidate every existing session/token after a password reset" and it
+   * calls both. This called only the first.
+   *
+   * The Security Center derives its device list from the surviving rows
+   * (`SessionModel.find({ userId, expiresAt: { $gt: now } })`), and a row's
+   * `expiresAt` is the 30-day refresh TTL. A device that never comes back never
+   * self-cleans, so after changing their password an admin went on being shown
+   * phones and laptops as "active" on the one screen they would check to
+   * confirm the change had taken effect.
+   */
+  await repo.deleteSessionsByUser(userId);
 
   await writeAuditLog({
     action: "auth.change_password",

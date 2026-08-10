@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Eye, EyeOff, KeyRound, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { changePasswordRequest } from "@/features/auth/lib/auth-api";
+import { signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { cn } from "@/lib/utils";
 
 interface StrengthResult {
@@ -77,14 +79,31 @@ function PasswordField({
   );
 }
 
+/**
+ * The rule the SERVER applies — `strongPassword` is `.min(8).max(100)` plus a
+ * letter and a digit, and nothing else.
+ *
+ * This checklist demanded mixed case and a symbol, which the server does not
+ * ask for, and did not mention digits, which it does. It was wrong in both
+ * directions at once: an admin could satisfy every tick on screen and be
+ * refused 422 for having no number, or be told they needed a symbol that
+ * nothing required. And none of it gated the button — `canSubmit` checked
+ * length alone, so the digitless password was submitted before anything could
+ * say otherwise.
+ *
+ * The reset-password screen already states the server's rule and pre-checks it,
+ * and so does the Security settings card. This is the third copy, agreeing.
+ */
 const RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { label: "Upper & lowercase letters", test: (p: string) => /[A-Z]/.test(p) && /[a-z]/.test(p) },
-  { label: "At least one number", test: (p: string) => /\d/.test(p) },
-  { label: "At least one symbol", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { label: "Letters and numbers", test: (p: string) => /[a-zA-Z]/.test(p) && /\d/.test(p) },
 ];
 
+const meetsServerRule = (value: string) =>
+  value.length >= 8 && /[a-zA-Z]/.test(value) && /\d/.test(value);
+
 export function ChangePasswordPage() {
+  const router = useRouter();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -94,11 +113,13 @@ export function ChangePasswordPage() {
   const mismatch = confirm.length > 0 && confirm !== next;
 
   const canSubmit =
-    current.length > 0 && next.length >= 8 && confirm === next && next !== current;
+    current.length > 0 && meetsServerRule(next) && confirm === next && next !== current;
 
   async function handleSubmit() {
     if (!current) return toast.error("Enter your current password");
-    if (next.length < 8) return toast.error("New password must be at least 8 characters");
+    if (!meetsServerRule(next)) {
+      return toast.error("New password must be at least 8 characters, with letters and numbers");
+    }
     if (next === current) return toast.error("New password must differ from the current one");
     if (confirm !== next) return toast.error("Passwords do not match");
 
@@ -112,9 +133,27 @@ export function ChangePasswordPage() {
       setCurrent("");
       setNext("");
       setConfirm("");
-      toast.success("Password updated", {
-        description: "Use your new password the next time you sign in.",
+
+      /**
+       * The session this was done from is already gone.
+       *
+       * `changePassword` ends with `revokeRefreshTokensByUser(userId)`, and that
+       * includes the refresh token in THIS browser's cookie — deliberately, and
+       * documented as such in the security policy. No new pair is issued. So the
+       * heartbeat's next refresh fails silently, the access cookie expires on
+       * its own within five to fifteen minutes, and the CMS starts 401-ing under
+       * an admin who was told to "use your new password the next time you sign
+       * in" and had no reason to expect the panel to stop working.
+       *
+       * Signing out properly clears the cookies — `logout` handles an
+       * already-revoked token — so the browser is left in one state instead of
+       * holding a valid-looking access cookie that is about to die.
+       */
+      await signOutOfThisDevice();
+      toast.success("Password updated — sign in again", {
+        description: "Changing your password signs you out on every device, including this one.",
       });
+      router.push(routes.auth.login);
     } catch (error) {
       toast.error("Could not update password", {
         description: error instanceof Error ? error.message : "Please try again.",

@@ -146,3 +146,58 @@ describe("what a refused write leaves behind", () => {
     expect(text).toContain("disabled={!analytics}");
   });
 });
+
+/**
+ * Changing the password revokes every refresh token for that admin — including
+ * the one in the cookie of the browser that just did it, deliberately, and named
+ * as such in the security policy. No new pair is issued.
+ *
+ * So the heartbeat's next refresh fails silently and the access cookie expires
+ * on its own within five to fifteen minutes: the CMS starts 401-ing under an
+ * admin who was told "use your new password the next time you sign in" and had
+ * no reason to expect the panel to stop working. The revocation is right; the
+ * sentence was wrong.
+ */
+describe("changing the password", () => {
+  const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("says it signs you out everywhere, and does it here too", () => {
+    const page = source("apps/admin/profile/components/change-password-page.tsx");
+
+    expect(page).toContain("await signOutOfThisDevice()");
+    expect(page).toContain("Password updated — sign in again");
+    expect(page).toContain("signs you out on every device, including this one");
+    // The sentence that was untrue.
+    expect(page).not.toContain("Use your new password the next time you sign in.");
+  });
+
+  it("states the rule the server actually applies", () => {
+    const page = source("apps/admin/profile/components/change-password-page.tsx");
+    const rules = page.slice(page.indexOf("const RULES = ["), page.indexOf("const meetsServerRule"));
+
+    // The checklist was wrong in both directions: it demanded mixed case and a
+    // symbol the server never asks for, and never mentioned the digit it does.
+    expect(rules).toContain("Letters and numbers");
+    expect(rules).not.toContain("At least one symbol");
+    expect(rules).not.toContain("Upper & lowercase letters");
+  });
+
+  it("gates the button on that rule instead of on length alone", () => {
+    const page = source("apps/admin/profile/components/change-password-page.tsx");
+
+    expect(page).toContain("current.length > 0 && meetsServerRule(next)");
+    expect(page).not.toContain("current.length > 0 && next.length >= 8 && confirm === next");
+  });
+
+  it("removes the session rows, as the reset path already did", () => {
+    const service = source("features/auth/server/auth.service.ts");
+    const fn = service.slice(service.indexOf("export async function changePassword"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+
+    // The Security Center lists devices from the surviving rows, and a row's
+    // expiresAt is the 30-day refresh TTL — a device that never comes back never
+    // self-cleans.
+    expect(body).toContain("await repo.revokeRefreshTokensByUser(userId);");
+    expect(body).toContain("await repo.deleteSessionsByUser(userId);");
+  });
+});
