@@ -211,9 +211,12 @@ function lowPersistMedia(files: MediaFile[]): void {
  * small URLs; the graceful-degrade path stores data URIs, so avoid a very large
  * library of un-uploaded images (a Mongo document is capped at 16MB).
  */
-async function persistMedia(files: MediaFile[]): Promise<boolean> {
+async function persistMedia(
+  files: MediaFile[],
+  deletedIds: string[] = [],
+): Promise<boolean> {
   lowPersistMedia(files);
-  return replaceMediaFilesRequest(files);
+  return replaceMediaFilesRequest(files, deletedIds);
 }
 
 export async function saveMediaFiles(files: MediaFile[]): Promise<boolean> {
@@ -313,7 +316,8 @@ export async function deleteMediaFiles(ids: string[]): Promise<WriteResult<numbe
   const files = loadMediaFiles();
   const next = files.filter((file) => !ids.includes(file.id));
   const count = files.length - next.length;
-  const persisted = await persistMedia(next);
+  // Naming them is what authorises destroying their Cloudinary assets.
+  const persisted = await persistMedia(next, ids);
   if (count > 0) notifyMediaUpdated();
   return { value: count, persisted };
 }
