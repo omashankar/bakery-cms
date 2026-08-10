@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogOut } from "lucide-react";
-import { clearDemoSession } from "@/features/auth/lib/session";
-import { logoutRequest } from "@/features/auth/lib/auth-api";
+import { toast } from "sonner";
+import { SIGN_OUT_FAILED, signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,10 +27,25 @@ export function LogoutConfirmDialog({ open, onOpenChange }: LogoutConfirmDialogP
 
   async function handleLogout() {
     setLoading(true);
-    // Revoke the server session/cookies (access + refresh) first, then clear the
-    // local UI marker. Redirect regardless so the user is never stuck on failure.
-    await logoutRequest().catch(() => undefined);
-    clearDemoSession();
+
+    /**
+     * The login page is the report, so it must not be shown for a sign-out that
+     * did not happen.
+     *
+     * This discarded the server's answer and redirected "regardless so the user
+     * is never stuck on failure". The failure it was routing around is the one
+     * that matters: only the server clears the auth cookies, nothing guards
+     * `/admin` in the browser, and the refresh cookie lasts thirty days. So on a
+     * shared machine the admin landed on the login form, walked away, and the
+     * next person to type /admin/orders was signed in as them.
+     */
+    const signedOut = await signOutOfThisDevice();
+    if (!signedOut) {
+      toast.error(SIGN_OUT_FAILED.title, { description: SIGN_OUT_FAILED.description });
+      setLoading(false);
+      return;
+    }
+
     router.push(routes.auth.login);
     // Keep `loading` true — the component unmounts on navigation, so resetting it
     // would only risk a flash of the enabled state.

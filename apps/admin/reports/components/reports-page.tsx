@@ -170,6 +170,25 @@ export function ReportsPage() {
   const showComparison = shownRange !== "all";
 
   function handleExport() {
+    /**
+     * A file of zeroes is worse than no file.
+     *
+     * Every figure on this page falls back to `emptySummary` and empty lists
+     * while the analytics read has not succeeded — which is right for the
+     * screen, because the header beside it says so. The export inherited those
+     * fallbacks and said nothing: the admin got `bakery-reports-30d-….csv`
+     * reading ₹0 revenue, 0 orders, no products and no customers, under a green
+     * "Full report exported to CSV", and a CSV outlives the toast. The same
+     * shape was already repaired on the Orders screen, whose cards read "—" and
+     * "Unavailable" rather than "0 orders, ₹0".
+     */
+    if (!analytics) {
+      toast.error("No figures loaded — nothing to export", {
+        description: "The report could not be read from the server. Try again.",
+      });
+      return;
+    }
+
     exportReportsCsv(
       summary,
       topProducts,
@@ -211,7 +230,14 @@ export function ReportsPage() {
                 </option>
               ))}
             </AdminSelect>
-            <Button variant="bakery" className="shrink-0" onClick={handleExport}>
+            {/* Disabled while there is nothing from the server, so the refusal
+                above is a backstop rather than the first thing the admin meets. */}
+            <Button
+              variant="bakery"
+              className="shrink-0"
+              disabled={!analytics}
+              onClick={handleExport}
+            >
               <Download className="size-4" />
               <span className="sm:hidden">Export</span>
               <span className="hidden sm:inline">Export CSV</span>

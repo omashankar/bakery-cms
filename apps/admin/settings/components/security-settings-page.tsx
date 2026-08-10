@@ -32,8 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { clearDemoSession } from "@/features/auth/lib/session";
-import { logoutRequest } from "@/features/auth/lib/auth-api";
+import { SIGN_OUT_FAILED, signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import type { SecuritySettings } from "@/types/settings";
@@ -189,16 +188,26 @@ export function SecuritySettingsPage() {
     // Revoke OTHER devices (fires with the current cookie) AND this device's own
     // session/cookie, so "everywhere" truly includes the current browser.
     const { persisted } = await logoutAllDevices();
-    const selfLoggedOut = await logoutRequest()
-      .then(() => true)
-      .catch(() => false);
-    clearDemoSession();
+    const selfLoggedOut = await signOutOfThisDevice();
     setLogoutEverywhereOpen(false);
 
-    // This browser is signed out either way — the local session is cleared and
-    // we are leaving for the login page — so the only thing worth reporting is
-    // whether the OTHER devices really went with it.
-    if (persisted && selfLoggedOut) {
+    /**
+     * "This browser is signed out either way" was the part that was untrue.
+     *
+     * Only the server's `clearAuthCookies()` signs this browser out; clearing
+     * the local marker gates nothing. So when the self-logout fails, the error
+     * this used to show blamed the OTHER devices while this one was still
+     * signed in — and it navigated to the login page anyway, which is what an
+     * admin reads as proof. Now the failure that is reported is the one that
+     * happened, and the browser only leaves for the login page once it really
+     * is signed out.
+     */
+    if (!selfLoggedOut) {
+      toast.error(SIGN_OUT_FAILED.title, { description: SIGN_OUT_FAILED.description });
+      return;
+    }
+
+    if (persisted) {
       toast.success("Signed out on all devices");
     } else {
       toast.error("Signed out here, but some devices may still be signed in", {

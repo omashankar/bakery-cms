@@ -102,8 +102,36 @@ export async function saveAdminProfile(
     username: patch.username.trim(),
     photoUrl: patch.photoUrl,
   };
+  const previous = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
   if (!write(next)) return false;
-  return replaceAdminProfileRequest(next);
+
+  const persisted = await replaceAdminProfileRequest(next);
+
+  /**
+   * Undo a write the server refused — the same guard `saveCustomCode` carries,
+   * in the same store, and this one was left without it.
+   *
+   * `ensureAdminConfigHydrated` returns early once the gate has settled, so
+   * nothing re-reads the server for the rest of the session. The rejected name
+   * therefore sat in the cache, and on the next mount `useHydratedForm` loaded
+   * it as BOTH the working copy and `saved` — so the form was clean, Save was
+   * disabled, and the admin had no way to retry an edit they had been told
+   * failed. The account menu read the same cache and greeted them by a name the
+   * server had never accepted.
+   *
+   * Restored only if this write is still the one in the cache, so a concurrent
+   * save the server DID accept is not destroyed.
+   */
+  if (!persisted && typeof window !== "undefined") {
+    const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
+    if (stillOurs) {
+      if (previous === null) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, previous);
+      window.dispatchEvent(new Event(ADMIN_PROFILE_UPDATED_EVENT));
+    }
+  }
+
+  return persisted;
 }
 
 /** Hydration: apply the server's saved profile fields locally (no re-push). */
