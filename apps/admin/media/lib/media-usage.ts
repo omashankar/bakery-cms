@@ -8,26 +8,58 @@ export interface MediaUsageRef {
   context: string;
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Where a media file is referenced, so the library can say whether deleting it
+ * will break something.
+ *
+ * This used to scan four localStorage keys — bakery-cms-homepage-draft,
+ * -published and the wedding pair — for the builders. Those keys do not exist:
+ * the page builders moved to MongoDB, and the browser stores that owned them are
+ * gone. So every builder scan silently matched nothing, and it never looked at
+ * CMS pages, testimonial avatars, the header logo, the footer or the SEO images
+ * at all.
+ *
+ * The consequence was not a cosmetic miscount. A hero image an admin had just
+ * chosen in the Homepage Builder was reported as "Not referenced in cakes,
+ * banners, or builders yet", counted on the Unused card, selectable through the
+ * Unused filter, and deleted — with Cloudinary configured, destroyed — while the
+ * live homepage still pointed at it.
+ *
+ * The server-held stores are fetched once on entering the admin and searched as
+ * text. `isUsageIndexReady` exists so that a caller about to DELETE can tell
+ * "nothing references this" apart from "I have not looked yet".
+ */
+
+interface RemoteSource {
+  label: string;
+  context: string;
+  haystack: string;
 }
 
-function scanStorageKeys(url: string, keys: string[], labelForKey: (key: string) => string): MediaUsageRef[] {
-  if (typeof window === "undefined") return [];
+let remoteSources: RemoteSource[] = [];
+let indexReady = false;
 
-  const refs: MediaUsageRef[] = [];
-  for (const key of keys) {
-    const raw = localStorage.getItem(key);
-    if (raw?.includes(url)) {
-      refs.push({ label: labelForKey(key), context: "Builder" });
-    }
-  }
-  return refs;
+/** Called by the admin's usage sync once the server documents are in. */
+export function setRemoteUsageIndex(sources: RemoteSource[]): void {
+  remoteSources = sources;
+  indexReady = true;
+}
+
+/** False until the server-held references have been loaded at least once. */
+export function isUsageIndexReady(): boolean {
+  return indexReady;
+}
+
+/** Test/reset helper. */
+export function clearRemoteUsageIndex(): void {
+  remoteSources = [];
+  indexReady = false;
 }
 
 export function getMediaUsageDetails(url: string): MediaUsageRef[] {
   const refs: MediaUsageRef[] = [];
   const normalized = url.trim();
+  if (!normalized) return refs;
 
   getAllProducts().forEach((cake) => {
     if (cake.image === normalized) {
@@ -51,30 +83,9 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
     refs.push({ label: "Gallery image", context: "Gallery" });
   }
 
-  refs.push(
-    ...scanStorageKeys(normalized, ["bakery-cms-homepage-draft", "bakery-cms-homepage-published"], (key) =>
-      key.includes("published") ? "Homepage (published)" : "Homepage (draft)"
-    )
-  );
-
-  refs.push(
-    ...scanStorageKeys(normalized, ["bakery-cms-wedding-draft", "bakery-cms-wedding-published"], (key) =>
-      key.includes("published") ? "Wedding page (published)" : "Wedding page (draft)"
-    )
-  );
-
-  if (typeof window !== "undefined") {
-    const productsRaw = localStorage.getItem("bakery-cms-admin-cakes");
-    if (productsRaw) {
-      try {
-        const pattern = new RegExp(escapeRegex(normalized), "g");
-        const matches = productsRaw.match(pattern);
-        if (matches && matches.length > 0 && !refs.some((ref) => ref.context === "Admin cake")) {
-          refs.push({ label: "Cake catalog", context: "Admin cakes JSON" });
-        }
-      } catch {
-        // ignore regex issues
-      }
+  for (const source of remoteSources) {
+    if (source.haystack.includes(normalized)) {
+      refs.push({ label: source.label, context: source.context });
     }
   }
 

@@ -318,4 +318,8 @@ export async function deleteMediaFiles(ids: string[]): Promise<WriteResult<numbe
   return { value: count, persisted };
 }
 
-export { countMediaUsage, getMediaUsageDetails } from "./media-usage";
+export {
+  countMediaUsage,
+  getMediaUsageDetails,
+  isUsageIndexReady,
+} from "./media-usage";

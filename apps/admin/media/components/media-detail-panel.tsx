@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/utils/format";
 import {
   getMediaUsageDetails,
+  isUsageIndexReady,
   updateMediaFile,
 } from "../lib/media-repository";
 import { loadMediaFolders } from "../lib/media-folders";
@@ -149,7 +150,12 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Not referenced in cakes, banners, or builders yet.
+            {/* The old wording named three places and checked the builders by
+                reading localStorage keys that no longer exist, so it said this
+                about images that were live on the homepage. */}
+            {isUsageIndexReady()
+              ? "Not used in cakes, banners, pages, testimonials, the site layout or either page builder."
+              : "Checking where this is used…"}
           </p>
         )}
 
