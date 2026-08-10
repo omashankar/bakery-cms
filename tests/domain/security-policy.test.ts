@@ -496,7 +496,30 @@ describe("a refused settings write", () => {
     const repo = code("features/settings/lib/settings-repository.ts");
     // A reset is not typing, so there is nothing to preserve — and `runWrite`
     // commits the returned value as the working copy regardless of acceptance.
-    expect(repo).toMatch(/return result\.persisted \? result : \{ \.\.\.result, value: getSecuritySettings\(\) \}/);
+    //
+    // This used to pin the SECURITY reset alone, which is how four sections
+    // ended up carrying the fix and five did not. It is one helper now, and
+    // every reset has to go through it — see settings-reset-refusal.test.ts,
+    // which exercises all nine against a server that refuses.
+    expect(repo).toMatch(/return result\.persisted \? result : \{ \.\.\.result, value: readCurrent\(\) \}/);
+
+    for (const section of [
+      "GeneralSettings",
+      "ContactSettings",
+      "SocialLinks",
+      "SecuritySettings",
+      "SmtpSettings",
+      "AnalyticsSettings",
+      "MaintenanceSettings",
+      "CommerceSettings",
+      "ModuleSettings",
+    ]) {
+      const body = repo.slice(repo.indexOf(`export function reset${section}(`));
+      expect(
+        body.slice(0, body.indexOf("\n}")),
+        `reset${section} does not go through resetToDefaults`,
+      ).toContain("resetToDefaults(");
+    }
   });
 });
 

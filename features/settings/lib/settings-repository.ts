@@ -423,65 +423,99 @@ export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLo
   return { value: value.activity, persisted };
 }
 
+/**
+ * A reset, reporting what is ACTUALLY in place when the server refuses one.
+ *
+ * `runWrite` commits the returned value as the form's working copy whatever the
+ * server answered — it has to, because on a refused SAVE that value is the
+ * admin's own typing and they must be able to retry it. A reset is not typing.
+ * Handing back the defaults after a refusal left the form showing the demo
+ * values over settings the shop still had: the toast said "the saved settings
+ * are unchanged" while the screen said the opposite, and the admin's next Save
+ * pushed those defaults up for real.
+ *
+ * Four of the nine resets were repaired for this, one at a time, each with its
+ * own copy of the explanation — and five were left on the old behaviour,
+ * Commerce among them, which carries the tax rate, the delivery fee, the
+ * minimum order value and which payment methods are switched on. One helper, so
+ * the tenth reset cannot be written the wrong way.
+ *
+ * `readCurrent` is called only on refusal, and reads the cache AFTER
+ * `rollBackCache` has undone the rejected write — so it is the last value the
+ * server confirmed, not the one it turned down.
+ */
+async function resetToDefaults<T>(
+  write: () => Promise<SettingsWriteResult<T>>,
+  readCurrent: () => T,
+): Promise<SettingsWriteResult<T>> {
+  const result = await write();
+  return result.persisted ? result : { ...result, value: readCurrent() };
+}
+
 /** Section-scoped resets — do not wipe sibling settings slices. */
-export async function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
-  const result = await saveGeneralSettings({ ...defaultGeneralSettings });
-  // A reset is not the admin's typing, so nothing needs preserving — hand
-  // back what is actually in place. `runWrite` commits the returned value
-  // as the working copy regardless of acceptance, so returning the defaults
-  // left the form showing them over a reset the server had refused.
-  return result.persisted ? result : { ...result, value: getGeneralSettings() };
+export function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
+  return resetToDefaults(
+    () => saveGeneralSettings({ ...defaultGeneralSettings }),
+    getGeneralSettings,
+  );
 }
 
-export async function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
-  const result = await saveContactSettings({ ...defaultContactSettings });
-  // A reset is not the admin's typing, so nothing needs preserving — hand
-  // back what is actually in place. `runWrite` commits the returned value
-  // as the working copy regardless of acceptance, so returning the defaults
-  // left the form showing them over a reset the server had refused.
-  return result.persisted ? result : { ...result, value: getContactSettings() };
+export function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
+  return resetToDefaults(
+    () => saveContactSettings({ ...defaultContactSettings }),
+    getContactSettings,
+  );
 }
 
-export async function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
-  const result = await saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link })));
-  // A reset is not the admin's typing, so nothing needs preserving — hand
-  // back what is actually in place. `runWrite` commits the returned value
-  // as the working copy regardless of acceptance, so returning the defaults
-  // left the form showing them over a reset the server had refused.
-  return result.persisted ? result : { ...result, value: getSocialLinks() };
+export function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
+  return resetToDefaults(
+    () => saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link }))),
+    getSocialLinks,
+  );
 }
 
-export async function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
-  const result = await saveSecuritySettings({ ...defaultSecuritySettings });
-  // A reset is not the admin's typing, so nothing needs preserving — hand
-  // back what is actually in place. `runWrite` commits the returned value
-  // as the working copy regardless of acceptance, so returning the defaults
-  // left the form showing them over a reset the server had refused.
-  return result.persisted ? result : { ...result, value: getSecuritySettings() };
+export function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
+  return resetToDefaults(
+    () => saveSecuritySettings({ ...defaultSecuritySettings }),
+    getSecuritySettings,
+  );
 }
 
 export function resetSmtpSettings(): Promise<SettingsWriteResult<SmtpSettings>> {
-  return saveSmtpSettings({ ...defaultSmtpSettings });
+  return resetToDefaults(() => saveSmtpSettings({ ...defaultSmtpSettings }), getSmtpSettings);
 }
 
 export function resetAnalyticsSettings(): Promise<SettingsWriteResult<AnalyticsSettings>> {
-  return saveAnalyticsSettings({ ...defaultAnalyticsSettings });
+  return resetToDefaults(
+    () => saveAnalyticsSettings({ ...defaultAnalyticsSettings }),
+    getAnalyticsSettings,
+  );
 }
 
 export function resetMaintenanceSettings(): Promise<SettingsWriteResult<MaintenanceSettings>> {
-  return saveMaintenanceSettings({ ...defaultMaintenanceSettings });
+  return resetToDefaults(
+    () => saveMaintenanceSettings({ ...defaultMaintenanceSettings }),
+    getMaintenanceSettings,
+  );
 }
 
 export function resetCommerceSettings(): Promise<SettingsWriteResult<CommerceSettings>> {
-  return saveCommerceSettings({
-    ...defaultCommerceSettings,
-    paymentMethods: { ...defaultCommerceSettings.paymentMethods },
-    deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
-  });
+  return resetToDefaults(
+    () =>
+      saveCommerceSettings({
+        ...defaultCommerceSettings,
+        paymentMethods: { ...defaultCommerceSettings.paymentMethods },
+        deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
+      }),
+    getCommerceSettings,
+  );
 }
 
 export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSettings>> {
-  return saveModuleSettings({ ...defaultModuleSettings });
+  return resetToDefaults(
+    () => saveModuleSettings({ ...defaultModuleSettings }),
+    getModuleSettings,
+  );
 }
 
 export function exportLocalStorageBackup(): Record<string, string | null> {
