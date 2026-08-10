@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,12 +53,25 @@ export function DeliverySlotsAdminPage() {
     const cleanedSlots = settings.deliveryTimeSlots
       .map((slot) => slot.trim())
       .filter(Boolean);
+
+    /**
+     * Say so rather than inventing one.
+     *
+     * An all-blank list used to be silently replaced with `["10:00 AM – 12:00
+     * PM"]` — a slot the admin never typed, saved under a toast that said
+     * "Delivery slots saved", and then offered to every customer at checkout.
+     * The server now enforces this list (an order for a slot the shop does not
+     * offer is refused), which makes a slot nobody chose worse than none.
+     */
+    if (cleanedSlots.length === 0) {
+      toast.error("Add at least one delivery time", {
+        description: "Customers choose from this list at checkout, so it cannot be empty.",
+      });
+      return;
+    }
+
     // `save` reports the server outcome itself.
-    void save("Delivery slots saved", {
-      ...settings,
-      deliveryTimeSlots:
-        cleanedSlots.length > 0 ? cleanedSlots : ["10:00 AM – 12:00 PM"],
-    });
+    void save("Delivery slots saved", { ...settings, deliveryTimeSlots: cleanedSlots });
   }
 
   return (

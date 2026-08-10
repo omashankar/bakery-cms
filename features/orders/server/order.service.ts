@@ -21,7 +21,7 @@ import {
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
-import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
+import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
   priceCart,
@@ -311,6 +311,30 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
     throw new AppError(
       `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
+      409,
+    );
+  }
+
+  /**
+   * And a slot the shop actually offers.
+   *
+   * `commerce.deliveryTimeSlots` was read by the admin page that edits it and
+   * the storefront dropdown that renders it, and by nothing else — so a slot
+   * the bakery had removed was still accepted, then printed on the invoice and
+   * pushed into the WhatsApp alert as a delivery it is expected to make.
+   *
+   * Only for a cart that was never quoted, for the same reason as the minimum
+   * order and the payment method: refusing after the gateway has captured would
+   * strand a paying customer because an admin edited the slot list in between.
+   * The quote endpoint refuses it while it is still free.
+   */
+  if (
+    !draft &&
+    input.deliverySlot?.timeSlot &&
+    !isOfferedTimeSlot(input.deliverySlot.timeSlot, commerce.deliveryTimeSlots ?? [])
+  ) {
+    throw new AppError(
+      "That delivery time is not one this shop offers. Please choose another.",
       409,
     );
   }

@@ -6,7 +6,7 @@ import { getMaintenanceState } from "@/features/settings/server/maintenance.serv
 import { priceCart, UnknownProductError, UnknownWeightError } from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
-import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
+import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { formatCurrency } from "@/utils/format";
 
@@ -50,22 +50,38 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
   try {
     const quote = await priceCart({ ...input, deliveryAddress: pricingAddress });
 
-    // Refuse an impossible delivery date HERE, before any money moves.
+    // Refuse an impossible delivery WINDOW here, before any money moves.
     //
-    // The same rule is enforced at placement, but placement runs after the
+    // The same rules are enforced at placement, but placement runs after the
     // gateway has captured — so a refusal there strands a paid customer, and the
     // webhook retries the identical doomed placement until the gateway gives up.
     // The quote is the last moment this costs nothing.
+
+    // A slot the shop actually offers. `commerce.deliveryTimeSlots` was read by
+    // the admin page that edits it and the storefront dropdown that renders it,
+    // and by nothing else — so a slot the bakery had removed was still accepted
+    // and printed on the invoice as a delivery it is expected to make.
+    if (
+      input.deliverySlot?.timeSlot &&
+      !isOfferedTimeSlot(input.deliverySlot.timeSlot, quote.commerce.deliveryTimeSlots ?? [])
+    ) {
+      throw new AppError(
+        "That delivery time is not one this shop offers. Please choose another.",
+        409,
+        [{ field: "deliverySlot.timeSlot", message: "Not an available delivery time" }],
+      );
+    }
+
     // The stricter of the zone's lead time and the shop's own. The shop-wide
     // `deliveryLeadDays` was read by the date picker and by nothing on the
     // server — and the zone value only exists when zone pricing is on and a
     // zone matched, so on a default shop this was NaN and `isBeforeLeadTime`
-    // waved everything through. Same rule as `placeOrder`, applied where a
-    // refusal is still free.
+    // waved everything through.
     const leadDays = Math.max(
       Number((quote.totals as { deliveryMinDays?: number }).deliveryMinDays) || 0,
       Number(quote.commerce.deliveryLeadDays) || 0,
     );
+
     if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
       throw new AppError(
         `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
