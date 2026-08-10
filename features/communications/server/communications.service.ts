@@ -203,17 +203,35 @@ export function keepServerApproval(
   const byId = new Map(
     stored
       .filter((item) => item.id)
-      .map((item) => [item.id as string, item as { approval?: string; metaName?: string }]),
+      .map((item) => [
+        item.id as string,
+        item as { approval?: string; metaName?: string; metaLanguage?: string },
+      ]),
   );
+
+  /**
+   * Meta approves a template per NAME AND LANGUAGE, so both are identity.
+   *
+   * This compared the name alone. `listMetaTemplates` keys its results
+   * `name|language` and `planMetaSync` builds its lookup the same way, for
+   * exactly this reason — the language is as identity-bearing as the name. So an
+   * admin who kept the name and switched the language from `en` to `hi` carried
+   * the old approval across: the send path gates only on that flag
+   * (`if (template.approval !== "approved") return`) and then passes the NEW
+   * language straight to Meta, which has approved nothing under it. Every send
+   * is rejected, and the screen still shows the template as approved.
+   */
+  const identity = (value: { metaName?: string; metaLanguage?: string } | undefined) =>
+    `${(value?.metaName ?? "").trim()}|${(value?.metaLanguage ?? "").trim()}`;
 
   return incoming.map((item) => {
     const previous = item.id ? byId.get(item.id) : undefined;
-    const sameName =
-      (previous?.metaName ?? "").trim() === ((item as { metaName?: string }).metaName ?? "").trim();
+    const sameBinding =
+      identity(previous) === identity(item as { metaName?: string; metaLanguage?: string });
 
     return {
       ...item,
-      approval: previous && sameName ? (previous.approval ?? "not_submitted") : "not_submitted",
+      approval: previous && sameBinding ? (previous.approval ?? "not_submitted") : "not_submitted",
     };
   });
 }

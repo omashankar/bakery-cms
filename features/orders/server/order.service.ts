@@ -691,19 +691,28 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // rather than logging a failure on every order. Note that this passes no
   // `invoice_url` — a link has to be inside the wording Meta approved, so it
   // cannot be supplied per-message the way it can in an email.
-  await notifyWhatsApp(
-    "order_confirmation",
-    placed.address.phone,
-    {
-      customer_name: placed.address.fullName?.trim() || "there",
-      order_number: placed.orderNumber,
-      order_total: formatCurrency(placed.totals.total, currency),
-      delivery_date: placed.deliverySlot?.date
-        ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
-        : new Date(placed.estimatedDelivery).toDateString(),
-    },
-    `confirmation for ${placed.orderNumber}`,
-  );
+  //
+  // GATED ON THE SAME SWITCH AS THE EMAIL ABOVE IT. That gate was added with
+  // the comment "Its switches stored a preference that nothing read" — and its
+  // sibling thirty lines down went on sending unconditionally, so the Payment
+  // Notifications screen showed the WhatsApp chip OFF while WhatsApp kept
+  // going out. Every `isNotificationEnabled` call in this file passed "email";
+  // nothing anywhere passed "whatsapp".
+  if (await isNotificationEnabled("cust_payment_success", "whatsapp")) {
+    await notifyWhatsApp(
+      "order_confirmation",
+      placed.address.phone,
+      {
+        customer_name: placed.address.fullName?.trim() || "there",
+        order_number: placed.orderNumber,
+        order_total: formatCurrency(placed.totals.total, currency),
+        delivery_date: placed.deliverySlot?.date
+          ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+          : new Date(placed.estimatedDelivery).toDateString(),
+      },
+      `confirmation for ${placed.orderNumber}`,
+    );
+  }
 
   // And tell the BAKERY.
   //

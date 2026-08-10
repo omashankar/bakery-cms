@@ -55,7 +55,19 @@ export const PAYMENT_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     event: "Payment Success",
     title: "Payment successful 🎉",
     message: "Your payment of {amount} for order {order} is confirmed. We're preparing your cakes!",
-    channels: ["in_app", "email"],
+    /**
+     * WhatsApp belongs here because the order confirmation has always gone out
+     * on it.
+     *
+     * `placeOrder` sends `order_confirmation` over WhatsApp whenever the shop
+     * has a connected, Meta-approved template — and the chip on the Payment
+     * Notifications screen was shown OFF, because this list did not mention it.
+     * The screen and the sender have been contradicting each other. Now that the
+     * send is gated on this switch, a default of `["in_app", "email"]` would
+     * silently stop a message every shop currently receives; the default has to
+     * describe what actually happens.
+     */
+    channels: ["in_app", "email", "whatsapp"],
     icon: "CheckCircle2",
   },
   {

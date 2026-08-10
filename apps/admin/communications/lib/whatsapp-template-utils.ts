@@ -114,3 +114,25 @@ export function filterWhatsAppTemplates(
     return haystack.includes(query);
   });
 }
+
+/**
+ * Parameters mapped BEYOND what Meta's approved body takes.
+ *
+ * `countUnfilledSlots` is one-directional by construction: it walks
+ * `Array.from({ length: slots })`, so with two slots and three parameters it
+ * counts zero blanks and the amber alert never renders. Meta rejects a send
+ * whose parameter count does not match the approved body, so the shop's
+ * confirmations stopped going out with nothing on the screen to explain it —
+ * and with `parameterCount: 0` the panel positively stated "This template takes
+ * no variables" while three parameters sat in the record.
+ *
+ * The server cannot catch it either: `parameterCount` comes from Meta and is
+ * only known here, on the screen that does the mapping.
+ */
+export function countSurplusParameters(
+  slots: number,
+  parameters: readonly string[] | undefined,
+): number {
+  const mapped = (parameters ?? []).filter((value) => value?.trim()).length;
+  return Math.max(0, mapped - Math.max(0, slots));
+}
