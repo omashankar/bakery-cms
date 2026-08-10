@@ -178,3 +178,84 @@ describe("a reset the server refused", () => {
     expect((result.value as CommerceSettings).deliveryFee).toBe(defaultAppSettings.commerce.deliveryFee);
   });
 });
+
+/**
+ * A reset is a RESET, not a PUT of the defaults.
+ *
+ * For eight sections those are the same thing. For SMTP they are not:
+ * `defaultSmtpSettings.password` is `""`, and the server reads a blank password
+ * as "keep the stored one" — a rule that has to exist, because the form is
+ * never sent the password back and would otherwise wipe a working credential
+ * every time somebody toggled `enabled`. So Reset wrote the demo host, port and
+ * username with the shop's OLD password reattached, told the admin "SMTP
+ * settings reset to defaults", and flipped the hint to "No password saved"
+ * while the mail transport went on authenticating with it.
+ */
+describe("how a reset reaches the server", () => {
+  function recordingServer() {
+    const calls: { url: string; method: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        calls.push({ url, method });
+        if (method === "GET") {
+          return { ok: true, status: 200, json: async () => ({ success: true, data: SERVER }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ success: true, data: {} }) };
+      }) as unknown as typeof fetch,
+    );
+    return calls;
+  }
+
+  it("posts to the section's reset endpoint and never PUTs the defaults", async () => {
+    const { repo } = await freshModules();
+    const calls = recordingServer();
+    await repo.hydrateSettingsFromServer();
+
+    const result = await repo.resetSmtpSettings();
+
+    expect(result.persisted).toBe(true);
+    expect(calls).toContainEqual({ url: "/api/settings/smtp/reset", method: "POST" });
+    // A PUT here is the bug: the server would re-attach the stored password.
+    expect(calls.filter((c) => c.url === "/api/settings/smtp" && c.method === "PUT")).toEqual([]);
+  });
+
+  it("does it for every section, not just the one that needed it", async () => {
+    const { repo } = await freshModules();
+    const calls = recordingServer();
+    await repo.hydrateSettingsFromServer();
+
+    for (const [section, reset] of [
+      ["general", repo.resetGeneralSettings],
+      ["contact", repo.resetContactSettings],
+      ["social", repo.resetSocialLinks],
+      ["security", repo.resetSecuritySettings],
+      ["smtp", repo.resetSmtpSettings],
+      ["analytics", repo.resetAnalyticsSettings],
+      ["maintenance", repo.resetMaintenanceSettings],
+      ["commerce", repo.resetCommerceSettings],
+      ["modules", repo.resetModuleSettings],
+    ] as const) {
+      await reset();
+      expect(calls, section).toContainEqual({
+        url: `/api/settings/${section}/reset`,
+        method: "POST",
+      });
+    }
+
+    expect(calls.filter((c) => c.method === "PUT")).toEqual([]);
+  });
+
+  it("applies the defaults locally once the server has taken it", async () => {
+    const { repo } = await freshModules();
+    recordingServer();
+    await repo.hydrateSettingsFromServer();
+    expect(repo.getCommerceSettings().deliveryFee).toBe(SERVER.commerce.deliveryFee);
+
+    await repo.resetCommerceSettings();
+
+    expect(repo.getCommerceSettings().deliveryFee).toBe(defaultAppSettings.commerce.deliveryFee);
+  });
+});

@@ -501,7 +501,12 @@ describe("a refused settings write", () => {
     // ended up carrying the fix and five did not. It is one helper now, and
     // every reset has to go through it — see settings-reset-refusal.test.ts,
     // which exercises all nine against a server that refuses.
-    expect(repo).toMatch(/return result\.persisted \? result : \{ \.\.\.result, value: readCurrent\(\) \}/);
+    expect(repo).toMatch(/if \(!\(await resetSectionRequest\(section\)\)\) return \{ value: readCurrent\(\), persisted: false \}/);
+    // And it drives the RESET endpoint, not a PUT of the defaults: the server
+    // reads a blank mail password as "keep the stored one", so a reset-by-PUT
+    // reattached the shop's real SMTP credential to the demo settings and
+    // reported the password cleared.
+    expect(repo).not.toMatch(/resetToDefaults\(\s*\(\) => save\w+\(/);
 
     for (const section of [
       "GeneralSettings",

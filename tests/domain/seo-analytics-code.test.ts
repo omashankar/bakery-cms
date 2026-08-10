@@ -117,9 +117,14 @@ describe("robots, sitemap and every storefront page", () => {
     // `getGlobalSeo()` answers from a module variable only client code writes.
     expect(robots).not.toContain("getGlobalSeo");
     expect(robots).toContain("getSeoStoreServer()");
-    // A synchronous robots() uses no request-time API, so Next prerenders it at
-    // build and it could never reflect a later change.
+    // Per REQUEST, not once at build. This used to assert only that `robots()`
+    // was `async` — which is not a request-time API, so `robots.js` stayed "a
+    // special Route Handler that is cached by default" and every crawler read
+    // the copy baked at build time. Nothing in the getSeoStoreServer chain
+    // touches headers/cookies either, so the opt-out has to be explicit.
     expect(robots).toMatch(/export default async function robots/);
+    expect(robots).toContain("await connection();");
+    expect(robots).toContain('from "next/server"');
 
     const sitemap = code("app/sitemap.ts");
     expect(sitemap).toContain("getSeoStoreServer()");

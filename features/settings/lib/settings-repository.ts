@@ -29,6 +29,7 @@ import {
   fetchFullSettings,
   fetchPublicSettings,
   pushSection,
+  resetSectionRequest,
   SERVER_SECTIONS,
   settingsHydration,
 } from "./settings-api";
@@ -466,82 +467,98 @@ export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLo
  * minimum order value and which payment methods are switched on. One helper, so
  * the tenth reset cannot be written the wrong way.
  *
- * `readCurrent` is called only on refusal, and reads the cache AFTER
- * `rollBackCache` has undone the rejected write — so it is the last value the
- * server confirmed, not the one it turned down.
+ * `readCurrent` is called only on refusal, so it reads the last value the
+ * server confirmed rather than the one it turned down.
+ *
+ * AND IT DRIVES THE RESET ENDPOINT, not a PUT of the defaults. For eight
+ * sections those are the same thing; for SMTP they are not.
+ * `defaultSmtpSettings.password` is `""`, and the server reads a blank password
+ * as "keep the stored one" — a rule that must exist, because the form is never
+ * sent the password back. So a "reset" wrote the demo host, port and username
+ * with the shop's OLD password reattached, said "SMTP settings reset to
+ * defaults", and flipped the hint to "No password saved" while the mail
+ * transport went on authenticating with it. `POST /api/settings/<section>/reset`
+ * skips that rule and files a `settings.reset.<section>` audit row instead of an
+ * update. See `resetSectionRequest`.
  */
-async function resetToDefaults<T>(
-  write: () => Promise<SettingsWriteResult<T>>,
-  readCurrent: () => T,
-): Promise<SettingsWriteResult<T>> {
-  const result = await write();
-  return result.persisted ? result : { ...result, value: readCurrent() };
+async function resetToDefaults<K extends keyof AppSettings>(
+  section: K & string,
+  defaults: AppSettings[K],
+  readCurrent: () => AppSettings[K],
+  details: string,
+): Promise<SettingsWriteResult<AppSettings[K]>> {
+  // The local cache is rewritten from the defaults below, and doing that to an
+  // unhydrated cache leaves the demo seed where the next save will push it.
+  if (!(await ensureSettingsHydrated())) return { value: readCurrent(), persisted: false };
+  if (!(await resetSectionRequest(section))) return { value: readCurrent(), persisted: false };
+
+  // The server has already done it, so this is a LOCAL write only — pushing
+  // the defaults back would be the PUT this exists to avoid.
+  const current = loadSettings();
+  const next = appendActivity(
+    mergeAppSettings({ ...current, [section]: defaults } as Partial<AppSettings>),
+    "reset",
+    "settings",
+    details,
+  );
+  const saved = saveSettings(next);
+  return { value: saved[section], persisted: true };
 }
 
 /** Section-scoped resets — do not wipe sibling settings slices. */
 export function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
-  return resetToDefaults(
-    () => saveGeneralSettings({ ...defaultGeneralSettings }),
-    getGeneralSettings,
-  );
+  return resetToDefaults("general", { ...defaultGeneralSettings }, getGeneralSettings, "General settings reset");
 }
 
 export function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
-  return resetToDefaults(
-    () => saveContactSettings({ ...defaultContactSettings }),
-    getContactSettings,
-  );
+  return resetToDefaults("contact", { ...defaultContactSettings }, getContactSettings, "Contact settings reset");
 }
 
 export function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
   return resetToDefaults(
-    () => saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link }))),
+    "social",
+    defaultSocialLinks.map((link) => ({ ...link })),
     getSocialLinks,
+    "Social links reset",
   );
 }
 
 export function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
-  return resetToDefaults(
-    () => saveSecuritySettings({ ...defaultSecuritySettings }),
-    getSecuritySettings,
-  );
+  return resetToDefaults("security", { ...defaultSecuritySettings }, getSecuritySettings, "Security settings reset");
 }
 
 export function resetSmtpSettings(): Promise<SettingsWriteResult<SmtpSettings>> {
-  return resetToDefaults(() => saveSmtpSettings({ ...defaultSmtpSettings }), getSmtpSettings);
+  return resetToDefaults("smtp", { ...defaultSmtpSettings }, getSmtpSettings, "SMTP settings reset");
 }
 
 export function resetAnalyticsSettings(): Promise<SettingsWriteResult<AnalyticsSettings>> {
-  return resetToDefaults(
-    () => saveAnalyticsSettings({ ...defaultAnalyticsSettings }),
-    getAnalyticsSettings,
-  );
+  return resetToDefaults("analytics", { ...defaultAnalyticsSettings }, getAnalyticsSettings, "Analytics settings reset");
 }
 
 export function resetMaintenanceSettings(): Promise<SettingsWriteResult<MaintenanceSettings>> {
   return resetToDefaults(
-    () => saveMaintenanceSettings({ ...defaultMaintenanceSettings }),
+    "maintenance",
+    { ...defaultMaintenanceSettings },
     getMaintenanceSettings,
+    "Maintenance settings reset",
   );
 }
 
 export function resetCommerceSettings(): Promise<SettingsWriteResult<CommerceSettings>> {
   return resetToDefaults(
-    () =>
-      saveCommerceSettings({
-        ...defaultCommerceSettings,
-        paymentMethods: { ...defaultCommerceSettings.paymentMethods },
-        deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
-      }),
+    "commerce",
+    {
+      ...defaultCommerceSettings,
+      paymentMethods: { ...defaultCommerceSettings.paymentMethods },
+      deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
+    },
     getCommerceSettings,
+    "Commerce settings reset",
   );
 }
 
 export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSettings>> {
-  return resetToDefaults(
-    () => saveModuleSettings({ ...defaultModuleSettings }),
-    getModuleSettings,
-  );
+  return resetToDefaults("modules", { ...defaultModuleSettings }, getModuleSettings, "Module settings reset");
 }
 
 export function exportLocalStorageBackup(): Record<string, string | null> {

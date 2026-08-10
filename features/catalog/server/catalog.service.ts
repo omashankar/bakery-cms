@@ -54,7 +54,14 @@ export async function updateSection(section: string, value: unknown, ctx: Reques
 }
 
 export async function resetSection(section: string, ctx: RequestCtx) {
-  if (!(section in SECTION_DEFAULTS)) throw new NotFoundError("Unknown catalog section");
+  // `Object.hasOwn`, because `in` walks the prototype chain — the same defect,
+  // in the same shape, as the settings reset beside it. `__proto__`,
+  // `constructor` and `toString` all answered true, took a function into
+  // `doc.set()`, and came back 200 "Catalog reset" with an audit row
+  // (`catalog.reset.__proto__`) recording a reset that never happened.
+  if (!Object.hasOwn(SECTION_DEFAULTS, section)) {
+    throw new NotFoundError("Unknown catalog section");
+  }
   const doc = await repo.updateSection(section, SECTION_DEFAULTS[section]);
   await writeAuditLog({
     action: `catalog.reset.${section}`,
