@@ -15,7 +15,6 @@ import {
   Phone,
   Quote,
   Send,
-  Star,
   Store,
   Tag,
   Truck,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader } from "@/components/shared/section-header";
+import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
@@ -658,11 +658,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
             key={item.id}
             className="flex flex-col rounded-xl border border-border bg-white p-6 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
           >
-            <div className="mb-4 flex items-center gap-0.5 text-gold-300">
-              {Array.from({ length: 5 }).map((_, star) => (
-                <Star key={star} className="size-4 fill-current" />
-              ))}
-            </div>
+            <RatingStars rating={item.rating} className="mb-4 text-gold-300" />
             <Quote className="mb-2 size-6 text-gold-300/60" />
             <p className="flex-1 text-sm leading-relaxed text-muted-foreground">
               {item.content}

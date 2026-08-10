@@ -14,7 +14,6 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
@@ -231,12 +230,16 @@ export function BannersAdminPage() {
     );
   }
 
-  function confirmReset() {
-    resetBanners();
+  async function confirmReset() {
+    // Reported the way every other write on this page is: on what the server
+    // said. This used to toast success for a reset that only ever touched
+    // localStorage — the database kept the shop's real banners, the storefront
+    // never changed, and the next hydration silently undid it.
+    const { persisted } = await resetBanners();
     refresh();
     setSelectedIds([]);
     setResetOpen(false);
-    toast.success("Banners reset to defaults");
+    reportWrite(persisted, "Banners reset to defaults");
   }
 
   return (
@@ -291,7 +294,11 @@ export function BannersAdminPage() {
           <DashboardStatCard
             title="Active"
             value={overview.active}
-            change="Live on storefront"
+            // Not "Live on storefront": this counts every banner inside its
+            // schedule window whatever its position, and only hero banners have
+            // a renderer. The Hero strip card beside it is the one that says
+            // what a visitor actually sees.
+            change="Switched on and in date"
             changeTone="positive"
             icon={LayoutTemplate}
             tone="bakery"

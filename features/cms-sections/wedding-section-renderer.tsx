@@ -10,12 +10,12 @@ import {
   Leaf,
   Palette,
   Quote,
-  Star,
   Tag,
   Truck,
 } from "lucide-react";
 import { ContactForm } from "@/components/shared/contact-form";
 import { SectionHeader } from "@/components/shared/section-header";
+import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
@@ -505,11 +505,7 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
             className="flex h-full flex-col rounded-2xl border border-border bg-white p-6 transition-all hover:border-bakery-300 hover:shadow-sm"
           >
             <div className="flex items-center justify-between">
-              <div className="flex gap-0.5 text-gold-500">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="size-4 fill-current" />
-                ))}
-              </div>
+              <RatingStars rating={item.rating} className="text-gold-500" />
               <Quote className="size-7 text-gold-300/60" />
             </div>
             <p className="mt-4 flex-1 leading-relaxed text-muted-foreground">{item.content}</p>

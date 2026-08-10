@@ -20,10 +20,24 @@ export function getStorefrontFaqs(category?: FaqCategory): LandingFaq[] {
  * down as a prop; each section derives its list from that same snapshot rather
  * than re-reading the browser store, which keeps the pages hydration-safe.
  */
+/**
+ * Featured reviews first, then the admin's order.
+ *
+ * `isFeatured` was dead. The admin's list shows a Featured badge, the overview
+ * counts them on a card headed "Homepage highlights", and the form switch reads
+ * "Feature this review on homepage sections" — and every storefront section
+ * rendered every published testimonial in plain `sortOrder`, so ticking it did
+ * nothing at all and nothing said so. A shop had no way to choose which review
+ * led its homepage.
+ */
 export function selectStorefrontTestimonials(testimonials: Testimonial[]): LandingTestimonial[] {
   return testimonials
     .filter((item) => item.status === "published")
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.isFeatured)) - Number(Boolean(a.isFeatured)) ||
+        a.sortOrder - b.sortOrder,
+    )
     .map(toLandingTestimonial);
 }
 

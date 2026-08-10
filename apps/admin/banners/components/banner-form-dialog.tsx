@@ -1,5 +1,6 @@
 "use client";
 
+import { fromScheduleInputValue, toScheduleInputValue } from "@/lib/datetime-local";
 import { useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -66,8 +67,16 @@ function bannerToForm(banner: Banner): BannerFormState {
     position: banner.position,
     visibility: banner.visibility ?? "all",
     priority: banner.priority ?? 0,
-    startDate: banner.startDate ? banner.startDate.slice(0, 16) : "",
-    endDate: banner.endDate ? banner.endDate.slice(0, 16) : "",
+    // The stored value is a UTC instant; this field is local wall time.
+    //
+    // Slicing the ISO string fed 03:30 into a datetime-local input for a
+    // 09:00 IST start, so the field visibly jumped the moment the banner was
+    // reopened — and the next save re-encoded that displayed value as local,
+    // moving the real start another 5h30m earlier. Fixing a typo in the title
+    // was enough to walk a Diwali banner backwards a day. Same bug, and the
+    // same pair of helpers, as the builders' scheduled publish.
+    startDate: toScheduleInputValue(banner.startDate),
+    endDate: toScheduleInputValue(banner.endDate),
     isActive: banner.isActive,
   };
 }
@@ -137,8 +146,8 @@ export function BannerFormDialog({
       position: form.position,
       visibility: form.visibility,
       priority: Math.max(0, form.priority),
-      startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
-      endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
+      startDate: fromScheduleInputValue(form.startDate) ?? undefined,
+      endDate: fromScheduleInputValue(form.endDate) ?? undefined,
       isActive: form.isActive,
     };
     if (isEdit && bannerId) {

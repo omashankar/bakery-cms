@@ -76,7 +76,12 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     // outlets; this is the shop's real address and hours.
     getStorefrontLocation(settings),
   ]);
-  const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "all");
+  // "homepage", not "all" — `"all"` is the WILDCARD in this selector, meaning
+  // "apply no visibility filter", not the visibility value "all". Passing it
+  // here made the admin's Visibility field inert on the one server-rendered
+  // surface that reads banners: a banner scoped to "Collections pages" was
+  // rendered on the homepage anyway.
+  const banners = selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "homepage");
   // Categories computed on the server too, so the category sections render the
   // same in the HTML and on hydration.
   const categories = selectHomepageCategories(

@@ -24,7 +24,7 @@ import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder
 import {
   fromScheduleInputValue,
   toScheduleInputValue,
-} from "@/apps/admin/builders/shared/schedule-time";
+} from "@/lib/datetime-local";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { routes } from "@/constants/routes";
 import type { WeddingSectionInstance, WeddingSectionType } from "@/types/wedding-builder";

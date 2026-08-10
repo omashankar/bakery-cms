@@ -18,7 +18,7 @@ import { BuilderVersionHistoryPanel } from "@/apps/admin/builders/shared/builder
 import {
   fromScheduleInputValue,
   toScheduleInputValue,
-} from "@/apps/admin/builders/shared/schedule-time";
+} from "@/lib/datetime-local";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import {

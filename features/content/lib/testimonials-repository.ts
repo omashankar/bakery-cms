@@ -104,10 +104,15 @@ export function loadTestimonials(): Testimonial[] {
   }
 }
 
+/** Featured first, then the admin's order — the same rule as the server selector. */
 export function getPublishedTestimonials(): Testimonial[] {
   return loadTestimonials()
     .filter((item) => item.status === "published")
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.isFeatured)) - Number(Boolean(a.isFeatured)) ||
+        a.sortOrder - b.sortOrder,
+    );
 }
 
 export function toLandingTestimonial(item: Testimonial): LandingTestimonial {

@@ -103,12 +103,18 @@ export function persistServerBanners(banners: Banner[]): void {
   persist(banners);
 }
 
-export function resetBanners(): Banner[] {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
-    persist(defaultBanners);
-  }
-  return defaultBanners;
+/**
+ * Back to the shipped banners — on the SERVER as well as in this browser.
+ *
+ * This only ever touched localStorage, while its caller toasted "Banners reset
+ * to defaults" unconditionally. MongoDB still held the shop's real banners, the
+ * storefront never changed, and the next hydration quietly overwrote the local
+ * cache with the server's list — so the reset the admin was told had succeeded
+ * simply vanished. In between, the local cache held the demo banners, so any
+ * other edit pushed those to the server instead.
+ */
+export async function resetBanners(): Promise<WriteResult<Banner[]>> {
+  return saveBanners(defaultBanners);
 }
 
 export function getActiveHeroBanners(visibility: Banner["visibility"] | "all" = "all"): Banner[] {

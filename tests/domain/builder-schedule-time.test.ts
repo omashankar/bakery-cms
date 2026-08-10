@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   fromScheduleInputValue,
   toScheduleInputValue,
-} from "@/apps/admin/builders/shared/schedule-time";
+} from "@/lib/datetime-local";
 
 /** What the builder used to do: format the UTC instant and feed it to a local input. */
 function theOldWay(iso: string): string {
