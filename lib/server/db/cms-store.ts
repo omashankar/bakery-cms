@@ -19,16 +19,51 @@ import type { JsonStore } from "@/lib/server/json-store";
 interface CmsStoreShape {
   _id: string;
   data: unknown;
+  /** Bumped by every versioned write — see `writeVersioned`. */
+  version?: number;
 }
 
 const cmsStoreSchema = new mongoose.Schema(
-  { _id: { type: String }, data: { type: mongoose.Schema.Types.Mixed } },
+  {
+    _id: { type: String },
+    data: { type: mongoose.Schema.Types.Mixed },
+    version: { type: Number },
+  },
   { minimize: false, versionKey: false },
 );
+
+/**
+ * A write composed against a state that has since moved on.
+ *
+ * The admin content stores are replace-all: a save sends the WHOLE list. With
+ * nothing to compare against, a second tab — or the same tab left open — sends
+ * its older list and silently reverts everything done in between, while both
+ * report success.
+ */
+export class StoreConflictError extends Error {
+  readonly currentVersion: number;
+
+  constructor(currentVersion: number) {
+    super("This was changed somewhere else after you loaded it.");
+    this.name = "StoreConflictError";
+    this.currentVersion = currentVersion;
+  }
+}
 
 const CmsStoreModel: Model<CmsStoreShape> =
   (mongoose.models.CmsStore as Model<CmsStoreShape>) ||
   mongoose.model<CmsStoreShape>("CmsStore", cmsStoreSchema);
+
+/**
+ * A cms-store, plus the two operations that make a replace-all write safe.
+ *
+ * Kept off JsonStore because the file-backed store has no version column and
+ * nothing needs one there — only the shared admin collections do.
+ */
+export interface VersionedStore<T> extends JsonStore<T> {
+  readVersioned(): Promise<{ value: T; version: number }>;
+  writeVersioned(value: T, expectedVersion?: number): Promise<{ value: T; version: number }>;
+}
 
 export function createMongoStore<T>(options: {
   /** Unique key for this store, e.g. "pages" (was the JSON file name). */
@@ -36,7 +71,7 @@ export function createMongoStore<T>(options: {
   seed: () => T;
   normalize?: (value: T) => T;
   isValid?: (value: T) => boolean;
-}): JsonStore<T> {
+}): VersionedStore<T> {
   const { key } = options;
   let queue: Promise<unknown> = Promise.resolve();
 
@@ -62,8 +97,58 @@ export function createMongoStore<T>(options: {
     return seeded;
   }
 
+  /** The stored value together with the version it is at (0 before any versioned write). */
+  async function readVersionedUnlocked(): Promise<{ value: T; version: number }> {
+    await connectDB();
+    const doc = await CmsStoreModel.findById(key).lean();
+    const raw = doc ? (doc.data as T) : null;
+    const usable = raw !== null && (!options.isValid || options.isValid(raw));
+
+    if (!usable) {
+      const seeded = options.seed();
+      await writeToDb(seeded);
+      return { value: seeded, version: 0 };
+    }
+
+    return {
+      value: options.normalize ? options.normalize(raw as T) : (raw as T),
+      version: (doc as { version?: number } | null)?.version ?? 0,
+    };
+  }
+
   return {
     read: readUnlocked,
+
+    readVersioned() {
+      const run = queue.then(readVersionedUnlocked);
+      queue = run.catch(() => undefined);
+      return run;
+    },
+
+    /**
+     * Replace the value, refusing if the version moved since the caller read it.
+     *
+     * `expectedVersion` is optional so a caller with nothing to compare is not
+     * forced to invent one; passing it is what makes a replace-all safe.
+     */
+    writeVersioned(value, expectedVersion) {
+      const run = queue.then(async () => {
+        const current = await readVersionedUnlocked();
+        if (expectedVersion !== undefined && current.version !== expectedVersion) {
+          throw new StoreConflictError(current.version);
+        }
+        const version = current.version + 1;
+        await connectDB();
+        await CmsStoreModel.updateOne(
+          { _id: key },
+          { $set: { data: value, version } },
+          { upsert: true },
+        );
+        return { value, version };
+      });
+      queue = run.catch(() => undefined);
+      return run;
+    },
 
     async write(value) {
       const run = queue.then(() => writeToDb(value));

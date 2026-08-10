@@ -312,6 +312,25 @@ export async function bulkMoveMediaToFolder(
   return { value: count, persisted };
 }
 
+/**
+ * Reassign every file in one folder to another. Returns how many moved.
+ *
+ * Used when a folder is deleted, so its files land somewhere real instead of
+ * pointing at a folder that no longer exists.
+ */
+export async function moveFilesToFolder(fromId: string, toId: string): Promise<number> {
+  const files = loadMediaFiles();
+  const affected = files.filter((file) => file.folderId === fromId);
+  if (affected.length === 0) return 0;
+
+  const next = files.map((file) =>
+    file.folderId === fromId ? { ...file, folderId: toId, updatedAt: nowIso() } : file,
+  );
+  await persistMedia(next);
+  notifyMediaUpdated();
+  return affected.length;
+}
+
 export async function deleteMediaFiles(ids: string[]): Promise<WriteResult<number>> {
   const files = loadMediaFiles();
   const next = files.filter((file) => !ids.includes(file.id));

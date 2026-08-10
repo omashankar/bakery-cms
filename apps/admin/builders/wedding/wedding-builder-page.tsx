@@ -26,6 +26,8 @@ import {
   toScheduleInputValue,
 } from "@/lib/datetime-local";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
+import { fetchFaqs, fetchTestimonials } from "@/features/content/lib/content-api";
+import type { FaqItem, Testimonial } from "@/types/content";
 import { routes } from "@/constants/routes";
 import type { WeddingSectionInstance, WeddingSectionType } from "@/types/wedding-builder";
 import { AddSectionDialog } from "../shared/add-section-dialog";
@@ -77,6 +79,16 @@ export function WeddingBuilderPage() {
   const [publishMeta, setPublishMeta] = useState(EMPTY_META);
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+  /**
+   * Content the preview renders, read from the SERVER.
+   *
+   * The preview showed whatever this browser had cached: delete every FAQ and
+   * the builder still drew the eight demo questions, because the renderer's
+   * fallback reads localStorage while the live page reads MongoDB. The admin
+   * was reviewing a layout that did not match what would ship.
+   */
+  const [previewTestimonials, setPreviewTestimonials] = useState<Testimonial[]>([]);
+  const [previewFaqs, setPreviewFaqs] = useState<FaqItem[]>([]);
 
   /**
    * What is on screen right now, readable after an await — see settleDirty.
@@ -175,6 +187,20 @@ export function WeddingBuilderPage() {
 
     void load();
   }, [refreshRevisions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchTestimonials(), fetchFaqs()]).then(
+      ([testimonials, faqs]) => {
+        if (cancelled) return;
+        if (testimonials) setPreviewTestimonials(testimonials);
+        if (faqs) setPreviewFaqs(faqs);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Covers a sidebar click as well as a reload — the previous beforeunload-only
   // guard never fired on an App Router transition.
@@ -612,6 +638,8 @@ export function WeddingBuilderPage() {
               <WeddingSectionRenderer
                 key={section.instanceId}
                 section={section}
+                testimonials={previewTestimonials}
+                faqs={previewFaqs}
                 selected={ctx.selected}
                 interactive
                 onSelect={ctx.onSelect}

@@ -26,6 +26,9 @@ import {
   getRegistryEntry,
   HOMEPAGE_SECTION_REGISTRY,
 } from "@/constants/section-registry";
+import { fetchFaqs, fetchTestimonials, fetchBanners } from "@/features/content/lib/content-api";
+import type { FaqItem, Testimonial } from "@/types/content";
+import type { Banner } from "@/types/media";
 import { routes } from "@/constants/routes";
 import type {
   HomepageSectionInstance,
@@ -80,6 +83,17 @@ export function HomepageBuilderPage() {
   const [publishMeta, setPublishMeta] = useState(EMPTY_META);
   const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+  /**
+   * Content the preview renders, read from the SERVER.
+   *
+   * The preview showed whatever this browser had cached: delete every FAQ and
+   * the builder still drew the eight demo questions, because the renderer's
+   * fallback reads localStorage while the live page reads MongoDB. The admin
+   * was reviewing a layout that did not match what would ship.
+   */
+  const [previewTestimonials, setPreviewTestimonials] = useState<Testimonial[]>([]);
+  const [previewFaqs, setPreviewFaqs] = useState<FaqItem[]>([]);
+  const [previewBanners, setPreviewBanners] = useState<Banner[]>([]);
 
   /**
    * What is on screen right now, readable after an await — see settleDirty.
@@ -186,6 +200,21 @@ export function HomepageBuilderPage() {
 
     void load();
   }, [refreshRevisions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchTestimonials(), fetchFaqs(), fetchBanners()]).then(
+      ([testimonials, faqs, banners]) => {
+        if (cancelled) return;
+        if (testimonials) setPreviewTestimonials(testimonials);
+        if (faqs) setPreviewFaqs(faqs);
+        if (banners) setPreviewBanners(banners);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Covers a sidebar click as well as a reload — the previous beforeunload-only
   // guard never fired on an App Router transition.
@@ -635,6 +664,9 @@ export function HomepageBuilderPage() {
               <HomepageSectionRenderer
                 key={section.instanceId}
                 section={section}
+                testimonials={previewTestimonials}
+                faqs={previewFaqs}
+                banners={previewBanners}
                 selected={ctx.selected}
                 interactive
                 onSelect={ctx.onSelect}

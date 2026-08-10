@@ -12,10 +12,24 @@ interface Envelope<T> {
   data: T | null;
 }
 
+/**
+ * The version each collection was last read at, so a save can say which state
+ * it was composed against.
+ *
+ * Without it these replace-all writes had nothing to compare: a second admin
+ * tab sent its older list and silently reverted everything done in between,
+ * while both tabs reported success.
+ */
+const versions = new Map<string, number>();
+
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
+    // Optional-chained: a fetch stand-in need not carry headers, and losing
+    // the version must never turn a good read into a failed one.
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -35,11 +49,27 @@ async function getJson<T>(path: string): Promise<T | null> {
  */
 async function putJson(path: string, body: unknown): Promise<boolean> {
   try {
+    const known = versions.get(path);
     const res = await fetch(path, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(known === undefined ? {} : { "X-Content-Version": String(known) }),
+      },
       body: JSON.stringify(body),
     });
+
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
+
+    if (res.status === 409) {
+      // Someone else moved it on. Re-read so this tab stops being stale — the
+      // caller reports the refusal, and the admin's next attempt is against
+      // what is actually stored rather than conflicting forever.
+      void getJson(path);
+      return false;
+    }
+
     return res.ok;
   } catch {
     return false;
