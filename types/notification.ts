@@ -31,9 +31,25 @@ export interface NotificationSettings {
   inquiryAlerts: boolean;
 }
 
+/** The card groupings, which cover more than one type. */
+export type NotificationGroup = "stock_alerts" | "payment_alerts";
+
+export const NOTIFICATION_GROUPS: Record<NotificationGroup, NotificationType[]> = {
+  stock_alerts: ["low_stock", "out_of_stock"],
+  payment_alerts: ["payment_received", "payment_failed"],
+};
+
 export interface NotificationListFilters {
   search: string;
-  type: "all" | NotificationType;
+  /**
+   * A single type, or a GROUP matching one of the overview cards.
+   *
+   * The Stock card counts low_stock + out_of_stock and its click filtered to
+   * low_stock alone, so clicking the number hid exactly the products that
+   * cannot be sold at all. A card and the filter behind it have to mean the
+   * same thing.
+   */
+  type: "all" | NotificationType | NotificationGroup;
   status: "all" | "unread" | "read";
 }
 

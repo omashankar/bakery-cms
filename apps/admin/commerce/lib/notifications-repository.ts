@@ -17,6 +17,18 @@ import {
 const STORAGE_KEY = "bakery-cms-admin-notifications";
 const SETTINGS_KEY = "bakery-cms-notification-settings";
 const DISMISSED_KEY = "bakery-cms-notification-dismissed";
+/**
+ * The ids the admin has read, kept apart from the notification list itself.
+ *
+ * Read state used to be carried forward from the LAST STORED LIST, and that
+ * list is derived from the preference switches. So switching "Stock alerts"
+ * off dropped every stock notification out of the stored set, and switching it
+ * back on regenerated them with no read flag to inherit — every alert the
+ * admin had already worked through came back unread, and the bell count jumped
+ * with it. The same happened to any alert that fell out of the lookback window
+ * and returned. A set of ids survives both.
+ */
+const READ_KEY = "bakery-cms-notification-read";
 const MAX_NOTIFICATIONS = 250;
 const ORDER_LOOKBACK_DAYS = 30;
 const PAYMENT_LOOKBACK_DAYS = 7;
@@ -62,6 +74,32 @@ function readDismissedIds(): Set<string> {
 function writeDismissedIds(ids: Set<string>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+}
+
+function readReadIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+
+  try {
+    const raw = localStorage.getItem(READ_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeReadIds(ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+}
+
+/** Remember that these ids have been read, whatever the derived set does next. */
+function rememberRead(ids: string[]): void {
+  if (ids.length === 0) return;
+  const known = readReadIds();
+  for (const id of ids) known.add(id);
+  writeReadIds(known);
 }
 
 function readStoredNotifications(): AdminNotification[] {
@@ -169,10 +207,13 @@ function mergeReadState(
   existing: AdminNotification[]
 ): AdminNotification[] {
   const readMap = new Map(existing.map((item) => [item.id, item.read]));
+  // The durable set is consulted too, so an alert that left the derived set
+  // and came back does not return as unread — see READ_KEY.
+  const readIds = readReadIds();
 
   return generated.map((notification) => ({
     ...notification,
-    read: readMap.get(notification.id) ?? notification.read,
+    read: readIds.has(notification.id) || (readMap.get(notification.id) ?? notification.read),
   }));
 }
 
@@ -260,7 +301,17 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
           entityId: order.id,
           entityKind: "order",
           read: false,
-          createdAt: order.refundRecord.requestedAt ?? order.placedAt,
+          // Dated when THIS state happened, not when the refund was first asked
+          // for.
+          //
+          // Every stage carried `requestedAt`, so the alert saying the money had
+          // actually gone out was filed at the moment the customer requested it —
+          // days earlier in a feed sorted newest-first, below orders that arrived
+          // since. The one alert an operator most needs to see arrived buried.
+          createdAt:
+            (completed ? order.refundRecord.completedAt : undefined) ??
+            order.refundRecord.requestedAt ??
+            order.placedAt,
         });
       }
 
@@ -426,6 +477,7 @@ export function getNotificationOverview(): NotificationOverview {
 }
 
 export function markNotificationRead(id: string): void {
+  rememberRead([id]);
   const notifications = readStoredNotifications().map((notification) =>
     notification.id === id ? { ...notification, read: true } : notification
   );
@@ -433,6 +485,7 @@ export function markNotificationRead(id: string): void {
 }
 
 export function markNotificationsRead(ids: string[]): void {
+  rememberRead(ids);
   const idSet = new Set(ids);
   const notifications = readStoredNotifications().map((notification) =>
     idSet.has(notification.id) ? { ...notification, read: true } : notification
@@ -441,11 +494,11 @@ export function markNotificationsRead(ids: string[]): void {
 }
 
 export function markAllNotificationsRead(): void {
-  const notifications = readStoredNotifications().map((notification) => ({
-    ...notification,
-    read: true,
-  }));
-  writeStoredNotifications(notifications);
+  const notifications = readStoredNotifications();
+  rememberRead(notifications.map((notification) => notification.id));
+  writeStoredNotifications(
+    notifications.map((notification) => ({ ...notification, read: true })),
+  );
 }
 
 export function dismissNotification(id: string): void {
