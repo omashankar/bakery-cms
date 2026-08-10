@@ -21,8 +21,12 @@ export function reportSettingsWrite(persisted: boolean, subject: string): boolea
     return true;
   }
 
-  toast.error(`${subject} saved on this device only — the server rejected it`, {
-    description: "Your changes are still here. Try again, or reload to discard them.",
+  // NOT "saved on this device only" — it is saved nowhere. The cache rollback
+  // undoes the refused write and now announces it, so every other screen is
+  // back on the value the server actually holds. What survives is the form in
+  // front of the admin, which is exactly what they need in order to retry.
+  toast.error(`${subject} not saved — the server rejected it`, {
+    description: "Your changes are still in this form. Try again, or reload to discard them.",
   });
   return false;
 }

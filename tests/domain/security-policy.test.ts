@@ -423,7 +423,10 @@ describe("the pieces that hold a session open", () => {
     expect(hook).toContain("PRESENCE_WINDOW_MS");
     expect(hook).toMatch(/if \(requirePresence && now - lastSeen > PRESENCE_WINDOW_MS\) return;/);
     // The timer requires presence; a mount or a focus is itself the evidence.
-    expect(hook).toContain("setInterval(() => tick(true)");
+    // (A self-rescheduling `setTimeout` now, so the delay can follow the shop's
+    // own session timeout — a fixed ten minutes was longer than the shortest
+    // timeout the Security screen offers, and signed a working admin out.)
+    expect(hook).toMatch(/window\.setTimeout\(\(\) => \{\s*tick\(true\);/);
     expect(hook).toContain("tick(false); // renew immediately");
   });
 
@@ -485,7 +488,18 @@ describe("a refused settings write", () => {
     // Every settings form writes its whole section back from this cache, so a
     // rejected payload left there was re-sent on the next unrelated edit.
     expect(repo).toContain("function rollBackCache(");
-    expect(repo).toMatch(/const stillOurs = localStorage\.getItem\(STORAGE_KEY\) === JSON\.stringify\(attempted\)/);
+    // Compared against what was WRITTEN — the scrubbed copy. The in-memory
+    // object still carries the typed mail password, which the cache never
+    // holds, so comparing against it would quietly mean "never roll back".
+    expect(repo).toMatch(
+      /localStorage\.getItem\(STORAGE_KEY\) === JSON\.stringify\(scrubbedForCache\(attempted\)\)/,
+    );
+    // And the undo is announced, exactly as the write is: every live consumer
+    // reads the store on SETTINGS_UPDATED_EVENT, so a silent restore left the
+    // whole admin sitting on the value the server had refused.
+    expect(repo).toMatch(
+      /localStorage\.setItem\(STORAGE_KEY, previousRaw\);[\s\S]{0,1200}?window\.dispatchEvent\(new CustomEvent\(SETTINGS_UPDATED_EVENT\)\);/,
+    );
     expect(repo).toMatch(/if \(!persisted\) rollBackCache\(previousRaw, saved\);/);
     // The attempted value still goes back to the caller — it is the admin's
     // typing and they must be able to retry it.

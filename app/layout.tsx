@@ -81,7 +81,15 @@ export default async function RootLayout({
       className={`${inter.variable} ${plusJakarta.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <LocaleSync currency={currency} timezone={timezone} />
+        {/*
+          Only on a RESOLVED read. `setActiveLocale` above is already gated on
+          it — the flag exists so a database blip cannot repaint a USD shop in
+          rupees — and this second publisher, which writes the same values into
+          the CLIENT module graph, was not. One request that failed its settings
+          read therefore repriced the product cards, the cart, the checkout
+          total and the order summary for that visitor.
+        */}
+        {resolved ? <LocaleSync currency={currency} timezone={timezone} /> : null}
         <ThemeBlockingScript />
         <BusinessBlockingScript />
         <AppProviders>{children}</AppProviders>

@@ -42,9 +42,29 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * What actually goes into localStorage — never the mail password.
+ *
+ * The SERVER stopped handing this out (`redactMailPassword`), and its comment
+ * lists exactly why: the password "was written to `localStorage` by the
+ * settings store, survived logout (only the session key is cleared), rode along
+ * to every device that admin signed in from, was readable by any script on any
+ * admin page, and was swept into every downloadable backup file". Redacting the
+ * READ left the other end of that list open — the admin TYPES it into the SMTP
+ * form, and every one of those consequences followed from the save.
+ *
+ * The value still reaches the server: `updateStore` pushes from the in-memory
+ * object, and only the cached copy is scrubbed. A blank password means "keep
+ * the stored one" on the way back in, so nothing is lost by not holding it.
+ */
+function scrubbedForCache(settings: AppSettings): AppSettings {
+  if (!settings.smtp?.password) return settings;
+  return { ...settings, smtp: { ...settings.smtp, password: "" } };
+}
+
 function persist(settings: AppSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubbedForCache(settings)));
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
@@ -279,11 +299,32 @@ async function updateStore(
 function rollBackCache(previousRaw: string | null, attempted: AppSettings): void {
   if (typeof window === "undefined") return;
 
-  const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(attempted);
+  // Compared against what was WRITTEN, which is the scrubbed copy — the
+  // in-memory object still carries the typed mail password and would never
+  // match, quietly turning this guard into "never roll back".
+  const stillOurs =
+    localStorage.getItem(STORAGE_KEY) === JSON.stringify(scrubbedForCache(attempted));
   if (!stillOurs) return;
 
   if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
   else localStorage.setItem(STORAGE_KEY, previousRaw);
+
+  /**
+   * The undo has to be announced, exactly as the write was.
+   *
+   * `persist()` dispatches SETTINGS_UPDATED_EVENT and every live consumer reads
+   * the store on it — the sidebar, the storefront module gates, the currency
+   * and timezone. The rollback wrote to localStorage silently, so a refused
+   * save left the whole admin sitting on the value the server had turned down:
+   * the Wedding Builder entry gone from the sidebar, Photo Cake absent from the
+   * product form, the business type switched — all from a write that never
+   * landed, until something else happened to fire the event or the page was
+   * reloaded. The toast said "saved on this device only"; it was not even here.
+   *
+   * The raw string goes back rather than routing through `persist()`, so the
+   * restored value is byte-identical to the one the `stillOurs` guard compared.
+   */
+  window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
 export function getGeneralSettings(): GeneralSettings {

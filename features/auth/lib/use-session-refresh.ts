@@ -3,10 +3,34 @@
 import { useEffect } from "react";
 
 import { refreshSession } from "./auth-api";
+import { getSecuritySettings } from "@/features/settings/lib/settings-repository";
 
-// Access tokens live ~15 min; refresh well inside that window so an open admin
-// tab never hits an expired token. The refresh token is good for ~30 days.
-const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+/**
+ * How often an ACTIVE admin touches the server, derived from the shop's own
+ * session timeout rather than fixed at ten minutes.
+ *
+ * A fixed ten minutes is longer than the timeout an owner is allowed to choose.
+ * The Security screen offers a minimum of 5, and the server's idle check runs
+ * against `lastSeenAt` — which only moves when the client asks. So an owner who
+ * set 5, or 10, signed themselves out while actively working: they typed, the
+ * timer had not fired, the server saw an idle session and ended it, and the
+ * admin panel started 401-ing until they signed in again. Tightening the
+ * shop's security setting made the admin unusable, which is the worst way for
+ * a security control to fail.
+ *
+ * A third of the timeout gives two chances to be seen before it expires.
+ * Floored at a minute so a five-minute policy cannot turn into a request storm,
+ * and capped at the old ten so nothing gets chattier than it was.
+ */
+const REFRESH_FLOOR_MS = 60 * 1000;
+const REFRESH_CEILING_MS = 10 * 60 * 1000;
+
+function refreshIntervalMs(): number {
+  const minutes = Number(getSecuritySettings().sessionTimeoutMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return REFRESH_CEILING_MS;
+  return Math.min(REFRESH_CEILING_MS, Math.max(REFRESH_FLOOR_MS, (minutes * 60 * 1000) / 3));
+}
+
 const MIN_GAP_MS = 60 * 1000; // coalesce focus/visibility bursts
 
 /**
@@ -26,7 +50,7 @@ const PRESENCE_WINDOW_MS = 5 * 60 * 1000;
 /**
  * Keeps the admin session alive by silently rotating the access token:
  *  - once on mount (renews a token that expired while the tab was closed/idle),
- *  - every 10 minutes, and
+ *  - on a timer derived from the shop's session timeout, and
  *  - when the tab regains focus / becomes visible (covers long idle).
  *
  * Without this the access token simply expires and every admin API call starts
@@ -58,7 +82,19 @@ export function useSessionRefresh(): void {
     };
 
     tick(false); // renew immediately in case the access token already expired
-    const interval = window.setInterval(() => tick(true), REFRESH_INTERVAL_MS);
+
+    // A self-rescheduling timeout rather than a fixed interval, so the delay is
+    // recomputed each round: an admin who tightens the session timeout on the
+    // Security screen has the heartbeat follow it in the same session, without
+    // this hook needing to hear about the change.
+    let timer = 0;
+    const arm = () => {
+      timer = window.setTimeout(() => {
+        tick(true);
+        arm();
+      }, refreshIntervalMs());
+    };
+    arm();
 
     const onFocus = () => {
       markPresent();
@@ -80,7 +116,7 @@ export function useSessionRefresh(): void {
     }
 
     return () => {
-      window.clearInterval(interval);
+      window.clearTimeout(timer);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       for (const event of PRESENCE_EVENTS) {

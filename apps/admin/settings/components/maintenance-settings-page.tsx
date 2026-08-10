@@ -113,7 +113,11 @@ export function MaintenanceSettingsPage({
     });
   }
 
-  const allowedIpCount = settings.allowedIps.length;
+  // From `saved`, like `liveEnabled` beside it. This read the unsaved DRAFT,
+  // so the header said "Store closed · 3 allowed IPs" — a statement about the
+  // live storefront — while two of those three had been typed and not saved,
+  // and could not reach anybody.
+  const allowedIpCount = saved.allowedIps.length;
 
   return (
     <SettingsSectionShell

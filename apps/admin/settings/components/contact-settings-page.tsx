@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import type { BusinessHoursEntry, ContactSettings } from "@/types/settings";
 import {
   defaultContactSettings,
+  isValidEmailAddress,
   isValidMapEmbedUrl,
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
@@ -28,12 +29,15 @@ import { SettingsSectionShell } from "./settings-section-shell";
 import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 
 /**
- * ASCII local/domain parts, deliberately matching what Zod's `z.email()` accepts.
- * A looser rule here is worse than none: it passes an address the server then
- * 422s, which surfaces as "saved on this device only — the server rejected it"
- * and reads like an outage rather than a typo.
+ * The rule is `isValidEmailAddress`, which IS `z.email()` — not a regex
+ * restating it.
+ *
+ * The regex that used to live here claimed to match Zod "deliberately" and did
+ * not, in either direction. An address with an apostrophe — `o'brien@bakery.ie`,
+ * legal, and accepted by the server — was refused here, so Save stayed disabled
+ * for the WHOLE Contact section and the shop could not change its address,
+ * phone or opening hours either.
  */
-const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 /** Everything the server will reject, checked here first. */
 function validate(settings: ContactSettings) {
@@ -43,7 +47,7 @@ function validate(settings: ContactSettings) {
   );
 
   return {
-    email: !email || EMAIL_PATTERN.test(email) ? "" : "Enter a valid email address.",
+    email: !email || isValidEmailAddress(email) ? "" : "Enter a valid email address.",
     // Normalise FIRST, exactly as the server does. Checking the raw value meant
     // a document already holding Google's `<iframe>` snippet — the precise state
     // this feature exists to repair — reported an error the server would not,

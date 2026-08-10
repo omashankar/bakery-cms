@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   brandInfo,
   businessHours,
@@ -482,4 +484,24 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
     activity: partial.activity ?? seedActivityLog,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
+}
+
+/**
+ * The ONE email rule, shared by the form and the schema.
+ *
+ * The Contact form restated it as a regex "deliberately matching what Zod's
+ * `z.email()` accepts" — and it did not, in either direction. `o'brien@bakery.ie`
+ * is a legal address that Zod takes and the regex refused, so the field showed
+ * "Enter a valid email address", Save stayed disabled for the WHOLE Contact
+ * section, and the shop could not change its address, phone or opening hours
+ * either until the owner used a different email.
+ *
+ * Restating a rule is how the two drift. `isSafeAssetUrl`, `isValidMapEmbedUrl`
+ * and `isSafeSocialUrl` are already shared between the form and the schema for
+ * exactly this reason; this is the fourth.
+ */
+const emailRule = z.email();
+
+export function isValidEmailAddress(value: string): boolean {
+  return emailRule.safeParse(value.trim()).success;
 }

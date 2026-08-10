@@ -132,7 +132,11 @@ export function SmtpSettingsPage() {
           variant="outline"
           className="w-full sm:w-auto"
           onClick={() => void handleTestEmail()}
-          disabled={testing}
+          // Gated like Reset. The handler checks `saved.enabled`, and before
+          // hydration that is the shipped default — so on a hard load the
+          // admin was told "Enable SMTP before sending a test" about a shop
+          // whose SMTP is enabled.
+          disabled={testing || hydration !== "ready"}
         >
           {testing ? "Sending…" : "Send test email"}
         </Button>

@@ -47,8 +47,20 @@ export function ShippingRulesAdminPage() {
   // the admin's first keystroke pinned the pre-hydration seed and Save pushed
   // the whole commerce section from it, including the tax rate this screen does
   // not show.
-  const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
     useSettingsSection<CommerceSettings>(getCommerceSettings, defaultCommerceSettings);
+  /**
+   * What CHECKOUT is doing, which is `saved`, not the draft on screen.
+   *
+   * The header and the banner read `settings` — the working copy — so flipping
+   * the switch made the amber "Zone-based pricing is off" warning vanish and
+   * the header read "Zone pricing on · 3 active zones" before anything was
+   * saved. Both are statements about the live shop. The Taxes page beside this
+   * one was already fixed to state its live value and flag the pending change;
+   * this is the same treatment.
+   */
+  const liveZonePricing = saved.useZoneBasedDelivery;
+  const zonePricingPending = settings.useZoneBasedDelivery !== saved.useZoneBasedDelivery;
   const [mounted, setMounted] = useState(false);
   const [previewPincode, setPreviewPincode] = useState("400001");
   const [previewCity, setPreviewCity] = useState("Mumbai");
@@ -98,9 +110,11 @@ export function ShippingRulesAdminPage() {
       <AdminPageHeader
         title="Shipping Rules"
         description={
-          settings.useZoneBasedDelivery
-            ? `Zone pricing on · ${stats.active} active zones`
-            : "Flat-fee shipping · zone pricing off"
+          hydration !== "ready"
+            ? "How delivery is charged at checkout."
+            : liveZonePricing
+              ? `Zone pricing on · ${stats.active} active zones`
+              : "Flat-fee shipping · zone pricing off"
         }
         className="gap-3"
         actions={
@@ -124,7 +138,7 @@ export function ShippingRulesAdminPage() {
 
       <SettingsHydrationNotice hydration={hydration} />
 
-      {!settings.useZoneBasedDelivery ? (
+      {hydration === "ready" && !liveZonePricing ? (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
           Zone-based pricing is off. Checkout uses the default delivery fee until you enable
           zones below.{" "}
@@ -134,6 +148,16 @@ export function ShippingRulesAdminPage() {
           >
             Review zones
           </Link>
+        </div>
+      ) : null}
+
+      {/* The switch is flipped but nothing has changed at checkout yet — say so
+          rather than letting the banner's disappearance imply it has. */}
+      {zonePricingPending ? (
+        <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Not applied yet — save to{" "}
+          {settings.useZoneBasedDelivery ? "apply zone pricing" : "go back to the flat fee"} at
+          checkout.
         </div>
       ) : null}
 
