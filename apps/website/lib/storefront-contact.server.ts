@@ -37,6 +37,8 @@ export interface StorefrontContact {
  *   demo pin", so a bakery in Delhi that removed its map advertised an address
  *   in Mumbai. Empty now stays empty, and the page renders no frame at all.
  */
+import { chosen } from "./shipped-placeholder";
+
 function resolveMapEmbedUrl(stored: string | undefined): string {
   if (stored === undefined) return defaultContact.mapEmbedUrl;
 
@@ -67,10 +69,31 @@ export async function getStorefrontContact(): Promise<StorefrontContact> {
       businessHours?: { day: string; hours: string }[];
     };
 
+    /**
+     * A CLEARED field means "we do not publish this", not "use the demo one".
+     *
+     * `contactSchema` stores a cleared field as `""`, and `""` is falsy — so
+     * `contact.phone || defaultContact.phone` handed back the shipped
+     * `+91 1800-123-4567`, which the contact page turns into a live `tel:` link
+     * and the FAQ page prints as the way to reach this bakery. A home baker
+     * with no landline, or a shop that only takes WhatsApp orders, was
+     * advertising a number that is not theirs and cannot be answered.
+     *
+     * The function directly above this was rewritten for exactly this reason —
+     * `resolveMapEmbedUrl`'s comment says "An admin who CLEARS the field means
+     * 'no map' … Empty now stays empty" — and its three siblings on the next
+     * three lines were left as they were. `chosen()` goes further than a blank
+     * check, because a value still equal to the shipped placeholder was seeded
+     * rather than chosen.
+     *
+     * `fallbackContact()` keeps the defaults, and should: that is the
+     * database-unreachable path, where the shop's real details are unknown
+     * rather than known to be empty.
+     */
     return {
-      address: contact.address || defaultContact.address,
-      phone: contact.phone || defaultContact.phone,
-      email: contact.email || defaultContact.email,
+      address: chosen(contact.address, defaultContact.address),
+      phone: chosen(contact.phone, defaultContact.phone),
+      email: chosen(contact.email, defaultContact.email),
       mapEmbedUrl: resolveMapEmbedUrl(contact.mapEmbedUrl),
       businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
     };

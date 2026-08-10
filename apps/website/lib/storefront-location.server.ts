@@ -1,6 +1,7 @@
 import { contactInfo, businessHours as seededHours } from "@/constants/landing-data";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { ContactSettings } from "@/types/settings";
+import { chosen } from "./shipped-placeholder";
 
 /**
  * The shop's real address and opening hours, read on the SERVER from Settings →
@@ -29,24 +30,6 @@ export interface StorefrontLocation {
   hours: { day: string; hours: string }[];
 }
 
-/**
- * The shipped placeholders count as "not set".
- *
- * Settings → Contact is never empty: the settings singleton is CREATED with
- * `defaultContactSettings`, which is `contactInfo` from landing-data — "123
- * Baker Street, Mumbai, Maharashtra 400001", a demo 1800 number and three demo
- * opening-hours rows. So an "is it filled in?" check can never fail, and a
- * bakery in Delhi that installs this CMS and never opens Settings would ship a
- * homepage panel headed "Visit Our Bakery" pointing at an address in Mumbai,
- * with a Get Directions button that opens Google Maps there. Replacing three
- * invented outlets with one invented outlet is not a fix.
- *
- * A value equal to the shipped placeholder was seeded, not chosen.
- */
-function chosen(value: string | undefined, placeholder: string): string {
-  const trimmed = value?.trim() ?? "";
-  return trimmed && trimmed !== placeholder.trim() ? trimmed : "";
-}
 
 /**
  * `settings` may be passed in by a caller that has already read it.

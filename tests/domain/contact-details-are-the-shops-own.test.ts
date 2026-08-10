@@ -1,0 +1,166 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { contactInfo } from "@/constants/landing-data";
+import { chosen } from "@/apps/website/lib/shipped-placeholder";
+
+/**
+ * A phone number the shop does not have is worse than no phone number.
+ *
+ * Settings → Contact is never empty — the singleton is CREATED from
+ * `defaultContactSettings`, which is the demo "123 Baker Street, Mumbai" and a
+ * demo 1800 number — and every read did `contact.phone || defaultContact.phone`.
+ * `contactSchema` stores a cleared field as `""`, which is falsy, so an admin
+ * who deleted the number got the demo one back, and the contact and FAQ pages
+ * turned it into a live `tel:` link. The footer did the same with the address,
+ * on every storefront page.
+ *
+ * The map field directly above them in the same file had already been fixed for
+ * exactly this ("An admin who CLEARS the field means 'no map' … Empty now stays
+ * empty") and its three siblings on the next three lines were left alone; so had
+ * the social block ten lines below the footer's copy, whose comment says
+ * answering "no social" with instagram.com "pointed visitors at accounts the
+ * shop does not own".
+ */
+describe("telling a chosen value from a shipped one", () => {
+  it("treats a cleared field as cleared", () => {
+    expect(chosen("", "placeholder")).toBe("");
+    expect(chosen("   ", "placeholder")).toBe("");
+    expect(chosen(undefined, "placeholder")).toBe("");
+  });
+
+  it("treats the shipped placeholder as never set", () => {
+    // The install ships these; a shop that never opened Settings has not
+    // chosen them, and publishing them is the same lie as publishing a blank.
+    expect(chosen(contactInfo.phone, contactInfo.phone)).toBe("");
+    expect(chosen(contactInfo.address, contactInfo.address)).toBe("");
+    expect(chosen(`  ${contactInfo.address}  `, contactInfo.address)).toBe("");
+  });
+
+  it("keeps what the shop actually typed", () => {
+    expect(chosen("+91 98765 43210", contactInfo.phone)).toBe("+91 98765 43210");
+    expect(chosen("  9 Real Street, Delhi ", contactInfo.address)).toBe("9 Real Street, Delhi");
+  });
+});
+
+const settings = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+vi.mock("@/features/settings/server/settings.service", () => ({
+  getSettings: vi.fn(async () => settings.value),
+}));
+vi.mock("@/features/site-layout/server/site-layout.service", () => ({
+  getSiteLayout: vi.fn(async () => ({})),
+}));
+
+import { getStorefrontContact } from "@/apps/website/lib/storefront-contact.server";
+import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
+
+describe("what the storefront publishes as the shop's contact details", () => {
+  beforeEach(() => {
+    settings.value = {};
+  });
+
+  it("publishes nothing where the admin cleared the field", async () => {
+    settings.value = { contact: { address: "", phone: "", email: "" } };
+
+    const contact = await getStorefrontContact();
+
+    expect(contact.address).toBe("");
+    expect(contact.phone).toBe("");
+    expect(contact.email).toBe("");
+  });
+
+  it("does not publish the demo details of a shop that never opened Settings", async () => {
+    settings.value = {
+      contact: {
+        address: contactInfo.address,
+        phone: contactInfo.phone,
+        email: contactInfo.email,
+      },
+    };
+
+    const contact = await getStorefrontContact();
+
+    expect(contact.phone).toBe("");
+    expect(contact.address).toBe("");
+  });
+
+  it("publishes what the shop really set", async () => {
+    settings.value = {
+      contact: { address: "9 Real Street, Delhi", phone: "+91 98765 43210", email: "hi@real.in" },
+    };
+
+    const contact = await getStorefrontContact();
+
+    expect(contact.address).toBe("9 Real Street, Delhi");
+    expect(contact.phone).toBe("+91 98765 43210");
+    expect(contact.email).toBe("hi@real.in");
+  });
+
+  it("applies the same rule to the footer on every page", async () => {
+    settings.value = { contact: { address: "", phone: "", email: "" } };
+
+    const chrome = await getStorefrontChrome();
+
+    expect(chrome.contact).toEqual({ address: "", phone: "", email: "" });
+  });
+
+  it("still falls back when the DATABASE is unreachable, which is a different thing", async () => {
+    // Not "the shop publishes nothing" — "we do not know what the shop
+    // publishes". The generic chrome is the right answer there.
+    const service = await import("@/features/settings/server/settings.service");
+    vi.mocked(service.getSettings).mockRejectedValueOnce(new Error("db down"));
+
+    const contact = await getStorefrontContact();
+
+    expect(contact.phone).toBe(contactInfo.phone);
+  });
+});
+
+/**
+ * The read telling the truth means a blank now reaches the render, so an
+ * unguarded anchor is `tel:` pointing at nothing and an unguarded row is an
+ * icon with empty space beside it.
+ */
+describe("the pages that render them", () => {
+  const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("does not build a tel: or mailto: link out of a blank", () => {
+    for (const path of ["apps/website/pages/contact-page.tsx", "apps/website/pages/faq-page.tsx"]) {
+      const page = source(path);
+      const tel = page.indexOf("href={`tel:");
+      const mailto = page.indexOf("href={`mailto:");
+
+      // Each anchor sits inside a `contactInfo.phone ? … : null` guard, so the
+      // conditional appears before it.
+      expect(page.slice(0, tel), `${path} renders tel: unguarded`).toContain(
+        "{contactInfo.phone ? (",
+      );
+      expect(page.slice(0, mailto), `${path} renders mailto: unguarded`).toContain(
+        "{contactInfo.email ? (",
+      );
+    }
+  });
+
+  it("drops the footer's Contact column when the shop publishes none of the three", () => {
+    const footer = source("apps/website/landing/components/landing-footer.tsx");
+
+    expect(footer).toContain(
+      "(contactInfo.address || contactInfo.phone || contactInfo.email)",
+    );
+    expect(footer).toContain("{contactInfo.address ? (");
+    expect(footer).toContain("{contactInfo.phone ? (");
+    expect(footer).toContain("{contactInfo.email ? (");
+  });
+
+  it("keeps the map URL checked on the client too, not only on the server", () => {
+    const client = source("apps/website/lib/settings.ts");
+
+    // It fed an `<iframe src>` straight from a field that was free text for the
+    // life of the project.
+    expect(client).toContain("normalizeMapEmbedUrl");
+    expect(client).toContain("isValidMapEmbedUrl");
+    expect(client).not.toContain("contact.mapEmbedUrl || contactInfo.mapEmbedUrl");
+  });
+});

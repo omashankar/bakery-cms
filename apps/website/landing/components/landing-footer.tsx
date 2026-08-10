@@ -78,22 +78,41 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             </div>
           ))}
 
-          {footerSettings.showContact ? (
+          {/*
+            And no column at all when the shop publishes none of the three — a
+            "Contact" heading over nothing is worse than its absence. Same shape
+            as the `socialLinks.length > 0` guard above.
+          */}
+          {footerSettings.showContact &&
+          (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
             <div className="space-y-4 lg:col-span-2">
               <h4 className="text-sm font-semibold text-foreground">Contact</h4>
+              {/*
+                A row per detail the shop actually publishes. These used to
+                render unconditionally against a `|| defaultContact.*` read, so
+                a cleared address put "123 Baker Street, Mumbai" in the footer
+                of every page. Now that a cleared field arrives as "", an
+                unguarded row would be an icon with nothing beside it.
+              */}
               <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 size-4 shrink-0 text-bakery-700" />
-                  {contactInfo.address}
-                </li>
-                <li className="flex items-center gap-2">
-                  <Phone className="size-4 shrink-0 text-bakery-700" />
-                  {contactInfo.phone}
-                </li>
-                <li className="flex items-center gap-2">
-                  <Mail className="size-4 shrink-0 text-bakery-700" />
-                  {contactInfo.email}
-                </li>
+                {contactInfo.address ? (
+                  <li className="flex items-start gap-2">
+                    <MapPin className="mt-0.5 size-4 shrink-0 text-bakery-700" />
+                    {contactInfo.address}
+                  </li>
+                ) : null}
+                {contactInfo.phone ? (
+                  <li className="flex items-center gap-2">
+                    <Phone className="size-4 shrink-0 text-bakery-700" />
+                    {contactInfo.phone}
+                  </li>
+                ) : null}
+                {contactInfo.email ? (
+                  <li className="flex items-center gap-2">
+                    <Mail className="size-4 shrink-0 text-bakery-700" />
+                    {contactInfo.email}
+                  </li>
+                ) : null}
               </ul>
             </div>
           ) : null}

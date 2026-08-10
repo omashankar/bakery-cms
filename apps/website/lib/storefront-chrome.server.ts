@@ -14,6 +14,7 @@ import {
   defaultAppearanceSettings,
 } from "@/features/site-layout/lib/appearance-tokens";
 import type { AppearanceSettings } from "@/types/appearance";
+import { chosen } from "./shipped-placeholder";
 
 /**
  * The "chrome" (navbar + footer) data for the storefront, read on the SERVER
@@ -153,10 +154,19 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
         tagline: general.siteTagline || brandInfo.tagline,
         description: general.siteDescription || brandInfo.description,
       },
+      // The same rule the social block ten lines below already follows, and for
+      // the same reason. Deactivating every social link is a deliberate "we are
+      // not on social"; clearing the address is a deliberate "we do not publish
+      // one". Answering the first with instagram.com was called out as pointing
+      // visitors at accounts the shop does not own — answering the second with
+      // `|| defaultContact.address` put "123 Baker Street, Mumbai" in the
+      // footer of EVERY storefront page of a bakery in Delhi, next to a phone
+      // number nobody can answer. `fallbackChrome()` keeps the defaults, and
+      // should: that is the database-unreachable path.
       contact: {
-        address: contact.address || defaultContact.address,
-        phone: contact.phone || defaultContact.phone,
-        email: contact.email || defaultContact.email,
+        address: chosen(contact.address, defaultContact.address),
+        phone: chosen(contact.phone, defaultContact.phone),
+        email: chosen(contact.email, defaultContact.email),
       },
       businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
       // No fallback to the demo profiles. Deactivating every link is a
