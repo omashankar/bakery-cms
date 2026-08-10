@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext, writeAuditLog } from "@/lib/server/audit/audit-log";
 
 import * as service from "./communications.service";
+import * as notificationState from "./notification-state.service";
 import * as whatsapp from "./whatsapp.service";
 import {
   readWhatsAppConnectionStatus,
@@ -14,6 +15,7 @@ import { verifyWhatsAppConnection } from "./whatsapp-client.server";
 import {
   templateSchemas,
   notificationSettingsSchema,
+  notificationStatePatchSchema,
   templateTestSchema,
   whatsappConnectionSchema,
 } from "./communications.validators";
@@ -69,6 +71,28 @@ export const saveNotificationSettingsController = withErrorHandler(async (reques
     actorEmail: session.email,
   });
   return ok(result, "Notification settings saved");
+});
+
+/**
+ * The signed-in admin's own read/dismissed ids — never another admin's.
+ *
+ * The subject comes from the session, not from the request, so there is no
+ * caller-supplied id to tamper with and nothing to authorise beyond being an
+ * admin at all. No audit entry: clearing one's own bell is not an act on the
+ * shop, and logging every read would bury the entries that matter.
+ */
+export const getNotificationStateController = withErrorHandler(async () => {
+  const session = await requireRole(...COMMS_ROLES);
+  return ok(await notificationState.getNotificationState(session.sub), "notification-state");
+});
+
+export const patchNotificationStateController = withErrorHandler(async (request: Request) => {
+  const session = await requireRole(...COMMS_ROLES);
+  const patch = validate(notificationStatePatchSchema, await readJson(request));
+  return ok(
+    await notificationState.patchNotificationState(session.sub, patch),
+    "notification-state",
+  );
 });
 
 /**

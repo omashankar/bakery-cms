@@ -14,6 +14,7 @@ import {
   filterOrdersInWindow,
   getAnalyticsWindow,
   getCityBreakdown,
+  getCouponBreakdown,
   getPaymentBreakdown,
   getStatusBreakdown,
   getRangeStart,
@@ -460,5 +461,62 @@ describe("the stats aggregation uses the same definition", () => {
 
   it("still drops cancelled and fully refunded orders entirely", () => {
     expect(fn).toMatch(/row\._id !== "cancelled" && row\._id !== "refunded"/);
+  });
+});
+
+/**
+ * Reports and the Coupons page have to be able to agree.
+ *
+ * `usageCount` on a coupon is a server counter: `placeOrder` increments it, and
+ * the shop gives the redemption BACK when the order is cancelled, or when a
+ * refund is both full and settled — which is the moment the order becomes
+ * `refunded`. Reports counted redemptions over every order in the window
+ * regardless of status, so the two surfaces described the same coupon with two
+ * different numbers and neither was wrong on its own terms.
+ */
+describe("coupon redemptions match what the coupon counter keeps", () => {
+  const used = (code: string, status: PlacedOrder["status"], discount = 100) =>
+    order({
+      status,
+      coupon: { code, discountAmount: discount },
+      totals: { ...order().totals, discount },
+    } as Partial<PlacedOrder>);
+
+  it("does not count a redemption the shop handed back on cancellation", () => {
+    const rows = getCouponBreakdown([used("WELCOME10", "delivered"), used("WELCOME10", "cancelled")]);
+
+    expect(rows).toEqual([{ code: "WELCOME10", uses: 1, discount: 100 }]);
+  });
+
+  it("does not count one handed back by a full refund", () => {
+    const rows = getCouponBreakdown([used("BDAY20", "delivered"), used("BDAY20", "refunded")]);
+
+    expect(rows[0].uses).toBe(1);
+  });
+
+  it("still counts a partial refund, because that redemption is not given back", () => {
+    // Not `refunded`: a part-refunded order stays delivered, and
+    // `releaseCouponNow` requires a FULL settled refund.
+    const partly = used("WED2026", "delivered");
+    const rows = getCouponBreakdown([{ ...partly, refundRecord: { amount: 60 } } as PlacedOrder]);
+
+    expect(rows[0].uses).toBe(1);
+  });
+
+  it("drops a code from the table entirely when every order for it fell away", () => {
+    expect(getCouponBreakdown([used("GONE", "cancelled"), used("GONE", "refunded")])).toEqual([]);
+  });
+
+  it("keeps the summary's discount total on the same set as the table", () => {
+    const orders = [
+      used("WELCOME10", "delivered"),
+      used("WELCOME10", "cancelled"),
+      used("BDAY20", "refunded"),
+    ];
+
+    const fromTable = getCouponBreakdown(orders).reduce((sum, row) => sum + row.discount, 0);
+    expect(getReportsSummary(orders).couponDiscount).toBe(fromTable);
+    // Money never given away is not a discount the shop granted.
+    expect(getReportsSummary(orders).couponDiscount).toBe(100);
   });
 });

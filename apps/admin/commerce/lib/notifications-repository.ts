@@ -8,7 +8,10 @@ import type {
   NotificationSettings,
 } from "@/types/notification";
 import { formatCurrency } from "@/utils/format";
-import { replaceNotificationSettingsRequest } from "@/apps/admin/communications/lib/communications-api";
+import {
+  pushNotificationState,
+  replaceNotificationSettingsRequest,
+} from "@/apps/admin/communications/lib/communications-api";
 import {
   formatInquiryTypeLabel,
   getInquiryHref,
@@ -29,6 +32,19 @@ const DISMISSED_KEY = "bakery-cms-notification-dismissed";
  * and returned. A set of ids survives both.
  */
 const READ_KEY = "bakery-cms-notification-read";
+
+/**
+ * These two keys are now a CACHE of a per-admin server document, not the record
+ * itself — see `admin-notification-state.model.ts`.
+ *
+ * Read and dismissed ids lived only in the browser that clicked, so the same
+ * person clearing the bell on the shop laptop found every alert unread again on
+ * their phone, and a cleared cache lost the lot. Each mutation below now sends
+ * the ids it just changed as a DELTA; `persistServerNotificationState` unions
+ * the server's copy back in on load. Nothing here ever sends the whole set, so
+ * a stale tab cannot erase what another device recorded — and a failed delta is
+ * re-sent by the next hydration rather than reported as saved.
+ */
 const MAX_NOTIFICATIONS = 250;
 const ORDER_LOOKBACK_DAYS = 30;
 const PAYMENT_LOOKBACK_DAYS = 7;
@@ -98,8 +114,23 @@ function writeReadIds(ids: Set<string>): void {
 function rememberRead(ids: string[]): void {
   if (ids.length === 0) return;
   const known = readReadIds();
+  // Only what this browser did not already know goes up. "Mark all read"
+  // pressed twice would otherwise re-send two hundred ids the server has held
+  // since the first press.
+  const fresh = ids.filter((id) => !known.has(id));
   for (const id of ids) known.add(id);
   writeReadIds(known);
+  void pushNotificationState({ read: fresh });
+}
+
+/** Remember that these ids have been dismissed, on this device and the server. */
+function rememberDismissed(ids: string[]): void {
+  if (ids.length === 0) return;
+  const dismissed = readDismissedIds();
+  const fresh = ids.filter((id) => !dismissed.has(id));
+  for (const id of ids) dismissed.add(id);
+  writeDismissedIds(dismissed);
+  void pushNotificationState({ dismissed: fresh });
 }
 
 function readStoredNotifications(): AdminNotification[] {
@@ -185,21 +216,75 @@ export function persistServerNotificationSettings(
 }
 
 /**
+ * Hydration: fold this admin's server-held read/dismissed ids into the local
+ * cache, and send back anything the server has not seen.
+ *
+ * A UNION in both directions, never a replace. Taking the server's copy
+ * wholesale would discard a click made before the fetch returned; sending this
+ * browser's copy wholesale is the replace-all mistake that this whole file was
+ * written to avoid. The upward half is also what migrates an admin who has been
+ * using the browser-only version, and what re-sends a delta that failed while
+ * the connection was down — the local set is the retry queue.
+ *
+ * `stock:` dismissals are deliberately NOT re-sent. They describe a condition,
+ * not an event, and are pruned the moment the product is back above its
+ * threshold — so an id missing from the server is far more likely to be a prune
+ * another device already made than a delta this one failed to send, and
+ * re-uploading it would race that prune and re-silence a live alert. Losing one
+ * costs a row reappearing in the feed, which is the safe direction.
+ */
+export function persistServerNotificationState(state: {
+  read: string[];
+  dismissed: string[];
+}): void {
+  if (typeof window === "undefined") return;
+
+  const localRead = readReadIds();
+  const localDismissed = readDismissedIds();
+  const serverRead = new Set(state.read);
+  const serverDismissed = new Set(state.dismissed);
+
+  const unsentRead = [...localRead].filter((id) => !serverRead.has(id));
+  const unsentDismissed = [...localDismissed].filter(
+    (id) => !serverDismissed.has(id) && !id.startsWith("stock:"),
+  );
+
+  for (const id of serverRead) localRead.add(id);
+  for (const id of serverDismissed) localDismissed.add(id);
+  writeReadIds(localRead);
+  writeDismissedIds(localDismissed);
+
+  void pushNotificationState({ read: unsentRead, dismissed: unsentDismissed });
+
+  // Re-derive so the feed and the bell reflect what just arrived: a dismissal
+  // made elsewhere has to remove the row here, and a read made elsewhere has to
+  // stop it counting.
+  syncNotifications();
+  emitNotificationsUpdated();
+}
+
+/**
  * Forget dismissals for stock alerts whose condition no longer holds, so the
  * alert can fire again if the product runs low a second time. Also keeps the
  * dismissed set from growing without bound as stock churns.
  */
 function pruneResolvedStockDismissals(dismissed: Set<string>, liveIds: Set<string>): void {
-  let changed = false;
+  const resolved: string[] = [];
 
   for (const id of dismissed) {
     if (id.startsWith("stock:") && !liveIds.has(id)) {
       dismissed.delete(id);
-      changed = true;
+      resolved.push(id);
     }
   }
 
-  if (changed) writeDismissedIds(dismissed);
+  if (resolved.length === 0) return;
+  writeDismissedIds(dismissed);
+  // The removal has to reach the server as well. Dropping it locally alone
+  // would silence the alert on every other device the second time that product
+  // ran low — the dismissal outliving the condition it described, which is the
+  // exact thing this prune exists to prevent.
+  void pushNotificationState({ undismissed: resolved });
 }
 
 function mergeReadState(
@@ -411,7 +496,15 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
     }
   }
 
-  const manual = readStoredNotifications().filter((notification) => notification.type === "system");
+  // System alerts are the one kind that is STORED rather than derived, so the
+  // dismissed set was never consulted for them — `dismissNotification` simply
+  // dropped the row from the stored list. That was survivable while dismissal
+  // was per-browser and is not now: one arriving from another device has
+  // nothing to delete here, and the row would sit in this feed forever while
+  // the admin who dismissed it saw it gone.
+  const manual = readStoredNotifications().filter(
+    (notification) => notification.type === "system" && !dismissed.has(notification.id),
+  );
   const merged = [...generated, ...manual];
 
   return merged
@@ -502,9 +595,7 @@ export function markAllNotificationsRead(): void {
 }
 
 export function dismissNotification(id: string): void {
-  const dismissed = readDismissedIds();
-  dismissed.add(id);
-  writeDismissedIds(dismissed);
+  rememberDismissed([id]);
 
   const notifications = readStoredNotifications().filter(
     (notification) => notification.id !== id
@@ -513,9 +604,7 @@ export function dismissNotification(id: string): void {
 }
 
 export function dismissNotifications(ids: string[]): void {
-  const dismissed = readDismissedIds();
-  ids.forEach((id) => dismissed.add(id));
-  writeDismissedIds(dismissed);
+  rememberDismissed(ids);
 
   const idSet = new Set(ids);
   const notifications = readStoredNotifications().filter(
@@ -529,11 +618,9 @@ export function clearReadNotifications(): number {
   const remaining = notifications.filter((notification) => !notification.read);
   const cleared = notifications.length - remaining.length;
 
-  const dismissed = readDismissedIds();
-  notifications
-    .filter((notification) => notification.read)
-    .forEach((notification) => dismissed.add(notification.id));
-  writeDismissedIds(dismissed);
+  rememberDismissed(
+    notifications.filter((notification) => notification.read).map((n) => n.id),
+  );
   writeStoredNotifications(remaining);
 
   return cleared;
@@ -559,10 +646,17 @@ export function addSystemNotification(input: {
   return notification;
 }
 
+/**
+ * Clears the LOCAL caches only. The server keeps this admin's read and
+ * dismissed ids, and the next hydration puts them back — which is the correct
+ * outcome for a device-level reset and is why READ_KEY is cleared here too
+ * rather than being left behind to contradict the set beside it.
+ */
 export function resetNotificationState(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(DISMISSED_KEY);
+  localStorage.removeItem(READ_KEY);
   localStorage.removeItem(SETTINGS_KEY);
   emitNotificationsUpdated();
 }

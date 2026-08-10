@@ -81,3 +81,19 @@ export const whatsappConnectionSchema = z.object({
   accessToken: z.string().trim().max(1024).default(""),
   enabled: z.boolean().default(false),
 });
+
+/**
+ * A delta of notification ids an admin has read, dismissed, or un-dismissed.
+ *
+ * Bounded on every axis. These arrays are appended to a per-admin document with
+ * `$addToSet`, so an unbounded request would let one call grow a document
+ * without limit; and an id is a generated key like `refund:completed:<orderId>`,
+ * never free text. Every field is optional — an empty patch is a no-op read.
+ */
+const notificationIdList = z.array(z.string().trim().min(1).max(200)).max(500);
+
+export const notificationStatePatchSchema = z.object({
+  read: notificationIdList.optional(),
+  dismissed: notificationIdList.optional(),
+  undismissed: notificationIdList.optional(),
+});

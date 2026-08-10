@@ -265,7 +265,7 @@ export function getReportsSummary(orders: PlacedOrder[]): ReportsSummary {
     (sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
     0
   );
-  const couponDiscount = orders.reduce((sum, order) => sum + (order.totals.discount ?? 0), 0);
+  const couponDiscount = countable.reduce((sum, order) => sum + (order.totals.discount ?? 0), 0);
   const uniqueCustomers = new Set(
     orders.map((order) => order.address.email.toLowerCase()).filter(Boolean)
   ).size;
@@ -502,10 +502,23 @@ export function getCityBreakdown(orders: PlacedOrder[], limit = 5): CityBreakdow
     .slice(0, limit);
 }
 
+/**
+ * How often each code was redeemed, counted the way the shop counts it.
+ *
+ * This walked EVERY order in the window, so a cancelled order and a refunded one
+ * both left their redemption on the report. But the server hands those
+ * redemptions back: `cancelOrder` releases the coupon outright and a full,
+ * settled refund releases it too (`releaseCouponNow`) — and both of those are
+ * exactly the statuses `isCountableRevenue` excludes. So the Coupons page said
+ * WELCOME10 had 28 uses while Reports said 31, with no way to reconcile them and
+ * no answer to which one the shop should believe. A partial refund is
+ * deliberately still a use: the redemption is not given back for one, and the
+ * discount really was allowed on that sale.
+ */
 export function getCouponBreakdown(orders: PlacedOrder[], limit = 5): CouponBreakdownItem[] {
   const map = new Map<string, CouponBreakdownItem>();
 
-  for (const order of orders) {
+  for (const order of orders.filter(isCountableRevenue)) {
     const code = order.coupon?.code?.trim();
     if (!code) continue;
     const key = code.toUpperCase();
