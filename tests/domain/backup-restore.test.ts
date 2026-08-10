@@ -16,6 +16,7 @@ import {
   serverBackedKeys,
 } from "@/apps/admin/settings/lib/backup-repository";
 import { settingsHydration } from "@/features/settings/lib/settings-api";
+import { catalogHydration } from "@/features/catalog/lib/catalog-api";
 
 /** A fetch stub whose answer depends on the URL and method. */
 function mockFetch(handler: (url: string, method: string) => { ok: boolean; data?: unknown }) {
@@ -37,6 +38,10 @@ function mockFetch(handler: (url: string, method: string) => { ok: boolean; data
 beforeEach(() => {
   localStorage.clear();
   settingsHydration.markSettled();
+  // Opened here for the same reason as the settings gate: otherwise every
+  // guarded catalog PUT waits out the full 8s deadline and the test measures
+  // that deadline rather than the restore.
+  catalogHydration.markSettled();
 });
 
 afterEach(() => {
@@ -66,9 +71,11 @@ describe("what an exported backup claims to be", () => {
 describe("restoring a backup", () => {
   /** A snapshot carrying one server-backed key and one browser-only key. */
   const snapshot: Record<string, string | null> = {
-    // A real section key, so the push actually sends something: with an
-    // unrecognised payload `pushSettingsSections` finds nothing to push and
-    // returns true vacuously.
+    // A real section key, so the push actually sends something: an
+    // unrecognised payload is refused outright, which is what the tests below
+    // check. (This comment used to say `pushSettingsSections` "returns true
+    // vacuously" — that WAS the behaviour, and the record of it is how the
+    // catalog twin went on doing it after the settings half was repaired.)
     [serverBackedKeys[0]]: JSON.stringify({ general: { siteName: "Restored Bakery" } }),
     "bakery-cms-products": JSON.stringify([{ id: "p1" }]),
   };
@@ -176,5 +183,91 @@ describe("the sections a restore can open its own gates for", () => {
     ]) {
       expect(repo, opener).toContain(opener + "(),");
     }
+  });
+});
+
+/**
+ * The list of rollback points is not shop data.
+ *
+ * `bakery-cms-backup-history` starts with `bakery-cms` like every other key, so
+ * it rode along in BOTH directions. Each snapshot embedded the whole previous
+ * history and the next embedded that, roughly doubling per export until
+ * `localStorage.setItem` threw QuotaExceededError and export simply stopped
+ * working. And a restore wrote the file's history over this machine's —
+ * deleting the "Before import" snapshot the import dialog had taken seconds
+ * earlier and promised the admin they could roll back to.
+ */
+describe("the backup history is not itself backed up", () => {
+  const HISTORY = "bakery-cms-backup-history";
+
+  it("is left out of a snapshot, so snapshots do not nest", async () => {
+    localStorage.setItem(HISTORY, JSON.stringify([{ id: "old", data: {} }]));
+    localStorage.setItem("bakery-cms-products", JSON.stringify([{ id: "p1" }]));
+    mockFetch(() => ({ ok: true, data: {} }));
+
+    const { data } = await buildServerBackup();
+
+    expect(data[HISTORY]).toBeUndefined();
+    // and it still carries the things that ARE shop data
+    expect(data["bakery-cms-products"]).toBeDefined();
+  });
+
+  it("survives a restore that carries someone else's history", async () => {
+    const mine = JSON.stringify([{ id: "before-import", label: "Before import" }]);
+    localStorage.setItem(HISTORY, mine);
+    mockFetch((_url, method) => ({ ok: method === "GET" || method === "PUT" }));
+
+    await restoreBackupToServer({
+      [HISTORY]: JSON.stringify([{ id: "from-the-file", label: "Someone else's machine" }]),
+      "bakery-cms-products": JSON.stringify([{ id: "p1" }]),
+    });
+
+    // The one rollback point an admin needs after a bad import is the one the
+    // import itself took.
+    expect(localStorage.getItem(HISTORY)).toBe(mine);
+    expect(localStorage.getItem("bakery-cms-products")).toBeDefined();
+  });
+});
+
+/**
+ * `[].every(Boolean)` is true, so a payload matching no known section reported
+ * a successful push having contacted the server zero times. That was fixed for
+ * settings and the comment explaining it left sitting one function above the
+ * catalog twin, which went on doing it.
+ */
+describe("a restore does not claim sections it never sent", () => {
+  it("refuses a catalog blob with nothing recognisable in it", async () => {
+    let puts = 0;
+    mockFetch((_url, method) => {
+      if (method !== "GET") puts += 1;
+      return { ok: true, data: {} };
+    });
+
+    const result = await restoreBackupToServer({
+      "bakery-cms-catalog": JSON.stringify({ nothing: "recognisable" }),
+    });
+
+    expect(puts).toBe(0);
+    expect(result.serverSections).not.toContain("Catalog");
+    expect(result.failedSections).toContain("Catalog");
+    // And above all it is not written locally: `loadCatalogStore` substitutes
+    // the demo categories, flavours, occasions and weights for every section a
+    // blob is missing, which the Catalog page's next save would ship to Mongo.
+    expect(localStorage.getItem("bakery-cms-catalog")).toBeNull();
+  });
+
+  it("still pushes a catalog blob that has a real section in it", async () => {
+    let puts = 0;
+    mockFetch((_url, method) => {
+      if (method !== "GET") puts += 1;
+      return { ok: true, data: {} };
+    });
+
+    const result = await restoreBackupToServer({
+      "bakery-cms-catalog": JSON.stringify({ categories: [{ id: "c1", name: "Cakes" }] }),
+    });
+
+    expect(puts).toBeGreaterThan(0);
+    expect(result.serverSections).toContain("Catalog");
   });
 });

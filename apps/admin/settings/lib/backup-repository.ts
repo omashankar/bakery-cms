@@ -113,12 +113,24 @@ async function pushSettingsSections(value: unknown): Promise<boolean> {
   return results.every(Boolean);
 }
 
+/**
+ * The same guard, for the same reason — this twin was left without it.
+ *
+ * A `bakery-cms-catalog` blob carrying no recognised section pushed nothing,
+ * returned true, and was listed among the restored sections. Worse than the
+ * settings case: `loadCatalogStore` substitutes `defaultCategories`,
+ * `defaultFlavours`, `defaultOccasions` and `defaultWeightOptions` for every
+ * section the blob is missing, so the admin was told their catalogue had been
+ * restored while the demo seed sat in the cache waiting for the Catalog page's
+ * next replace-all save to ship it to Mongo.
+ */
 async function pushCatalogSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
+  const present = CATALOG_SECTIONS.filter((section) => record[section] !== undefined);
+  if (present.length === 0) return false;
+
   const results = await Promise.all(
-    CATALOG_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
-      pushCatalogSection(section, record[section])
-    )
+    present.map((section) => pushCatalogSection(section, record[section]))
   );
   return results.every(Boolean);
 }
@@ -325,6 +337,19 @@ export interface ServerBackupData {
  */
 export async function buildServerBackup(): Promise<ServerBackupData> {
   const base = exportLocalStorageBackup();
+  /**
+   * A snapshot must not contain the shelf it is about to be put on.
+   *
+   * `exportLocalStorageBackup()` copies EVERY `bakery-cms*` key, and this
+   * store's own history is one of them. So each snapshot embedded the whole
+   * previous history, and the next snapshot embedded that — the size roughly
+   * doubling per export until `localStorage.setItem` threw QuotaExceededError
+   * and every export and import failed with "please try again" and no file.
+   *
+   * It also made the history a thing a RESTORE could overwrite; see the filter
+   * in `restoreBackupToServer`.
+   */
+  delete base[STORAGE_KEY];
   const unavailableSections: string[] = [];
 
   await Promise.all(
@@ -439,8 +464,21 @@ export async function restoreBackupToServer(
     }
   }
 
+  /**
+   * The backup history is never restored FROM a backup.
+   *
+   * It is not shop data, it is the list of rollback points on this machine —
+   * and it fell into the browser-only bucket, so importing a file replaced it
+   * with whatever snapshots existed on the machine that produced that file,
+   * months ago. Including, specifically, the "Before import" snapshot written
+   * moments earlier by the very dialog that promises "A snapshot of your
+   * current data is archived first, so you can roll back from history". The one
+   * rollback point an admin needs is the one the restore deleted.
+   */
   const browserOnly = Object.fromEntries(
-    Object.entries(data).filter(([key]) => !serverBackedKeys.includes(key)),
+    Object.entries(data).filter(
+      ([key]) => !serverBackedKeys.includes(key) && key !== STORAGE_KEY,
+    ),
   );
 
   const localCount = importLocalStorageBackup({ ...browserOnly, ...accepted });

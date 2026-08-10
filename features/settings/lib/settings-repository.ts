@@ -159,6 +159,32 @@ export async function ensureSettingsHydrated(): Promise<boolean> {
 }
 
 /**
+ * The commerce section, but only once the server's copy is actually in it.
+ *
+ * A section PUT is a replace-all, and `updateStore`'s own comment is explicit
+ * about the limit of the gate it waits on: it protects the sections NOT in the
+ * patch, and "the section that IS in `patch` came from the caller — protecting
+ * that one is the form's job". Every settings FORM does that job, by staying
+ * behind a skeleton until hydration lands. `setGatewayEnabled` is not a form:
+ * it read `getCommerceSettings()` synchronously and only then awaited, so the
+ * whole commerce object was frozen before anything had been read from the
+ * server — and one click on the Cash-on-Delivery switch PUT that frozen copy
+ * back. On a cache as old as the last page load that silently reverts the
+ * delivery fee, the free-delivery threshold, the tax rate and label, gift wrap,
+ * the minimum order value, the order-number prefix, the checkout terms and the
+ * delivery time slots to whatever this browser last saw; on a genuinely empty
+ * one it writes the demo seed. The toast said "Gateway disabled" either way.
+ *
+ * `null` means hydration never settled, and then the caller must send nothing
+ * and report the refusal — the same shape as `readHydratedCoupons`, which this
+ * codebase already wrote for the identical mistake.
+ */
+export async function readHydratedCommerce(): Promise<CommerceSettings | null> {
+  if (!(await ensureSettingsHydrated())) return null;
+  return getCommerceSettings();
+}
+
+/**
  * A settings slice, plus whether the SERVER took it.
  *
  * `SettingsServerSync` merges the server's copy over the local one on every
@@ -531,6 +557,23 @@ export function exportLocalStorageBackup(): Record<string, string | null> {
   return backup;
 }
 
+/**
+ * The list of rollback points is not shop data, and a restore never writes it.
+ *
+ * `bakery-cms-backup-history` starts with `bakery-cms` like everything else, so
+ * it rode along in both directions: every snapshot embedded the whole previous
+ * history (doubling in size per export until localStorage threw and export
+ * simply stopped working), and every restore replaced this machine's history
+ * with the one from the file — including the "Before import" snapshot the
+ * import dialog had written seconds earlier and promised the admin they could
+ * roll back to. The one rollback point they need is the one the restore
+ * deleted.
+ *
+ * Named here rather than only at the call sites because this function is the
+ * choke point every restore path goes through, including the legacy one.
+ */
+const BACKUP_HISTORY_KEY = "bakery-cms-backup-history";
+
 export function importLocalStorageBackup(
   backup: Record<string, string | null>
 ): number {
@@ -539,6 +582,7 @@ export function importLocalStorageBackup(
   let count = 0;
   for (const [key, value] of Object.entries(backup)) {
     if (!key.startsWith("bakery-cms") || value === null) continue;
+    if (key === BACKUP_HISTORY_KEY) continue;
     localStorage.setItem(key, value);
     count += 1;
   }

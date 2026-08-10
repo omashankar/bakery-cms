@@ -51,10 +51,14 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   // gateways and nothing switched.
   async function handleToggle(next: boolean) {
     setEnabled(next);
-    reportWrite(
-      await setGatewayEnabled(config!.id, next),
-      next ? "Gateway enabled" : "Gateway disabled"
-    );
+    const persisted = await setGatewayEnabled(config!.id, next);
+    // Put the switch back where the SERVER has it. The optimistic flip stood
+    // whatever the answer, so a refused write left the screen saying Cash on
+    // Delivery was off while every customer's checkout still offered it — and
+    // the toast underneath it said the write had failed. A switch is not
+    // typing to be preserved for a retry; it is a claim about the shop.
+    if (!persisted) setEnabled(!next);
+    reportWrite(persisted, next ? "Gateway enabled" : "Gateway disabled");
   }
 
   const statusBadge = !wired ? (
