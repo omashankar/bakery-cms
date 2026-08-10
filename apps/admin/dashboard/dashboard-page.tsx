@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IndianRupee, MessageSquare, Send, ShoppingBag } from "lucide-react";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -29,6 +29,9 @@ import { fetchOrderAnalytics } from "@/features/orders/lib/orders-api";
 import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 
+const MAX_REFRESH_RETRIES = 4;
+const REFRESH_RETRY_BASE_MS = 5_000;
+
 export function DashboardPage() {
   const [greetingName, setGreetingName] = useState<string | null>(null);
   const [stats, setStats] = useState(EMPTY_DASHBOARD_STATS);
@@ -36,6 +39,13 @@ export function DashboardPage() {
   const [range, setRange] = useState<DashboardDateRange>("30d");
   const [lastUpdated, setLastUpdated] = useState("");
   const [analyticsFailed, setAnalyticsFailed] = useState(false);
+  // "Nothing has loaded" and "the last refresh failed" are different things to
+  // say, and the caption said the first for both.
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const attempts = useRef(0);
+  /** Which range `attempts` is counting for — changing range starts over. */
+  const loadedRange = useRef(range);
 
   useEffect(() => {
     const session = getDemoSession();
@@ -60,12 +70,40 @@ export function DashboardPage() {
   // rather than by each card, which would be four requests for one answer.
   useEffect(() => {
     let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
     async function load() {
+      if (loadedRange.current !== range) {
+        loadedRange.current = range;
+        attempts.current = 0;
+      }
+
       const result = await fetchOrderAnalytics(range);
       if (cancelled) return;
-      if (result) setCommerce(toDashboardCommerceAnalytics(range, result));
-      setAnalyticsFailed(!result);
+
+      if (result) {
+        attempts.current = 0;
+        setCommerce(toDashboardCommerceAnalytics(range, result));
+        setLoadedOnce(true);
+        setAnalyticsFailed(false);
+        return;
+      }
+
+      setAnalyticsFailed(true);
+      /**
+       * Retry, with the same backoff Reports uses.
+       *
+       * This page's only other trigger is an order mutation elsewhere in the
+       * admin, so a single blip froze the figures for as long as the tab stayed
+       * open — and captioned them "Figures unavailable" while they were the
+       * shop's real numbers from a moment earlier. Both halves were already
+       * repaired in reports-page.tsx and left here.
+       */
+      if (attempts.current < MAX_REFRESH_RETRIES) {
+        const delay = REFRESH_RETRY_BASE_MS * 2 ** attempts.current;
+        attempts.current += 1;
+        retry = setTimeout(() => setRetryKey((value) => value + 1), delay);
+      }
     }
 
     void load();
@@ -80,9 +118,10 @@ export function DashboardPage() {
       // Both, not just the unsubscribe: a request already in flight would
       // otherwise still resolve and set state after this effect is torn down.
       cancelled = true;
+      if (retry !== undefined) clearTimeout(retry);
       window.removeEventListener(ORDERS_UPDATED_EVENT, load);
     };
-  }, [range]);
+  }, [range, retryKey]);
 
   // Label the range the FIGURES are for, not the one the selector is on — they
   // differ while a new range is loading, and captioning last month's revenue
@@ -93,7 +132,11 @@ export function DashboardPage() {
     rangeLabel,
     lastUpdated || null,
     // Saying nothing would leave ₹0 reading as fact.
-    analyticsFailed ? "Figures unavailable — the server did not answer" : null,
+    analyticsFailed
+      ? loadedOnce
+        ? "Showing the last figures — the server did not answer"
+        : "Figures unavailable — the server did not answer"
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");

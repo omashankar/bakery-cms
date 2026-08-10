@@ -341,13 +341,26 @@ export async function sendTemplateTest(
   if (!template) return { sent: false, error: "That template no longer exists." };
 
   const sample = getSampleDataForVariables(template.variables ?? [], { slug: template.slug });
+  const body = renderTemplate(template.body, sample);
+
   return sendMail({
     to,
     subject: `[Test] ${renderTemplate(template.subject, sample)}`,
     // Including the preview line, so a test shows what an inbox will.
     html: toEmailHtml(
-      renderTemplate(template.body, sample),
+      body,
       template.previewText ? renderTemplate(template.previewText, sample) : undefined,
     ),
+    /**
+     * The plain-text alternative, given explicitly — as the real sender does.
+     *
+     * Without it `sendMail` derives text from the HTML, and the HTML carries
+     * the hidden preheader block: thirty repetitions of `&#847;&zwnj;&nbsp;`,
+     * padding that exists to stop an inbox preview spilling into the body. A
+     * text-only client showed the test as a wall of entities that no real
+     * order confirmation contains — so the one thing the button exists to
+     * check, "what will the customer see", was the one thing it got wrong.
+     */
+    text: body,
   });
 }

@@ -22,8 +22,17 @@ type ForgotPasswordForm = {
 export function ForgotPasswordFormPage() {
   const router = useRouter();
   const [sent, setSent] = useState(false);
+  /**
+   * Not prefilled, and not with a real person's address.
+   *
+   * This page is public and shipped with a real inbox typed into it, so any
+   * visitor could land here and press Send — a password-reset code to somebody
+   * else's mailbox, with nothing typed. The login page carried the same
+   * address as a default (see there); this is the one where a single click
+   * sends mail.
+   */
   const { register, handleSubmit, formState } = useForm<ForgotPasswordForm>({
-    defaultValues: { email: "sumanom7014106@gmail.com" },
+    defaultValues: { email: "" },
   });
 
   const onSubmit = async (data: ForgotPasswordForm) => {
@@ -61,7 +70,7 @@ export function ForgotPasswordFormPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="sumanom7014106@gmail.com"
+            placeholder="you@example.com"
             disabled={sent}
             {...register("email", { required: "Email is required" })}
           />

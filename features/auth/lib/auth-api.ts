@@ -105,3 +105,25 @@ export function resetPasswordRequest(input: {
 }) {
   return post<null>("/api/auth/reset-password", input);
 }
+
+/**
+ * The signed-in user, as the SERVER knows them.
+ *
+ * The admin profile screen invented this: a hardcoded email as its fallback and
+ * seeded "created"/"last login" dates, which it then pushed back as fact.
+ * `getCurrentUser()` already returns the real `email`, `name`, `role`, `status`,
+ * `lastLoginAt` and `createdAt`; nothing was asking for them.
+ *
+ * Null on any failure — a profile screen that cannot reach the server should
+ * show nothing rather than something plausible.
+ */
+export async function fetchCurrentUser(): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch("/api/auth/me", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { success?: boolean; data?: Record<string, unknown> | null };
+    return json.success ? (json.data ?? null) : null;
+  } catch {
+    return null;
+  }
+}

@@ -34,8 +34,12 @@ export function LoginFormPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const { register, control, handleSubmit, formState } = useForm<LoginForm>({
+    // Blank, not a real address. This shipped in the source with one person's
+    // inbox typed into it, so every deployment of this CMS opened its login
+    // page with a stranger's email already filled in — and the browser's own
+    // password manager is the right thing to prefill a returning admin.
     defaultValues: {
-      email: "sumanom7014106@gmail.com",
+      email: "",
       password: "",
       rememberMe: true,
     },
@@ -91,7 +95,7 @@ export function LoginFormPage() {
               type="email"
               autoComplete="email"
               inputMode="email"
-              placeholder="sumanom7014106@gmail.com"
+              placeholder="you@example.com"
               className={cn(fieldClass, "pl-11")}
               aria-invalid={!!formState.errors.email}
               aria-describedby={formState.errors.email ? "email-error" : undefined}

@@ -90,12 +90,35 @@ export function GatewayManagerPage() {
   // Counted over the gateways that can take money — the others cannot be
   // "active" in any sense a customer would notice.
   const chargeable = gateways.filter((g) => g.config.isCore === true);
-  const enabledCount = mounted ? chargeable.filter((g) => g.runtime.enabled).length : 0;
-  const onlineCount = mounted
-    ? chargeable.filter((g) => g.config.category === "online" && g.runtime.enabled).length
+
+  /**
+   * "Live at checkout" has to mean what checkout does.
+   *
+   * These counted `runtime.enabled` alone — for Razorpay that is
+   * `commerce.paymentMethods.razorpay`, which defaults to true. So a shop that
+   * has never entered Razorpay keys read "Online 1 · live at checkout" while
+   * the card two inches below showed the amber "Not configured" pill and the
+   * storefront offered Cash on Delivery only: checkout drops Razorpay whenever
+   * `/api/razorpay/availability` says it is not configured.
+   *
+   * The page had already asked and folded the answer into the CARD badge; it
+   * just never reached the number whose subtitle is literally "live at
+   * checkout". Held at zero until that answer arrives, rather than counting an
+   * unanswered gateway as live.
+   */
+  const isLiveAtCheckout = (gateway: (typeof chargeable)[number]) => {
+    if (!gateway.runtime.enabled) return false;
+    if (gateway.config.id !== "razorpay") return true;
+    return razorpayStatus === "connected";
+  };
+
+  const countsReady = mounted && razorpayStatus !== null;
+  const enabledCount = countsReady ? chargeable.filter(isLiveAtCheckout).length : 0;
+  const onlineCount = countsReady
+    ? chargeable.filter((g) => g.config.category === "online" && isLiveAtCheckout(g)).length
     : 0;
-  const offlineCount = mounted
-    ? chargeable.filter((g) => g.config.category === "offline" && g.runtime.enabled).length
+  const offlineCount = countsReady
+    ? chargeable.filter((g) => g.config.category === "offline" && isLiveAtCheckout(g)).length
     : 0;
 
   return (

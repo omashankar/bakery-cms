@@ -7,7 +7,11 @@ import {
   fetchPaymentGateways,
   fetchPaymentNotifPrefs,
 } from "./admin-config-api";
-import { persistServerAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
+import {
+  persistServerAccount,
+  persistServerAdminProfile,
+} from "@/apps/admin/profile/lib/admin-profile";
+import { fetchCurrentUser } from "@/features/auth/lib/auth-api";
 import { persistServerGateways } from "@/features/payments/lib/payment-gateway-settings";
 import { persistServerNotifPrefs } from "@/features/payments/lib/notification-prefs";
 import { persistServerCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
@@ -41,6 +45,12 @@ export async function ensureAdminConfigHydrated(): Promise<boolean> {
   ]);
 
   if (profile) persistServerAdminProfile(profile);
+  // The account fields the profile screen used to invent: the email (whose
+  // fallback was a hardcoded personal address) and the created / last-login
+  // dates it seeded and then pushed back as fact. Not part of the gate: these
+  // are read-only, so a failed read leaves them blank rather than blocking a
+  // save.
+  persistServerAccount(await fetchCurrentUser());
   if (gateways) persistServerGateways(gateways);
   if (prefs) persistServerNotifPrefs(prefs);
   if (code) persistServerCustomCode(code);

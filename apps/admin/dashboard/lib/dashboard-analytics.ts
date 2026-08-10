@@ -119,15 +119,29 @@ export function toDashboardCommerceAnalytics(
 ): DashboardCommerceAnalytics {
   const { summary, previousSummary } = response;
 
+  /**
+   * "All time" has no prior period to compare against.
+   *
+   * `getAnalyticsWindow` returns `previousStart: null` for it and
+   * `filterOrdersInPreviousWindow` answers with an empty array, so
+   * `previousSummary` is all zeros — and `formatDashboardDelta` reads a zero
+   * previous as "New vs prior period" and paints it green. Every all-time
+   * dashboard therefore claimed growth against a period that does not exist,
+   * on the shop's revenue and order count. The Reports page carries the same
+   * rule as `showComparison = shownRange !== "all"`.
+   */
+  const comparable = range !== "all";
+  const delta = (current: number, previous: number): DashboardDelta =>
+    comparable
+      ? formatDashboardDelta(current, previous)
+      : { label: "All-time total", tone: "neutral" };
+
   return {
     range,
     summary,
-    revenueDelta: formatDashboardDelta(summary.revenue, previousSummary.revenue),
-    ordersDelta: formatDashboardDelta(summary.orders, previousSummary.orders),
-    aovDelta: formatDashboardDelta(
-      summary.averageOrderValue,
-      previousSummary.averageOrderValue
-    ),
+    revenueDelta: delta(summary.revenue, previousSummary.revenue),
+    ordersDelta: delta(summary.orders, previousSummary.orders),
+    aovDelta: delta(summary.averageOrderValue, previousSummary.averageOrderValue),
     trend: response.trend,
     statusBreakdown: response.statusBreakdown,
     paymentBreakdown: response.paymentBreakdown,

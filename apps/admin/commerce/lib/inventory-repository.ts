@@ -145,14 +145,34 @@ export function getInventoryItems(): InventoryItem[] {
   });
 }
 
+/**
+ * The SERVER's two rules, which this local twin did not have.
+ *
+ * `getOverview()` on the server drops archived products entirely, and counts a
+ * low/out-of-stock product as an ALERT only when it is `published` — a draft
+ * cannot be oversold because nobody can buy it. This counted every product in
+ * the catalogue, so the Dashboard's alert strip and the sidebar badge showed
+ * stock warnings for cakes that were archived months ago or had never been
+ * published, while the Inventory page's own cards — which read the server —
+ * showed a different, smaller number for the same shop.
+ */
 export function getInventoryOverview(): InventoryOverview {
-  const items = getInventoryItems();
+  const products = new Map(loadProducts().map((product) => [product.id, product]));
+  const items = getInventoryItems().filter(
+    (item) => products.get(item.cakeId)?.status !== "archived",
+  );
+  const onSale = (item: InventoryItem) => products.get(item.cakeId)?.status === "published";
 
+  const alerting = (status: InventoryItem["stockStatus"]) => (item: InventoryItem) =>
+    item.stockStatus === status && onSale(item);
+
+  const lowStock = items.filter(alerting("low_stock")).length;
+  const outOfStock = items.filter(alerting("out_of_stock")).length;
+  // Everything countable that is not an alert — including a low or empty
+  // DRAFT, which the server also folds in here.
   const inStock = items.filter(
-    (item) => !item.unlimitedStock && item.stockStatus === "in_stock"
+    (item) => !item.unlimitedStock && !alerting("low_stock")(item) && !alerting("out_of_stock")(item),
   ).length;
-  const lowStock = items.filter((item) => item.stockStatus === "low_stock").length;
-  const outOfStock = items.filter((item) => item.stockStatus === "out_of_stock").length;
   const unlimited = items.filter((item) => item.unlimitedStock).length;
 
   return {

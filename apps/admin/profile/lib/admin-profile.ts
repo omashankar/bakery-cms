@@ -57,33 +57,76 @@ function write(data: StoredProfile): boolean {
   return true;
 }
 
-/** Fully-resolved profile (session email + saved fields + sensible defaults). */
-export function getAdminProfile(): AdminProfile {
-  const email = getDemoSession()?.email ?? "sumanom7014106@gmail.com";
-  const saved = read();
+/**
+ * The fields the SERVER owns, kept out of the editable blob entirely.
+ *
+ * These were invented in the browser. The email fell back to a hardcoded
+ * personal address — a real one, shipped in the source — so an admin whose
+ * local session marker was missing saw a stranger's email presented as their
+ * own account address. And `createdAt` / `lastLogin` were SEEDED on first read
+ * ("15 January last year", and now) into the same blob `saveAdminProfile`
+ * pushes, so the next profile save sent those invented dates to the server as
+ * fact.
+ *
+ * They live under their own key now, are written only by
+ * `persistServerAccount` from `/api/auth/me`, and are never part of a push.
+ * Blank until the server answers — which the screen renders as an em dash, an
+ * honest "not known yet" rather than a plausible date.
+ */
+const ACCOUNT_KEY = "bakery-cms-admin-account";
 
-  // Seed created/last-login once so the demo shows realistic values.
-  if (!saved.createdAt || !saved.lastLogin) {
-    const now = new Date();
-    const created = new Date(now.getFullYear() - 1, 0, 15).toISOString();
-    write({
-      ...saved,
-      createdAt: saved.createdAt ?? created,
-      lastLogin: saved.lastLogin ?? now.toISOString(),
-    });
+interface ServerAccount {
+  email?: string;
+  name?: string;
+  lastLogin?: string;
+  createdAt?: string;
+  role?: string;
+  status?: string;
+}
+
+function readAccount(): ServerAccount {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "{}") as ServerAccount;
+  } catch {
+    return {};
   }
+}
+
+/** Hydration: the authenticated user as the SERVER knows them. Never pushed back. */
+export function persistServerAccount(user: Record<string, unknown> | null): void {
+  if (typeof window === "undefined" || !user) return;
+
+  const asString = (value: unknown) => (typeof value === "string" ? value : undefined);
+  const account: ServerAccount = {
+    email: asString(user.email),
+    name: asString(user.name),
+    lastLogin: asString(user.lastLoginAt),
+    createdAt: asString(user.createdAt),
+    role: asString(user.role),
+    status: asString(user.status),
+  };
+
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  window.dispatchEvent(new Event(ADMIN_PROFILE_UPDATED_EVENT));
+}
+
+/** The server's account fields, over the admin's own edits. Nothing invented. */
+export function getAdminProfile(): AdminProfile {
+  const account = readAccount();
   const merged = read();
+  const email = account.email ?? getDemoSession()?.email ?? "";
 
   return {
-    fullName: merged.fullName ?? nameFromEmail(email),
+    fullName: merged.fullName ?? account.name ?? (email ? nameFromEmail(email) : ""),
     email,
     mobile: merged.mobile ?? "",
     username: merged.username ?? "",
     photoUrl: merged.photoUrl ?? "",
-    role: "Administrator",
-    status: "Active",
-    lastLogin: merged.lastLogin ?? new Date().toISOString(),
-    createdAt: merged.createdAt ?? new Date().toISOString(),
+    role: account.role === "owner" ? "Owner" : "Administrator",
+    status: account.status === "suspended" ? "Suspended" : "Active",
+    lastLogin: account.lastLogin ?? "",
+    createdAt: account.createdAt ?? "",
   };
 }
 
