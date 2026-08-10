@@ -78,6 +78,10 @@ export function DeliverySlotsAdminPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Delivery Slots"
+        // Counts the rows on screen, deliberately: unlike the Taxes and
+        // Shipping Rules headers, this makes no claim about what checkout is
+        // doing — it summarises the list being edited, and the Discard/Save
+        // buttons beside it say whether that list has been committed.
         description={hydration === "pending" ? "Loading delivery settings…" : `${settings.deliveryTimeSlots.length} time slot${settings.deliveryTimeSlots.length === 1 ? "" : "s"} · lead ${settings.deliveryLeadDays} day${settings.deliveryLeadDays === 1 ? "" : "s"}`}
         className="gap-3"
         actions={
