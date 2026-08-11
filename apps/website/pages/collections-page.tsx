@@ -19,7 +19,7 @@ import {
   defaultCollectionFilters,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
-import { categories } from "@/constants/landing-data";
+import { categories as demoCategories } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,14 +47,39 @@ interface CollectionsPageProps {
   categorySlug?: string;
   /** Catalogue fetched on the server, so the grid renders into the HTML. */
   catalog: LandingProduct[];
+  /**
+   * The SHOP's own categories, from Catalog settings.
+   *
+   * The pills below were `categories` from landing-data — the shipped demo
+   * taxonomy — so a category the shop added had no pill and could only be
+   * reached by typing its URL, a renamed one still showed its old name, and a
+   * deleted one kept a pill that led nowhere. This shop has 13 categories and
+   * the hardcoded list has 9.
+   */
+  categories?: { id: string; name: string; slug: string }[];
 }
 
 export function CollectionsPage({
   categorySlug: categorySlugProp,
   catalog,
+  categories: categoriesFromShop,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
-  const activeCategory = categories.find((cat) => cat.slug === categorySlug);
+  /**
+   * De-duplicated by slug: the categories list is admin-typed and this shop
+   * already has two rows called "Seasonal" with the same slug, which would
+   * render two identical pills pointing at the same page.
+   */
+  const categoryPills = useMemo(() => {
+    const source = categoriesFromShop?.length ? categoriesFromShop : demoCategories;
+    const bySlug = new Map<string, { id: string; name: string; slug: string }>();
+    for (const category of source) {
+      if (category.slug && !bySlug.has(category.slug)) bySlug.set(category.slug, category);
+    }
+    return [...bySlug.values()];
+  }, [categoriesFromShop]);
+
+  const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
   /**
    * The top of the price slider, from the shop's OWN catalogue.
    *
@@ -202,13 +227,15 @@ export function CollectionsPage({
                 {`Showing ${paginated.length} of ${filtered.length} ${(labels?.productWordPlural ?? "Cakes").toLowerCase()}`}
               </p>
 
-              <div className="mb-8 flex flex-wrap gap-2">
+              {/* Named, so it reads as one group of related links rather than
+                  a loose row of anchors. */}
+              <nav aria-label="Categories" className="mb-8 flex flex-wrap gap-2">
                 <CategoryPill
                   label="All"
                   active={!categorySlug}
                   href={routes.store.collections}
                 />
-                {categories.map((cat) => (
+                {categoryPills.map((cat) => (
                   <CategoryPill
                     key={cat.id}
                     label={cat.name}
@@ -216,7 +243,7 @@ export function CollectionsPage({
                     href={routes.store.collection(cat.slug)}
                   />
                 ))}
-              </div>
+              </nav>
 
               {paginated.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">

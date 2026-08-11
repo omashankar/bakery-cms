@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { connect } from "./shop-state";
+
 /**
  * The category pages, in a browser.
  *
@@ -35,6 +37,41 @@ test.describe("browsing a category", () => {
     // read as a limit — "Up to ₹19,000" next to an unfiltered grid says the
     // customer is being shown a subset when they are not.
     await expect(page.getByText(/any price/i).first()).toBeVisible();
+  });
+
+  test("offers the shop's own categories, not the ones that shipped", async ({ page }) => {
+    // The pills were `categories` from landing-data — the demo taxonomy. This
+    // shop's catalogue has categories that list does not (Chocolate, Premium,
+    // Classic), so they had no pill and could only be reached by URL.
+    const db = await connect();
+    const catalog = await db.collection("catalogs").findOne({});
+    const own = ((catalog?.categories ?? []) as { name: string; slug: string }[]).filter(
+      (item) => item.slug,
+    );
+    expect(own.length, "this shop has no categories to test with").toBeGreaterThan(0);
+
+    await page.goto("/store/collections");
+
+    // Scoped to the pill group. An earlier version counted every link on the
+    // page, so unrelated links to a collection made it fail for a reason that
+    // had nothing to do with the pills.
+    const pills = page.getByRole("navigation", { name: "Categories" });
+    await expect(pills).toBeVisible();
+
+    // Every category the shop has, offered. Checked by name so a rename shows.
+    for (const category of own) {
+      await expect(
+        pills.getByRole("link", { name: category.name, exact: true }),
+        `${category.name} is missing from the category pills`,
+      ).toBeVisible();
+    }
+
+    // And no duplicates — the list is admin-typed and this shop has two rows
+    // sharing a slug.
+    const hrefs = await pills
+      .locator("a")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href")));
+    expect(new Set(hrefs).size, "the same category is offered twice").toBe(hrefs.length);
   });
 
   test("still filters when the slider is moved down", async ({ page }) => {
