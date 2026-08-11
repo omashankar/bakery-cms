@@ -137,15 +137,29 @@ export function clearCart(): void {
   notifyCartUpdated();
 }
 
-export function addToCart(input: AddToCartInput): CartLineItem {
-  const items = readCart();
+/**
+ * The id a set of choices takes in the cart. Two adds of the same cake, size,
+ * flavour and options are one line.
+ *
+ * Exported because callers other than `addToCart` need to find the line a set
+ * of choices WOULD land on — restoring a saved item, for one, which has to know
+ * whether that line is already in the cart before it decides whose price wins.
+ */
+export function cartLineId(
+  input: Pick<AddToCartInput, "productSlug" | "weight" | "flavour" | "variantSelections">,
+): string {
   const variantKey = input.variantSelections
     ? Object.entries(input.variantSelections)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([groupId, optionId]) => `${groupId}:${optionId}`)
         .join("|")
     : "default";
-  const lineId = `${input.productSlug}-${input.weight ?? "default"}-${input.flavour ?? "default"}-${variantKey}`;
+  return `${input.productSlug}-${input.weight ?? "default"}-${input.flavour ?? "default"}-${variantKey}`;
+}
+
+export function addToCart(input: AddToCartInput): CartLineItem {
+  const items = readCart();
+  const lineId = cartLineId(input);
   const existing = items.find((item) => item.id === lineId);
 
   if (existing) {
@@ -242,11 +256,23 @@ export function restoreSavedItemToCart(savedId: string): boolean {
   const savedItem = getSavedForLaterItems().find((item) => item.id === savedId);
   if (!savedItem) return false;
 
+  /**
+   * The price the cart is ALREADY showing wins, when the line is already there.
+   *
+   * A saved item carries whatever the price was when it was saved, and
+   * `addToCart` overwrites the existing line's price with whatever it is
+   * handed. So restoring a cake saved last month rewrote the price of the units
+   * the customer had just added at today's price — the number on screen went
+   * backwards, and the shop reprices at checkout anyway. Between two stale
+   * prices, the one the customer is looking at is the less wrong one.
+   */
+  const inCart = readCart().find((entry) => entry.id === cartLineId(savedItem));
+
   addToCart({
     productSlug: savedItem.productSlug,
     name: savedItem.name,
     image: savedItem.image,
-    price: savedItem.price,
+    price: inCart ? inCart.price : savedItem.price,
     quantity: savedItem.quantity,
     weight: savedItem.weight,
     flavour: savedItem.flavour,

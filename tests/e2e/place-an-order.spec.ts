@@ -103,10 +103,67 @@ test.describe("a customer placing an order", () => {
 
     const placeOrder = page.getByRole("button", { name: /place order/i });
     await expect(placeOrder, "Place order never became available").toBeEnabled();
+
+    /**
+     * Record what the page SAYS and where it tries to go, as it happens.
+     *
+     * Checking for a toast after the fact cannot work: sonner dismisses in a
+     * few seconds and placing an order takes tens of them, so an assertion at
+     * the end passes whether or not the toast ever appeared. An earlier version
+     * of this check did exactly that and could not tell the bug from the fix.
+     *
+     * The App Router navigates without replacing the document, so an observer
+     * and a patched history survive the trip to the success page.
+     */
+    await page.evaluate(() => {
+      const w = window as unknown as { __said: string[]; __went: string[] };
+      w.__said = [];
+      w.__went = [];
+      new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            const text = (node as HTMLElement).textContent?.trim();
+            if (text) w.__said.push(text);
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+
+      for (const method of ["pushState", "replaceState"] as const) {
+        const original = history[method].bind(history);
+        history[method] = ((state: unknown, title: string, url?: string) => {
+          if (url) w.__went.push(String(url));
+          return original(state, title, url);
+        }) as typeof history.pushState;
+      }
+    });
+
     await placeOrder.click();
 
     // ---- the shop says it happened ----
     await expect(page).toHaveURL(/\/store\/order\/(success|BK-)/i, { timeout: 60_000 });
+
+    /**
+     * And it does not contradict itself on the way there.
+     *
+     * `commitPlacedOrder` clears the cart, which fires checkout's cart
+     * subscriber — and that subscriber treats an empty cart as the customer
+     * having removed everything: it toasted "Your cart is now empty — add a
+     * cake to check out" and `router.replace`d to the cart, racing the push to
+     * this page. The customer's order had just succeeded.
+     */
+    const { said, went } = await page.evaluate(() => {
+      const w = window as unknown as { __said: string[]; __went: string[] };
+      return { said: w.__said, went: w.__went };
+    });
+
+    expect(
+      said.filter((text) => /cart is now empty/i.test(text)),
+      "checkout said the cart was empty at the moment the order succeeded",
+    ).toEqual([]);
+    expect(
+      went.filter((url) => /\/store\/cart/.test(url)),
+      "checkout tried to send the customer back to the cart as the order succeeded",
+    ).toEqual([]);
 
     // ---- and it really did ----
     const db = await connect();

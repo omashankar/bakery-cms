@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Banknote,
@@ -246,6 +246,13 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     setPaymentMethod(availablePaymentOptions[0].value);
   }, [paymentMethod, availablePaymentOptions]);
 
+  /**
+   * This checkout has produced an order, so an emptied cart is expected.
+   *
+   * A ref, not state: the cart subscriber below reads it from inside a
+   * subscription registered once, which would close over a stale state value.
+   */
+  const orderCommitted = useRef(false);
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
   /**
@@ -417,6 +424,17 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     return subscribeToCart(() => {
       const next = getCartItems();
       if (next.length === 0) {
+        /**
+         * Unless WE emptied it, one line before the success page.
+         *
+         * `commitPlacedOrder` clears the cart on a successful order, which
+         * fires this subscriber. So at the exact moment the order went through,
+         * the customer got "Your cart is now empty — add a cake to check out"
+         * and a `router.replace` to the cart, racing the push to the success
+         * page — a contradiction and a coin toss over where they landed.
+         */
+        if (orderCommitted.current) return;
+
         toast.info("Your cart is now empty — add a cake to check out");
         router.replace(routes.store.cart);
         return;
@@ -671,8 +689,10 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     commitPlacedOrder(order);
   };
 
+
   /** The steps that must happen exactly once, and only once the server has it. */
   const commitPlacedOrder = (order: PlacedOrder) => {
+    orderCommitted.current = true;
     // The coupon redemption is NOT counted here.
     //
     // `placeOrder` already does it, atomically, against the code the shop itself
