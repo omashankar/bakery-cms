@@ -23,6 +23,23 @@ export interface RefreshClaims {
   type: "refresh";
 }
 
+/**
+ * A signed-in STOREFRONT customer. Not a user of the admin.
+ *
+ * `type: "customer"` is inside the signed payload, and every verifier here
+ * checks it, so a customer token can never be accepted where an access token is
+ * expected — `verifyAccessToken` returns null on it — and vice versa. That type
+ * check, not the choice of secret, is what keeps the two apart.
+ *
+ * There is no role: a customer's authority is exactly "their own orders", which
+ * is decided by `sub`/`email`, never by a claim the token carries.
+ */
+export interface CustomerClaims {
+  sub: string; // customerAccountId
+  email: string;
+  type: "customer";
+}
+
 function secretFor(type: TokenType): Uint8Array {
   const raw =
     type === "access" ? process.env.JWT_ACCESS_SECRET : process.env.JWT_REFRESH_SECRET;
@@ -78,6 +95,54 @@ export async function verifyRefreshToken(token: string): Promise<RefreshClaims |
   try {
     const { payload } = await jwtVerify(token, secretFor("refresh"), { algorithms: ["HS256"] });
     return payload.type === "refresh" ? (payload as unknown as RefreshClaims) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How long a customer stays signed in on the storefront.
+ *
+ * Long, deliberately: a shopper is not an administrator, the token authorises
+ * nothing but their own order history, and being logged out between placing an
+ * order and coming back to track it is the thing the account exists to fix.
+ */
+export const CUSTOMER_TTL = process.env.JWT_CUSTOMER_TTL || "30d";
+
+/**
+ * Its own secret when one is configured, the access secret otherwise.
+ *
+ * Sharing is safe here in a way that sharing between access and refresh is not:
+ * those two differ only by intent, so a leaked access secret minting refresh
+ * tokens would be an escalation. A customer token is strictly LESS authority
+ * than an access token, and anyone able to sign one could sign an admin token
+ * instead. `JWT_CUSTOMER_SECRET` is honoured for installs that want the
+ * separation anyway, and no existing install has to add an env var to get
+ * customer accounts working.
+ */
+function customerSecret(): Uint8Array {
+  const raw = process.env.JWT_CUSTOMER_SECRET || process.env.JWT_ACCESS_SECRET;
+  if (!raw) {
+    throw new Error("JWT_CUSTOMER_SECRET or JWT_ACCESS_SECRET is not set in .env.local");
+  }
+  return new TextEncoder().encode(raw);
+}
+
+export async function signCustomerToken(
+  claims: Omit<CustomerClaims, "type">,
+  ttl: string = CUSTOMER_TTL,
+): Promise<string> {
+  return new SignJWT({ ...claims, type: "customer" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(ttl)
+    .sign(customerSecret());
+}
+
+export async function verifyCustomerToken(token: string): Promise<CustomerClaims | null> {
+  try {
+    const { payload } = await jwtVerify(token, customerSecret(), { algorithms: ["HS256"] });
+    return payload.type === "customer" ? (payload as unknown as CustomerClaims) : null;
   } catch {
     return null;
   }

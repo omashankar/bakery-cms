@@ -119,19 +119,31 @@ describe("the profile form", () => {
   const page = read("apps/website/account/pages/account-dashboard-page.tsx");
 
   it("does not report a save that did not happen", () => {
-    // `updateCustomerProfile` answers null when there is no session to update,
-    // and the result was thrown away — so "Profile updated" fired over a write
-    // that never took place.
-    expect(page).toContain("const updated = updateCustomerProfile(");
+    // The write used to go to localStorage and toast "Profile updated"
+    // regardless of whether anything was stored.
+    expect(page).toContain("const updated = await updateCustomerProfile(");
     expect(page).toContain("if (!updated)");
   });
 
-  it("says what changing the email does to the customer's order history", () => {
-    // Orders are matched by the email they were placed with, and there is no
-    // server-side account to follow the change. My Orders emptied itself and
-    // said "No orders yet" under a toast reading "Profile updated".
-    expect(page).toContain("emailChanged");
-    expect(page).toContain("stay under that address");
+  it("does not let the customer edit the address their orders are matched on", () => {
+    /**
+     * Stronger than the warning this used to assert.
+     *
+     * The first fix explained what editing the email would cost — "orders
+     * placed with X stay under that address". Now there is a real account
+     * behind the session and the email IS the account: every order is found by
+     * matching it, so an edit here could only ever produce an account pointing
+     * at a history it no longer has. Moving to another address means signing in
+     * as that address and proving it.
+     */
+    const form = page.slice(page.indexOf('htmlFor="email"'));
+    const field = form.slice(0, form.indexOf("</div>"));
+
+    expect(field).toContain("readOnly");
+    expect(field).toContain("disabled");
+    // And the save payload cannot carry one either.
+    const submit = page.slice(page.indexOf("const onSubmit"));
+    expect(submit.slice(0, submit.indexOf("toast.success"))).not.toContain("email:");
   });
 });
 

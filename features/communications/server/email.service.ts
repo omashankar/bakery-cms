@@ -31,6 +31,7 @@ export type EmailTemplateSlug =
   | "order_cancelled"
   | "invoice"
   | "password_reset"
+  | "customer_sign_in"
   | "refund_processed"
   | "admin_new_order";
 
@@ -118,6 +119,21 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Hi {{customer_name}},\n\nUse this code to reset your password:\n\n" +
       "{{reset_code}}\n\nIt expires in {{expires_in}}. If you did not request " +
       "this, ignore this email — your password has not changed.\n\n— {{store_name}}",
+  },
+  /**
+   * How a CUSTOMER signs in to the storefront.
+   *
+   * There is no password to reset: proving control of the email address is the
+   * whole of it, which is also what ties the account to the orders — those are
+   * keyed on the address the confirmation went to.
+   */
+  customer_sign_in: {
+    subject: "Your {{store_name}} sign-in code",
+    body:
+      "Hi {{customer_name}},\n\nUse this code to sign in and see your orders:\n\n" +
+      "{{sign_in_code}}\n\nIt expires in {{expires_in}}. If you did not ask to " +
+      "sign in, you can ignore this email — nobody can use the code without it.\n\n" +
+      "— {{store_name}}",
   },
 };
 

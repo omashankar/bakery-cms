@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { connect } from "./shop-state";
+import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 
 /**
  * The one journey the whole shop exists for, driven the way a customer drives
@@ -17,27 +18,26 @@ import { connect } from "./shop-state";
  * the stock back.
  */
 test.describe("a customer placing an order", () => {
+  let customerEmail = "";
+
+  test.afterAll(async () => {
+    await removeCustomer(customerEmail);
+  });
+
   test("can go from a product page to a placed order", async ({ page }) => {
     /**
-     * Signed in as a customer, which today means one localStorage key.
+     * Signed in for real.
      *
-     * `customer-session.ts` says so itself — "UI-only customer session —
-     * replaced by real auth later" — and checkout gates on it: pressing
-     * "Proceed to checkout" without one opens the sign-in modal instead of
-     * navigating. Seeding the key IS the real mechanism, not a shortcut around
-     * it; there is no server-side customer auth to go through.
+     * This used to plant `bakery-cms-customer-session` in localStorage, and the
+     * comment here said that WAS the mechanism, "not a shortcut around it;
+     * there is no server-side customer auth to go through". That was true when
+     * it was written. There is one now: the session is an httpOnly cookie the
+     * browser cannot write, and every page asks the server — so a planted key
+     * is cleared within a round trip of being planted, and this test would
+     * bounce off checkout with "Please sign in to continue".
      */
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "bakery-cms-customer-session",
-        JSON.stringify({
-          email: "e2e-probe@example.com",
-          name: "E2E Probe",
-          phone: "9000000001",
-          signedInAt: new Date().toISOString(),
-        }),
-      );
-    });
+    customerEmail = await probeEmail("order");
+    await signInAsCustomer(page, customerEmail);
 
     // ---- find a cake that can actually be bought ----
     await page.goto("/store");
@@ -69,7 +69,7 @@ test.describe("a customer placing an order", () => {
 
     // ---- the address step ----
     await page.getByLabel(/full name/i).fill("E2E Probe");
-    await page.getByLabel(/email/i).fill("e2e-probe@example.com");
+    await page.getByLabel(/email/i).fill(customerEmail);
     await page.getByLabel(/phone/i).fill("9000000001");
     await page.getByLabel(/address line 1|address/i).first().fill("1 Probe Lane");
     await page.getByLabel(/city/i).fill("Mumbai");
@@ -169,7 +169,7 @@ test.describe("a customer placing an order", () => {
     const db = await connect();
     const placed = await db
       .collection("orders")
-      .findOne({ "address.email": "e2e-probe@example.com" });
+      .findOne({ "address.email": customerEmail });
 
     expect(placed, "the success page appeared but no order reached the database").toBeTruthy();
     expect(placed!.status).toBeTruthy();

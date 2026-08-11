@@ -5,9 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogOut, MapPin, Package, User } from "lucide-react";
 import {
-  clearCustomerSession,
   getCustomerDisplayName,
   getCustomerSession,
+  signOutCustomer,
 } from "@/apps/website/account/lib/customer-session";
 import { getAccountInitials } from "@/apps/website/account/components/account-menu";
 import { routes } from "@/constants/routes";
@@ -42,8 +42,10 @@ export function AccountNav({ className, onNavigate }: AccountNavProps) {
     return () => window.removeEventListener("bakery-customer-session-updated", load);
   }, []);
 
-  function handleLogout() {
-    clearCustomerSession();
+  async function handleLogout() {
+    // Same path as the header menu: the server ends the session, and this
+    // device is cleared whether or not it could be reached.
+    await signOutCustomer();
     onNavigate?.();
     router.push(routes.store.home);
   }
@@ -91,7 +93,7 @@ export function AccountNav({ className, onNavigate }: AccountNavProps) {
 
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
         >
           <LogOut className="size-4" />

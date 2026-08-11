@@ -66,6 +66,13 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
     "invoice_url",
   ],
   password_reset: [...STORE_VARIABLES, "customer_name", "reset_code", "expires_in"],
+  /**
+   * The storefront's own sign-in code. Its own variable name rather than
+   * reusing `reset_code`: an admin wording one of these should not have to
+   * work out which flow the word "reset" belongs to, and the two emails say
+   * different things to different people.
+   */
+  customer_sign_in: [...STORE_VARIABLES, "customer_name", "sign_in_code", "expires_in"],
   refund_processed: [
     ...STORE_VARIABLES,
     "customer_name",

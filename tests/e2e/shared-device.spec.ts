@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
+
 /**
  * What the NEXT person on this device can see.
  *
@@ -14,16 +16,9 @@ import { expect, test, type Page } from "@playwright/test";
  * who saved it. Checkout offers them as a picker.
  */
 
-const CUSTOMER_KEY = "bakery-cms-customer-session";
 const ADDRESS_KEY = "bakery-cms-customer-addresses";
 const CART_KEY = "bakery-cms-cart";
 
-const signInAs = (email: string, name: string) => ({
-  email,
-  name,
-  phone: "9000000001",
-  signedInAt: new Date().toISOString(),
-});
 
 /**
  * Signs out the way a customer does: the account menu in the header.
@@ -52,13 +47,18 @@ async function signOutThroughTheUi(page: Page) {
 }
 
 test.describe("a shared device", () => {
+  let asha = "";
+  let bilal = "";
+
+  test.afterEach(async () => {
+    await removeCustomer(asha);
+    await removeCustomer(bilal);
+  });
+
   test("does not hand the next customer the previous one's address book", async ({ page }) => {
     // ---- customer A signs in and saves an address ----
-    await page.addInitScript(
-      ([key, session]) => localStorage.setItem(key as string, JSON.stringify(session)),
-      [CUSTOMER_KEY, signInAs("asha@example.com", "Asha Menon")] as const,
-    );
-    await page.goto("/store");
+    asha = await probeEmail("asha");
+    await signInAsCustomer(page, asha);
 
     await page.evaluate(
       ([key, record]) => localStorage.setItem(key as string, JSON.stringify([record])),
@@ -84,11 +84,8 @@ test.describe("a shared device", () => {
     await signOutThroughTheUi(page);
 
     // ---- B signs in on the same browser ----
-    await page.evaluate(
-      ([key, session]) => localStorage.setItem(key as string, JSON.stringify(session)),
-      [CUSTOMER_KEY, signInAs("bilal@example.com", "Bilal Khan")] as const,
-    );
-    await page.reload();
+    bilal = await probeEmail("bilal");
+    await signInAsCustomer(page, bilal);
 
     const leftBehind = await page.evaluate((key) => localStorage.getItem(key as string), ADDRESS_KEY);
 
@@ -100,11 +97,8 @@ test.describe("a shared device", () => {
   });
 
   test("does not leave the previous customer's cart behind", async ({ page }) => {
-    await page.addInitScript(
-      ([key, session]) => localStorage.setItem(key as string, JSON.stringify(session)),
-      [CUSTOMER_KEY, signInAs("asha@example.com", "Asha Menon")] as const,
-    );
-
+    asha = await probeEmail("asha");
+    await signInAsCustomer(page, asha);
     await page.goto("/store");
     const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
     await expect(firstProduct).toBeVisible();
@@ -122,10 +116,8 @@ test.describe("a shared device", () => {
 
     await signOutThroughTheUi(page);
 
-    await page.evaluate(
-      ([key, session]) => localStorage.setItem(key as string, JSON.stringify(session)),
-      [CUSTOMER_KEY, signInAs("bilal@example.com", "Bilal Khan")] as const,
-    );
+    bilal = await probeEmail("bilal");
+    await signInAsCustomer(page, bilal);
 
     /**
      * Asserted against storage, not against the rendered page.

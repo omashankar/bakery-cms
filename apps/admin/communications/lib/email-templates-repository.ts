@@ -199,6 +199,18 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ...base,
     },
     {
+      id: "email-customer-sign-in",
+      slug: "customer_sign_in",
+      name: "Customer sign-in code",
+      description: "One-time code a customer uses to sign in and see their orders.",
+      category: "system",
+      subject: "Your {{store_name}} sign-in code",
+      previewText: "Use the code below to sign in.",
+      body: `Hi {{customer_name}},\n\nUse this code to sign in and see your orders:\n\n{{sign_in_code}}\n\nIt expires in {{expires_in}}. If you didn't ask to sign in, you can ignore this email — nobody can use the code without it.\n\n— {{store_name}}`,
+      variables: ["customer_name", "store_name", "sign_in_code", "expires_in"],
+      ...base,
+    },
+    {
       id: "email-abandoned-cart",
       slug: "abandoned_cart",
       name: "Abandoned cart reminder",

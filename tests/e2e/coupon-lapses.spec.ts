@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { connect } from "./shop-state";
+import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 
 /**
  * A coupon applied to one cart, and then the cart changes.
@@ -16,23 +17,7 @@ import { connect } from "./shop-state";
  * the page did with that null.
  */
 
-const CUSTOMER_KEY = "bakery-cms-customer-session";
 
-async function signIn(page: Page) {
-  await page.addInitScript(
-    (key) =>
-      localStorage.setItem(
-        key as string,
-        JSON.stringify({
-          email: "coupon-probe@example.com",
-          name: "Coupon Probe",
-          phone: "9000000001",
-          signedInAt: new Date().toISOString(),
-        }),
-      ),
-    CUSTOMER_KEY,
-  );
-}
 
 async function addToCart(page: Page, slug: string) {
   await page.goto(`/store/cakes/${slug}`);
@@ -40,6 +25,12 @@ async function addToCart(page: Page, slug: string) {
 }
 
 test.describe("a coupon that stops qualifying", () => {
+  let customerEmail = "";
+
+  test.afterAll(async () => {
+    await removeCustomer(customerEmail);
+  });
+
   test("says so, instead of staying green over a total with no discount", async ({ page }) => {
     // The shop's own coupon and its own minimum, read rather than assumed.
     const db = await connect();
@@ -55,7 +46,9 @@ test.describe("a coupon that stops qualifying", () => {
     expect(dear, "no single product reaches the coupon's minimum").toBeTruthy();
     expect(cheap, "no inexpensive product to leave in the cart").toBeTruthy();
 
-    await signIn(page);
+    // A real session: checkout asks the server now, so a planted key bounces.
+    customerEmail = await probeEmail("coupon");
+    await signInAsCustomer(page, customerEmail);
     await addToCart(page, dear!.slug);
     await addToCart(page, cheap!.slug);
 

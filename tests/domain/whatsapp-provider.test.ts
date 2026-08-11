@@ -485,7 +485,16 @@ describe("a shop that was already running", () => {
     // shop set up before it existed gets it, which is the whole point of the
     // backfill. A template added to the seed WITHOUT being wired must not appear
     // here — the test below pins that.
-    expect(restoredSlugs).toEqual(["admin_new_order", "order_cancelled", "refund_processed"]);
+    // `customer_sign_in` joined the list when storefront customer accounts were
+    // built: a shop running before that gains the sign-in email its customers
+    // now receive, and can word it, rather than having it sent from a hardcoded
+    // fallback it cannot see.
+    expect(restoredSlugs).toEqual([
+      "admin_new_order",
+      "customer_sign_in",
+      "order_cancelled",
+      "refund_processed",
+    ]);
     expect(plan.empty).toBe(false);
   });
 

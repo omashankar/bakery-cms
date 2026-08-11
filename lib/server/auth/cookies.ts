@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-import { ttlToDate, ACCESS_TTL, REFRESH_TTL } from "./jwt";
+import { ttlToDate, ACCESS_TTL, CUSTOMER_TTL, REFRESH_TTL } from "./jwt";
 
 /**
  * httpOnly auth cookies. Tokens live in cookies (never localStorage) so client
@@ -54,4 +54,28 @@ export async function getAccessCookie(): Promise<string | undefined> {
 
 export async function getRefreshCookie(): Promise<string | undefined> {
   return (await cookies()).get(REFRESH_COOKIE)?.value;
+}
+
+/**
+ * The storefront customer's session.
+ *
+ * Its own cookie name, so signing out of the admin does not sign a customer out
+ * of the shop on the same browser, and so neither can ever be read as the
+ * other. httpOnly for the same reason the admin's are: the storefront runs a
+ * lot of third-party-ish client code and a token in `localStorage` is one XSS
+ * away from being someone else's order history.
+ */
+export const CUSTOMER_COOKIE = "customer_session";
+
+export async function setCustomerCookie(token: string): Promise<void> {
+  const store = await cookies();
+  store.set(CUSTOMER_COOKIE, token, { ...baseOptions(), expires: ttlToDate(CUSTOMER_TTL) });
+}
+
+export async function clearCustomerCookie(): Promise<void> {
+  (await cookies()).delete(CUSTOMER_COOKIE);
+}
+
+export async function getCustomerCookie(): Promise<string | undefined> {
+  return (await cookies()).get(CUSTOMER_COOKIE)?.value;
 }

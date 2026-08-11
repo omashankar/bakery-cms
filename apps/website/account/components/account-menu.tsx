@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, MapPin, Package, User } from "lucide-react";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/constants/routes";
-import { clearCustomerSession } from "@/apps/website/account/lib/customer-session";
+import { signOutCustomer } from "@/apps/website/account/lib/customer-session";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
 
 interface AccountMenuProps {
@@ -37,10 +38,17 @@ export function AccountMenu({ name, phone, onSignOut }: AccountMenuProps) {
   const router = useRouter();
   const { open, setOpen, hoverProps } = useHoverMenu();
 
-  function handleLogout() {
-    clearCustomerSession();
+  async function handleLogout() {
+    // The SERVER ends the session; this device is wiped either way. Awaited so
+    // the push below cannot race the cookie being cleared.
+    const endedOnServer = await signOutCustomer();
     onSignOut?.();
     router.push(routes.store.home);
+    if (!endedOnServer) {
+      toast.error("Signed out on this device", {
+        description: "We could not reach the bakery to end the session everywhere. Try again when you are back online.",
+      });
+    }
   }
 
   return (
@@ -87,7 +95,7 @@ export function AccountMenu({ name, phone, onSignOut }: AccountMenuProps) {
 
         <DropdownMenuItem
           variant="destructive"
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
           className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium"
         >
           <LogOut className="size-4" />

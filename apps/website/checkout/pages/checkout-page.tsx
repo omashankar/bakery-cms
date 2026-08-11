@@ -10,7 +10,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
+import {
+  getCustomerSession,
+  syncCustomerSession,
+} from "@/apps/website/account/lib/customer-session";
 import {
   createSavedAddress,
   getDefaultAddress,
@@ -295,6 +298,9 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
     /**
      * A payment this browser made that the bakery never acknowledged.
      *
@@ -311,9 +317,21 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       return;
     }
 
+    /**
+     * Ask the SERVER before bouncing anyone.
+     *
+     * This read the browser's cached copy, which is empty on a cold load — so
+     * opening /store/checkout directly, or in a new tab, threw a signed-in
+     * customer back to the cart with "Please sign in" while their session
+     * cookie was perfectly valid. The cache is a render hint; only the server
+     * knows.
+     */
+    const signedIn = await syncCustomerSession();
+    if (cancelled) return;
+
     // Being bounced back to the cart with no explanation reads as a broken
     // button, so say why before moving them.
-    if (!getCustomerSession()) {
+    if (!signedIn) {
       toast.info("Please sign in to continue to checkout");
       router.replace(routes.store.cart);
       return;
@@ -393,6 +411,11 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     }
 
     setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [reset, router, searchParams]);
 
   /** Moves between steps and records it in history, so Back walks the flow. */
