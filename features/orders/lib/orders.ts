@@ -251,6 +251,16 @@ export interface PlaceOrderResult {
    * the caller must say so instead of offering a retry that cannot work.
    */
   closed?: string;
+  /**
+   * The shop's own reason for refusing, when it gave one and means to keep
+   * giving it — a cart that needs re-pricing, a payment method switched off.
+   *
+   * Also distinct from a plain `persisted: false`. Both were reported to the
+   * customer as "we couldn't reach the bakery", so a refusal the server made
+   * INSTANTLY read as a network fault and was offered a retry that could only
+   * ever be refused the same way.
+   */
+  refusal?: string;
 }
 
 /**
@@ -265,9 +275,19 @@ export interface PlaceOrderResult {
  * to write down, which is exactly the pause that outlasts fifteen seconds.
  *
  * So the retry sends the order it already has, byte for byte.
+ *
+ * WITH THE DRAFT ID. Without it the server has no priced cart to place against,
+ * and for anything other than cash it refuses outright — `order.service.ts`:
+ * "This cart needs to be priced again before payment." That refusal is
+ * permanent, so a customer whose card had already been captured could press
+ * Retry confirmation forever and never get an order out of it. The caller has
+ * to hold the draft id from the original attempt and hand it back here.
  */
-export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult> {
-  return adoptStoredOrder(order, await placeOrderRequest(order));
+export async function confirmOrder(
+  order: PlacedOrder,
+  draftId?: string,
+): Promise<PlaceOrderResult> {
+  return adoptStoredOrder(order, await placeOrderRequest(order, draftId));
 }
 
 /**
@@ -279,7 +299,14 @@ export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult
  * otherwise the customer's confirmation matches no order in the bakery.
  */
 function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): PlaceOrderResult {
-  if (!response.ok) return { order: local, persisted: false, closed: response.closed };
+  if (!response.ok) {
+    return {
+      order: local,
+      persisted: false,
+      closed: response.closed,
+      refusal: response.refusal,
+    };
+  }
 
   const stored = response.order;
   if (!stored || stored.orderNumber === local.orderNumber) {
@@ -329,7 +356,12 @@ export async function placeOrder(input: {
   // Re-send rather than assume the first attempt reached the server: a customer
   // pressing the button again is often doing so BECAUSE it did not. The POST is
   // idempotent on the order id, so this cannot create a second order.
-  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent));
+  //
+  // `input.draftId` goes with it. It used to be dropped here, which turned the
+  // second press of Place Order on an online payment into a 409 — the server
+  // refuses a card payment with no priced cart behind it — reported to the
+  // customer as an unreachable bakery.
+  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent, input.draftId));
 
   const order: PlacedOrder = {
     id: newOrderId(),

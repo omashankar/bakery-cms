@@ -210,7 +210,23 @@ describe("a customer who paid just as the shop closed", () => {
     const body = branch.slice(0, branch.indexOf("if (!persisted)"));
 
     expect(body).toContain('if (paymentStatus === "paid" || paymentReference)');
-    expect(body).toContain("setUnconfirmed({ order, paymentStatus, paymentReference, closed })");
+    // The reference and the maintenance notice both reach the overlay. Matched
+    // on the fields rather than on one exact call, so that refactoring how the
+    // hold is assembled does not read as the guard being removed.
+    for (const field of ["order", "paymentStatus", "paymentReference", "closed"]) {
+      expect(body).toContain(field);
+    }
+    expect(body).toContain("setUnconfirmed(");
+  });
+
+  it("keeps the reference through a reload, not just until one", () => {
+    const branch = page.slice(page.indexOf("if (closed) {"));
+    const body = branch.slice(0, branch.indexOf("if (!persisted)"));
+
+    // An overlay held only in React state is erased by a reload, and the page
+    // comes back as an ordinary checkout — offering to charge a customer whose
+    // card the gateway has already captured.
+    expect(body).toContain("saveUnconfirmedOrder(");
   });
 
   it("is not offered a retry that cannot succeed while the shop is shut", () => {

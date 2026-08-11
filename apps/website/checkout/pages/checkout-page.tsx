@@ -62,6 +62,11 @@ import {
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
+import {
+  clearUnconfirmedOrder,
+  readUnconfirmedOrder,
+  saveUnconfirmedOrder,
+} from "@/features/orders/lib/unconfirmed-order";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
@@ -253,6 +258,17 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     paymentStatus: "paid" | "cod";
     paymentReference?: string;
     /**
+     * The priced cart this order was placed against.
+     *
+     * Held BECAUSE the retry needs it. It used to be dropped here, and the
+     * retry sent the order on its own — which for anything but cash the server
+     * refuses outright, permanently, because a card payment must be placed
+     * against a cart the shop priced. The customer had been charged, was told
+     * the bakery could not be reached, and could press Retry confirmation for
+     * as long as they liked without ever getting an order.
+     */
+    draftId?: string;
+    /**
      * The shop's own maintenance notice, when THAT is why this could not be
      * confirmed. Retrying cannot help until the shop reopens, so the overlay
      * says so and does not offer a button that would only loop.
@@ -272,6 +288,22 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   });
 
   useEffect(() => {
+    /**
+     * A payment this browser made that the bakery never acknowledged.
+     *
+     * Checked FIRST, before the sign-in and empty-cart bounces, because it
+     * outranks both: a customer who has been charged must see that before they
+     * see anything else, whatever state the rest of the page is in. Restoring
+     * it also puts the blocking overlay back, which is what stops the page from
+     * quietly offering to take the money a second time.
+     */
+    const held = readUnconfirmedOrder();
+    if (held) {
+      setUnconfirmed(held);
+      setReady(true);
+      return;
+    }
+
     // Being bounced back to the cart with no explanation reads as a broken
     // button, so say why before moving them.
     if (!getCustomerSession()) {
@@ -597,7 +629,11 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
        * away.
        */
       if (paymentStatus === "paid" || paymentReference) {
-        setUnconfirmed({ order, paymentStatus, paymentReference, closed });
+        const held = { order, paymentStatus, paymentReference, draftId, closed };
+        setUnconfirmed(held);
+        // Survives a reload. Without this the page comes back as an ordinary
+        // checkout and offers to charge them again.
+        saveUnconfirmedOrder(held);
         return;
       }
 
@@ -611,7 +647,9 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       // overlay, so leaving it up on a failed RETRY would strand the customer
       // behind a "Verifying payment…" spinner with no way back to the button.
       setPayUI(null);
-      setUnconfirmed({ order, paymentStatus, paymentReference });
+      const held = { order, paymentStatus, paymentReference, draftId };
+      setUnconfirmed(held);
+      saveUnconfirmedOrder(held);
       return;
     }
 
@@ -635,6 +673,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     clearCheckoutDraft();
     setPlacing(false);
     setUnconfirmed(null);
+    clearUnconfirmedOrder();
     setPayUI(null);
 
     toast.success("Order placed!", {
@@ -664,10 +703,27 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     if (!unconfirmed || placing) return;
     setPlacing(true);
 
-    const { order, persisted } = await confirmOrder(unconfirmed.order);
+    // With the draft id from the original attempt. Without it the server has no
+    // priced cart to place a card payment against and refuses — every time.
+    const { order, persisted, refusal } = await confirmOrder(
+      unconfirmed.order,
+      unconfirmed.draftId,
+    );
     setPlacing(false);
 
     if (!persisted) {
+      // A refusal is not an outage. The server answered, and it will answer the
+      // same way to the next press, so saying "couldn't reach the bakery" sends
+      // the customer round a loop that cannot end. Their own words, and the
+      // reference, so support can act on it.
+      if (refusal) {
+        toast.error("The bakery could not accept this order", {
+          description: `${refusal} Please contact support with the reference shown — your payment is safe.`,
+          duration: 15000,
+        });
+        return;
+      }
+
       toast.error("Still couldn't reach the bakery", {
         description:
           "Your order is safe here. Try again, or contact support with the reference shown.",

@@ -75,6 +75,10 @@ const CUSTOMER_DEVICE_KEYS = [
   "bakery-cms-checkout-draft",
   // Which order numbers this browser has proved ownership of, by email.
   "bakery-cms-verified-orders",
+  // A held payment carries the previous customer's order number and payment
+  // reference, and the checkout overlay puts both on screen. The order itself
+  // stays in `bakery-cms-orders`, so signing out loses them nothing.
+  "bakery-cms-unconfirmed-order",
 ] as const;
 
 export function clearCustomerSession() {

@@ -206,6 +206,15 @@ export interface PlaceOrderResponse {
    * looking at a generic "could not reach the server".
    */
   closed?: string;
+  /**
+   * The shop's own reason for a refusal it will keep making.
+   *
+   * Distinct from an absent one, which means the request never got an answer.
+   * The two were reported identically — "we couldn't reach the bakery" — so a
+   * customer whose order the server had ANSWERED, instantly and permanently,
+   * was told the network had failed and invited to retry it forever.
+   */
+  refusal?: string;
 }
 
 export async function placeOrderRequest(
@@ -218,12 +227,12 @@ export async function placeOrderRequest(
   for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
 
-    const { ok, status, data, closed } = await sendWithStatus("/api/orders", "POST", body);
+    const { ok, status, data, closed, error } = await sendWithStatus("/api/orders", "POST", body);
     if (ok) return { ok: true, order: data ?? undefined };
     // A closed shop will refuse every attempt. Retrying only makes the customer
     // wait out the backoff before being told the same thing.
     if (closed) return { ok: false, closed };
-    if (!isWorthRetrying(status)) return { ok: false };
+    if (!isWorthRetrying(status)) return { ok: false, refusal: error };
   }
 
   return { ok: false };
