@@ -141,13 +141,29 @@ async function refreshProductRating(productSlug: string): Promise<void> {
 // ---- Public (storefront review form) --------------------------------------
 
 export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): Promise<ProductReview> {
+  /**
+   * The cake, resolved HERE, from the catalogue this server owns.
+   *
+   * The browser used to resolve it and send `cakeId`/`cakeName` along — through
+   * `loadProducts()`, which on a customer's browser seeds the shipped demo
+   * catalogue, so a review of any product the shop had actually created was
+   * refused before it left the page.
+   *
+   * Refusing an unknown slug is the check that lookup was reaching for, and it
+   * belongs on this side: the endpoint is public, so a review could otherwise
+   * be filed against a slug the shop has never sold, and land in moderation
+   * with a blank product name.
+   */
+  const cake = await productRepo.findBySlug(input.productSlug);
+  if (!cake) throw new NotFoundError("Product not found");
+
   const now = new Date().toISOString();
   const review: ProductReview = {
     // Minted here, never taken from the body. See `submitReviewSchema`.
     id: `review-${randomUUID()}`,
-    cakeId: input.cakeId ?? "",
-    productSlug: input.productSlug,
-    cakeName: input.cakeName ?? "",
+    cakeId: cake.id,
+    productSlug: cake.slug,
+    cakeName: cake.name,
     authorName: input.authorName.trim(),
     authorEmail: input.authorEmail?.trim() || undefined,
     rating: Math.min(5, Math.max(1, input.rating)),

@@ -14,7 +14,7 @@ import {
   defaultAppearanceSettings,
 } from "@/features/site-layout/lib/appearance-tokens";
 import type { AppearanceSettings } from "@/types/appearance";
-import { chosen } from "./shipped-placeholder";
+import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
 
 /**
  * The "chrome" (navbar + footer) data for the storefront, read on the SERVER
@@ -168,7 +168,9 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
         phone: chosen(contact.phone, defaultContact.phone),
         email: chosen(contact.email, defaultContact.email),
       },
-      businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
+      // See storefront-contact.server.ts: the footer published the shipped
+      // demo hours as this shop's own in exactly the same way.
+      businessHours: chosenList(contact.businessHours, defaultHours, hoursIdentity),
       // No fallback to the demo profiles. Deactivating every link is a
       // deliberate "we are not on social", and answering that with
       // instagram.com/facebook.com pointed visitors at accounts the shop does

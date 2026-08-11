@@ -10,6 +10,7 @@ import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import { getOrdersForCustomer } from "@/features/orders/lib/orders";
 import { reorderFromOrder } from "@/apps/website/lib/reorder";
+import { fetchProducts } from "@/features/products/data/products-client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
@@ -32,13 +33,44 @@ export function AccountOrdersPage() {
   const currentPage = Math.min(page, totalPages);
   const paginated = orders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  function handleReorder(orderNumber: string) {
+  /**
+   * The SHOP's catalogue, fetched when it is needed.
+   *
+   * Reorder used to resolve products through the browser's cache, which on a
+   * customer's device holds the shipped demo cakes — so every reorder of a real
+   * order failed with "items may be unavailable". `/api/products` serves the
+   * published catalogue to anyone, which is what this needs and all it needs.
+   */
+  async function handleReorder(orderNumber: string) {
     const order = orders.find((entry) => entry.orderNumber === orderNumber);
     if (!order) return;
 
-    const result = reorderFromOrder(order);
+    let catalogue;
+    try {
+      catalogue = await fetchProducts();
+    } catch {
+      // Distinct from "unavailable": nothing has been checked yet.
+      toast.error("Could not reach the bakery", {
+        description: "Please check your connection and try again.",
+      });
+      return;
+    }
+
+    const result = reorderFromOrder(
+      order,
+      catalogue.map((product) => ({
+        slug: product.slug,
+        image: product.images?.[0],
+        // The same flag the storefront reads, not the quantity.
+        inStock: product.stockStatus !== "out_of_stock",
+      })),
+    );
     if (result.added === 0) {
-      toast.error("Could not reorder — items may be unavailable");
+      toast.error("Could not reorder — items may be unavailable", {
+        description: result.unavailable.length
+          ? `${result.unavailable.join(", ")} ${result.unavailable.length === 1 ? "is" : "are"} no longer available.`
+          : undefined,
+      });
       return;
     }
 

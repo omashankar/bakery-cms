@@ -128,6 +128,12 @@ export function ContactPage({
                 </ul>
               </div>
 
+              {/*
+                No hours, no card. The heading used to sit above an invented
+                list; with the invention gone it would sit above nothing, which
+                is its own small lie about a shop that publishes no hours.
+              */}
+              {businessHours.length > 0 ? (
               <div className="rounded-2xl border border-border bg-white p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Opening Hours</h2>
                 <ul className="mt-5 space-y-3 text-sm">
@@ -148,6 +154,7 @@ export function ContactPage({
                   ))}
                 </ul>
               </div>
+              ) : null}
             </ScrollReveal>
           </div>
 

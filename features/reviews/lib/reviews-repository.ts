@@ -305,21 +305,37 @@ export async function deleteReviews(
   return { count, persisted: await deleteReviewsRequest(ids) };
 }
 
+/**
+ * A customer's review, submitted from the storefront.
+ *
+ * This used to resolve the product through `loadProducts()` and refuse
+ * outright when it could not find it. `loadProducts()` reads the ADMIN's
+ * localStorage cache and seeds the shipped DEMO catalogue when that key is
+ * missing — and it is always missing in a customer's browser, because
+ * `useProductCacheSync` runs only in the admin layout. So the lookup ran
+ * against the demo cakes, and any product the shop had actually created was
+ * "not found": every review of it was refused with "Could not submit review",
+ * every time, for every customer, with no retry that could ever work.
+ *
+ * The slug is enough. The server owns the catalogue, resolves the cake from
+ * the slug, and refuses one it does not have — which is the check this was
+ * trying to be.
+ */
 export function submitStorefrontReview(input: {
   productSlug: string;
+  cakeName?: string;
   authorName: string;
   authorEmail?: string;
   rating: number;
   title?: string;
   body: string;
 }): Promise<ReviewWriteResult> {
-  const cake = loadProducts().find((item) => item.slug === input.productSlug);
-  if (!cake) return Promise.resolve({ review: null, persisted: false });
-
   return createReview({
-    cakeId: cake.id,
-    productSlug: cake.slug,
-    cakeName: cake.name,
+    productSlug: input.productSlug,
+    // For the local row only, so the optimistic copy reads properly before the
+    // server's answer lands. The server fills in the authoritative values.
+    cakeId: "",
+    cakeName: input.cakeName ?? "",
     authorName: input.authorName.trim(),
     authorEmail: input.authorEmail?.trim() || undefined,
     rating: Math.min(5, Math.max(1, input.rating)),

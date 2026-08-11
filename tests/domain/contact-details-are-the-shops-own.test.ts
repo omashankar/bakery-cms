@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { contactInfo } from "@/constants/landing-data";
+import { businessHours as shippedHours, contactInfo } from "@/constants/landing-data";
 import { chosen } from "@/apps/website/lib/shipped-placeholder";
 
 /**
@@ -104,6 +104,39 @@ describe("what the storefront publishes as the shop's contact details", () => {
     const chrome = await getStorefrontChrome();
 
     expect(chrome.contact).toEqual({ address: "", phone: "", email: "" });
+  });
+
+  /**
+   * Opening hours, the fourth sibling on the same four lines.
+   *
+   * `businessHours?.length ? … : defaultHours` published "Monday – Saturday,
+   * 9:00 AM – 9:00 PM" under a heading reading "Opening Hours". Unlike a wrong
+   * phone number, a customer can act on this one without contacting anybody:
+   * they turn up at 8pm and the door is locked.
+   */
+  it("does not invent opening hours for a shop that has none", async () => {
+    settings.value = { contact: { businessHours: [] } };
+
+    expect((await getStorefrontContact()).businessHours).toEqual([]);
+  });
+
+  it("does not publish the shipped hours of a shop that never opened Settings", async () => {
+    settings.value = { contact: { businessHours: [...shippedHours] } };
+
+    expect((await getStorefrontContact()).businessHours).toEqual([]);
+  });
+
+  it("publishes the hours the shop really set", async () => {
+    const real = [{ day: "Tue – Sun", hours: "7:00 AM – 7:00 PM" }];
+    settings.value = { contact: { businessHours: real } };
+
+    expect((await getStorefrontContact()).businessHours).toEqual(real);
+  });
+
+  it("applies the same rule to the footer, which shows hours on every page", async () => {
+    settings.value = { contact: { businessHours: [...shippedHours] } };
+
+    expect((await getStorefrontChrome()).businessHours).toEqual([]);
   });
 
   it("still falls back when the DATABASE is unreachable, which is a different thing", async () => {

@@ -117,7 +117,12 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             </div>
           ) : null}
 
-          {footerSettings.showHours ? (
+          {/*
+            The switch AND something to show. The shop's hours are no longer
+            invented from the shipped demo set, so this column can legitimately
+            be empty — and a heading over nothing is its own claim.
+          */}
+          {footerSettings.showHours && businessHours.length > 0 ? (
             <div className="space-y-4 lg:col-span-2">
               <h4 className="text-sm font-semibold text-foreground">Opening Hours</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">

@@ -1,4 +1,5 @@
 import { brandInfo, businessHours, contactInfo } from "@/constants/landing-data";
+import { chosenList, hoursIdentity } from "@/apps/website/lib/shipped-placeholder";
 import {
   getActiveSocialLinks,
   getContactSettings,
@@ -53,9 +54,16 @@ export function getStorefrontContactInfo() {
   };
 }
 
+/**
+ * The shop's own opening hours, or none.
+ *
+ * The third site with `businessHours?.length ? … : businessHours` — the client
+ * twin of the two server readers. See `chosenList`: hours nobody typed are not
+ * this bakery's hours, and a customer can act on them.
+ */
 export function getStorefrontBusinessHours() {
   const contact = getContactSettings();
-  return contact.businessHours?.length ? contact.businessHours : businessHours;
+  return chosenList(contact.businessHours, businessHours, hoursIdentity);
 }
 
 export function getStorefrontBusinessType(): BusinessType {

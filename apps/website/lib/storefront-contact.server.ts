@@ -37,7 +37,7 @@ export interface StorefrontContact {
  *   demo pin", so a bakery in Delhi that removed its map advertised an address
  *   in Mumbai. Empty now stays empty, and the page renders no frame at all.
  */
-import { chosen } from "./shipped-placeholder";
+import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
 
 function resolveMapEmbedUrl(stored: string | undefined): string {
   if (stored === undefined) return defaultContact.mapEmbedUrl;
@@ -95,7 +95,10 @@ export async function getStorefrontContact(): Promise<StorefrontContact> {
       phone: chosen(contact.phone, defaultContact.phone),
       email: chosen(contact.email, defaultContact.email),
       mapEmbedUrl: resolveMapEmbedUrl(contact.mapEmbedUrl),
-      businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
+      // The last of the four siblings. `businessHours?.length ? … : defaultHours`
+      // published "Monday – Saturday, 9:00 AM – 9:00 PM" as this bakery's own
+      // hours — a claim a customer can act on and turn up to a shut door.
+      businessHours: chosenList(contact.businessHours, defaultHours, hoursIdentity),
     };
   } catch {
     return fallbackContact();

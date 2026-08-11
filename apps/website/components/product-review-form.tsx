@@ -35,6 +35,10 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
 
     const { review, persisted } = await submitStorefrontReview({
       productSlug,
+      // Already on this page. It used to be looked up instead, through the
+      // admin's product cache, which on a customer's browser holds the shipped
+      // demo catalogue — so a real product could never be reviewed.
+      cakeName,
       authorName,
       authorEmail,
       rating,
