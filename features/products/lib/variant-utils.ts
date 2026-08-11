@@ -146,6 +146,33 @@ export function getVariantOption(
   return group.options.find((option) => option.id === optionId) ?? null;
 }
 
+/**
+ * The variant groups a shop with these modules actually sells.
+ *
+ * A module that is off used to hide only the PICKER — "the group stays in the
+ * data + pricing", as the product page's own comment put it. So a shop that
+ * switched Egg/Eggless off still had every eggless cake charged its +₹80
+ * default and every order line stamped "Egg preference: Eggless", for a choice
+ * the customer was never shown and a feature the shop had turned off.
+ * `calculateVariantAdjustment` falls back to a group's default option when no
+ * selection is sent, so simply not sending one does not stop the charge — the
+ * group has to be gone.
+ *
+ * The flavour and shape pickers on the same page were already gated for exactly
+ * this reason: "an order line must not record a choice the customer was never
+ * shown". These two were the ones left.
+ */
+export function variantGroupsEnabledBy(
+  groups: ProductVariantGroup[],
+  modules: { eggEggless: boolean; photoCake: boolean },
+): ProductVariantGroup[] {
+  return groups.filter(
+    (group) =>
+      (group.type !== "egg" || modules.eggEggless) &&
+      (group.type !== "photo" || modules.photoCake),
+  );
+}
+
 export function calculateVariantAdjustment(
   groups: ProductVariantGroup[],
   selections: Record<string, string>

@@ -9,6 +9,10 @@ import { purgeProductTraces } from "@/features/products/server/product-cascade.s
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
+import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import { getSettings } from "@/features/settings/server/settings.service";
+import type { ModuleSettings } from "@/types/settings";
 import {
   buildHomepageProducts,
   type HomepageProductSource,
@@ -87,7 +91,7 @@ export async function getStorefrontProducts(): Promise<LandingProduct[]> {
  * their labels, since the filter compares labels and the card shows no prices
  * per tier.
  */
-function toCard(product: LandingProduct): LandingProduct {
+function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduct {
   return {
     id: product.id,
     slug: product.slug,
@@ -109,7 +113,13 @@ function toCard(product: LandingProduct): LandingProduct {
      * groups it was computed from. Pricing itself is untouched: `priceCart`
      * reads full products straight from the repository, never a card.
      */
-    price: defaultProductUnitPrice(product),
+    price: defaultProductUnitPrice({
+      price: product.price,
+      weights: product.weights,
+      // A module the shop has switched off is not priced, so a card must not
+      // show its surcharge either — the server would not charge it.
+      variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+    }),
     compareAtPrice: product.compareAtPrice,
     badge: product.badge,
     rating: product.rating,
@@ -124,8 +134,27 @@ function toCard(product: LandingProduct): LandingProduct {
   };
 }
 
+/**
+ * The modules this shop sells, for pricing a card.
+ *
+ * Defaults are every module ON, so a settings document written before these
+ * switches existed — or a database that cannot be reached — prices exactly as
+ * it did before rather than silently dropping surcharges.
+ */
+async function readModuleSettings(): Promise<ModuleSettings> {
+  try {
+    const settings = (await getSettings()) as unknown as {
+      modules?: Partial<ModuleSettings>;
+    };
+    return { ...defaultModuleSettings, ...(settings.modules ?? {}) };
+  } catch {
+    return defaultModuleSettings;
+  }
+}
+
 export async function getStorefrontProductCards(): Promise<LandingProduct[]> {
-  return (await getStorefrontProducts()).map(toCard);
+  const [products, modules] = await Promise.all([getStorefrontProducts(), readModuleSettings()]);
+  return products.map((product) => toCard(product, modules));
 }
 
 export async function getStorefrontProductBySlug(
@@ -233,7 +262,11 @@ export async function setProductStatus(
 export async function getHomepageRails(
   maxCount = 8
 ): Promise<Record<HomepageProductSource, LandingProduct[]>> {
-  const [products, names] = await Promise.all([readProducts(), categoryNames()]);
+  const [products, names, modules] = await Promise.all([
+    readProducts(),
+    categoryNames(),
+    readModuleSettings(),
+  ]);
   const all = products
     .filter((product) => product.status === "published")
     .map((product) => mapAdminProductToStorefront(product, names));
@@ -250,7 +283,7 @@ export async function getHomepageRails(
   return Object.fromEntries(
     sources.map((source) => [
       source,
-      buildHomepageProducts(source, maxCount, products, all).map(toCard),
+      buildHomepageProducts(source, maxCount, products, all).map((product) => toCard(product, modules)),
     ])
   ) as Record<HomepageProductSource, LandingProduct[]>;
 }

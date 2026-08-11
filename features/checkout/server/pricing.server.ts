@@ -5,8 +5,10 @@ import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { getProductVariantGroups } from "@/apps/website/lib/product-details";
 import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
+import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
-import type { CommerceSettings, GeneralSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { DeliveryZone } from "@/types/delivery";
 
@@ -97,7 +99,12 @@ export class UnknownWeightError extends Error {
 }
 
 /** The unit price of one line, given the options the customer picked. */
-function priceLine(product: LandingProduct, line: QuoteLineInput): number {
+function priceLine(
+  product: LandingProduct,
+  line: QuoteLineInput,
+  /** The modules this shop has switched on. A group it does not sell is not priced. */
+  modules: ModuleSettings,
+): number {
   const weightOptions = getProductWeightOptions(product);
 
   // An unrecognised weight label is REFUSED, not repriced.
@@ -123,7 +130,11 @@ function priceLine(product: LandingProduct, line: QuoteLineInput): number {
   return calculateProductUnitPrice({
     basePrice: product.price,
     weightPrice,
-    variantGroups: getProductVariantGroups(product),
+    // Only the groups this shop sells. A module that is off used to hide the
+    // picker and keep charging its default option's surcharge — and since the
+    // adjustment falls back to that default whenever no selection is sent,
+    // omitting the selection would not have stopped it either.
+    variantGroups: variantGroupsEnabledBy(getProductVariantGroups(product), modules),
     variantSelections: line.variantSelections ?? {},
   });
 }
@@ -138,6 +149,12 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
   const settings = settingsRaw as unknown as Record<string, unknown>;
   const commerce = (settings.commerce ?? {}) as CommerceSettings;
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
+  // Defaults are every module ON, so a settings document written before these
+  // switches existed prices exactly as it did before.
+  const modules: ModuleSettings = {
+    ...defaultModuleSettings,
+    ...((settings.modules ?? {}) as Partial<ModuleSettings>),
+  };
 
   const items: QuotedLine[] = [];
   for (const line of input.items) {
@@ -153,7 +170,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       quantity,
       name: product.name,
       image: product.image,
-      price: priceLine(product, line),
+      price: priceLine(product, line, modules),
     });
   }
 

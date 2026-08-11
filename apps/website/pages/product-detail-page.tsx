@@ -41,7 +41,10 @@ import {
   calculateProductUnitPrice,
   formatVariantSummary,
 } from "@/features/products/lib/product-pricing";
-import { getDefaultVariantSelections } from "@/features/products/lib/variant-utils";
+import {
+  getDefaultVariantSelections,
+  variantGroupsEnabledBy,
+} from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -115,7 +118,6 @@ export function ProductDetailPage({
     getDefaultVariantSelections(variantGroups)
   );
   const [message, setMessage] = useState("");
-  const [photoName, setPhotoName] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -131,6 +133,29 @@ export function ProductDetailPage({
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
+  /**
+   * The groups this shop actually sells.
+   *
+   * This used to hide only the PICKER — the comment here said so: "the group
+   * stays in the data + pricing". So a shop with Egg/Eggless switched off still
+   * charged every eggless cake its +80 default and still stamped "Egg
+   * preference: Eggless" on the order line, for a choice the customer was never
+   * shown. The flavour and shape pickers below were already gated for exactly
+   * that reason; these two were the ones left.
+   */
+  const visibleVariantGroups = useMemo(
+    () => variantGroupsEnabledBy(variantGroups, modules),
+    [variantGroups, modules]
+  );
+
+  /** Only what the customer could see, and only what the shop will charge for. */
+  const visibleSelections = useMemo(() => {
+    const allowed = new Set(visibleVariantGroups.map((group) => group.id));
+    return Object.fromEntries(
+      Object.entries(variantSelections).filter(([groupId]) => allowed.has(groupId))
+    );
+  }, [visibleVariantGroups, variantSelections]);
+
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
   const weightPrice =
     cake.weights?.[selectedWeight]?.price ?? cake.price + (weight?.modifier ?? 0);
@@ -139,14 +164,14 @@ export function ProductDetailPage({
       calculateProductUnitPrice({
         basePrice: cake.price,
         weightPrice,
-        variantGroups,
-        variantSelections,
+        variantGroups: visibleVariantGroups,
+        variantSelections: visibleSelections,
       }),
-    [cake.price, weightPrice, variantGroups, variantSelections]
+    [cake.price, weightPrice, visibleVariantGroups, visibleSelections]
   );
   const variantSummary = useMemo(
-    () => formatVariantSummary(variantGroups, variantSelections),
-    [variantGroups, variantSelections]
+    () => formatVariantSummary(visibleVariantGroups, visibleSelections),
+    [visibleVariantGroups, visibleSelections]
   );
   const eggGroup = variantGroups.find((group) => group.type === "egg");
   const selectedEggOption = eggGroup?.options.find(
@@ -168,13 +193,6 @@ export function ProductDetailPage({
       selectedPhotoOption?.semantic === "photo-print") &&
     modules.photoCake;
   const isOutOfStock = cake.inStock === false;
-  // Hide the egg / photo variant choosers when their module is off (the group
-  // stays in the data + pricing — only the on-page picker is hidden).
-  const visibleVariantGroups = variantGroups.filter(
-    (group) =>
-      (group.type !== "egg" || modules.eggEggless) &&
-      (group.type !== "photo" || modules.photoCake)
-  );
 
   useEffect(() => {
     const slots = getDeliveryTimeSlots();
@@ -265,7 +283,11 @@ export function ProductDetailPage({
       message: message.trim() || undefined,
       deliveryDate,
       deliveryTime,
-      variantSelections,
+      // Only the groups the customer could see. `calculateVariantAdjustment`
+      // falls back to a group's default option when no selection is sent, so
+      // the server-side gate in pricing.server.ts is what actually stops the
+      // charge; this stops the ORDER recording a choice nobody made.
+      variantSelections: visibleSelections,
       variantSummary,
     });
 
@@ -456,20 +478,33 @@ export function ProductDetailPage({
                 </div>
               ) : null}
 
+              {/*
+                The photo a photo cake is printed with.
+
+                There was a file input here. It kept the file NAME in local
+                state and nothing else — the file was never uploaded, the name
+                never reached the cart line or the order, and the bakery
+                received an order for a photo cake with no photo and no sign
+                that one had been chosen. The customer had watched themselves
+                select it, seen "Selected: birthday.jpg", and paid the photo
+                surcharge.
+
+                Uploading it for real needs an upload route a signed-out
+                customer can reach, which this app does not have — /api/media/upload
+                requires an admin role — and giving anonymous callers one is a
+                feature with its own size, type and abuse limits to design, not
+                a line in a form. Until then this says what actually happens.
+              */}
               {showPhotoUpload ? (
-                <div className="space-y-2" data-gate-photo>
-                  <Label htmlFor="photo-upload">Upload photo (photo cakes)</Label>
-                  <Input
-                    id="photo-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) =>
-                      setPhotoName(event.target.files?.[0]?.name ?? "")
-                    }
-                  />
-                  {photoName ? (
-                    <p className="text-xs text-muted-foreground">Selected: {photoName}</p>
-                  ) : null}
+                <div
+                  className="space-y-1 rounded-xl border border-border bg-cream-50 p-4"
+                  data-gate-photo
+                >
+                  <p className="text-sm font-medium text-foreground">Your photo</p>
+                  <p className="text-sm text-muted-foreground">
+                    We will contact you on the number you give at checkout to collect the
+                    photo for printing, once your order is placed.
+                  </p>
                 </div>
               ) : null}
 
