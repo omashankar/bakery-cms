@@ -24,6 +24,45 @@ export interface CollectionFilters {
   inStockOnly: boolean;
 }
 
+/**
+ * The top of the price slider, when the shop sells nothing dearer.
+ *
+ * It used to be the top FULL STOP — a hard 5,000 that was also the default, so
+ * every product above it was filtered out of Collections before a customer
+ * touched anything, and `countActiveFilters` reported no filter active while it
+ * happened. There was no slider position that showed them: 5,000 was the
+ * maximum, and the maximum excluded them.
+ *
+ * This shop's three wedding cakes are ₹12,499, ₹15,999 and ₹18,999. All three
+ * were unreachable through Collections, and /store/collections/wedding-cakes —
+ * a category whose every product is above the cap — rendered "No Cakes found".
+ * The most expensive things the bakery sells were the ones it could not show.
+ */
+export const COLLECTION_PRICE_FLOOR = 5000;
+
+/**
+ * A ceiling that includes the dearest cake, always.
+ *
+ * Rounded UP, never down: the guarantee the filter depends on is that at the
+ * slider's maximum `cake.price > filters.priceMax` is false for every cake in
+ * the catalogue. A ceiling below the highest price silently hides it again.
+ */
+export function collectionPriceCeiling(cakes: { price: number }[]): number {
+  const highest = cakes.reduce(
+    (max, cake) => (Number.isFinite(cake.price) ? Math.max(max, cake.price) : max),
+    0,
+  );
+  if (highest <= COLLECTION_PRICE_FLOOR) return COLLECTION_PRICE_FLOOR;
+
+  const step = 500;
+  return Math.ceil(highest / step) * step;
+}
+
+/** The starting filters for a given catalogue: nothing filtered out. */
+export function defaultCollectionFilters(priceCeiling: number): CollectionFilters {
+  return { ...DEFAULT_COLLECTION_FILTERS, priceMax: priceCeiling };
+}
+
 export const DEFAULT_COLLECTION_FILTERS: CollectionFilters = {
   search: "",
   sort: "popular",
@@ -31,12 +70,10 @@ export const DEFAULT_COLLECTION_FILTERS: CollectionFilters = {
   flavours: [],
   weights: [],
   priceMin: 0,
-  priceMax: 5000,
+  priceMax: COLLECTION_PRICE_FLOOR,
   egglessOnly: false,
   inStockOnly: false,
 };
-
-export const COLLECTION_PRICE_MAX = 5000;
 
 export function getFilterOccasionOptions(): string[] {
   return getOccasions().map((item) => item.name);
@@ -164,13 +201,17 @@ export function applyCollectionFilters(
   return result;
 }
 
-export function countActiveFilters(filters: CollectionFilters): number {
+export function countActiveFilters(
+  filters: CollectionFilters,
+  /** The top of this catalogue's slider — where "up to X" means "everything". */
+  priceCeiling: number = COLLECTION_PRICE_FLOOR,
+): number {
   let count = 0;
   if (filters.occasions.length) count += 1;
   if (filters.flavours.length) count += 1;
   if (filters.weights.length) count += 1;
   if (filters.egglessOnly) count += 1;
   if (filters.inStockOnly) count += 1;
-  if (filters.priceMin > 0 || filters.priceMax < COLLECTION_PRICE_MAX) count += 1;
+  if (filters.priceMin > 0 || filters.priceMax < priceCeiling) count += 1;
   return count;
 }

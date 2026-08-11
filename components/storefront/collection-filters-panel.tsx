@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
-  COLLECTION_PRICE_MAX,
-  DEFAULT_COLLECTION_FILTERS,
+  COLLECTION_PRICE_FLOOR,
+  defaultCollectionFilters,
   DEFAULT_FILTER_FLAVOUR_OPTIONS,
   DEFAULT_FILTER_OCCASION_OPTIONS,
   type CollectionFilters,
@@ -15,6 +15,7 @@ import {
   getFilterOccasionOptions,
   getFilterWeightOptions,
 } from "@/apps/website/lib/collection-filters";
+import { formatCurrency } from "@/utils/format";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -26,12 +27,18 @@ import { cn } from "@/lib/utils";
 interface CollectionFiltersPanelProps {
   filters: CollectionFilters;
   onChange: (filters: CollectionFilters) => void;
+  /**
+   * The dearest thing the shop sells, rounded up. The slider must reach it —
+   * a fixed ceiling hid every product above itself with no way to get them back.
+   */
+  priceCeiling?: number;
   className?: string;
 }
 
 export function CollectionFiltersPanel({
   filters,
   onChange,
+  priceCeiling = COLLECTION_PRICE_FLOOR,
   className,
 }: CollectionFiltersPanelProps) {
   const weights = getFilterWeightOptions();
@@ -81,7 +88,13 @@ export function CollectionFiltersPanel({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => onChange({ ...DEFAULT_COLLECTION_FILTERS, search: filters.search, sort: filters.sort })}
+          onClick={() =>
+            onChange({
+              ...defaultCollectionFilters(priceCeiling),
+              search: filters.search,
+              sort: filters.sort,
+            })
+          }
         >
           Clear
         </Button>
@@ -133,16 +146,27 @@ export function CollectionFiltersPanel({
             type="range"
             aria-label="Maximum price"
             min={0}
-            max={COLLECTION_PRICE_MAX}
+            max={priceCeiling}
             step={100}
-            value={filters.priceMax}
+            value={Math.min(filters.priceMax, priceCeiling)}
             onChange={(event) =>
               onChange({ ...filters, priceMax: Number(event.target.value) })
             }
             className="w-full accent-bakery-700"
           />
           <p className="text-sm text-muted-foreground">
-            Up to ₹{filters.priceMax.toLocaleString("en-IN")}
+            {/*
+              The shop's currency, not a hardcoded rupee. A shop selling in
+              dollars had its own prices formatted correctly everywhere else on
+              the page and "₹" here alone.
+
+              And at the top of the slider this says so in words: "Up to
+              ₹19,000" beside a grid showing everything reads as a filter that
+              is doing something, when it is not.
+            */}
+            {filters.priceMax >= priceCeiling
+              ? "Any price"
+              : `Up to ${formatCurrency(filters.priceMax)}`}
           </p>
         </div>
       </FilterGroup>
