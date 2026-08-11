@@ -171,11 +171,22 @@ export function applyCollectionFilters(
 
   let result = cakes.filter((cake) => {
     if (query) {
-      const matchesSearch =
-        cake.name.toLowerCase().includes(query) ||
-        cake.category.toLowerCase().includes(query) ||
-        cake.description.toLowerCase().includes(query);
-      if (!matchesSearch) return false;
+      // Same haystack as the search page, and for the same reason: this filter
+      // runs on the card projection, where `description` is deliberately blank.
+      // A third of this predicate could never match, while the flavours and
+      // occasions the customer actually types were sitting unused in the same
+      // payload.
+      const haystack = [
+        cake.name,
+        cake.category,
+        cake.description,
+        ...(cake.flavours ?? []),
+        ...(cake.occasions ?? []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(query)) return false;
     }
 
     if (cake.price < filters.priceMin || cake.price > filters.priceMax) return false;

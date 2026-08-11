@@ -56,17 +56,40 @@ export function getProductBySlug(slug: string): LandingProduct | undefined {
   return getAllProducts().find((cake) => cake.slug === slug);
 }
 
+/**
+ * Everything a search term is allowed to match on one cake.
+ *
+ * Search used to be name, category and DESCRIPTION — and the storefront's
+ * search page runs on the card projection, where `toCard` deliberately sets
+ * `description: ""` to keep the payload small. So a third of the predicate
+ * matched nothing on the one surface that uses it, and a customer searching
+ * for a word that appears only in a cake's description was told there were no
+ * results.
+ *
+ * The flavours and occasions were already in that payload — carried for the
+ * filter panel — and are what customers actually type ("chocolate",
+ * "wedding"). The description stays in the haystack for callers that pass full
+ * products, where it is real.
+ */
+function searchHaystack(cake: LandingProduct): string {
+  return [
+    cake.name,
+    cake.category,
+    cake.description,
+    ...(cake.flavours ?? []),
+    ...(cake.occasions ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 export function searchProducts(query: string, catalog?: LandingProduct[]): LandingProduct[] {
   const source = catalog ?? getAllProducts();
   const normalized = query.trim().toLowerCase();
   if (!normalized) return source;
 
-  return source.filter(
-    (cake) =>
-      cake.name.toLowerCase().includes(normalized) ||
-      cake.description.toLowerCase().includes(normalized) ||
-      cake.category.toLowerCase().includes(normalized)
-  );
+  return source.filter((cake) => searchHaystack(cake).includes(normalized));
 }
 
 export function filterProductsByCategory(

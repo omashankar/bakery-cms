@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -59,7 +60,28 @@ export function OrderDetailPage() {
         return;
       }
     }
-    setOrder(getOrderByNumber(orderNumber));
+
+    /**
+     * A refresh that fails must not delete the order from the screen.
+     *
+     * This fell through to the local cache unconditionally, and the local cache
+     * is empty for any order this browser did not itself write — an order
+     * placed by the Razorpay webhook, or opened from a tracking link on another
+     * device. So one failed request replaced a fully loaded order with `null`,
+     * and the page rendered "Order Not Found" for an order that exists and that
+     * the customer had been looking at a second earlier.
+     */
+    const local = getOrderByNumber(orderNumber);
+    if (local) {
+      setOrder(local);
+      return;
+    }
+
+    if (order) {
+      toast.error("Could not refresh this order", {
+        description: "Showing the details we already have. Please try again in a moment.",
+      });
+    }
   }
 
   useEffect(() => {

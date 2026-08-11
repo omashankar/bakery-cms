@@ -70,7 +70,41 @@ export function AccountDashboardPage() {
   const onSubmit = async (data: ProfileForm) => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const name = `${data.firstName} ${data.lastName}`.trim();
-    updateCustomerProfile({ name, email: data.email });
+    const previousEmail = session?.email ?? "";
+    const emailChanged = data.email.trim().toLowerCase() !== previousEmail.toLowerCase();
+
+    /**
+     * The return value decides what to say.
+     *
+     * `updateCustomerProfile` answers null when there is no session to update
+     * or the stored one cannot be parsed — and the result was thrown away, so
+     * "Profile updated" fired over a write that had not happened and the form
+     * went on showing edits nobody had saved.
+     */
+    const updated = updateCustomerProfile({ name, email: data.email });
+    if (!updated) {
+      toast.error("Could not update your profile", {
+        description: "Please sign in again and try once more.",
+      });
+      return;
+    }
+
+    /**
+     * Changing the email moves the account away from its own order history.
+     *
+     * Orders are matched to a customer by the email they were placed with —
+     * `getOrdersForCustomer(session.email)` — and there is no server-side
+     * customer account to follow the change. So My Orders emptied itself and
+     * said "No orders yet", under a toast reading "Profile updated".
+     */
+    if (emailChanged) {
+      toast.success("Profile updated", {
+        description: `Orders placed with ${previousEmail} stay under that address — sign in with it to see them.`,
+        duration: 10000,
+      });
+      return;
+    }
+
     toast.success("Profile updated");
   };
 

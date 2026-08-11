@@ -12,6 +12,7 @@ import { getCoupons } from "@/features/commerce/server/commerce.service";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { ContactSettings, GeneralSettings } from "@/types/settings";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
+import { publishedOnly } from "@/features/content/lib/storefront-content";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
 import type { Banner } from "@/types/media";
@@ -96,8 +97,8 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
       rails={rails}
       banners={banners}
       categories={categories}
-      testimonials={(testimonialsRaw ?? []) as Testimonial[]}
-      faqs={(faqsRaw ?? []) as FaqItem[]}
+      testimonials={publishedOnly(testimonialsRaw as Testimonial[] | null)}
+      faqs={publishedOnly(faqsRaw as FaqItem[] | null)}
       instagram={instagram}
       offers={selectStorefrontOffers(coupons, 12, {
         currency: settings.general?.currency,

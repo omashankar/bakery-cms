@@ -65,7 +65,22 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
               <h4 className="text-sm font-semibold text-foreground">{column.title}</h4>
               <ul className="space-y-2.5">
                 {column.links.map((link) => (
-                  <li key={link.id}>
+                  <li
+                    key={link.id}
+                    /*
+                      Gated the way the navbar gates its own wedding link. The
+                      default footer ships a "Wedding Cakes" quick link
+                      (footer-utils.ts), and it was not gated — so a shop that
+                      switched the Wedding module off, or a business type that
+                      never had it, kept a link to a 404 on every page of the
+                      storefront while the header's copy of the same link
+                      correctly disappeared.
+
+                      On the <li>, not the <a>: hiding the anchor alone would
+                      leave its bullet and spacing behind.
+                    */
+                    data-gate-wedding={link.href === routes.store.weddingCakes ? "" : undefined}
+                  >
                     <Link
                       href={link.href}
                       className="text-sm text-muted-foreground transition-colors hover:text-bakery-700"

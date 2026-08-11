@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MapPin, PackageSearch, Truck } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
+import { getOrderByNumber } from "@/features/orders/lib/orders";
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
@@ -25,16 +24,6 @@ type TrackOrderForm = {
 export function TrackOrderPage() {
   const router = useRouter();
   const { register, handleSubmit, formState } = useForm<TrackOrderForm>();
-  const [demoHint, setDemoHint] = useState<string | null>(null);
-
-  useEffect(() => {
-    const sample = getOrders()[0];
-    if (sample) {
-      // Show only the order number as a demo nudge — never the email, which on a
-      // shared/kiosk browser would expose the previous customer's address.
-      setDemoHint(sample.orderNumber);
-    }
-  }, []);
 
   const onSubmit = async (data: TrackOrderForm) => {
     const orderNumber = data.orderNumber.trim().toUpperCase();
@@ -131,11 +120,14 @@ export function TrackOrderPage() {
                 </Button>
               </form>
 
-              {demoHint ? (
-                <p className="mt-4 rounded-lg border border-dashed border-border bg-cream-50 px-3 py-2 text-xs text-muted-foreground">
-                  Demo order: <span className="font-medium text-foreground">{demoHint}</span>
-                </p>
-              ) : null}
+              {/*
+                There was a "Demo order: BK-…" box here, filled from
+                `getOrders()[0]` — the most recent REAL order in this browser's
+                cache. So it labelled a genuine order as a demo, and on a shared
+                device it printed the PREVIOUS customer's order number to
+                whoever sat down next. The input's placeholder shows the format
+                without quoting anybody's order.
+              */}
 
               <p className="mt-6 text-center text-sm text-muted-foreground">
                 Just placed an order?{" "}

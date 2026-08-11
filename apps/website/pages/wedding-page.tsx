@@ -6,6 +6,7 @@ import {
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { getCoupons } from "@/features/commerce/server/commerce.service";
 import { getContent } from "@/features/content/server/content.service";
+import { publishedOnly } from "@/features/content/lib/storefront-content";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { GeneralSettings } from "@/types/settings";
 import {
@@ -45,8 +46,8 @@ export async function WeddingPage({ isPreview = false }: WeddingPageProps) {
       weddingOffers={selectWeddingOffers(coupons, 12, {
         currency: ((settings as { general?: GeneralSettings }).general ?? {}).currency,
       })}
-      testimonials={(testimonialsRaw ?? []) as Testimonial[]}
-      faqs={(faqsRaw ?? []) as FaqItem[]}
+      testimonials={publishedOnly(testimonialsRaw as Testimonial[] | null)}
+      faqs={publishedOnly(faqsRaw as FaqItem[] | null)}
       isPreview={isPreview}
     />
   );
