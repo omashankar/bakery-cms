@@ -55,7 +55,7 @@ import {
   getMinDeliveryDate,
 } from "@/apps/website/lib/product-details";
 import type { AppliedCoupon } from "@/features/orders/lib/coupons";
-import { revalidateCoupon } from "@/features/orders/lib/coupons";
+import { applyCouponCode } from "@/features/orders/lib/coupons";
 import {
   hasBlockingCartIssues,
   validateCartAgainstCatalog,
@@ -454,7 +454,22 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
   );
-  const validCoupon = useMemo(() => revalidateCoupon(coupon, subtotal), [coupon, subtotal]);
+  /**
+   * The coupon re-checked against the cart being paid for, and WHY when it no
+   * longer holds.
+   *
+   * The reason used to be discarded — `revalidateCoupon` returns the coupon or
+   * null — so an edited cart silently lost its discount while the green
+   * "SAVE20 (₹200 off)" chip stayed on screen. The totals beside it had no
+   * discount line in them. Nothing said the coupon had stopped applying, and
+   * nothing said what would bring it back.
+   */
+  const couponCheck = useMemo(
+    () => (coupon ? applyCouponCode(coupon.code, subtotal) : null),
+    [coupon, subtotal],
+  );
+  const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
+  const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
 
   /**
    * The SHOP's totals, once it has priced this cart.
@@ -764,6 +779,31 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       setPlacing(false);
       toast.error("Could not price your order", {
         description: quoteError ?? "Please refresh and try again.",
+      });
+      return;
+    }
+
+    /**
+     * A coupon the SHOP will not honour.
+     *
+     * The quote has carried `rejectedCoupon` all along — its own comment says
+     * "so the customer can be told" — and nothing here read it. The refused
+     * code left the total higher than the browser expected, which tripped the
+     * price-change branch below, so a customer whose coupon had expired or run
+     * out of uses was told "Prices have changed" and shown a bigger number with
+     * no explanation, while the coupon chip still said it was applied.
+     *
+     * Checked first, because it is the REASON for the difference the next
+     * branch would otherwise report as a mystery.
+     */
+    if (quote.rejectedCoupon) {
+      setServerTotals(quote.totals);
+      setCoupon(undefined);
+      persistDraft({ coupon: undefined });
+      setPlacing(false);
+      toast.error(`${quote.rejectedCoupon} could not be applied`, {
+        description: `The bakery did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
+        duration: 10000,
       });
       return;
     }
@@ -1391,6 +1431,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                   <CouponInput
                     subtotal={totals.subtotal}
                     applied={coupon}
+                    lapsedReason={couponLapsedReason}
                     onApply={(next) => {
                       setCoupon(next);
                       persistDraft({ coupon: next });
