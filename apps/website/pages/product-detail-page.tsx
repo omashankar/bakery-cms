@@ -40,7 +40,7 @@ import {
 import {
   calculateProductUnitPrice,
   formatVariantSummary,
-} from "@/apps/website/lib/product-pricing";
+} from "@/features/products/lib/product-pricing";
 import { getDefaultVariantSelections } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";

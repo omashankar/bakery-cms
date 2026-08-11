@@ -256,7 +256,20 @@ describe("storefront projections", () => {
 
     expect(card).toBeDefined();
     expect(card?.name).toBe("Card Me");
-    expect(card?.price).toBe(800);
+
+    /**
+     * The price the SHOP would charge, not the base on the record.
+     *
+     * This asserted 800 — the base — and that is what the cards were showing
+     * while checkout charged something else. Here the fixture sets `price: 800`
+     * and leaves the form's default weight tiers, which are priced from 999, so
+     * the shop charges the tier: `priceLine` in pricing.server.ts reads
+     * `product.weights[0].price` before it falls back to the base. 999 is the
+     * number a customer is charged, so 999 is the number the card must show.
+     */
+    const stored = await getProductBySlug("card-me");
+    expect(card?.price).toBe(stored?.weights?.[0]?.price);
+    expect(card?.price).toBe(999);
     // Dropped to keep the RSC payload small.
     expect(card?.description).toBe("");
     expect(card?.variantGroups).toBeUndefined();

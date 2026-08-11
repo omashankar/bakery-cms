@@ -24,6 +24,15 @@ export interface ShopSnapshot {
   orderIds: string[];
   auditIds: string[];
   stock: Record<string, number>;
+  /**
+   * Whether each product is marked out of stock.
+   *
+   * Separate from the quantity, and the storefront reads THIS one:
+   * `inStock: cake.stockStatus !== "out_of_stock"`. A test that flips it and a
+   * teardown that only restores quantities is a test that leaves the shop with
+   * a product it will not sell.
+   */
+  stockStatus: Record<string, string>;
 }
 
 function readEnv(): Record<string, string> {
@@ -55,7 +64,7 @@ export async function snapshotShop(): Promise<ShopSnapshot> {
   const audit = await db.collection("auditlogs").find({}, { projection: { _id: 1 } }).toArray();
   const products = await db
     .collection("products")
-    .find({}, { projection: { _id: 1, stockQuantity: 1 } })
+    .find({}, { projection: { _id: 1, stockQuantity: 1, stockStatus: 1 } })
     .toArray();
 
   const snapshot: ShopSnapshot = {
@@ -63,6 +72,9 @@ export async function snapshotShop(): Promise<ShopSnapshot> {
     auditIds: audit.map((a) => String(a._id)),
     stock: Object.fromEntries(
       products.map((p) => [String(p._id), Number(p.stockQuantity ?? 0)]),
+    ),
+    stockStatus: Object.fromEntries(
+      products.map((p) => [String(p._id), String(p.stockStatus ?? "in_stock")]),
     ),
   };
 
@@ -102,6 +114,16 @@ export async function restoreShop(): Promise<string> {
     restocked += result.modifiedCount;
   }
 
+  // And the flag the storefront actually reads. A test that marks a cake out of
+  // stock to see what the card does must not leave it that way.
+  let restatused = 0;
+  for (const [id, status] of Object.entries(before.stockStatus ?? {})) {
+    const result = await db
+      .collection("products")
+      .updateOne({ _id: id as never, stockStatus: { $ne: status } }, { $set: { stockStatus: status } });
+    restatused += result.modifiedCount;
+  }
+
   // The customer drafts a checkout creates are short-lived and keyed to the
   // cart, but they are still rows this run made.
   const draftsRemoved = await db
@@ -117,6 +139,7 @@ export async function restoreShop(): Promise<string> {
     `orders removed: ${strayOrders.length}${strayOrders.length ? ` (${strayOrders.map((o) => o.orderNumber).join(", ")})` : ""}`,
     `audit rows removed: ${strayAudit.length}`,
     `products restocked: ${restocked}`,
+    `stock flags restored: ${restatused}`,
     `checkout drafts removed: ${draftsRemoved}`,
   ].join(" · ");
 }

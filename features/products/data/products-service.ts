@@ -8,6 +8,7 @@ import * as productRepo from "@/features/products/server/product.repository";
 import { purgeProductTraces } from "@/features/products/server/product-cascade.server";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
+import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
 import {
   buildHomepageProducts,
   type HomepageProductSource,
@@ -93,7 +94,22 @@ function toCard(product: LandingProduct): LandingProduct {
     name: product.name,
     image: product.image,
     category: product.category,
-    price: product.price,
+    /**
+     * The price the SHOP would charge for this cake untouched — not the base
+     * price on the record.
+     *
+     * With nothing selected the server still applies each variant group's
+     * default option, and those defaults are not always free: this shop's four
+     * eggless cakes default to an "Eggless" option that adds ₹80. Cards showed
+     * ₹1,099, the shop charged ₹1,179, and a customer who added one from a grid
+     * met "Prices have changed" at the last step of checkout.
+     *
+     * Resolved here rather than on the client because `variantGroups` is not in
+     * this payload and does not need to be — one number is smaller than the
+     * groups it was computed from. Pricing itself is untouched: `priceCart`
+     * reads full products straight from the repository, never a card.
+     */
+    price: defaultProductUnitPrice(product),
     compareAtPrice: product.compareAtPrice,
     badge: product.badge,
     rating: product.rating,

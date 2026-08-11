@@ -4,7 +4,7 @@ import { getCoupons, getZones } from "@/features/commerce/server/commerce.servic
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { getProductVariantGroups } from "@/apps/website/lib/product-details";
-import { calculateProductUnitPrice } from "@/apps/website/lib/product-pricing";
+import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";

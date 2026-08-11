@@ -11,6 +11,7 @@ import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { addToCart } from "@/features/cart/lib/cart";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
+import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -22,6 +23,16 @@ interface ProductCardProps {
 
 export function ProductCard({ cake, variant = "default", className }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(false);
+  /**
+   * The price the SHOP will charge, not the base price on the record.
+   *
+   * With nothing selected the server still applies each variant group's default
+   * option, and those defaults are not always free — this shop's eggless cakes
+   * default to an option that adds ₹80. The card showed the base, the cart
+   * carried the base, and checkout repriced at the last step: "Prices have
+   * changed", for a choice the customer never made.
+   */
+  const price = defaultProductUnitPrice(cake);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
@@ -35,14 +46,30 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
     toast.success(added ? "Added to wishlist" : "Removed from wishlist");
   };
 
+  /**
+   * The product page has refused this since it was written — the button is
+   * disabled and reads "Out of stock". The card, which is the same action on
+   * every grid in the storefront including the wishlist, added it anyway and
+   * said "Added to cart".
+   *
+   * Checkout then blocks on it (`hasBlockingCartIssues`), so the customer got
+   * as far as the address form before anything told them the cake was
+   * unavailable.
+   */
+  const outOfStock = cake.inStock === false;
+
   const handleAddToCart = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    if (outOfStock) {
+      toast.error("This cake is currently out of stock");
+      return;
+    }
     addToCart({
       productSlug: cake.slug,
       name: cake.name,
       image: cake.image,
-      price: cake.price,
+      price,
       quantity: 1,
     });
     toast.success("Added to cart", { description: cake.name });
@@ -111,15 +138,16 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
         </div>
 
         <div className="mt-auto space-y-3">
-          <PriceDisplay price={cake.price} compareAtPrice={cake.compareAtPrice} size="sm" />
+          <PriceDisplay price={price} compareAtPrice={cake.compareAtPrice} size="sm" />
           <Button
             type="button"
             variant="bakery"
             className="h-10 w-full"
+            disabled={outOfStock}
             onClick={handleAddToCart}
           >
             <ShoppingBag className="size-4" />
-            Add to Cart
+            {outOfStock ? "Out of stock" : "Add to Cart"}
           </Button>
         </div>
       </div>
