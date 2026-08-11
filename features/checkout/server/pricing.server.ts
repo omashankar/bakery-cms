@@ -38,6 +38,7 @@ export interface QuoteLineInput {
   flavour?: string;
   shape?: string;
   message?: string;
+  photoUrl?: string;
   deliveryDate?: string;
   deliveryTime?: string;
   variantSelections?: Record<string, string>;

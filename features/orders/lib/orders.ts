@@ -13,6 +13,7 @@ import {
   refundOrderRequest,
   paymentStatusRequest,
   adminNotesRequest,
+  deliveryPartnerRequest,
   refundNotesRequest,
   requestRefundRequest,
   type PlaceOrderResponse,
@@ -39,6 +40,22 @@ export interface OrderStatusEvent {
   at: string;
 }
 
+/**
+ * The person bringing an order, as the BAKERY entered them.
+ *
+ * Only a name, and optionally a phone and what they are driving. There is no
+ * rating and no partner id, deliberately: the tracking page used to show
+ * "4.9 ★" for a delivery that had not happened, next to a partner id from a
+ * hardcoded list — numbers that described nothing. A shop with no rider
+ * management has a name and a phone, and that is what a customer wants anyway.
+ */
+export interface DeliveryPartner {
+  name: string;
+  phone?: string;
+  /** "Bike", "Refrigerated van" — free text, because every shop's fleet differs. */
+  vehicle?: string;
+}
+
 export interface PlacedOrder {
   id: string;
   orderNumber: string;
@@ -57,6 +74,15 @@ export interface PlacedOrder {
   /** The delivery window agreed at checkout, when one was chosen. */
   deliverySlot?: DeliverySlot;
   adminNotes?: string;
+  /**
+   * The person bringing this order, as the bakery entered them.
+   *
+   * Absent until they say. The tracking page used to fabricate one by hashing
+   * the order id against three hardcoded riders — a name, a phone number a
+   * customer could ring, and a star rating for a delivery that had not
+   * happened yet.
+   */
+  deliveryPartner?: DeliveryPartner;
   cancellationReason?: string;
   /**
    * The coupon redemption has been handed back for this order.
@@ -536,6 +562,31 @@ export async function updateOrderAdminNotes(
   }));
 
   return { order: updated, persisted: await adminNotesRequest(orderId, adminNotes) };
+}
+
+/**
+ * Assign the rider on an order, or clear it with a blank name.
+ *
+ * The customer's tracking page shows a partner card only once this is set. It
+ * used to invent one for every order by hashing the order id against three
+ * hardcoded people, phone number included.
+ */
+export async function updateOrderDeliveryPartner(
+  orderId: string,
+  partner: { name: string; phone?: string; vehicle?: string },
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+
+  const name = partner.name.trim();
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
+    deliveryPartner: name
+      ? { name, phone: partner.phone?.trim() || undefined, vehicle: partner.vehicle?.trim() || undefined }
+      : undefined,
+  }));
+
+  return { order: updated, persisted: await deliveryPartnerRequest(orderId, partner) };
 }
 
 export async function updatePaymentStatus(

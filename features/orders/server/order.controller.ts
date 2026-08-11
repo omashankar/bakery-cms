@@ -14,6 +14,7 @@ import {
   cancelSchema,
   refundSchema,
   paymentSchema,
+  deliveryPartnerSchema,
   notesSchema,
   refundNotesSchema,
   refundRequestSchema,
@@ -286,6 +287,18 @@ export const adminNotesController = withErrorHandler(async (request: Request, ct
     actorEmail: session.email,
   });
   return ok(order, "Notes saved");
+});
+
+export const deliveryPartnerController = withErrorHandler(async (request: Request, ctx: IdContext) => {
+  const session = await requireRole(...ORDER_ROLES);
+  const { id } = await ctx.params;
+  const input = validate(deliveryPartnerSchema, await readJson(request));
+  const order = await service.updateDeliveryPartner(id, input, {
+    ...requestContext(request),
+    actorId: session.sub,
+    actorEmail: session.email,
+  });
+  return ok(order, input.name.trim() ? "Delivery partner assigned" : "Delivery partner cleared");
 });
 
 export const refundNotesController = withErrorHandler(async (request: Request, ctx: IdContext) => {

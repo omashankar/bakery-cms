@@ -195,6 +195,19 @@ export const paymentSchema = z.object({
 
 export const notesSchema = z.object({ adminNotes: z.string() });
 
+/**
+ * Who the bakery is sending with an order.
+ *
+ * A blank name CLEARS the assignment — an admin who set the wrong person must
+ * be able to take it back off the customer's tracking page, and there is no
+ * other control that would do it.
+ */
+export const deliveryPartnerSchema = z.object({
+  name: z.string().trim().max(120),
+  phone: z.string().trim().max(32).optional(),
+  vehicle: z.string().trim().max(80).optional(),
+});
+
 export const refundNotesSchema = z.object({ notes: z.string() });
 
 export const refundRequestSchema = z.object({

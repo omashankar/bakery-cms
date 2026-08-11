@@ -1,16 +1,22 @@
-import type { PlacedOrder } from "@/features/orders/lib/orders";
+import type { DeliveryPartner, PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCalendarDate, formatDate } from "@/utils/format";
 import { FULFILLMENT_STATUSES } from "@/features/orders/lib/order-status-meta";
 import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 
-export interface DeliveryPartnerInfo {
-  name: string;
-  phone: string;
-  vehicle: string;
-  rating: number;
-  partnerId: string;
-}
-
+/**
+ * The rider on this order, or nobody.
+ *
+ * There used to be a DELIVERY_PARTNERS list here: three invented people —
+ * "Ravi Kumar, +91 98765 43210, Delivery scooter, 4.9" and two others — and
+ * `pickPartner` chose one by hashing the order id. Every order therefore had a
+ * courier with a name, a phone number a customer could actually ring, and a
+ * star rating for a delivery that had not happened yet. The card carrying it
+ * said "Demo assignment for frontend preview" in small grey text at the bottom,
+ * which is not a disclaimer a customer reads before dialling.
+ *
+ * A shop that has not assigned anyone shows no card. That is the honest answer,
+ * and it is also the one that makes assigning somebody mean something.
+ */
 export interface DeliveryTrackingSnapshot {
   progressPercent: number;
   etaHeadline: string;
@@ -18,46 +24,9 @@ export interface DeliveryTrackingSnapshot {
   etaWindow: string;
   showLiveMap: boolean;
   showPartner: boolean;
-  partner: DeliveryPartnerInfo | null;
+  partner: DeliveryPartner | null;
   mapLabel: string;
   statusMessage: string;
-}
-
-const DELIVERY_PARTNERS: DeliveryPartnerInfo[] = [
-  {
-    partnerId: "dp-01",
-    name: "Ravi Kumar",
-    phone: "+91 98765 43210",
-    vehicle: "Delivery scooter",
-    rating: 4.9,
-  },
-  {
-    partnerId: "dp-02",
-    name: "Sneha Nair",
-    phone: "+91 91234 56780",
-    vehicle: "Refrigerated van",
-    rating: 4.8,
-  },
-  {
-    partnerId: "dp-03",
-    name: "Imran Sheikh",
-    phone: "+91 99887 76655",
-    vehicle: "Bike courier",
-    rating: 4.7,
-  },
-];
-
-function hashString(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function pickPartner(order: PlacedOrder): DeliveryPartnerInfo {
-  return DELIVERY_PARTNERS[hashString(order.id) % DELIVERY_PARTNERS.length];
 }
 
 /**
@@ -125,7 +94,7 @@ export function getDeliveryProgressPercent(order: PlacedOrder): number {
 
 export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackingSnapshot {
   const progressPercent = getDeliveryProgressPercent(order);
-  const partner = pickPartner(order);
+  const partner = order.deliveryPartner ?? null;
   const etaWindow = resolveEtaWindow(order);
   const deliveryDate = formatOrderDeliveryDay(order);
   const mapLabel = `${order.address.city}, ${order.address.pincode}`;
@@ -137,7 +106,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaDetail: `Your order arrived on ${deliveryDate}.`,
       etaWindow,
       showLiveMap: false,
-      showPartner: true,
+      showPartner: Boolean(partner),
       partner,
       mapLabel,
       statusMessage: "Hope your celebration was as sweet as our cakes.",
@@ -178,10 +147,15 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
     return {
       progressPercent,
       etaHeadline: "Out for delivery",
-      etaDetail: `${partner.name} is on the way with your cakes.`,
+      // Named only when the bakery has said who. It used to read "Ravi Kumar is
+      // on the way with your cakes" for every order, about a person the shop
+      // has never employed.
+      etaDetail: partner
+        ? `${partner.name} is on the way with your cakes.`
+        : "Your order is on its way.",
       etaWindow,
       showLiveMap: true,
-      showPartner: true,
+      showPartner: Boolean(partner),
       partner,
       mapLabel,
       statusMessage: "Keep your phone nearby — we may call before arrival.",
@@ -195,7 +169,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaDetail: `Scheduled for ${deliveryDate}.`,
       etaWindow,
       showLiveMap: false,
-      showPartner: true,
+      showPartner: Boolean(partner),
       partner,
       mapLabel,
       statusMessage: "Your cake is packed and will be handed to our delivery partner soon.",

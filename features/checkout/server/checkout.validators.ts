@@ -15,6 +15,8 @@ export const quoteLineSchema = z.object({
   flavour: z.string().trim().optional(),
   shape: z.string().trim().optional(),
   message: z.string().trim().max(500).optional(),
+  // A URL this server minted, so it is length-bounded and never rendered as HTML.
+  photoUrl: z.string().trim().max(500).optional(),
   deliveryDate: z.string().trim().optional(),
   deliveryTime: z.string().trim().optional(),
   variantSelections: z.record(z.string(), z.string()).optional(),

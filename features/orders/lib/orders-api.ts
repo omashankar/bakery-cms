@@ -314,6 +314,14 @@ export function adminNotesRequest(orderId: string, adminNotes: string): Promise<
   return send(`/api/orders/${orderId}/notes`, "PATCH", { adminNotes });
 }
 
+/** Assign (or, with a blank name, clear) the rider on an order. */
+export function deliveryPartnerRequest(
+  orderId: string,
+  partner: { name: string; phone?: string; vehicle?: string },
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/delivery-partner`, "PATCH", partner);
+}
+
 export function refundNotesRequest(orderId: string, notes: string): Promise<boolean> {
   return send(`/api/orders/${orderId}/refund-notes`, "PATCH", { notes });
 }

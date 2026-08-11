@@ -62,6 +62,7 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
     flavour: item.flavour,
     shape: item.shape,
     message: item.message,
+    photoUrl: item.photoUrl,
     deliveryDate: item.deliveryDate,
     deliveryTime: item.deliveryTime,
     variantSelections: item.variantSelections,

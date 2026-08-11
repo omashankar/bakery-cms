@@ -165,19 +165,33 @@ describe("where the gate is applied", () => {
 });
 
 describe("the photo a photo cake is printed with", () => {
-  it("is not collected by a control that throws it away", () => {
+  const page = readFileSync(
+    join(process.cwd(), "apps/website/pages/product-detail-page.tsx"),
+    "utf8",
+  );
+
+  it("is actually uploaded, not just named", () => {
     // The file input kept the file NAME in local state and nothing else. It was
     // never uploaded, never reached the cart line or the order, and the bakery
     // got an order for a photo cake with no photo — after the customer had paid
     // the photo surcharge and watched themselves attach it.
-    const page = readFileSync(
-      join(process.cwd(), "apps/website/pages/product-detail-page.tsx"),
-      "utf8",
-    );
-
-    expect(page).not.toContain('id="photo-upload"');
     expect(page).not.toContain("setPhotoName");
-    // And it says what does happen instead.
-    expect(page).toContain("collect the");
+    expect(page).toContain("/api/uploads/photo-cake");
+  });
+
+  it("is only called attached once the SERVER has it", () => {
+    // "Selected: birthday.jpg" was true about the browser and false about
+    // everything else. Nothing is claimed until a URL comes back.
+    const handler = page.slice(page.indexOf("async function handlePhotoUpload"));
+    const body = handler.slice(0, handler.indexOf("\n  }"));
+
+    expect(body).toContain("if (!res.ok || !parsed?.data?.url)");
+    const claim = body.indexOf('toast.success("Photo attached")');
+    expect(claim).toBeGreaterThan(body.indexOf("setPhotoUrl(parsed.data.url)"));
+  });
+
+  it("travels with the line the customer added", () => {
+    const handler = page.slice(page.indexOf("const handleAddToCart"));
+    expect(handler.slice(0, handler.indexOf("toast.success"))).toContain("photoUrl: photoUrl");
   });
 });

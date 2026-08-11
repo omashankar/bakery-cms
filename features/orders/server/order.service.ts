@@ -146,6 +146,7 @@ async function repriceForPlacement(input: PlaceOrderInput) {
           flavour: typeof line.flavour === "string" ? line.flavour : undefined,
           shape: typeof line.shape === "string" ? line.shape : undefined,
           message: typeof line.message === "string" ? line.message : undefined,
+          photoUrl: typeof line.photoUrl === "string" ? line.photoUrl : undefined,
           deliveryDate: typeof line.deliveryDate === "string" ? line.deliveryDate : undefined,
           deliveryTime: typeof line.deliveryTime === "string" ? line.deliveryTime : undefined,
           variantSelections:
@@ -1106,6 +1107,29 @@ export async function updateAdminNotes(id: string, adminNotes: string, ctx: Requ
   await requireOrder(id);
   const updated = await repo.patch(id, { adminNotes: adminNotes.trim() || undefined });
   await audit(ctx, "order.notes", id);
+  return updated;
+}
+
+/**
+ * Assign the person bringing this order — or clear the assignment.
+ *
+ * A blank name clears it, so a wrong rider can be taken back off the
+ * customer's tracking page. The tracking page shows no partner card at all
+ * until this is set; it used to invent one for every order.
+ */
+export async function updateDeliveryPartner(
+  id: string,
+  input: { name: string; phone?: string; vehicle?: string },
+  ctx: RequestCtx,
+) {
+  await requireOrder(id);
+  const name = input.name.trim();
+  const partner = name
+    ? { name, phone: input.phone?.trim() || undefined, vehicle: input.vehicle?.trim() || undefined }
+    : undefined;
+
+  const updated = await repo.patch(id, { deliveryPartner: partner });
+  await audit(ctx, "order.delivery_partner", id, { assigned: Boolean(partner) });
   return updated;
 }
 

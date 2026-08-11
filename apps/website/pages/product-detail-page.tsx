@@ -51,6 +51,8 @@ import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
+import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
@@ -118,6 +120,9 @@ export function ProductDetailPage({
     getDefaultVariantSelections(variantGroups)
   );
   const [message, setMessage] = useState("");
+  /** The uploaded photo's URL, once the shop has it. Empty until then. */
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -259,6 +264,53 @@ export function ProductDetailPage({
     };
   }, [cake]);
 
+  /**
+   * Send the photo to the shop, and only then say it is attached.
+   *
+   * The old control reported "Selected: birthday.jpg" the instant the file
+   * was chosen, which was true about the browser and false about everything
+   * else. Nothing is claimed here until the server answers with a URL.
+   */
+  async function handlePhotoUpload(file: File) {
+    if (!getCustomerSession()) {
+      toast.info("Please sign in to attach a photo", {
+        description: "It travels with your order, so it needs to belong to an account.",
+      });
+      openCustomerAuthModal("phone");
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const body = new FormData();
+      body.append("photo", file);
+      const res = await fetch("/api/uploads/photo-cake", {
+        method: "POST",
+        credentials: "same-origin",
+        body,
+      });
+      const parsed = (await res.json().catch(() => null)) as
+        | { data?: { url?: string }; message?: string }
+        | null;
+
+      if (!res.ok || !parsed?.data?.url) {
+        setPhotoUrl("");
+        toast.error(parsed?.message ?? "Could not upload that photo");
+        return;
+      }
+
+      setPhotoUrl(parsed.data.url);
+      toast.success("Photo attached");
+    } catch {
+      setPhotoUrl("");
+      toast.error("Could not reach the bakery", {
+        description: "Please check your connection and try again.",
+      });
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   const handleAddToCart = (redirectToCart = false) => {
     if (isOutOfStock) {
       toast.error("This cake is currently out of stock");
@@ -281,6 +333,7 @@ export function ProductDetailPage({
       flavour: (modules.flavour && selectedFlavour) || undefined,
       shape: modules.shape ? selectedShape : undefined,
       message: message.trim() || undefined,
+      photoUrl: photoUrl || undefined,
       deliveryDate,
       deliveryTime,
       // Only the groups the customer could see. `calculateVariantAdjustment`
@@ -481,30 +534,45 @@ export function ProductDetailPage({
               {/*
                 The photo a photo cake is printed with.
 
-                There was a file input here. It kept the file NAME in local
-                state and nothing else — the file was never uploaded, the name
-                never reached the cart line or the order, and the bakery
-                received an order for a photo cake with no photo and no sign
-                that one had been chosen. The customer had watched themselves
-                select it, seen "Selected: birthday.jpg", and paid the photo
-                surcharge.
+                This kept the file NAME in local state and nothing else — never
+                uploaded, never on the cart line, never on the order. The bakery
+                received an order for a photo cake with no photo and no sign one
+                had been chosen, after the customer had watched themselves
+                attach it and paid the photo surcharge.
 
-                Uploading it for real needs an upload route a signed-out
-                customer can reach, which this app does not have — /api/media/upload
-                requires an admin role — and giving anonymous callers one is a
-                feature with its own size, type and abuse limits to design, not
-                a line in a form. Until then this says what actually happens.
+                It now uploads to `/api/uploads/photo-cake`, which requires a
+                signed-in customer (checkout does too), checks the magic bytes
+                rather than the browser's word for the type, caps the size, and
+                stores it where the bakery can open it.
               */}
               {showPhotoUpload ? (
-                <div
-                  className="space-y-1 rounded-xl border border-border bg-cream-50 p-4"
-                  data-gate-photo
-                >
-                  <p className="text-sm font-medium text-foreground">Your photo</p>
-                  <p className="text-sm text-muted-foreground">
-                    We will contact you on the number you give at checkout to collect the
-                    photo for printing, once your order is placed.
-                  </p>
+                <div className="space-y-2" data-gate-photo>
+                  <Label htmlFor="photo-upload">Upload your photo</Label>
+                  <Input
+                    id="photo-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={photoUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      // The input is cleared either way, so choosing the same
+                      // file again after a failure still fires a change.
+                      event.target.value = "";
+                      if (file) void handlePhotoUpload(file);
+                    }}
+                  />
+                  {photoUploading ? (
+                    <p className="text-xs text-muted-foreground">Uploading your photo…</p>
+                  ) : photoUrl ? (
+                    <p className="flex items-center gap-1.5 text-xs text-green-700">
+                      <Check className="size-3.5" />
+                      Photo attached — it will reach the bakery with your order.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      JPEG, PNG or WebP, up to 6 MB.
+                    </p>
+                  )}
                 </div>
               ) : null}
 

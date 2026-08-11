@@ -30,6 +30,8 @@ export interface CartLineItem {
   flavour?: string;
   shape?: string;
   message?: string;
+  /** A photo cake's uploaded image, stored where the bakery can open it. */
+  photoUrl?: string;
   deliveryDate?: string;
   deliveryTime?: string;
   variantSelections?: Record<string, string>;
@@ -46,6 +48,8 @@ export interface AddToCartInput {
   flavour?: string;
   shape?: string;
   message?: string;
+  /** A photo cake's uploaded image, stored where the bakery can open it. */
+  photoUrl?: string;
   deliveryDate?: string;
   deliveryTime?: string;
   variantSelections?: Record<string, string>;
@@ -166,6 +170,7 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     existing.quantity += input.quantity;
     existing.price = input.price;
     existing.message = input.message;
+    existing.photoUrl = input.photoUrl;
     existing.deliveryDate = input.deliveryDate;
     existing.deliveryTime = input.deliveryTime;
     existing.variantSelections = input.variantSelections;
@@ -186,6 +191,7 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     flavour: input.flavour,
     shape: input.shape,
     message: input.message,
+    photoUrl: input.photoUrl,
     deliveryDate: input.deliveryDate,
     deliveryTime: input.deliveryTime,
     variantSelections: input.variantSelections,
@@ -278,6 +284,7 @@ export function restoreSavedItemToCart(savedId: string): boolean {
     flavour: savedItem.flavour,
     shape: savedItem.shape,
     message: savedItem.message,
+    photoUrl: savedItem.photoUrl,
     deliveryDate: savedItem.deliveryDate,
     deliveryTime: savedItem.deliveryTime,
     variantSelections: savedItem.variantSelections,

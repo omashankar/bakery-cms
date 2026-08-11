@@ -53,6 +53,14 @@ const orderSchema = new mongoose.Schema(
     estimatedDelivery: { type: String, default: "" },
     deliverySlot: { type: mongoose.Schema.Types.Mixed },
     adminNotes: { type: String },
+    /**
+     * Who is bringing this order, once the bakery has said.
+     *
+     * The tracking page used to invent one: three hardcoded people picked by
+     * hashing the order id, complete with a name, a phone number and a star
+     * rating. A customer could ring it.
+     */
+    deliveryPartner: { type: mongoose.Schema.Types.Mixed },
     cancellationReason: { type: String },
     /**
      * The coupon redemption has been handed back for this order.
