@@ -56,6 +56,9 @@ export function formatCurrency(
  * in — the server's, for anything server-rendered — so a 9pm order could show
  * as the previous day to an admin in Kolkata.
  */
+/** Shown where a date is missing or unreadable. */
+export const NO_DATE = "—";
+
 export function formatDate(
   date: string | Date,
   options: Intl.DateTimeFormatOptions = {
@@ -64,10 +67,25 @@ export function formatDate(
     year: "numeric",
   }
 ): string {
+  /**
+   * An unusable date must not take the page down.
+   *
+   * `Intl.DateTimeFormat().format()` throws a RangeError on an Invalid Date,
+   * and this is called from 29 places — order lists, review rows, the admin
+   * profile — so one record with a blank or malformed date string was a white
+   * screen for the whole route. It happened on Admin → Profile, whose empty
+   * profile ships `lastLogin: ""` and `createdAt: ""`: every hard load rendered
+   * that placeholder before hydration and crashed on it.
+   *
+   * The same reasoning as `active-locale.ts`, which guards the currency and
+   * timezone at the point they meet `Intl` for exactly this: "Guarding at the
+   * point of use means no caller can take the site out."
+   */
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return NO_DATE;
+
   const { locale, timezone } = getActiveLocale();
-  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(
-    new Date(date)
-  );
+  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(parsed);
 }
 
 /**
@@ -110,6 +128,10 @@ export function formatCalendarDate(
 export function formatRelativeTime(date: string | Date): string {
   const now = Date.now();
   const then = new Date(date).getTime();
+  // Every comparison below is false against NaN, so an unusable date fell all
+  // the way through to `formatDate` — which used to throw. Answered here so the
+  // reason is stated where it is decided rather than inherited.
+  if (Number.isNaN(then)) return NO_DATE;
   const diff = now - then;
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
