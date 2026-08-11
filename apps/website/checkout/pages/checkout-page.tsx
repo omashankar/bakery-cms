@@ -87,7 +87,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency } from "@/utils/format";
+import { formatCalendarDate, formatCurrency } from "@/utils/format";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -1282,13 +1282,15 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
                       {hasDeliverySlot(deliverySlot) ? (
                         <ReviewBlock title="Delivery slot">
-                          <p className="font-medium">
-                            {new Date(deliverySlot.date).toLocaleDateString("en-IN", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                            })}
-                          </p>
+                          {/*
+                            The calendar day the customer picked, not an
+                            instant. `new Date("2026-08-16")` is midnight UTC,
+                            and rendering that anywhere west of UTC shows the
+                            day before — so a customer confirmed a Sunday
+                            delivery on a page that said Saturday, while the
+                            order stored Sunday.
+                          */}
+                          <p className="font-medium">{formatCalendarDate(deliverySlot.date)}</p>
                           <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
                         </ReviewBlock>
                       ) : null}

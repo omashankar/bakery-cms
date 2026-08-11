@@ -1,4 +1,5 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { formatCalendarDate, formatDate } from "@/utils/format";
 import { FULFILLMENT_STATUSES } from "@/features/orders/lib/order-status-meta";
 import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 
@@ -59,33 +60,58 @@ function pickPartner(order: PlacedOrder): DeliveryPartnerInfo {
   return DELIVERY_PARTNERS[hashString(order.id) % DELIVERY_PARTNERS.length];
 }
 
-function formatTimeWindow(isoDate: string): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return "Soon";
+/**
+ * The window under "Time window" on the tracking page.
+ *
+ * The slot the customer picked at checkout, because that is the promise the
+ * shop made — "2:00 PM – 4:00 PM", one of the windows the admin configured and
+ * the server validated the order against.
+ *
+ * It used to be derived from `estimatedDelivery` by taking an hour either side
+ * of it, and `estimatedDelivery` for a slot-booked order is
+ * `new Date("2026-08-16").toISOString()` — a bare date, parsed as UTC midnight.
+ * In IST that renders as 5:30 AM, so the page told a customer who had booked
+ * an afternoon slot that their cake would arrive between 4:30 and 6:30 in the
+ * morning. It contradicted the order confirmation, the invoice and the slot
+ * they had chosen, and the number came from a timezone offset.
+ *
+ * With no booked slot there is no window: the shop has agreed a DAY, not a
+ * time, and inventing a two-hour range around midnight-plus-an-offset is how
+ * this went wrong in the first place.
+ */
+function resolveEtaWindow(order: PlacedOrder): string {
+  const booked = order.deliverySlot?.timeSlot?.trim();
+  if (booked) return booked;
 
-  const start = new Date(date);
-  start.setHours(start.getHours() - 1);
-  const end = new Date(date);
-  end.setHours(end.getHours() + 1);
-
-  const formatter = new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-
-  return `${formatter.format(start)} – ${formatter.format(end)}`;
+  return "To be confirmed";
 }
 
-function formatDeliveryDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return "Date to be confirmed";
-
-  return date.toLocaleDateString("en-IN", {
+/**
+ * The day the cake arrives.
+ *
+ * The BOOKED date when there is one, formatted as a calendar day. It used to
+ * come from `estimatedDelivery` via `toLocaleDateString` with no timezone,
+ * which for a slot-booked order is midnight UTC of the chosen day — the day
+ * before, anywhere west of UTC, and in whatever zone the rendering machine
+ * happened to be in rather than the shop's.
+ */
+export function formatOrderDeliveryDay(
+  order: Pick<PlacedOrder, "deliverySlot" | "estimatedDelivery">,
+  options: Intl.DateTimeFormatOptions = {
     weekday: "long",
     day: "numeric",
     month: "long",
-  });
+  },
+): string {
+  const booked = order.deliverySlot?.date?.trim();
+  if (booked) return formatCalendarDate(booked, options);
+
+  const date = new Date(order.estimatedDelivery);
+  if (Number.isNaN(date.getTime())) return "Date to be confirmed";
+
+  // A real instant — `now + estimatedDeliveryDays` — so it renders in the
+  // shop's own timezone.
+  return formatDate(order.estimatedDelivery, options);
 }
 
 export function getDeliveryProgressPercent(order: PlacedOrder): number {
@@ -100,8 +126,8 @@ export function getDeliveryProgressPercent(order: PlacedOrder): number {
 export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackingSnapshot {
   const progressPercent = getDeliveryProgressPercent(order);
   const partner = pickPartner(order);
-  const etaWindow = formatTimeWindow(order.estimatedDelivery);
-  const deliveryDate = formatDeliveryDate(order.estimatedDelivery);
+  const etaWindow = resolveEtaWindow(order);
+  const deliveryDate = formatOrderDeliveryDay(order);
   const mapLabel = `${order.address.city}, ${order.address.pincode}`;
 
   if (order.status === "delivered") {

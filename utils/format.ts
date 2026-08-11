@@ -71,6 +71,40 @@ export function formatDate(
 }
 
 /**
+ * A date with no time in it — "2026-08-16", as an `<input type="date">` gives
+ * it — rendered as the calendar day it says, in every timezone.
+ *
+ * `new Date("2026-08-16")` is not that day. It is an INSTANT: midnight UTC.
+ * Render that instant anywhere west of UTC and it is the day before, so a
+ * customer in London booking a Sunday delivery had their order confirmed for
+ * Saturday, on the review step, on the tracking page, and nowhere else — the
+ * order itself still said Sunday, because the string was stored verbatim.
+ *
+ * Anything that is genuinely an instant (a placed-at timestamp) belongs in
+ * `formatDate`, which renders in the shop's configured timezone. This one is
+ * for the dates that have no time to render.
+ */
+export function formatCalendarDate(
+  day: string,
+  options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }
+): string {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.trim());
+  // Not a bare calendar date. Whatever it is, it carries a time, so it is an
+  // instant and belongs in the shop's timezone rather than in UTC.
+  if (!parts) return formatDate(day, options);
+
+  const [, year, month, date] = parts;
+  const { locale } = getActiveLocale();
+  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", ...options }).format(
+    new Date(Date.UTC(Number(year), Number(month) - 1, Number(date)))
+  );
+}
+
+/**
  * Format relative time (e.g. "2 hours ago")
  */
 export function formatRelativeTime(date: string | Date): string {

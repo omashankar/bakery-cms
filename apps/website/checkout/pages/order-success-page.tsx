@@ -14,7 +14,8 @@ import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
+import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -111,7 +112,18 @@ export function OrderSuccessPage() {
                       {order.deliverySlot?.timeSlot ? "Delivery" : "Estimated delivery"}
                     </dt>
                     <dd className="text-right">
-                      {formatDate(order.estimatedDelivery)}
+                      {/*
+                        The booked calendar day, not the instant derived from
+                        it. `estimatedDelivery` for a slot-booked order is
+                        midnight UTC of the chosen date, so rendering it in a
+                        shop timezone west of UTC put the confirmation a day
+                        earlier than the order.
+                      */}
+                      {formatOrderDeliveryDay(order, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                       {order.deliverySlot?.timeSlot ? (
                         <span className="block text-xs text-muted-foreground">
                           {order.deliverySlot.timeSlot}
