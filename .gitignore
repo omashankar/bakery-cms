@@ -43,3 +43,9 @@ next-env.d.ts
 # Razorpay admin-saved keys (server-side secret — never commit)
 .razorpay-config.json
 .data/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
