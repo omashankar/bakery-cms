@@ -500,6 +500,15 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
    * server's and the customer is asked to look again before committing.
    */
   const [serverTotals, setServerTotals] = useState<CartTotals | null>(null);
+  /**
+   * The SHOP's line prices, held alongside its totals.
+   *
+   * The summary priced each line from the browser's cart while the total below
+   * them came from the server, so after "Prices have changed" the order summary
+   * did not add up — the customer was asked to review a list whose numbers
+   * contradicted the number they were being asked to pay.
+   */
+  const [serverItems, setServerItems] = useState<CartLineItem[] | null>(null);
 
   const localTotals = useMemo(
     () =>
@@ -542,6 +551,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   // Anything that changes the price invalidates the shop's last answer.
   useEffect(() => {
     setServerTotals(null);
+    setServerItems(null);
   }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
 
   function persistDraft(
@@ -818,6 +828,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
      */
     if (quote.rejectedCoupon) {
       setServerTotals(quote.totals);
+      setServerItems(quote.items);
       setCoupon(undefined);
       persistDraft({ coupon: undefined });
       setPlacing(false);
@@ -832,6 +843,10 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     // customer has to see before they commit to paying.
     if (Math.abs(quote.totals.total - totals.total) >= 0.01) {
       setServerTotals(quote.totals);
+      // The lines the customer is about to re-read have to be the shop's too,
+      // or the summary asks them to review a list that does not add up to the
+      // number underneath it.
+      setServerItems(quote.items);
       setPlacing(false);
       toast.error("Prices have changed", {
         description: `This order now comes to ${formatCurrency(quote.totals.total)}. Please review and place it again.`,
@@ -1423,7 +1438,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
             <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
               <OrderSummaryPanel
-                items={items}
+                items={serverItems ?? items}
                 totals={totals}
                 giftWrapLabel={commerce.giftWrapLabel}
               />
