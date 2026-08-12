@@ -36,10 +36,30 @@ export async function setAuthCookies(
   accessToken: string,
   refreshToken: string,
   accessTtl: string = ACCESS_TTL,
+  /**
+   * Whether the session should outlive the browser.
+   *
+   * "Keep me signed in" was collected, validated, and then dropped: the refresh
+   * cookie always carried a 30-day `expires`, so unticking it on a shared or
+   * public machine changed nothing at all. Closing the browser left a working
+   * admin session for the next person to open it.
+   *
+   * A cookie with no `expires` is a SESSION cookie — the browser discards it
+   * when it closes. The server-side session row is untouched either way; this
+   * governs how long this BROWSER keeps presenting it.
+   *
+   * Defaulted true so callers that do not express a preference — the refresh
+   * rotation, which must not shorten a session the admin already chose to keep
+   * — behave exactly as before.
+   */
+  rememberMe: boolean = true,
 ): Promise<void> {
   const store = await cookies();
   store.set(ACCESS_COOKIE, accessToken, { ...baseOptions(), expires: ttlToDate(accessTtl) });
-  store.set(REFRESH_COOKIE, refreshToken, { ...baseOptions(), expires: ttlToDate(REFRESH_TTL) });
+  store.set(REFRESH_COOKIE, refreshToken, {
+    ...baseOptions(),
+    ...(rememberMe ? { expires: ttlToDate(REFRESH_TTL) } : {}),
+  });
 }
 
 export async function clearAuthCookies(): Promise<void> {

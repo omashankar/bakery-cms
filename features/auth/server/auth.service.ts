@@ -104,7 +104,7 @@ export async function login(input: LoginInput, ctx: RequestCtx): Promise<PublicU
     throw new AuthError("Invalid email or password");
   }
 
-  await issueTokens(String(user._id), user.role, user.email, ctx);
+  await issueTokens(String(user._id), user.role, user.email, ctx, input.rememberMe);
   await repo.touchLastLogin(String(user._id));
   await writeAuditLog({
     action: "auth.login",
@@ -118,7 +118,14 @@ export async function login(input: LoginInput, ctx: RequestCtx): Promise<PublicU
 }
 
 /** Create a session + refresh token and set both auth cookies. */
-async function issueTokens(userId: string, role: string, email: string, ctx: RequestCtx) {
+async function issueTokens(
+  userId: string,
+  role: string,
+  email: string,
+  ctx: RequestCtx,
+  /** See `setAuthCookies` — false makes the refresh cookie session-only. */
+  rememberMe = true,
+) {
   const session = await repo.createSession({
     userId,
     userAgent: ctx.userAgent,
@@ -140,7 +147,7 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
   });
 
   // The cookie carries the same lifetime as the token inside it.
-  await setAuthCookies(accessToken, refreshToken, accessTtl);
+  await setAuthCookies(accessToken, refreshToken, accessTtl, rememberMe);
   return { accessToken, refreshToken, sessionId: String(session._id) };
 }
 

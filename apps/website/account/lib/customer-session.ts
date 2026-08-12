@@ -141,6 +141,9 @@ export function adoptCustomerSession(identity: {
  * whoever is signed in and clearing it would lose a customer's own order
  * history on every sign-out.
  */
+/** Matches `ACCESS_KEY` in features/orders/lib/order-access.ts. */
+const ORDER_ACCESS_KEY = "bakery-cms-verified-orders";
+
 const CUSTOMER_DEVICE_KEYS = [
   "bakery-cms-customer-addresses",
   "bakery-cms-cart",
@@ -148,8 +151,9 @@ const CUSTOMER_DEVICE_KEYS = [
   "bakery-cms-saved-for-later",
   "bakery-cms-wishlist",
   "bakery-cms-checkout-draft",
-  // Which order numbers this browser has proved ownership of, by email.
-  "bakery-cms-verified-orders",
+  // Which order numbers this browser has proved ownership of, by email. The
+  // per-order sibling keys are swept by prefix below.
+  ORDER_ACCESS_KEY,
   // A held payment carries the previous customer's order number and payment
   // reference, and the checkout overlay puts both on screen. The order itself
   // stays in `bakery-cms-orders`, so signing out loses them nothing.
@@ -166,6 +170,29 @@ function clearLocalCustomerData(): void {
   for (const key of CUSTOMER_DEVICE_KEYS) {
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);
+  }
+
+  /**
+   * The PER-ORDER grants, which the exact-key list above cannot reach.
+   *
+   * `grantOrderAccess` writes two things: the id into
+   * `bakery-cms-verified-orders`, and the email that proved ownership into a
+   * sibling key per order — `bakery-cms-verified-orders:lookup:BK-2026-1041`.
+   * Only the first was cleared. The second is what `/store/order/<number>` and
+   * the success page read to fetch an order from the server, so after sign-out
+   * the next person in that tab could open the previous customer's order and
+   * read their name, phone, email and full delivery address.
+   *
+   * Enumerated by prefix rather than listed, because the key contains an order
+   * number that is not knowable in advance.
+   */
+  for (const store of [localStorage, sessionStorage]) {
+    const stale: string[] = [];
+    for (let index = 0; index < store.length; index += 1) {
+      const key = store.key(index);
+      if (key?.startsWith(`${ORDER_ACCESS_KEY}:`)) stale.push(key);
+    }
+    for (const key of stale) store.removeItem(key);
   }
 
   // The screens that render these read them on their own events, not on the

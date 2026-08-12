@@ -438,9 +438,13 @@ describe("the pieces that hold a session open", () => {
     expect(cookies).toMatch(/accessTtl: string = ACCESS_TTL/);
     expect(cookies).toContain("expires: ttlToDate(accessTtl)");
 
+    // Both issue paths hand the access TTL through. Matched on the ARGUMENT
+    // rather than on the whole call text: this asserted the exact three-argument
+    // form, so adding the "rememberMe" argument beside it broke a test whose
+    // subject had not changed.
     const service = code("features/auth/server/auth.service.ts");
-    expect(service).toContain("setAuthCookies(accessToken, refreshToken, accessTtl)");
-    expect(service).toContain("setAuthCookies(accessToken, newRefresh, accessTtl)");
+    expect(service).toMatch(/setAuthCookies\(accessToken, refreshToken, accessTtl[,)]/);
+    expect(service).toMatch(/setAuthCookies\(accessToken, newRefresh, accessTtl[,)]/);
   });
 
   it("says out loud when it falls back to the shipped policy", () => {

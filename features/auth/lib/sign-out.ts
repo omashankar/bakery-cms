@@ -30,9 +30,40 @@ export async function signOutOfThisDevice(): Promise<boolean> {
     .then(() => true)
     .catch(() => false);
 
-  if (signedOut) clearDemoSession();
+  if (signedOut) {
+    clearDemoSession();
+    clearAdminDeviceData();
+  }
   return signedOut;
 }
+
+/**
+ * What the previous admin leaves behind on a shared machine.
+ *
+ * Sign-out cleared the session marker and nothing else, so the next person to
+ * open the browser — before signing in as anyone — could read the previous
+ * admin's name, email and photo out of the profile cache, their login history
+ * and active devices out of the security centre, and the shop's SMTP host and
+ * username, analytics ids and maintenance state out of the settings cache.
+ *
+ * These are all mirrors of server state, re-fetched on the next sign-in, so
+ * clearing them costs a hydration and nothing else.
+ */
+function clearAdminDeviceData(): void {
+  if (typeof window === "undefined") return;
+
+  for (const key of ADMIN_DEVICE_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+}
+
+const ADMIN_DEVICE_KEYS = [
+  "bakery-cms-admin-profile",
+  "bakery-cms-admin-account",
+  "bakery-cms-security-center",
+  "bakery-cms-settings",
+] as const;
 
 /** What to tell someone whose sign-out the server never completed. */
 export const SIGN_OUT_FAILED = {

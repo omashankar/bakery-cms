@@ -137,3 +137,47 @@ test.describe("a shared device", () => {
     ).toBe(true);
   });
 });
+
+test.describe("a shared device", () => {
+  /**
+   * `grantOrderAccess` writes TWO things when a customer proves they own an
+   * order: the number into `bakery-cms-verified-orders`, and the email that
+   * proved it into a sibling key PER ORDER —
+   * `bakery-cms-verified-orders:lookup:BK-…`.
+   *
+   * Sign-out cleared the exact key and not the siblings. The sibling is the one
+   * the order page and the success page read to fetch that order from the
+   * server, so the next person in the tab could open the previous customer's
+   * order and read their name, phone, email and full delivery address.
+   */
+  test("does not leave the previous customer's proof of order ownership", async ({ page }) => {
+    const asha = await probeEmail("asha");
+    await signInAsCustomer(page, asha);
+
+    // Exactly what grantOrderAccess writes, under both storages.
+    await page.evaluate(() => {
+      sessionStorage.setItem("bakery-cms-verified-orders", JSON.stringify(["BK-1", "BK-2"]));
+      sessionStorage.setItem("bakery-cms-verified-orders:lookup:BK-1", "asha@example.com");
+      sessionStorage.setItem("bakery-cms-verified-orders:lookup:BK-2", "asha@example.com");
+      localStorage.setItem("bakery-cms-verified-orders:lookup:BK-3", "asha@example.com");
+    });
+
+    await signOutThroughTheUi(page);
+
+    const leftBehind = await page.evaluate(() => {
+      const found: string[] = [];
+      for (const store of [localStorage, sessionStorage]) {
+        for (let i = 0; i < store.length; i += 1) {
+          const key = store.key(i);
+          if (key?.startsWith("bakery-cms-verified-orders")) found.push(key);
+        }
+      }
+      return found;
+    });
+
+    expect(
+      leftBehind,
+      "the next customer can still fetch the previous one's orders from the server",
+    ).toEqual([]);
+  });
+});
