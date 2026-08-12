@@ -22,6 +22,7 @@ import {
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   defaultOrderFilters,
   exportOrdersToCsv,
@@ -87,6 +88,7 @@ export function OrdersListPage() {
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
   const [statsFailed, setStatsFailed] = useState(false);
+  const [statsLoaded, setStatsLoaded] = useState(false);
   const [totalMatching, setTotalMatching] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -154,6 +156,7 @@ export function OrdersListPage() {
       // one reading an admin must never get from a request that simply failed.
       setStatsFailed(!summary);
       if (summary) setStats(summary);
+      setStatsLoaded(true);
     })();
 
     return () => {
@@ -169,7 +172,20 @@ export function OrdersListPage() {
   // shown as pending. A request the admin has already caused counts as in flight.
   const pending = loading || requestKey !== liveKey;
 
-  /** Cards must read "unavailable", not zero, when the aggregation did not answer. */
+  /**
+   * Cards must read "unavailable", not zero, when the aggregation did not
+   * answer — and must say nothing at all until it has.
+   *
+   * `statsFailed` knew failure from success and counted "has not answered yet"
+   * as success, so a cold load printed nine confident zeros and captioned "In
+   * progress 0" as "All clear" in green: the sentence that tells a baker there
+   * is nothing waiting to be made.
+   */
+  const statFigures: FiguresState = !statsLoaded
+    ? "loading"
+    : statsFailed
+      ? "unavailable"
+      : "ready";
   const statValue = (value: string | number) => (statsFailed ? "—" : value);
   const statChange = (change: string) => (statsFailed ? "Unavailable" : change);
   const statTone = <T,>(tone: T) => (statsFailed ? ("warning" as const) : tone);
@@ -199,7 +215,7 @@ export function OrdersListPage() {
    * "All 0", "Pending 0", "Delivered 0" — directly above ten visible orders.
    */
   function countForStatus(status: OrderListFilters["status"]): string | number {
-    if (statsFailed) return "—";
+    if (statFigures !== "ready") return "—";
     if (status === "all") return stats.total;
     if (status === "out_for_delivery") return stats.outForDelivery;
     return stats[status];
@@ -385,6 +401,7 @@ export function OrdersListPage() {
             changeTone={statTone("neutral" as const)}
             icon={ShoppingBag}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <button
@@ -404,6 +421,7 @@ export function OrdersListPage() {
             changeTone={statTone(inProgress > 0 ? ("warning" as const) : ("positive" as const))}
             icon={Send}
             tone="gold"
+            figures={statFigures}
           />
         </button>
         <button
@@ -423,6 +441,7 @@ export function OrdersListPage() {
             changeTone={statTone("positive" as const)}
             icon={CheckCircle2}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -432,6 +451,7 @@ export function OrdersListPage() {
           changeTone={statTone("neutral" as const)}
           icon={IndianRupee}
           tone="gold"
+          figures={statFigures}
         />
       </section>
 

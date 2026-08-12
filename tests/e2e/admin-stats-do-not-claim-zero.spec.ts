@@ -76,6 +76,15 @@ const PAGES = [
     settled: /customers/i,
     lies: [/₹\s*0\.00/, /All clear/i],
   },
+  {
+    // Handled the FAILED aggregation ("—", "Unavailable") and counted "has not
+    // answered yet" as success, so a cold load still printed nine zeros.
+    name: "orders",
+    path: "/admin/orders",
+    stall: "**/api/orders/stats**",
+    settled: /orders/i,
+    lies: [/All clear/i],
+  },
 ];
 
 for (const target of PAGES) {
@@ -117,6 +126,17 @@ test("reviews does not offer to add the first review before it has looked", asyn
     /No reviews found/i,
   );
 });
+
+/*
+ * NOT covered here, deliberately: the security centre's four lists.
+ *
+ * They look like the same bug — "No login history yet." and "No failed
+ * attempts." rendered off empty arrays — but each lives in a non-default
+ * TabsContent, and the effect that fills them runs on mount. By the time an
+ * admin opens any of those tabs the data is already in. A gate was written for
+ * them and then removed: reintroducing the bug left every test passing, which
+ * is what a fix for an unreachable state looks like.
+ */
 
 test("inquiries does not say all clear before it has counted", async ({ page }) => {
   await adminSession(page);
