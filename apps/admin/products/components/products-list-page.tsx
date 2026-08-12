@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -440,7 +441,18 @@ export function ProductsListPage() {
         </div>
       </FilterPanel>
 
-      {filtered.length === 0 ? (
+      {!mounted ? (
+        /*
+          `mounted` gated the STAT CARDS and nothing else, so the table below
+          rendered "No Cakes found — add your first cake" on every cold load,
+          before `fetchProducts()` had answered. In a shop with a full
+          catalogue that is simply false, and it invites the admin to add a
+          product they already have.
+        */
+        <section className={adminShell.tableCard}>
+          <ListLoading label={`Loading ${productsLower}`} />
+        </section>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={labels.productIcon}
           title={`No ${productsLower} found`}

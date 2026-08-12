@@ -10,6 +10,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ListLoading } from "@/components/shared/list-loading";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
@@ -143,6 +144,15 @@ export function ReportsPage() {
   const summary = analytics?.summary ?? emptySummary;
   const comparison = analytics?.comparison ?? emptyComparison;
   const trend = useMemo(() => analytics?.trend ?? [], [analytics]);
+  /**
+   * Whether the shop has answered for this range yet.
+   *
+   * `analytics` is null until it has. The three breakdowns below read
+   * `?? []` off it, so before the answer arrived they each rendered "No
+   * orders in this range" — a statement about the range, made without having
+   * looked at it, and wrong on every cold load of a shop with orders.
+   */
+  const awaitingAnalytics = analytics === null && !failed;
   const statusBreakdown = analytics?.statusBreakdown ?? [];
   const paymentBreakdown = analytics?.paymentBreakdown ?? [];
   const topProducts = (analytics?.topProducts ?? []).slice(0, LIST_ROWS);
@@ -355,7 +365,9 @@ export function ReportsPage() {
               <CardTitle className="min-w-0 truncate text-base">Order status</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-0">
-              {statusBreakdown.length === 0 ? (
+              {awaitingAnalytics ? (
+                <ListLoading rows={3} label="Loading order status" />
+              ) : statusBreakdown.length === 0 ? (
                 <EmptyState message="No orders in this range" />
               ) : (
                 <ul className="divide-y divide-border">
@@ -396,7 +408,9 @@ export function ReportsPage() {
                 <p className="mt-0.5 font-heading text-lg font-semibold">{summary.prepaidOrders}</p>
               </div>
             </div>
-            {paymentBreakdown.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading payment data" />
+            ) : paymentBreakdown.length === 0 ? (
               <EmptyState message="No payment data" />
             ) : (
               <div className="space-y-3">
@@ -457,7 +471,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top cities</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {cities.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading city data" />
+            ) : cities.length === 0 ? (
               <EmptyState message="No city data" />
             ) : (
               <ul className="divide-y divide-border">

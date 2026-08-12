@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -314,7 +315,13 @@ export function InquiriesListPage({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,20rem)]">
         <div className="min-w-0 space-y-4">
-          {filtered.length === 0 ? (
+          {!mounted ? (
+            // "No inquiries found" before the first read is a claim about the
+            // shop's inbox that nothing has checked yet.
+            <section className={adminShell.tableCard}>
+              <ListLoading rows={4} label="Loading inquiries" />
+            </section>
+          ) : filtered.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
               title="No inquiries found"

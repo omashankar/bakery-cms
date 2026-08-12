@@ -21,6 +21,7 @@ import {
 } from "@/components/shared/filter-panel";
 import { SafeImage } from "@/components/shared/safe-image";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -308,7 +309,9 @@ export function InventoryAdminPage() {
             <CardTitle className="text-base">Recent history</CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0">
-            {history.length === 0 ? (
+            {!mounted ? (
+              <ListLoading rows={3} label="Loading recent adjustments" />
+            ) : history.length === 0 ? (
               <div className="flex h-full min-h-28 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-3 py-6 text-center">
                 <p className="text-sm text-muted-foreground">No adjustments yet</p>
               </div>
@@ -374,7 +377,12 @@ export function InventoryAdminPage() {
       </FilterPanel>
 
       <section className={adminShell.tableCard}>
-        {paginated.length === 0 ? (
+        {!mounted ? (
+          // `mounted` gated the stat cards and the derived lists, but not this:
+          // a cold load told the admin there were "No inventory records" and
+          // suggested adding cakes to a catalogue that already has them.
+          <ListLoading rows={5} label="Loading inventory" />
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Package}
             title="No inventory records found"

@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -239,7 +240,11 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
           </div>
         ) : null}
 
-        {filtered.length === 0 ? (
+        {!mounted ? (
+          <section className={adminShell.tableCard}>
+            <ListLoading rows={4} label="Loading subscribers" />
+          </section>
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={Users}
             title="No subscribers found"

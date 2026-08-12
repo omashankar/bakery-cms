@@ -18,6 +18,7 @@ import {
   FilterPanelToolbar,
 } from "@/components/shared/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { NotificationListItem } from "@/apps/admin/commerce/components/notification-list-item";
 import {
@@ -112,7 +113,20 @@ export function NotificationsAdminPage() {
   }, []);
   const [filters, setFilters] = useState<NotificationListFilters>(defaultNotificationFilters);
   const [page, setPage] = useState(1);
-  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [loadedNotifications, setNotifications] = useState<AdminNotification[] | null>(null);
+  /**
+   * `null` until the first derivation has run — the absence IS the signal, so
+   * there is no second piece of state and nothing extra to set in the effect.
+   *
+   * Notifications are DERIVED from orders, inquiries and inventory rather than
+   * stored, and those stores are filled by the admin layout after mount. So on
+   * a cold load the derivation ran over empty inputs and the page said "No
+   * notifications" to a shop with pending orders and low stock.
+   */
+  const loaded = loadedNotifications !== null;
+  // Memoised: this feeds two `useMemo`s below, and a fresh `[]` on every render
+  // would make both of them recompute forever.
+  const notifications = useMemo(() => loadedNotifications ?? [], [loadedNotifications]);
   const [settings, setSettings] = useState<NotificationSettings>(defaultNotificationSettings);
   const [savedSettings, setSavedSettings] = useState<NotificationSettings>(
     defaultNotificationSettings
@@ -332,7 +346,9 @@ export function NotificationsAdminPage() {
             </FilterPanelToolbar>
           </FilterPanel>
 
-          {filtered.length === 0 ? (
+          {!loaded ? (
+            <ListLoading rows={4} label="Loading notifications" />
+          ) : filtered.length === 0 ? (
             <EmptyState
               icon={Bell}
               title="No notifications"

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -125,7 +126,11 @@ export function CouponsAdminPage() {
           <CardTitle className="text-base">All coupons</CardTitle>
         </CardHeader>
         <CardContent>
-          {coupons.length === 0 ? (
+          {!mounted ? (
+            // "No coupons yet — create your first discount code" on a cold load
+            // of a shop that already runs three.
+            <ListLoading rows={3} label="Loading coupons" />
+          ) : coupons.length === 0 ? (
             <EmptyState
               icon={Tag}
               title="No coupons yet"
