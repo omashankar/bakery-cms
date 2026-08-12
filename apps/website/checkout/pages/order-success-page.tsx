@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Package } from "lucide-react";
+import { CheckCircle2, Download, Loader2, Package, SearchX } from "lucide-react";
 import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
@@ -12,6 +12,7 @@ import { openCustomerAuthModal } from "@/apps/website/account/components/custome
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
@@ -24,16 +25,38 @@ const paymentLabels = {
   razorpay: "Online (Razorpay)",
 } as const;
 
+/**
+ * Whether this page has an order yet — which is NOT the same as having one.
+ *
+ * `order` is null for three different reasons and this screen used to treat
+ * them all as the third: nothing has been looked up yet, the server is still
+ * answering, or there really is no such order. So the very first paint of a
+ * successful checkout — and every frame until the fetch landed — read "We could
+ * not find that order" beneath a green tick, an "Order Confirmed" page title and
+ * "Thank you for your order. We're preparing your cakes with care." A customer
+ * whose money had just left their account read that the shop had lost it.
+ */
+type Lookup = "looking" | "found" | "missing";
+
 export function OrderSuccessPage() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get("order");
   const [order, setOrder] = useState<PlacedOrder | null>(null);
+  const [lookup, setLookup] = useState<Lookup>("looking");
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
-    if (!orderNumber) return;
+    // A link with no order on it is the one case that is knowable immediately.
+    if (!orderNumber) {
+      setLookup("missing");
+      return;
+    }
+
     const local = getOrderByNumber(orderNumber);
-    setOrder(local);
+    if (local) {
+      setOrder(local);
+      setLookup("found");
+    }
 
     // Re-read from the server once.
     //
@@ -43,11 +66,24 @@ export function OrderSuccessPage() {
     // later. This is exactly the screen where a customer who has just paid reads
     // "pending" and worries.
     const email = readOrderLookupEmail(orderNumber) ?? local?.address?.email;
-    if (!email) return;
+    if (!email) {
+      // Nothing left to try. Only now is "we could not find it" true — and only
+      // if the device had no copy either.
+      if (!local) setLookup("missing");
+      return;
+    }
 
     let cancelled = false;
     void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
-      if (!cancelled && fresh) setOrder(fresh);
+      if (cancelled) return;
+      if (fresh) {
+        setOrder(fresh);
+        setLookup("found");
+      } else if (!local) {
+        // `fetchOrderByNumber` answers null for a network failure too, so this
+        // says "could not load", never "your order does not exist".
+        setLookup("missing");
+      }
     });
     return () => {
       cancelled = true;
@@ -58,33 +94,70 @@ export function OrderSuccessPage() {
     setSignedIn(hasCustomerSession());
   }, []);
 
+  const looking = lookup === "looking";
+  // The heading, the icon and the page title are one verdict, so they are
+  // decided together. They used to disagree: only the h2 knew the order was
+  // missing, while the tick above it and the title above that both celebrated.
+  const heading = looking
+    ? "Checking your order…"
+    : order
+      ? "Thank you for your order!"
+      : "We could not load that order";
+
   return (
     <>
       <StorePageHeader
-        title="Order Confirmed"
-        description="Thank you for your order. We're preparing your cakes with care."
-        breadcrumbs={[{ label: "Order Confirmed" }]}
+        title={looking ? "Your Order" : order ? "Order Confirmed" : "Order Not Found"}
+        description={
+          looking
+            ? "One moment while we fetch your order details."
+            : order
+              ? "Thank you for your order. We're preparing your cakes with care."
+              : "Look it up with your order number, or contact us and we will help."
+        }
+        breadcrumbs={[{ label: looking ? "Your Order" : order ? "Order Confirmed" : "Order" }]}
       />
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.containerNarrow}>
           <ScrollReveal className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm sm:p-12">
             <div className="relative mx-auto mb-4 flex size-16 items-center justify-center">
-              <span className="absolute inset-0 animate-ping rounded-full bg-green-100 opacity-60 [animation-iteration-count:2]" />
-              <span className="relative flex size-16 items-center justify-center rounded-2xl bg-green-50 animate-in zoom-in-50 duration-500">
-                <CheckCircle2 className="size-9 text-green-600" />
-              </span>
+              {looking ? (
+                <span className="relative flex size-16 items-center justify-center rounded-2xl bg-muted">
+                  <Loader2 className="size-9 animate-spin text-muted-foreground" />
+                </span>
+              ) : order ? (
+                <>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-green-100 opacity-60 [animation-iteration-count:2]" />
+                  <span className="relative flex size-16 items-center justify-center rounded-2xl bg-green-50 animate-in zoom-in-50 duration-500">
+                    <CheckCircle2 className="size-9 text-green-600" />
+                  </span>
+                </>
+              ) : (
+                <span className="relative flex size-16 items-center justify-center rounded-2xl bg-amber-50">
+                  <SearchX className="size-9 text-amber-600" />
+                </span>
+              )}
             </div>
-            <h2 className="font-heading text-2xl font-bold">
-              {order ? "Thank you for your order!" : "We could not find that order"}
+            <h2 className="font-heading text-2xl font-bold" aria-live="polite">
+              {heading}
             </h2>
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              {order
-                ? "Your order has been placed successfully. Save your order number below — you can use it to track this order at any time."
-                : "This link has no order attached, or the order was placed on another device. Look it up with your order number below."}
+              {looking
+                ? "We're fetching the details for this order."
+                : order
+                  ? "Your order has been placed successfully. Save your order number below — you can use it to track this order at any time."
+                  : "This link has no order attached, or the order was placed on another device. Look it up with your order number below."}
             </p>
 
-            {order ? (
+            {looking ? (
+              <div className="mx-auto mt-8 max-w-lg space-y-3 rounded-xl border border-border bg-cream-50 p-6">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            ) : order ? (
               <div className="mx-auto mt-8 max-w-lg rounded-xl border border-border bg-cream-50 p-6 text-left text-sm">
                 <div className="flex items-center gap-2 font-medium">
                   <Package className="size-4 text-bakery-700" />
@@ -149,7 +222,12 @@ export function OrderSuccessPage() {
               <Button variant="bakery" render={<Link href={routes.store.collections} />}>
                 Continue shopping
               </Button>
-              {order ? (
+              {/*
+                No order-specific link while the lookup is open: "Track order"
+                would have to point at either this order or the generic search,
+                and picking one is the same guess the heading used to make.
+              */}
+              {looking ? null : order ? (
                 <Button
                   variant="outline"
                   render={<Link href={routes.store.orderDetail(order.orderNumber)} />}

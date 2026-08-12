@@ -138,7 +138,15 @@ export function OrderDetailPage() {
   if (!ready) {
     return (
       <div className={layoutSpacing.container}>
-        <div className="my-16 h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="my-16 h-40 animate-pulse rounded-xl border border-border bg-cream-100"
+        >
+          {/* A bare pulsing box is silence to a screen reader — which then
+              hears nothing at all until the verdict below replaces it. */}
+          <span className="sr-only">Loading your order…</span>
+        </div>
       </div>
     );
   }
