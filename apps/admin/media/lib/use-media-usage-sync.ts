@@ -47,15 +47,33 @@ async function loadSource(source: Source): Promise<string | null> {
   }
 }
 
+/** Long enough for a cold serverless read, short enough to catch a real blip. */
+const RETRY_BASE_MS = 4000;
+const MAX_RETRIES = 3;
+
 export function useMediaUsageSync(): void {
   useEffect(() => {
     let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
 
-    (async () => {
+    async function load() {
       const loaded = await Promise.all(
         SOURCES.map(async (source) => ({ source, haystack: await loadSource(source) })),
       );
       if (cancelled) return;
+
+      /**
+       * Every source has to answer before this index may call itself complete.
+       *
+       * The failed ones were filtered out and the rest handed over as if that
+       * were the whole picture, so a single failed GET made every reference in
+       * that document invisible. A file used only by the homepage then read as
+       * "not used anywhere" — offered under the Unused filter, and deleted from
+       * a dialog whose "Still checking" caveat had been switched off by the
+       * flag this sets. Cloudinary destroys the asset; the homepage breaks.
+       */
+      const complete = loaded.every((entry) => entry.haystack !== null);
 
       setRemoteUsageIndex(
         loaded
@@ -65,11 +83,23 @@ export function useMediaUsageSync(): void {
             context: entry.source.context,
             haystack: entry.haystack as string,
           })),
+        complete,
       );
-    })();
+
+      // An incomplete index is not a permanent state to sit in: the admin is
+      // held at "Still checking" until it resolves, so keep trying.
+      if (!complete && attempts < MAX_RETRIES) {
+        const delay = RETRY_BASE_MS * 2 ** attempts;
+        attempts += 1;
+        retry = setTimeout(() => void load(), delay);
+      }
+    }
+
+    void load();
 
     return () => {
       cancelled = true;
+      if (retry !== undefined) clearTimeout(retry);
     };
   }, []);
 }

@@ -65,8 +65,15 @@ export function MediaFolderSidebar({
    * which the detail panel's folder picker would render as no selection at all.
    */
   async function handleDelete(folder: MediaFolder) {
-    const moved = await moveFilesToFolder(folder.id, UPLOADS_FOLDER_ID);
-    const { value: removed, persisted } = await deleteMediaFolder(folder.id);
+    const { value: moved, persisted: filesPersisted } = await moveFilesToFolder(
+      folder.id,
+      UPLOADS_FOLDER_ID,
+    );
+    const { value: removed, persisted: folderPersisted } = await deleteMediaFolder(folder.id);
+    // Two writes, and the message below describes both. Reporting on the
+    // folder's alone announced files as moved that are still in the folder
+    // that was just deleted.
+    const persisted = filesPersisted && folderPersisted;
 
     if (!removed) {
       toast.error("Built-in folders cannot be deleted");

@@ -39,10 +39,26 @@ interface RemoteSource {
 let remoteSources: RemoteSource[] = [];
 let indexReady = false;
 
-/** Called by the admin's usage sync once the server documents are in. */
-export function setRemoteUsageIndex(sources: RemoteSource[]): void {
+/**
+ * Called by the admin's usage sync once the server documents are in.
+ *
+ * `complete` is what makes the index's answer trustworthy, and it used to be
+ * assumed. The sync filters out any source whose GET failed and passed the
+ * survivors, so ONE failed request — the homepage layout, say — left the index
+ * "ready" while blind to every reference that document holds. A hero image used
+ * on the live homepage then answered "not used anywhere": it appeared under the
+ * Unused filter, and the delete dialog dropped its "Still checking where this is
+ * used" caveat, because that caveat is gated on this very flag. With Cloudinary
+ * configured, Confirm destroys the asset rather than delisting it, and the
+ * homepage renders a broken image.
+ *
+ * A partial index is still worth holding — every reference in it is real, so it
+ * can only ever say "in use", never wrongly say "unused" — but it may not claim
+ * to be the whole picture.
+ */
+export function setRemoteUsageIndex(sources: RemoteSource[], complete: boolean): void {
   remoteSources = sources;
-  indexReady = true;
+  indexReady = complete;
 }
 
 /** False until the server-held references have been loaded at least once. */

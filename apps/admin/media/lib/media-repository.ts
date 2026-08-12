@@ -347,18 +347,26 @@ export async function bulkMoveMediaToFolder(
  * Used when a folder is deleted, so its files land somewhere real instead of
  * pointing at a folder that no longer exists.
  */
-export async function moveFilesToFolder(fromId: string, toId: string): Promise<number> {
+export async function moveFilesToFolder(
+  fromId: string,
+  toId: string,
+): Promise<WriteResult<number>> {
   const files = await readHydratedMedia();
-  if (files === null) return 0;
+  if (files === null) return { value: 0, persisted: false };
   const affected = files.filter((file) => file.folderId === fromId);
-  if (affected.length === 0) return 0;
+  // Nothing to move means nothing that could have failed to move.
+  if (affected.length === 0) return { value: 0, persisted: true };
 
   const next = files.map((file) =>
     file.folderId === fromId ? { ...file, folderId: toId, updatedAt: nowIso() } : file,
   );
-  await persistMedia(next);
+  // Its own answer, not a discarded one. This awaited `persistMedia` and threw
+  // the result away, so the caller reported "Folder deleted — 3 files moved to
+  // Uploads" off the FOLDER write's success while the file write had been
+  // refused: the files stayed in a folder that no longer exists.
+  const persisted = await persistMedia(next);
   notifyMediaUpdated();
-  return affected.length;
+  return { value: affected.length, persisted };
 }
 
 export async function deleteMediaFiles(ids: string[]): Promise<WriteResult<number>> {

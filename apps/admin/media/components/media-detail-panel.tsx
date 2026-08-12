@@ -57,7 +57,17 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
     const { value: updated, persisted } = await updateMediaFile(current.id, patch);
     if (updated) onUpdate(updated);
     if (!persisted) {
-      reportWrite(false, "Media details saved");
+      /**
+       * A null `value` means the write landed NOWHERE — not the server, and not
+       * localStorage either, because `readHydratedMedia` refused to compose it.
+       * The bare call says "saved on this device only", which sends the admin
+       * looking for alt text that does not exist on any device.
+       */
+      reportWrite(
+        false,
+        "Media details saved",
+        updated ? undefined : { failure: "Could not save the media details" },
+      );
     }
   }
 

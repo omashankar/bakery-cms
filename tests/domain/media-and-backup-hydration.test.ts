@@ -73,7 +73,12 @@ describe("a media mutation before the server's copy has landed", () => {
       value: 0,
       persisted: false,
     });
-    await expect(repo.moveFilesToFolder("folder-cakes", "folder-uploads")).resolves.toBe(0);
+    // Reports its OWN write now: the folder sidebar used to announce "3 files
+    // moved to Uploads" off the FOLDER write's success while this one had been
+    // refused, leaving the files in a folder that no longer exists.
+    await expect(
+      repo.moveFilesToFolder("folder-cakes", "folder-uploads"),
+    ).resolves.toEqual({ value: 0, persisted: false });
 
     expect(api.replaceMediaFilesRequest).not.toHaveBeenCalled();
   });

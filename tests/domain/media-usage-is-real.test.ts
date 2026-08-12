@@ -42,7 +42,7 @@ describe("where a media file is used", () => {
   });
 
   it("knows once the server documents are in", () => {
-    setRemoteUsageIndex([]);
+    setRemoteUsageIndex([], true);
 
     expect(isUsageIndexReady()).toBe(true);
   });
@@ -54,7 +54,7 @@ describe("where a media file is used", () => {
         context: "Builder",
         haystack: JSON.stringify({ state: { published: { sections: [{ content: { imageUrl: HERO } }] } } }),
       },
-    ]);
+    ], true);
 
     const refs = getMediaUsageDetails(HERO);
 
@@ -73,7 +73,7 @@ describe("where a media file is used", () => {
   ])("finds an image used by %s", (_what, label, context) => {
     setRemoteUsageIndex([
       { label, context, haystack: JSON.stringify({ anything: { nested: HERO } }) },
-    ]);
+    ], true);
 
     expect(getMediaUsageDetails(HERO)).toEqual([{ label, context }]);
   });
@@ -83,7 +83,7 @@ describe("where a media file is used", () => {
       { label: "Homepage layout", context: "Builder", haystack: HERO },
       { label: "CMS pages", context: "Pages", haystack: HERO },
       { label: "Footer", context: "Site layout", haystack: "something else" },
-    ]);
+    ], true);
 
     expect(countMediaUsage(HERO)).toBe(2);
   });
@@ -91,7 +91,7 @@ describe("where a media file is used", () => {
   it("says nothing uses a file that nothing uses", () => {
     setRemoteUsageIndex([
       { label: "Homepage layout", context: "Builder", haystack: JSON.stringify({ a: 1 }) },
-    ]);
+    ], true);
 
     expect(getMediaUsageDetails(HERO)).toEqual([]);
   });
@@ -103,7 +103,7 @@ describe("where a media file is used", () => {
         context: "Builder",
         haystack: "https://images.example.com/hero-diwali-2.jpg",
       },
-    ]);
+    ], true);
 
     expect(countMediaUsage(HERO)).toBe(0);
   });
@@ -119,7 +119,7 @@ describe("where a media file is used", () => {
         context: "Pages",
         haystack: "https://images.example.com/my-hero-diwali.jpg",
       },
-    ]);
+    ], true);
 
     expect(countMediaUsage(HERO)).toBe(0);
     expect(countMediaUsage("hero-diwali.jpg")).toBe(1);
@@ -128,9 +128,54 @@ describe("where a media file is used", () => {
   it("ignores an empty url rather than matching everything", () => {
     setRemoteUsageIndex([
       { label: "Homepage layout", context: "Builder", haystack: "{}" },
-    ]);
+    ], true);
 
     expect(getMediaUsageDetails("")).toEqual([]);
     expect(getMediaUsageDetails("   ")).toEqual([]);
+  });
+});
+
+describe("an index built from a failed read", () => {
+  /**
+   * "Nothing uses this" and "I could not check" are different answers, and the
+   * whole delete flow turns on which one this is.
+   *
+   * `useMediaUsageSync` fetches seven server documents, drops any whose GET
+   * failed, and hands over the rest. That hand-over used to mark the index
+   * READY regardless, so one failed request made every reference inside that
+   * document invisible: a hero image used on the live homepage answered "not
+   * used anywhere". It appeared under the Unused filter, and the delete
+   * dialog's "Still checking where this is used" caveat is gated on this very
+   * flag, so it vanished too. With Cloudinary configured, Confirm destroys the
+   * asset rather than delisting it, and the homepage renders a broken image.
+   */
+  it("does not claim to know where files are used", () => {
+    setRemoteUsageIndex(
+      [{ label: "CMS pages", context: "Pages", haystack: JSON.stringify({}) }],
+      false,
+    );
+
+    expect(
+      isUsageIndexReady(),
+      "a partial index claimed it had checked everywhere",
+    ).toBe(false);
+  });
+
+  it("still reports the references it did load", () => {
+    // A partial index is worth keeping: every reference in it is real, so it
+    // can only ever say "in use" — never wrongly say "unused".
+    const url = "/images/hero.jpg";
+    setRemoteUsageIndex(
+      [
+        {
+          label: "Homepage layout",
+          context: "Builder",
+          haystack: JSON.stringify({ sections: [{ content: { image: url } }] }),
+        },
+      ],
+      false,
+    );
+
+    expect(getMediaUsageDetails(url).map((ref) => ref.context)).toContain("Builder");
   });
 });
