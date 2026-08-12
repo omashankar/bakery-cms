@@ -23,6 +23,7 @@ import {
 import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { ListLoading } from "@/components/shared/list-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -251,6 +252,7 @@ export function ReviewsAdminPage() {
             changeTone={overview.pending > 0 ? "warning" : "positive"}
             icon={MessageSquare}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -265,6 +267,7 @@ export function ReviewsAdminPage() {
             changeTone={overview.reported > 0 ? "warning" : "positive"}
             icon={Flag}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <DashboardStatCard
@@ -274,6 +277,7 @@ export function ReviewsAdminPage() {
           changeTone="neutral"
           icon={Star}
           tone="bakery"
+          figures={mounted ? "ready" : "loading"}
         />
       </section>
 
@@ -373,7 +377,9 @@ export function ReviewsAdminPage() {
           </div>
         ) : null}
 
-        {paginated.length === 0 ? (
+        {!mounted ? (
+          <ListLoading rows={5} label="Loading reviews" />
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Star}
             title="No reviews found"

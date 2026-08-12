@@ -198,6 +198,7 @@ export function InquiriesListPage({
             changeTone={stats.new > 0 ? "warning" : "positive"}
             icon={MessageSquare}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -212,6 +213,7 @@ export function InquiriesListPage({
             changeTone="neutral"
             icon={CircleDashed}
             tone="bakery"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -226,6 +228,7 @@ export function InquiriesListPage({
             changeTone="positive"
             icon={Reply}
             tone="bakery"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -240,6 +243,7 @@ export function InquiriesListPage({
             changeTone="neutral"
             icon={CheckCircle2}
             tone="neutral"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
       </section>

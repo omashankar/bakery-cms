@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ListLoading } from "@/components/shared/list-loading";
+import { Skeleton } from "@/components/ui/skeleton";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
@@ -47,6 +49,25 @@ const emptyComparison: ReportsComparison = {
   averageOrderValue: { label: "—", tone: "neutral" },
   itemsSold: { label: "—", tone: "neutral" },
 };
+
+/**
+ * A single figure that has not arrived, in place of the zero it would print.
+ *
+ * These sit inline in the cards rather than in a list, so they cannot use
+ * ListLoading: they need to hold one number's worth of space.
+ */
+function FigurePlaceholder({
+  figures,
+  className,
+}: {
+  figures: FiguresState;
+  className?: string;
+}) {
+  if (figures === "unavailable") {
+    return <p className="mt-1 font-heading text-xl font-semibold text-muted-foreground">—</p>;
+  }
+  return <Skeleton className={className} />;
+}
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -152,7 +173,8 @@ export function ReportsPage() {
    * orders in this range" — a statement about the range, made without having
    * looked at it, and wrong on every cold load of a shop with orders.
    */
-  const awaitingAnalytics = analytics === null && !failed;
+  const figures: FiguresState = analytics ? "ready" : failed ? "unavailable" : "loading";
+  const awaitingAnalytics = figures === "loading";
   const statusBreakdown = analytics?.statusBreakdown ?? [];
   const paymentBreakdown = analytics?.paymentBreakdown ?? [];
   const topProducts = (analytics?.topProducts ?? []).slice(0, LIST_ROWS);
@@ -264,6 +286,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.revenue.tone : "neutral"}
           icon={IndianRupee}
           tone="gold"
+          figures={figures}
         />
         <DashboardStatCard
           title="Orders"
@@ -272,6 +295,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.orders.tone : "neutral"}
           icon={ShoppingBag}
           tone="bakery"
+          figures={figures}
           href={routes.admin.orders.list}
         />
         <DashboardStatCard
@@ -281,6 +305,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.averageOrderValue.tone : "neutral"}
           icon={BarChart3}
           tone="neutral"
+          figures={figures}
         />
         <DashboardStatCard
           title="Items sold"
@@ -289,6 +314,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.itemsSold.tone : "neutral"}
           icon={Package}
           tone="bakery"
+          figures={figures}
         />
       </section>
 
@@ -399,14 +425,19 @@ export function ReportsPage() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-4 pt-0">
             <div className="grid grid-cols-2 gap-3 border-b border-border pb-3">
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">COD</p>
-                <p className="mt-0.5 font-heading text-lg font-semibold">{summary.codOrders}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Prepaid</p>
-                <p className="mt-0.5 font-heading text-lg font-semibold">{summary.prepaidOrders}</p>
-              </div>
+              {[
+                { label: "COD", value: summary.codOrders },
+                { label: "Prepaid", value: summary.prepaidOrders },
+              ].map((item) => (
+                <div key={item.label} className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                  {figures === "ready" ? (
+                    <p className="mt-0.5 font-heading text-lg font-semibold">{item.value}</p>
+                  ) : (
+                    <FigurePlaceholder figures={figures} className="mt-1 h-5 w-10" />
+                  )}
+                </div>
+              ))}
             </div>
             {awaitingAnalytics ? (
               <ListLoading rows={3} label="Loading payment data" />
@@ -457,9 +488,13 @@ export function ReportsPage() {
                   className="rounded-lg border border-border bg-muted/80 px-3 py-3"
                 >
                   <p className="text-[11px] text-muted-foreground">{item.label}</p>
-                  <p className={cn("mt-1 font-heading text-xl font-semibold", item.tone)}>
-                    {item.value}
-                  </p>
+                  {figures === "ready" ? (
+                    <p className={cn("mt-1 font-heading text-xl font-semibold", item.tone)}>
+                      {item.value}
+                    </p>
+                  ) : (
+                    <FigurePlaceholder figures={figures} className="mt-1.5 h-6 w-10" />
+                  )}
                 </div>
               ))}
             </div>
@@ -498,7 +533,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top products</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {topProducts.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={4} label="Loading top products" />
+            ) : topProducts.length === 0 ? (
               <EmptyState message="No product sales" />
             ) : (
               <ul className="divide-y divide-border">
@@ -521,7 +558,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top customers</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {topCustomers.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={4} label="Loading top customers" />
+            ) : topCustomers.length === 0 ? (
               <EmptyState message="No customer orders" />
             ) : (
               <ul className="divide-y divide-border">
@@ -547,10 +586,12 @@ export function ReportsPage() {
             <div className="border-b border-border pb-3">
               <p className="text-[11px] text-muted-foreground">Total savings</p>
               <p className="mt-0.5 font-heading text-lg font-semibold">
-                {formatCurrency(summary.couponDiscount)}
+                {figures === "ready" ? formatCurrency(summary.couponDiscount) : "—"}
               </p>
             </div>
-            {coupons.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading coupon usage" />
+            ) : coupons.length === 0 ? (
               <EmptyState message="No coupons used" />
             ) : (
               <ul className="divide-y divide-border">
@@ -580,7 +621,9 @@ export function ReportsPage() {
             <CardTitle className="min-w-0 truncate text-base">Orders in range</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            {recentOrders.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={5} label="Loading orders in range" />
+            ) : recentOrders.length === 0 ? (
               <EmptyState message="No orders in this range" />
             ) : (
               <>

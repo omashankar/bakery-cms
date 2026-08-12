@@ -156,6 +156,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="neutral"
             icon={Users}
             tone="bakery"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -170,6 +171,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="positive"
             icon={UserCheck}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -184,6 +186,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="neutral"
             icon={UserX}
             tone="neutral"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
       </section>

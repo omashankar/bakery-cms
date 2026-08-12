@@ -28,6 +28,7 @@ import {
   type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -91,6 +92,16 @@ export function CustomersListPage() {
     () => (mounted ? customers.reduce((sum, customer) => sum + customer.totalSpent, 0) : 0),
     [customers, mounted]
   );
+  /**
+   * The stat cards state three things about the shop's customers, and before
+   * this request answered they stated all three as zero: Total 0, Lifetime
+   * revenue ₹0.00, and "At risk 0" captioned "All clear" in green. The figures
+   * were already held back to EMPTY_STATS until `mounted`, which is exactly the
+   * moment the zeroes went on screen — it kept them from being WRONG, not from
+   * being STATED.
+   */
+  const figures: FiguresState = !mounted ? "loading" : failed ? "unavailable" : "ready";
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -146,6 +157,7 @@ export function CustomersListPage() {
             changeTone="neutral"
             icon={Users}
             tone="bakery"
+            figures={figures}
           />
         </button>
         <button
@@ -160,6 +172,7 @@ export function CustomersListPage() {
             changeTone={stats.atRisk > 0 ? "warning" : "positive"}
             icon={AlertTriangle}
             tone="neutral"
+            figures={figures}
           />
         </button>
         <DashboardStatCard
@@ -169,6 +182,7 @@ export function CustomersListPage() {
           changeTone="neutral"
           icon={IndianRupee}
           tone="gold"
+          figures={figures}
         />
       </section>
 
