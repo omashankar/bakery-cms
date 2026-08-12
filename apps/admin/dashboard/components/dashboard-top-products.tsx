@@ -4,6 +4,11 @@ import Link from "next/link";
 import { ArrowRight, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  PanelLoading,
+  PanelUnavailable,
+  type FiguresState,
+} from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import {
@@ -12,9 +17,17 @@ import {
 
 interface DashboardTopProductsProps {
   analytics: DashboardCommerceAnalytics;
+  /**
+   * Whether the range's figures have arrived.
+   *
+   * Without this the panel reads its empty branch off
+   * `EMPTY_DASHBOARD_COMMERCE_ANALYTICS` and states, on every cold load, that
+   * the shop has none of whatever it counts.
+   */
+  figures?: FiguresState;
 }
 
-export function DashboardTopProducts({ analytics }: DashboardTopProductsProps) {
+export function DashboardTopProducts({ analytics, figures = "ready" }: DashboardTopProductsProps) {
   const products = analytics.topProducts.slice(0, 4);
 
   return (
@@ -32,7 +45,11 @@ export function DashboardTopProducts({ analytics }: DashboardTopProductsProps) {
         </Button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pt-0">
-        {products.length === 0 ? (
+        {figures === "loading" ? (
+          <PanelLoading label="Loading the top sellers" rows={4} />
+        ) : figures === "unavailable" ? (
+          <PanelUnavailable />
+        ) : products.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center">
             <div>
               <ShoppingBag className="mx-auto mb-2 size-5 text-muted-foreground" />

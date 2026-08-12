@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
@@ -19,6 +20,16 @@ const FEED_LIMIT = 5;
 
 export function DashboardActivityFeed() {
   const [activities, setActivities] = useState<DashboardActivityItem[]>([]);
+  /**
+   * Whether the first effect has run.
+   *
+   * The read below is synchronous, but `useEffect` fires after the browser
+   * paints — so without this there is a real frame stating the shop has none of
+   * these. It cannot be read eagerly instead: this renders on the server too,
+   * where the browser-held store is empty, and seeding from it would be a
+   * hydration mismatch.
+   */
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +38,7 @@ export function DashboardActivityFeed() {
     // in flight, then replace it with the server's durable trail. The local log
     // only records what this browser did; the audit trail spans every device.
     setActivities(getDashboardActivities().slice(0, FEED_LIMIT));
+    setLoaded(true);
 
     (async () => {
       const result = await fetchAuditLogs({ limit: FEED_LIMIT });
@@ -59,7 +71,9 @@ export function DashboardActivityFeed() {
         </Button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
-        {activities.length === 0 ? (
+        {!loaded ? (
+          <PanelLoading label="Loading recent activity" rows={5} />
+        ) : activities.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center">
             <p className="text-sm text-muted-foreground">No recent activity yet.</p>
           </div>

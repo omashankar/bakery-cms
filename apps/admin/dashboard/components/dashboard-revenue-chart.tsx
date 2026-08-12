@@ -4,15 +4,19 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { type DashboardCommerceAnalytics } from "../lib/dashboard-analytics";
 
 interface DashboardRevenueChartProps {
   analytics: DashboardCommerceAnalytics;
+  /** An all-zero chart is not "no sales" unless the figures actually arrived. */
+  figures?: FiguresState;
 }
 
-export function DashboardRevenueChart({ analytics }: DashboardRevenueChartProps) {
+export function DashboardRevenueChart({ analytics, figures = "ready" }: DashboardRevenueChartProps) {
   const trend = analytics.trend;
   const maxRevenue = Math.max(...trend.map((item) => item.revenue), 1);
   const latest = trend[trend.length - 1];
@@ -44,7 +48,22 @@ export function DashboardRevenueChart({ analytics }: DashboardRevenueChartProps)
           ref={trendScrollRef}
           className="overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
         >
-          {!hasData ? (
+          {figures === "loading" ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex h-36 items-end gap-1.5 sm:h-44"
+            >
+              <span className="sr-only">Loading the revenue trend</span>
+              {[45, 70, 30, 85, 55, 65, 40].map((height, index) => (
+                <Skeleton key={index} className="flex-1" style={{ height: `${height}%` }} />
+              ))}
+            </div>
+          ) : figures === "unavailable" ? (
+            <div className="flex h-36 items-center justify-center sm:h-44">
+              <p className="text-sm text-muted-foreground">Figures unavailable</p>
+            </div>
+          ) : !hasData ? (
             <div className="flex h-36 items-center justify-center sm:h-44">
               <p className="text-sm text-muted-foreground">No sales data yet</p>
             </div>
