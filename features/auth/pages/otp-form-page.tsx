@@ -9,7 +9,7 @@ import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { OtpInput } from "@/features/auth/components/otp-input";
 import { getResetFlow, markResetVerified } from "@/features/auth/lib/reset-flow";
-import { forgotPasswordRequest, verifyOtpRequest } from "@/features/auth/lib/auth-api";
+import { forgotPasswordRequest, isDeliveryFailure, verifyOtpRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
@@ -84,7 +84,20 @@ export function OtpFormPage() {
           className="text-muted-foreground hover:text-bakery-700"
           onClick={async () => {
             if (!email) return;
-            await forgotPasswordRequest(email).catch(() => undefined);
+            try {
+              await forgotPasswordRequest(email);
+            } catch (error) {
+              // "Code resent" was unconditional: the request's outcome was
+              // discarded entirely, so a throttled or failed resend still said
+              // it had gone — to someone already waiting for an email that had
+              // not arrived, whose next move is to wait longer.
+              if (isDeliveryFailure(error)) {
+                toast.error("Could not resend the code", {
+                  description: "The server did not answer. Try again in a moment.",
+                });
+                return;
+              }
+            }
             toast.message("Code resent");
           }}
         >

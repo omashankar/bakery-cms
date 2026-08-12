@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";
-import { forgotPasswordRequest } from "@/features/auth/lib/auth-api";
+import { forgotPasswordRequest, isDeliveryFailure } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,9 +38,23 @@ export function ForgotPasswordFormPage() {
   const onSubmit = async (data: ForgotPasswordForm) => {
     try {
       await forgotPasswordRequest(data.email);
-    } catch {
-      // Endpoint never reveals whether the email exists; proceed regardless so
-      // the flow (and messaging) stays identical for every input.
+    } catch (error) {
+      /**
+       * Keep the existence-hiding, drop the rest.
+       *
+       * The endpoint never reveals whether the email is registered, and the
+       * flow must stay identical for every input — that part is deliberate.
+       * But this caught EVERY error, so a rate-limited or failed request still
+       * showed "Reset code sent", turned the panel green and pushed the
+       * customer to an OTP screen backed by no reset row. They then sat typing
+       * codes from an email that was never sent.
+       */
+      if (isDeliveryFailure(error)) {
+        toast.error("Could not send the reset code", {
+          description: "The server did not answer. Check your connection and try again.",
+        });
+        return;
+      }
     }
     startResetFlow(data.email);
     setSent(true);

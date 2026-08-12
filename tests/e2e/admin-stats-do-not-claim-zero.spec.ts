@@ -85,6 +85,29 @@ const PAGES = [
     settled: /orders/i,
     lies: [/All clear/i],
   },
+  {
+    // Handled the FAILED aggregation and counted "has not answered yet" as
+    // success — the same gap the orders page had, in three more places.
+    name: "refund centre",
+    path: "/admin/commerce/payments/refunds",
+    stall: "**/api/orders/refund-cases**",
+    settled: /refund/i,
+    lies: [/All clear/i, /₹\s*0\.00/],
+  },
+  {
+    name: "transactions",
+    path: "/admin/commerce/payments/transactions",
+    stall: "**/api/payments/transactions**",
+    settled: /transaction/i,
+    lies: [/₹\s*0\.00/, /all time/i],
+  },
+  {
+    name: "invoices",
+    path: "/admin/commerce/invoices",
+    stall: "**/api/orders/invoices**",
+    settled: /invoice/i,
+    lies: [/all time/i],
+  },
 ];
 
 for (const target of PAGES) {

@@ -5,6 +5,12 @@ import type { WriteResult } from "@/lib/write-result";
 
 const COUPONS_STORAGE_KEY = "bakery-cms-coupons";
 
+/**
+ * Named once, because a listener that mistypes it simply never fires — which
+ * is a silent bug, not a loud one.
+ */
+export const COUPONS_UPDATED_EVENT = "bakery-coupons-updated";
+
 export interface StoredCoupon {
   id: string;
   code: string;
@@ -136,7 +142,7 @@ async function readHydratedCoupons(): Promise<StoredCoupon[] | null> {
 function lowWriteCoupons(coupons: StoredCoupon[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
-  window.dispatchEvent(new Event("bakery-coupons-updated"));
+  window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
 }
 
 /** Mutation write: local first, then the server, reporting what the server did. */
@@ -180,7 +186,7 @@ async function writeCoupons(
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(COUPONS_STORAGE_KEY);
       else localStorage.setItem(COUPONS_STORAGE_KEY, previous);
-      window.dispatchEvent(new Event("bakery-coupons-updated"));
+      window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
     }
   }
 

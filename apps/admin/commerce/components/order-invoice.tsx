@@ -7,6 +7,7 @@ import {
   INVOICE_SETTINGS_UPDATED_EVENT,
   loadInvoiceSettings,
 } from "@/features/commerce/lib/invoice-settings-repository";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
@@ -50,6 +51,18 @@ export function OrderInvoice({
       });
     }
 
+    /**
+     * Ask the server before printing, not just the cache.
+     *
+     * `loadInvoiceSettings()` returns the SEEDED demo identity when nothing has
+     * hydrated — a company name, address and GSTIN belonging to no one. This is
+     * the admin's print copy of a real order, so on a cold tab it went onto
+     * paper with the wrong seller while the customer's copy of the same order
+     * carried the shop's real one. Two invoices for one sale, disagreeing about
+     * who sold it. `invoices-admin-page` and the invoice designer both await
+     * this first.
+     */
+    void ensureInvoiceSettingsHydrated().then(refresh);
     refresh();
     window.addEventListener(INVOICE_SETTINGS_UPDATED_EVENT, refresh);
     window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);

@@ -12,6 +12,32 @@ interface Envelope<T> {
   errors: { field: string; message: string }[] | null;
 }
 
+/**
+ * A failed auth request, with the status that caused it.
+ *
+ * The screens need to tell a DELIBERATE refusal from a transport failure. The
+ * forgot-password endpoint answers the same way whether or not the email
+ * exists — on purpose, so it cannot be used to enumerate accounts — and both
+ * screens swallowed every error to preserve that. Which also swallowed the
+ * 429s and the 500s, and then told the customer their code was on its way.
+ */
+export class AuthRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthRequestError";
+    this.status = status;
+  }
+}
+
+/** Whether a failure means "we could not send it", rather than "no such account". */
+export function isDeliveryFailure(error: unknown): boolean {
+  // A thrown non-AuthRequestError is a network failure: nothing was sent.
+  if (!(error instanceof AuthRequestError)) return true;
+  return error.status === 429 || error.status >= 500;
+}
+
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
@@ -34,8 +60,9 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     const fieldMessage = Array.isArray(json?.errors)
       ? json.errors.find((entry) => entry?.message)?.message
       : undefined;
-    throw new Error(
+    throw new AuthRequestError(
       fieldMessage || json?.message || "Request failed. Please try again.",
+      res.status,
     );
   }
   return json.data as T;

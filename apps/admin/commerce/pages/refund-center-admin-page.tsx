@@ -33,6 +33,7 @@ import {
   type RefundOverview,
 } from "@/apps/admin/commerce/lib/refund-utils";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   refundOrder,
   type PlacedOrder,
@@ -205,6 +206,17 @@ export function RefundCenterAdminPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
+  /**
+   * The three states these cards have, rather than the one they assumed.
+   *
+   * Each renders its zeroed EMPTY_* constant with no gate, so a cold load
+   * stated "Pending amount ₹0.00 — All clear" in green, "Volume ₹0.00 · all
+   * time" and "Paid 0 · all time" as the shop's figures — and a FAILED load
+   * left them standing. The loading and failed flags were already here; they
+   * simply never reached the cards. Same wiring as the dashboard and reports.
+   */
+  const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   // The rows AND the counters come from one server snapshot over every order.
@@ -332,6 +344,15 @@ export function RefundCenterAdminPage() {
   }
 
   async function handleExport() {
+    // `total` is 0 after a FAILED load too, and telling the admin the shop has
+    // no refund cases is a different claim from admitting the list never arrived.
+    // orders-list and invoices already make this distinction.
+    if (failed) {
+      toast.error("Could not load the refund cases to export", {
+        description: "The server did not answer — reload and try again.",
+      });
+      return;
+    }
     if (total === 0) {
       toast.error("No refund cases to export");
       return;
@@ -392,6 +413,7 @@ export function RefundCenterAdminPage() {
             changeTone="neutral"
             icon={RotateCcw}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -401,6 +423,7 @@ export function RefundCenterAdminPage() {
           changeTone={openCases > 0 ? "warning" : "positive"}
           icon={Clock3}
           tone="gold"
+          figures={statFigures}
         />
         <button
           type="button"
@@ -414,6 +437,7 @@ export function RefundCenterAdminPage() {
             changeTone="positive"
             icon={CheckCircle2}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -423,6 +447,7 @@ export function RefundCenterAdminPage() {
           changeTone="neutral"
           icon={Banknote}
           tone="gold"
+          figures={statFigures}
         />
       </section>
 

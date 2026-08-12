@@ -20,6 +20,7 @@ import type { ActivityLog } from "@/types/settings";
 import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activity";
+import { ListLoading } from "@/components/shared/list-loading";
 
 const actionTone: Record<string, string> = {
   published: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -52,12 +53,26 @@ export function ActivitySettingsPage() {
 
   // Hydrate the durable server audit trail (every admin/customer action, across
   // devices) into the same list, merged with the local settings activity.
+  /**
+   * The AUDIT read's own state.
+   *
+   * The empty sentence below was gated on `mounted`, which the local-storage
+   * effect above sets — a different request entirely. So the panel said "No
+   * activity recorded yet" over a populated audit collection for the whole
+   * round trip, and permanently on a 401 or a 500. That is the log an owner
+   * opens to find out who changed something.
+   */
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditFailed, setAuditFailed] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const result = await fetchAuditLogs({ limit: 100 });
-      if (cancelled || !result) return;
-      setServerEntries(result.items.map(auditToActivity));
+      if (cancelled) return;
+      if (result) setServerEntries(result.items.map(auditToActivity));
+      setAuditFailed(!result);
+      setAuditLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -136,7 +151,13 @@ export function ActivitySettingsPage() {
               aria-label="Search activity"
             />
             <div className="divide-y divide-border rounded-xl border border-border">
-              {filtered.length === 0 ? (
+              {auditLoading ? (
+                <ListLoading rows={5} label="Loading the activity log" />
+              ) : auditFailed && entries.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">
+                  Could not load the activity log — the server did not answer.
+                </p>
+              ) : filtered.length === 0 ? (
                 <p className="p-6 text-center text-sm text-muted-foreground">
                   {/*
                     Two different nothings. The seeded demo rows meant this

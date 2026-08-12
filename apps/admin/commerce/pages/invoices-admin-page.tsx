@@ -35,6 +35,7 @@ import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoi
 import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -70,6 +71,17 @@ export function InvoicesAdminPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  /**
+   * The three states these cards have, rather than the one they assumed.
+   *
+   * Each renders its zeroed EMPTY_* constant with no gate, so a cold load
+   * stated "Pending amount ₹0.00 — All clear" in green, "Volume ₹0.00 · all
+   * time" and "Paid 0 · all time" as the shop's figures — and a FAILED load
+   * left them standing. The loading and failed flags were already here; they
+   * simply never reached the cards. Same wiring as the dashboard and reports.
+   */
+  const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
   const [overview, setOverview] = useState<InvoiceOverview>(EMPTY_INVOICE_OVERVIEW);
   const [filters, setFilters] = useState<InvoiceListFilters>(defaultInvoiceListFilters);
   const [page, setPage] = useState(1);
@@ -366,6 +378,7 @@ export function InvoicesAdminPage() {
                 changeTone="positive"
                 icon={IndianRupee}
                 tone="bakery"
+                figures={statFigures}
               />
             </button>
             <button
@@ -380,6 +393,7 @@ export function InvoicesAdminPage() {
                 changeTone="neutral"
                 icon={Wallet}
                 tone="gold"
+                figures={statFigures}
               />
             </button>
           </section>

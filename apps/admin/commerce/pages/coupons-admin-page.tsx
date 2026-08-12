@@ -22,6 +22,7 @@ import {
   type StoredCoupon,
 } from "@/features/commerce/lib/coupons-repository";
 import { CouponFormDialog } from "../components/coupon-form-dialog";
+import { COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
 
 const PAGE_SIZE = 10;
 
@@ -40,7 +41,20 @@ export function CouponsAdminPage() {
   }
 
   useEffect(() => {
+    /**
+     * Re-read when the store changes, which is what every sibling list does.
+     *
+     * This read the cache once on mount and subscribed to nothing. On a cold
+     * cache `loadCoupons` seeds the shipped WELCOME10 / BDAY20 / WED2026 with
+     * invented usage counts, and the server's real coupons — landing in
+     * localStorage a moment later, from the hydration — never reached the
+     * screen. So the page showed a discount table the shop does not have, with
+     * redemption numbers nobody earned, for the whole of that mount. Delivery
+     * zones next door already listen for their own event.
+     */
     refresh();
+    window.addEventListener(COUPONS_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(COUPONS_UPDATED_EVENT, refresh);
   }, []);
 
   const activeCount = coupons.filter((coupon) => coupon.isActive).length;

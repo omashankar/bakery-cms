@@ -329,7 +329,16 @@ export function ReportsPage() {
                 ref={trendScrollRef}
                 className="flex flex-1 flex-col overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
               >
-                {!hasTrendData ? (
+                {figures !== "ready" ? (
+                  <div className="flex flex-1 items-center justify-center py-10">
+                    {/* Every sibling panel in this file is gated; the trend was
+                        the one left asserting "No sales data yet" while the
+                        analytics request was in flight, and after it failed. */}
+                    <p className="text-sm text-muted-foreground">
+                      {figures === "loading" ? "Loading the revenue trend…" : "Figures unavailable"}
+                    </p>
+                  </div>
+                ) : !hasTrendData ? (
                   <div className="flex flex-1 items-center justify-center py-10">
                     <p className="text-sm text-muted-foreground">No sales data yet</p>
                   </div>
