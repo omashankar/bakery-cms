@@ -69,6 +69,15 @@ const EMPTY_META = {
 
 export function HomepageBuilderPage() {
   const [mounted, setMounted] = useState(false);
+  /**
+   * Whether the saved layout was actually READ.
+   *
+   * Distinct from `mounted`, which is set in a `finally` and is therefore true
+   * even when the fetch threw. Both writes here are replace-all, so a builder
+   * that never read the layout would publish its empty in-memory list over the
+   * live storefront page.
+   */
+  const [loadedLayout, setLoadedLayout] = useState(false);
   const [sections, setSections] = useState<HomepageSectionInstance[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -191,6 +200,7 @@ export function HomepageBuilderPage() {
         setSelectedId(draft[0]?.instanceId ?? null);
         setPublishMeta(deriveHomepageMeta(state));
         setScheduledPublishAt(toScheduleInputValue(state.draft.scheduledPublishAt));
+        setLoadedLayout(true);
       } catch {
         toast.error("Could not load the homepage builder");
       }
@@ -544,6 +554,7 @@ export function HomepageBuilderPage() {
           }
           isDirty={isDirty}
           isSaving={isSaving}
+          hasLoaded={loadedLayout}
           onSaveDraft={handleSaveDraft}
           onPublish={() => setConfirm({ type: "publish" })}
           onReset={() => setConfirm({ type: "reset" })}

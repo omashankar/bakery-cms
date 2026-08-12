@@ -15,6 +15,16 @@ interface BuilderToolbarProps {
   description: string;
   isDirty?: boolean;
   isSaving?: boolean;
+  /**
+   * Whether this builder has actually READ the layout it is about to replace.
+   *
+   * Both writes are replace-all. Until the opening fetch resolves — and
+   * forever, if it threw — the section list in memory is still empty, and
+   * Publish was live the whole time: one click wrote an empty homepage over
+   * the live storefront. The server refuses it now too, but a button that
+   * cannot succeed should not be offered.
+   */
+  hasLoaded?: boolean;
   onSaveDraft: () => void;
   onPublish: () => void;
   onReset?: () => void;
@@ -38,6 +48,7 @@ export function BuilderToolbar({
   description,
   isDirty,
   isSaving,
+  hasLoaded = true,
   onSaveDraft,
   onPublish,
   onReset,
@@ -111,6 +122,15 @@ export function BuilderToolbar({
                 size="sm"
                 className="shrink-0"
                 onClick={onPreview}
+                // This Preview saves the draft first, so the preview window has
+                // something to read. The other branch below is a plain link and
+                // writes nothing — it stays live.
+                disabled={isSaving || !hasLoaded}
+                title={
+                  hasLoaded
+                    ? undefined
+                    : "Waiting for the saved layout — previewing saves the draft first"
+                }
               >
                 <ExternalLink className="size-4" />
                 Preview
@@ -147,7 +167,7 @@ export function BuilderToolbar({
               size="sm"
               className="min-w-0"
               onClick={onSaveDraft}
-              disabled={isSaving || !isDirty}
+              disabled={isSaving || !isDirty || !hasLoaded}
             >
               <Save className="size-4" />
               Save draft
@@ -157,7 +177,8 @@ export function BuilderToolbar({
               size="sm"
               className="min-w-0"
               onClick={onPublish}
-              disabled={isSaving}
+              disabled={isSaving || !hasLoaded}
+              title={hasLoaded ? undefined : "Waiting for the saved layout — publishing now would replace it with nothing"}
             >
               <Upload className="size-4" />
               Publish
@@ -178,6 +199,10 @@ export function BuilderToolbar({
               className="h-9 w-full min-w-0 max-w-full sm:w-52"
               value={scheduledPublishAt ?? ""}
               onChange={(event) => onScheduleChange(event.target.value)}
+              // Setting a date SAVES THE DRAFT — the schedule is stored on it.
+              // Before the layout is in hand that draft is `[]`, so this is the
+              // same write Publish is held back from, wearing a date picker.
+              disabled={isSaving || !hasLoaded}
             />
           </div>
           {scheduledPublishAt ? (

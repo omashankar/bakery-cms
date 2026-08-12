@@ -8,6 +8,7 @@ import {
 import {
   assertVersion,
   nextVersion,
+  versionOf,
   type VersionedSnapshot,
 } from "@/features/cms-sections/lib/builder-conflict";
 import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
@@ -70,7 +71,11 @@ function isScheduleDue(snapshot: HomepageBuilderSnapshot): boolean {
  */
 async function readWithSchedule(): Promise<HomepageStoreState> {
   const state = await store.read();
-  if (!isScheduleDue(state.draft)) return state;
+  // Always REPORTS a version, even for a document written before versioning
+  // existed. A reader that answers `undefined` forces every caller to write
+  // `?? 0` and turns a forgotten one into a versionless — now refused — write.
+  const versioned = { ...state, version: versionOf(state) };
+  if (!isScheduleDue(versioned.draft)) return versioned;
 
   return store.mutate((current) => {
     // Re-check under the mutate lock so a concurrent read can't double-fire.

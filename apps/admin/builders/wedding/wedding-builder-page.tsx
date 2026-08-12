@@ -65,6 +65,15 @@ const EMPTY_META = {
 
 export function WeddingBuilderPage() {
   const [mounted, setMounted] = useState(false);
+  /**
+   * Whether the saved layout was actually READ.
+   *
+   * Distinct from `mounted`, which is set in a `finally` and is therefore true
+   * even when the fetch threw. Both writes here are replace-all, so a builder
+   * that never read the layout would publish its empty in-memory list over the
+   * live storefront page.
+   */
+  const [loadedLayout, setLoadedLayout] = useState(false);
   const [sections, setSections] = useState<WeddingSectionInstance[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -178,6 +187,7 @@ export function WeddingBuilderPage() {
         setSelectedId(draft[0]?.instanceId ?? null);
         setPublishMeta(deriveWeddingMeta(state));
         setScheduledPublishAt(toScheduleInputValue(state.draft.scheduledPublishAt));
+        setLoadedLayout(true);
       } catch {
         toast.error("Could not load the wedding builder");
       }
@@ -520,6 +530,7 @@ export function WeddingBuilderPage() {
           }
           isDirty={isDirty}
           isSaving={isSaving}
+          hasLoaded={loadedLayout}
           onSaveDraft={handleSaveDraft}
           onPublish={() => setConfirm({ type: "publish" })}
           onReset={() => setConfirm({ type: "reset" })}

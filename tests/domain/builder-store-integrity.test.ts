@@ -140,9 +140,28 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
     return sections[0]?.content?.title;
   }
 
+  /**
+   * Read, then replace — which is what a real caller does.
+   *
+   * These used to call publish/saveDraft with no version, and the store let
+   * them: the version was optional, so a caller that had never read anything
+   * could replace the whole layout. That hole is what published an empty
+   * homepage to the live storefront, so the store now refuses a versionless
+   * write and these helpers carry the version the same way the builder does.
+   */
+  async function publishLatest(marker: string) {
+    const { version } = await builder.getState();
+    return builder.publish(await layout(marker), version);
+  }
+
+  async function saveDraftLatest(marker: string, scheduledPublishAt: string | null = null) {
+    const { version } = await builder.getState();
+    return builder.saveDraft(await layout(marker), scheduledPublishAt, version);
+  }
+
   it("keeps every publish snapshot when the layout is reset", async () => {
-    await builder.publish(await layout("first"));
-    await builder.publish(await layout("second"));
+    await publishLatest("first");
+    await publishLatest("second");
     expect(await builder.listRevisions()).toHaveLength(2);
 
     await builder.reset();
@@ -156,7 +175,7 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
   });
 
   it("makes the reset itself undoable by capturing what was live", async () => {
-    await builder.publish(await layout("the-live-one"));
+    await publishLatest("the-live-one");
     await builder.reset();
 
     const snapshot = (await builder.listRevisions()).find(
@@ -171,10 +190,10 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
   });
 
   it("leaves a pending scheduled publish alone when a revision is restored", async () => {
-    await builder.publish(await layout("old"));
+    await publishLatest("old");
     const [revision] = await builder.listRevisions();
 
-    await builder.saveDraft(await layout("in-progress"), FUTURE);
+    await saveDraftLatest("in-progress", FUTURE);
     expect((await builder.getState()).draft.scheduledPublishAt).toBe(FUTURE);
 
     const restored = await builder.restore(revision.id);
@@ -187,7 +206,7 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
     // The client sorts what it receives. If the stored copy is not already
     // sorted, the two disagree on `order` while the builder reports a clean
     // draft — so the server sorts before storing.
-    await builder.publish(await layout("x"));
+    await publishLatest("x");
     const [revision] = await builder.listRevisions();
 
     const restored = await builder.restore(revision.id);
@@ -198,7 +217,7 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
   });
 
   it("answers null for a revision that is not there, without touching the draft", async () => {
-    await builder.saveDraft(await layout("keep-me"), null);
+    await saveDraftLatest("keep-me");
 
     expect(await builder.restore("rev-does-not-exist")).toBeNull();
     expect(titleOf((await builder.getState()).draft.sections)).toBe("keep-me");
@@ -254,11 +273,22 @@ describe.each(BUILDERS)("$what builder store", (builder) => {
       expect(titleOf((await builder.getState()).draft.sections)).toBe("two");
     });
 
+    it("reports a version the caller can write with, on a store nobody has written yet", async () => {
+      // The seed has no `version` key at all, and this read used to hand that
+      // `undefined` straight to the builder. Now that a versionless write is
+      // refused, a reader that cannot name the version locks out the very first
+      // save on a fresh shop — the builder would have nothing to send back.
+      const { version } = await builder.getState();
+
+      expect(typeof version, "the opening read did not report a version").toBe("number");
+      await expect(builder.publish(await layout("first save"), version)).resolves.toBeDefined();
+    });
+
     it("moves the counter on every write, including reset and restore", async () => {
       // A write that left the counter alone would be invisible to the next save.
       const start = (await builder.getState()).version ?? 0;
 
-      const published = await builder.publish(await layout("published"));
+      const published = await builder.publish(await layout("published"), start);
       expect(published.version).toBeGreaterThan(start);
 
       const afterReset = await builder.reset();
