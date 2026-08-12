@@ -1,4 +1,5 @@
 import { getSettings } from "@/features/settings/server/settings.service";
+import { getStorefrontCategories } from "./storefront-categories.server";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { defaultHeaderSettings, selectVisibleNavItems } from "@/features/site-layout/lib/header-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
@@ -24,6 +25,8 @@ import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
  */
 export interface StorefrontChrome {
   siteName: string;
+  /** The shop's own categories, for the header's Shop menu. */
+  categories: { id: string; name: string; slug: string }[];
   /** General settings logo URL. Empty means "render the letter mark instead". */
   logo: string;
   logoLetter: string;
@@ -63,6 +66,8 @@ export interface StorefrontChrome {
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
+    // The settings read failed; the demo taxonomy is the only list there is.
+    categories: [],
     logo: "",
     logoLetter: defaultHeaderSettings.logoLetter,
     showSearch: defaultHeaderSettings.showSearch,
@@ -149,6 +154,17 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
         href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
       },
       navItems: selectVisibleNavItems(header.nav ?? []),
+      /**
+       * The shop's own categories, for the header's Shop menu.
+       *
+       * That menu rendered `shopMegaMenu.categories` from constants — the
+       * shipped demo taxonomy — on every storefront page. A category the shop
+       * deleted still had a link (to an empty grid) and one it created never
+       * appeared, so the header and the collections page below it described two
+       * different shops. The collections pills were moved onto the real
+       * taxonomy already; this is the other half of that fix.
+       */
+      categories: await getStorefrontCategories(),
       brand: {
         name,
         tagline: general.siteTagline || brandInfo.tagline,

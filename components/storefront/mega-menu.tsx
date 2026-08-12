@@ -27,8 +27,17 @@ function useWeddingLinkFilter() {
     weddingEnabled ? items : items.filter((item) => item.href !== routes.store.weddingCakes);
 }
 
+/** One entry in the shop's own category list, as the server resolved it. */
+export interface ShopCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface MegaMenuProps {
   isActive?: boolean;
+  /** The shop's real categories. Falls back to the demo list only if absent. */
+  categories?: ShopCategory[];
   /**
    * The label from the admin's Collections nav row. It read "Shop",
    * hardcoded, while the editor offered a label field for that row and a
@@ -37,9 +46,16 @@ interface MegaMenuProps {
   label?: string;
 }
 
-export function MegaMenu({ isActive, label = "Shop" }: MegaMenuProps) {
+export function MegaMenu({ isActive, label = "Shop", categories: shopCategories }: MegaMenuProps) {
   const filterWedding = useWeddingLinkFilter();
-  const categories = filterWedding(shopMegaMenu.categories);
+  const categories = filterWedding(
+    shopCategories?.length
+      ? shopCategories.map((category) => ({
+          label: category.name,
+          href: routes.store.collection(category.slug),
+        }))
+      : shopMegaMenu.categories,
+  );
   const occasions = filterWedding(shopMegaMenu.occasions);
   return (
     <div className="group relative">
@@ -125,17 +141,27 @@ export function MobileShopLinks({
   // The mobile half of the same heading. It was hardcoded too, so the
   // Collections row's label changed the desktop menu and not this one.
   label = "Shop",
+  categories: shopCategories,
 }: {
   onNavigate?: () => void;
   label?: string;
+  categories?: ShopCategory[];
 }) {
   const filterWedding = useWeddingLinkFilter();
+  const categories = filterWedding(
+    shopCategories?.length
+      ? shopCategories.map((category) => ({
+          label: category.name,
+          href: routes.store.collection(category.slug),
+        }))
+      : shopMegaMenu.categories,
+  );
   return (
     <div className="space-y-1 border-t border-border pt-3">
       <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      {filterWedding(shopMegaMenu.categories).map((item) => (
+      {categories.map((item) => (
         <Link
           key={item.href}
           href={item.href}

@@ -79,6 +79,16 @@ export function CollectionsPage({
     return [...bySlug.values()];
   }, [categoriesFromShop]);
 
+  // Filtering stays on the client (it is interactive), but the catalogue it
+  // filters arrives from the server, so the first paint shows real cakes. The
+  // pills are passed too: a category's slug and its name are edited
+  // independently, so only this list can say which product belongs to which
+  // route — "Birthday Cakes" lives at /birthday here.
+  const inCategory = useMemo(
+    () => filterProductsByCategory(catalog, categorySlug || undefined, categoryPills),
+    [catalog, categorySlug, categoryPills],
+  );
+
   const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
   /**
    * The top of the price slider, from the shop's OWN catalogue.
@@ -98,10 +108,7 @@ export function CollectionsPage({
   const [labels, setLabels] = useState<BusinessLabels | null>(null);
   // Filtering stays on the client (it is interactive), but the catalogue it
   // filters now arrives from the server, so the first paint shows real cakes.
-  const inCategory = useMemo(
-    () => filterProductsByCategory(catalog, categorySlug || undefined),
-    [catalog, categorySlug],
-  );
+
   /**
    * A category with nothing in it shows nothing.
    *

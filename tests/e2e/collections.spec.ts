@@ -92,3 +92,55 @@ test.describe("browsing a category", () => {
     await expect(page.getByRole("button", { name: /clear filters/i })).toBeVisible();
   });
 });
+
+test.describe("a category page", () => {
+  /**
+   * A category's NAME and its SLUG are edited independently, and the product
+   * carries the name. This shop has "Birthday Cakes" at /birthday, "Eggless
+   * Cakes" at /eggless and "Custom Cakes" at /custom.
+   *
+   * The filter compared the two directly — `"birthday cakes".includes(
+   * "birthday")` — so every multi-word category rendered "No Cakes in … yet"
+   * for products the shop had itself assigned to it. Slugifying the name does
+   * not fix it either ("birthday-cakes" is still not "birthday"); only the
+   * shop's own category list knows which name goes with which route.
+   *
+   * The pills were moved onto the real taxonomy in an earlier fix, which made
+   * this MORE visible, not less: it is the untouched half of that change.
+   */
+  test("shows the cakes the shop put in it, for a multi-word category", async ({ page }) => {
+    const db = await connect();
+    const catalog = await db.collection("catalogs").findOne({});
+    const categories = ((catalog?.categories ?? []) as { name: string; slug: string }[]).filter(
+      (item) => item.slug && item.name.includes(" "),
+    );
+    expect(
+      categories.length,
+      "this shop has no multi-word category to test with",
+    ).toBeGreaterThan(0);
+
+    const products = await db
+      .collection("products")
+      .find({ status: "published" })
+      .toArray();
+
+    // A category the shop has actually assigned products to.
+    let tested = 0;
+    for (const category of categories) {
+      const id = (catalog?.categories as { name: string; slug: string; id: string }[]).find(
+        (item) => item.slug === category.slug,
+      )?.id;
+      const count = products.filter((product) => String(product.categoryId) === String(id)).length;
+      if (count === 0) continue;
+
+      await page.goto(`/store/collections/${category.slug}`);
+      await expect(
+        page.getByText(/no cakes in/i),
+        `"${category.name}" (/${category.slug}) holds ${count} cakes and rendered empty`,
+      ).toHaveCount(0);
+      tested += 1;
+    }
+
+    expect(tested, "no multi-word category had any products to check").toBeGreaterThan(0);
+  });
+});
