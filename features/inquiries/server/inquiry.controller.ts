@@ -24,9 +24,23 @@ export const createInquiryController = withErrorHandler(async (request: Request)
   // through. Without a limit one script buries the shop's real enquiries — the
   // wedding form is where its largest orders come from. Login and password reset
   // already use this helper.
-  rateLimit(`inquiry:${ctx.ip}`, { limit: 5, windowMs: 60_000 });
-
   const input = validate(createInquirySchema, await readJson(request));
+
+  /**
+   * Keyed on something the caller cannot rotate for free — the same rule the
+   * login and password-reset throttles above were rewritten to.
+   *
+   * This was `ctx.ip` alone, and `ctx.ip` is "" on every deployment that has
+   * not set TRUST_PROXY_HEADERS=true, which is the default. An empty string is
+   * a CONSTANT, so the five-per-minute budget was not per visitor at all: it
+   * was one bucket for the whole shop. Six people submitting in the same minute
+   * meant the sixth got a 429, and on a busy Saturday the wedding form — where
+   * this bakery's largest orders come from — simply stopped accepting anyone.
+   *
+   * The IP is still used when there IS one, as a second, narrower bucket.
+   */
+  rateLimit(`inquiry:from:${input.email.trim().toLowerCase()}`, { limit: 5, windowMs: 60_000 });
+  if (ctx.ip) rateLimit(`inquiry:ip:${ctx.ip}`, { limit: 20, windowMs: 60_000 });
   const inquiry = await service.createInquiry(input, ctx);
   return created(inquiry, "Inquiry submitted");
 });

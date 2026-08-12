@@ -7,6 +7,7 @@ import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils"
 import type { InvoiceSettings } from "@/types/invoice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
 
 interface InvoiceDocumentProps {
   order: PlacedOrder;
@@ -136,7 +137,17 @@ export function InvoiceDocument({
               Delivery
             </p>
             <p className="mt-1 font-medium">
-              {formatDate(order.estimatedDelivery)}
+              {/*
+                The BOOKED CALENDAR DAY, not the instant derived from it.
+                `resolveEstimatedDelivery` stores UTC midnight of the chosen
+                date for a slot-booked order, so rendering it in a shop
+                timezone west of UTC prints the day BEFORE the one the
+                customer chose — while the tracking card, the success page and
+                the stored slot all say the other day. This is the copy the
+                customer keeps. The success page was given this helper for
+                exactly that; the invoice was left behind.
+              */}
+              {formatOrderDeliveryDay(order, { day: "numeric", month: "short", year: "numeric" })}
               {order.totals.deliveryZoneName ? ` · ${order.totals.deliveryZoneName}` : ""}
             </p>
             {order.orderNotes ? (

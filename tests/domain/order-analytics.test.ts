@@ -25,6 +25,7 @@ import {
   type ReportDateRange,
 } from "@/features/orders/lib/order-analytics";
 import { isValidTimeZone } from "@/features/orders/lib/viewer-time";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 
 function order(overrides: Partial<PlacedOrder> = {}): PlacedOrder {
@@ -518,5 +519,54 @@ describe("coupon redemptions match what the coupon counter keeps", () => {
     expect(getReportsSummary(orders).couponDiscount).toBe(fromTable);
     // Money never given away is not a discount the shop granted.
     expect(getReportsSummary(orders).couponDiscount).toBe(100);
+  });
+});
+
+describe("revenue against a refund that has not settled", () => {
+  /**
+   * Only money that ACTUALLY LEFT counts against revenue.
+   *
+   * `keptRevenue` subtracted `refundRecord.amount` — the total refunded across
+   * every attempt, including gateway refunds still `pending` and cash records
+   * not yet marked completed. Every other money surface in the admin subtracts
+   * `settledRefundAmount`, so from the moment a refund was requested and until
+   * it processed, Reports, the Payments overview and the Refund Centre stated
+   * three different figures for the same order — and Reports, the one an owner
+   * checks, was the one that moved first.
+   */
+  const requested = order({
+    totals: { ...order().totals, total: 2000 },
+    refundRecord: {
+      status: "processing",
+      amount: 1500,
+      gatewayRefunds: [{ id: "rfnd_1", amount: 1500, status: "pending" }],
+    },
+  } as Partial<PlacedOrder>);
+
+  const settled = order({
+    totals: { ...order().totals, total: 2000 },
+    refundRecord: {
+      status: "processing",
+      amount: 1500,
+      gatewayRefunds: [{ id: "rfnd_1", amount: 1500, status: "processed" }],
+    },
+  } as Partial<PlacedOrder>);
+
+  it("keeps the full total while the gateway refund is still pending", () => {
+    expect(
+      getReportsSummary([requested]).revenue,
+      "revenue was reduced by money the gateway has not sent back yet",
+    ).toBe(2000);
+  });
+
+  it("subtracts it once the gateway has processed it", () => {
+    expect(getReportsSummary([settled]).revenue).toBe(500);
+  });
+
+  it("agrees with the figure every other money surface computes", () => {
+    // The point of the fix: one definition of "refunded", shared.
+    expect(getReportsSummary([requested]).revenue - getReportsSummary([settled]).revenue).toBe(
+      settledRefundAmount(settled),
+    );
   });
 });

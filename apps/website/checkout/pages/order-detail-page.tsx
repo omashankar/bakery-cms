@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -223,7 +224,14 @@ export function OrderDetailPage() {
                     <h2 className="font-heading text-lg font-semibold">Order timeline</h2>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Estimated delivery: {formatDate(order.estimatedDelivery)}
+                    {/* The booked day, like the card above it — these two
+                        disagreed for every shop west of UTC. */}
+                    Estimated delivery:{" "}
+                    {formatOrderDeliveryDay(order, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </p>
                   <div className="mt-6">
                     <OrderStatusTimeline steps={timeline} />

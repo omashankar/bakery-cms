@@ -143,12 +143,24 @@ function exportedConst(source: string, name: string): string {
 describe("the public review endpoint is rate limited", () => {
   const fn = exportedConst(read("features/reviews/server/review.controller.ts"), "submitReviewController");
 
-  it("limits by ip before doing any work", () => {
+  it("limits before it touches the database", () => {
     // Unauthenticated, and every submission lands in the moderation queue — one
     // script can bury a shop's real reviews. Login and password reset, the only
     // other public write paths, already use this helper.
-    expect(fn).toContain("rateLimit(`review:${ctx.ip}`");
     expect(fn.indexOf("rateLimit(")).toBeLessThan(fn.indexOf("service.submitReview"));
+  });
+
+  it("is not keyed on the IP alone", () => {
+    // `ctx.ip` is "" unless TRUST_PROXY_HEADERS=true, which is not the default.
+    // An empty string is a CONSTANT, so keying on it alone gave the whole shop
+    // ONE five-per-minute bucket rather than one per visitor: the sixth person
+    // to review anything in a minute got a 429. The login throttle was
+    // rewritten for exactly this and keys on the account first, adding the IP
+    // only when there is one.
+    expect(fn, "the throttle is still keyed on the IP alone").not.toContain(
+      "rateLimit(`review:${ctx.ip}`",
+    );
+    expect(fn).toContain("if (ctx.ip)");
   });
 });
 

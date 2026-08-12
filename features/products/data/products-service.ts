@@ -193,6 +193,15 @@ export async function createProduct(data: ProductFormData): Promise<Product> {
   return productRepo.insertOne({
     ...data,
     id: nextId(),
+    // Owned by the reviews aggregate, exactly as `updateProduct` below already
+    // insists. This wrote the form's values verbatim, and the new-product form
+    // defaulted to 4.5 — so every cake an admin added went on sale advertising
+    // "4.5 ★" on its card and its product page, with no reviews behind it and
+    // nothing the admin did to claim it. A shop's first honest review then
+    // DROPPED the visible rating, because the aggregate replaced the invented
+    // number with the real one.
+    rating: 0,
+    reviewCount: 0,
     createdAt: timestamp,
     updatedAt: timestamp,
   } as Product);

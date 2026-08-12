@@ -370,7 +370,8 @@ export function createEmptyProductForm(): ProductFormData {
     allergens: "",
     careInstructions: "",
     variantGroups: createDefaultVariantGroups(),
-    rating: 4.5,
+    // A cake with no reviews has no rating. This started at 4.5.
+    rating: 0,
     reviewCount: 0,
     seo: {
       metaTitle: "",

@@ -125,6 +125,12 @@ describe("the customer's first paint", () => {
           ? { primaryColor: "#123456", accentColor: "#abcdef", surfaceColor: "#fefefe", borderRadius: 16, preset: "custom" }
           : {},
     }));
+    // The chrome read also fetches the header menu's categories. Not this
+    // test's subject, but left unmocked it reaches for a real catalog document
+    // and makes a unit test depend on a database being up.
+    vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
+      getStorefrontCategories: async () => [],
+    }));
 
     const { getStorefrontChrome } = await import(
       "@/apps/website/lib/storefront-chrome.server"

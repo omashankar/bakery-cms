@@ -133,6 +133,12 @@ export function CartPage() {
             flavour: item.flavour,
             shape: item.shape,
             message: item.message,
+            // The uploaded photo, which this rebuild dropped. Undo restored the
+            // line with the cake, the size, the shape and the message, and no
+            // image — so a photo cake was placed and paid for with nothing for
+            // the baker to print. Its sibling `restoreSavedItemToCart` already
+            // carries this field.
+            photoUrl: item.photoUrl,
             deliveryDate: item.deliveryDate,
             deliveryTime: item.deliveryTime,
             variantSelections: item.variantSelections,

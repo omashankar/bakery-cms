@@ -98,11 +98,15 @@ function fallbackChrome(): StorefrontChrome {
 
 export async function getStorefrontChrome(): Promise<StorefrontChrome> {
   try {
-    const [settingsRaw, headerRaw, footerRaw, appearanceRaw] = await Promise.all([
+    // Concurrently with the rest. The categories read was added as a serial
+    // `await` further down, which put a whole extra round trip on the critical
+    // path of every storefront render for a value the others do not depend on.
+    const [settingsRaw, headerRaw, footerRaw, appearanceRaw, categories] = await Promise.all([
       getSettings(),
       getSiteLayout("header"),
       getSiteLayout("footer"),
       getSiteLayout("appearance"),
+      getStorefrontCategories(),
     ]);
 
     const settings = settingsRaw as unknown as Record<string, unknown>;
@@ -164,7 +168,7 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
        * different shops. The collections pills were moved onto the real
        * taxonomy already; this is the other half of that fix.
        */
-      categories: await getStorefrontCategories(),
+      categories,
       brand: {
         name,
         tagline: general.siteTagline || brandInfo.tagline,

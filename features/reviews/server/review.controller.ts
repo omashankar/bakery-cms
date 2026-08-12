@@ -32,9 +32,26 @@ export const submitReviewController = withErrorHandler(async (request: Request) 
   // a limit one script can bury a shop's real reviews under thousands of rows —
   // the codebase has this helper and applies it to login and password reset,
   // which are the only other public write paths.
-  rateLimit(`review:${ctx.ip}`, { limit: 5, windowMs: 60_000 });
-
   const input = validate(submitReviewSchema, await readJson(request));
+
+  /**
+   * Keyed on something the caller cannot rotate for free — the same rule the
+   * login and password-reset throttles above were rewritten to.
+   *
+   * This was `ctx.ip` alone, and `ctx.ip` is "" on every deployment that has
+   * not set TRUST_PROXY_HEADERS=true, which is the default. An empty string is
+   * a CONSTANT, so the five-per-minute budget was not per visitor at all: it
+   * was one bucket for the whole shop. Six people submitting in the same minute
+   * meant the sixth got a 429, and on a busy Saturday the wedding form — where
+   * this bakery's largest orders come from — simply stopped accepting anyone.
+   *
+   * The IP is still used when there IS one, as a second, narrower bucket.
+   */
+  rateLimit(`review:from:${input.authorEmail?.trim().toLowerCase() ?? input.productSlug}`, {
+    limit: 5,
+    windowMs: 60_000,
+  });
+  if (ctx.ip) rateLimit(`review:ip:${ctx.ip}`, { limit: 20, windowMs: 60_000 });
   const review = await service.submitReview(input, ctx);
   return created(review, "Review submitted");
 });

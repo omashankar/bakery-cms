@@ -127,11 +127,24 @@ describe("a public enquiry cannot address an existing one", () => {
     expect(fn).not.toContain("updateOne");
   });
 
-  it("is rate limited before it does any work", () => {
+  it("is rate limited before it touches the database", () => {
     const fn = exportedConst(read("features/inquiries/server/inquiry.controller.ts"), "createInquiryController");
 
-    expect(fn).toContain("rateLimit(`inquiry:${ctx.ip}`");
     expect(fn.indexOf("rateLimit(")).toBeLessThan(fn.indexOf("service.createInquiry"));
+  });
+
+  it("is not keyed on the IP alone", () => {
+    // `ctx.ip` is "" unless TRUST_PROXY_HEADERS=true, which is not the default,
+    // and an empty string is a CONSTANT — so the five-per-minute budget was one
+    // bucket for the whole shop rather than one per visitor. Six enquiries in a
+    // minute and the wedding form, where this bakery's largest orders come
+    // from, started answering 429 to everyone.
+    const fn = exportedConst(read("features/inquiries/server/inquiry.controller.ts"), "createInquiryController");
+
+    expect(fn, "the throttle is still keyed on the IP alone").not.toContain(
+      "rateLimit(`inquiry:${ctx.ip}`",
+    );
+    expect(fn).toContain("if (ctx.ip)");
   });
 
   it("the client adopts the server's id", () => {

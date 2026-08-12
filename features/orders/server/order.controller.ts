@@ -86,6 +86,40 @@ export const placeOrderController = withErrorHandler(async (request: Request) =>
  * demanded the order number AND the email on the confirmation; this endpoint
  * now demands the same. An admin may look up any order.
  */
+/**
+ * The customer's copy of their own order.
+ *
+ * This endpoint serialised the whole document to anyone who could name the
+ * order and its email — which is the customer, by design. That document
+ * carries `adminNotes`, the field the admin UI labels "Internal notes" and
+ * describes as visible only to admin staff, plus the refund record's internal
+ * `notes` and the note on every refund history entry. Staff write things there
+ * they would not say to the customer: why a complaint was refused, what a
+ * previous call was like, what the shop thinks happened.
+ *
+ * A deny-list rather than an allow-list, deliberately. The customer order page,
+ * the invoice and the tracking timeline read most of this document, and an
+ * allow-list that missed one field would blank part of a page the customer is
+ * entitled to see. Anything genuinely internal added later belongs here.
+ */
+function withoutStaffOnlyFields(order: Awaited<ReturnType<typeof service.getByNumber>>) {
+  if (!order) return order;
+  const { adminNotes: _adminNotes, refundRecord, ...rest } = order;
+
+  return {
+    ...rest,
+    ...(refundRecord
+      ? {
+          refundRecord: {
+            ...refundRecord,
+            notes: undefined,
+            history: refundRecord.history?.map((entry) => ({ ...entry, note: undefined })),
+          },
+        }
+      : {}),
+  };
+}
+
 export const getByNumberController = withErrorHandler(async (request: Request, ctx: NumberContext) => {
   const { orderNumber } = await ctx.params;
   const order = await service.getByNumber(orderNumber);
@@ -93,7 +127,7 @@ export const getByNumberController = withErrorHandler(async (request: Request, c
 
   const params = new URL(request.url).searchParams;
   const lookup = { email: params.get("email") ?? undefined, phone: params.get("phone") ?? undefined };
-  if (verifyOrderLookup(order, lookup)) return ok(order, "Order");
+  if (verifyOrderLookup(order, lookup)) return ok(withoutStaffOnlyFields(order), "Order");
 
   const session = await getSession();
   if (session && ORDER_ROLES.includes(session.role as (typeof ORDER_ROLES)[number])) {

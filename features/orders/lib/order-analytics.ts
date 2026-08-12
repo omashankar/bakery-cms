@@ -7,6 +7,7 @@
  * functions, one definition of "revenue", whoever is asking.
  */
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import {
   DEFAULT_TIME_ZONE,
   zonedDayKey,
@@ -130,12 +131,19 @@ function isCountableRevenue(order: PlacedOrder): boolean {
  * ₹2,000 across the summary, the trend, the payment mix, top products, top
  * customers and the city breakdown.
  *
- * `refundRecord.amount` is the TOTAL refunded across every attempt, which is
- * what makes this a subtraction rather than a per-attempt walk.
+ * Only money that ACTUALLY LEFT counts against revenue.
+ *
+ * This subtracted `refundRecord.amount`, the total refunded across every
+ * attempt — including gateway refunds still `pending`, and cash records not yet
+ * marked completed. Every other money surface in the admin subtracts
+ * `settledRefundAmount` instead, so Reports, the Payments overview and the
+ * Refund Centre stated three different figures for one order the moment a
+ * refund was requested and before it processed. The one that moves first is
+ * this one, which is the report an owner checks.
  */
 function keptRevenue(order: PlacedOrder): number {
   if (!isCountableRevenue(order)) return 0;
-  return Math.max(0, order.totals.total - (order.refundRecord?.amount ?? 0));
+  return Math.max(0, order.totals.total - settledRefundAmount(order));
 }
 
 /**
