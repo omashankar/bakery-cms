@@ -39,7 +39,16 @@ export const replaceCouponsController = withErrorHandler(async (request: Request
 // ---- Delivery zones ----
 
 export const getZonesController = withErrorHandler(async () => {
-  return ok(await service.getZones(), "Delivery zones");
+  // Public read — checkout has to tell a visitor whether their pincode is
+  // served. Scoped the same way the coupons read above is: a visitor sees the
+  // live zones, staff see the switched-off ones they have to manage.
+  const session = await getSession();
+  const isStaff = Boolean(session && COMMERCE_ROLES.includes(session.role as never));
+
+  return ok(
+    isStaff ? await service.getZones() : await service.getPublicZones(),
+    "Delivery zones",
+  );
 });
 
 export const replaceZonesController = withErrorHandler(async (request: Request) => {

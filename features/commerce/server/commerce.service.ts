@@ -60,6 +60,25 @@ export function getZones() {
   return repo.listZones();
 }
 
+/**
+ * The delivery zones a customer's browser may see.
+ *
+ * The read on /api/delivery-zones is public, because the storefront has to tell
+ * a visitor whether their pincode is served and what it costs. It was returning
+ * every zone — including the ones the shop has switched OFF, with the charge and
+ * the delivery window it used to quote for them. That is a public record of
+ * which neighbourhoods a bakery has stopped serving and what it charged when it
+ * did, from one `curl`, with no session.
+ *
+ * `findDeliveryZone` already filters on `isActive`, so nothing a visitor can
+ * legitimately be quoted is withheld — the inactive rows were never used, only
+ * shipped. Its two siblings on this same shape, /api/coupons and
+ * /api/content/[key], were each narrowed this way; this one was missed.
+ */
+export async function getPublicZones() {
+  return (await repo.listZones()).filter((zone) => zone.isActive);
+}
+
 export async function replaceZones(
   zones: DeliveryZone[],
   knownIds: string[] | null,
