@@ -46,8 +46,14 @@ import { openCustomerAuthModal } from "@/apps/website/account/components/custome
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
+import type { LandingProduct } from "@/constants/landing-data";
 
-export function CartPage() {
+interface CartPageProps {
+  /** The shop's published catalogue, read on the server — see `getRecentlyViewedProducts`. */
+  catalog?: LandingProduct[];
+}
+
+export function CartPage({ catalog = [] }: CartPageProps) {
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [savedItems, setSavedItems] = useState<CartLineItem[]>([]);
   const [preferences, setPreferences] = useState<CartPreferences>({
@@ -99,7 +105,10 @@ export function CartPage() {
     [items, preferences.giftWrap, commerce]
   );
 
-  const recentlyViewed = useMemo(() => getRecentlyViewedProducts(), [loaded, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const recentlyViewed = useMemo(
+    () => getRecentlyViewedProducts(catalog),
+    [catalog, loaded, items.length], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   function handleSaveForLater(item: CartLineItem) {
     if (moveCartItemToSavedForLater(item.id)) {

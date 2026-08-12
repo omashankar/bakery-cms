@@ -211,6 +211,13 @@ export function BuilderToolbar({
               size="sm"
               className="shrink-0 text-muted-foreground"
               onClick={() => onScheduleChange("")}
+              // Clearing the schedule SAVES THE DRAFT, like setting it does, so
+              // this is the same write as its neighbours and needed the same
+              // guard. It was the only control in the toolbar without one:
+              // clicking it mid-save fired a second draft write carrying the
+              // stale expectedVersion, which 409s, repaints the field with the
+              // old time, and leaves the page still scheduled to auto-publish.
+              disabled={isSaving || !hasLoaded}
             >
               Clear
             </Button>

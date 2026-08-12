@@ -91,6 +91,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCalendarDate, formatCurrency } from "@/utils/format";
+import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -884,6 +885,8 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       try {
         const result = await openRazorpayCheckout({
           draftId: quote.draftId,
+          // The sheet is headed with the shop's name, not a hardcoded one.
+          brandName: getStorefrontBrandInfo().name,
           name: address.fullName,
           email: address.email,
           phone: address.phone,

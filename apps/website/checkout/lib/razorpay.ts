@@ -143,7 +143,17 @@ export async function openRazorpayCheckout(options: OpenOptions): Promise<Razorp
       amount: orderData.amount,
       currency: orderData.currency,
       order_id: orderData.orderId,
-      name: options.brandName || "Monginis",
+      // The shop's configured site name, not a hardcoded demo brand.
+      //
+      // `brandName` was declared in these options and never supplied by the one
+      // caller, so every payment sheet was headed "Monginis" — a different
+      // company from the storefront the customer is on, the invoice they get
+      // and the confirmation they read. Nothing is misdirected (the merchant
+      // account comes from the server's `keyId` and the signature is verified
+      // there), but an unfamiliar name on a payment sheet is a reason to close
+      // it. The caller reads the configured name; this fallback stands only if
+      // it somehow arrives empty.
+      name: options.brandName?.trim() || "Checkout",
       description: "Order payment",
       prefill: {
         name: options.name,

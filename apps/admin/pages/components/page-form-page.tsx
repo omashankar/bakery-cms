@@ -39,6 +39,7 @@ import {
 } from "@/features/content/data/pages-client";
 import { getStorefrontPageUrl } from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
+import { fromScheduleInputValue, toScheduleInputValue } from "@/lib/datetime-local";
 
 interface PageFormPageProps {
   mode: "add" | "edit";
@@ -64,38 +65,60 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
+  const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
   const [isSystem, setIsSystem] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
   useEffect(() => {
+    /**
+     * A response for the page we have NAVIGATED AWAY FROM must not land.
+     *
+     * The admin's global search moves straight from one page's editor to
+     * another's, so this effect re-runs with a new `pageId` while the previous
+     * request is still open. Without the flag, a slow response for page A
+     * arrives afterwards and calls `setForm` and `setBaseline` with A's
+     * content — under B's URL, and with A's serialisation as the "unchanged"
+     * baseline. The form then looks clean, so nothing warns, and pressing
+     * Publish writes A's content over page B. `product-form-page` has this
+     * guard; this twin did not.
+     */
+    let cancelled = false;
+
     async function load() {
-    if (mode !== "edit" || !pageId) {
-      const empty = createEmptyPageForm();
-      setForm(empty);
-      setBaseline(serializeForm(empty));
+      if (mode !== "edit" || !pageId) {
+        const empty = createEmptyPageForm();
+        if (cancelled) return;
+        setForm(empty);
+        setBaseline(serializeForm(empty));
+        setIsLoading(false);
+        return;
+      }
+
+      let existing;
+      try {
+        existing = await fetchPage(pageId);
+      } catch {
+        if (cancelled) return;
+        toast.error("Page not found");
+        router.replace(routes.admin.pages.list);
+        return;
+      }
+      if (cancelled) return;
+
+      const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
+      setForm(data);
+      setBaseline(serializeForm(data));
+      setIsSystem(existing.isSystem);
       setIsLoading(false);
-      return;
-    }
-
-    let existing;
-    try {
-      existing = await fetchPage(pageId);
-    } catch {
-      toast.error("Page not found");
-      router.replace(routes.admin.pages.list);
-      return;
-    }
-
-    const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
-    setForm(data);
-    setBaseline(serializeForm(data));
-    setIsSystem(existing.isSystem);
-    setIsLoading(false);
     }
 
     void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [mode, pageId, router]);
 
   useEffect(() => {
@@ -119,7 +142,16 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
       slug: slugTouched ? prev.slug : slugify(title),
       seo: {
         ...prev.seo,
-        metaTitle: prev.seo?.metaTitle || `${title} | Monginis`,
+        // Tracks the title until the admin edits the meta title themselves.
+        //
+        // The `||` meant the FIRST keystroke made this truthy and short-
+        // circuited every one after: typing "Delivery Information" left the SEO
+        // tab, the search preview and the stored record all reading
+        // "D | Monginis" — which is the page's browser-tab and search-result
+        // title. The brand was hard-coded too, in a CMS meant to run more than
+        // one shop. `product-form-page` already holds this fix; this was the
+        // twin it was not applied to.
+        metaTitle: metaTitleTouched ? prev.seo?.metaTitle : title,
       },
     }));
   }
@@ -441,9 +473,11 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                   <Input
                     id="meta-title"
                     value={form.seo?.metaTitle ?? ""}
-                    onChange={(e) =>
-                      patch({ seo: { ...form.seo, metaTitle: e.target.value } })
-                    }
+                    onChange={(e) => {
+                      // Once they type here, the title stops driving it.
+                      setMetaTitleTouched(true);
+                      patch({ seo: { ...form.seo, metaTitle: e.target.value } });
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -534,16 +568,24 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                   id="page-schedule"
                   type="datetime-local"
                   className="min-w-0"
-                  value={
-                    form.scheduledPublishAt
-                      ? new Date(form.scheduledPublishAt).toISOString().slice(0, 16)
-                      : ""
-                  }
+                  /**
+                   * A `datetime-local` input reads and writes LOCAL wall clock;
+                   * `toISOString()` yields UTC. Rendering one through the other
+                   * shifted the displayed time by the UTC offset the moment it
+                   * was set, and again on every subsequent edit — while the
+                   * server really does auto-publish the page at the instant
+                   * stored. An admin in IST scheduling 09:00 saw 03:30 on
+                   * reopening, "corrected" it, and moved the real publish time
+                   * by another five and a half hours.
+                   *
+                   * The homepage builder uses these two helpers for the same
+                   * field; this form was doing the conversion by hand.
+                   */
+                  value={toScheduleInputValue(form.scheduledPublishAt)}
                   onChange={(event) =>
                     patch({
-                      scheduledPublishAt: event.target.value
-                        ? new Date(event.target.value).toISOString()
-                        : undefined,
+                      scheduledPublishAt:
+                        fromScheduleInputValue(event.target.value) ?? undefined,
                     })
                   }
                 />

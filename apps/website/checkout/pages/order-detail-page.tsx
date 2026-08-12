@@ -72,17 +72,30 @@ export function OrderDetailPage() {
      * and the page rendered "Order Not Found" for an order that exists and that
      * the customer had been looking at a second earlier.
      */
-    const local = getOrderByNumber(orderNumber);
-    if (local) {
-      setOrder(local);
-      return;
+    /**
+     * The local copy is a FALLBACK, not a replacement for what is on screen.
+     *
+     * This adopted it unconditionally and returned, so the error toast below
+     * was unreachable for everyone who had placed the order on this device —
+     * and the local copy is the one written at placement, which never changes
+     * again. Pressing "Refresh status" on a cancelled and refunded order, with
+     * the request dropping, silently reverted the page to "Confirmed · Total
+     * paid ₹1,200". The customer asked for the newest state and was shown an
+     * older one, with nothing to say so.
+     */
+    if (!order) {
+      const local = getOrderByNumber(orderNumber);
+      if (local) {
+        setOrder(local);
+        return;
+      }
     }
 
-    if (order) {
-      toast.error("Could not refresh this order", {
-        description: "Showing the details we already have. Please try again in a moment.",
-      });
-    }
+    toast.error("Could not refresh this order", {
+      description: order
+        ? "Showing the details we already have. Please try again in a moment."
+        : "The server did not answer. Please try again in a moment.",
+    });
   }
 
   useEffect(() => {

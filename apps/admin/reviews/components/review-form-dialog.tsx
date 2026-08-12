@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import type { ProductReview, ProductReviewFormData } from "@/types/review";
+import { PRODUCTS_UPDATED_EVENT } from "@/features/products/lib/products-repository";
+import { toast } from "sonner";
+import type { Product } from "@/types/product";
 
 interface ReviewFormDialogProps {
   open: boolean;
@@ -30,7 +33,44 @@ export function ReviewFormDialog({
   initial,
   onSubmit,
 }: ReviewFormDialogProps) {
-  const cakes = useMemo(() => loadProducts().filter((cake) => cake.status === "published"), []);
+  /**
+   * The catalogue, re-read whenever it changes and whenever the dialog opens.
+   *
+   * This was an empty-dep `useMemo`, computed on the page's first client render
+   * — before `useProductCacheSync` had fetched anything — and never recomputed.
+   * On a fresh browser that is the shipped demo catalogue, so the Product
+   * dropdown offered cakes the shop does not sell and the server refused every
+   * submission.
+   *
+   * The review being EDITED is folded in, because the list is published-only:
+   * a review of a draft, archived or since-deleted product had no matching
+   * option, and `handleSubmit` below then returned without a word.
+   */
+  const [published, setPublished] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const read = () => setPublished(loadProducts().filter((cake) => cake.status === "published"));
+    read();
+    window.addEventListener(PRODUCTS_UPDATED_EVENT, read);
+    return () => window.removeEventListener(PRODUCTS_UPDATED_EVENT, read);
+    // `open` re-reads when the dialog is reopened, in case the catalogue moved
+    // on while it was closed.
+  }, [open]);
+
+  const cakes = useMemo(() => {
+    if (!initial) return published;
+    if (published.some((cake) => cake.slug === initial.productSlug)) return published;
+    // Its own product, kept selectable so the review can still be edited.
+    return [
+      ...published,
+      {
+        id: initial.cakeId,
+        slug: initial.productSlug,
+        name: initial.cakeName,
+        status: "published",
+      } as Product,
+    ];
+  }, [initial, published]);
   const [productSlug, setCakeSlug] = useState(cakes[0]?.slug ?? "");
   const [authorName, setAuthorName] = useState("");
   const [authorEmail, setAuthorEmail] = useState("");
@@ -55,8 +95,28 @@ export function ReviewFormDialog({
   }, [open, initial, cakes]);
 
   function handleSubmit() {
+    /**
+     * Three different refusals, which were one silent `return`.
+     *
+     * Save did nothing at all — no toast, no field error, nothing — and did it
+     * every time, so the admin clicked, watched the dialog sit there, and
+     * eventually gave up. The product case was the one that could not be
+     * escaped: the list is published-only, so any review of a draft or archived
+     * cake was unfixable and unexplained.
+     */
     const cake = cakes.find((item) => item.slug === productSlug);
-    if (!cake || !authorName.trim() || !body.trim()) return;
+    if (!cake) {
+      toast.error("Choose a product for this review");
+      return;
+    }
+    if (!authorName.trim()) {
+      toast.error("The review needs a customer name");
+      return;
+    }
+    if (!body.trim()) {
+      toast.error("The review needs something to say");
+      return;
+    }
 
     onSubmit(
       {
