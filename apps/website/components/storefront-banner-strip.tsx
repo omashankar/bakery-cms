@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { getActiveHeroBanners } from "@/features/content/lib/banners-repository";
-import { contentHydration } from "@/features/content/lib/content-api";
+import { bannersLoaded } from "@/features/content/lib/content-api";
 import { routes } from "@/constants/routes";
 import type { Banner } from "@/types/media";
 
@@ -44,7 +44,7 @@ export function StorefrontBannerStrip() {
     // whole session, on every page. It never re-read, so the real banners
     // arriving milliseconds later changed nothing. An empty strip is the honest
     // state until the shop's own answer is in.
-    void contentHydration.waitForSettled().then((settled) => {
+    void bannersLoaded.waitForSettled().then((settled) => {
       if (settled && !cancelled) setBanners(getActiveHeroBanners(visibilityForPath(pathname)));
     });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { contentHydration } from "@/features/content/lib/content-api";
+import { faqsWritable } from "@/features/content/lib/content-api";
 import {
   Archive,
   FileCheck2,
@@ -134,7 +134,7 @@ export function FaqAdminPage() {
     // sent BEFORE the server copy arrives; this is the other half of it.
     refresh();
     let cancelled = false;
-    void contentHydration.waitForSettled().then((settled) => {
+    void faqsWritable.waitForSettled().then((settled) => {
       if (settled && !cancelled) refresh();
     });
     return () => {

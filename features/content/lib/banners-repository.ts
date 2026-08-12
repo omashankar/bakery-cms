@@ -2,7 +2,13 @@ import type { Banner } from "@/types/media";
 import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { defaultBanners } from "./banners-utils";
-import { replaceBannersRequest } from "./content-api";
+import {
+  bannersLoaded,
+  bannersWritable,
+  fetchBanners,
+  replaceBannersRequest,
+} from "./content-api";
+import { ensureWritable, readWritableList, saveWithRollback } from "./content-write";
 
 const STORAGE_KEY = "bakery-cms-banners";
 const STORAGE_VERSION_KEY = "bakery-cms-banners-version";
@@ -94,8 +100,36 @@ export function loadBanners(): Banner[] {
 }
 
 export async function saveBanners(banners: Banner[]): Promise<WriteResult<Banner[]>> {
-  persist(banners);
-  return { value: banners, persisted: await replaceBannersRequest(banners) };
+  return {
+    value: banners,
+    persisted: await saveWithRollback({
+      storageKey: STORAGE_KEY,
+      next: banners,
+      writeLocal: persist,
+      request: replaceBannersRequest,
+    }),
+  };
+}
+
+/** The banners a replace-all may be composed from — see `readWritableList`. */
+async function readWritableBanners(): Promise<Banner[] | null> {
+  return readWritableList({
+    writable: bannersWritable,
+    loaded: bannersLoaded,
+    fetch: fetchBanners,
+    persistServer: persistServerBanners,
+    loadLocal: loadBanners,
+  });
+}
+
+/** Whether this browser may compose a replace-all yet. Exposed for the admin page. */
+export function ensureBannersWritable(): Promise<boolean> {
+  return ensureWritable({
+    writable: bannersWritable,
+    loaded: bannersLoaded,
+    fetch: fetchBanners,
+    persistServer: persistServerBanners,
+  });
 }
 
 /** Hydration: write the server's banners into the local cache (no re-push). */
@@ -137,8 +171,9 @@ export function getActivePromoBanners(limit = 3, visibility: Banner["visibility"
 
 export async function createBanner(
   data: Omit<Banner, "id" | "createdAt" | "updatedAt">
-): Promise<WriteResult<Banner>> {
-  const banners = loadBanners();
+): Promise<WriteResult<Banner | null>> {
+  const banners = await readWritableBanners();
+  if (!banners) return { value: null, persisted: false };
   const banner: Banner = {
     ...data,
     id: `banner-${Date.now()}`,
@@ -153,7 +188,8 @@ export async function updateBanner(
   id: string,
   patch: Partial<Banner>
 ): Promise<WriteResult<Banner | null>> {
-  const banners = loadBanners();
+  const banners = await readWritableBanners();
+  if (!banners) return { value: null, persisted: false };
   const index = banners.findIndex((item) => item.id === id);
   if (index < 0) return { value: null, persisted: false };
   const next = [...banners];
@@ -163,15 +199,20 @@ export async function updateBanner(
 }
 
 export async function deleteBanners(ids: string[]): Promise<WriteResult<number>> {
-  const banners = loadBanners();
+  const banners = await readWritableBanners();
+  if (!banners) return { value: 0, persisted: false };
   const next = banners.filter((item) => !ids.includes(item.id));
   const { persisted } = await saveBanners(next);
   return { value: banners.length - next.length, persisted };
 }
 
-export function toggleBannerActive(id: string): Promise<WriteResult<Banner | null>> {
-  const banner = loadBanners().find((item) => item.id === id);
-  if (!banner) return Promise.resolve({ value: null, persisted: false });
+export async function toggleBannerActive(id: string): Promise<WriteResult<Banner | null>> {
+  // The CURRENT value has to come from the writable list too — flipping a value
+  // read out of a visitor's subset would send back the opposite of what the
+  // shop actually has stored.
+  const banners = await readWritableBanners();
+  const banner = banners?.find((item) => item.id === id);
+  if (!banner) return { value: null, persisted: false };
   return updateBanner(id, { isActive: !banner.isActive });
 }
 
@@ -181,7 +222,8 @@ export async function bulkSetBannerActive(
 ): Promise<WriteResult<number>> {
   if (ids.length === 0) return { value: 0, persisted: true };
   const idSet = new Set(ids);
-  const banners = loadBanners();
+  const banners = await readWritableBanners();
+  if (!banners) return { value: 0, persisted: false };
   let changed = 0;
   const next = banners.map((banner) => {
     if (!idSet.has(banner.id) || banner.isActive === isActive) return banner;

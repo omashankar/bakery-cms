@@ -3,7 +3,13 @@ import type { WriteResult } from "@/lib/write-result";
 import type { LandingTestimonial } from "@/constants/landing-data";
 import { testimonials as seedTestimonials } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
-import { replaceTestimonialsRequest } from "./content-api";
+import {
+  testimonialsLoaded,
+  testimonialsWritable,
+  fetchTestimonials,
+  replaceTestimonialsRequest,
+} from "./content-api";
+import { ensureWritable, readWritableList, saveWithRollback } from "./content-write";
 
 const STORAGE_KEY = "bakery-cms-testimonials";
 const STORAGE_VERSION_KEY = "bakery-cms-testimonials-version";
@@ -37,8 +43,33 @@ function lowPersist(items: Testimonial[]): void {
 
 /** Mutation write: local first, then the server, reporting what the server did. */
 async function persist(items: Testimonial[]): Promise<boolean> {
-  lowPersist(items);
-  return replaceTestimonialsRequest(items);
+  return saveWithRollback({
+    storageKey: STORAGE_KEY,
+    next: items,
+    writeLocal: lowPersist,
+    request: replaceTestimonialsRequest,
+  });
+}
+
+/** The list a replace-all may be composed from — see `readWritableList`. */
+async function readWritableTestimonials(): Promise<Testimonial[] | null> {
+  return readWritableList({
+    writable: testimonialsWritable,
+    loaded: testimonialsLoaded,
+    fetch: fetchTestimonials,
+    persistServer: persistServerTestimonials,
+    loadLocal: loadTestimonials,
+  });
+}
+
+/** Whether this browser may compose a replace-all yet. */
+export function ensureTestimonialsWritable(): Promise<boolean> {
+  return ensureWritable({
+    writable: testimonialsWritable,
+    loaded: testimonialsLoaded,
+    fetch: fetchTestimonials,
+    persistServer: persistServerTestimonials,
+  });
 }
 
 /** Hydration: write the server's testimonials into the local cache (no re-push). */
@@ -145,8 +176,9 @@ export function createEmptyTestimonialForm(): TestimonialFormData {
 
 export async function createTestimonial(
   data: TestimonialFormData
-): Promise<WriteResult<Testimonial>> {
-  const items = loadTestimonials();
+): Promise<WriteResult<Testimonial | null>> {
+  const items = await readWritableTestimonials();
+  if (!items) return { value: null, persisted: false };
   const timestamp = nowIso();
   const created: Testimonial = {
     ...data,
@@ -161,7 +193,8 @@ export async function updateTestimonial(
   id: string,
   patch: Partial<TestimonialFormData>
 ): Promise<WriteResult<Testimonial | null>> {
-  const items = loadTestimonials();
+  const items = await readWritableTestimonials();
+  if (!items) return { value: null, persisted: false };
   const index = items.findIndex((item) => item.id === id);
   if (index === -1) return { value: null, persisted: false };
 
@@ -176,7 +209,8 @@ export async function updateTestimonial(
 }
 
 export async function deleteTestimonials(ids: string[]): Promise<WriteResult<number>> {
-  const items = loadTestimonials();
+  const items = await readWritableTestimonials();
+  if (!items) return { value: 0, persisted: false };
   const next = items.filter((item) => !ids.includes(item.id));
   const count = items.length - next.length;
   return { value: count, persisted: await persist(next) };
@@ -186,7 +220,8 @@ export async function bulkUpdateTestimonialStatus(
   ids: string[],
   status: Testimonial["status"]
 ): Promise<WriteResult<number>> {
-  const items = loadTestimonials();
+  const items = await readWritableTestimonials();
+  if (!items) return { value: 0, persisted: false };
   let count = 0;
   const next = items.map((item) => {
     if (!ids.includes(item.id)) return item;

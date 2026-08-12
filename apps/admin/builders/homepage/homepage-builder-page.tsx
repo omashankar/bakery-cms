@@ -216,9 +216,9 @@ export function HomepageBuilderPage() {
     void Promise.all([fetchTestimonials(), fetchFaqs(), fetchBanners()]).then(
       ([testimonials, faqs, banners]) => {
         if (cancelled) return;
-        if (testimonials) setPreviewTestimonials(testimonials);
-        if (faqs) setPreviewFaqs(faqs);
-        if (banners) setPreviewBanners(banners);
+        if (testimonials) setPreviewTestimonials(testimonials.items);
+        if (faqs) setPreviewFaqs(faqs.items);
+        if (banners) setPreviewBanners(banners.items);
       },
     );
     return () => {

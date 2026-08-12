@@ -27,7 +27,29 @@ export const getContentController = withErrorHandler(async (_req: Request, ctx: 
   const { version } = await service.getContentVersioned(key);
   const data = isStaff ? await service.getContent(key) : await service.getPublicContent(key);
 
-  return ok(data, key, { headers: { "X-Content-Version": String(version) } });
+  /**
+   * Which of the two answers this is.
+   *
+   * The body alone cannot say. A visitor's list and a staff list have the same
+   * shape, so the browser could not tell a complete collection from a filtered
+   * one — and it cached both the same way, then composed a REPLACE-ALL write
+   * from whatever it held. `ContentServerSync` runs from `app-providers`, which
+   * wraps /login too, so an admin who signed in through the form hydrated while
+   * anonymous, got the public subset, and marked the cache trustworthy. Signing
+   * in is a soft navigation, so that `[]`-dep effect never ran again. Editing
+   * one banner then PUT a list with every switched-off, scheduled and expired
+   * banner missing, and the server deleted them — the same for unpublished FAQs
+   * and unapproved testimonials. Green toast, no warning.
+   *
+   * A header rather than a body field, matching `X-Content-Version` beside it,
+   * so every existing reader keeps working unchanged.
+   */
+  return ok(data, key, {
+    headers: {
+      "X-Content-Version": String(version),
+      "X-Content-Scope": isStaff ? "full" : "public",
+    },
+  });
 });
 
 export const replaceContentController = withErrorHandler(async (request: Request, ctx: KeyContext) => {

@@ -203,8 +203,8 @@ export function WeddingBuilderPage() {
     void Promise.all([fetchTestimonials(), fetchFaqs()]).then(
       ([testimonials, faqs]) => {
         if (cancelled) return;
-        if (testimonials) setPreviewTestimonials(testimonials);
-        if (faqs) setPreviewFaqs(faqs);
+        if (testimonials) setPreviewTestimonials(testimonials.items);
+        if (faqs) setPreviewFaqs(faqs.items);
       },
     );
     return () => {
