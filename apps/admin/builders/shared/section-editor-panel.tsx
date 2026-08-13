@@ -143,7 +143,15 @@ function ListField({
               </div>
             </div>
             {columns.map((column) =>
-              column.type === "select" ? (
+              column.isImage ? (
+                <BuilderMediaField
+                  key={column.key}
+                  id={`${field.key}-${id}-${column.key}`}
+                  label={column.label}
+                  value={row[column.key] ?? ""}
+                  onChange={(next) => updateRow(index, column.key, next)}
+                />
+              ) : column.type === "select" ? (
                 <select
                   key={column.key}
                   aria-label={column.label}

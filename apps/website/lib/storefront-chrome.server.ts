@@ -26,7 +26,7 @@ import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
 export interface StorefrontChrome {
   siteName: string;
   /** The shop's own categories, for the header's Shop menu. */
-  categories: { id: string; name: string; slug: string }[];
+  categories: { id: string; name: string; slug: string; image?: string }[];
   /** General settings logo URL. Empty means "render the letter mark instead". */
   logo: string;
   logoLetter: string;

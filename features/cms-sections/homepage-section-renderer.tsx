@@ -34,9 +34,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  galleryCaptions,
-  galleryImages,
-  instagramPosts,
   weddingCakes,
   type LandingCategory,
   type LandingOffer,
@@ -722,6 +719,16 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
 
 function GallerySection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The shop's own photographs, or no grid.
+   *
+   * This rendered `galleryImages` — twelve stock Unsplash photos of somebody
+   * else's cakes — as this shop's work, on every install, with no field to
+   * change them. A customer choosing a bakery by its photographs was choosing
+   * on someone else's.
+   */
+  const photos = renderableRows(parseListField(c, "images"));
+  if (photos.length === 0) return null;
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -732,11 +739,12 @@ function GallerySection(props: HomepageSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-        {galleryImages.slice(0, 8).map((src, index) => {
-          const caption = galleryCaptions[index];
+        {photos.map((photo, index) => {
+          const src = photo.image;
+          const caption = { title: photo.title, tag: photo.tag };
           return (
             <figure
-              key={src}
+              key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
               <Image
@@ -965,6 +973,17 @@ function OffersSection(props: HomepageSectionRendererProps) {
 function InstagramSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
+  /**
+   * The shop's own posts, or no strip.
+   *
+   * This rendered six stock photos as though they were the shop's feed — under
+   * a heading naming the shop's REAL handle, with every tile linking to that
+   * profile. So it invited a customer to a feed that looked nothing like the
+   * pictures above it. There is no Instagram API here; these are photos the
+   * shop uploads, and without them the section does not appear.
+   */
+  const posts = renderableRows(parseListField(c, "posts"));
+  if (posts.length === 0) return null;
   // The section's own content wins when the admin has set it in the builder;
   // otherwise the shop's real Instagram from Settings → Social. The shipped
   // placeholders count as "not set" — they were seeded, not chosen, and a shop
@@ -1008,9 +1027,9 @@ function InstagramSection(props: HomepageSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {instagramPosts.slice(0, maxCount).map((post) => (
+        {posts.slice(0, maxCount).map((post, index) => (
           <a
-            key={post.id}
+            key={`${post.image}-${index}`}
             href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"

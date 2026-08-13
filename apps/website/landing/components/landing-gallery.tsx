@@ -6,7 +6,6 @@ import { ArrowRight } from "lucide-react";
 import { AnimateOnScroll } from "@/components/shared/animate-on-scroll";
 import { SectionHeader } from "@/components/shared/section-header";
 import { Button } from "@/components/ui/button";
-import { galleryCaptions, galleryImages } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -14,7 +13,28 @@ import { cn } from "@/lib/utils";
 // Varied aspect ratios drive the masonry rhythm inside the balanced CSS columns.
 const aspects = ["aspect-[3/4]", "aspect-square", "aspect-[4/5]", "aspect-square"] as const;
 
-export function LandingGallery({ showHeader = true }: { showHeader?: boolean }) {
+/** One photograph the shop has uploaded. */
+export interface GalleryPhoto {
+  image: string;
+  title?: string;
+  tag?: string;
+}
+
+export function LandingGallery({
+  showHeader = true,
+  photos = [],
+}: {
+  showHeader?: boolean;
+  /**
+   * The shop's own photographs.
+   *
+   * This rendered `galleryImages` from landing-data — twelve stock Unsplash
+   * photos of somebody else's cakes — as this shop's work, on the page whose
+   * entire job is to show what it bakes. Empty renders an honest empty state
+   * rather than another bakery's portfolio.
+   */
+  photos?: GalleryPhoto[];
+}) {
   return (
     <section id="gallery" className={cn("scroll-mt-16 bg-white", layoutSpacing.sectionY)}>
       <div className={layoutSpacing.container}>
@@ -28,10 +48,16 @@ export function LandingGallery({ showHeader = true }: { showHeader?: boolean }) 
           </AnimateOnScroll>
         ) : null}
 
+        {photos.length === 0 ? (
+          <p className="mt-8 rounded-2xl border border-dashed border-border px-6 py-16 text-center text-sm text-muted-foreground">
+            Photographs of our work are on their way.
+          </p>
+        ) : (
         <AnimateOnScroll delay={showHeader ? 0.1 : 0}>
           <div className={cn("columns-2 gap-4 sm:columns-3 lg:columns-4", showHeader ? "mt-8" : "")}>
-            {galleryImages.map((src, index) => {
-              const caption = galleryCaptions[index];
+            {photos.map((photo, index) => {
+              const src = photo.image;
+              const caption = { title: photo.title, tag: photo.tag };
               return (
                 <figure
                   key={`${src}-${index}`}
@@ -62,6 +88,7 @@ export function LandingGallery({ showHeader = true }: { showHeader?: boolean }) 
             })}
           </div>
         </AnimateOnScroll>
+        )}
 
         {showHeader ? (
           <AnimateOnScroll className="mt-10 text-center" delay={0.2}>

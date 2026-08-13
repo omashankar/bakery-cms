@@ -481,6 +481,28 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       ctaHref: routes.store.gallery,
     },
     fields: [
+      {
+        /**
+         * The shop's OWN photographs.
+         *
+         * This grid rendered `galleryImages` from landing-data — twelve stock
+         * Unsplash photos of somebody else's cakes, shown as this shop's work on
+         * every install, with no field anywhere to change them. A customer
+         * choosing a bakery by its photographs was choosing on someone else's.
+         *
+         * Empty renders no grid: a section that admits it has no photos yet is
+         * better than one showing another bakery's.
+         */
+        key: "images",
+        label: "Photos",
+        type: "list",
+        emptyHint: "No photos — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Photo", type: "url", isImage: true },
+          { key: "title", label: "Caption", type: "text" },
+          { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
@@ -504,6 +526,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 6,
     },
     fields: [
+      {
+        /**
+         * The shop's own posts, if it wants to show any.
+         *
+         * This rendered six stock photos from `instagramPosts` as though they
+         * were the shop's feed — under a heading naming the shop's real handle,
+         * and each one linking to that profile. So the strip invited a customer
+         * to a feed that looked nothing like the tiles above it.
+         *
+         * There is no Instagram API here and none is being added: these are
+         * pictures the shop uploads, and the section disappears without them.
+         */
+        key: "posts",
+        label: "Posts",
+        type: "list",
+        emptyHint: "No posts — this section will not appear on the page.",
+        itemFields: [{ key: "image", label: "Photo", type: "url", isImage: true }],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },

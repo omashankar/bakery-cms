@@ -26,7 +26,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
-import { galleryCaptions } from "@/constants/landing-data";
 import {
   getStorefrontFaqs,
   getStorefrontTestimonials,
@@ -35,7 +34,6 @@ import {
 } from "@/features/content/lib/storefront-content";
 import {
   getWeddingCollectionProducts,
-  getWeddingGalleryImages,
   getWeddingOffers,
 } from "@/features/products/lib/wedding-catalog";
 import { layoutSpacing } from "@/constants/spacing";
@@ -461,7 +459,16 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
 function WeddingGallerySection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 8);
-  const images = getWeddingGalleryImages(maxCount);
+  /**
+   * The shop's own photographs, or no grid.
+   *
+   * `getWeddingGalleryImages` returned a slice of `galleryImages` — the same
+   * twelve stock Unsplash photos the homepage showed — presented as this shop's
+   * wedding work. A couple choosing a bakery by its cakes was choosing on
+   * somebody else's.
+   */
+  const photos = renderableRows(parseListField(c, "images")).slice(0, maxCount);
+  if (photos.length === 0) return null;
 
   return (
     <SectionShell {...props} noReveal>
@@ -473,11 +480,12 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-        {images.map((src, index) => {
-          const caption = galleryCaptions[index];
+        {photos.map((photo, index) => {
+          const src = photo.image;
+          const caption = { title: photo.title, tag: photo.tag };
           return (
             <figure
-              key={src}
+              key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
               <Image

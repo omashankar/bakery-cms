@@ -24,11 +24,11 @@ import { categories as demoCategories } from "@/constants/landing-data";
  * consumer should not have to find out too.
  */
 export async function getStorefrontCategories(): Promise<
-  { id: string; name: string; slug: string }[]
+  { id: string; name: string; slug: string; image?: string }[]
 > {
   try {
     const catalog = await getCatalog();
-    const rows = (catalog.categories ?? []) as { id: string; name: string; slug: string }[];
+    const rows = (catalog.categories ?? []) as { id: string; name: string; slug: string; image?: string }[];
     return rows.length > 0 ? dedupeBySlug(rows) : demoCategories;
   } catch {
     return demoCategories;
@@ -37,11 +37,11 @@ export async function getStorefrontCategories(): Promise<
 
 /** First row wins, and a row with no slug is not a category anyone can reach. */
 function dedupeBySlug(
-  rows: { id: string; name: string; slug: string }[],
-): { id: string; name: string; slug: string }[] {
-  const bySlug = new Map<string, { id: string; name: string; slug: string }>();
-  for (const { id, name, slug } of rows) {
-    if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug });
+  rows: { id: string; name: string; slug: string; image?: string }[],
+): { id: string; name: string; slug: string; image?: string }[] {
+  const bySlug = new Map<string, { id: string; name: string; slug: string; image?: string }>();
+  for (const { id, name, slug, image } of rows) {
+    if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug, image });
   }
   return [...bySlug.values()];
 }

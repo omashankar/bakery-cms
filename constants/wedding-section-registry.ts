@@ -147,6 +147,28 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       ctaHref: routes.store.gallery,
     },
     fields: [
+      {
+        /**
+         * The shop's OWN photographs.
+         *
+         * This grid rendered `galleryImages` from landing-data — twelve stock
+         * Unsplash photos of somebody else's cakes, shown as this shop's work on
+         * every install, with no field anywhere to change them. A customer
+         * choosing a bakery by its photographs was choosing on someone else's.
+         *
+         * Empty renders no grid: a section that admits it has no photos yet is
+         * better than one showing another bakery's.
+         */
+        key: "images",
+        label: "Photos",
+        type: "list",
+        emptyHint: "No photos — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Photo", type: "url", isImage: true },
+          { key: "title", label: "Caption", type: "text" },
+          { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },

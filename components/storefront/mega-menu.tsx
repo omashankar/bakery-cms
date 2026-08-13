@@ -32,6 +32,8 @@ export interface ShopCategory {
   id: string;
   name: string;
   slug: string;
+  /** The picture the shop uploaded for it, if any. */
+  image?: string;
 }
 
 interface MegaMenuProps {
@@ -57,6 +59,10 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
       : shopMegaMenu.categories,
   );
   const occasions = filterWedding(shopMegaMenu.occasions);
+  // The first of the shop's own categories that has a picture. Nothing to show
+  // is a real answer — the menu is complete without this card.
+  const withPicture = (shopCategories ?? []).find((category) => category.image?.trim());
+  const featured = withPicture?.image ? { ...withPicture, image: withPicture.image } : null;
   return (
     <div className="group relative">
       <Link
@@ -109,26 +115,38 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
                 ))}
               </ul>
             </div>
-            <Link
-              href={shopMegaMenu.featured.href}
-              className="group/card overflow-hidden rounded-xl border border-border bg-cream-50"
-            >
-              <div className="relative aspect-[4/5] bg-muted">
-                <Image
-                  src={shopMegaMenu.featured.image}
-                  alt={shopMegaMenu.featured.title}
-                  fill
-                  className="object-cover transition-transform group-hover/card:scale-[1.02]"
-                  sizes="200px"
-                />
-              </div>
-              <div className="p-3">
-                <p className="text-sm font-semibold">{shopMegaMenu.featured.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {shopMegaMenu.featured.description}
-                </p>
-              </div>
-            </Link>
+            {/*
+              A category the shop actually has, with a picture it actually
+              uploaded — or no card.
+
+              This was a fixed promo: "Seasonal Collection · Limited-edition
+              flavours for this season", a stock photo of somebody else's cake,
+              and a link to /store/collections/seasonal whether or not that
+              category existed. It is the only part of this menu that was still
+              inventing something after the category links were fixed.
+            */}
+            {featured ? (
+              <Link
+                href={routes.store.collection(featured.slug)}
+                className="group/card overflow-hidden rounded-xl border border-border bg-cream-50"
+              >
+                <div className="relative aspect-[4/5] bg-muted">
+                  <Image
+                    src={featured.image}
+                    alt={featured.name}
+                    fill
+                    className="object-cover transition-transform group-hover/card:scale-[1.02]"
+                    sizes="200px"
+                  />
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-semibold">{featured.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Browse our {featured.name.toLowerCase()}.
+                  </p>
+                </div>
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>

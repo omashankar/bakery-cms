@@ -1,4 +1,3 @@
-import { galleryImages } from "@/constants/landing-data";
 import { loadBanners } from "@/features/content/lib/banners-repository";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { getAllProducts } from "@/features/products/lib/product-catalog";
@@ -95,9 +94,19 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
     }
   });
 
-  if (galleryImages.includes(normalized)) {
-    refs.push({ label: "Gallery image", context: "Gallery" });
-  }
+  /*
+   * The gallery no longer renders `galleryImages`.
+   *
+   * Being in that constant used to mean "the storefront gallery shows this",
+   * so the usage index reported every shipped demo photo as in use. The
+   * galleries read the shop's own `images` list now, which arrives through the
+   * homepage- and wedding-section documents in `remoteSources` below — so a
+   * demo photo the shop never used correctly reads as unused, and one it DID
+   * pick is found by the same search that finds every other reference.
+   *
+   * Left in the media library itself: those are sample assets an admin can pick
+   * from or delete, which is not the same as publishing them as the shop's work.
+   */
 
   for (const source of remoteSources) {
     if (source.haystack.includes(normalized)) {
