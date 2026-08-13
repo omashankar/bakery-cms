@@ -53,6 +53,7 @@ import {
 import { ReviewFormDialog } from "../components/review-form-dialog";
 import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
+import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
 
 const PAGE_SIZE = 10;
 
@@ -96,11 +97,20 @@ export function ReviewsAdminPage() {
 
   function refresh() {
     setReviews(loadReviews());
-    setMounted(true);
   }
 
   useEffect(() => {
     refresh();
+    /**
+     * `mounted` waits for the SERVER, not for the local read.
+     *
+     * It used to be set inside `refresh()`, which runs straight after a
+     * synchronous localStorage read — so on a fresh browser the cards painted
+     * "0 pending · All clear" and the list said "No reviews found" before the
+     * server had been asked. `useReviewsServerSync` in the admin layout is what
+     * actually fetches them, and it settles this gate when it lands.
+     */
+    void reviewsHydration.waitForSettled().then(() => setMounted(true));
     window.addEventListener(REVIEWS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, refresh);
   }, []);

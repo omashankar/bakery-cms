@@ -4,6 +4,7 @@
  * deletions and hydrates the full list. Best-effort — never throws.
  */
 import type { ProductReview, ProductReviewFormData } from "@/types/review";
+import { createHydrationGate } from "@/lib/hydration-gate";
 
 interface Envelope<T> {
   success: boolean;
@@ -108,3 +109,14 @@ export async function fetchReviews(): Promise<ProductReview[] | null> {
     return null;
   }
 }
+
+/**
+ * Settled by `useReviewsServerSync` once the server's reviews are in the cache.
+ *
+ * The admin page's figures used to open on `mounted`, which its own effect sets
+ * straight after a SYNCHRONOUS localStorage read — so on a fresh browser the
+ * cards painted "0 pending · All clear" and the list said "No reviews found"
+ * from an empty cache, before the server had been asked at all. That is the
+ * defect the gate was added to prevent, opened by the wrong signal.
+ */
+export const reviewsHydration = createHydrationGate();

@@ -62,6 +62,7 @@ import {
 import { SettingsSectionShell } from "./settings-section-shell";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import { securityCenterHydration } from "@/features/settings/lib/security-center-api";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
@@ -98,7 +99,7 @@ export function SecuritySettingsPage() {
   const [tab, setTab] = useState<SecurityTab>("policies");
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [sessions, setSessions] = useState<ActiveSession[]>([]);
   /** Whether /api/security-center has answered — see the header above. */
   const [centerLoaded, setCenterLoaded] = useState(false);
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
@@ -110,13 +111,15 @@ export function SecuritySettingsPage() {
     setFailedAttempts(getFailedLoginAttempts());
     setSessions(getActiveSessions());
     setDevices(getRegisteredDevices());
-    setCenterLoaded(true);
   }
 
   useEffect(() => {
     // The security CENTRE — login history, sessions, devices — has its own
     // store and its own event. The settings form above is the hook's business.
     refreshCenter();
+    // The COUNT comes from /api/security-center, so the header waits for that
+    // request rather than for the synchronous cache read above it.
+    void securityCenterHydration.waitForSettled().then(() => setCenterLoaded(true));
 
     function handleUpdate() {
       refreshCenter();

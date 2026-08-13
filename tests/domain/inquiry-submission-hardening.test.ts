@@ -104,7 +104,7 @@ describe("a public enquiry cannot address an existing one", () => {
   it("mints the id and forces the status server-side", () => {
     const fn = bodyOf(read("features/inquiries/server/inquiry.service.ts"), "export async function createInquiry(");
 
-    // Asserted POSITIVELY on the exact assignment. A `not.toMatch(/input\.x/)`
+    // Asserted POSITIVELY on the exact assignment. A `not.toContain(/input\.x/)`
     // is satisfied by `(input as { x?: string }).x` — the property access moves
     // one character and the guard stops seeing it.
     expect(fn).toMatch(/id: `inq-\$\{randomUUID\(\)\}`,/);
@@ -130,7 +130,24 @@ describe("a public enquiry cannot address an existing one", () => {
   it("is rate limited before it touches the database", () => {
     const fn = exportedConst(read("features/inquiries/server/inquiry.controller.ts"), "createInquiryController");
 
+    /**
+     * Both halves, because the ordering check ALONE cannot fail.
+     *
+     * `indexOf` returns -1 when the needle is absent, and -1 is less than any
+     * real index — so deleting the throttle entirely satisfied this assertion.
+     * The existence check that used to sit beside it was removed when the key
+     * changed, leaving the rate limit provable only by a test that passes
+     * without it.
+     */
+    expect(fn, "the throttle is gone").toContain("rateLimit(");
+    expect(fn).toContain("service.createInquiry");
     expect(fn.indexOf("rateLimit(")).toBeLessThan(fn.indexOf("service.createInquiry"));
+
+    // And on something the caller cannot rotate for free: `ctx.ip` is "" without
+    // TRUST_PROXY_HEADERS, so an ip-only key is one shop-wide bucket.
+    expect(fn, "the throttle is keyed only on an IP that is usually empty").toMatch(
+      "rateLimit(`inquiry:from:",
+    );
   });
 
   it("is not keyed on the IP alone", () => {

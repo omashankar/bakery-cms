@@ -23,7 +23,8 @@ import {
   defaultCustomerFilters,
   exportCustomersToCsv,
   filterCustomerProfiles,
-  formatCustomerSegmentLabel,  getCustomerSegmentStats,
+  formatCustomerSegmentLabel,
+  getCustomerSegmentStats,
   type CustomerListFilters,
   type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";

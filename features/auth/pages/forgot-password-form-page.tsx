@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";
-import { forgotPasswordRequest, isDeliveryFailure } from "@/features/auth/lib/auth-api";
+import { AuthRequestError, forgotPasswordRequest, isDeliveryFailure } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,8 +50,19 @@ export function ForgotPasswordFormPage() {
        * codes from an email that was never sent.
        */
       if (isDeliveryFailure(error)) {
-        toast.error("Could not send the reset code", {
-          description: "The server did not answer. Check your connection and try again.",
+        /**
+         * A throttle is not a connection problem.
+         *
+         * `isDeliveryFailure` counts a 429 as "not sent", which is right — but
+         * the message told the customer to check their connection, a remedy
+         * that cannot work, and threw away the server's own sentence, which is
+         * the one that says how long to wait.
+         */
+        const throttled = error instanceof AuthRequestError && error.status === 429;
+        toast.error(throttled ? "Too many attempts" : "Could not send the reset code", {
+          description: throttled
+            ? error.message
+            : "The server did not answer. Check your connection and try again.",
         });
         return;
       }

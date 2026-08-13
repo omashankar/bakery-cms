@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchReviews } from "./reviews-api";
+import { fetchReviews, reviewsHydration } from "./reviews-api";
 import { persistServerReviews } from "./reviews-repository";
 
 /**
@@ -17,7 +17,11 @@ export function useReviewsServerSync(): void {
 
     (async () => {
       const reviews = await fetchReviews();
-      if (!cancelled && reviews) persistServerReviews(reviews);
+      if (cancelled) return;
+      if (reviews) persistServerReviews(reviews);
+      // Settled either way: a failed read is still an answer, and leaving the
+      // page on a skeleton forever is worse than showing what it has.
+      reviewsHydration.markSettled();
     })();
 
     return () => {

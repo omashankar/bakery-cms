@@ -162,12 +162,31 @@ test("reviews does not offer to add the first review before it has looked", asyn
  */
 
 test("inquiries does not say all clear before it has counted", async ({ page }) => {
+  /**
+   * Only meaningful on a shop that HAS new inquiries.
+   *
+   * The recorder is cumulative, and once the counts land "All clear" is the
+   * correct caption for a shop with none — so without this precondition the
+   * test forbade a sentence the page is entitled to paint, and would have
+   * failed for the gate behaving correctly. With unread inquiries present,
+   * "All clear" is wrong at every moment, which is the claim under test.
+   *
+   * Unlike the cases above there is nothing to stall here: this page reads its
+   * counts from localStorage synchronously, so the window is the single frame
+   * before its first effect runs — which is exactly what the recorder catches.
+   */
+  const db = await connect();
+  const unread = await db
+    .collection("inquiries")
+    .countDocuments({ status: { $in: ["new", "New"] } });
+  test.skip(unread === 0, "no new inquiries in this shop, so 'All clear' would be the truth");
+
   await adminSession(page);
   await recordText(page);
 
   await page.goto("/admin/inquiries");
   await expect(page.getByRole("heading", { name: /inquiries/i }).first()).toBeVisible();
 
-  const midFlight = await said(page);
-  expect(midFlight, "said all clear before counting the inquiries").not.toMatch(/All clear/i);
+  const said_ = await said(page);
+  expect(said_, "said all clear while unread inquiries were waiting").not.toMatch(/All clear/i);
 });

@@ -147,7 +147,19 @@ describe("the public review endpoint is rate limited", () => {
     // Unauthenticated, and every submission lands in the moderation queue — one
     // script can bury a shop's real reviews. Login and password reset, the only
     // other public write paths, already use this helper.
+    /**
+     * Both halves. `indexOf` returns -1 for an absent needle and -1 is less
+     * than any real index, so this ordering check passed with the throttle
+     * deleted — and the existence check that used to prove it was there went
+     * when the key changed.
+     */
+    expect(fn, "the throttle is gone").toContain("rateLimit(");
+    expect(fn).toContain("service.submitReview");
     expect(fn.indexOf("rateLimit(")).toBeLessThan(fn.indexOf("service.submitReview"));
+
+    expect(fn, "the throttle is keyed only on an IP that is usually empty").toContain(
+      "rateLimit(`review:from:",
+    );
   });
 
   it("is not keyed on the IP alone", () => {

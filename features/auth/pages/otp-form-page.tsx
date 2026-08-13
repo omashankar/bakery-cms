@@ -9,7 +9,12 @@ import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { OtpInput } from "@/features/auth/components/otp-input";
 import { getResetFlow, markResetVerified } from "@/features/auth/lib/reset-flow";
-import { forgotPasswordRequest, isDeliveryFailure, verifyOtpRequest } from "@/features/auth/lib/auth-api";
+import {
+  AuthRequestError,
+  forgotPasswordRequest,
+  isDeliveryFailure,
+  verifyOtpRequest,
+} from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 
@@ -92,8 +97,13 @@ export function OtpFormPage() {
               // it had gone — to someone already waiting for an email that had
               // not arrived, whose next move is to wait longer.
               if (isDeliveryFailure(error)) {
-                toast.error("Could not resend the code", {
-                  description: "The server did not answer. Try again in a moment.",
+                // A throttle carries its own sentence, and it is the one that
+                // says how long to wait — see the forgot-password twin.
+                const throttled = error instanceof AuthRequestError && error.status === 429;
+                toast.error(throttled ? "Too many attempts" : "Could not resend the code", {
+                  description: throttled
+                    ? error.message
+                    : "The server did not answer. Try again in a moment.",
                 });
                 return;
               }

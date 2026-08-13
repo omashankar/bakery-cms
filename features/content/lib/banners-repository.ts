@@ -148,6 +148,20 @@ export function persistServerBanners(banners: Banner[]): void {
  * other edit pushed those to the server instead.
  */
 export async function resetBanners(): Promise<WriteResult<Banner[]>> {
+  /**
+   * Opens the gate first, like every other write here.
+   *
+   * This was the one banners write that did not: it went straight to
+   * `saveBanners`, whose PUT waits on `bannersWritable`. An admin who signed in
+   * through the login form has never had a full read — the anonymous one on
+   * /login settles only the LOADED gate — so Reset sat for the whole 8-second
+   * timeout and was then refused and rolled back. The mutators reach the opener
+   * through `readWritableBanners`; this one replaces the list outright and so
+   * has nothing to read, but it still needs the gate open.
+   */
+  if (!(await ensureBannersWritable())) {
+    return { value: defaultBanners, persisted: false };
+  }
   return saveBanners(defaultBanners);
 }
 

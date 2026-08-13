@@ -284,15 +284,25 @@ export function OrdersListPage() {
             reason ?? "An order cannot go back down the fulfilment ladder. Nothing was changed.",
         },
       );
-      return;
     }
 
-    if (rejected > 0) {
-      toast.error(`${rejected} of ${selectedIds.length} did not reach the server`, {
+    /**
+     * Not `else` — a batch can contain both.
+     *
+     * The refusal branch used to return, so in a mixed batch the admin was told
+     * about the permanent refusals and never about the requests that merely
+     * dropped. Those are the ones whose optimistic write is deliberately KEPT,
+     * so they are the ones worth retrying — and the only ones the second
+     * sentence is true of.
+     */
+    const dropped = rejected - refused;
+    if (dropped > 0) {
+      toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
         description: "Those changes exist on this device only — reload to see the server's version.",
       });
-      return;
     }
+
+    if (rejected > 0) return;
 
     toast.success(`Applied to ${updated} order${updated === 1 ? "" : "s"}`);
   }

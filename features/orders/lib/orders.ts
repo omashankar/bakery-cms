@@ -815,7 +815,12 @@ export async function bulkUpdateOrderStatus(
   const now = new Date().toISOString();
   let touchedCache = false;
   /** What each row showed before the optimistic write, so a refusal can undo it. */
-  const before = new Map(orders.map((order) => [order.id, order.status]));
+  const before = new Map(
+    orders.map((order) => [
+      order.id,
+      { status: order.status, statusHistory: order.statusHistory },
+    ]),
+  );
 
   // Optimistically update the rows the cache happens to hold. The cache covers
   // only the newest orders while the list is paginated over all of them, so this
@@ -863,9 +868,19 @@ export async function bulkUpdateOrderStatus(
     const refusedIds = new Set(
       results.flatMap((result, index) => (result.refused ? [orderIds[index]] : [])),
     );
-    const restored = stale.map((order) =>
-      refusedIds.has(order.id) ? { ...order, status: before.get(order.id) ?? order.status } : order,
-    );
+    const restored = stale.map((order) => {
+      if (!refusedIds.has(order.id)) return order;
+      const previous = before.get(order.id);
+      return {
+        ...order,
+        status: previous?.status ?? order.status,
+        // The HISTORY goes back too. Restoring only the status left the entry
+        // the optimistic pass appended, so the order's timeline showed a
+        // transition the server had refused — visible on the order page, and
+        // carried into the next full write of that row.
+        statusHistory: previous?.statusHistory ?? order.statusHistory,
+      };
+    });
     writeOrders(restored);
   }
 
