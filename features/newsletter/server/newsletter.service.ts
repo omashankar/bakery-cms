@@ -34,12 +34,16 @@ async function ensureSeeded(): Promise<void> {
 export async function subscribe(input: SubscribeInput, ctx: RequestCtx): Promise<NewsletterSubscriber> {
   const now = new Date().toISOString();
   const subscriber: NewsletterSubscriber = {
-    id: input.id ?? `sub-${randomUUID()}`,
+    // The server owns the identity and the timestamps. These used to fall back
+    // to caller-supplied values, so an anonymous subscriber could choose its own
+    // id — a collision surfaces as a 500 — and its own `createdAt`, pinning a
+    // spam row above every real one in a list sorted newest-first.
+    id: `sub-${randomUUID()}`,
     email: input.email.toLowerCase().trim(),
     isActive: input.isActive ?? true,
     source: input.source ?? "Website",
-    createdAt: input.createdAt ?? now,
-    updatedAt: input.updatedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   const saved = await repo.subscribe(subscriber);

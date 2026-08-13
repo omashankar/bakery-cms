@@ -323,7 +323,12 @@ export function ProductDetailPage({
       image: cake.image,
       price: displayPrice,
       quantity,
-      weight: weight?.label,
+      // Gated like the two below it. The weight picker is hidden when the
+      // module is off, but `weight` still defaulted to the first tier — so a
+      // shop with Weight switched off recorded "0.5 kg" on every cart line,
+      // order, invoice and confirmation email, for a size no customer was ever
+      // shown and no baker agreed to.
+      weight: (modules.weight && weight?.label) || undefined,
       // Omitted entirely when this cake has no flavour choice, or when the
       // module is off — the picker is hidden in both cases, and an order line
       // must not record a choice the customer was never shown. `selectedFlavour`

@@ -42,6 +42,22 @@ export function getDefaultAddress(): SavedAddress | null {
   return getSavedAddresses().find((address) => address.isDefault) ?? getSavedAddresses()[0] ?? null;
 }
 
+/**
+ * `crypto.randomUUID` is undefined outside a secure context.
+ *
+ * A shop reached over plain HTTP on a LAN — a tablet on the counter — has no
+ * `crypto.randomUUID`, so "Save address" threw before its success toast, and
+ * the same call at checkout silently no-opped. `newOrderId` in
+ * features/orders/lib/orders.ts carries this exact fallback and a comment
+ * saying why; this twin did not.
+ */
+function newAddressId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `addr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function createSavedAddress(input: SavedAddressInput): SavedAddress {
   const now = new Date().toISOString();
   const addresses = readAddresses();
@@ -49,7 +65,7 @@ export function createSavedAddress(input: SavedAddressInput): SavedAddress {
 
   const created: SavedAddress = {
     ...input,
-    id: crypto.randomUUID(),
+    id: newAddressId(),
     isDefault: shouldBeDefault,
     createdAt: now,
     updatedAt: now,

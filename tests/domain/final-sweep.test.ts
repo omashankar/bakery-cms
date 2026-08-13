@@ -217,8 +217,13 @@ describe("the Preview button", () => {
   const fn = bodyOf(read("apps/admin/products/components/product-form-page.tsx"), "function openPreview(");
 
   it("sends a draft to the admin preview instead of a 404", () => {
-    // The storefront route serves published products only.
-    expect(fn).toMatch(/form\.status !== "published"/);
+    // The storefront route serves published products only, and it honours the
+    // status the SERVER holds — not the unsaved dropdown. Switching the select
+    // to "Published" and pressing Preview before saving used to open
+    // /store/cakes/<slug> for a product still stored as a draft: the shop's own
+    // 404, reached from the admin's preview button.
+    expect(fn).toMatch(/savedStatus !== "published"/);
+    expect(fn).not.toMatch(/form\.status !== "published"/);
     expect(fn).toContain("routes.admin.cakes.preview(cakeId)");
   });
 

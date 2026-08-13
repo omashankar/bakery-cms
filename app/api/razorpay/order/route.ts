@@ -37,7 +37,9 @@ export async function POST(request: Request) {
   // money hole: the customer chose what they would be charged, so a 5000-rupee
   // cart could be paid in full — genuinely, with a real captured payment — at 1
   // rupee, and every later check saw a legitimate payment for the amount asked.
-  const draftId = (body.draftId ?? "").trim();
+  // `.trim()` on a number or an object throws, and this runs outside any try —
+  // a public route answering 500 where it means 400.
+  const draftId = typeof body.draftId === "string" ? body.draftId.trim() : "";
   if (!draftId) {
     return Response.json({ error: "Missing draftId" }, { status: 400 });
   }

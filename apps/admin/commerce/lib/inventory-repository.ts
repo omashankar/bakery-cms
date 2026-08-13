@@ -288,12 +288,24 @@ export async function setUnlimitedStock(
     unlimitedStock: unlimited,
   });
 
+  /**
+   * Ask first, write second — the ordering `adjustStock` above was rewritten to.
+   *
+   * This wrote the product cache and then asked the server, with no rollback.
+   * A refusal left the row showing ∞ stock, so that item dropped out of the
+   * low-stock alerts and the notification feed on this device while the shop
+   * still had a finite, dwindling count of it — until the next hydration put it
+   * back, after the admin had moved on believing it was set.
+   */
+  const persisted = await setUnlimitedRequest(cakeId, unlimited);
+  if (!persisted) {
+    return { item: getInventoryItems().find((entry) => entry.cakeId === cakeId) ?? null, persisted };
+  }
+
   updateProduct(cakeId, {
     ...cake,
     ...stockFields,
   });
-
-  const persisted = await setUnlimitedRequest(cakeId, unlimited);
 
   emitInventoryUpdated();
   return {

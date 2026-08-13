@@ -38,14 +38,22 @@ export function AnalyticsSettingsPage() {
   // The four tracking IDs default to empty strings, so what lands is all four
   // blanked: the storefront stops reporting to Google Analytics, GTM, Meta and
   // Hotjar, and the gap only surfaces as missing data days later.
-  const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
+  const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
     useSettingsSection<AnalyticsSettings>(getAnalyticsSettings, defaultAnalyticsSettings);
 
+  /**
+   * What is SAVED, not what is typed.
+   *
+   * This read `settings` — the unsaved draft — so the header claimed
+   * "1 of 4 integrations configured" the moment an id was typed, before
+   * anything was stored and while the tracking script was still absent from
+   * every page. The SMTP and Security headers beside it already count `saved`.
+   */
   const configuredCount = [
-    settings.googleAnalyticsId,
-    settings.googleTagManagerId,
-    settings.facebookPixelId,
-    settings.hotjarId,
+    saved.googleAnalyticsId,
+    saved.googleTagManagerId,
+    saved.facebookPixelId,
+    saved.hotjarId,
   ].filter((id) => id.trim()).length;
 
   async function handleSave() {

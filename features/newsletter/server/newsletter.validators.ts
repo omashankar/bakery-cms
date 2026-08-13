@@ -1,13 +1,18 @@
 import { z } from "zod";
 
-/** Public subscribe. The storefront builds the record and dual-writes it. */
+/**
+ * Public subscribe.
+ *
+ * `id`, `createdAt` and `updatedAt` are the server's to set, and they were
+ * accepted from the caller — the exact three fields the inquiry and review
+ * submit schemas already strip. A chosen `createdAt` pins a spam row above
+ * every real subscriber in a list sorted newest-first, and a chosen `id` that
+ * collides surfaces as a 500 rather than a duplicate.
+ */
 export const subscribeSchema = z.object({
-  id: z.string().min(1).optional(),
   email: z.string().email(),
   source: z.string().optional(),
   isActive: z.boolean().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
 });
 
 /** Admin patch — activate/deactivate or relabel the source. */

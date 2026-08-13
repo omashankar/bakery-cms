@@ -43,11 +43,20 @@ export interface CouponRule {
  * was valid because the customer's browser said so — and the order carried a
  * `coupon` object the caller could invent outright, discount included.
  */
+/** Rounds to the currency's minor unit — whole rupees, cents elsewhere. */
+function roundToCurrency(value: number, currency = "INR"): number {
+  const digits = ["INR", "JPY", "KRW", "VND"].includes(currency.toUpperCase()) ? 0 : 2;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 export function evaluateCoupon(
   coupons: CouponRule[],
   code: string,
   subtotal: number,
   now = Date.now(),
+  /** Defaults to rupees, so every existing caller's arithmetic is unchanged. */
+  currency?: string,
 ): { ok: true; coupon: AppliedCoupon } | { ok: false; message: string } {
   const normalized = code.trim().toUpperCase();
   if (!normalized) {
@@ -74,7 +83,11 @@ export function evaluateCoupon(
 
   let discountAmount = 0;
   if (definition.percentOff) {
-    discountAmount = Math.round(subtotal * (definition.percentOff / 100));
+    // Rounded to the CURRENCY's minor unit, like every other money figure in
+    // the pipeline. A bare `Math.round` is whole units, so a USD shop's 10%
+    // coupon on $12.50 gave $1.00 — an 8% discount, quietly — and every
+    // fractional-cent shop rounded a customer's saving away.
+    discountAmount = roundToCurrency(subtotal * (definition.percentOff / 100), currency);
   } else if (definition.flatOff) {
     discountAmount = definition.flatOff;
   }
