@@ -148,7 +148,23 @@ export function getDeliveryPromise(): string {
       ? getCommerceSettings().deliveryLeadDays
       : defaultCommerceSettings.deliveryLeadDays;
 
-  if (leadDays <= 0) return "Same-day delivery";
+  return deliveryPromiseFor(leadDays);
+}
+
+/**
+ * The same sentence, from a lead time the caller already has.
+ *
+ * Split out because `getDeliveryPromise` above reads the BROWSER's settings
+ * cache and falls back to the shipped defaults on the server — so calling it
+ * during a server render returns "Same-day delivery" for a next-day shop,
+ * which is the exact claim this exists to stop. The homepage renders on the
+ * server, so it passes the shop's real value in.
+ *
+ * Phrased as the earliest, never as a guarantee: a delivery zone can set its
+ * own `minDeliveryDays` above the shop-wide figure.
+ */
+export function deliveryPromiseFor(leadDays: number): string {
+  if (!Number.isFinite(leadDays) || leadDays <= 0) return "Same-day delivery";
   if (leadDays === 1) return "Next-day delivery";
   return `Delivery from ${leadDays} days ahead`;
 }

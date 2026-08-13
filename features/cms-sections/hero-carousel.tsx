@@ -52,7 +52,16 @@ function accentLastWord(headline: string) {
   );
 }
 
-function HeroSlideView({ slide, priority }: { slide: HeroSlide; priority?: boolean }) {
+function HeroSlideView({
+  slide,
+  priority,
+  rating,
+}: {
+  slide: HeroSlide;
+  priority?: boolean;
+  /** The shop's approved-review figures, or null for no chip. */
+  rating?: { count: number; average: number } | null;
+}) {
   return (
     <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
       {/* Copy — left on phones, centred on tablet (fills the single column), split-left on desktop */}
@@ -157,23 +166,34 @@ function HeroSlideView({ slide, priority }: { slide: HeroSlide; priority?: boole
           <span className="text-xs font-semibold text-foreground">100% Fresh</span>
         </div>
 
-        {/* Rating chip */}
-        <div
-          className={cn(
-            reveal,
-            "absolute bottom-4 left-4 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-2.5 shadow-sm zoom-in-90 [animation-delay:660ms]"
-          )}
-        >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
-            <Star className="size-4 fill-current" />
-          </span>
-          <div>
-            <p className="text-sm font-bold leading-none text-foreground">4.9 Rating</p>
-            <p className="mt-1 text-[11px] leading-none text-muted-foreground">
-              2000+ reviews
-            </p>
+        {/*
+          Rating chip — the shop's own approved reviews, or no chip.
+
+          This read "4.9 Rating · 2000+ reviews" as a constant on every slide.
+          Both numbers were invented: the real figures come from the approved
+          review aggregate, and on this shop they are 4.7 across 27. A shop with
+          nothing approved now shows nothing, rather than borrowing a score.
+        */}
+        {rating ? (
+          <div
+            className={cn(
+              reveal,
+              "absolute bottom-4 left-4 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-2.5 shadow-sm zoom-in-90 [animation-delay:660ms]"
+            )}
+          >
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
+              <Star className="size-4 fill-current" />
+            </span>
+            <div>
+              <p className="text-sm font-bold leading-none text-foreground">
+                {rating.average} Rating
+              </p>
+              <p className="mt-1 text-[11px] leading-none text-muted-foreground">
+                {rating.count} review{rating.count === 1 ? "" : "s"}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
@@ -198,7 +218,22 @@ export function activeSlideIndex(index: number, count: number): number {
   return index < count ? index : count - 1;
 }
 
-export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
+export function HeroCarousel({
+  slides,
+  /**
+   * The shop's own approved-review figures, or null.
+   *
+   * The chip below said "4.9 Rating · 2000+ reviews" as a constant, on every
+   * slide, for every shop running this CMS — on this one the real numbers are
+   * 4.7 across 27 approved reviews. Null (a shop with none approved, or the
+   * builder preview, which has no server data) renders no chip at all rather
+   * than an invented score.
+   */
+  rating = null,
+}: {
+  slides: HeroSlide[];
+  rating?: { count: number; average: number } | null;
+}) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -250,7 +285,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* key forces a fresh mount per slide so the staggered entrance replays */}
         <div key={activeIndex} className="col-start-1 row-start-1">
-          <HeroSlideView slide={active} priority={activeIndex === 0} />
+          <HeroSlideView slide={active} priority={activeIndex === 0} rating={rating} />
         </div>
       </div>
 

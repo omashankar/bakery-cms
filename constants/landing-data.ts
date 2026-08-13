@@ -611,13 +611,13 @@ export const faqs: LandingFaq[] = [
     id: "3",
     question: "What are your delivery areas and charges?",
     answer:
-      "We deliver across 500+ cities in India. Delivery is free for orders above ₹999 within city limits. Same-day delivery is available for orders placed before 2 PM.",
+      "Delivery areas, charges and lead times are set in your shop's Commerce settings — update this answer to match them.",
   },
   {
     id: "4",
     question: "Can I customize the design and flavour of my cake?",
     answer:
-      "Absolutely! Our expert bakers can create custom designs based on your theme, colours, and preferences. Share your ideas during checkout or visit your nearest outlet for a design consultation.",
+      "Absolutely! Our bakers can create custom designs based on your theme, colours and preferences. Share your ideas during checkout, or get in touch for a design consultation.",
   },
   {
     id: "5",

@@ -11,6 +11,7 @@ import type { Banner } from "@/types/media";
 import type { FaqItem, Testimonial } from "@/types/content";
 import type { StorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 import type { StorefrontLocation } from "@/apps/website/lib/storefront-location.server";
+import type { StorefrontTrust } from "@/apps/website/lib/storefront-trust.server";
 
 /**
  * Everything the sections need, read on the server.
@@ -36,6 +37,13 @@ interface HomepageSectionData {
   offers: LandingOffer[];
   /** The shop's real address and hours from Settings -> Contact. */
   storeLocation: StorefrontLocation | null;
+  /**
+   * The shop's own rating, delivery speed and free-delivery threshold.
+   *
+   * Null when the settings read failed — every consumer renders nothing rather
+   * than the demo constants these replaced.
+   */
+  trust: StorefrontTrust | null;
 }
 
 interface StoreHomeContentProps extends HomepageSectionData {

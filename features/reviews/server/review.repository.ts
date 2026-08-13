@@ -118,6 +118,30 @@ export async function approvedAggregate(
   return { count: row.count, average: Math.round(row.average * 10) / 10 };
 }
 
+/**
+ * The shop's rating across every approved review, for the storefront.
+ *
+ * The homepage hero advertised "4.9 Rating · 2000+ reviews" as a constant, on
+ * every slide, for every shop running this CMS. On this one the real figures
+ * are 4.7 across 27 approved reviews — so the front page overstated both the
+ * score and the volume by a factor of seventy.
+ *
+ * Zeroes are a real answer, not a missing one: a shop with nothing approved
+ * shows no chip at all rather than an invented score. Same rule as
+ * `approvedAggregate` above, which this deliberately mirrors.
+ */
+export async function approvedSiteAggregate(): Promise<{ count: number; average: number }> {
+  await connectDB();
+  const rows = (await ReviewModel.aggregate([
+    { $match: { status: "approved" } },
+    { $group: { _id: null, count: { $sum: 1 }, average: { $avg: "$rating" } } },
+  ])) as Array<{ count: number; average: number }>;
+
+  const row = rows[0];
+  if (!row) return { count: 0, average: 0 };
+  return { count: row.count, average: Math.round(row.average * 10) / 10 };
+}
+
 /** Product slugs touched by a set of review ids — needed before they are deleted. */
 export async function slugsForIds(ids: string[]): Promise<string[]> {
   await connectDB();

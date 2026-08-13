@@ -71,6 +71,7 @@ import {
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
+import { formatCurrency } from "@/utils/format";
 
 interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
@@ -115,6 +116,21 @@ interface HomepageSectionRendererProps {
    * the admin builder preview, where the section falls back to its own content.
    */
   instagram?: { url: string; handle: string } | null;
+  /**
+   * The shop's own rating, delivery speed and free-delivery threshold, read on
+   * the server.
+   *
+   * These were constants — "4.9 Rating · 2000+ reviews", "Same-Day Delivery",
+   * "On orders over ₹999" — and every one of them is a figure this CMS already
+   * stores, so each was a stale second copy of an answer the shop had already
+   * given. Absent in the builder preview, where each tile shows its label with
+   * no figure rather than inventing one.
+   */
+  trust?: {
+    freeDeliveryThreshold: number;
+    deliveryPromise: string;
+    rating: { count: number; average: number } | null;
+  } | null;
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -190,12 +206,35 @@ function SectionShell({
   );
 }
 
-const heroTrustBar = [
-  { icon: "Truck", title: "Free Delivery", subtitle: "On orders over ₹999" },
-  { icon: "Clock", title: "Same-Day Delivery", subtitle: "Order today, get today" },
-  { icon: "BadgeCheck", title: "100% Quality", subtitle: "Premium ingredients" },
-  { icon: "Heart", title: "Made with Love", subtitle: "Since 1956" },
-] as const;
+/**
+ * The trust bar, with its two figures taken from the shop.
+ *
+ * It read "Free Delivery · On orders over ₹999" and "Same-Day Delivery · Order
+ * today, get today" as constants. The threshold is `freeDeliveryThreshold` and
+ * the speed is `deliveryLeadDays`, both stored — and on this shop the second
+ * was simply false: lead days is 1, so it cannot deliver same-day. The ₹999
+ * happened to match today's setting, which is worse, not better: it would have
+ * gone on saying ₹999 the moment an admin changed it.
+ *
+ * "Since 1956" is a claim with nothing behind it — and it disagreed with the
+ * "Since 1965" in the hero badge a few hundred pixels above. It goes; the tile
+ * keeps its title.
+ */
+function heroTrustBarFor(trust: HomepageSectionRendererProps["trust"]) {
+  const freeDelivery =
+    trust == null
+      ? ""
+      : trust.freeDeliveryThreshold > 0
+        ? `On orders over ${formatCurrency(trust.freeDeliveryThreshold)}`
+        : "On every order";
+
+  return [
+    { icon: "Truck", title: "Free Delivery", subtitle: freeDelivery },
+    { icon: "Clock", title: trust?.deliveryPromise ?? "Delivery", subtitle: "" },
+    { icon: "BadgeCheck", title: "100% Quality", subtitle: "Premium ingredients" },
+    { icon: "Heart", title: "Made with Love", subtitle: "" },
+  ] as const;
+}
 
 const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
 
@@ -217,10 +256,10 @@ function HeroSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props} className="bg-white py-10 sm:py-12 lg:py-16">
-      <HeroCarousel slides={slides} />
+      <HeroCarousel slides={slides} rating={props.trust?.rating ?? null} />
 
       <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:mt-12 sm:gap-6 sm:p-6 lg:grid-cols-4">
-        {heroTrustBar.map((item) => {
+        {heroTrustBarFor(props.trust).map((item) => {
           const Icon = heroTrustIcons[item.icon as keyof typeof heroTrustIcons];
           return (
             <div key={item.title} className="flex items-center gap-3">
@@ -229,7 +268,9 @@ function HeroSection(props: HomepageSectionRendererProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                {item.subtitle ? (
+                  <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                ) : null}
               </div>
             </div>
           );
@@ -600,8 +641,13 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
     },
     {
       icon: "Truck",
-      title: "Same-Day Delivery",
-      description: "Order by 2 PM for same-day delivery across major cities.",
+      // The shop's own lead time, not a constant. This said "Order by 2 PM for
+      // same-day delivery across major cities" — three claims at once: a cutoff
+      // time this CMS stores nowhere, a speed contradicted by
+      // `deliveryLeadDays`, and a national reach for a shop that stores ONE
+      // address, which is why the store locator was rewritten.
+      title: props.trust?.deliveryPromise ?? "Delivery",
+      description: "Baked to order and packed fresh for the day it reaches you.",
     },
     {
       icon: "Palette",

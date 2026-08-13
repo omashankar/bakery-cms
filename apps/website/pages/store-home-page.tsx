@@ -7,10 +7,11 @@ import { getHomepageRails, getProducts } from "@/features/products/data/products
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { getStorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 import { getStorefrontLocation } from "@/apps/website/lib/storefront-location.server";
+import { getStorefrontTrust } from "@/apps/website/lib/storefront-trust.server";
 import { getContent } from "@/features/content/server/content.service";
 import { getCoupons } from "@/features/commerce/server/commerce.service";
 import { getSettings } from "@/features/settings/server/settings.service";
-import type { ContactSettings, GeneralSettings } from "@/types/settings";
+import type { ContactSettings, CommerceSettings, GeneralSettings } from "@/types/settings";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import { publishedOnly } from "@/features/content/lib/storefront-content";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
@@ -43,6 +44,7 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
   const settings = (await getSettings()) as {
     general?: GeneralSettings;
     contact?: ContactSettings;
+    commerce?: CommerceSettings;
   };
 
   const [
@@ -56,6 +58,7 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     instagram,
     coupons,
     storeLocation,
+    trust,
   ] = await Promise.all([
     isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
     getHomepageRails(),
@@ -76,6 +79,12 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     // The store locator invented a pincode search over three hardcoded Mumbai
     // outlets; this is the shop's real address and hours.
     getStorefrontLocation(settings),
+    // The hero chip and the trust bar stated the shop's rating, its delivery
+    // speed and its free-delivery threshold as CONSTANTS. All three are values
+    // this CMS already stores, so each was a second copy of an answer the shop
+    // had given — and two of them were wrong here. Read once, on the server,
+    // in the same batch as everything else on this list.
+    getStorefrontTrust(settings),
   ]);
   // "homepage", not "all" — `"all"` is the WILDCARD in this selector, meaning
   // "apply no visibility filter", not the visibility value "all". Passing it
@@ -104,6 +113,7 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
         currency: settings.general?.currency,
       })}
       storeLocation={storeLocation}
+      trust={trust}
       isPreview={isPreview}
     />
   );
