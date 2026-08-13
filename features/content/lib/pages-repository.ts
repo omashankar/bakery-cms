@@ -269,6 +269,30 @@ export function createEmptyPageForm(): CmsPageFormData {
       metaTitle: "",
       metaDescription: "",
     },
+    /**
+     * Present with empty values, not omitted.
+     *
+     * `serializeForm` in the page editor is a whole-object `JSON.stringify`,
+     * and that drops undefined-valued keys — so a blank form and a loaded page
+     * would serialise differently and the unsaved-changes guard would misreport.
+     * Empty strings are also the only thing that can CLEAR a field: the client
+     * stringifies its patch and the server shallow-merges it, so an `undefined`
+     * never reaches Mongo and the old value survives. `heroImage: ""` above is
+     * here for the same reason.
+     */
+    about: {
+      badgeTitle: "",
+      badgeSubtitle: "",
+      storyLabel: "",
+      stats: [],
+      highlightsTitle: "",
+      highlightsDescription: "",
+      highlights: [],
+      ctaTitle: "",
+      ctaDescription: "",
+      ctaPrimaryLabel: "",
+      ctaSecondaryLabel: "",
+    },
   };
 }
 
