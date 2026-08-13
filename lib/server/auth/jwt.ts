@@ -21,6 +21,19 @@ export interface RefreshClaims {
   sub: string; // userId
   sid: string; // sessionId
   type: "refresh";
+  /**
+   * Whether the browser was told to keep this session past a restart.
+   *
+   * It has to travel WITH the token. A rotation re-issues the cookie, and the
+   * server cannot read back the expiry of the cookie it is replacing — so
+   * without this the rotation fell back to the default and stamped a 30-day
+   * lifetime on a session an admin had deliberately made browser-only. One
+   * background refresh silently undid the choice.
+   *
+   * Optional: tokens minted before this existed carry no flag, and those
+   * sessions were 30-day by definition, so `undefined` reads as remembered.
+   */
+  remember?: boolean;
 }
 
 /**

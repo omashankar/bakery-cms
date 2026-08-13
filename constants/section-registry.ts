@@ -105,6 +105,19 @@ export function parseHeroSlides(
  * value that is not an array. NEVER a default: these lists hold claims about
  * the shop, and a fallback would re-assert the demo copy on every section
  * saved before the field existed, which is the defect this exists to fix.
+ *
+ * A FAITHFUL read: rows come back exactly as stored, blanks and all.
+ *
+ * It used to drop all-empty rows and trim every value here, which broke the
+ * editor in two ways. The editor holds no draft of its own — it re-reads
+ * through this function on every render — so "Add row" wrote an empty row and
+ * this filter deleted it before it could be typed into, making the button a
+ * no-op on every list field. And clearing a row's last non-empty column
+ * deleted the row out from under the cursor. Trimming did the same to a
+ * trailing space, which a controlled input cannot then display.
+ *
+ * Deciding what is worth SHOWING belongs to the renderer, which is what
+ * `renderableRows` below is for.
  */
 export function parseListField(
   content: Record<string, string | number | boolean>,
@@ -121,15 +134,25 @@ export function parseListField(
       .map((row) => {
         const out: Record<string, string> = {};
         for (const [k, v] of Object.entries(row)) {
-          out[k] = typeof v === "string" ? v.trim() : v == null ? "" : String(v);
+          out[k] = typeof v === "string" ? v : v == null ? "" : String(v);
         }
         return out;
-      })
-      // A row with nothing in it says nothing.
-      .filter((row) => Object.values(row).some((value) => value !== ""));
+      });
   } catch {
     return [];
   }
+}
+
+/**
+ * The rows a page should actually render.
+ *
+ * A row with nothing in any column says nothing, and an admin mid-edit leaves
+ * exactly that behind. Storefront renderers filter here rather than in
+ * `parseListField`, so the editor keeps its blank rows and the page does not
+ * show them.
+ */
+export function renderableRows(rows: Record<string, string>[]): Record<string, string>[] {
+  return rows.filter((row) => Object.values(row).some((value) => value.trim() !== ""));
 }
 
 export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
@@ -173,33 +196,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 8,
     },
     fields: [
-      {
-        /**
-         * The four cards were a hardcoded array inside the renderer: "Over six
-         * decades of baking expertise", "Belgian chocolate", "Order by 2 PM for
-         * same-day delivery across major cities". None of it is true of every
-         * shop, and the delivery line contradicted the shop's own lead time.
-         */
-        key: "items",
-        label: "Cards",
-        type: "list",
-        emptyHint: "No cards — this section will not appear on the page.",
-        itemFields: [
-          {
-            key: "icon",
-            label: "Icon",
-            type: "select",
-            options: [
-              { label: "Award", value: "Award" },
-              { label: "Leaf", value: "Leaf" },
-              { label: "Truck", value: "Truck" },
-              { label: "Palette", value: "Palette" },
-            ],
-          },
-          { key: "title", label: "Title", type: "text", placeholder: "Premium Ingredients" },
-          { key: "description", label: "Description", type: "text" },
-        ],
-      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
@@ -424,6 +420,33 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       description: "",
     },
     fields: [
+      {
+        /**
+         * The four cards were a hardcoded array inside the renderer: "Over six
+         * decades of baking expertise", "Belgian chocolate", "Order by 2 PM for
+         * same-day delivery across major cities". None of it is true of every
+         * shop, and the delivery line contradicted the shop's own lead time.
+         */
+        key: "items",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          {
+            key: "icon",
+            label: "Icon",
+            type: "select",
+            options: [
+              { label: "Award", value: "Award" },
+              { label: "Leaf", value: "Leaf" },
+              { label: "Truck", value: "Truck" },
+              { label: "Palette", value: "Palette" },
+            ],
+          },
+          { key: "title", label: "Title", type: "text", placeholder: "Premium Ingredients" },
+          { key: "description", label: "Description", type: "text" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },

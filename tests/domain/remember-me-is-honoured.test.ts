@@ -61,3 +61,46 @@ describe("the refresh cookie", () => {
     expect(options.expires).toBeInstanceOf(Date);
   });
 });
+
+describe("a token rotation", () => {
+  /**
+   * The choice has to survive the refresh, and it nearly did not.
+   *
+   * `refreshTokens` re-issues both cookies. It called `setAuthCookies` without
+   * a preference, so the `rememberMe = true` default stamped a 30-day expires
+   * on a cookie the login had deliberately written as session-only — one
+   * background refresh silently undoing an admin's choice on a shared machine.
+   *
+   * The server cannot read back the expiry of the cookie it is replacing, so
+   * the flag travels inside the refresh token itself.
+   */
+  it("carries the preference in the refresh token's claims", async () => {
+    const source = await import("node:fs").then(({ readFileSync }) =>
+      readFileSync("lib/server/auth/jwt.ts", "utf8"),
+    );
+
+    expect(source, "RefreshClaims cannot express the preference").toMatch(/remember\?: boolean;/);
+  });
+
+  it("re-issues from the token's own claim rather than the default", async () => {
+    const source = await import("node:fs").then(({ readFileSync }) =>
+      readFileSync("features/auth/server/auth.service.ts", "utf8"),
+    );
+
+    // Read from the incoming token…
+    expect(source).toMatch(/claims\.remember !== false/);
+    // …and handed to BOTH the new token and the cookie that carries it.
+    expect(source).toMatch(/remember: remembered/);
+    expect(source).toMatch(/setAuthCookies\(accessToken, newRefresh, accessTtl, remembered\)/);
+  });
+
+  it("treats a token minted before the claim existed as remembered", () => {
+    // Those sessions were 30-day by definition; `undefined` must not silently
+    // downgrade them to session-only on the next refresh.
+    const remembered = (claim: boolean | undefined) => claim !== false;
+
+    expect(remembered(undefined)).toBe(true);
+    expect(remembered(true)).toBe(true);
+    expect(remembered(false)).toBe(false);
+  });
+});

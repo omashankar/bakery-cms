@@ -44,7 +44,7 @@ import type { LandingOffer, LandingProduct } from "@/constants/landing-data";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
-import { parseListField } from "@/constants/section-registry";
+import { parseListField, renderableRows } from "@/constants/section-registry";
 
 interface WeddingSectionRendererProps {
   section: WeddingSectionInstance;
@@ -166,7 +166,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
    * has verified, both asserted for whichever shop runs this CMS. Empty renders
    * neither.
    */
-  const highlights = parseListField(c, "highlights");
+  const highlights = renderableRows(parseListField(c, "highlights"));
   const badgeTitle = contentString(c, "badgeTitle");
   const badgeSubtitle = contentString(c, "badgeSubtitle");
   const title = contentString(c, "title", "Celebrate Your Love Story");
@@ -280,7 +280,7 @@ function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
    *
    * Empty renders no section: a heading over nothing is worse than nothing.
    */
-  const items = parseListField(c, "items");
+  const items = renderableRows(parseListField(c, "items"));
   if (items.length === 0) return null;
 
   return (

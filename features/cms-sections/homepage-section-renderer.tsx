@@ -45,7 +45,7 @@ import {
 import { routes } from "@/constants/routes";
 import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
 import type { Banner } from "@/types/media";
-import { parseHeroSlides, parseListField } from "@/constants/section-registry";
+import { parseHeroSlides, parseListField, renderableRows } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import {
   getStorefrontFaqs,
@@ -259,7 +259,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
       <HeroCarousel
         slides={slides}
         rating={props.trust?.rating ?? null}
-        stats={parseListField(props.section.content, "stats")}
+        stats={renderableRows(parseListField(props.section.content, "stats"))}
       />
 
       <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:mt-12 sm:gap-6 sm:p-6 lg:grid-cols-4">
@@ -642,7 +642,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
    *
    * Empty renders no section — a heading over nothing is worse than nothing.
    */
-  const items = parseListField(c, "items");
+  const items = renderableRows(parseListField(c, "items"));
 
 
   if (items.length === 0) return null;

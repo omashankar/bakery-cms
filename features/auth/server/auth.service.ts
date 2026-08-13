@@ -137,7 +137,7 @@ async function issueTokens(
   // 15 minutes regardless of what the Security screen said.
   const accessTtl = accessTokenTtl(await getSecurityPolicy());
   const accessToken = await signAccessToken({ sub: userId, role, email }, accessTtl);
-  const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) });
+  const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) , remember: rememberMe });
 
   await repo.createRefreshToken({
     userId,
@@ -204,14 +204,20 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
     { sub: claims.sub, role: user.role, email: user.email },
     accessTtl,
   );
-  const newRefresh = await signRefreshToken({ sub: claims.sub, sid: claims.sid });
+  // Carried forward, not re-defaulted — see `RefreshClaims.remember`.
+  const remembered = claims.remember !== false;
+  const newRefresh = await signRefreshToken({
+    sub: claims.sub,
+    sid: claims.sid,
+    remember: remembered,
+  });
   await repo.createRefreshToken({
     userId: claims.sub,
     sessionId: claims.sid,
     tokenHash: sha256(newRefresh),
     expiresAt: ttlToDate(REFRESH_TTL),
   });
-  await setAuthCookies(accessToken, newRefresh, accessTtl);
+  await setAuthCookies(accessToken, newRefresh, accessTtl, remembered);
 
   return toPublicUser(user);
 }
