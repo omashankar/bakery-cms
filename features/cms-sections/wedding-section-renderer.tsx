@@ -26,7 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
-import { galleryCaptions, whyChooseUs } from "@/constants/landing-data";
+import { galleryCaptions } from "@/constants/landing-data";
 import {
   getStorefrontFaqs,
   getStorefrontTestimonials,
@@ -44,6 +44,7 @@ import type { LandingOffer, LandingProduct } from "@/constants/landing-data";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
+import { parseListField } from "@/constants/section-registry";
 
 interface WeddingSectionRendererProps {
   section: WeddingSectionInstance;
@@ -128,11 +129,8 @@ function SectionShell({
   );
 }
 
-const heroHighlights = [
-  { icon: Cake, label: "Bespoke tiered designs" },
-  { icon: Palette, label: "Themed to your colours" },
-  { icon: Award, label: "60+ years of craft" },
-] as const;
+/** The chip icons, cycled in order — the admin supplies only the words. */
+const heroHighlightIcons = [Cake, Palette, Award] as const;
 
 function accentLastWord(text: string) {
   const words = text.trim().split(/\s+/);
@@ -160,6 +158,17 @@ function HeroStatic({
 
 function WeddingHeroSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The chips and the image badge, from the section's own content.
+   *
+   * The chips were a constant ending "60+ years of craft" and the badge read
+   * "Award-winning · wedding studio" — the demo brand's age and an award nobody
+   * has verified, both asserted for whichever shop runs this CMS. Empty renders
+   * neither.
+   */
+  const highlights = parseListField(c, "highlights");
+  const badgeTitle = contentString(c, "badgeTitle");
+  const badgeSubtitle = contentString(c, "badgeSubtitle");
   const title = contentString(c, "title", "Celebrate Your Love Story");
   // Same fade-up entrance the rest of the page uses, staggered text → image.
   const Reveal = props.interactive ? HeroStatic : ScrollReveal;
@@ -195,11 +204,15 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               View Gallery
             </Button>
           </div>
+          {highlights.length > 0 ? (
           <ul className="grid max-w-md gap-3 border-t border-border pt-6 sm:grid-cols-3">
-            {heroHighlights.map((item) => {
-              const Icon = item.icon;
+            {highlights.map((item, index) => {
+              const Icon = heroHighlightIcons[index % heroHighlightIcons.length];
               return (
-                <li key={item.label} className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2">
+                <li
+                  key={`${item.label}-${index}`}
+                  className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2"
+                >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                     <Icon className="size-4" />
                   </span>
@@ -208,6 +221,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               );
             })}
           </ul>
+          ) : null}
         </Reveal>
 
         <Reveal delay={160} className="relative mx-auto w-full max-w-lg lg:max-w-none">
@@ -225,15 +239,27 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               ) : null}
             </div>
           </div>
-          <div className="absolute bottom-5 left-5 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-3 shadow-sm">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
-              <Award className="size-4" />
-            </span>
-            <div>
-              <p className="text-sm font-bold leading-none text-foreground">Award-winning</p>
-              <p className="mt-1 text-[11px] leading-none text-muted-foreground">wedding studio</p>
+          {/*
+            The badge said "Award-winning · wedding studio" as a constant — an
+            award nobody has verified, for a studio that may not have one.
+          */}
+          {badgeTitle || badgeSubtitle ? (
+            <div className="absolute bottom-5 left-5 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-3 shadow-sm">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
+                <Award className="size-4" />
+              </span>
+              <div>
+                {badgeTitle ? (
+                  <p className="text-sm font-bold leading-none text-foreground">{badgeTitle}</p>
+                ) : null}
+                {badgeSubtitle ? (
+                  <p className="mt-1 text-[11px] leading-none text-muted-foreground">
+                    {badgeSubtitle}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
         </Reveal>
       </div>
     </SectionShell>
@@ -244,6 +270,19 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
 function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The cards, from this section's own content.
+   *
+   * They came from `whyChooseUs` in landing-data — the same shared constant the
+   * About template used to render — claiming six decades of expertise, Belgian
+   * chocolate, and same-day delivery across 500+ cities. None of that is true
+   * of every shop, and the delivery line contradicted the shop's own lead time.
+   *
+   * Empty renders no section: a heading over nothing is worse than nothing.
+   */
+  const items = parseListField(c, "items");
+  if (items.length === 0) return null;
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -255,11 +294,11 @@ function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
         </p>
       </ScrollReveal>
       <StaggerReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {whyChooseUs.map((item) => {
+        {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
             <div
-              key={item.title}
+              key={`${item.title}-${index}`}
               className="h-full rounded-xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">

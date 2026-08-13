@@ -57,10 +57,22 @@ describe("the About template", () => {
   });
 
   it("does not import the shared demo copy any more", () => {
-    // `whyChooseUs` itself stays in landing-data.ts — the wedding renderer is
-    // its other consumer, and emptying it would blank that page instead.
     expect(read(TEMPLATE)).not.toContain('from "@/constants/landing-data"');
-    expect(read("constants/landing-data.ts")).toContain("export const whyChooseUs");
+  });
+
+  it("left no consumer of the shared demo copy behind", () => {
+    /**
+     * `whyChooseUs` outlived this template.
+     *
+     * When the About page stopped rendering it, the wedding page was still its
+     * consumer — so the constant stayed, and this test asserted so, to stop
+     * anyone deleting it and blanking that page. The wedding section now reads
+     * its own editable cards too, which left the constant with no consumer at
+     * all, so it is gone. Asserted the other way round now: nothing should
+     * reintroduce a shared module of claims for two pages to render as their
+     * own.
+     */
+    expect(read("constants/landing-data.ts")).not.toContain("export const whyChooseUs");
   });
 
   it("gates every section on its own content", () => {

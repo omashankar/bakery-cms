@@ -506,32 +506,6 @@ export const specialOffers: LandingOffer[] = [
   },
 ];
 
-export const whyChooseUs = [
-  {
-    icon: "Award",
-    title: "Legacy of Excellence",
-    description:
-      "Over six decades of baking expertise, trusted by generations of families across India.",
-  },
-  {
-    icon: "Leaf",
-    title: "Premium Ingredients",
-    description:
-      "Only the finest Belgian chocolate, fresh cream, and seasonal fruits in every creation.",
-  },
-  {
-    icon: "Truck",
-    title: "Same-Day Delivery",
-    description:
-      "Order by 2 PM for same-day delivery across 500+ cities. Freshness guaranteed.",
-  },
-  {
-    icon: "Palette",
-    title: "Custom Designs",
-    description:
-      "Personalized cakes crafted to your vision — from birthdays to grand weddings.",
-  },
-];
 
 export const testimonials: LandingTestimonial[] = [
   {
