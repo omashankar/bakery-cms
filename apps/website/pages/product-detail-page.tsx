@@ -33,6 +33,7 @@ import {
   getProductShapeOptions,
   getProductVariantGroups,
   getDeliveryTimeSlots,
+  getDeliveryPromise,
   getMinDeliveryDate,
   getProductDetailBadges,
   type ProductReview,
@@ -110,6 +111,7 @@ export function ProductDetailPage({
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
+  const [deliveryPromise, setDeliveryPromise] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
   const [deliveryReady, setDeliveryReady] = useState(false);
 
@@ -202,6 +204,7 @@ export function ProductDetailPage({
   useEffect(() => {
     const slots = getDeliveryTimeSlots();
     const minDate = getMinDeliveryDate();
+    setDeliveryPromise(getDeliveryPromise());
     setDeliverySlots(slots);
     setMinDeliveryDate(minDate);
     setDeliveryDate(minDate);
@@ -657,7 +660,7 @@ export function ProductDetailPage({
                 </li>
                 <li className="flex items-center gap-2">
                   <Truck className="size-4 text-bakery-700" />
-                  Same-day delivery
+                  {deliveryPromise}
                 </li>
                 {modules.eggEggless ? (
                   <li className="flex items-center gap-2" data-gate-egg>
@@ -773,7 +776,7 @@ export function ProductDetailPage({
                   )}
                 </TabsContent>
                 <TabsContent value="delivery" className="text-sm text-muted-foreground">
-                  Same-day delivery available for orders placed before 2 PM within city limits.
+                  {deliveryPromise} on orders placed within city limits.
                   Scheduled delivery on {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
                   {deliveryTime ? ` between ${deliveryTime}` : ""}. Custom message card included at
                   no extra charge.

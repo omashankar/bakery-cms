@@ -132,3 +132,23 @@ export function getMinDeliveryDate(): string {
       : defaultCommerceSettings.deliveryLeadDays;
   return earliestDeliveryDateString(leadDays);
 }
+
+/**
+ * What the shop can actually promise, in the customer's words.
+ *
+ * The product page asserted "Same-day delivery" as static copy — twice, in the
+ * feature list and again in the Delivery tab — while `deliveryLeadDays` on this
+ * shop is 1, so the date picker directly beside it will not offer today. A
+ * customer reading both saw the shop contradict itself, and the sentence that
+ * loses is the one they had already decided to trust.
+ */
+export function getDeliveryPromise(): string {
+  const leadDays =
+    typeof window !== "undefined"
+      ? getCommerceSettings().deliveryLeadDays
+      : defaultCommerceSettings.deliveryLeadDays;
+
+  if (leadDays <= 0) return "Same-day delivery";
+  if (leadDays === 1) return "Next-day delivery";
+  return `Delivery from ${leadDays} days ahead`;
+}
