@@ -8,7 +8,7 @@ import type {
   SectionBackground,
   SectionFieldDef,
 } from "@/types/homepage-builder";
-import { parseHeroSlides } from "@/constants/section-registry";
+import { parseHeroSlides, parseListField } from "@/constants/section-registry";
 import { routes } from "@/constants/routes";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,150 @@ interface SectionEditorPanelProps<T extends BuilderEditableSection> {
 }
 
 /** Repeatable editor for the hero carousel's slides (stored as JSON in content). */
+/**
+ * A repeating list of small rows — stats, highlight cards, perks.
+ *
+ * Every one of these used to be a module-level constant asserting something
+ * about the shop that a different bakery could not repeat: "1M+ Happy
+ * customers", "60+ Years of joy", "Over six decades of baking expertise". They
+ * are the shop's own content now, and an empty list renders no section at all.
+ *
+ * Rows are keyed by a generated id rather than by array index. `SlidesField`
+ * below keys by index, and a move or a delete there re-uses the key for a
+ * different row: the caret jumps, and with two similarly-worded rows the wrong
+ * one takes the edit. The page editor already keys by id for this reason.
+ */
+function ListField({
+  field,
+  content,
+  onChange,
+}: {
+  field: SectionFieldDef;
+  content: Record<string, string | number | boolean>;
+  onChange: (next: string) => void;
+}) {
+  const rows = parseListField(content, field.key);
+  const columns = field.itemFields ?? [];
+
+  // Ids live only for this editing session; they are stripped before saving so
+  // nothing writes a synthetic key into the shop's content.
+  const keyed = rows.map((row, index) => ({ row, id: String(row.__id ?? index) }));
+
+  const commit = (next: Record<string, string>[]) =>
+    onChange(
+      JSON.stringify(
+        next.map((row) => {
+          const { __id: _drop, ...rest } = row;
+          return rest;
+        }),
+      ),
+    );
+
+  const updateRow = (index: number, key: string, value: string) =>
+    commit(rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
+
+  const addRow = () =>
+    commit([
+      ...rows,
+      Object.fromEntries(columns.map((column) => [column.key, ""])) as Record<string, string>,
+    ]);
+
+  const removeRow = (index: number) => commit(rows.filter((_, i) => i !== index));
+
+  const moveRow = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[index], next[target]] = [next[target], next[index]];
+    commit(next);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">{field.label}</Label>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={addRow}>
+          <Plus className="size-3.5" />
+          Add
+        </Button>
+      </div>
+
+      {keyed.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+          {field.emptyHint ?? "Nothing here yet — this will not appear on the page."}
+        </p>
+      ) : (
+        keyed.map(({ row, id }, index) => (
+          <div key={id} className="space-y-2 rounded-lg border border-border p-2.5">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {index + 1}
+              </span>
+              <div className="flex items-center gap-0.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 p-0"
+                  aria-label="Move up"
+                  disabled={index === 0}
+                  onClick={() => moveRow(index, -1)}
+                >
+                  <ChevronUp className="size-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 p-0"
+                  aria-label="Move down"
+                  disabled={index === keyed.length - 1}
+                  onClick={() => moveRow(index, 1)}
+                >
+                  <ChevronDown className="size-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 p-0"
+                  aria-label="Remove"
+                  onClick={() => removeRow(index)}
+                >
+                  <Trash2 className="size-3.5 text-destructive" />
+                </Button>
+              </div>
+            </div>
+            {columns.map((column) =>
+              column.type === "select" ? (
+                <select
+                  key={column.key}
+                  aria-label={column.label}
+                  className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                  value={row[column.key] ?? ""}
+                  onChange={(event) => updateRow(index, column.key, event.target.value)}
+                >
+                  {(column.options ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  key={column.key}
+                  className="h-9 text-sm"
+                  aria-label={column.label}
+                  placeholder={column.placeholder ?? column.label}
+                  value={row[column.key] ?? ""}
+                  onChange={(event) => updateRow(index, column.key, event.target.value)}
+                />
+              ),
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function SlidesField({
   content,
   onChange,
@@ -199,6 +343,17 @@ function renderField<T extends BuilderEditableSection>(
   updateContent: (key: string, value: string | number | boolean) => void
 ) {
   const value = section.content[field.key];
+
+  if (field.type === "list") {
+    return (
+      <ListField
+        key={field.key}
+        field={field}
+        content={section.content}
+        onChange={(next) => updateContent(field.key, next)}
+      />
+    );
+  }
 
   if (field.type === "slides") {
     return (

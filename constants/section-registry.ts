@@ -95,6 +95,43 @@ export function parseHeroSlides(
   return [];
 }
 
+/**
+ * Read a `type: "list"` field from a section's content.
+ *
+ * Stored as a JSON string for the same reason `slides` is: content values are
+ * primitives, and `contentIsUsable` rejects anything else with a 400.
+ *
+ * Returns [] for anything it cannot read — an absent key, malformed JSON, a
+ * value that is not an array. NEVER a default: these lists hold claims about
+ * the shop, and a fallback would re-assert the demo copy on every section
+ * saved before the field existed, which is the defect this exists to fix.
+ */
+export function parseListField(
+  content: Record<string, string | number | boolean>,
+  key: string,
+): Record<string, string>[] {
+  const raw = content[key];
+  if (typeof raw !== "string" || !raw.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+      .map((row) => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(row)) {
+          out[k] = typeof v === "string" ? v.trim() : v == null ? "" : String(v);
+        }
+        return out;
+      })
+      // A row with nothing in it says nothing.
+      .filter((row) => Object.values(row).some((value) => value !== ""));
+  } catch {
+    return [];
+  }
+}
+
 export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   {
     type: "hero",
@@ -104,7 +141,25 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       slides: JSON.stringify(DEFAULT_HERO_SLIDES),
     },
-    fields: [{ key: "slides", label: "Hero slides", type: "slides" }],
+    fields: [
+      { key: "slides", label: "Hero slides", type: "slides" },
+      {
+        /**
+         * The strip under the hero. It was a constant reading "1M+ Happy
+         * customers · 500+ Cake varieties · 60+ Years of joy" — the demo
+         * brand's figures, shown as whichever shop runs this CMS. Empty by
+         * default, and an empty list renders no strip at all.
+         */
+        key: "stats",
+        label: "Stats strip",
+        type: "list",
+        emptyHint: "No stats — the strip will not appear on the page.",
+        itemFields: [
+          { key: "value", label: "Figure", type: "text", placeholder: "500+" },
+          { key: "label", label: "Label", type: "text", placeholder: "Cakes baked" },
+        ],
+      },
+    ],
   },
   {
     type: "our-menu",
@@ -118,6 +173,33 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 8,
     },
     fields: [
+      {
+        /**
+         * The four cards were a hardcoded array inside the renderer: "Over six
+         * decades of baking expertise", "Belgian chocolate", "Order by 2 PM for
+         * same-day delivery across major cities". None of it is true of every
+         * shop, and the delivery line contradicted the shop's own lead time.
+         */
+        key: "items",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          {
+            key: "icon",
+            label: "Icon",
+            type: "select",
+            options: [
+              { label: "Award", value: "Award" },
+              { label: "Leaf", value: "Leaf" },
+              { label: "Truck", value: "Truck" },
+              { label: "Palette", value: "Palette" },
+            ],
+          },
+          { key: "title", label: "Title", type: "text", placeholder: "Premium Ingredients" },
+          { key: "description", label: "Description", type: "text" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
@@ -334,10 +416,12 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     icon: "Shield",
     defaultBackground: "white",
     defaultContent: {
-      overline: "The Monginis Difference",
+      // Seeded without the demo brand's name or its "six decades" — a new shop
+      // should not have to delete someone else's history before it can write
+      // its own.
+      overline: "",
       title: "Why Choose Us",
-      description:
-        "Six decades of trust, quality, and the sweetest memories for every celebration.",
+      description: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },

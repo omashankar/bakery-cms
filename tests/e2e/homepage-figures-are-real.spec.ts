@@ -93,3 +93,32 @@ test("states the free-delivery threshold from settings, not a constant", async (
     expect(body).toContain("On every order");
   }
 });
+
+test("no longer advertises the demo brand's unverifiable boasts", async ({ page }) => {
+  /**
+   * The hero strip read "1M+ Happy customers · 500+ Cake varieties · 60+ Years
+   * of joy" and the Why-Choose-Us cards claimed "Over six decades of baking
+   * expertise" — the demo brand's history, shown as whichever shop runs this
+   * CMS, with no field anywhere to change them.
+   *
+   * They are editable section content now, and an empty list renders no strip
+   * and no section rather than someone else's past.
+   */
+  await page.goto("/store");
+  const body = (await page.locator("body").textContent()) ?? "";
+
+  for (const boast of [
+    "1M+",
+    "Happy customers",
+    "500+ Cake varieties",
+    "Years of joy",
+    "Over six decades of baking expertise",
+  ]) {
+    expect(body, `the homepage still boasts "${boast}"`).not.toContain(boast);
+  }
+
+  // And the page still works — this is a page without invented claims, not an
+  // empty one. The hero headline and the product rails are untouched.
+  await expect(page.getByRole("heading").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /collections|shop/i }).first()).toBeVisible();
+});

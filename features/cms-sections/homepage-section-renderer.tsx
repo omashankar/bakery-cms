@@ -45,7 +45,7 @@ import {
 import { routes } from "@/constants/routes";
 import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
 import type { Banner } from "@/types/media";
-import { parseHeroSlides } from "@/constants/section-registry";
+import { parseHeroSlides, parseListField } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import {
   getStorefrontFaqs,
@@ -256,7 +256,11 @@ function HeroSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props} className="bg-white py-10 sm:py-12 lg:py-16">
-      <HeroCarousel slides={slides} rating={props.trust?.rating ?? null} />
+      <HeroCarousel
+        slides={slides}
+        rating={props.trust?.rating ?? null}
+        stats={parseListField(props.section.content, "stats")}
+      />
 
       <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:mt-12 sm:gap-6 sm:p-6 lg:grid-cols-4">
         {heroTrustBarFor(props.trust).map((item) => {
@@ -628,33 +632,20 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const items = [
-    {
-      icon: "Award",
-      title: "Legacy of Excellence",
-      description: "Over six decades of baking expertise trusted by generations.",
-    },
-    {
-      icon: "Leaf",
-      title: "Premium Ingredients",
-      description: "Finest chocolate, fresh cream, and seasonal fruits in every creation.",
-    },
-    {
-      icon: "Truck",
-      // The shop's own lead time, not a constant. This said "Order by 2 PM for
-      // same-day delivery across major cities" — three claims at once: a cutoff
-      // time this CMS stores nowhere, a speed contradicted by
-      // `deliveryLeadDays`, and a national reach for a shop that stores ONE
-      // address, which is why the store locator was rewritten.
-      title: props.trust?.deliveryPromise ?? "Delivery",
-      description: "Baked to order and packed fresh for the day it reaches you.",
-    },
-    {
-      icon: "Palette",
-      title: "Custom Designs",
-      description: "Personalized cakes crafted to your vision for every celebration.",
-    },
-  ];
+  /**
+   * The cards, from the section's own content.
+   *
+   * They were a hardcoded array in this function: "Over six decades of baking
+   * expertise", "Finest chocolate", "Order by 2 PM for same-day delivery across
+   * major cities", each asserted for whichever shop runs this CMS. The heading
+   * above them was editable while the claims underneath were not.
+   *
+   * Empty renders no section — a heading over nothing is worse than nothing.
+   */
+  const items = parseListField(c, "items");
+
+
+  if (items.length === 0) return null;
 
   return (
     <SectionShell {...props}>
@@ -664,20 +655,24 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
         description={contentString(c, "description")}
       />
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
             <div
-              key={item.title}
+              key={`${item.title}-${index}`}
               className="rounded-xl border border-border bg-white p-5 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
               </div>
-              <p className="font-heading font-semibold">{item.title}</p>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                {item.description}
-              </p>
+              {item.title ? (
+                <p className="font-heading font-semibold">{item.title}</p>
+              ) : null}
+              {item.description ? (
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
+              ) : null}
             </div>
           );
         })}

@@ -29,7 +29,8 @@ export type SectionFieldType =
   | "number"
   | "select"
   | "boolean"
-  | "slides";
+  | "slides"
+  | "list";
 
 export interface SectionFieldDef {
   key: string;
@@ -38,6 +39,16 @@ export interface SectionFieldDef {
   placeholder?: string;
   isImage?: boolean;
   options?: { label: string; value: string }[];
+  /**
+   * For `type: "list"` — the columns of one row.
+   *
+   * A list is stored as a JSON string, like `slides`, because a section's
+   * content values are primitives: `contentIsUsable` refuses anything that is
+   * not a string, number or boolean with a 400.
+   */
+  itemFields?: SectionFieldDef[];
+  /** For `type: "list"` — shown in place of the rows when there are none. */
+  emptyHint?: string;
 }
 
 /**

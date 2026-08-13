@@ -26,12 +26,6 @@ export interface HeroSlide {
   imageUrl: string;
 }
 
-const heroStats = [
-  { value: "1M+", label: "Happy customers" },
-  { value: "500+", label: "Cake varieties" },
-  { value: "60+", label: "Years of joy" },
-] as const;
-
 const AUTOPLAY_MS = 6000;
 const SWIPE_THRESHOLD = 48;
 
@@ -56,11 +50,14 @@ function HeroSlideView({
   slide,
   priority,
   rating,
+  stats = [],
 }: {
   slide: HeroSlide;
   priority?: boolean;
   /** The shop's approved-review figures, or null for no chip. */
   rating?: { count: number; average: number } | null;
+  /** The shop's own stats strip. Empty renders no strip. */
+  stats?: { value?: string; label?: string }[];
 }) {
   return (
     <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
@@ -116,21 +113,36 @@ function HeroSlideView({
           ) : null}
         </div>
 
-        <div
-          className={cn(
-            reveal,
-            "grid max-w-md grid-cols-3 gap-4 border-t border-border pt-6 slide-in-from-bottom-4 [animation-delay:400ms] sm:mx-auto lg:mx-0"
-          )}
-        >
-          {heroStats.map((stat) => (
-            <div key={stat.label}>
-              <p className="font-heading text-2xl font-bold text-bakery-800 sm:text-3xl">
-                {stat.value}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
-            </div>
-          ))}
-        </div>
+        {/*
+          The stats strip, from the shop's own figures.
+
+          It was a constant — "1M+ Happy customers · 500+ Cake varieties · 60+
+          Years of joy" — the demo brand's numbers shown as whichever shop runs
+          this CMS, with no field to change them. Empty renders no strip: a
+          border-topped band of nothing is worse than no band.
+        */}
+        {stats.length > 0 ? (
+          <div
+            className={cn(
+              reveal,
+              "grid max-w-md gap-4 border-t border-border pt-6 slide-in-from-bottom-4 [animation-delay:400ms] sm:mx-auto lg:mx-0"
+            )}
+            style={{ gridTemplateColumns: `repeat(${Math.min(stats.length, 3)}, minmax(0, 1fr))` }}
+          >
+            {stats.map((stat, index) => (
+              <div key={`${stat.label}-${index}`}>
+                {stat.value ? (
+                  <p className="font-heading text-2xl font-bold text-bakery-800 sm:text-3xl">
+                    {stat.value}
+                  </p>
+                ) : null}
+                {stat.label ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Visual */}
@@ -230,9 +242,12 @@ export function HeroCarousel({
    * than an invented score.
    */
   rating = null,
+  stats = [],
 }: {
   slides: HeroSlide[];
   rating?: { count: number; average: number } | null;
+  /** The shop's own stats strip, from the hero section's `stats` field. */
+  stats?: { value?: string; label?: string }[];
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -285,7 +300,12 @@ export function HeroCarousel({
       <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* key forces a fresh mount per slide so the staggered entrance replays */}
         <div key={activeIndex} className="col-start-1 row-start-1">
-          <HeroSlideView slide={active} priority={activeIndex === 0} rating={rating} />
+          <HeroSlideView
+            slide={active}
+            priority={activeIndex === 0}
+            rating={rating}
+            stats={stats}
+          />
         </div>
       </div>
 
