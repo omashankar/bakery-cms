@@ -24,6 +24,7 @@ import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -63,25 +64,23 @@ export function OrderDetailPage() {
     }
 
     /**
-     * A refresh that fails must not delete the order from the screen.
-     *
-     * This fell through to the local cache unconditionally, and the local cache
-     * is empty for any order this browser did not itself write — an order
-     * placed by the Razorpay webhook, or opened from a tracking link on another
-     * device. So one failed request replaced a fully loaded order with `null`,
-     * and the page rendered "Order Not Found" for an order that exists and that
-     * the customer had been looking at a second earlier.
-     */
-    /**
      * The local copy is a FALLBACK, not a replacement for what is on screen.
      *
-     * This adopted it unconditionally and returned, so the error toast below
-     * was unreachable for everyone who had placed the order on this device —
-     * and the local copy is the one written at placement, which never changes
-     * again. Pressing "Refresh status" on a cancelled and refunded order, with
-     * the request dropping, silently reverted the page to "Confirmed · Total
-     * paid ₹1,200". The customer asked for the newest state and was shown an
-     * older one, with nothing to say so.
+     * Two things this has to get right, and it got each one wrong in turn.
+     *
+     * A failed refresh must not blank the page: the local cache is empty for
+     * any order this browser did not itself write — one placed by the Razorpay
+     * webhook, or opened from a tracking link on another device — so falling
+     * through to it unconditionally replaced a loaded order with `null` and
+     * rendered "Order Not Found" for an order the customer was just reading.
+     *
+     * And a failed refresh must not go BACKWARDS. Adopting the local copy
+     * whenever it existed made the error toast below unreachable for everyone
+     * who placed the order on this device, and that copy is frozen at placement
+     * — so pressing "Refresh status" on a cancelled, refunded order with the
+     * request dropping silently reverted the page to "Confirmed · Total paid
+     * ₹1,200". The customer asked for the newest state and got an older one,
+     * with nothing to say so.
      */
     if (!order) {
       const local = getOrderByNumber(orderNumber);
@@ -301,6 +300,10 @@ export function OrderDetailPage() {
                 items={order.items}
                 totals={order.totals}
                 showEditLink={false}
+                // A placed order: no free-delivery nudge, and the refund shown
+                // beside the total the way the invoice already shows it.
+                placed
+                refunded={settledRefundAmount(order)}
               />
               <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm">
                 <div className="flex justify-between">

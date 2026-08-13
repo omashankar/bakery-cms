@@ -98,7 +98,9 @@ export function SecuritySettingsPage() {
   const [tab, setTab] = useState<SecurityTab>("policies");
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  /** Whether /api/security-center has answered — see the header above. */
+  const [centerLoaded, setCenterLoaded] = useState(false);
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [clearFailedOpen, setClearFailedOpen] = useState(false);
   const [logoutEverywhereOpen, setLogoutEverywhereOpen] = useState(false);
@@ -108,6 +110,7 @@ export function SecuritySettingsPage() {
     setFailedAttempts(getFailedLoginAttempts());
     setSessions(getActiveSessions());
     setDevices(getRegisteredDevices());
+    setCenterLoaded(true);
   }
 
   useEffect(() => {
@@ -248,7 +251,14 @@ export function SecuritySettingsPage() {
         // screen must never do. The attempt limit IS enforced, so it takes the
         // place.
         hydration === "ready"
-          ? `${saved.sessionTimeoutMinutes}m timeout · ${saved.maxLoginAttempts} login attempts/min · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+          ? // The session COUNT comes from /api/security-center, not from the
+            // settings read this line is gated on — so "· 0 sessions" was
+            // stated as fact while that request was still open, and stayed
+            // stated if it failed. A dash says "not counted yet"; a zero is a
+            // claim that nobody is signed in anywhere.
+            `${saved.sessionTimeoutMinutes}m timeout · ${saved.maxLoginAttempts} login attempts/min · ${
+              centerLoaded ? `${sessions.length} session${sessions.length === 1 ? "" : "s"}` : "— sessions"
+            }`
           : "Session policies, login history, active devices, and access controls."
       }
       isDirty={isDirty}
