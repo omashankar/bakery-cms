@@ -242,6 +242,28 @@ export function updateStatusRequest(orderId: string, status: OrderStatus): Promi
   return send(`/api/orders/${orderId}/status`, "PATCH", { status });
 }
 
+/**
+ * The same write, with the server's answer intact.
+ *
+ * The bulk path counted booleans, so a transition the server refuses BY RULE —
+ * moving an order back down the fulfilment ladder — was indistinguishable from
+ * a dropped request, and got reported as "did not reach the server … changes
+ * exist on this device only". Both halves were wrong: the server answered, and
+ * nothing was kept anywhere. The admin's only move was to retry, forever.
+ */
+export async function updateStatusWithReason(
+  orderId: string,
+  status: OrderStatus,
+): Promise<{ ok: boolean; refused: boolean; reason?: string }> {
+  const { ok, status: code, error } = await sendWithStatus(
+    `/api/orders/${orderId}/status`,
+    "PATCH",
+    { status },
+  );
+  // 4xx is the server deciding; anything else is the request not landing.
+  return { ok, refused: !ok && code >= 400 && code < 500, reason: error };
+}
+
 export function cancelOrderRequest(
   orderId: string,
   cancellationReason?: string,

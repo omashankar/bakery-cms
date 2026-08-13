@@ -256,10 +256,36 @@ export function OrdersListPage() {
 
     setApplying(true);
     // Named apart from the `failed` fetch state above — they mean different things.
-    const { updated, failed: rejected } = await bulkUpdateOrderStatus(selectedIds, bulkStatus);
+    const {
+      updated,
+      failed: rejected,
+      refused,
+      reason,
+    } = await bulkUpdateOrderStatus(selectedIds, bulkStatus);
     setApplying(false);
     setSelectedIds([]);
     setReloadKey((value) => value + 1);
+
+    /**
+     * A rule the server enforces is not a request that went missing.
+     *
+     * Every failure was reported as "did not reach the server — those changes
+     * exist on this device only", which for a refused transition is wrong
+     * twice: the server answered, and nothing was kept anywhere. The
+     * fulfilment ladder does not run backwards, so that message sent the admin
+     * into a retry that could never succeed. Refusals carry the server's own
+     * sentence now, and the optimistic cache write is undone for them.
+     */
+    if (refused > 0) {
+      toast.error(
+        `${refused} of ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"} could not be moved to ${bulkStatus}`,
+        {
+          description:
+            reason ?? "An order cannot go back down the fulfilment ladder. Nothing was changed.",
+        },
+      );
+      return;
+    }
 
     if (rejected > 0) {
       toast.error(`${rejected} of ${selectedIds.length} did not reach the server`, {

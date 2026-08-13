@@ -9,6 +9,7 @@ import {
   fetchOrder,
   placeOrderRequest,
   updateStatusRequest,
+  updateStatusWithReason,
   cancelOrderRequest,
   refundOrderRequest,
   paymentStatusRequest,
@@ -642,7 +643,7 @@ export async function bulkUpdatePaymentStatus(
     if (!result.persisted) failed += 1;
   }
 
-  return { updated, failed };
+  return { updated, failed, refused: 0 };
 }
 
 export async function cancelOrder(
@@ -798,17 +799,23 @@ export async function requestRefundForCancelledOrder(
 export interface BulkOrderResult {
   updated: number;
   failed: number;
+  /** Of the failures, how many the SERVER refused by rule rather than dropped. */
+  refused: number;
+  /** The server's own explanation, when it gave one. */
+  reason?: string;
 }
 
 export async function bulkUpdateOrderStatus(
   orderIds: string[],
   status: OrderStatus
 ): Promise<BulkOrderResult> {
-  if (orderIds.length === 0) return { updated: 0, failed: 0 };
+  if (orderIds.length === 0) return { updated: 0, failed: 0, refused: 0 };
 
   const orders = readOrders();
   const now = new Date().toISOString();
   let touchedCache = false;
+  /** What each row showed before the optimistic write, so a refusal can undo it. */
+  const before = new Map(orders.map((order) => [order.id, order.status]));
 
   // Optimistically update the rows the cache happens to hold. The cache covers
   // only the newest orders while the list is paginated over all of them, so this
@@ -838,11 +845,37 @@ export async function bulkUpdateOrderStatus(
   // after a rejected batch that is true of every one of them, and skipping would
   // turn the admin's retry into a silent no-op.
   const results = await Promise.all(
-    orderIds.map((orderId) => updateStatusRequest(orderId, status))
+    orderIds.map((orderId) => updateStatusWithReason(orderId, status))
   );
 
-  const failed = results.filter((persisted) => !persisted).length;
-  return { updated: orderIds.length - failed, failed };
+  const failures = results.filter((result) => !result.ok);
+  const refusals = failures.filter((result) => result.refused);
+
+  /**
+   * Undo the optimistic cache write for anything the server REFUSED.
+   *
+   * A refusal is permanent — the fulfilment ladder does not run backwards — so
+   * leaving the target status in the cache shows the admin a change that will
+   * never exist, and invites the retry that can never succeed.
+   */
+  if (refusals.length > 0 && touchedCache) {
+    const stale = readOrders();
+    const refusedIds = new Set(
+      results.flatMap((result, index) => (result.refused ? [orderIds[index]] : [])),
+    );
+    const restored = stale.map((order) =>
+      refusedIds.has(order.id) ? { ...order, status: before.get(order.id) ?? order.status } : order,
+    );
+    writeOrders(restored);
+  }
+
+  return {
+    updated: orderIds.length - failures.length,
+    failed: failures.length,
+    refused: refusals.length,
+    // One reason for the batch: they are all the same rule.
+    reason: refusals.find((result) => result.reason)?.reason,
+  };
 }
 
 export function getLatestOrder(): PlacedOrder | null {
