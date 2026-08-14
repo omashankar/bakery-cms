@@ -3,6 +3,45 @@ import { toast } from "sonner";
 import { sessionState } from "@/features/auth/lib/session-expiry";
 
 /**
+ * A write refused because of WHO was asking, not what was sent.
+ *
+ * "on this device only" tells the admin the change survived locally and invites
+ * a reload to compare — which signs them out of the very tab holding it. The
+ * server did not reject the value; it did not know who was asking.
+ *
+ * `checking` is the important half. A 401 does not publish "expired" any more —
+ * it asks the server, because a routine expired access token is not a dead
+ * session — and that answer takes a round trip this reporter does not wait for.
+ * Reading only for "expired" here meant the guard was dead on the ordinary
+ * path: the misleading toast went out, and the sign-in dialog landed on top of
+ * it a moment later, contradicting it.
+ *
+ * Returns true when it has already said what happened.
+ */
+function reportedAsSignedOut(): boolean {
+  const state = sessionState();
+
+  if (state === "expired") {
+    toast.error("Not saved — your session had ended", {
+      description: "Sign in again in the dialog, then try once more.",
+    });
+    return true;
+  }
+
+  if (state === "checking") {
+    // Deliberately not a verdict. We asked and have not heard back, and saying
+    // either "the server rejected it" or "you are signed out" would be a claim
+    // this moment cannot support.
+    toast.error("Not saved — checking whether you are still signed in", {
+      description: "Wait a moment, then try again.",
+    });
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Report an admin write honestly, and tell the caller whether it may treat the
  * change as saved.
  *
@@ -41,22 +80,7 @@ export function reportWrite(
     return true;
   }
 
-  /**
-   * A write refused because the SESSION ended is not a write the server
-   * rejected, and the difference decides what the admin should do next.
-   *
-   * "on this device only" tells them the change survived locally and invites a
-   * reload to compare — which signs them out of the tab holding it. The api
-   * modules mark the session on a 401 before this runs, so by here it is known.
-   * The dialog asking them to sign in is already on screen; this only has to
-   * stop contradicting it.
-   */
-  if (sessionState() === "expired") {
-    toast.error("Not saved — your session had ended", {
-      description: "Sign in again in the dialog, then try once more.",
-    });
-    return false;
-  }
+  if (reportedAsSignedOut()) return false;
 
   if (options?.failure) {
     toast.error(options.failure, {

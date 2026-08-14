@@ -105,7 +105,18 @@ describe("the store that tracks the session", () => {
 
     expect(noteAuthStatus(401)).toBe(true);
     expect(asked, "the 401 was not put to the server").toBe(1);
-    expect(sessionState(), "a 401 ended the session by itself").toBe("active");
+    expect(sessionState(), "a 401 ended the session by itself").not.toBe("expired");
+    /**
+     * And it says so SYNCHRONOUSLY.
+     *
+     * The write reporters read this state on the very next line of a refused
+     * write. Leaving it "active" until the round trip answered made their
+     * guard dead on the ordinary path: the admin was told "saved on this
+     * device only — the server rejected it", and the sign-in dialog landed on
+     * top of that a moment later, contradicting it and advising a reload that
+     * would destroy the unsaved edits the dialog promises are safe.
+     */
+    expect(sessionState(), "the question left no trace for the reporters").toBe("checking");
   });
 
   it("asks about nothing else", async () => {
@@ -220,6 +231,27 @@ describe("the store that tracks the session", () => {
     expect(sessionState()).toBe("expired");
   });
 
+  it("does not let the warning bury a question already put to the server", async () => {
+    /**
+     * The watcher ticks every ten seconds, so it will fire while a 401's
+     * question is still in flight. Overwriting "checking" with a prediction
+     * would take the reporters' honest "checking whether you are still signed
+     * in" away and put a countdown over it — a guess replacing an answer that
+     * is already on its way.
+     */
+    const { noteAuthStatus, markSessionExpiring, sessionState, setExpiryConfirmer } = await import(
+      "@/features/auth/lib/session-expiry"
+    );
+
+    setExpiryConfirmer(() => {});
+    noteAuthStatus(401);
+    expect(sessionState()).toBe("checking");
+
+    markSessionExpiring();
+
+    expect(sessionState(), "a prediction overwrote a question in flight").toBe("checking");
+  });
+
   it("measures idleness from the last RENEWAL, which is when the server's clock moved", async () => {
     /**
      * The warning used to predict from the last keystroke. The heartbeat renews
@@ -287,7 +319,10 @@ describe("the server, when a session ends", () => {
   });
 
   it("routes every definitive end through it", () => {
-    const source = service();
+    // Comments stripped: this file DISCUSSES `endSession(` and the reasons by
+    // name in its docstrings, and anchoring on the first occurrence of a reason
+    // string found the prose rather than the throw.
+    const source = stripComments(service());
 
     for (const reason of [
       "Invalid refresh token",
@@ -435,11 +470,27 @@ describe("the expiry countdown", () => {
       source.indexOf("function ExpiringSoon"),
       source.indexOf("function SignInAgain"),
     );
-    const timer = expiring.slice(expiring.indexOf("useEffect("), expiring.indexOf("const stay ="));
+    expect(expiring.length, "ExpiringSoon was not found").toBeGreaterThan(200);
 
-    expect(timer, "the countdown renews the session on its own").not.toContain("refreshSession");
-    // The only caller left is the button's handler.
+    const stayAt = expiring.indexOf("const stay =");
+    expect(stayAt, "the button's handler was not found").toBeGreaterThan(-1);
+    const timer = expiring.slice(0, stayAt);
+
+    /**
+     * Nothing that can REACH the network, not just the one function name.
+     *
+     * Forbidding the literal `refreshSession` left every indirection open — a
+     * fetch, an import alias, the confirmer, a helper. The property under test
+     * is "this timer does not talk to the server", so the check has to be about
+     * talking to the server.
+     */
+    for (const reach of ["refreshSession", "fetch(", "confirmExpiry", "noteAuthStatus", "renew("]) {
+      expect(timer, `the countdown reaches the server via ${reach}`).not.toContain(reach);
+    }
+
+    // And exactly one caller survives in the whole component: the button's.
     expect(expiring.match(/refreshSession\(\)/g) ?? []).toHaveLength(1);
+    expect(expiring.slice(stayAt), "the button no longer renews").toContain("refreshSession()");
   });
 
   it("counts against the same clock the server uses", () => {
@@ -467,9 +518,22 @@ describe("the expiry countdown", () => {
     expect(source).toMatch(/reload to refresh/i);
   });
 
-  it("writes the re-entry into the security log, like the login page does", () => {
-    // A sign-in that does not appear in the log of sign-ins is worse than none.
-    expect(guard()).toContain("recordLoginSuccess(user.email)");
+  it("writes the re-entry into the security log, and lets the server correct it", () => {
+    /**
+     * A sign-in missing from the log of sign-ins is worse than none — but
+     * `recordLoginSuccess` writes an INVENTED session row: an id from the
+     * clock, a blank IP, `isCurrent: true`, and every real row demoted. The
+     * login page gets away with it because the navigation that follows
+     * re-hydrates from the server. This dialog does not navigate, so it has to
+     * ask for the correction itself.
+     */
+    const source = guard();
+
+    expect(source).toContain("recordLoginSuccess(user.email)");
+    expect(source, "the invented session row is left in the cache").toContain(
+      "fetchSecurityCenter()",
+    );
+    expect(source).toContain("persistServerSecurityCenter(state)");
   });
 });
 
@@ -518,10 +582,19 @@ describe("a write refused because the session ended", () => {
 
     for (const path of reporters) {
       const source = stripComments(read(path));
-      const expiredAt = source.indexOf('sessionState() !== "expired"');
-      const consults = expiredAt > -1 || source.includes('sessionState() === "expired"');
 
-      expect(consults, `${path} cannot tell an ended session from a refused value`).toBe(true);
+      expect(
+        source,
+        `${path} cannot tell an ended session from a refused value`,
+      ).toContain("sessionState()");
+      /**
+       * BOTH answers, because a 401 asks rather than declares.
+       *
+       * Handling only "expired" left the guard dead on the ordinary path: the
+       * question takes a round trip and this reporter runs before it lands.
+       */
+      expect(source, `${path} ignores a session it has asked about`).toContain('"checking"');
+      expect(source, `${path} ignores a session known to have ended`).toContain('"expired"');
 
       /**
        * Scoped to the FUNCTION that emits it.
@@ -531,26 +604,40 @@ describe("a write refused because the session ended", () => {
        * `reportSettingsReset` left this green, which is the file-scoped
        * weakness this very test exists to close, reproduced inside it.
        */
-      const bodies = source.split(/export function /).slice(1);
+      // `export async function` and `export const x = () => {}` too: splitting
+      // on the bare `export function ` alone would leave either shape invisible.
+      const bodies = source.split(/export (?:async )?(?:function |const )/).slice(1);
       expect(bodies.length, `${path} exports nothing to check`).toBeGreaterThan(0);
 
-      for (const body of bodies) {
-        if (!body.includes("on this device only")) continue;
-        const name = body.slice(0, body.indexOf("(")).trim();
-        const guardAt = Math.max(
-          body.indexOf("reportedAsSignedOut()"),
-          body.indexOf('sessionState() === "expired"'),
-        );
+      let guarded = 0;
 
+      for (const body of bodies) {
+        const name = body.slice(0, body.search(/[(:=\s]/)).trim();
+        /**
+         * EVERY exported reporter, not only the ones whose copy happens to
+         * contain the phrase.
+         *
+         * The first version skipped any function without "on this device only"
+         * in it — and `reportSettingsWrite`, the reporter behind all eleven
+         * settings pages' Save buttons, says "not saved — the server rejected
+         * it" instead. So the guard on the single most-used reporter in the
+         * admin was never checked at all.
+         */
+        if (!/toast\.error\(/.test(body)) continue;
+        guarded += 1;
+
+        const guardAt = body.indexOf("reportedAsSignedOut()");
         expect(
           guardAt,
-          `${path} — ${name}() says "on this device only" without ever asking whether the session ended`,
+          `${path} — ${name}() reports a refused write without asking whether the session ended`,
         ).toBeGreaterThan(-1);
         expect(
           guardAt,
-          `${path} — ${name}() reaches the misleading message first`,
-        ).toBeLessThan(body.indexOf("on this device only"));
+          `${path} — ${name}() reaches its misleading message first`,
+        ).toBeLessThan(body.indexOf("toast.error("));
       }
+
+      expect(guarded, `${path} — no reporter bodies were checked`).toBeGreaterThan(0);
     }
   });
 

@@ -17,7 +17,24 @@
  * per browser.
  */
 
-export type SessionState = "active" | "expiring" | "expired";
+/**
+ * `checking` exists because the answer takes a round trip.
+ *
+ * A 401 used to publish "expired" synchronously, and the write reporters were
+ * built on that: they read `sessionState()` the instant a refused write
+ * returned. Making the 401 into a QUESTION — the right fix, since a routine
+ * expired access token is not a dead session — quietly broke them. The question
+ * is asked, `noteAuthStatus` returns, the reporter reads "active", and the
+ * admin is told "saved on this device only — the server rejected it" a
+ * heartbeat before the sign-in dialog lands on top of it, contradicting it and
+ * advising a reload that would destroy the unsaved edits the dialog promises
+ * are safe.
+ *
+ * So the question itself is a state. It is published SYNCHRONOUSLY, which is
+ * what the reporters need, and it says exactly what is true at that moment:
+ * we have asked and do not yet know.
+ */
+export type SessionState = "active" | "checking" | "expiring" | "expired";
 
 let state: SessionState = "active";
 const listeners = new Set<(next: SessionState) => void>();
@@ -46,9 +63,14 @@ export function markSessionExpired(): void {
   publish("expired");
 }
 
-/** The idle timeout is close. Ignored once the session has actually ended. */
+/**
+ * The idle timeout is close.
+ *
+ * A prediction, so it yields to anything better informed: a session already
+ * known to have ended, and a question already put to the server.
+ */
 export function markSessionExpiring(): void {
-  if (state === "expired") return;
+  if (state === "expired" || state === "checking") return;
   publish("expiring");
 }
 
@@ -138,7 +160,13 @@ export function setExpiryConfirmer(confirmer: Confirmer): () => void {
 
 export function noteAuthStatus(status: number): boolean {
   if (status !== 401) return false;
-  // Already answered — do not ask again on every 401 of a failed page load.
-  if (state !== "expired") confirmExpiry();
+  // Already answered, or already asking — a failed page load fires a 401 from
+  // every panel on it, and one question is enough.
+  if (state === "expired" || state === "checking") return true;
+
+  // Published BEFORE the question goes out, because the caller reports its
+  // refused write on the very next line and has to have something true to say.
+  publish("checking");
+  confirmExpiry();
   return true;
 }

@@ -8,14 +8,31 @@ import { sessionState } from "@/features/auth/lib/session-expiry";
  * again". Both reporters below consult it, because the settings screens are
  * exactly where an admin sits still long enough to be timed out.
  *
+ * `checking` matters as much as `expired`, and was the half this file was born
+ * missing: a 401 asks the server rather than declaring, and this reporter runs
+ * before that answer lands. Reading only for "expired" left the guard dead on
+ * the ordinary path — the twin of the twin.
+ *
  * Returns true when it has already told the admin what happened.
  */
 function reportedAsSignedOut(): boolean {
-  if (sessionState() !== "expired") return false;
-  toast.error("Not saved — your session had ended", {
-    description: "Sign in again in the dialog, then try once more.",
-  });
-  return true;
+  const state = sessionState();
+
+  if (state === "expired") {
+    toast.error("Not saved — your session had ended", {
+      description: "Sign in again in the dialog, then try once more.",
+    });
+    return true;
+  }
+
+  if (state === "checking") {
+    toast.error("Not saved — checking whether you are still signed in", {
+      description: "Wait a moment, then try again.",
+    });
+    return true;
+  }
+
+  return false;
 }
 
 /**

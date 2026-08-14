@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { routes } from "@/constants/routes";
 import { getSecuritySettings } from "@/features/settings/lib/settings-repository";
-import { recordLoginSuccess } from "@/features/settings/lib/security-center-repository";
+import {
+  persistServerSecurityCenter,
+  recordLoginSuccess,
+} from "@/features/settings/lib/security-center-repository";
+import { fetchSecurityCenter } from "@/features/settings/lib/security-center-api";
 import { loginRequest, refreshSession } from "../lib/auth-api";
 import {
   idleForMs,
@@ -168,12 +172,27 @@ function SignInAgain() {
       // the session to one that survives closing the browser.
       const user = await loginRequest({ email, password, rememberMe: false });
       setDemoSession(user.email, false);
-      // The same bookkeeping the login PAGE does. Without it the Security
-      // Center's login history and device list quietly omit every re-entry
-      // made through this dialog — a sign-in that does not appear in the log
-      // of sign-ins is worse than no log.
+      /**
+       * The same bookkeeping the login PAGE does — and then the correction the
+       * login page gets for free.
+       *
+       * `recordLoginSuccess` writes an optimistic row: a session id it invents
+       * from the clock, a blank IP, `isCurrent: true`, and every existing row
+       * flipped to `isCurrent: false`. On the login page that is harmless —
+       * the navigation that follows re-hydrates the Security Center from the
+       * server, which derives the real state from the audit trail and the live
+       * sessions. This dialog does NOT navigate, so the invention would sit in
+       * the cache: a session that does not exist, and the real one demoted.
+       *
+       * Without the record at all, a sign-in would be missing from the log of
+       * sign-ins, which is worse. So: write it, then ask the server and let its
+       * answer replace it.
+       */
       recordLoginSuccess(user.email);
       markSessionRenewed();
+      void fetchSecurityCenter().then((state) => {
+        if (state) persistServerSecurityCenter(state);
+      });
       router.refresh();
       /**
        * Says what actually happened.

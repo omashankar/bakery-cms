@@ -31,6 +31,8 @@ import { describe, expect, it } from "vitest";
 
 const ROOTS = ["apps", "components", "features", "layouts"];
 const POSITIONED = /\brelative\b|\babsolute\b|\bfixed\b|\bsticky\b/;
+const stripComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 
 function tsxFilesUnder(roots: string[]): string[] {
   const found: string[] = [];
@@ -114,7 +116,18 @@ describe("a loading indicator with a screen-reader label", () => {
     const offenders: string[] = [];
 
     for (const path of FILES) {
-      const source = readFileSync(join(process.cwd(), path), "utf8");
+      /**
+       * Comments stripped BEFORE parsing, not after.
+       *
+       * Two ways they lied. A `// \`relative\` anchors the sr-only` comment
+       * inside an opening tag put the word "relative" where the className check
+       * looks, so the test read its own documentation and passed. And the same
+       * comment says "the containing block is <body>" — whose `>` ended the
+       * opening tag early for a naive scan, cutting the real className off and
+       * failing a site that was correct. False pass and false fail from one
+       * habit.
+       */
+      const source = stripComments(readFileSync(join(process.cwd(), path), "utf8"));
 
       for (const { tag, body } of statusRegions(source)) {
         if (!body.includes('className="sr-only"')) continue;
@@ -131,8 +144,8 @@ describe("a loading indicator with a screen-reader label", () => {
 
   it("found some to check, so an empty pass cannot look like a clean one", () => {
     const checked = FILES.flatMap((path) =>
-      statusRegions(readFileSync(join(process.cwd(), path), "utf8")).filter((region) =>
-        region.body.includes('className="sr-only"'),
+      statusRegions(stripComments(readFileSync(join(process.cwd(), path), "utf8"))).filter(
+        (region) => region.body.includes('className="sr-only"'),
       ),
     );
 
