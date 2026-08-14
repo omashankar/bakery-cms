@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { shopMegaMenu, type MegaMenuLink } from "@/constants/storefront-nav";
 import { routes } from "@/constants/routes";
+import { SafeImage } from "@/components/shared/safe-image";
 import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import { cn } from "@/lib/utils";
@@ -130,13 +130,19 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
                 href={routes.store.collection(featured.slug)}
                 className="group/card overflow-hidden rounded-xl border border-border bg-cream-50"
               >
-                <div className="relative aspect-[4/5] bg-muted">
-                  <Image
+                {/*
+                  The category image is a free-text box in Catalog → Categories
+                  — an admin-typed URL on any host — so next/image is not usable
+                  here: it renders only hosts allow-listed in next.config
+                  remotePatterns, and an un-listed one throws the render of a
+                  component that sits in the header of every storefront page.
+                  Same reasoning as the admin-typed logo in storefront-navbar.
+                */}
+                <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+                  <SafeImage
                     src={featured.image}
                     alt={featured.name}
-                    fill
-                    className="object-cover transition-transform group-hover/card:scale-[1.02]"
-                    sizes="200px"
+                    className="transition-transform group-hover/card:scale-[1.02]"
                   />
                 </div>
                 <div className="p-3">

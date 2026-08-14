@@ -155,6 +155,36 @@ export function renderableRows(rows: Record<string, string>[]): Record<string, s
   return rows.filter((row) => Object.values(row).some((value) => value.trim() !== ""));
 }
 
+/**
+ * The rows of a PHOTO list worth rendering — those that have a photo.
+ *
+ * `renderableRows` keeps any row with one non-blank column, which is right for
+ * a stat or a card but wrong for a picture: an admin who types the caption
+ * "Priya's wedding tier" and is interrupted before choosing the image leaves a
+ * row that passes it, and the row then reaches `<Image src="">` — a broken tile
+ * sitting among the shop's real photographs. A row with no picture is not a
+ * photograph, whatever else has been typed on it.
+ */
+export function photoRows(
+  content: Record<string, string | number | boolean>,
+  key: string,
+): Record<string, string>[] {
+  return parseListField(content, key).filter((row) => (row.image ?? "").trim() !== "");
+}
+
+/**
+ * The first `max` rows, where a max of zero or less means "no limit".
+ *
+ * The builder's number input writes `Number(value) || 0`, so an admin who
+ * selects "Max images shown" to retype it stores 0 mid-keystroke — and
+ * `slice(0, 0)` is empty. On these sections empty means "render nothing", so
+ * clearing that one box did not widen the gallery, it deleted the heading, the
+ * photos and the CTA from the live page while the photo list stayed full.
+ */
+export function limitRows<T>(rows: T[], max: number): T[] {
+  return max > 0 ? rows.slice(0, max) : rows;
+}
+
 export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   {
     type: "hero",
@@ -479,6 +509,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       description: "A glimpse into our world of cakes, pastries, and celebrations.",
       ctaLabel: "View Full Gallery",
       ctaHref: routes.store.gallery,
+      // The homepage strip is a taste of the gallery, not the gallery. It used
+      // to be a hardcoded `slice(0, 8)`; the photos are the shop's own list now
+      // and the same list feeds /store/gallery, so without a cap here a shop
+      // that curates forty photographs for its gallery page grows a forty-tile
+      // block on its homepage whose own "View Full Gallery" button leads to the
+      // very same forty.
+      maxCount: 8,
     },
     fields: [
       {
@@ -508,6 +545,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "maxCount", label: "Max photos on the homepage", type: "number" },
     ],
   },
   {

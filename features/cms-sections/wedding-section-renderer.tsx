@@ -42,7 +42,7 @@ import type { LandingOffer, LandingProduct } from "@/constants/landing-data";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
-import { parseListField, renderableRows } from "@/constants/section-registry";
+import { limitRows, parseListField, photoRows, renderableRows } from "@/constants/section-registry";
 
 interface WeddingSectionRendererProps {
   section: WeddingSectionInstance;
@@ -467,7 +467,7 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
    * wedding work. A couple choosing a bakery by its cakes was choosing on
    * somebody else's.
    */
-  const photos = renderableRows(parseListField(c, "images")).slice(0, maxCount);
+  const photos = limitRows(photoRows(c, "images"), maxCount);
   if (photos.length === 0) return null;
 
   return (
@@ -482,7 +482,9 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
         {photos.map((photo, index) => {
           const src = photo.image;
-          const caption = { title: photo.title, tag: photo.tag };
+          // "" from the editor, never undefined — see the homepage gallery.
+          const title = photo.title?.trim() ?? "";
+          const tag = photo.tag?.trim() ?? "";
           return (
             <figure
               key={`${src}-${index}`}
@@ -490,19 +492,23 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
             >
               <Image
                 src={src}
-                alt={caption?.title ?? `Wedding gallery ${index + 1}`}
+                alt={title || `Wedding gallery ${index + 1}`}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
-              {caption ? (
+              {title || tag ? (
                 <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/0 p-3 opacity-0 transition-all duration-300 group-hover:bg-bakery-950/45 group-hover:opacity-100">
-                  <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
-                    {caption.tag}
-                  </span>
-                  <span className="mt-1.5 font-heading text-sm font-semibold text-white">
-                    {caption.title}
-                  </span>
+                  {tag ? (
+                    <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
+                      {tag}
+                    </span>
+                  ) : null}
+                  {title ? (
+                    <span className="mt-1.5 font-heading text-sm font-semibold text-white">
+                      {title}
+                    </span>
+                  ) : null}
                 </figcaption>
               ) : null}
             </figure>

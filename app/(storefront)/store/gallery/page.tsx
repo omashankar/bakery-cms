@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { GalleryPage } from "@/apps/website";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
-import { getPublishedHomepageSections } from "@/features/cms-sections/data/homepage-sections.server";
-import { parseListField, renderableRows } from "@/constants/section-registry";
+import { getPublishedSectionContent } from "@/features/cms-sections/data/homepage-sections.server";
+import { photoRows } from "@/constants/section-registry";
 
 /**
  * Per request, not at module load.
@@ -23,11 +23,15 @@ export default async function Page() {
    * two lists of the same pictures is how they drift apart. Both this page and
    * the homepage strip used to render the same twelve stock photos from a
    * constant; both now read what the shop actually put in the builder.
+   *
+   * Read UNFILTERED on purpose. The visibility switch governs the homepage
+   * strip, not this page — see `getPublishedSectionContent`. The homepage cap
+   * ("Max photos on the homepage") is not applied here either: this is the full
+   * gallery, which is what the strip's own button promises.
    */
-  const sections = await getPublishedHomepageSections();
-  const gallery = sections.find((section) => section.type === "gallery");
+  const gallery = await getPublishedSectionContent("gallery");
   const photos = gallery
-    ? renderableRows(parseListField(gallery.content, "images")).map((row) => ({
+    ? photoRows(gallery, "images").map((row) => ({
         image: row.image,
         title: row.title,
         tag: row.tag,

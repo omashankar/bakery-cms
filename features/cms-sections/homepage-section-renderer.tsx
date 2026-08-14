@@ -42,7 +42,13 @@ import {
 import { routes } from "@/constants/routes";
 import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
 import type { Banner } from "@/types/media";
-import { parseHeroSlides, parseListField, renderableRows } from "@/constants/section-registry";
+import {
+  limitRows,
+  parseHeroSlides,
+  parseListField,
+  photoRows,
+  renderableRows,
+} from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import {
   getStorefrontFaqs,
@@ -727,7 +733,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
    * change them. A customer choosing a bakery by its photographs was choosing
    * on someone else's.
    */
-  const photos = renderableRows(parseListField(c, "images"));
+  const photos = limitRows(photoRows(c, "images"), contentNumber(c, "maxCount", 8));
   if (photos.length === 0) return null;
   return (
     <SectionShell {...props} noReveal>
@@ -741,7 +747,11 @@ function GallerySection(props: HomepageSectionRendererProps) {
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
         {photos.map((photo, index) => {
           const src = photo.image;
-          const caption = { title: photo.title, tag: photo.tag };
+          // An untouched column is "" from the editor, not undefined, so `??`
+          // could never fire and the object literal was always truthy: every
+          // tile shipped alt="" and an empty white pill on hover.
+          const title = photo.title?.trim() ?? "";
+          const tag = photo.tag?.trim() ?? "";
           return (
             <figure
               key={`${src}-${index}`}
@@ -749,19 +759,23 @@ function GallerySection(props: HomepageSectionRendererProps) {
             >
               <Image
                 src={src}
-                alt={caption?.title ?? `Gallery ${index + 1}`}
+                alt={title || `Gallery ${index + 1}`}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
-              {caption ? (
+              {title || tag ? (
                 <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/0 p-3 opacity-0 transition-all duration-300 group-hover:bg-bakery-950/45 group-hover:opacity-100">
-                  <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
-                    {caption.tag}
-                  </span>
-                  <span className="mt-1.5 font-heading text-sm font-semibold text-white">
-                    {caption.title}
-                  </span>
+                  {tag ? (
+                    <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
+                      {tag}
+                    </span>
+                  ) : null}
+                  {title ? (
+                    <span className="mt-1.5 font-heading text-sm font-semibold text-white">
+                      {title}
+                    </span>
+                  ) : null}
                 </figcaption>
               ) : null}
             </figure>
@@ -982,7 +996,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
    * pictures above it. There is no Instagram API here; these are photos the
    * shop uploads, and without them the section does not appear.
    */
-  const posts = renderableRows(parseListField(c, "posts"));
+  const posts = limitRows(photoRows(c, "posts"), maxCount);
   if (posts.length === 0) return null;
   // The section's own content wins when the admin has set it in the builder;
   // otherwise the shop's real Instagram from Settings → Social. The shipped
@@ -1027,7 +1041,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {posts.slice(0, maxCount).map((post, index) => (
+        {posts.map((post, index) => (
           <a
             key={`${post.image}-${index}`}
             href={profileUrl}

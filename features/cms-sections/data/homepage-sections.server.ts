@@ -105,6 +105,25 @@ export async function getPublishedHomepageSections(): Promise<HomepageSectionIns
   );
 }
 
+/**
+ * A published section's content by type, WITHOUT the visibility filter.
+ *
+ * Hiding a section means "do not show this strip on the homepage". It does not
+ * mean "throw the content away", and it must not govern a page that merely
+ * SOURCES its data from that section: /store/gallery is a nav item of its own,
+ * and it reads the shop's photographs off the Gallery section because there is
+ * no second place to upload them. Read through the filtered accessor, an admin
+ * who hid the homepage strip to shorten the homepage emptied a different page —
+ * "Photographs of our work are on their way." — while the builder still showed
+ * every photo, with nothing anywhere connecting the switch to the page.
+ */
+export async function getPublishedSectionContent(
+  type: HomepageSectionInstance["type"]
+): Promise<HomepageSectionInstance["content"] | null> {
+  const { published } = await readWithSchedule();
+  return sortSections(published.sections).find((section) => section.type === type)?.content ?? null;
+}
+
 export async function getDraftHomepageSections(): Promise<HomepageSectionInstance[]> {
   const { draft } = await readWithSchedule();
   return getVisibleSections(sortSections(draft.sections)).filter(
