@@ -1,3 +1,4 @@
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
 import {
   createInquiryRequest,
@@ -8,6 +9,18 @@ import {
 const STORAGE_KEY = "bakery-cms-inquiries";
 
 export const INQUIRIES_UPDATED_EVENT = "bakery-inquiries-updated";
+
+/**
+ * Open once the SERVER's inquiries have been read, not once localStorage has.
+ *
+ * The server is the source of truth here and this key is only a cache, so on a
+ * fresh browser — a first login, another device, a cleared profile — the read
+ * below returns `[]` in the first frame. A screen that treats that as an
+ * answer paints "0" captioned "All clear" in green, and "No inquiries found",
+ * over an inbox with unanswered customers in it. Settled here rather than in
+ * the sync hook so it cannot drift from the write it stands for.
+ */
+export const inquiriesHydration = createHydrationGate();
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -195,6 +208,7 @@ function persistInquiries(inquiries: Inquiry[]): void {
 /** Hydration: replace the local cache with the server's inquiries (no re-push). */
 export function persistServerInquiries(inquiries: Inquiry[]): void {
   persistInquiries(inquiries);
+  inquiriesHydration.markSettled();
 }
 
 /**

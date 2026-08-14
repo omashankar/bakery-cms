@@ -27,8 +27,10 @@ import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components"
 import { cn } from "@/lib/utils";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
 import { formatDate, formatRelativeTime } from "@/utils/format";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   deleteInquiries,
+  inquiriesHydration,
   INQUIRIES_UPDATED_EVENT,
   loadInquiries,
 } from "@/features/inquiries/lib/inquiries-repository";
@@ -63,7 +65,18 @@ export function InquiriesListPage({
   description = "Customer messages and follow-ups",
   embedded = false,
 }: InquiriesListPageProps) {
-  const [mounted, setMounted] = useState(false);
+  /**
+   * "Have I heard from the SERVER", not "have I read the cache".
+   *
+   * This was `mounted`, set by the localStorage read in the effect below — and
+   * that key is a cache the server fills, so on a first login it is empty and
+   * the read answers `[]` in the first frame. Every card then stated "0" under
+   * "All clear" in green, and the list said "No inquiries found", for an inbox
+   * with customers waiting in it. A failed load says so rather than settling on
+   * a zero: a zero is an answer.
+   */
+  const [figures, setFigures] = useState<FiguresState>("loading");
+  const known = figures === "ready";
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [weddingEnabled, setWeddingEnabled] = useState(true);
   const [filters, setFilters] = useState<InquiryListFilters>({
@@ -86,13 +99,25 @@ export function InquiriesListPage({
         return true;
       });
       setInquiries(loaded);
-      setMounted(true);
     }
 
     refreshList();
     window.addEventListener(INQUIRIES_UPDATED_EVENT, refreshList);
     return () => window.removeEventListener(INQUIRIES_UPDATED_EVENT, refreshList);
   }, [fixedType]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Resolves immediately when the sync has already settled — the normal case
+    // when arriving here from another admin screen — and false on timeout,
+    // which is "I could not find out", not "there are none".
+    void inquiriesHydration.waitForSettled().then((settled) => {
+      if (!cancelled) setFigures(settled ? "ready" : "unavailable");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const sync = () => setWeddingEnabled(isWeddingEnabled());
@@ -108,7 +133,6 @@ export function InquiriesListPage({
       return true;
     });
     setInquiries(loaded);
-    setMounted(true);
   }
 
   const filtered = useMemo(
@@ -122,7 +146,7 @@ export function InquiriesListPage({
 
   const stats = useMemo(
     () =>
-      mounted
+      known
         ? {
             new: countInquiriesByStatus(inquiries, "new"),
             inProgress: countInquiriesByStatus(inquiries, "in_progress"),
@@ -131,7 +155,7 @@ export function InquiriesListPage({
             total: inquiries.length,
           }
         : { new: 0, inProgress: 0, replied: 0, closed: 0, total: 0 },
-    [inquiries, mounted]
+    [inquiries, known]
   );
 
   const pageIds = paginated.map((item) => item.id);
@@ -198,7 +222,7 @@ export function InquiriesListPage({
             changeTone={stats.new > 0 ? "warning" : "positive"}
             icon={MessageSquare}
             tone="gold"
-            figures={mounted ? "ready" : "loading"}
+            figures={figures}
           />
         </button>
         <button
@@ -213,7 +237,7 @@ export function InquiriesListPage({
             changeTone="neutral"
             icon={CircleDashed}
             tone="bakery"
-            figures={mounted ? "ready" : "loading"}
+            figures={figures}
           />
         </button>
         <button
@@ -228,7 +252,7 @@ export function InquiriesListPage({
             changeTone="positive"
             icon={Reply}
             tone="bakery"
-            figures={mounted ? "ready" : "loading"}
+            figures={figures}
           />
         </button>
         <button
@@ -243,7 +267,7 @@ export function InquiriesListPage({
             changeTone="neutral"
             icon={CheckCircle2}
             tone="neutral"
-            figures={mounted ? "ready" : "loading"}
+            figures={figures}
           />
         </button>
       </section>
@@ -319,12 +343,19 @@ export function InquiriesListPage({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,20rem)]">
         <div className="min-w-0 space-y-4">
-          {!mounted ? (
-            // "No inquiries found" before the first read is a claim about the
-            // shop's inbox that nothing has checked yet.
+          {figures === "loading" ? (
+            // "No inquiries found" before the SERVER has answered is a claim
+            // about the shop's inbox that nothing has checked yet — the local
+            // cache being empty is not the shop's inbox being empty.
             <section className={adminShell.tableCard}>
               <ListLoading rows={4} label="Loading inquiries" />
             </section>
+          ) : figures === "unavailable" && filtered.length === 0 ? (
+            <EmptyState
+              icon={MessageSquare}
+              title="Inquiries could not be loaded"
+              description="The server did not answer. Reload to try again — this is not a claim that the inbox is empty."
+            />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={MessageSquare}

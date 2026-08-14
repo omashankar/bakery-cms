@@ -1,3 +1,4 @@
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {
   subscribeRequest,
@@ -8,6 +9,14 @@ import {
 const STORAGE_KEY = "bakery-cms-newsletter-subscribers";
 
 export const NEWSLETTER_UPDATED_EVENT = "bakery-newsletter-updated";
+
+/**
+ * Open once the SERVER's subscribers have been read — see `inquiriesHydration`,
+ * of which this is the exact twin. `loadNewsletterSubscribers` returns `[]` for
+ * an absent key, and the key is a cache the server fills, so a first login read
+ * the empty cache as an answer and told the admin the shop had no mailing list.
+ */
+export const newsletterHydration = createHydrationGate();
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -55,6 +64,7 @@ function persistSubscribers(subscribers: NewsletterSubscriber[]): void {
 /** Hydration: replace the local cache with the server's subscribers (no re-push). */
 export function persistServerSubscribers(subscribers: NewsletterSubscriber[]): void {
   persistSubscribers(subscribers);
+  newsletterHydration.markSettled();
 }
 
 /**
