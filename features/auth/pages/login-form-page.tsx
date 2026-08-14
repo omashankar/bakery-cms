@@ -10,6 +10,7 @@ import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { setDemoSession } from "@/features/auth/lib/session";
 import { loginRequest } from "@/features/auth/lib/auth-api";
+import { markSessionRenewed } from "@/features/auth/lib/session-expiry";
 import {
   recordFailedLogin,
   recordLoginSuccess,
@@ -53,6 +54,17 @@ export function LoginFormPage() {
       // signed-in email) working unchanged.
       setDemoSession(user.email, data.rememberMe);
       recordLoginSuccess(user.email);
+      /**
+       * Take the "session has ended" state down.
+       *
+       * That state is module-level and survives a client-side navigation, so an
+       * admin who reached this page from the expiry dialog's own "sign in on
+       * the login page instead" link — and signed in successfully — was pushed
+       * back to a dashboard still covered by the non-dismissible dialog saying
+       * their session had ended. The one route out of the dialog led straight
+       * back into it.
+       */
+      markSessionRenewed();
       toast.success("Signed in", {
         description: "Opening your dashboard…",
       });

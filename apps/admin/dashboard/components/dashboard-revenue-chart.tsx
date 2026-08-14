@@ -52,7 +52,11 @@ export function DashboardRevenueChart({ analytics, figures = "ready" }: Dashboar
             <div
               role="status"
               aria-live="polite"
-              className="flex h-36 items-end gap-1.5 sm:h-44"
+              // `relative` anchors the absolutely-positioned `sr-only` below.
+              // Without it the span's containing block is <body>, so it escapes
+              // the admin shell's clip and grows the document past the viewport
+              // — a second window scrollbar, on this very page. See PanelLoading.
+              className="relative flex h-36 items-end gap-1.5 sm:h-44"
             >
               <span className="sr-only">Loading the revenue trend</span>
               {[45, 70, 30, 85, 55, 65, 40].map((height, index) => (

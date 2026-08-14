@@ -122,7 +122,8 @@ export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePa
         <div
           role="status"
           aria-live="polite"
-          className="my-16 h-96 animate-pulse rounded-xl border border-border bg-cream-100"
+          // `relative` anchors the `sr-only` span below — see PanelLoading.
+          className="relative my-16 h-96 animate-pulse rounded-xl border border-border bg-cream-100"
         >
           {/* A bare pulsing box is silence to a screen reader — which then
               hears nothing at all until the verdict below replaces it. */}

@@ -17,10 +17,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { routes } from "@/constants/routes";
+import { getSecuritySettings } from "@/features/settings/lib/settings-repository";
+import { recordLoginSuccess } from "@/features/settings/lib/security-center-repository";
 import { loginRequest, refreshSession } from "../lib/auth-api";
 import {
-  markSessionActive,
+  idleForMs,
   markSessionExpired,
+  markSessionRenewed,
   sessionState,
   subscribeToSession,
   type SessionState,
@@ -61,59 +64,49 @@ export function SessionGuard() {
   return null;
 }
 
-/** How long the warning counts down before asking the server for the verdict. */
-const COUNTDOWN_SECONDS = 60;
+/** Seconds until the server would consider this session idle past its timeout. */
+function secondsLeft(): number {
+  const minutes = Number(getSecuritySettings().sessionTimeoutMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return Math.max(0, Math.round((minutes * 60 * 1000 - idleForMs()) / 1000));
+}
 
 function ExpiringSoon() {
-  const [left, setLeft] = useState(COUNTDOWN_SECONDS);
+  const [left, setLeft] = useState(secondsLeft);
   const [checking, setChecking] = useState(false);
-  const asked = useRef(false);
 
   useEffect(() => {
-    // Counted from a start TIMESTAMP rather than by decrementing: a background
-    // tab throttles its timers, and a decrementing counter would come back
+    // Recomputed from the clock rather than decremented: a background tab
+    // throttles its timers, and a counter that ticks down would come back
     // reading forty seconds left on a session that ended thirty seconds ago.
-    const started = Date.now();
-
-    const timer = window.setInterval(() => {
-      const remaining = Math.max(
-        0,
-        COUNTDOWN_SECONDS - Math.round((Date.now() - started) / 1000),
-      );
-      setLeft(remaining);
-      if (remaining > 0 || asked.current) return;
-
-      /**
-       * At zero, ASK rather than announce.
-       *
-       * This countdown is a prediction from the shop's timeout and the last
-       * sign of a human; the server holds the real clock and its answer can
-       * differ. Declaring the session over here would be this screen making a
-       * claim it has not checked — the mistake the rest of this admin was
-       * built to stop making.
-       */
-      asked.current = true;
-      setChecking(true);
-      void refreshSession().then((outcome) => {
-        if (outcome === "expired") markSessionExpired();
-        else if (outcome === "renewed") markSessionActive();
-        else {
-          // Server unreachable: nothing is known, so nothing is claimed. Let
-          // them try again rather than sitting on a dead countdown.
-          asked.current = false;
-          setChecking(false);
-        }
-      });
-    }, 1000);
-
+    const timer = window.setInterval(() => setLeft(secondsLeft()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  /**
+   * At zero this does NOTHING, on purpose.
+   *
+   * The first version "asked the server for the verdict" here — but
+   * /api/auth/refresh is a RENEWAL, not a read, so asking was extending. On an
+   * unattended tab the answer came back "renewed", the warning cleared, the
+   * watcher re-fired seconds later, and the whole thing repeated about every
+   * seventy seconds for as long as the tab stayed open: the shop's idle
+   * timeout became unreachable and the session was held open by the very
+   * dialog warning that it was about to close — roughly twelve hundred
+   * rotations a day with nobody in the room. That is precisely the regression
+   * `PRESENCE_WINDOW_MS` was introduced to end.
+   *
+   * So the countdown only ever COUNTS. Renewing is a human pressing the button
+   * below, which is itself the evidence of presence the server's timeout is
+   * asking for. If nobody presses it, the session lapses exactly as the shop
+   * configured, and the next request's 401 raises the sign-in dialog.
+   */
 
   const stay = async () => {
     setChecking(true);
     const outcome = await refreshSession();
     if (outcome === "renewed") {
-      markSessionActive();
+      markSessionRenewed();
       return;
     }
     if (outcome === "expired") {
@@ -134,12 +127,17 @@ function ExpiringSoon() {
           <DialogDescription>
             {checking
               ? "Checking with the server…"
-              : `This shop signs admins out after a period of inactivity. Yours ends in ${left} second${left === 1 ? "" : "s"}.`}
+              : left > 0
+                ? `This shop signs admins out after a period of inactivity. Yours ends in ${left} second${left === 1 ? "" : "s"}.`
+                : // Past the deadline the button still works: the server may not
+                  // have been asked yet, and if it has ended, pressing it says
+                  // so plainly instead of this dialog guessing.
+                  "Your session may already have ended. Press below to find out."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button onClick={stay} disabled={checking}>
-            {checking ? "Checking…" : "Stay signed in"}
+            {checking ? "Checking…" : left > 0 ? "Stay signed in" : "Check now"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -170,11 +168,27 @@ function SignInAgain() {
       // the session to one that survives closing the browser.
       const user = await loginRequest({ email, password, rememberMe: false });
       setDemoSession(user.email, false);
-      markSessionActive();
-      // The server components on this page rendered against the old session;
-      // re-run them so the data behind this dialog is real again.
+      // The same bookkeeping the login PAGE does. Without it the Security
+      // Center's login history and device list quietly omit every re-entry
+      // made through this dialog — a sign-in that does not appear in the log
+      // of sign-ins is worse than no log.
+      recordLoginSuccess(user.email);
+      markSessionRenewed();
       router.refresh();
-      toast.success("Signed back in");
+      /**
+       * Says what actually happened.
+       *
+       * `router.refresh()` re-runs Server Components and deliberately PRESERVES
+       * client state — and every admin screen here is a client component that
+       * fetches in an effect on mount. So the lists that emptied while the
+       * session was dead do not come back on their own, and claiming "the data
+       * behind this dialog is real again" would be this screen reporting
+       * something that did not happen. The unsaved edits are the reason we did
+       * not simply reload, so the choice belongs to the person holding them.
+       */
+      toast.success("Signed back in", {
+        description: "Save your work, then reload to refresh this page's data.",
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not sign in");
       setBusy(false);

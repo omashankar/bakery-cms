@@ -4,10 +4,12 @@ import { useEffect } from "react";
 
 import { refreshSession } from "./auth-api";
 import {
-  markSessionActive,
+  idleForMs,
   markSessionExpired,
   markSessionExpiring,
+  markSessionRenewed,
   sessionState,
+  setExpiryConfirmer,
 } from "./session-expiry";
 import { getSecuritySettings } from "@/features/settings/lib/settings-repository";
 
@@ -92,14 +94,43 @@ export function useSessionRefresh(): void {
     let last = 0;
     let lastSeen = Date.now();
 
+    /**
+     * Somebody is here. That is ALL this records.
+     *
+     * It used to clear the warning too, and that broke the warning's only
+     * button: the listener is on `window`, so the pointerdown that presses
+     * "Stay signed in" reached this first, the dialog unmounted, and the click
+     * never arrived at its handler. The warning was dismissed, the server's
+     * clock was never touched, and the session went on to expire anyway — with
+     * the admin believing they had kept it.
+     *
+     * Only a successful RENEWAL clears the warning now, because only a renewal
+     * changes the fact the warning is about.
+     */
     const markPresent = () => {
       lastSeen = Date.now();
-      // Typing again after the warning has appeared takes it away. Not after
-      // the session has actually ended — no amount of activity brings that
-      // back, and pretending otherwise would hide the dialog asking them to
-      // sign in.
-      if (sessionState() === "expiring") markSessionActive();
     };
+
+    const renew = () =>
+      refreshSession().then((outcome) => {
+        // `unreachable` is deliberately not an expiry: the server never
+        // answered, so nothing is known, and signing an admin out mid-edit for
+        // a dropped request would be the wrong cure. The next tick asks again.
+        if (outcome === "expired") markSessionExpired();
+        else if (outcome === "renewed") markSessionRenewed();
+        return outcome;
+      });
+
+    /**
+     * Put the question a 401 raises to the server.
+     *
+     * A 401 usually means only that the short-lived access token has run out,
+     * which is routine and repairable. This is the one place allowed to decide
+     * it is more than that.
+     */
+    setExpiryConfirmer(() => {
+      void renew();
+    });
 
     const tick = (requirePresence: boolean) => {
       const now = Date.now();
@@ -112,13 +143,7 @@ export function useSessionRefresh(): void {
       // itself the evidence, so those pass straight through.
       if (requirePresence && now - lastSeen > PRESENCE_WINDOW_MS) return;
       last = now;
-      void refreshSession().then((outcome) => {
-        // `unreachable` is deliberately not an expiry: the server never
-        // answered, so nothing is known, and signing an admin out mid-edit for
-        // a dropped request would be the wrong cure. The next tick asks again.
-        if (outcome === "expired") markSessionExpired();
-        else if (outcome === "renewed") markSessionActive();
-      });
+      void renew();
     };
 
     tick(false); // renew immediately in case the access token already expired
@@ -139,11 +164,14 @@ export function useSessionRefresh(): void {
     /**
      * Warn while there is still time to act.
      *
-     * The heartbeat only renews when somebody has been present, so an idle tab
-     * stops asking and the server's clock runs out — correctly. What was
-     * missing is that the person comes back to a session already gone, having
-     * had no chance to keep it. This watches the same `lastSeen` the heartbeat
-     * uses, so the two cannot disagree about who is here.
+     * Measured against `idleForMs()` — the time since the last successful
+     * REFRESH — because that is the instant the server's own `lastSeenAt`
+     * moved, and the server's clock is the one that decides. Predicting from
+     * the last keystroke instead put the two clocks minutes apart: the
+     * heartbeat renews up to PRESENCE_WINDOW_MS after the last input, so the
+     * warning fired on a session with minutes left, and the dialog then
+     * "checked" by renewing it — warn, renew, warn, renew, about every seventy
+     * seconds, on a tab with nobody in front of it.
      */
     let watch = 0;
     const armWatch = () => {
@@ -153,7 +181,7 @@ export function useSessionRefresh(): void {
         // changes the timeout on the Security screen has both follow it in the
         // same session, with neither needing to hear about the change.
         if (timeout > 0 && sessionState() !== "expired") {
-          if (Date.now() - lastSeen >= timeout - WARN_BEFORE_MS) markSessionExpiring();
+          if (idleForMs() >= timeout - WARN_BEFORE_MS) markSessionExpiring();
         }
         armWatch();
       }, WATCH_TICK_MS);
