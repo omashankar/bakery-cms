@@ -52,11 +52,16 @@ export function markSessionExpiring(): void {
   publish("expiring");
 }
 
-/** Someone is here again, or has signed back in. */
-export function markSessionActive(): void {
-  publish("active");
-  renewedAt = Date.now();
-}
+/*
+ * There is deliberately no `markSessionActive`.
+ *
+ * It existed and had no callers left, which made it worse than unused: it
+ * published "active" AND reset the idle clock, so the next person to reach for
+ * the obvious-sounding name would silently have told the warning that the
+ * server had just renewed a session it had not. Going back to "active" is not
+ * a thing anything is entitled to assert on its own — only a renewal the
+ * server confirmed is, and that is `markSessionRenewed` below.
+ */
 
 /**
  * When the SERVER's idle clock was last moved, as far as this browser knows.
@@ -103,9 +108,32 @@ export function idleForMs(): number {
 type Confirmer = () => void;
 let confirmExpiry: Confirmer = () => {};
 
-/** Wired once by the admin shell; kept here so api modules import no React. */
-export function setExpiryConfirmer(confirmer: Confirmer): void {
+/** Test helper: forget the registered confirmer and reset the idle clock. */
+export function resetSessionTracking(): void {
+  confirmExpiry = () => {};
+  state = "active";
+  renewedAt = Date.now();
+}
+
+const NO_CONFIRMER: Confirmer = () => {};
+
+/**
+ * Wired by the admin shell; kept here so api modules import no React.
+ *
+ * Returns its own undo, and the shell MUST call it on unmount. Without that
+ * the callback outlives the layout that registered it: an admin who navigates
+ * to the storefront leaves a live confirmer behind, and a 401 from any module
+ * both surfaces share then renews the admin session from a page that has no
+ * admin on it — the unattended renewal this feature exists to prevent, through
+ * a second door.
+ */
+export function setExpiryConfirmer(confirmer: Confirmer): () => void {
   confirmExpiry = confirmer;
+  return () => {
+    // Only if it is still ours. A remount registers before the old effect's
+    // cleanup runs, and clearing unconditionally would unregister the LIVE one.
+    if (confirmExpiry === confirmer) confirmExpiry = NO_CONFIRMER;
+  };
 }
 
 export function noteAuthStatus(status: number): boolean {

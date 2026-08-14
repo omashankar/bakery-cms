@@ -128,7 +128,7 @@ export function useSessionRefresh(): void {
      * which is routine and repairable. This is the one place allowed to decide
      * it is more than that.
      */
-    setExpiryConfirmer(() => {
+    const forgetConfirmer = setExpiryConfirmer(() => {
       void renew();
     });
 
@@ -208,6 +208,9 @@ export function useSessionRefresh(): void {
     }
 
     return () => {
+      // Before the timers: a confirmer left registered outlives this layout and
+      // would renew the admin session from a storefront page.
+      forgetConfirmer();
       window.clearTimeout(timer);
       window.clearTimeout(watch);
       window.removeEventListener("focus", onFocus);

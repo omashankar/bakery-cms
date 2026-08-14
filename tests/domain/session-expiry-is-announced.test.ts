@@ -147,6 +147,65 @@ describe("the store that tracks the session", () => {
     expect(asked).toBe(0);
   });
 
+  it("hands back an undo, so the confirmer cannot outlive the layout", async () => {
+    /**
+     * The callback is module-level and the shell registers it in an effect. Left
+     * registered after that effect is torn down, it outlives the admin layout:
+     * an admin who navigates to the storefront leaves a live confirmer behind,
+     * and a 401 from any module the two surfaces share then renews the ADMIN
+     * session from a page with no admin on it — the unattended renewal this
+     * whole feature exists to prevent, through a second door.
+     */
+    const { noteAuthStatus, setExpiryConfirmer } = await import(
+      "@/features/auth/lib/session-expiry"
+    );
+
+    let asked = 0;
+    const forget = setExpiryConfirmer(() => {
+      asked += 1;
+    });
+
+    noteAuthStatus(401);
+    expect(asked).toBe(1);
+
+    forget();
+    noteAuthStatus(401);
+    expect(asked, "the confirmer kept answering after its owner unmounted").toBe(1);
+  });
+
+  it("does not let a departing layout unregister the one that replaced it", async () => {
+    // React runs the new effect before the old cleanup on a remount. Clearing
+    // unconditionally would leave the LIVE shell with no confirmer at all, and
+    // every 401 after that would go unanswered in silence.
+    const { noteAuthStatus, setExpiryConfirmer } = await import(
+      "@/features/auth/lib/session-expiry"
+    );
+
+    const forgetFirst = setExpiryConfirmer(() => {});
+    let second = 0;
+    setExpiryConfirmer(() => {
+      second += 1;
+    });
+
+    forgetFirst();
+    noteAuthStatus(401);
+
+    expect(second, "the old cleanup silenced the new confirmer").toBe(1);
+  });
+
+  it("offers no way to assert a session is fine without the server saying so", async () => {
+    /**
+     * `markSessionActive` published "active" AND reset the idle clock, and had
+     * no callers left. Unused would be harmless; the danger is the name — the
+     * next person to reach for the obvious one would have told the warning that
+     * the server had just renewed a session it had not.
+     */
+    const store = await import("@/features/auth/lib/session-expiry");
+
+    expect(Object.keys(store)).not.toContain("markSessionActive");
+    expect(store.markSessionRenewed, "the honest one went too").toBeTypeOf("function");
+  });
+
   it("does not let the warning overwrite a session that has actually ended", async () => {
     const { markSessionExpired, markSessionExpiring, sessionState } = await import(
       "@/features/auth/lib/session-expiry"
@@ -322,6 +381,23 @@ describe("the client heartbeat", () => {
     expect(markPresent, "the warning is cleared by mere presence again").not.toMatch(
       /markSession(Active|Renewed)/,
     );
+  });
+
+  it("actually calls the undo when it tears down", () => {
+    /**
+     * The store hands back an unregister, and a test proves the unregister
+     * works — neither of which matters if the shell never calls it. The
+     * mechanism and its wiring are two separate things to get wrong, and only
+     * the first had a guard.
+     */
+    const source = stripComments(hook());
+    const cleanupAt = source.indexOf("return () => {");
+
+    expect(cleanupAt, "the effect no longer cleans up at all").toBeGreaterThan(-1);
+    expect(
+      source.slice(cleanupAt),
+      "the confirmer is left registered after the layout unmounts",
+    ).toContain("forgetConfirmer()");
   });
 
   it("clears the warning only when a renewal actually succeeded", () => {
