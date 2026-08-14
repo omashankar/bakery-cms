@@ -51,7 +51,9 @@ function checkout(overrides: Partial<Parameters<typeof placeOrder>[0]> = {}) {
   });
 }
 
-type Answer = { ok: boolean; status: number; data?: unknown } | "network-error";
+type Answer =
+  | { ok: boolean; status: number; data?: unknown; message?: string }
+  | "network-error";
 
 /** A fetch stub that answers each call with the next entry, then repeats the last. */
 function respond(...answers: Answer[]) {
@@ -63,11 +65,23 @@ function respond(...answers: Answer[]) {
     return Promise.resolve({
       ok: answer.ok,
       status: answer.status,
-      json: () => Promise.resolve({ success: answer.ok, data: answer.data ?? null }),
+      json: () =>
+        Promise.resolve({
+          success: answer.ok,
+          data: answer.data ?? null,
+          // What a refused write actually answers with. The shop's reason lives
+          // here, and it is the difference between "retry this" and "stop".
+          ...(answer.message ? { message: answer.message } : {}),
+        }),
     } as Response);
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+/** The body of the Nth POST this test made. */
+function bodyOf(fetchMock: ReturnType<typeof respond>, call = 0) {
+  return JSON.parse(fetchMock.mock.calls[call][1].body as string);
 }
 
 beforeEach(() => {
@@ -211,5 +225,80 @@ describe("placing an order", () => {
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(sent.id).toBe(first.order.id);
     expect(sent.orderNumber).toBe(first.order.orderNumber);
+  });
+});
+
+/**
+ * The retry, once the card has already been charged.
+ *
+ * The shop will not place a card payment against a cart it did not price —
+ * `order.service.ts`: "This cart needs to be priced again before payment", a
+ * 409. So a retry that forgets the draft id is not merely less efficient, it is
+ * refused, permanently, and the customer is left pressing a button that can
+ * never work while holding a receipt for a cake nobody is baking.
+ */
+describe("re-sending an order the server never acknowledged", () => {
+  it("sends the priced cart with it, so the shop can accept a paid order", async () => {
+    respond({ ok: false, status: 500 });
+    const first = await settle(checkout({ draftId: "draft_abc" }));
+    expect(first.persisted).toBe(false);
+
+    const fetchMock = respond({ ok: true, status: 201 });
+    const { persisted } = await settle(confirmOrder(first.order, "draft_abc"));
+
+    expect(persisted).toBe(true);
+    expect(
+      bodyOf(fetchMock).draftId,
+      "the retry dropped the draft id, so the shop refuses the paid order",
+    ).toBe("draft_abc");
+  });
+
+  it("keeps the priced cart when the customer just presses Place order again", async () => {
+    respond({ ok: false, status: 500 });
+    const first = await settle(checkout({ draftId: "draft_abc" }));
+    expect(first.persisted).toBe(false);
+
+    // Inside the duplicate window, so this goes down the re-send path rather
+    // than minting a new order. That path dropped the draft id too.
+    const fetchMock = respond({ ok: true, status: 201 });
+    const second = await settle(checkout({ draftId: "draft_abc" }));
+
+    expect(second.order.id).toBe(first.order.id);
+    expect(
+      bodyOf(fetchMock).draftId,
+      "the duplicate-window re-send dropped the draft id",
+    ).toBe("draft_abc");
+  });
+
+  it("reports the shop's own refusal instead of calling it an unreachable bakery", async () => {
+    respond({ ok: false, status: 500 });
+    const first = await settle(checkout({ draftId: "draft_abc" }));
+
+    // 409 — answered, instantly, and it will be answered the same way next time.
+    const fetchMock = respond({
+      ok: false,
+      status: 409,
+      message: "This cart needs to be priced again before payment. Please refresh and retry.",
+    });
+    const { persisted, refusal } = await settle(confirmOrder(first.order, "draft_abc"));
+
+    expect(persisted).toBe(false);
+    // Without this the customer is told the network failed and invited to retry
+    // something the server has already decided about.
+    expect(refusal).toBe(
+      "This cart needs to be priced again before payment. Please refresh and retry.",
+    );
+    // And it is not retried three times on the way to saying so.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the refusal empty when the request genuinely never got an answer", async () => {
+    // The distinction is the whole point: no answer IS worth retrying, and must
+    // not be dressed up in a reason the shop never gave.
+    respond("network-error");
+    const first = await settle(checkout({ draftId: "draft_abc" }));
+
+    expect(first.persisted).toBe(false);
+    expect(first.refusal).toBeUndefined();
   });
 });

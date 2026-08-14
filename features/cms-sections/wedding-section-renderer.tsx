@@ -10,11 +10,12 @@ import {
   Leaf,
   Palette,
   Quote,
-  Star,
+  Tag,
   Truck,
 } from "lucide-react";
 import { ContactForm } from "@/components/shared/contact-form";
 import { SectionHeader } from "@/components/shared/section-header";
+import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
@@ -25,7 +26,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
-import { galleryCaptions, whyChooseUs } from "@/constants/landing-data";
 import {
   getStorefrontFaqs,
   getStorefrontTestimonials,
@@ -34,7 +34,6 @@ import {
 } from "@/features/content/lib/storefront-content";
 import {
   getWeddingCollectionProducts,
-  getWeddingGalleryImages,
   getWeddingOffers,
 } from "@/features/products/lib/wedding-catalog";
 import { layoutSpacing } from "@/constants/spacing";
@@ -43,6 +42,7 @@ import type { LandingOffer, LandingProduct } from "@/constants/landing-data";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
+import { limitRows, parseListField, photoRows, renderableRows } from "@/constants/section-registry";
 
 interface WeddingSectionRendererProps {
   section: WeddingSectionInstance;
@@ -127,11 +127,8 @@ function SectionShell({
   );
 }
 
-const heroHighlights = [
-  { icon: Cake, label: "Bespoke tiered designs" },
-  { icon: Palette, label: "Themed to your colours" },
-  { icon: Award, label: "60+ years of craft" },
-] as const;
+/** The chip icons, cycled in order — the admin supplies only the words. */
+const heroHighlightIcons = [Cake, Palette, Award] as const;
 
 function accentLastWord(text: string) {
   const words = text.trim().split(/\s+/);
@@ -159,6 +156,17 @@ function HeroStatic({
 
 function WeddingHeroSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The chips and the image badge, from the section's own content.
+   *
+   * The chips were a constant ending "60+ years of craft" and the badge read
+   * "Award-winning · wedding studio" — the demo brand's age and an award nobody
+   * has verified, both asserted for whichever shop runs this CMS. Empty renders
+   * neither.
+   */
+  const highlights = renderableRows(parseListField(c, "highlights"));
+  const badgeTitle = contentString(c, "badgeTitle");
+  const badgeSubtitle = contentString(c, "badgeSubtitle");
   const title = contentString(c, "title", "Celebrate Your Love Story");
   // Same fade-up entrance the rest of the page uses, staggered text → image.
   const Reveal = props.interactive ? HeroStatic : ScrollReveal;
@@ -194,11 +202,15 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               View Gallery
             </Button>
           </div>
+          {highlights.length > 0 ? (
           <ul className="grid max-w-md gap-3 border-t border-border pt-6 sm:grid-cols-3">
-            {heroHighlights.map((item) => {
-              const Icon = item.icon;
+            {highlights.map((item, index) => {
+              const Icon = heroHighlightIcons[index % heroHighlightIcons.length];
               return (
-                <li key={item.label} className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2">
+                <li
+                  key={`${item.label}-${index}`}
+                  className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2"
+                >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                     <Icon className="size-4" />
                   </span>
@@ -207,6 +219,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               );
             })}
           </ul>
+          ) : null}
         </Reveal>
 
         <Reveal delay={160} className="relative mx-auto w-full max-w-lg lg:max-w-none">
@@ -224,15 +237,27 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               ) : null}
             </div>
           </div>
-          <div className="absolute bottom-5 left-5 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-3 shadow-sm">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
-              <Award className="size-4" />
-            </span>
-            <div>
-              <p className="text-sm font-bold leading-none text-foreground">Award-winning</p>
-              <p className="mt-1 text-[11px] leading-none text-muted-foreground">wedding studio</p>
+          {/*
+            The badge said "Award-winning · wedding studio" as a constant — an
+            award nobody has verified, for a studio that may not have one.
+          */}
+          {badgeTitle || badgeSubtitle ? (
+            <div className="absolute bottom-5 left-5 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-3 shadow-sm">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
+                <Award className="size-4" />
+              </span>
+              <div>
+                {badgeTitle ? (
+                  <p className="text-sm font-bold leading-none text-foreground">{badgeTitle}</p>
+                ) : null}
+                {badgeSubtitle ? (
+                  <p className="mt-1 text-[11px] leading-none text-muted-foreground">
+                    {badgeSubtitle}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
         </Reveal>
       </div>
     </SectionShell>
@@ -243,6 +268,19 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
 function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The cards, from this section's own content.
+   *
+   * They came from `whyChooseUs` in landing-data — the same shared constant the
+   * About template used to render — claiming six decades of expertise, Belgian
+   * chocolate, and same-day delivery across 500+ cities. None of that is true
+   * of every shop, and the delivery line contradicted the shop's own lead time.
+   *
+   * Empty renders no section: a heading over nothing is worse than nothing.
+   */
+  const items = renderableRows(parseListField(c, "items"));
+  if (items.length === 0) return null;
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -254,11 +292,11 @@ function WeddingWhyUsSection(props: WeddingSectionRendererProps) {
         </p>
       </ScrollReveal>
       <StaggerReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {whyChooseUs.map((item) => {
+        {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
             <div
-              key={item.title}
+              key={`${item.title}-${index}`}
               className="h-full rounded-xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
@@ -279,6 +317,25 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
   const maxCount = contentNumber(c, "maxCount", 3);
   const offers = (props.weddingOffers ?? getWeddingOffers(maxCount)).slice(0, maxCount);
 
+  // Same rule as the homepage offers row: with no live coupon there is no offer
+  // to make, so the storefront omits the section rather than heading an empty
+  // grid. The builder says why, so the admin is not left guessing.
+  if (offers.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props} noReveal>
+        <SectionHeader
+          title={contentString(c, "title", "Wedding Offers")}
+          description={contentString(c, "description")}
+        />
+        <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No active coupons, so this section is hidden on the live wedding page.
+          Add one under Commerce → Coupons and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -291,14 +348,32 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
         {offers.map((offer) => (
           <article key={offer.id} className="h-full overflow-hidden rounded-xl border border-border bg-white">
             <div className="relative aspect-[16/10] bg-muted">
-              <Image src={offer.image} alt={offer.title} fill className="object-cover" sizes="300px" />
+              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="300px" />
               <Badge className="absolute top-3 left-3" variant="gold">
                 {offer.discount}
               </Badge>
             </div>
             <div className="p-4">
-              <h3 className="font-heading font-semibold">{offer.title}</h3>
+              {/* Empty when the coupon's label just repeats the discount the badge
+                  already shows — see sameCopy in coupon-offers.ts. */}
+              {offer.title ? (
+                <h3 className="font-heading font-semibold">{offer.title}</h3>
+              ) : null}
               <p className="mt-1 text-sm text-muted-foreground">{offer.description}</p>
+              {/* The code was never shown here, so a customer could read a real
+                  wedding discount and have no way to claim it. The homepage twin
+                  has always shown it. */}
+              {offer.code ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
+                  <Tag className="size-3.5 text-gold-700" />
+                  <span className="font-mono text-sm font-semibold text-gold-800">
+                    {offer.code}
+                  </span>
+                  {offer.minSpend ? (
+                    <span className="text-xs text-gold-800/80">{offer.minSpend}</span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </article>
         ))}
@@ -313,6 +388,25 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
   // Prefer the server-provided snapshot (SSR → identical on hydration); fall back
   // to the client store only in the builder preview, which never server-renders.
   const cakes = (props.weddingProducts ?? getWeddingCollectionProducts(maxCount)).slice(0, maxCount);
+
+  // No wedding cakes in the catalogue means no collection to show. The grid used
+  // to fill itself from demo data rather than say so — see
+  // selectWeddingCollectionProducts.
+  if (cakes.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props} noReveal>
+        <h2 className="font-heading mb-2 text-2xl font-bold">
+          {contentString(c, "title", "Wedding Collections")}
+        </h2>
+        <p className="mb-8 text-muted-foreground">{contentString(c, "description")}</p>
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No published cakes in a wedding category, so this section is hidden on
+          the live page. Add one under Products and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props} noReveal>
@@ -365,7 +459,16 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
 function WeddingGallerySection(props: WeddingSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 8);
-  const images = getWeddingGalleryImages(maxCount);
+  /**
+   * The shop's own photographs, or no grid.
+   *
+   * `getWeddingGalleryImages` returned a slice of `galleryImages` — the same
+   * twelve stock Unsplash photos the homepage showed — presented as this shop's
+   * wedding work. A couple choosing a bakery by its cakes was choosing on
+   * somebody else's.
+   */
+  const photos = limitRows(photoRows(c, "images"), maxCount);
+  if (photos.length === 0) return null;
 
   return (
     <SectionShell {...props} noReveal>
@@ -377,28 +480,35 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-        {images.map((src, index) => {
-          const caption = galleryCaptions[index];
+        {photos.map((photo, index) => {
+          const src = photo.image;
+          // "" from the editor, never undefined — see the homepage gallery.
+          const title = photo.title?.trim() ?? "";
+          const tag = photo.tag?.trim() ?? "";
           return (
             <figure
-              key={src}
+              key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
               <Image
                 src={src}
-                alt={caption?.title ?? `Wedding gallery ${index + 1}`}
+                alt={title || `Wedding gallery ${index + 1}`}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
-              {caption ? (
+              {title || tag ? (
                 <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/0 p-3 opacity-0 transition-all duration-300 group-hover:bg-bakery-950/45 group-hover:opacity-100">
-                  <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
-                    {caption.tag}
-                  </span>
-                  <span className="mt-1.5 font-heading text-sm font-semibold text-white">
-                    {caption.title}
-                  </span>
+                  {tag ? (
+                    <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
+                      {tag}
+                    </span>
+                  ) : null}
+                  {title ? (
+                    <span className="mt-1.5 font-heading text-sm font-semibold text-white">
+                      {title}
+                    </span>
+                  ) : null}
                 </figcaption>
               ) : null}
             </figure>
@@ -448,11 +558,7 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
             className="flex h-full flex-col rounded-2xl border border-border bg-white p-6 transition-all hover:border-bakery-300 hover:shadow-sm"
           >
             <div className="flex items-center justify-between">
-              <div className="flex gap-0.5 text-gold-500">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="size-4 fill-current" />
-                ))}
-              </div>
+              <RatingStars rating={item.rating} className="text-gold-500" />
               <Quote className="size-7 text-gold-300/60" />
             </div>
             <p className="mt-4 flex-1 leading-relaxed text-muted-foreground">{item.content}</p>

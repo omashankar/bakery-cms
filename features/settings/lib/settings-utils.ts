@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   brandInfo,
   businessHours,
@@ -23,11 +25,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function daysAgo(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
 
 export const defaultGeneralSettings: GeneralSettings = {
   siteName: brandInfo.name,
@@ -82,9 +79,12 @@ export const defaultSecuritySettings: SecuritySettings = {
 export const defaultSmtpSettings: SmtpSettings = {
   host: "smtp.example.com",
   port: 587,
-  username: "noreply@monginis.com",
+  username: "sumanom7014106@gmail.com",
   password: "",
-  fromEmail: "hello@monginis.com",
+  // The address mail goes out AS. A relay will only send from an address it
+  // has verified, so this is a starting point rather than a working config —
+  // but it is one somebody owns, which the monginis.com placeholder was not.
+  fromEmail: "sumanom7014106@gmail.com",
   fromName: brandInfo.name,
   encryption: "tls",
   enabled: false,
@@ -144,50 +144,22 @@ export const defaultCommerceSettings: CommerceSettings = {
   },
 };
 
-export const seedActivityLog: ActivityLog[] = [
-  {
-    id: "act-1",
-    action: "published",
-    entity: "homepage",
-    userId: "admin",
-    timestamp: daysAgo(1),
-    details: "Homepage builder snapshot published",
-  },
-  {
-    id: "act-2",
-    action: "updated",
-    entity: "appearance",
-    userId: "admin",
-    timestamp: daysAgo(2),
-    details: "Theme colors and border radius updated",
-  },
-  {
-    id: "act-3",
-    action: "created",
-    entity: "cake",
-    entityId: "cake-12",
-    userId: "admin",
-    timestamp: daysAgo(3),
-    details: "Added Chocolate Truffle Delight",
-  },
-  {
-    id: "act-4",
-    action: "updated",
-    entity: "seo",
-    userId: "admin",
-    timestamp: daysAgo(4),
-    details: "Global SEO defaults saved",
-  },
-  {
-    id: "act-5",
-    action: "received",
-    entity: "inquiry",
-    entityId: "inq-3",
-    userId: "system",
-    timestamp: daysAgo(5),
-    details: "New wedding inquiry submitted",
-  },
-];
+/**
+ * Empty, and it has to be.
+ *
+ * This shipped three fabricated rows — "Homepage builder snapshot published",
+ * "Theme colors and border radius updated" — attributed to "admin" with
+ * plausible timestamps. The Activity Log page MERGES them with the real server
+ * audit trail and renders both identically, so a fresh shop opened its audit
+ * log and read three things that never happened, indistinguishable from the
+ * ones that did.
+ *
+ * An audit trail is worth exactly what it can be trusted for. Demo data in one
+ * is not a placeholder; it is a false record. The page already handles an empty
+ * list, and the real trail fills it from the first admin action.
+ */
+export const seedActivityLog: ActivityLog[] = [];
+
 
 export const defaultAppSettings: AppSettings = {
   general: defaultGeneralSettings,
@@ -512,4 +484,24 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
     activity: partial.activity ?? seedActivityLog,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
+}
+
+/**
+ * The ONE email rule, shared by the form and the schema.
+ *
+ * The Contact form restated it as a regex "deliberately matching what Zod's
+ * `z.email()` accepts" — and it did not, in either direction. `o'brien@bakery.ie`
+ * is a legal address that Zod takes and the regex refused, so the field showed
+ * "Enter a valid email address", Save stayed disabled for the WHOLE Contact
+ * section, and the shop could not change its address, phone or opening hours
+ * either until the owner used a different email.
+ *
+ * Restating a rule is how the two drift. `isSafeAssetUrl`, `isValidMapEmbedUrl`
+ * and `isSafeSocialUrl` are already shared between the form and the schema for
+ * exactly this reason; this is the fourth.
+ */
+const emailRule = z.email();
+
+export function isValidEmailAddress(value: string): boolean {
+  return emailRule.safeParse(value.trim()).success;
 }

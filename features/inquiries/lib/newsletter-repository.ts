@@ -1,3 +1,4 @@
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {
   subscribeRequest,
@@ -8,6 +9,14 @@ import {
 const STORAGE_KEY = "bakery-cms-newsletter-subscribers";
 
 export const NEWSLETTER_UPDATED_EVENT = "bakery-newsletter-updated";
+
+/**
+ * Open once the SERVER's subscribers have been read — see `inquiriesHydration`,
+ * of which this is the exact twin. `loadNewsletterSubscribers` returns `[]` for
+ * an absent key, and the key is a cache the server fills, so a first login read
+ * the empty cache as an answer and told the admin the shop had no mailing list.
+ */
+export const newsletterHydration = createHydrationGate();
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -55,23 +64,32 @@ function persistSubscribers(subscribers: NewsletterSubscriber[]): void {
 /** Hydration: replace the local cache with the server's subscribers (no re-push). */
 export function persistServerSubscribers(subscribers: NewsletterSubscriber[]): void {
   persistSubscribers(subscribers);
+  newsletterHydration.markSettled();
 }
 
+/**
+ * The admin's cached subscriber list. A CACHE — never a source of subscribers.
+ *
+ * Empty used to mean "not seeded yet": `parsed.length > 0 ? parsed : seed()`.
+ * So an admin who cleared the list watched 15 demo subscribers reappear on the
+ * next read, and the Total and Active stat cards counted them as real people
+ * the shop could mail.
+ *
+ * The SERVER seeds a demo shop once, against a flag that survives deletions.
+ * Empty here now means empty, and the list fills when
+ * `useNewsletterServerSync` hydrates it.
+ */
 export function loadNewsletterSubscribers(): NewsletterSubscriber[] {
-  if (typeof window === "undefined") return seedSubscribers();
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedSubscribers();
-    persistSubscribers(seeded);
-    return seeded;
-  }
+  if (typeof window === "undefined") return [];
 
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
     const parsed = JSON.parse(raw) as NewsletterSubscriber[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedSubscribers();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return seedSubscribers();
+    return [];
   }
 }
 

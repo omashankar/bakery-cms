@@ -33,6 +33,7 @@ import {
   getProductShapeOptions,
   getProductVariantGroups,
   getDeliveryTimeSlots,
+  getDeliveryPromise,
   getMinDeliveryDate,
   getProductDetailBadges,
   type ProductReview,
@@ -40,14 +41,19 @@ import {
 import {
   calculateProductUnitPrice,
   formatVariantSummary,
-} from "@/apps/website/lib/product-pricing";
-import { getDefaultVariantSelections } from "@/features/products/lib/variant-utils";
+} from "@/features/products/lib/product-pricing";
+import {
+  getDefaultVariantSelections,
+  variantGroupsEnabledBy,
+} from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
+import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
@@ -105,6 +111,7 @@ export function ProductDetailPage({
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
+  const [deliveryPromise, setDeliveryPromise] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
   const [deliveryReady, setDeliveryReady] = useState(false);
 
@@ -115,7 +122,9 @@ export function ProductDetailPage({
     getDefaultVariantSelections(variantGroups)
   );
   const [message, setMessage] = useState("");
-  const [photoName, setPhotoName] = useState("");
+  /** The uploaded photo's URL, once the shop has it. Empty until then. */
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -131,6 +140,29 @@ export function ProductDetailPage({
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
+  /**
+   * The groups this shop actually sells.
+   *
+   * This used to hide only the PICKER — the comment here said so: "the group
+   * stays in the data + pricing". So a shop with Egg/Eggless switched off still
+   * charged every eggless cake its +80 default and still stamped "Egg
+   * preference: Eggless" on the order line, for a choice the customer was never
+   * shown. The flavour and shape pickers below were already gated for exactly
+   * that reason; these two were the ones left.
+   */
+  const visibleVariantGroups = useMemo(
+    () => variantGroupsEnabledBy(variantGroups, modules),
+    [variantGroups, modules]
+  );
+
+  /** Only what the customer could see, and only what the shop will charge for. */
+  const visibleSelections = useMemo(() => {
+    const allowed = new Set(visibleVariantGroups.map((group) => group.id));
+    return Object.fromEntries(
+      Object.entries(variantSelections).filter(([groupId]) => allowed.has(groupId))
+    );
+  }, [visibleVariantGroups, variantSelections]);
+
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
   const weightPrice =
     cake.weights?.[selectedWeight]?.price ?? cake.price + (weight?.modifier ?? 0);
@@ -139,14 +171,14 @@ export function ProductDetailPage({
       calculateProductUnitPrice({
         basePrice: cake.price,
         weightPrice,
-        variantGroups,
-        variantSelections,
+        variantGroups: visibleVariantGroups,
+        variantSelections: visibleSelections,
       }),
-    [cake.price, weightPrice, variantGroups, variantSelections]
+    [cake.price, weightPrice, visibleVariantGroups, visibleSelections]
   );
   const variantSummary = useMemo(
-    () => formatVariantSummary(variantGroups, variantSelections),
-    [variantGroups, variantSelections]
+    () => formatVariantSummary(visibleVariantGroups, visibleSelections),
+    [visibleVariantGroups, visibleSelections]
   );
   const eggGroup = variantGroups.find((group) => group.type === "egg");
   const selectedEggOption = eggGroup?.options.find(
@@ -168,17 +200,11 @@ export function ProductDetailPage({
       selectedPhotoOption?.semantic === "photo-print") &&
     modules.photoCake;
   const isOutOfStock = cake.inStock === false;
-  // Hide the egg / photo variant choosers when their module is off (the group
-  // stays in the data + pricing — only the on-page picker is hidden).
-  const visibleVariantGroups = variantGroups.filter(
-    (group) =>
-      (group.type !== "egg" || modules.eggEggless) &&
-      (group.type !== "photo" || modules.photoCake)
-  );
 
   useEffect(() => {
     const slots = getDeliveryTimeSlots();
     const minDate = getMinDeliveryDate();
+    setDeliveryPromise(getDeliveryPromise());
     setDeliverySlots(slots);
     setMinDeliveryDate(minDate);
     setDeliveryDate(minDate);
@@ -222,13 +248,71 @@ export function ProductDetailPage({
   }, [cake.slug]);
 
   useEffect(() => {
-    function refreshReviews() {
-      setReviews(getProductReviews(cake));
+    // The list now comes from the server, so this is async and can land after
+    // the visitor has navigated on. `cancelled` keeps one product's reviews from
+    // arriving under another product's page.
+    let cancelled = false;
+
+    async function refreshReviews() {
+      const fetched = await getProductReviews(cake);
+      // Null is a failed read, not an empty list — leave what is on screen.
+      if (!cancelled && fetched) setReviews(fetched);
     }
-    refreshReviews();
+
+    void refreshReviews();
     window.addEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
-    return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(REVIEWS_UPDATED_EVENT, refreshReviews);
+    };
   }, [cake]);
+
+  /**
+   * Send the photo to the shop, and only then say it is attached.
+   *
+   * The old control reported "Selected: birthday.jpg" the instant the file
+   * was chosen, which was true about the browser and false about everything
+   * else. Nothing is claimed here until the server answers with a URL.
+   */
+  async function handlePhotoUpload(file: File) {
+    if (!getCustomerSession()) {
+      toast.info("Please sign in to attach a photo", {
+        description: "It travels with your order, so it needs to belong to an account.",
+      });
+      openCustomerAuthModal("phone");
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const body = new FormData();
+      body.append("photo", file);
+      const res = await fetch("/api/uploads/photo-cake", {
+        method: "POST",
+        credentials: "same-origin",
+        body,
+      });
+      const parsed = (await res.json().catch(() => null)) as
+        | { data?: { url?: string }; message?: string }
+        | null;
+
+      if (!res.ok || !parsed?.data?.url) {
+        setPhotoUrl("");
+        toast.error(parsed?.message ?? "Could not upload that photo");
+        return;
+      }
+
+      setPhotoUrl(parsed.data.url);
+      toast.success("Photo attached");
+    } catch {
+      setPhotoUrl("");
+      toast.error("Could not reach the bakery", {
+        description: "Please check your connection and try again.",
+      });
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
 
   const handleAddToCart = (redirectToCart = false) => {
     if (isOutOfStock) {
@@ -242,7 +326,12 @@ export function ProductDetailPage({
       image: cake.image,
       price: displayPrice,
       quantity,
-      weight: weight?.label,
+      // Gated like the two below it. The weight picker is hidden when the
+      // module is off, but `weight` still defaulted to the first tier — so a
+      // shop with Weight switched off recorded "0.5 kg" on every cart line,
+      // order, invoice and confirmation email, for a size no customer was ever
+      // shown and no baker agreed to.
+      weight: (modules.weight && weight?.label) || undefined,
       // Omitted entirely when this cake has no flavour choice, or when the
       // module is off — the picker is hidden in both cases, and an order line
       // must not record a choice the customer was never shown. `selectedFlavour`
@@ -252,9 +341,14 @@ export function ProductDetailPage({
       flavour: (modules.flavour && selectedFlavour) || undefined,
       shape: modules.shape ? selectedShape : undefined,
       message: message.trim() || undefined,
+      photoUrl: photoUrl || undefined,
       deliveryDate,
       deliveryTime,
-      variantSelections,
+      // Only the groups the customer could see. `calculateVariantAdjustment`
+      // falls back to a group's default option when no selection is sent, so
+      // the server-side gate in pricing.server.ts is what actually stops the
+      // charge; this stops the ORDER recording a choice nobody made.
+      variantSelections: visibleSelections,
       variantSummary,
     });
 
@@ -445,20 +539,48 @@ export function ProductDetailPage({
                 </div>
               ) : null}
 
+              {/*
+                The photo a photo cake is printed with.
+
+                This kept the file NAME in local state and nothing else — never
+                uploaded, never on the cart line, never on the order. The bakery
+                received an order for a photo cake with no photo and no sign one
+                had been chosen, after the customer had watched themselves
+                attach it and paid the photo surcharge.
+
+                It now uploads to `/api/uploads/photo-cake`, which requires a
+                signed-in customer (checkout does too), checks the magic bytes
+                rather than the browser's word for the type, caps the size, and
+                stores it where the bakery can open it.
+              */}
               {showPhotoUpload ? (
                 <div className="space-y-2" data-gate-photo>
-                  <Label htmlFor="photo-upload">Upload photo (photo cakes)</Label>
+                  <Label htmlFor="photo-upload">Upload your photo</Label>
                   <Input
                     id="photo-upload"
                     type="file"
-                    accept="image/*"
-                    onChange={(event) =>
-                      setPhotoName(event.target.files?.[0]?.name ?? "")
-                    }
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={photoUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      // The input is cleared either way, so choosing the same
+                      // file again after a failure still fires a change.
+                      event.target.value = "";
+                      if (file) void handlePhotoUpload(file);
+                    }}
                   />
-                  {photoName ? (
-                    <p className="text-xs text-muted-foreground">Selected: {photoName}</p>
-                  ) : null}
+                  {photoUploading ? (
+                    <p className="text-xs text-muted-foreground">Uploading your photo…</p>
+                  ) : photoUrl ? (
+                    <p className="flex items-center gap-1.5 text-xs text-green-700">
+                      <Check className="size-3.5" />
+                      Photo attached — it will reach the bakery with your order.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      JPEG, PNG or WebP, up to 6 MB.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
@@ -538,7 +660,7 @@ export function ProductDetailPage({
                 </li>
                 <li className="flex items-center gap-2">
                   <Truck className="size-4 text-bakery-700" />
-                  Same-day delivery
+                  {deliveryPromise}
                 </li>
                 {modules.eggEggless ? (
                   <li className="flex items-center gap-2" data-gate-egg>
@@ -608,7 +730,14 @@ export function ProductDetailPage({
                   <ProductReviewForm
                     productSlug={cake.slug}
                     cakeName={cake.name}
-                    onSubmitted={() => setReviews(getProductReviews(cake))}
+                    onSubmitted={() => {
+                      // A new review is pending, so this re-read normally comes
+                      // back unchanged — which is the honest outcome. It runs so
+                      // that anything approved since the page loaded appears.
+                      void getProductReviews(cake).then((next) => {
+                        if (next) setReviews(next);
+                      });
+                    }}
                   />
                   {reviews.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
@@ -647,7 +776,7 @@ export function ProductDetailPage({
                   )}
                 </TabsContent>
                 <TabsContent value="delivery" className="text-sm text-muted-foreground">
-                  Same-day delivery available for orders placed before 2 PM within city limits.
+                  {deliveryPromise} on orders placed within city limits.
                   Scheduled delivery on {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
                   {deliveryTime ? ` between ${deliveryTime}` : ""}. Custom message card included at
                   no extra charge.

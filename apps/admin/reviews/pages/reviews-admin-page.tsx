@@ -23,6 +23,7 @@ import {
 import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { ListLoading } from "@/components/shared/list-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +38,7 @@ import {
   loadReviews,
   rejectReviews,
   REVIEWS_UPDATED_EVENT,
-  resetReviews,
+  reloadReviewsFromServer,
   saveReviewReply,
   setReviewStatus,
   toggleReviewFeatured,
@@ -52,6 +53,7 @@ import {
 import { ReviewFormDialog } from "../components/review-form-dialog";
 import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
+import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
 
 const PAGE_SIZE = 10;
 
@@ -95,11 +97,20 @@ export function ReviewsAdminPage() {
 
   function refresh() {
     setReviews(loadReviews());
-    setMounted(true);
   }
 
   useEffect(() => {
     refresh();
+    /**
+     * `mounted` waits for the SERVER, not for the local read.
+     *
+     * It used to be set inside `refresh()`, which runs straight after a
+     * synchronous localStorage read — so on a fresh browser the cards painted
+     * "0 pending · All clear" and the list said "No reviews found" before the
+     * server had been asked. `useReviewsServerSync` in the admin layout is what
+     * actually fetches them, and it settles this gate when it lands.
+     */
+    void reviewsHydration.waitForSettled().then(() => setMounted(true));
     window.addEventListener(REVIEWS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, refresh);
   }, []);
@@ -145,11 +156,24 @@ export function ReviewsAdminPage() {
   }
 
   async function handleSaveReview(data: ProductReviewFormData, id?: string) {
-    const { persisted } = id ? await updateReview(id, data) : await createReview(data);
+    const { persisted, partial } = id
+      ? await updateReview(id, data)
+      : await createReview(data);
     refresh();
     setSelectedIds([]);
 
     if (!persisted) return reportUnpersisted(id ? "Review updated" : "Review added");
+
+    // Adding a review is two writes. When only the status/feature step fails the
+    // review IS stored — saying "nothing was saved" invites a second submission
+    // and a duplicate row.
+    if (partial === "moderation") {
+      toast.warning("Review added, but it is still pending", {
+        description: "The status could not be applied. Approve it from the list.",
+      });
+      return;
+    }
+
     toast.success(id ? "Review updated" : "Review added");
   }
 
@@ -195,16 +219,19 @@ export function ReviewsAdminPage() {
               variant="outline"
               className="min-w-0 flex-1 sm:flex-none"
               onClick={() => {
-                void resetReviews().then(({ persisted }) => {
+                void reloadReviewsFromServer().then(({ persisted }) => {
                   refresh();
-                  if (!persisted) return reportUnpersisted("Reviews reset");
-                  toast.success("Reviews reset to demo seed");
+                  if (!persisted) {
+                    toast.error("Could not reach the server — showing the cached list");
+                    return;
+                  }
+                  toast.success("Reloaded from the server");
                 });
               }}
             >
               <RotateCcw className="size-4" />
-              <span className="sm:hidden">Reset</span>
-              <span className="hidden sm:inline">Reset demo</span>
+              <span className="sm:hidden">Reload</span>
+              <span className="hidden sm:inline">Reload from server</span>
             </Button>
             <Button
               variant="bakery"
@@ -235,6 +262,7 @@ export function ReviewsAdminPage() {
             changeTone={overview.pending > 0 ? "warning" : "positive"}
             icon={MessageSquare}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <button
@@ -249,6 +277,7 @@ export function ReviewsAdminPage() {
             changeTone={overview.reported > 0 ? "warning" : "positive"}
             icon={Flag}
             tone="gold"
+            figures={mounted ? "ready" : "loading"}
           />
         </button>
         <DashboardStatCard
@@ -258,6 +287,7 @@ export function ReviewsAdminPage() {
           changeTone="neutral"
           icon={Star}
           tone="bakery"
+          figures={mounted ? "ready" : "loading"}
         />
       </section>
 
@@ -357,7 +387,9 @@ export function ReviewsAdminPage() {
           </div>
         ) : null}
 
-        {paginated.length === 0 ? (
+        {!mounted ? (
+          <ListLoading rows={5} label="Loading reviews" />
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Star}
             title="No reviews found"

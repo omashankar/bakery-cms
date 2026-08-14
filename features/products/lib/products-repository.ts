@@ -216,15 +216,19 @@ function normalizeProductImages(cakes: Product[]): { cakes: Product[]; changed: 
 export function loadProducts(): Product[] {
   if (typeof window === "undefined") return seedProducts();
 
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedProducts();
-    writeProducts(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
-    return seeded;
-  }
-
   try {
+    // Inside the try. `localStorage.getItem` itself throws in a browser that
+    // denies storage — private mode, or blocked third-party cookies — and this
+    // read sat outside it, so every admin screen that calls this crashed rather
+    // than falling back to the server.
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const seeded = seedProducts();
+      writeProducts(seeded);
+      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      return seeded;
+    }
+
     const parsed = JSON.parse(raw) as Product[];
     // Only corrupt data re-seeds. A stored empty array is a real answer — it is
     // what `useProductCacheSync` writes when the server's catalogue is empty —
@@ -246,10 +250,17 @@ export function loadProducts(): Product[] {
 
     return normalized;
   } catch {
-    const seeded = seedProducts();
-    writeProducts(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
-    return seeded;
+    // Do NOT re-seed here.
+    //
+    // This catch covers a failed localStorage WRITE as well as a parse failure —
+    // a full quota, or private browsing — and it answered both by replacing the
+    // shop's cached catalogue with 34 demo cakes. The screens that read this
+    // cache then showed demo products to an admin whose real ones were fine on
+    // the server, and a save from one of those screens could publish them.
+    //
+    // Empty is the honest answer: `useProductCacheSync` refills it from the
+    // server on the next pass.
+    return [];
   }
 }
 
@@ -359,7 +370,8 @@ export function createEmptyProductForm(): ProductFormData {
     allergens: "",
     careInstructions: "",
     variantGroups: createDefaultVariantGroups(),
-    rating: 4.5,
+    // A cake with no reviews has no rating. This started at 4.5.
+    rating: 0,
     reviewCount: 0,
     seo: {
       metaTitle: "",

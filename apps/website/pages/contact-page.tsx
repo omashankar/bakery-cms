@@ -62,47 +62,78 @@ export function ContactPage({
             <ScrollReveal delay={120} className="space-y-6">
               <div className="rounded-2xl border border-border bg-cream-100 p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Get in Touch</h2>
+                {/*
+                  Only what the shop actually publishes.
+
+                  These read from a `contact.phone || defaultContact.phone`
+                  helper, so a cleared field came back as the shipped demo
+                  number and this page turned it into a live `tel:` link — a
+                  home baker with no landline advertising +91 1800-123-4567 as
+                  the way to reach them. The read tells the truth now, which
+                  means a blank arrives as "" and an unguarded anchor would be
+                  `tel:` / `mailto:` pointing at nothing.
+                */}
                 <ul className="mt-5 space-y-3">
-                  <li className="flex items-start gap-3.5 rounded-xl border border-border bg-white p-3.5">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                      <MapPin className="size-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold text-foreground">Visit us</span>
-                      <span className="block text-sm text-muted-foreground">{contactInfo.address}</span>
-                    </span>
-                  </li>
-                  <li>
-                    <a
-                      href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
-                      className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
-                    >
+                  {contactInfo.address ? (
+                    <li className="flex items-start gap-3.5 rounded-xl border border-border bg-white p-3.5">
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                        <Phone className="size-4" />
+                        <MapPin className="size-4" />
                       </span>
                       <span>
-                        <span className="block text-sm font-semibold text-foreground">Call us</span>
-                        <span className="block text-sm text-muted-foreground">{contactInfo.phone}</span>
+                        <span className="block text-sm font-semibold text-foreground">Visit us</span>
+                        <span className="block text-sm text-muted-foreground">
+                          {contactInfo.address}
+                        </span>
                       </span>
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href={`mailto:${contactInfo.email}`}
-                      className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
-                    >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                        <Mail className="size-4" />
-                      </span>
-                      <span>
-                        <span className="block text-sm font-semibold text-foreground">Email us</span>
-                        <span className="block text-sm text-muted-foreground">{contactInfo.email}</span>
-                      </span>
-                    </a>
-                  </li>
+                    </li>
+                  ) : null}
+                  {contactInfo.phone ? (
+                    <li>
+                      <a
+                        href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
+                        className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
+                          <Phone className="size-4" />
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">Call us</span>
+                          <span className="block text-sm text-muted-foreground">
+                            {contactInfo.phone}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ) : null}
+                  {contactInfo.email ? (
+                    <li>
+                      <a
+                        href={`mailto:${contactInfo.email}`}
+                        className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
+                          <Mail className="size-4" />
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">
+                            Email us
+                          </span>
+                          <span className="block text-sm text-muted-foreground">
+                            {contactInfo.email}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ) : null}
                 </ul>
               </div>
 
+              {/*
+                No hours, no card. The heading used to sit above an invented
+                list; with the invention gone it would sit above nothing, which
+                is its own small lie about a shop that publishes no hours.
+              */}
+              {businessHours.length > 0 ? (
               <div className="rounded-2xl border border-border bg-white p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Opening Hours</h2>
                 <ul className="mt-5 space-y-3 text-sm">
@@ -123,6 +154,7 @@ export function ContactPage({
                   ))}
                 </ul>
               </div>
+              ) : null}
             </ScrollReveal>
           </div>
 

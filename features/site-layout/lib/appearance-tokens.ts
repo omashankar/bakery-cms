@@ -36,11 +36,29 @@ export const APPEARANCE_SSR_STYLE_ID = "appearance-tokens";
 
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
+/**
+ * A bad TYPE, not just a bad value.
+ *
+ * These both called `.trim()` on the argument, which throws when a stored
+ * colour is `null` rather than a malformed string — and `hasValidAppearanceColors`
+ * is the guard `appearanceCssVariables` relies on to "return nothing for a
+ * palette it cannot use". Instead of returning nothing it threw, and on the
+ * storefront that throw is caught by `getStorefrontChrome`, which answers with
+ * `fallbackChrome()`: the demo brand, the demo nav, the demo footer and the demo
+ * contact details on EVERY page, because one colour field held the wrong type.
+ *
+ * Confirmed live. `"not-a-colour"` degraded correctly — the palette dropped and
+ * the shop's own header and footer survived — while `null` took the lot. The
+ * schema refuses both on the way in now, but it only constrains FUTURE writes,
+ * and the comment at the call site already says a row at rest "can hold a colour
+ * that was allowed in years earlier".
+ */
 export function isValidHexColor(value: string): boolean {
-  return HEX_COLOR.test(value.trim());
+  return typeof value === "string" && HEX_COLOR.test(value.trim());
 }
 
 export function normalizeHexColor(value: string): string {
+  if (typeof value !== "string") return "";
   const trimmed = value.trim();
   if (!HEX_COLOR.test(trimmed)) return trimmed;
   if (trimmed.length === 4) {

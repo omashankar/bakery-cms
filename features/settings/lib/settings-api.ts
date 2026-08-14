@@ -84,6 +84,39 @@ export async function pushSection(section: string, value: unknown): Promise<bool
   }
 }
 
+/**
+ * Reset ONE section on the server, through the endpoint that exists for it.
+ *
+ * A "reset" used to be an ordinary PUT of `defaultXSettings`. For eight
+ * sections that is indistinguishable from a reset; for SMTP it is not.
+ * `defaultSmtpSettings.password` is `""`, and the server reads a blank password
+ * as "keep the stored one" — a rule that has to exist, because the form is
+ * never sent the password back and would otherwise wipe a working credential
+ * every time somebody toggled `enabled`. So Reset wrote the demo host, port and
+ * username with the shop's OLD password reattached, told the admin "SMTP
+ * settings reset to defaults", and flipped the hint to "No password saved"
+ * while the mail transport went on authenticating with it.
+ *
+ * `POST /api/settings/[section]/reset` does not go through that rule — its own
+ * comment already claimed this was the path a reset takes — and it records
+ * `settings.reset.<section>` in the audit trail rather than an update.
+ *
+ * Gated like the writes: not because a reset can clobber (it sends no local
+ * data) but because what follows it does — the local cache is rewritten from
+ * the defaults, and doing that to an unhydrated cache leaves the seed sitting
+ * where the next save will push it.
+ */
+export async function resetSectionRequest(section: string): Promise<boolean> {
+  if (!(await settingsHydration.waitForSettled())) return false;
+
+  try {
+    const res = await fetch(`/api/settings/${section}/reset`, { method: "POST" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface TestEmailResult {
   sent: boolean;
   /** The server's reason when `sent` is false — a wrong port, a refused login. */

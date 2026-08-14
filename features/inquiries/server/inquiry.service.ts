@@ -38,18 +38,21 @@ async function ensureSeeded(): Promise<void> {
 export async function createInquiry(input: CreateInquiryInput, ctx: RequestCtx): Promise<Inquiry> {
   const now = new Date().toISOString();
   const inquiry: Inquiry = {
-    id: input.id ?? `inq-${randomUUID()}`,
+    // Minted here, never taken from the body. See `createInquirySchema`.
+    id: `inq-${randomUUID()}`,
     type: input.type,
     name: input.name,
     email: input.email,
     phone: input.phone,
     subject: input.subject,
     message: input.message,
-    status: input.status ?? "new",
+    // Forced. A public submission is a new enquiry and nothing else — accepting
+    // "closed" let a stranger file one the shop would never look at.
+    status: "new",
     eventDate: input.eventDate,
     guestCount: input.guestCount,
-    createdAt: input.createdAt ?? now,
-    updatedAt: input.updatedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await repo.create(inquiry);

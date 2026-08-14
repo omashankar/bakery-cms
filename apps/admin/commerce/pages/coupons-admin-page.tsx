@@ -1,5 +1,7 @@
 "use client";
 
+import { hasExpired } from "@/lib/expiry-date";
+import { formatDate } from "@/utils/format";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -9,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -19,6 +22,7 @@ import {
   type StoredCoupon,
 } from "@/features/commerce/lib/coupons-repository";
 import { CouponFormDialog } from "../components/coupon-form-dialog";
+import { COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
 
 const PAGE_SIZE = 10;
 
@@ -37,7 +41,20 @@ export function CouponsAdminPage() {
   }
 
   useEffect(() => {
+    /**
+     * Re-read when the store changes, which is what every sibling list does.
+     *
+     * This read the cache once on mount and subscribed to nothing. On a cold
+     * cache `loadCoupons` seeds the shipped WELCOME10 / BDAY20 / WED2026 with
+     * invented usage counts, and the server's real coupons — landing in
+     * localStorage a moment later, from the hydration — never reached the
+     * screen. So the page showed a discount table the shop does not have, with
+     * redemption numbers nobody earned, for the whole of that mount. Delivery
+     * zones next door already listen for their own event.
+     */
     refresh();
+    window.addEventListener(COUPONS_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(COUPONS_UPDATED_EVENT, refresh);
   }, []);
 
   const activeCount = coupons.filter((coupon) => coupon.isActive).length;
@@ -123,7 +140,11 @@ export function CouponsAdminPage() {
           <CardTitle className="text-base">All coupons</CardTitle>
         </CardHeader>
         <CardContent>
-          {coupons.length === 0 ? (
+          {!mounted ? (
+            // "No coupons yet — create your first discount code" on a cold load
+            // of a shop that already runs three.
+            <ListLoading rows={3} label="Loading coupons" />
+          ) : coupons.length === 0 ? (
             <EmptyState
               icon={Tag}
               title="No coupons yet"
@@ -165,6 +186,14 @@ export function CouponsAdminPage() {
                         <p className="font-mono text-sm font-semibold">{coupon.code}</p>
                         <Badge variant="secondary">{coupon.label}</Badge>
                         {!coupon.isActive ? <Badge variant="outline">Inactive</Badge> : null}
+                        {/* An expired coupon used to render with a green Active
+                            switch and nothing else — expiresAt was captured by
+                            the form and enforced at checkout but shown nowhere,
+                            so an admin looking at the screen saw a live code
+                            while customers were being refused. */}
+                        {hasExpired(coupon.expiresAt) ? (
+                          <Badge variant="destructive">Expired</Badge>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">{coupon.description}</p>
                       <p className="mt-2 text-xs text-muted-foreground">
@@ -175,6 +204,11 @@ export function CouponsAdminPage() {
                             : "No discount configured"}
                         {coupon.minSubtotal ? ` · Min ${coupon.minSubtotal.toLocaleString("en-IN")}` : ""}
                         {` · Used ${coupon.usageCount} times`}
+                        {coupon.expiresAt
+                          ? ` · ${hasExpired(coupon.expiresAt) ? "Expired" : "Expires"} ${formatDate(
+                              coupon.expiresAt,
+                            )}`
+                          : ""}
                       </p>
                     </div>
                   </div>

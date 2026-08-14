@@ -95,6 +95,96 @@ export function parseHeroSlides(
   return [];
 }
 
+/**
+ * Read a `type: "list"` field from a section's content.
+ *
+ * Stored as a JSON string for the same reason `slides` is: content values are
+ * primitives, and `contentIsUsable` rejects anything else with a 400.
+ *
+ * Returns [] for anything it cannot read — an absent key, malformed JSON, a
+ * value that is not an array. NEVER a default: these lists hold claims about
+ * the shop, and a fallback would re-assert the demo copy on every section
+ * saved before the field existed, which is the defect this exists to fix.
+ *
+ * A FAITHFUL read: rows come back exactly as stored, blanks and all.
+ *
+ * It used to drop all-empty rows and trim every value here, which broke the
+ * editor in two ways. The editor holds no draft of its own — it re-reads
+ * through this function on every render — so "Add row" wrote an empty row and
+ * this filter deleted it before it could be typed into, making the button a
+ * no-op on every list field. And clearing a row's last non-empty column
+ * deleted the row out from under the cursor. Trimming did the same to a
+ * trailing space, which a controlled input cannot then display.
+ *
+ * Deciding what is worth SHOWING belongs to the renderer, which is what
+ * `renderableRows` below is for.
+ */
+export function parseListField(
+  content: Record<string, string | number | boolean>,
+  key: string,
+): Record<string, string>[] {
+  const raw = content[key];
+  if (typeof raw !== "string" || !raw.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+      .map((row) => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(row)) {
+          out[k] = typeof v === "string" ? v : v == null ? "" : String(v);
+        }
+        return out;
+      });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The rows a page should actually render.
+ *
+ * A row with nothing in any column says nothing, and an admin mid-edit leaves
+ * exactly that behind. Storefront renderers filter here rather than in
+ * `parseListField`, so the editor keeps its blank rows and the page does not
+ * show them.
+ */
+export function renderableRows(rows: Record<string, string>[]): Record<string, string>[] {
+  return rows.filter((row) => Object.values(row).some((value) => value.trim() !== ""));
+}
+
+/**
+ * The rows of a PHOTO list worth rendering — those that have a photo.
+ *
+ * `renderableRows` keeps any row with one non-blank column, which is right for
+ * a stat or a card but wrong for a picture: an admin who types the caption
+ * "Priya's wedding tier" and is interrupted before choosing the image leaves a
+ * row that passes it, and the row then reaches `<Image src="">` — a broken tile
+ * sitting among the shop's real photographs. A row with no picture is not a
+ * photograph, whatever else has been typed on it.
+ */
+export function photoRows(
+  content: Record<string, string | number | boolean>,
+  key: string,
+): Record<string, string>[] {
+  return parseListField(content, key).filter((row) => (row.image ?? "").trim() !== "");
+}
+
+/**
+ * The first `max` rows, where a max of zero or less means "no limit".
+ *
+ * The builder's number input writes `Number(value) || 0`, so an admin who
+ * selects "Max images shown" to retype it stores 0 mid-keystroke — and
+ * `slice(0, 0)` is empty. On these sections empty means "render nothing", so
+ * clearing that one box did not widen the gallery, it deleted the heading, the
+ * photos and the CTA from the live page while the photo list stayed full.
+ */
+export function limitRows<T>(rows: T[], max: number): T[] {
+  return max > 0 ? rows.slice(0, max) : rows;
+}
+
 export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   {
     type: "hero",
@@ -104,7 +194,25 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       slides: JSON.stringify(DEFAULT_HERO_SLIDES),
     },
-    fields: [{ key: "slides", label: "Hero slides", type: "slides" }],
+    fields: [
+      { key: "slides", label: "Hero slides", type: "slides" },
+      {
+        /**
+         * The strip under the hero. It was a constant reading "1M+ Happy
+         * customers · 500+ Cake varieties · 60+ Years of joy" — the demo
+         * brand's figures, shown as whichever shop runs this CMS. Empty by
+         * default, and an empty list renders no strip at all.
+         */
+        key: "stats",
+        label: "Stats strip",
+        type: "list",
+        emptyHint: "No stats — the strip will not appear on the page.",
+        itemFields: [
+          { key: "value", label: "Figure", type: "text", placeholder: "500+" },
+          { key: "label", label: "Label", type: "text", placeholder: "Cakes baked" },
+        ],
+      },
+    ],
   },
   {
     type: "our-menu",
@@ -334,12 +442,41 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     icon: "Shield",
     defaultBackground: "white",
     defaultContent: {
-      overline: "The Monginis Difference",
+      // Seeded without the demo brand's name or its "six decades" — a new shop
+      // should not have to delete someone else's history before it can write
+      // its own.
+      overline: "",
       title: "Why Choose Us",
-      description:
-        "Six decades of trust, quality, and the sweetest memories for every celebration.",
+      description: "",
     },
     fields: [
+      {
+        /**
+         * The four cards were a hardcoded array inside the renderer: "Over six
+         * decades of baking expertise", "Belgian chocolate", "Order by 2 PM for
+         * same-day delivery across major cities". None of it is true of every
+         * shop, and the delivery line contradicted the shop's own lead time.
+         */
+        key: "items",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          {
+            key: "icon",
+            label: "Icon",
+            type: "select",
+            options: [
+              { label: "Award", value: "Award" },
+              { label: "Leaf", value: "Leaf" },
+              { label: "Truck", value: "Truck" },
+              { label: "Palette", value: "Palette" },
+            ],
+          },
+          { key: "title", label: "Title", type: "text", placeholder: "Premium Ingredients" },
+          { key: "description", label: "Description", type: "text" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
@@ -372,13 +509,43 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       description: "A glimpse into our world of cakes, pastries, and celebrations.",
       ctaLabel: "View Full Gallery",
       ctaHref: routes.store.gallery,
+      // The homepage strip is a taste of the gallery, not the gallery. It used
+      // to be a hardcoded `slice(0, 8)`; the photos are the shop's own list now
+      // and the same list feeds /store/gallery, so without a cap here a shop
+      // that curates forty photographs for its gallery page grows a forty-tile
+      // block on its homepage whose own "View Full Gallery" button leads to the
+      // very same forty.
+      maxCount: 8,
     },
     fields: [
+      {
+        /**
+         * The shop's OWN photographs.
+         *
+         * This grid rendered `galleryImages` from landing-data — twelve stock
+         * Unsplash photos of somebody else's cakes, shown as this shop's work on
+         * every install, with no field anywhere to change them. A customer
+         * choosing a bakery by its photographs was choosing on someone else's.
+         *
+         * Empty renders no grid: a section that admits it has no photos yet is
+         * better than one showing another bakery's.
+         */
+        key: "images",
+        label: "Photos",
+        type: "list",
+        emptyHint: "No photos — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Photo", type: "url", isImage: true },
+          { key: "title", label: "Caption", type: "text" },
+          { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "maxCount", label: "Max photos on the homepage", type: "number" },
     ],
   },
   {
@@ -397,6 +564,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 6,
     },
     fields: [
+      {
+        /**
+         * The shop's own posts, if it wants to show any.
+         *
+         * This rendered six stock photos from `instagramPosts` as though they
+         * were the shop's feed — under a heading naming the shop's real handle,
+         * and each one linking to that profile. So the strip invited a customer
+         * to a feed that looked nothing like the tiles above it.
+         *
+         * There is no Instagram API here and none is being added: these are
+         * pictures the shop uploads, and the section disappears without them.
+         */
+        key: "posts",
+        label: "Posts",
+        type: "list",
+        emptyHint: "No posts — this section will not appear on the page.",
+        itemFields: [{ key: "image", label: "Photo", type: "url", isImage: true }],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
@@ -410,12 +595,15 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     label: "Store Locator",
     icon: "MapPin",
     defaultBackground: "cream",
+    // Was "Find a Store Near You" / "Over 300 outlets across India" / "Find
+    // Stores" — copy for a chain, shipped to every shop that installs this CMS,
+    // above a locator that searched nothing and listed three fixed Mumbai
+    // addresses. This CMS stores one address; the section shows it.
     defaultContent: {
       overline: "Visit Us",
-      title: "Find a Store Near You",
-      description:
-        "Over 300 outlets across India — freshly baked treats, always close by.",
-      buttonLabel: "Find Stores",
+      title: "Visit Our Bakery",
+      description: "Here is where to find us, and when we are open.",
+      buttonLabel: "Get Directions",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },

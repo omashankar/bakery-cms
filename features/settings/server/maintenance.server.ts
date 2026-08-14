@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { clientIpFrom, proxyHeadersAreTrusted } from "@/lib/server/http/client-ip";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 
@@ -48,9 +49,8 @@ const MAINTENANCE_ROLES = ["owner", "admin"];
  * Everywhere else the allow-list simply cannot match, and the admin is told so
  * on the settings page rather than being left to assume it works.
  */
-export function proxyHeadersAreTrusted(): boolean {
-  return process.env.TRUST_PROXY_HEADERS === "true";
-}
+export { proxyHeadersAreTrusted };
+
 
 const OPEN: MaintenanceState = {
   isEnabled: false,
@@ -61,19 +61,12 @@ const OPEN: MaintenanceState = {
 };
 
 async function clientIp(): Promise<string> {
-  if (!proxyHeadersAreTrusted()) return "";
-
-  const h = await headers();
-  const forwarded = h.get("x-forwarded-for");
-  if (forwarded) {
-    // With a trusted proxy the client is the LAST entry it appended, not the
-    // first — the first is whatever the caller sent.
-    const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
-    const last = hops.at(-1);
-    if (last) return last;
-  }
-  return h.get("x-real-ip")?.trim() ?? "";
+  // The derivation moved to lib/server/http/client-ip.ts, unchanged, because
+  // the audit context and the login throttle needed exactly this rule and had
+  // their own weaker copy — the first hop, believed unconditionally.
+  return clientIpFrom(await headers());
 }
+
 
 export const getMaintenanceState = cache(async (): Promise<MaintenanceState> => {
   // Per request, never prerendered: a storefront baked at build time would keep

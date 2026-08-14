@@ -5,6 +5,12 @@ import {
   appendRevision,
   findRevisionSections,
 } from "@/features/cms-sections/lib/builder-revision-utils";
+import {
+  assertVersion,
+  nextVersion,
+  versionOf,
+  type VersionedSnapshot,
+} from "@/features/cms-sections/lib/builder-conflict";
 import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   HomepageBuilderSnapshot,
@@ -65,7 +71,11 @@ function isScheduleDue(snapshot: HomepageBuilderSnapshot): boolean {
  */
 async function readWithSchedule(): Promise<HomepageStoreState> {
   const state = await store.read();
-  if (!isScheduleDue(state.draft)) return state;
+  // Always REPORTS a version, even for a document written before versioning
+  // existed. A reader that answers `undefined` forces every caller to write
+  // `?? 0` and turns a forgotten one into a versionless — now refused — write.
+  const versioned = { ...state, version: versionOf(state) };
+  if (!isScheduleDue(versioned.draft)) return versioned;
 
   return store.mutate((current) => {
     // Re-check under the mutate lock so a concurrent read can't double-fire.
@@ -75,6 +85,7 @@ async function readWithSchedule(): Promise<HomepageStoreState> {
       draft: { ...snapshot },
       published: snapshot,
       revisions: appendRevision(current.revisions, snapshot.sections, "Scheduled publish"),
+      version: nextVersion(current),
     };
     return { next, result: next };
   });
@@ -92,6 +103,25 @@ export async function getPublishedHomepageSections(): Promise<HomepageSectionIns
   return getVisibleSections(sortSections(published.sections)).filter(
     (section) => section.type !== "faq"
   );
+}
+
+/**
+ * A published section's content by type, WITHOUT the visibility filter.
+ *
+ * Hiding a section means "do not show this strip on the homepage". It does not
+ * mean "throw the content away", and it must not govern a page that merely
+ * SOURCES its data from that section: /store/gallery is a nav item of its own,
+ * and it reads the shop's photographs off the Gallery section because there is
+ * no second place to upload them. Read through the filtered accessor, an admin
+ * who hid the homepage strip to shorten the homepage emptied a different page —
+ * "Photographs of our work are on their way." — while the builder still showed
+ * every photo, with nothing anywhere connecting the switch to the page.
+ */
+export async function getPublishedSectionContent(
+  type: HomepageSectionInstance["type"]
+): Promise<HomepageSectionInstance["content"] | null> {
+  const { published } = await readWithSchedule();
+  return sortSections(published.sections).find((section) => section.type === type)?.content ?? null;
 }
 
 export async function getDraftHomepageSections(): Promise<HomepageSectionInstance[]> {
@@ -119,42 +149,103 @@ export async function restoreHomepageRevision(
   return store.mutate((state) => {
     const sections = findRevisionSections(state.revisions, revisionId);
     if (!sections) return { next: state, result: null };
-    const draft = createSnapshot(sections);
-    return { next: { ...state, draft }, result: draft };
+    const draft = createSnapshot(
+      // Sorted here so the builder's own sortSections on the response is a no-op
+      // and what it shows is byte-identical to what is stored. Otherwise it sits
+      // flagged clean while holding different `order` values.
+      sortSections(sections),
+      // Carried over. A restore rebuilt the draft with no second argument, so
+      // opening History on Friday to compare against last month's layout erased
+      // the Monday 09:00 launch the admin had already scheduled — silently, and
+      // Monday came and went with nothing published.
+      state.draft.scheduledPublishAt
+    );
+    return {
+      next: { ...state, draft, version: nextVersion(state) },
+      result: draft,
+    };
   });
 }
 
+/**
+ * Save the draft.
+ *
+ * `expectedVersion` is what the builder read when it loaded. Without it this is
+ * replace-all with nothing to compare against: a tab open since 09:00 and saved
+ * at 09:15 quietly replaced everything done in between, and both admins got a
+ * green "draft saved".
+ */
 export async function saveDraftSections(
   sections: HomepageSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<HomepageBuilderSnapshot> {
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<VersionedSnapshot<HomepageBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const draft = createSnapshot(sections, scheduledPublishAt ?? undefined);
-    return { next: { ...state, draft }, result: draft };
+    const version = nextVersion(state);
+    return {
+      next: { ...state, draft, version },
+      result: { snapshot: draft, version },
+    };
   });
 }
 
 export async function publishSections(
-  sections: HomepageSectionInstance[]
-): Promise<HomepageBuilderSnapshot> {
+  sections: HomepageSectionInstance[],
+  expectedVersion?: number
+): Promise<VersionedSnapshot<HomepageBuilderSnapshot>> {
   return store.mutate((state) => {
+    // Checked here above all: publishing a stale array puts the storefront back
+    // in time for every visitor AND destroys the other admin's saved draft in
+    // the same write.
+    assertVersion(state, expectedVersion);
     const snapshot = createSnapshot(sections);
+    const version = nextVersion(state);
     return {
       // Publishing clears any pending schedule — it has just happened.
       next: {
         draft: { ...snapshot },
         published: snapshot,
         revisions: appendRevision(state.revisions, snapshot.sections, "Homepage publish"),
+        version,
       },
-      result: snapshot,
+      result: { snapshot, version },
     };
   });
 }
 
+/**
+ * Back to the registry defaults.
+ *
+ * The mutator used to ignore its `state` and return `{ draft, published }` only.
+ * `createMongoStore.mutate` writes with `$set: { data: value }`, replacing the
+ * whole document — so every publish snapshot the shop had ever taken went with
+ * it, and an admin who reset intending to restore last month's layout from
+ * Version History afterwards found it empty. Reset was the one action in the
+ * builder that destroyed data no amount of re-doing the work could bring back.
+ *
+ * The history is kept, and the layout that was live is captured into it first,
+ * so Reset is now recoverable in one click.
+ */
 export async function resetHomepageSections(): Promise<HomepageBuilderState> {
-  return store.mutate(() => {
-    const next = { draft: createSnapshot(), published: createSnapshot() };
-    return { next, result: next };
+  return store.mutate((state) => {
+    const draft = createSnapshot();
+    const published = createSnapshot();
+    const version = nextVersion(state);
+    return {
+      next: {
+        draft,
+        published,
+        revisions: appendRevision(
+          state.revisions,
+          state.published.sections,
+          "Before reset to defaults"
+        ),
+        version,
+      },
+      result: { draft, published, version },
+    };
   });
 }
 

@@ -29,14 +29,33 @@ export function getFiles() {
 }
 
 /**
- * Replace the media file list. Any previously-stored file that has a Cloudinary
- * `publicId` and is no longer present is deleted from Cloudinary too — the
- * delete-sync the prompt asks for.
+ * Replace the media file list.
+ *
+ * Cloudinary assets are destroyed only for ids the caller NAMES as deleted, not
+ * for anything merely absent from the incoming list.
+ *
+ * This used to compute `removed` as "stored, has a publicId, not in the new
+ * list" and destroy every one of them. That made a replace-all — which is what
+ * renaming a file, moving it to a folder or editing alt text sends — into an
+ * instruction to delete remote assets. Two admin tabs were enough: tab A uploads
+ * three photos, tab B (hydrated before those uploads) edits one alt text, and
+ * B's whole stale list arrives with A's three files absent, so all three are
+ * destroyed at Cloudinary. Every product, banner and section pointing at them
+ * renders a broken image, and there is nothing to restore.
+ *
+ * A list replacement is a statement about the list. Deleting an asset is a
+ * separate intention, so it travels separately.
  */
-export async function replaceFiles(files: MediaFile[], ctx: RequestCtx) {
+export async function replaceFiles(
+  files: MediaFile[],
+  ctx: RequestCtx,
+  deletedIds: string[] = [],
+) {
   const current = await filesStore.read();
   const keptIds = new Set(files.map((f) => f.id));
-  const removed = current.filter((f) => f.publicId && !keptIds.has(f.id));
+  const removed = current.filter(
+    (f) => f.publicId && deletedIds.includes(f.id) && !keptIds.has(f.id),
+  );
 
   await Promise.all(removed.map((f) => deleteFromCloudinary(f.publicId as string)));
   await filesStore.write(files);

@@ -20,13 +20,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function daysAgo(days: number): string {
-  return new Date(Date.now() - days * 86400000).toISOString();
-}
 
-function hoursAgo(hours: number): string {
-  return new Date(Date.now() - hours * 3600000).toISOString();
-}
 
 function notify(): void {
   if (typeof window === "undefined") return;
@@ -62,135 +56,45 @@ function parseUserAgent(): { browser: string; os: string; deviceLabel: string } 
   return { browser, os, deviceLabel };
 }
 
-function demoIp(): string {
-  return "103.45.128." + (Math.floor(Math.random() * 200) + 10);
-}
+
+/**
+ * Empty, all four of them.
+ *
+ * This shipped a login history, a failed-attempt list, an active-session
+ * list and a device list — invented rows with real-looking IP addresses,
+ * a randomised `103.45.128.x`, and timestamps a couple of hours old. The
+ * Security Centre renders them exactly as it renders the real ones.
+ *
+ * On a security screen that is not placeholder content. An owner scanning
+ * their login history for something they do not recognise was reading
+ * fiction, and the one thing that page exists for is to be believed. The
+ * activity log was emptied for the same reason; these are the same problem
+ * with a sharper edge, because a stranger's IP in a login list is exactly
+ * what someone would act on.
+ *
+ * Real sessions come from the server (`/api/security-center`), so the tab
+ * that matters is unaffected.
+ */
+/**
+ * The browser does not know its own public address, so it does not claim to.
+ *
+ * This was `UNKNOWN_IP`: `"103.45.128." + a random number`. Every login this
+ * client recorded got a fabricated IP that looks exactly like a real one, in
+ * the list an owner scans for a sign-in they do not recognise. An empty
+ * value renders as "Unknown", which is true and cannot be mistaken for
+ * evidence.
+ *
+ * The real address is on the server's audit trail, which the page already
+ * merges in.
+ */
+const UNKNOWN_IP = "";
 
 function seedSecurityCenter(): SecurityCenterState {
-  const { browser, os, deviceLabel } = parseUserAgent();
-
   return {
-    loginHistory: [
-      {
-        id: "lh-1",
-        email: "admin@bakery.com",
-        success: true,
-        ipAddress: "103.45.128.42",
-        deviceLabel: "Chrome on Windows",
-        browser: "Chrome",
-        os: "Windows",
-        timestamp: hoursAgo(2),
-      },
-      {
-        id: "lh-2",
-        email: "admin@bakery.com",
-        success: false,
-        ipAddress: "49.36.201.18",
-        deviceLabel: "Safari on iOS",
-        browser: "Safari",
-        os: "iOS",
-        timestamp: daysAgo(1),
-      },
-      {
-        id: "lh-3",
-        email: "admin@bakery.com",
-        success: true,
-        ipAddress: "103.45.128.42",
-        deviceLabel: "Chrome on Windows",
-        browser: "Chrome",
-        os: "Windows",
-        timestamp: daysAgo(2),
-      },
-      {
-        id: "lh-4",
-        email: "manager@bakery.com",
-        success: false,
-        ipAddress: "182.76.44.91",
-        deviceLabel: "Firefox on Linux",
-        browser: "Firefox",
-        os: "Linux",
-        timestamp: daysAgo(3),
-      },
-      {
-        id: "lh-5",
-        email: "admin@bakery.com",
-        success: true,
-        ipAddress: "103.45.128.42",
-        deviceLabel: "Chrome on Windows",
-        browser: "Chrome",
-        os: "Windows",
-        timestamp: daysAgo(5),
-      },
-    ],
-    failedAttempts: [
-      {
-        id: "fa-1",
-        email: "admin@bakery.com",
-        ipAddress: "49.36.201.18",
-        reason: "Invalid password",
-        timestamp: daysAgo(1),
-      },
-      {
-        id: "fa-2",
-        email: "manager@bakery.com",
-        ipAddress: "182.76.44.91",
-        reason: "Account not found",
-        timestamp: daysAgo(3),
-      },
-    ],
-    activeSessions: [
-      {
-        id: "sess-current",
-        email: "admin@bakery.com",
-        deviceLabel,
-        browser,
-        os,
-        ipAddress: "103.45.128.42",
-        signedInAt: hoursAgo(2),
-        lastActiveAt: nowIso(),
-        isCurrent: true,
-      },
-      {
-        id: "sess-2",
-        email: "admin@bakery.com",
-        deviceLabel: "Safari on iOS",
-        browser: "Safari",
-        os: "iOS",
-        ipAddress: "49.36.201.18",
-        signedInAt: daysAgo(4),
-        lastActiveAt: daysAgo(1),
-        isCurrent: false,
-      },
-    ],
-    devices: [
-      {
-        id: "dev-1",
-        label: deviceLabel,
-        browser,
-        os,
-        ipAddress: "103.45.128.42",
-        lastSeenAt: nowIso(),
-        trusted: true,
-      },
-      {
-        id: "dev-2",
-        label: "Safari on iOS",
-        browser: "Safari",
-        os: "iOS",
-        ipAddress: "49.36.201.18",
-        lastSeenAt: daysAgo(1),
-        trusted: true,
-      },
-      {
-        id: "dev-3",
-        label: "Firefox on Linux",
-        browser: "Firefox",
-        os: "Linux",
-        ipAddress: "182.76.44.91",
-        lastSeenAt: daysAgo(3),
-        trusted: false,
-      },
-    ],
+    loginHistory: [],
+    failedAttempts: [],
+    activeSessions: [],
+    devices: [],
     updatedAt: nowIso(),
   };
 }
@@ -249,7 +153,7 @@ export function getRegisteredDevices(): RegisteredDevice[] {
 export function recordLoginSuccess(email: string): void {
   const state = loadSecurityCenter();
   const { browser, os, deviceLabel } = parseUserAgent();
-  const ip = demoIp();
+  const ip = UNKNOWN_IP;
   const sessionId = `sess-${Date.now()}`;
 
   const historyEntry: LoginHistoryEntry = {
@@ -315,7 +219,7 @@ export function recordFailedLogin(email: string, reason = "Invalid password"): v
     id: `lh-${Date.now()}`,
     email,
     success: false,
-    ipAddress: demoIp(),
+    ipAddress: UNKNOWN_IP,
     deviceLabel,
     browser,
     os,
@@ -325,7 +229,7 @@ export function recordFailedLogin(email: string, reason = "Invalid password"): v
   const failed: FailedLoginAttempt = {
     id: `fa-${Date.now()}`,
     email,
-    ipAddress: demoIp(),
+    ipAddress: UNKNOWN_IP,
     reason,
     timestamp: nowIso(),
   };

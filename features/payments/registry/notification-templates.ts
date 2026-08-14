@@ -7,7 +7,19 @@
  */
 
 export type NotifAudience = "customer" | "admin";
-export type NotifChannel = "in_app" | "email" | "sms";
+/**
+ * The channels this shop can actually deliver on.
+ *
+ *  was offered — and default-on for payment success and refund completed —
+ * with no SMS provider, no credentials screen and no transport anywhere in the
+ * codebase. An admin reading the page concluded customers were being texted
+ * when a refund completed, so nobody followed up, and the customer's first
+ * signal that their money was coming back was their bank statement.
+ *
+ * WhatsApp is the reverse: it is connected, it really sends the order
+ * confirmation, and the page offered no way to turn it off.
+ */
+export type NotifChannel = "in_app" | "email" | "whatsapp";
 
 export type NotifIcon =
   | "CheckCircle2"
@@ -32,7 +44,7 @@ export interface NotificationTemplate {
 export const CHANNEL_LABELS: Record<NotifChannel, string> = {
   in_app: "In-app",
   email: "Email",
-  sms: "SMS",
+  whatsapp: "WhatsApp",
 };
 
 export const PAYMENT_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
@@ -43,7 +55,19 @@ export const PAYMENT_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     event: "Payment Success",
     title: "Payment successful 🎉",
     message: "Your payment of {amount} for order {order} is confirmed. We're preparing your cakes!",
-    channels: ["in_app", "email", "sms"],
+    /**
+     * WhatsApp belongs here because the order confirmation has always gone out
+     * on it.
+     *
+     * `placeOrder` sends `order_confirmation` over WhatsApp whenever the shop
+     * has a connected, Meta-approved template — and the chip on the Payment
+     * Notifications screen was shown OFF, because this list did not mention it.
+     * The screen and the sender have been contradicting each other. Now that the
+     * send is gated on this switch, a default of `["in_app", "email"]` would
+     * silently stop a message every shop currently receives; the default has to
+     * describe what actually happens.
+     */
+    channels: ["in_app", "email", "whatsapp"],
     icon: "CheckCircle2",
   },
   {
@@ -70,7 +94,7 @@ export const PAYMENT_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     event: "Refund Completed",
     title: "Refund completed",
     message: "Your refund of {amount} for order {order} has been processed successfully.",
-    channels: ["in_app", "email", "sms"],
+    channels: ["in_app", "email"],
     icon: "Banknote",
   },
   {

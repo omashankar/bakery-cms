@@ -1,5 +1,4 @@
 import { addToCart } from "@/features/cart/lib/cart";
-import { getProductBySlug } from "@/features/products/lib/product-catalog";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
 
@@ -9,13 +8,40 @@ export interface ReorderResult {
   unavailable: string[];
 }
 
-export function reorderFromOrder(order: PlacedOrder): ReorderResult {
+/** What reorder needs to know about a cake: does the shop still sell it. */
+export interface ReorderCatalogueEntry {
+  slug: string;
+  image?: string;
+  inStock?: boolean;
+}
+
+/**
+ * Put a past order back in the cart.
+ *
+ * `catalogue` is the SHOP's published list, and it is a required argument on
+ * purpose. This used to call `getProductBySlug`, which resolves against the
+ * shipped demo constants merged with `loadProducts()` — the ADMIN's
+ * localStorage cache, seeded with those same demo cakes and never populated in
+ * a customer's browser, because `useProductCacheSync` runs only in the admin
+ * layout.
+ *
+ * So reorder checked a real customer's real order against the demo catalogue.
+ * Every line of a product the shop had actually created came back
+ * "unavailable", `added` was 0, and the button reported "Could not reorder —
+ * items may be unavailable" every single time. Passing the catalogue in makes
+ * the caller say where it came from.
+ */
+export function reorderFromOrder(
+  order: PlacedOrder,
+  catalogue: ReorderCatalogueEntry[],
+): ReorderResult {
   let added = 0;
   let skipped = 0;
   const unavailable: string[] = [];
+  const bySlug = new Map(catalogue.map((entry) => [entry.slug, entry]));
 
   for (const item of order.items) {
-    const cake = getProductBySlug(item.productSlug);
+    const cake = bySlug.get(item.productSlug);
     if (!cake || cake.inStock === false) {
       skipped += 1;
       unavailable.push(item.name);
@@ -25,7 +51,7 @@ export function reorderFromOrder(order: PlacedOrder): ReorderResult {
     addToCart({
       productSlug: item.productSlug,
       name: item.name,
-      image: item.image || cake.image,
+      image: item.image || cake.image || "",
       price: item.price,
       quantity: item.quantity,
       weight: item.weight,
@@ -43,10 +69,13 @@ export function reorderFromOrder(order: PlacedOrder): ReorderResult {
   return { added, skipped, unavailable };
 }
 
-export function reorderFromOrderNumber(orderNumber: string): ReorderResult | null {
+export function reorderFromOrderNumber(
+  orderNumber: string,
+  catalogue: ReorderCatalogueEntry[],
+): ReorderResult | null {
   const order = getOrderByNumber(orderNumber);
   if (!order) return null;
-  return reorderFromOrder(order);
+  return reorderFromOrder(order, catalogue);
 }
 
 export function getFrequentlyOrderedSlugs(limit = 6): string[] {

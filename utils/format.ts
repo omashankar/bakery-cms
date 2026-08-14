@@ -2,6 +2,7 @@ import {
   fractionDigits,
   getActiveLocale,
   localeForCurrency,
+  usableCurrencyCode,
 } from "@/features/settings/lib/active-locale";
 
 /**
@@ -18,7 +19,26 @@ export function formatCurrency(
   currency?: string,
   locale?: string
 ): string {
-  const resolved = currency ?? getActiveLocale().currency;
+  /**
+   * The EXPLICIT currency gets the same filter the ambient one already has.
+   *
+   * `getActiveLocale()` runs every value through `resolve()`, precisely so a
+   * settings document written before the Zod enum existed — the model stores it
+   * as a bare `String`, so "Rs" is a real possibility — cannot reach `Intl`.
+   * The explicit argument skipped that with a bare `??`, and the server always
+   * passes one: it reads `general.currency` straight out of the document.
+   *
+   * A `RangeError: Invalid currency code` from here is not a formatting glitch.
+   * It fires while building the WhatsApp notification arguments in `placeOrder`
+   * — after the order is committed and the card is charged — so the customer
+   * got a 500 on a paid order, no confirmation of any kind was sent, and the
+   * bakery was never told. It also turned a legitimate 409 "below the minimum
+   * order" refusal into a masked 500, and blanked the Appearance admin screen
+   * mid-render. The coupon offers module already wraps this in `usableCurrency`
+   * plus a try/catch for exactly this reason; doing it here means no caller has
+   * to remember.
+   */
+  const resolved = usableCurrencyCode(currency) ?? getActiveLocale().currency;
   const digits = fractionDigits(resolved);
 
   return new Intl.NumberFormat(locale ?? localeForCurrency(resolved), {
@@ -36,6 +56,9 @@ export function formatCurrency(
  * in — the server's, for anything server-rendered — so a 9pm order could show
  * as the previous day to an admin in Kolkata.
  */
+/** Shown where a date is missing or unreadable. */
+export const NO_DATE = "—";
+
 export function formatDate(
   date: string | Date,
   options: Intl.DateTimeFormatOptions = {
@@ -44,9 +67,58 @@ export function formatDate(
     year: "numeric",
   }
 ): string {
+  /**
+   * An unusable date must not take the page down.
+   *
+   * `Intl.DateTimeFormat().format()` throws a RangeError on an Invalid Date,
+   * and this is called from 29 places — order lists, review rows, the admin
+   * profile — so one record with a blank or malformed date string was a white
+   * screen for the whole route. It happened on Admin → Profile, whose empty
+   * profile ships `lastLogin: ""` and `createdAt: ""`: every hard load rendered
+   * that placeholder before hydration and crashed on it.
+   *
+   * The same reasoning as `active-locale.ts`, which guards the currency and
+   * timezone at the point they meet `Intl` for exactly this: "Guarding at the
+   * point of use means no caller can take the site out."
+   */
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return NO_DATE;
+
   const { locale, timezone } = getActiveLocale();
-  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(
-    new Date(date)
+  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(parsed);
+}
+
+/**
+ * A date with no time in it — "2026-08-16", as an `<input type="date">` gives
+ * it — rendered as the calendar day it says, in every timezone.
+ *
+ * `new Date("2026-08-16")` is not that day. It is an INSTANT: midnight UTC.
+ * Render that instant anywhere west of UTC and it is the day before, so a
+ * customer in London booking a Sunday delivery had their order confirmed for
+ * Saturday, on the review step, on the tracking page, and nowhere else — the
+ * order itself still said Sunday, because the string was stored verbatim.
+ *
+ * Anything that is genuinely an instant (a placed-at timestamp) belongs in
+ * `formatDate`, which renders in the shop's configured timezone. This one is
+ * for the dates that have no time to render.
+ */
+export function formatCalendarDate(
+  day: string,
+  options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }
+): string {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.trim());
+  // Not a bare calendar date. Whatever it is, it carries a time, so it is an
+  // instant and belongs in the shop's timezone rather than in UTC.
+  if (!parts) return formatDate(day, options);
+
+  const [, year, month, date] = parts;
+  const { locale } = getActiveLocale();
+  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", ...options }).format(
+    new Date(Date.UTC(Number(year), Number(month) - 1, Number(date)))
   );
 }
 
@@ -56,6 +128,10 @@ export function formatDate(
 export function formatRelativeTime(date: string | Date): string {
   const now = Date.now();
   const then = new Date(date).getTime();
+  // Every comparison below is false against NaN, so an unusable date fell all
+  // the way through to `formatDate` — which used to throw. Answered here so the
+  // reason is stated where it is decided rather than inherited.
+  if (Number.isNaN(then)) return NO_DATE;
   const diff = now - then;
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);

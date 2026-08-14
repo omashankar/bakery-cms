@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { fetchSecurityCenter } from "./security-center-api";
+import { fetchSecurityCenter, securityCenterHydration } from "./security-center-api";
 import { persistServerSecurityCenter } from "./security-center-repository";
 
 /**
@@ -17,7 +17,11 @@ export function useSecurityCenterServerSync(): void {
 
     (async () => {
       const state = await fetchSecurityCenter();
-      if (!cancelled && state) persistServerSecurityCenter(state);
+      if (cancelled) return;
+      if (state) persistServerSecurityCenter(state);
+      // Settled either way — a refused read is still an answer, and a header
+      // stuck on a dash forever says less than the count it could show.
+      securityCenterHydration.markSettled();
     })();
 
     return () => {

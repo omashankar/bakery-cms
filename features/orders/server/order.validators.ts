@@ -37,9 +37,44 @@ const addressSchema = z
   })
   .passthrough();
 
-const deliverySlotSchema = z
-  .object({ date: z.string(), timeSlot: z.string() })
-  .passthrough();
+/**
+ * WHEN the customer asked for the cake, checked as hard as WHAT they ordered.
+ *
+ * This was `{ date: z.string(), timeSlot: z.string() }.passthrough()` — three
+ * separate holes, all of them reachable with one POST:
+ *
+ *  - `date` was any string at all. `"whenever you like"` was accepted and
+ *    stored, and every surface that prints a delivery date reads it back
+ *    verbatim: the customer's invoice, the bakery's WhatsApp alert, the order
+ *    screen, the confirmation email. The lead-time guard compares strings, and
+ *    `"whenever you like" < "2026-08-11"` is false, so it waved it through.
+ *  - `timeSlot` was any string, and the shop's own list of slots is checked in
+ *    `placeOrder` (see the offered-slot rule there) rather than here, because
+ *    only the service has the settings.
+ *  - `.passthrough()` meant anything else the caller attached was stored on the
+ *    order verbatim — `{ note: "CALL ME AT 3AM" }` came back on the document.
+ *
+ * The regex is not enough on its own: `2026-02-30` matches it. The refine is
+ * what makes it a day that exists.
+ */
+const deliverySlotSchema = z.object({
+  date: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Delivery date must be a calendar date (YYYY-MM-DD)")
+    .refine((value) => {
+      const [year, month, day] = value.split("-").map(Number);
+      const stamp = new Date(Date.UTC(year, month - 1, day));
+      return (
+        stamp.getUTCFullYear() === year &&
+        stamp.getUTCMonth() === month - 1 &&
+        stamp.getUTCDate() === day
+      );
+    }, "That is not a real date"),
+  // Bounded because it is printed on an invoice and pushed into a WhatsApp
+  // template. Blank is allowed: a shop may offer no timed slots at all.
+  timeSlot: z.string().trim().max(60).default(""),
+});
 
 export const placeOrderSchema = z.object({
   // Identity/state are OPTIONAL: when the storefront client places an order it
@@ -138,12 +173,40 @@ export const refundSchema = z.object({
   amount: z.number().positive("A refund has to be for more than zero.").optional(),
 });
 
+/**
+ * Marking how a payment stands. NOT a way to say it was refunded.
+ *
+ * `refunded` was settable here, and this endpoint only patches a field — no
+ * gateway is contacted, no refund record is written, no money moves. So an
+ * order could be marked payment-refunded with nothing behind it: the Refund
+ * Centre found no record to show, the Payments page stopped counting the money
+ * as collected, and the customer had been sent nothing.
+ *
+ * It is exactly the reasoning `statusSchema` already applies to `cancelled` and
+ * `refunded` — those have their own endpoints because they move stock and money
+ * — and this schema was the hole left beside it.
+ */
 export const paymentSchema = z.object({
-  paymentStatus: z.enum(["cod", "paid", "pending", "failed", "refunded"]),
+  paymentStatus: z.enum(["cod", "paid", "pending", "failed"], {
+    message: "Use the refund action to refund a payment — it moves money.",
+  }),
   paymentReference: z.string().optional(),
 });
 
 export const notesSchema = z.object({ adminNotes: z.string() });
+
+/**
+ * Who the bakery is sending with an order.
+ *
+ * A blank name CLEARS the assignment — an admin who set the wrong person must
+ * be able to take it back off the customer's tracking page, and there is no
+ * other control that would do it.
+ */
+export const deliveryPartnerSchema = z.object({
+  name: z.string().trim().max(120),
+  phone: z.string().trim().max(32).optional(),
+  vehicle: z.string().trim().max(80).optional(),
+});
 
 export const refundNotesSchema = z.object({ notes: z.string() });
 

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { connection } from "next/server";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 
 /**
@@ -11,11 +12,23 @@ import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
  * admin had saved. Confirmed live before the fix: the Sitemap line pointed at
  * a host that does not exist.
  *
- * `async` also matters on its own: a synchronous `robots()` uses no
- * request-time API, so Next prerenders it at build and it could never reflect
- * a later change.
+ * And it has to be read PER REQUEST. `robots.js` is "a special Route Handler
+ * that is cached by default unless it uses a Request-time API or dynamic
+ * config" — and `async` is not one of those. Nothing in the
+ * `getSeoStoreServer` → `getSiteLayout` → cms-store chain touches `headers()`,
+ * `cookies()` or `connection()` either, so this really was prerendered at
+ * build: an admin turning "Allow search engines to index this site" OFF saved
+ * the field, and every crawler went on reading the copy baked at build time —
+ * on a build without a database, the seeded `https://www.monginis.example` with
+ * indexing ALLOWED. The admin screen even links to /robots.txt as "already
+ * generated and live".
+ *
+ * `sitemap.ts` beside it is dynamic only by accident: it awaits
+ * `isWeddingEnabledOnServer()`, which calls `connection()` and carries the
+ * comment explaining why. This says it out loud instead.
  */
 export default async function robots(): Promise<MetadataRoute.Robots> {
+  await connection();
   const { global } = await getSeoStoreServer();
   const base = global.canonicalBaseUrl.replace(/\/$/, "");
 

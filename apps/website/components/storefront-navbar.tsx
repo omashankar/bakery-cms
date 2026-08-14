@@ -19,6 +19,7 @@ import {
   getCustomerDisplayName,
   getCustomerSession,
   hasCustomerSession,
+  syncCustomerSession,
 } from "@/apps/website/account/lib/customer-session";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
@@ -73,6 +74,20 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     setSignedIn(hasCustomerSession());
     setCustomerName(getCustomerDisplayName());
     setCustomerPhone(getCustomerSession()?.phone ?? "");
+
+    /**
+     * Ask the SERVER who is signed in.
+     *
+     * The header renders from the cached copy first so the account menu does
+     * not flash "Login" on every page, then corrects it here. This is what
+     * makes an expired session, a sign-out in another tab, or an account the
+     * shop has blocked actually take effect — the cache alone would keep an
+     * account menu, and a name, on screen indefinitely.
+     *
+     * `syncCustomerSession` dispatches the session event, which the listener
+     * below picks up, so there is nothing to set from here.
+     */
+    void syncCustomerSession();
   }, []);
 
   useEffect(() => {
@@ -197,6 +212,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           {collectionsRow ? (
             <MegaMenu
               label={collectionsRow.label}
+              categories={chrome.categories}
               isActive={
                 pathname === routes.store.collections ||
                 pathname.startsWith(`${routes.store.collections}/`)
@@ -334,6 +350,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             {collectionsRow ? (
               <MobileShopLinks
                 label={collectionsRow.label}
+                categories={chrome.categories}
                 onNavigate={() => setMobileOpen(false)}
               />
             ) : null}

@@ -66,6 +66,14 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
 export const emailTemplatesHydration = createHydrationGate();
 export const whatsappTemplatesHydration = createHydrationGate();
 export const notificationSettingsHydration = createHydrationGate();
+/**
+ * A "have we read it yet" marker, not a write guard.
+ *
+ * Notification state is written as a delta, so nothing about it needs gating —
+ * this exists only so `ensureCommunicationsHydrated` fetches it once per
+ * session rather than on every call.
+ */
+export const notificationStateHydration = createHydrationGate();
 
 /**
  * A replace-all write sends the ENTIRE local list. Waiting for hydration is what
@@ -131,6 +139,56 @@ export const fetchNotificationSettings = () =>
  */
 export const replaceNotificationSettingsRequest = (settings: NotificationSettings) =>
   guardedPut(notificationSettingsHydration, NOTIFICATION_SETTINGS_PATH, settings);
+
+const NOTIFICATION_STATE_PATH = "/api/communications/notification-state";
+
+/** Which alerts THIS admin has read and dismissed, kept server-side. */
+export interface NotificationStatePayload {
+  read: string[];
+  dismissed: string[];
+}
+
+export interface NotificationStateDelta {
+  read?: string[];
+  dismissed?: string[];
+  undismissed?: string[];
+}
+
+export const fetchNotificationState = () =>
+  getJson<NotificationStatePayload>(NOTIFICATION_STATE_PATH);
+
+/**
+ * A DELTA, and deliberately not behind a hydration gate.
+ *
+ * Every other write in this file is a replace-all and has to wait for the
+ * server's copy, or it overwrites it with whatever this browser happens to
+ * hold. This one cannot: it names the handful of ids the admin just acted on
+ * and the server unions them in, so a browser that has read nothing still
+ * cannot erase anything. Gating it would only mean losing the click that
+ * happened during the first second of a page load.
+ */
+export async function pushNotificationState(
+  delta: NotificationStateDelta,
+): Promise<boolean> {
+  if (
+    (delta.read?.length ?? 0) === 0 &&
+    (delta.dismissed?.length ?? 0) === 0 &&
+    (delta.undismissed?.length ?? 0) === 0
+  ) {
+    return true;
+  }
+
+  try {
+    const res = await fetch(NOTIFICATION_STATE_PATH, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(delta),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * A POST whose failure message is worth showing.
@@ -228,4 +286,33 @@ export async function sendWhatsAppTestRequest(
 ): Promise<{ sent: boolean; to?: string; error?: string }> {
   const result = await postJson<{ to?: string }>("/api/communications/whatsapp/test", { slug });
   return result.ok ? { sent: true, to: result.data?.to } : { sent: false, error: result.error };
+}
+
+/**
+ * A RESTORE of a template collection, not a save.
+ *
+ * `replaceEmailTemplatesRequest(items)` with no `knownIds` deletes nothing —
+ * that is deliberate, so an ordinary save from a stale tab cannot remove a
+ * template another admin added. A restore means the opposite: the file IS the
+ * intended state, and a template the backup does not contain must go, or the
+ * shop is left sending wording it thought it had replaced.
+ *
+ * The CURRENT server ids are read first and sent as the known set, exactly as
+ * `restoreCouponsRequest` and `restoreZonesRequest` do. A failed read returns
+ * false rather than falling back to a blind replace.
+ */
+export async function restoreEmailTemplatesRequest(
+  items: EmailTemplateRecord[],
+): Promise<boolean> {
+  const current = await fetchEmailTemplates();
+  if (current === null) return false;
+  return replaceEmailTemplatesRequest(items, current.map((item) => item.id));
+}
+
+export async function restoreWhatsAppTemplatesRequest(
+  items: WhatsAppTemplateRecord[],
+): Promise<boolean> {
+  const current = await fetchWhatsAppTemplates();
+  if (current === null) return false;
+  return replaceWhatsAppTemplatesRequest(items, current.map((item) => item.id));
 }

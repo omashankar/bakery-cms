@@ -1,7 +1,9 @@
 import { routes } from "@/constants/routes";
 import type { Inquiry, InquiryType } from "@/types/inquiry";
+import { NOTIFICATION_GROUPS } from "@/types/notification";
 import type {
   AdminNotification,
+  NotificationGroup,
   NotificationListFilters,
   NotificationType,
 } from "@/types/notification";
@@ -41,7 +43,13 @@ export function filterNotifications(
   const query = filters.search.trim().toLowerCase();
 
   return notifications.filter((notification) => {
-    if (filters.type !== "all" && notification.type !== filters.type) return false;
+    if (filters.type !== "all") {
+      const group = NOTIFICATION_GROUPS[filters.type as NotificationGroup];
+      const matches = group
+        ? group.includes(notification.type)
+        : notification.type === filters.type;
+      if (!matches) return false;
+    }
     if (filters.status === "unread" && notification.read) return false;
     if (filters.status === "read" && !notification.read) return false;
     if (!query) return true;

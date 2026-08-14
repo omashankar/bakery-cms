@@ -10,6 +10,7 @@ import { defaultAppearanceSettings } from "@/features/site-layout/lib/appearance
 import type { SeoStore } from "@/types/seo";
 import type { HeaderSettings, FooterSettings } from "@/types/site-layout";
 import type { AppearanceSettings } from "@/types/appearance";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 /**
  * Site-layout singletons (SEO store, header, footer) that were client-only
@@ -32,7 +33,7 @@ export type SiteLayoutKey = keyof typeof stores;
 export const SITE_LAYOUT_KEYS = Object.keys(stores) as SiteLayoutKey[];
 
 function storeFor(key: string) {
-  const store = stores[key as SiteLayoutKey];
+  const store = allowlisted(stores, key);
   if (!store) throw new NotFoundError("Unknown site-layout section");
   return store;
 }

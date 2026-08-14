@@ -6,6 +6,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./admin-config.service";
 import { adminConfigSchemas } from "./admin-config.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 const CONFIG_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
@@ -21,7 +22,7 @@ export const replaceAdminConfigController = withErrorHandler(async (request: Req
   const session = await requireRole(...CONFIG_ROLES);
   const { key } = await ctx.params;
 
-  const schema = adminConfigSchemas[key as keyof typeof adminConfigSchemas];
+  const schema = allowlisted(adminConfigSchemas, key);
   if (!schema) throw new NotFoundError("Unknown admin-config section");
 
   const value = validate(schema, await readJson(request));

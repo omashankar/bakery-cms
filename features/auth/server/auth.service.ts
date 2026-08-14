@@ -1,5 +1,6 @@
 import { hashPassword, verifyPassword } from "@/lib/server/auth/password";
 import {
+  isRemembered,
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
@@ -9,6 +10,11 @@ import {
 import { setAuthCookies, clearAuthCookies } from "@/lib/server/auth/cookies";
 import { sha256, generateOtp } from "@/lib/server/auth/hash";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
+import {
+  accessTokenTtl,
+  getSecurityPolicy,
+  sessionTimeoutMs,
+} from "@/features/settings/server/security-policy.server";
 import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import {
   AuthError,
@@ -99,7 +105,7 @@ export async function login(input: LoginInput, ctx: RequestCtx): Promise<PublicU
     throw new AuthError("Invalid email or password");
   }
 
-  await issueTokens(String(user._id), user.role, user.email, ctx);
+  await issueTokens(String(user._id), user.role, user.email, ctx, input.rememberMe);
   await repo.touchLastLogin(String(user._id));
   await writeAuditLog({
     action: "auth.login",
@@ -113,7 +119,14 @@ export async function login(input: LoginInput, ctx: RequestCtx): Promise<PublicU
 }
 
 /** Create a session + refresh token and set both auth cookies. */
-async function issueTokens(userId: string, role: string, email: string, ctx: RequestCtx) {
+async function issueTokens(
+  userId: string,
+  role: string,
+  email: string,
+  ctx: RequestCtx,
+  /** See `setAuthCookies` — false makes the refresh cookie session-only. */
+  rememberMe = true,
+) {
   const session = await repo.createSession({
     userId,
     userAgent: ctx.userAgent,
@@ -121,8 +134,11 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
     expiresAt: ttlToDate(REFRESH_TTL),
   });
 
-  const accessToken = await signAccessToken({ sub: userId, role, email });
-  const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) });
+  // The shop's configured session timeout, finally applied. Every session was
+  // 15 minutes regardless of what the Security screen said.
+  const accessTtl = accessTokenTtl(await getSecurityPolicy());
+  const accessToken = await signAccessToken({ sub: userId, role, email }, accessTtl);
+  const refreshToken = await signRefreshToken({ sub: userId, sid: String(session._id) , remember: rememberMe });
 
   await repo.createRefreshToken({
     userId,
@@ -131,7 +147,8 @@ async function issueTokens(userId: string, role: string, email: string, ctx: Req
     expiresAt: ttlToDate(REFRESH_TTL),
   });
 
-  await setAuthCookies(accessToken, refreshToken);
+  // The cookie carries the same lifetime as the token inside it.
+  await setAuthCookies(accessToken, refreshToken, accessTtl, rememberMe);
   return { accessToken, refreshToken, sessionId: String(session._id) };
 }
 
@@ -154,18 +171,54 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   const user = await repo.findUserById(claims.sub);
   if (!user || user.status !== "active") throw new AuthError("Account unavailable");
 
+  const policy = await getSecurityPolicy();
+
+  /**
+   * The shop's configured session timeout, enforced HERE.
+   *
+   * The first attempt at this expressed the timeout by lengthening the access
+   * token, which was worse than doing nothing: `getSession` verifies the JWT
+   * alone — no session-row read, no revocation list — so the token's lifetime
+   * IS the revocation lag. Raising it widened the window in which a revoked or
+   * stolen token still works, while "Revoke session" and "Log out everywhere"
+   * both reported success.
+   *
+   * The rotation is the right place: it is the moment a session either
+   * continues or does not, so refusing here ends it for a real client without
+   * giving a replayed token a single extra second.
+   */
+  const session = await repo.findSessionById(claims.sid).catch(() => null);
+  if (session) {
+    const idleMs = Date.now() - new Date(session.lastSeenAt).getTime();
+    if (idleMs > sessionTimeoutMs(policy)) {
+      await repo.deleteSession(claims.sid).catch(() => undefined);
+      throw new AuthError("Session timed out");
+    }
+  }
+
   // Rotate: revoke the used token, issue a fresh pair.
   await repo.revokeRefreshToken(String(stored._id));
+  await repo.touchSession(claims.sid).catch(() => undefined);
 
-  const accessToken = await signAccessToken({ sub: claims.sub, role: user.role, email: user.email });
-  const newRefresh = await signRefreshToken({ sub: claims.sub, sid: claims.sid });
+  const accessTtl = accessTokenTtl(policy);
+  const accessToken = await signAccessToken(
+    { sub: claims.sub, role: user.role, email: user.email },
+    accessTtl,
+  );
+  // Carried forward, not re-defaulted — see `RefreshClaims.remember`.
+  const remembered = isRemembered(claims);
+  const newRefresh = await signRefreshToken({
+    sub: claims.sub,
+    sid: claims.sid,
+    remember: remembered,
+  });
   await repo.createRefreshToken({
     userId: claims.sub,
     sessionId: claims.sid,
     tokenHash: sha256(newRefresh),
     expiresAt: ttlToDate(REFRESH_TTL),
   });
-  await setAuthCookies(accessToken, newRefresh);
+  await setAuthCookies(accessToken, newRefresh, accessTtl, remembered);
 
   return toPublicUser(user);
 }
@@ -292,6 +345,19 @@ export async function changePassword(
 
   await repo.updateUserPassword(userId, await hashPassword(input.newPassword));
   await repo.revokeRefreshTokensByUser(userId);
+  /**
+   * And the session ROWS, exactly as `resetPassword` does — its comment says
+   * "invalidate every existing session/token after a password reset" and it
+   * calls both. This called only the first.
+   *
+   * The Security Center derives its device list from the surviving rows
+   * (`SessionModel.find({ userId, expiresAt: { $gt: now } })`), and a row's
+   * `expiresAt` is the 30-day refresh TTL. A device that never comes back never
+   * self-cleans, so after changing their password an admin went on being shown
+   * phones and laptops as "active" on the one screen they would check to
+   * confirm the change had taken effect.
+   */
+  await repo.deleteSessionsByUser(userId);
 
   await writeAuditLog({
     action: "auth.change_password",

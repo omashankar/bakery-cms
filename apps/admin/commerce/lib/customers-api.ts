@@ -23,7 +23,9 @@ interface ServerCustomer {
  * strength of the localStorage write alone means a 401 or a 500 silently loses
  * them at the next hydration, and the admin never finds out.
  */
-export async function saveCustomerMetaRequest(meta: CustomerAdminMeta): Promise<boolean> {
+export async function saveCustomerMetaRequest(
+  meta: { email: string } & Partial<Omit<CustomerAdminMeta, "email">>,
+): Promise<boolean> {
   try {
     const res = await fetch("/api/customers/meta", {
       method: "PUT",

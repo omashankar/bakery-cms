@@ -68,9 +68,29 @@ export function AccountDashboardPage() {
   };
 
   const onSubmit = async (data: ProfileForm) => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
     const name = `${data.firstName} ${data.lastName}`.trim();
-    updateCustomerProfile({ name, email: data.email });
+
+    /**
+     * Saved on the SERVER, and only reported when the server says so.
+     *
+     * This wrote to localStorage and toasted "Profile updated" regardless —
+     * over a write that had not necessarily happened, and onto a copy no other
+     * device would ever see.
+     *
+     * The EMAIL is not in this payload and the field is read-only below. It is
+     * the account key and the key every order is matched on, so editing it here
+     * used to disconnect a customer from their entire history under a success
+     * toast. Moving to another address now means signing in as that address and
+     * proving it, which is the only version of the change that can be true.
+     */
+    const updated = await updateCustomerProfile({ name });
+    if (!updated) {
+      toast.error("Could not update your profile", {
+        description: "Please check your connection and try again.",
+      });
+      return;
+    }
+
     toast.success("Profile updated");
   };
 
@@ -105,11 +125,17 @@ export function AccountDashboardPage() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                {...register("email", { required: true })}
-              />
+              {/*
+                Read-only, because it is the account. Every order is matched to
+                a customer by the address it was placed with, so editing it here
+                used to leave the account pointing at an address with no orders
+                under it — My Orders emptied itself and said "No orders yet",
+                beneath a toast reading "Profile updated".
+              */}
+              <Input id="email" type="email" value={session.email} readOnly disabled />
+              <p className="text-xs text-muted-foreground">
+                Your orders are matched to this address. To use another one, sign in with it.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile Number</Label>

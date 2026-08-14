@@ -8,6 +8,7 @@ import { sendTestEmail } from "@/lib/server/mail/send-test-email";
 
 import * as service from "./settings.service";
 import { sectionSchemas, type SettingsSection } from "./settings.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 /** Roles allowed to read/write settings (owner + legacy admin). */
 const SETTINGS_ROLES = ["owner", "admin"] as const;
@@ -47,9 +48,30 @@ export function redactMailPassword(settings: Awaited<ReturnType<typeof service.g
   };
 }
 
+/**
+ * The one way a settings document may become a response.
+ *
+ * `redactMailPassword` was applied at exactly ONE of the three places that hand
+ * the document to a browser — the GET — and the two write endpoints returned it
+ * whole. So the password was redacted when the admin opened Settings and sent
+ * back in cleartext the moment they saved ANY section: a PUT about Google
+ * Analytics answered with the shop's live mail credential in its body, and so
+ * did every reset. It sat in the browser's network log, in whatever proxy or
+ * CDN log the response passed through, and readable by any script on the page.
+ *
+ * The redaction is not the problem; remembering to call it was. Every settings
+ * response goes through here now, so a fourth endpoint cannot quietly skip it.
+ */
+function settingsResponse(
+  settings: Awaited<ReturnType<typeof service.getSettings>>,
+  message: string,
+) {
+  return ok(redactMailPassword(settings), message);
+}
+
 export const getSettingsController = withErrorHandler(async () => {
   await requireRole(...SETTINGS_ROLES);
-  return ok(redactMailPassword(await service.getSettings()), "Settings");
+  return settingsResponse(await service.getSettings(), "Settings");
 });
 
 export const getPublicSettingsController = withErrorHandler(async () => {
@@ -66,7 +88,18 @@ export const updateSectionController = withErrorHandler(
     const session = await requireRole(...SETTINGS_ROLES);
     const { section } = await context.params;
 
-    const schema = sectionSchemas[section as SettingsSection];
+    /**
+     * `in` on the OWN keys, not a bare index.
+     *
+     * `sectionSchemas[section]` reaches the prototype chain, so `__proto__`,
+     * `constructor` and `toString` all answered with something truthy and walked
+     * straight past this guard — then `validate()` was handed `Object.prototype`
+     * and the route answered 500 instead of 404. The reset endpoint beside it
+     * had the same shape and no validate step to stop it, so it returned 200
+     * "Settings reset" for a section that does not exist and wrote an audit row
+     * saying so.
+     */
+    const schema = allowlisted(sectionSchemas, section);
     if (!schema) throw new NotFoundError("Unknown settings section");
 
     const value = validate(schema, await readJson(request));
@@ -76,7 +109,7 @@ export const updateSectionController = withErrorHandler(
       actorId: session.sub,
       actorEmail: session.email,
     });
-    return ok(updated, "Settings updated");
+    return settingsResponse(updated, "Settings updated");
   },
 );
 
@@ -90,7 +123,7 @@ export const resetSectionController = withErrorHandler(
       actorId: session.sub,
       actorEmail: session.email,
     });
-    return ok(updated, "Settings reset");
+    return settingsResponse(updated, "Settings reset");
   },
 );
 

@@ -28,8 +28,10 @@ import { getTemplates } from "./communications.service";
 export type EmailTemplateSlug =
   | "order_confirmation"
   | "order_shipped"
+  | "order_cancelled"
   | "invoice"
   | "password_reset"
+  | "customer_sign_in"
   | "refund_processed"
   | "admin_new_order";
 
@@ -73,6 +75,21 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Deliver: {{delivery_date}}\nTo: {{delivery_address}}\n\n" +
       "Items:\n{{order_items}}\n\n{{admin_url}}",
   },
+  /**
+   * The one status change a customer is never glad to read, and was never sent.
+   *
+   * A fallback matters here for the usual reason: an unpublished or deleted
+   * template would otherwise mean a cancelled customer hears nothing at all,
+   * which is the state this template exists to end.
+   */
+  order_cancelled: {
+    subject: "Your order {{order_number}} has been cancelled",
+    body:
+      "Hi {{customer_name}},\n\nWe are sorry — order {{order_number}} " +
+      "({{order_total}}) has been cancelled.\n\n{{refund_note}}\n\n" +
+      "If this was not expected, please call us on {{store_phone}}.\n\n" +
+      "— {{store_name}}",
+  },
   invoice: {
     subject: "Invoice for order {{order_number}}",
     body:
@@ -102,6 +119,21 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Hi {{customer_name}},\n\nUse this code to reset your password:\n\n" +
       "{{reset_code}}\n\nIt expires in {{expires_in}}. If you did not request " +
       "this, ignore this email — your password has not changed.\n\n— {{store_name}}",
+  },
+  /**
+   * How a CUSTOMER signs in to the storefront.
+   *
+   * There is no password to reset: proving control of the email address is the
+   * whole of it, which is also what ties the account to the orders — those are
+   * keyed on the address the confirmation went to.
+   */
+  customer_sign_in: {
+    subject: "Your {{store_name}} sign-in code",
+    body:
+      "Hi {{customer_name}},\n\nUse this code to sign in and see your orders:\n\n" +
+      "{{sign_in_code}}\n\nIt expires in {{expires_in}}. If you did not ask to " +
+      "sign in, you can ignore this email — nobody can use the code without it.\n\n" +
+      "— {{store_name}}",
   },
 };
 

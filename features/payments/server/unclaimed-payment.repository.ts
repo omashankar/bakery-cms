@@ -94,10 +94,36 @@ export async function resolveUnclaimedPayment(paymentId: string, orderId: string
   );
 }
 
-/** Everything still outstanding, oldest money first — that is what needs chasing. */
+/**
+ * Mark an unclaimed payment as sent back to the customer.
+ *
+ * `refundedAt` was on the model and in the record type with NO writer and no
+ * reader, so the only way off this list was to attach an order — and a payment
+ * that has been refunded can never have one. The money went back, and the row
+ * stayed on the operator's alert forever, counted in its total.
+ *
+ * The refund itself happens at the gateway: there is no order here for the
+ * refund path to work against, so an operator does it in the Razorpay dashboard
+ * and records it here.
+ */
+export async function markUnclaimedPaymentRefunded(paymentId: string): Promise<boolean> {
+  await connectDB();
+  const res = await UnclaimedPaymentModel.updateOne(
+    { _id: paymentId, refundedAt: null, resolvedByOrderId: null },
+    { $set: { refundedAt: new Date().toISOString() } },
+  );
+  return (res.modifiedCount ?? 0) > 0;
+}
+
+/**
+ * Everything still outstanding, oldest money first — that is what needs chasing.
+ *
+ * Refunded rows are settled too. Filtering on `resolvedByOrderId` alone kept
+ * them here forever.
+ */
 export async function listUnclaimedPayments(): Promise<UnclaimedPayment[]> {
   await connectDB();
-  const docs = await UnclaimedPaymentModel.find({ resolvedByOrderId: null })
+  const docs = await UnclaimedPaymentModel.find({ resolvedByOrderId: null, refundedAt: null })
     .sort({ noticedAt: 1 })
     .lean();
   return (docs as unknown as Record<string, unknown>[]).map(toRecord);
@@ -107,7 +133,9 @@ export async function listUnclaimedPayments(): Promise<UnclaimedPayment[]> {
 export async function unclaimedPaymentTotal(): Promise<{ count: number; amount: number }> {
   await connectDB();
   const [summary] = await UnclaimedPaymentModel.aggregate<{ count: number; amount: number }>([
-    { $match: { resolvedByOrderId: null } },
+    // Same rule as the list: a refunded payment is settled, and counting it kept
+    // the operator's alert showing money that had already gone back.
+    { $match: { resolvedByOrderId: null, refundedAt: null } },
     { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: "$amount" } } },
     { $project: { _id: 0, count: 1, amount: 1 } },
   ]);

@@ -48,6 +48,21 @@ export function localeForCurrency(currency: string): string {
 }
 
 /**
+ * A currency code `Intl` will accept, or undefined.
+ *
+ * `Object.hasOwn`, not `in`: `in` walks the prototype chain, so `"toString"`
+ * and `"constructor"` would both answer true and be handed straight to
+ * `Intl.NumberFormat`, which is the RangeError this exists to prevent.
+ *
+ * Exported because the explicit-currency path needs the same filter the
+ * ambient one gets — see `formatCurrency`.
+ */
+export function usableCurrencyCode(currency?: string): string | undefined {
+  if (!currency) return undefined;
+  return Object.hasOwn(CURRENCY_LOCALE, currency) ? currency : undefined;
+}
+
+/**
  * Neither value may reach `Intl` unchecked.
  *
  * `Intl.NumberFormat` throws a RangeError on a currency code it does not know,
@@ -58,7 +73,7 @@ export function localeForCurrency(currency: string): string {
  * Guarding at the point of use means no caller can take the site out.
  */
 function resolve(currency: string, timezone: string): ActiveLocale {
-  const safeCurrency = currency in CURRENCY_LOCALE ? currency : DEFAULT_CURRENCY;
+  const safeCurrency = usableCurrencyCode(currency) ?? DEFAULT_CURRENCY;
   return {
     currency: safeCurrency,
     timezone: isUsableTimezone(timezone) ? timezone : DEFAULT_TIMEZONE,

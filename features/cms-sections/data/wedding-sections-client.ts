@@ -7,6 +7,19 @@ import type {
 
 /** Browser-side wedding section access for the admin builder. */
 
+/** A refused write, carrying the server's current version — see the homepage client. */
+export class BuilderRequestError extends Error {
+  readonly status: number;
+  readonly currentVersion?: number;
+
+  constructor(message: string, status: number, currentVersion?: number) {
+    super(message);
+    this.name = "BuilderRequestError";
+    this.status = status;
+    this.currentVersion = currentVersion;
+  }
+}
+
 async function request<T>(init?: RequestInit): Promise<T> {
   const response = await fetch("/api/wedding-sections", {
     ...init,
@@ -15,7 +28,11 @@ async function request<T>(init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+    throw new BuilderRequestError(
+      payload?.error ?? `Request failed (${response.status})`,
+      response.status,
+      typeof payload?.currentVersion === "number" ? payload.currentVersion : undefined,
+    );
   }
   return payload as T;
 }
@@ -48,25 +65,31 @@ export async function fetchWeddingState(): Promise<WeddingBuilderState> {
   return state;
 }
 
+/** A write's result, carrying the version to send with the next one. */
+export interface WeddingWriteResult {
+  snapshot: WeddingBuilderSnapshot;
+  version: number;
+}
+
 export async function saveWeddingDraftRequest(
   sections: WeddingSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<WeddingBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: WeddingBuilderSnapshot }>({
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<WeddingWriteResult> {
+  return request<WeddingWriteResult>({
     method: "PUT",
-    body: JSON.stringify({ sections, scheduledPublishAt }),
+    body: JSON.stringify({ sections, scheduledPublishAt, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function publishWedding(
-  sections: WeddingSectionInstance[]
-): Promise<WeddingBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: WeddingBuilderSnapshot }>({
+  sections: WeddingSectionInstance[],
+  expectedVersion?: number
+): Promise<WeddingWriteResult> {
+  return request<WeddingWriteResult>({
     method: "POST",
-    body: JSON.stringify({ sections }),
+    body: JSON.stringify({ sections, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function resetWedding(): Promise<WeddingBuilderState> {

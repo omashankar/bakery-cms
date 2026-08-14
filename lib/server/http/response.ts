@@ -42,11 +42,11 @@ function envelope<T>(partial: Partial<Envelope<T>> & { success: boolean; message
 export function ok<T>(
   data: T,
   message = "Success",
-  init?: { status?: number; pagination?: Pagination },
+  init?: { status?: number; pagination?: Pagination; headers?: Record<string, string> },
 ): NextResponse {
   return NextResponse.json(
     envelope<T>({ success: true, message, data, pagination: init?.pagination ?? null }),
-    { status: init?.status ?? 200 },
+    { status: init?.status ?? 200, headers: init?.headers },
   );
 }
 

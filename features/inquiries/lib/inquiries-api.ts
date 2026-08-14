@@ -34,8 +34,30 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
 }
 
 /** Public: send the fully-built inquiry to the server (verbatim id/timestamps). */
-export function createInquiryRequest(inquiry: Inquiry): Promise<boolean> {
-  return send("/api/inquiries", "POST", inquiry);
+/**
+ * Public: submit an enquiry. Returns the record the SERVER created, or null.
+ *
+ * The id matters to the caller. The server mints it now — it no longer accepts
+ * one from the body, because that endpoint is unauthenticated and the id was
+ * reaching an upsert on guessable keys. So the locally-built record and the
+ * stored one differ, and anything that follows up on this enquiry has to address
+ * the server's id.
+ *
+ * The server also forces `status: "new"` regardless of what is sent.
+ */
+export async function createInquiryRequest(inquiry: Inquiry): Promise<Inquiry | null> {
+  try {
+    const res = await fetch("/api/inquiries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(inquiry),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { success: boolean; data: Inquiry | null };
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export function updateInquiryRequest(id: string, patch: Partial<Inquiry>): Promise<boolean> {

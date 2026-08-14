@@ -416,7 +416,31 @@ export async function stats(): Promise<OrderStatsSummary> {
   await connectDB();
 
   const rows = (await OrderModel.aggregate([
-    { $group: { _id: "$status", count: { $sum: 1 }, revenue: { $sum: "$totals.total" } } },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        // What the shop KEPT, not what it billed.
+        //
+        // This summed `totals.total` and then excluded whole statuses. But an
+        // order only becomes `refunded` when the refund is BOTH full and
+        // settled, so a partial refund leaves it `delivered` forever — and its
+        // full total kept counting. A ₹2,000 order refunded ₹1,500 for a quality
+        // complaint reported ₹2,000 of revenue against ₹500 actually kept, on
+        // this card and in every report.
+        //
+        // The transactions aggregation already nets `amount - refundedAmount`;
+        // this one did not, so the two screens disagreed about the same money.
+        revenue: {
+          $sum: {
+            $subtract: [
+              { $ifNull: ["$totals.total", 0] },
+              { $ifNull: ["$refundRecord.amount", 0] },
+            ],
+          },
+        },
+      },
+    },
   ])) as Array<{ _id: OrderStatus | null; count: number; revenue: number }>;
 
   const summary: OrderStatsSummary = {
@@ -485,6 +509,144 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
  * (Razorpay itself caps the total refundable, so losing this race cannot cause a
  * double gateway payout — the danger is a payout that no record accounts for.)
  */
+/**
+ * Take the refund slot before any money moves.
+ *
+ * Bumps `refundRecord.version` and records the attempt, both under the same
+ * compare-and-set the final write uses. A concurrent request reads the old
+ * version, loses this, and is refused having paid out nothing.
+ *
+ * Returns null when the slot is already taken — either by a request in flight or
+ * by one that has moved the version on.
+ */
+/**
+ * Cancel, but only if this request is the one that does it.
+ *
+ * The service read the order, checked `status !== "cancelled"`, and patched —
+ * three separate steps, with a comment claiming the check kept the side effects
+ * from running twice. It did not: a double-clicked Cancel, or two operators on
+ * the same order, both read `confirmed`, both passed, and both went on to
+ * restore the stock and hand the coupon back. A three-cake order ended up six on
+ * the shelf and the customer's single-use code was returned twice.
+ *
+ * The status change IS the guard now. Null means someone else did it, and the
+ * caller must do none of the follow-on work.
+ */
+export async function cancelIfActive(
+  id: string,
+  fields: Partial<PlacedOrder>,
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, status: { $nin: ["cancelled", "refunded"] } },
+    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
+/**
+ * Hand a coupon redemption back once, whoever gets there first.
+ *
+ * Cancelling releases the coupon, and so does a full settled refund — and a
+ * cancelled order being refunded is the ordinary path, so both ran and the
+ * customer's single-use code came back twice. The refund tracked its own
+ * `refundRecord.couponReleased`, which cancellation never saw.
+ *
+ * Returns true only for the request that actually claimed it.
+ */
+export async function claimCouponRelease(id: string): Promise<boolean> {
+  await connectDB();
+  const res = await OrderModel.updateOne(
+    { _id: id, couponReleased: { $ne: true } },
+    { $set: { couponReleased: true } },
+  );
+  return (res.modifiedCount ?? 0) > 0;
+}
+
+export async function claimRefundAttempt(
+  id: string,
+  expectedVersion: number,
+  attempt: { amount: number; at: string; actorEmail?: string },
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    {
+      _id: id,
+      $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, expectedVersion] },
+      // Nothing may be in flight. A retry arriving while the first attempt is
+      // still open must not pay a second time.
+      "refundRecord.pendingAttempt": { $exists: false },
+    },
+    {
+      $set: {
+        "refundRecord.version": expectedVersion + 1,
+        "refundRecord.pendingAttempt": attempt,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
+/**
+ * Give the refund slot back after an attempt that moved no money.
+ *
+ * Puts the record back exactly as the claim found it. Nothing can have been
+ * written in between — the claim held the slot exclusively — so winding the
+ * version back is safe, and it is what lets the retry a 503 invites succeed.
+ *
+ * An order that had no refund record before keeps having none: leaving a bare
+ * `{ version: 1 }` behind would say a refund had been attempted where the
+ * screens read the record's existence as exactly that.
+ */
+export async function releaseRefundAttempt(
+  id: string,
+  claimedVersion: number,
+  hadRecord: boolean,
+): Promise<void> {
+  await connectDB();
+  const filter = {
+    _id: id,
+    $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, claimedVersion] },
+  };
+
+  await OrderModel.updateOne(
+    filter,
+    hadRecord
+      ? {
+          $set: { "refundRecord.version": claimedVersion - 1 },
+          $unset: { "refundRecord.pendingAttempt": "" },
+        }
+      : { $unset: { refundRecord: "" } },
+  );
+}
+
+/**
+ * Write the operator's note and nothing else.
+ *
+ * Saving a note used to read the order, spread the whole `refundRecord` and
+ * write it back through a plain patch — outside the version protocol entirely.
+ * A webhook settle landing between that read and that write was erased: the
+ * record went back to `processing`, and `stockRestored` and `couponReleased`
+ * reverted with it. The next settle then put the stock back and released the
+ * coupon a SECOND time.
+ *
+ * One field, addressed directly. There is nothing here to lose a race with.
+ */
+export async function setRefundNotes(id: string, notes: string | undefined): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, refundRecord: { $exists: true } },
+    notes
+      ? { $set: { "refundRecord.notes": notes, updatedAt: new Date().toISOString() } }
+      : { $unset: { "refundRecord.notes": "" }, $set: { updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function compareAndSetRefund(
   id: string,
   expectedVersion: number,

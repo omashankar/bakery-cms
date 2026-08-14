@@ -741,7 +741,7 @@ export function DesignSystemPage() {
                       <Input
                         id="ds-email"
                         type="email"
-                        defaultValue="admin@bakery.com"
+                        defaultValue="sumanom7014106@gmail.com"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1066,7 +1066,7 @@ export function DesignSystemPage() {
                               Admin User
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              admin@bakery.com
+                              sumanom7014106@gmail.com
                             </p>
                           </div>
                         </div>

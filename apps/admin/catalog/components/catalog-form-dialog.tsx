@@ -139,6 +139,18 @@ export function CatalogFormDialog({
 
     const finalSlug = slug.trim() || slugify(name);
 
+    // `slugify` strips everything outside `[\w\s-]`, so a name written entirely
+    // in a non-Latin script — मिठाई, 蛋糕 — produces an empty string. The server
+    // rejects it, and because each section is a replace-all, that refusal
+    // poisons every later save of the section until the page is reloaded. Say so
+    // here, where the admin can fix it.
+    if (!finalSlug) {
+      toast.error("Add a URL slug", {
+        description: "The name has no characters that can be used in a web address.",
+      });
+      return;
+    }
+
     if (tab === "categories") {
       const payload: Omit<ProductCategory, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),

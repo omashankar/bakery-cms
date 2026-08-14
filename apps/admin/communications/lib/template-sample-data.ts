@@ -29,7 +29,7 @@ export const defaultTemplateSampleData: Record<string, string> = {
   payment_method: "UPI",
   store_name: "Monginis Bakery",
   store_phone: "+91 98765 43210",
-  store_email: "hello@monginis.demo",
+  store_email: "sumanom7014106@gmail.com",
   support_url: "https://bakery.demo/store/contact",
   reset_link: "https://bakery.demo/account/reset-password?token=demo",
   invoice_url: "https://bakery.demo/store/order/BK-1042",
@@ -44,7 +44,12 @@ export const defaultTemplateSampleData: Record<string, string> = {
   // "[refund_amount]" where the customer will see a sum of money, and the real
   // test-send landed in their inbox the same way.
   reset_code: "482913",
+  // The storefront's sign-in code. Its own key rather than reusing
+  // `reset_code`, so an admin previewing either email sees the variable that
+  // email actually supplies.
+  sign_in_code: "704118",
   expires_in: "10 minutes",
+  refund_note: "You paid for this order, so a refund is on its way. It usually takes 5–7 working days to reach your account.",
   refund_amount: "₹1,468",
   refund_eta: "5–7 working days",
   refund_reference: "rfnd_PmXq82Kd10Lb",

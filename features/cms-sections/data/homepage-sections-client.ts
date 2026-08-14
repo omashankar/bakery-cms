@@ -12,6 +12,26 @@ import type {
  * on the server and reads the store directly.
  */
 
+/**
+ * A refused write, carrying what the server said about it.
+ *
+ * A 409 answers with the version the store is on now. Throwing a bare Error
+ * discarded it, and the builder's version ref stayed pinned at the number the
+ * conflict rejected — so every subsequent save in that tab conflicted too and
+ * the admin could not save again at all, in a tab still holding their work.
+ */
+export class BuilderRequestError extends Error {
+  readonly status: number;
+  readonly currentVersion?: number;
+
+  constructor(message: string, status: number, currentVersion?: number) {
+    super(message);
+    this.name = "BuilderRequestError";
+    this.status = status;
+    this.currentVersion = currentVersion;
+  }
+}
+
 async function request<T>(init?: RequestInit): Promise<T> {
   const response = await fetch("/api/homepage-sections", {
     ...init,
@@ -20,7 +40,11 @@ async function request<T>(init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+    throw new BuilderRequestError(
+      payload?.error ?? `Request failed (${response.status})`,
+      response.status,
+      typeof payload?.currentVersion === "number" ? payload.currentVersion : undefined,
+    );
   }
   return payload as T;
 }
@@ -53,25 +77,36 @@ export async function fetchHomepageState(): Promise<HomepageBuilderState> {
   return state;
 }
 
+/**
+ * A write's result, carrying the version to send with the next one.
+ *
+ * The builder is replace-all, so every write has to say which state it was
+ * composed against — otherwise a stale tab silently replaces work it never saw.
+ */
+export interface HomepageWriteResult {
+  snapshot: HomepageBuilderSnapshot;
+  version: number;
+}
+
 export async function saveHomepageDraft(
   sections: HomepageSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<HomepageBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: HomepageBuilderSnapshot }>({
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<HomepageWriteResult> {
+  return request<HomepageWriteResult>({
     method: "PUT",
-    body: JSON.stringify({ sections, scheduledPublishAt }),
+    body: JSON.stringify({ sections, scheduledPublishAt, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function publishHomepage(
-  sections: HomepageSectionInstance[]
-): Promise<HomepageBuilderSnapshot> {
-  const { snapshot } = await request<{ snapshot: HomepageBuilderSnapshot }>({
+  sections: HomepageSectionInstance[],
+  expectedVersion?: number
+): Promise<HomepageWriteResult> {
+  return request<HomepageWriteResult>({
     method: "POST",
-    body: JSON.stringify({ sections }),
+    body: JSON.stringify({ sections, expectedVersion }),
   });
-  return snapshot;
 }
 
 export async function resetHomepage(): Promise<HomepageBuilderState> {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CollectionsPage } from "@/apps/website";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
+import { getStorefrontCategories } from "@/apps/website/lib/storefront-categories.server";
 
 /**
  * Per request, not at module load.
@@ -19,10 +20,13 @@ interface PageProps {
 }
 
 export default async function Page(props: PageProps) {
-  const [{ category }, catalog] = await Promise.all([
+  const [{ category }, catalog, categories] = await Promise.all([
     props.searchParams,
     getStorefrontProductCards(),
+    getStorefrontCategories(),
   ]);
 
-  return <CollectionsPage categorySlug={category ?? ""} catalog={catalog} />;
+  return (
+    <CollectionsPage categorySlug={category ?? ""} catalog={catalog} categories={categories} />
+  );
 }

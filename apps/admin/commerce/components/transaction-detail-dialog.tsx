@@ -1,7 +1,8 @@
 "use client";
 
 import type { PlacedOrder } from "@/features/orders/lib/orders";
-import { deriveTransactionStatus } from "@/features/payments/lib/payment-status";
+import { deriveTransactionStatus, isCollectedMoney } from "@/features/payments/lib/payment-status";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { PaymentStatusBadge } from "@/features/payments/components/payment-status-badge";
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
@@ -51,6 +52,9 @@ export function TransactionDetailDialog({ order, open, onOpenChange }: Transacti
               const gatewayId = METHOD_GATEWAY[order.paymentMethod] ?? "razorpay";
               const gateway = getGatewayConfig(gatewayId);
               const t = order.totals;
+              // The same two facts the Volume card is built from.
+              const refunded = settledRefundAmount(order);
+              const collected = isCollectedMoney(order) ? Math.max(0, t.total - refunded) : 0;
               const updatedAt =
                 order.statusHistory?.[order.statusHistory.length - 1]?.at ?? order.placedAt;
               return (
@@ -83,8 +87,25 @@ export function TransactionDetailDialog({ order, open, onOpenChange }: Transacti
                     {t.giftWrapFee > 0 ? (
                       <Row label="Gift wrap" value={formatCurrency(t.giftWrapFee)} />
                     ) : null}
+                    {/*
+                      "Total paid" was printed for every transaction, including
+                      the ones that were never paid — a failed or pending
+                      payment showed its order total under a label asserting the
+                      money had arrived — and it ignored refunds entirely, so a
+                      fully refunded order still read as paid in full.
+
+                      The order total is a fact about the order; what the shop
+                      COLLECTED is a different number, and it is computed with
+                      the same predicate the Volume card above the table uses,
+                      so the dialog and that card cannot disagree about one
+                      order.
+                    */}
                     <div className="mt-2 border-t border-border pt-2">
-                      <Row label="Total paid" value={formatCurrency(t.total)} strong />
+                      <Row label="Order total" value={formatCurrency(t.total)} strong />
+                      {refunded > 0 ? (
+                        <Row label="Refunded" value={`− ${formatCurrency(refunded)}`} />
+                      ) : null}
+                      <Row label="Collected" value={formatCurrency(collected)} strong />
                     </div>
                   </div>
 

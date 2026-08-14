@@ -58,7 +58,16 @@ async function guardedPut(path: string, body: unknown): Promise<boolean> {
 }
 
 export const fetchMediaFiles = () => getJson<MediaFile[]>("/api/media");
-export const replaceMediaFilesRequest = (files: MediaFile[]) => guardedPut("/api/media", files);
+/**
+ * Save the library, naming any ids being DELETED.
+ *
+ * Only named ids have their Cloudinary asset destroyed. A rename, a folder
+ * move or an alt-text edit sends no ids and destroys nothing — a replace-all
+ * used to mean "delete everything absent from this list", which a stale tab
+ * turned into the permanent loss of another admin's uploads.
+ */
+export const replaceMediaFilesRequest = (files: MediaFile[], deletedIds: string[] = []) =>
+  guardedPut("/api/media", { files, deletedIds });
 
 export const fetchMediaFolders = () => getJson<MediaFolder[]>("/api/media/folders");
 export const replaceMediaFoldersRequest = (folders: MediaFolder[]) =>

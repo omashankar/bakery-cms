@@ -28,7 +28,24 @@ export async function POST(request: Request) {
   }
 
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+  /**
+   * TYPE-checked, not just truthiness-checked.
+   *
+   * The body is caller-controlled JSON, so any of these can arrive as a number,
+   * an object or an array and still be truthy. `Buffer.from(<non-string>)`
+   * throws ERR_INVALID_ARG_TYPE, and this handler has no error wrapper — so a
+   * crafted body produced a 500 out of a public route instead of the
+   * `{ verified: false }` the caller is meant to get. The guard beside it
+   * already reasons about exactly this class for the signature's LENGTH.
+   */
+  if (
+    typeof razorpay_order_id !== "string" ||
+    typeof razorpay_payment_id !== "string" ||
+    typeof razorpay_signature !== "string" ||
+    !razorpay_order_id ||
+    !razorpay_payment_id ||
+    !razorpay_signature
+  ) {
     return Response.json({ verified: false, error: "Missing fields" }, { status: 400 });
   }
 

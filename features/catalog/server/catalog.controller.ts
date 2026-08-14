@@ -6,6 +6,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./catalog.service";
 import { catalogSectionSchemas, type CatalogSection } from "./catalog.validators";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 const CATALOG_ROLES = ["owner", "admin"] as const;
 
@@ -21,7 +22,12 @@ export const updateCatalogSectionController = withErrorHandler(
     const session = await requireRole(...CATALOG_ROLES);
     const { section } = await context.params;
 
-    const schema = catalogSectionSchemas[section as CatalogSection];
+    // Checked on the OWN keys before indexing: a bare lookup resolves
+    // `constructor` and `toString` off the prototype chain, so both were
+    // truthy, walked past this guard, and handed `validate()` something with
+    // no `safeParse` — a masked 500 where a 404 was the answer. Same fix as
+    // the settings controller.
+    const schema = allowlisted(catalogSectionSchemas, section);
     if (!schema) throw new NotFoundError("Unknown catalog section");
 
     const value = validate(schema, await readJson(request));

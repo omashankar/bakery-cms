@@ -86,6 +86,27 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ...base,
     },
     {
+      id: "email-order-cancelled",
+      slug: "order_cancelled",
+      name: "Order cancelled",
+      description: "Sent when the shop cancels an order.",
+      category: "transactional",
+      subject: "Your order {{order_number}} has been cancelled",
+      previewText: "We have cancelled your order.",
+      // `refund_note` carries the money question, because the answer differs:
+      // a paid order has a refund coming and a COD one never took anything.
+      body: `Hi {{customer_name}},\n\nWe're sorry — order {{order_number}} ({{order_total}}) has been cancelled.\n\n{{refund_note}}\n\nIf this was not expected, please call us on {{store_phone}} and we will put it right.\n\n— {{store_name}}`,
+      variables: [
+        "customer_name",
+        "order_number",
+        "order_total",
+        "refund_note",
+        "store_phone",
+        "store_name",
+      ],
+      ...base,
+    },
+    {
       id: "email-invoice",
       slug: "invoice",
       name: "Invoice email",
@@ -175,6 +196,18 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       // wired, the code the customer needs would not have been in the email.
       body: `Hi {{customer_name}},\n\nUse this code to reset your password:\n\n{{reset_code}}\n\nIt expires in {{expires_in}}. If you didn't request this, ignore this email — your password has not changed.\n\n— {{store_name}} Support`,
       variables: ["customer_name", "store_name", "reset_code", "expires_in"],
+      ...base,
+    },
+    {
+      id: "email-customer-sign-in",
+      slug: "customer_sign_in",
+      name: "Customer sign-in code",
+      description: "One-time code a customer uses to sign in and see their orders.",
+      category: "system",
+      subject: "Your {{store_name}} sign-in code",
+      previewText: "Use the code below to sign in.",
+      body: `Hi {{customer_name}},\n\nUse this code to sign in and see your orders:\n\n{{sign_in_code}}\n\nIt expires in {{expires_in}}. If you didn't ask to sign in, you can ignore this email — nobody can use the code without it.\n\n— {{store_name}}`,
+      variables: ["customer_name", "store_name", "sign_in_code", "expires_in"],
       ...base,
     },
     {

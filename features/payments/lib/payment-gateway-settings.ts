@@ -6,6 +6,7 @@ import {
 } from "@/features/payments/registry/gateways";
 import {
   getCommerceSettings,
+  readHydratedCommerce,
   saveCommerceSettings,
 } from "@/features/settings/lib/settings-repository";
 import {
@@ -154,7 +155,13 @@ export function getGatewayRuntime(id: string): GatewayRuntime {
 /** Whether the SERVER took it. Which gateway is on decides how customers pay. */
 export async function setGatewayEnabled(id: string, enabled: boolean): Promise<boolean> {
   if (CORE.has(id)) {
-    const commerce = getCommerceSettings();
+    // Which payment methods are on lives INSIDE the commerce section, so this
+    // one switch sends the whole of it — the delivery fee, the tax rate, the
+    // checkout terms, the time slots. Read it only once the server's copy has
+    // landed in the cache, or send nothing at all. See `readHydratedCommerce`.
+    const commerce = await readHydratedCommerce();
+    if (!commerce) return false;
+
     const { persisted } = await saveCommerceSettings({
       ...commerce,
       paymentMethods: { ...commerce.paymentMethods, [id]: enabled },

@@ -24,11 +24,18 @@ describe("auth validators", () => {
   });
 
   it("rejects mismatched reset passwords", () => {
+    /**
+     * "longenough1" stopped being a valid password when `strongPassword`
+     * gained an uppercase rule, so this fixture failed on the FIELD and the
+     * `.refine` that compares the two never ran — the test still passed, and
+     * replacing the refine with `() => true` passed too. It asserted nothing
+     * about the thing it is named for.
+     */
     const result = resetPasswordSchema.safeParse({
       email: "a@b.com",
       otp: "123456",
-      password: "longenough1",
-      confirmPassword: "different1",
+      password: "Longenough1",
+      confirmPassword: "Different1",
     });
     expect(result.success).toBe(false);
   });

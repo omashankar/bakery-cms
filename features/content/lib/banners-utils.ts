@@ -52,10 +52,19 @@ export const bannerVisibilityOptions = [
   { value: "collections", label: "Collections pages" },
 ] as const;
 
+/**
+ * Only the hero strip has a renderer.
+ *
+ * `selectActiveHeroBanners` and `getActiveHeroBanners` are the only two readers
+ * of `position` outside the admin's own labels, and both drop anything that is
+ * not "hero". An admin who created an active "Sidebar promo" for a free-delivery
+ * offer got a green Active badge for a banner that appears nowhere on the site.
+ * The labels say so until those surfaces exist.
+ */
 export const bannerPositionOptions = [
   { value: "hero", label: "Hero strip (top of storefront)" },
-  { value: "sidebar", label: "Sidebar promo" },
-  { value: "popup", label: "Popup (future)" },
+  { value: "sidebar", label: "Sidebar promo — not shown on the site yet" },
+  { value: "popup", label: "Popup — not shown on the site yet" },
 ] as const;
 
 export type BannerListFilters = {

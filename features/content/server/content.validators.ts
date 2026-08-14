@@ -7,7 +7,15 @@ const bannerSchema = z
   .passthrough();
 
 const testimonialSchema = z
-  .object({ id: z.string().min(1), name: z.string().min(1), content: z.string().default("") })
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    content: z.string().default(""),
+    // Bounded, because the storefront draws a star per point. Unchecked, a
+    // rating of 40 — or of -1 — reached a `Array.from({ length: rating })` in
+    // the admin table and a star row on the live page.
+    rating: z.coerce.number().min(0).max(5).default(5),
+  })
   .passthrough();
 
 const faqSchema = z

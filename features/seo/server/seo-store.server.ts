@@ -25,13 +25,46 @@ import { buildRouteMetadataFrom } from "@/features/seo/lib/seo-metadata";
  * missing record, so a shop provisioned before a field existed gets that
  * field's default instead of `undefined` reaching a metadata builder.
  */
+/**
+ * A merge only defends against a MISSING field, and the crash came from a
+ * present one of the wrong type.
+ *
+ * `{ ...seedGlobal(), ...stored.global }` gives an absent `canonicalBaseUrl`
+ * the seed. It does not help when the stored value is `null`: the spread copies
+ * it over the default, and the three consumers that call
+ * `.replace(/\/$/, "")` on it — robots.txt, the sitemap generator and the
+ * metadata builder — throw. Confirmed live: robots.txt and sitemap.xml both
+ * answered 500. `allowIndexing: null` is quieter and worse — `if (!allowIndexing)`
+ * is true, so robots.txt served `Disallow: /` and the shop left the index.
+ *
+ * The schema now refuses both on the way in, but a schema only constrains
+ * FUTURE writes; this is what a document already at rest goes through. Falling
+ * back to the SEED rather than to a blank, because that is what this function's
+ * own catch block already returns when it cannot read at all — a value nobody
+ * can vouch for is the same situation.
+ */
+function usableGlobal(stored: SeoStore["global"]): SeoStore["global"] {
+  const merged = { ...seedGlobal(), ...stored };
+  const seed = seedGlobal();
+
+  return {
+    ...merged,
+    canonicalBaseUrl:
+      typeof merged.canonicalBaseUrl === "string" && merged.canonicalBaseUrl.trim()
+        ? merged.canonicalBaseUrl
+        : seed.canonicalBaseUrl,
+    allowIndexing:
+      typeof merged.allowIndexing === "boolean" ? merged.allowIndexing : seed.allowIndexing,
+  };
+}
+
 export async function getSeoStoreServer(): Promise<SeoStore> {
   try {
     const stored = (await getSiteLayout("seo")) as SeoStore | null;
     if (!stored?.global) return seedStore();
 
     return {
-      global: { ...seedGlobal(), ...stored.global },
+      global: usableGlobal(stored.global),
       routes: (Array.isArray(stored.routes) ? stored.routes : []).map((entry) => ({
         ...entry,
         metaKeywords: entry.metaKeywords ?? [],

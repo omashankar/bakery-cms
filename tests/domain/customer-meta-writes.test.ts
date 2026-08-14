@@ -76,7 +76,20 @@ describe("customer meta writes", () => {
     expect(result.skipped).toBe(NOTHING_TO_WRITE);
   });
 
-  it("composes every write from the meta it is handed, not a cached copy", async () => {
+  /**
+   * Each write carries ONLY what it changed.
+   *
+   * This used to assert the opposite — that a notes write must carry the tags
+   * and a tag write the notes — because the server `$set` everything it was
+   * given, so a write that omitted a field wiped it. That made every save a
+   * full snapshot composed from the caller's copy, which is precisely how two
+   * admins on one customer overwrote each other: each carried the other's field
+   * at its old value, and both were told it saved.
+   *
+   * Sending only the change makes the two edits independent, which is what the
+   * snapshot was working around.
+   */
+  it("sends only the field it changed", async () => {
     const fetchMock = mockServer(true);
     const current = meta({ notes: "prefers evening delivery", tags: ["VIP", "wholesale"] });
 
@@ -87,9 +100,18 @@ describe("customer meta writes", () => {
       JSON.parse((init as RequestInit).body as string)
     );
 
-    // The notes write must carry the existing tags, and the tag write the
-    // existing notes — otherwise each one silently reverts the other.
-    expect(sent[0]).toMatchObject({ notes: "calls ahead", tags: ["VIP", "wholesale"] });
-    expect(sent[1]).toMatchObject({ notes: "prefers evening delivery", tags: ["wholesale"] });
+    expect(sent[0]).toEqual({ email: current.email, notes: "calls ahead" });
+    expect(sent[1]).toEqual({ email: current.email, tags: ["wholesale"] });
+  });
+
+  it("still returns a complete record for the screen to render", () => {
+    // The patch is what travels; the caller still needs something whole.
+    const current = meta({ notes: "old", tags: ["VIP"] });
+    mockServer(true);
+
+    return updateCustomerNotes(current, "new").then(({ meta: saved }) => {
+      expect(saved.notes).toBe("new");
+      expect(saved.tags).toEqual(["VIP"]);
+    });
   });
 });

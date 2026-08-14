@@ -20,14 +20,20 @@ import {
 } from "@/features/payments/server/razorpay-refund.server";
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
-import { isBeforeLeadTime } from "@/features/orders/lib/delivery-date";
+import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
+import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
-import { priceCart, UnknownProductError } from "@/features/checkout/server/pricing.server";
+import {
+  priceCart,
+  UnknownProductError,
+  UnknownWeightError,
+} from "@/features/checkout/server/pricing.server";
 import {
   publicBaseUrl,
   sendTemplatedEmail,
 } from "@/features/communications/server/email.service";
 import { notifyWhatsApp } from "@/features/communications/server/whatsapp.service";
+import { isNotificationEnabled } from "@/features/payments/server/notification-prefs.server";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
@@ -140,6 +146,7 @@ async function repriceForPlacement(input: PlaceOrderInput) {
           flavour: typeof line.flavour === "string" ? line.flavour : undefined,
           shape: typeof line.shape === "string" ? line.shape : undefined,
           message: typeof line.message === "string" ? line.message : undefined,
+          photoUrl: typeof line.photoUrl === "string" ? line.photoUrl : undefined,
           deliveryDate: typeof line.deliveryDate === "string" ? line.deliveryDate : undefined,
           deliveryTime: typeof line.deliveryTime === "string" ? line.deliveryTime : undefined,
           variantSelections:
@@ -159,6 +166,12 @@ async function repriceForPlacement(input: PlaceOrderInput) {
   } catch (error) {
     if (error instanceof UnknownProductError) {
       throw new AppError("One of the items is no longer available.", 409);
+    }
+    // A size the shop does not sell. Refused for the same reason a missing slug
+    // is: the alternative is charging the smallest tier's price for whatever
+    // size the line still says, and then baking that size.
+    if (error instanceof UnknownWeightError) {
+      throw new AppError("One of the items is no longer available in that size.", 409);
     }
     throw error;
   }
@@ -282,10 +295,47 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // `deliveryLeadDays`, which knows nothing about zones, and `min` on an input
   // is a suggestion to a browser rather than a rule. So a five-day zone accepted
   // tomorrow, and a direct POST accepted today.
-  const leadDays = Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays);
+  //
+  // And the SHOP-WIDE floor, which the server had still never heard of. Only
+  // the matched zone's `minDeliveryDays` was checked here — but a zone quote
+  // only carries that field when `useZoneBasedDelivery` is on AND a zone
+  // matched, and it defaults to off. So on an ordinary shop this was
+  // `Number(undefined)` → NaN, and `isBeforeLeadTime` treats a non-finite lead
+  // as unconstrained: the bakery's "we need 3 days" was enforced by an `<input
+  // min=…>` and nothing else. Even with zones on, a zone configured at 1 day
+  // silently overrode a shop-wide 3. The browser already takes the stricter of
+  // the two; the server takes it now as well.
+  const leadDays = Math.max(
+    Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays) || 0,
+    Number(commerce.deliveryLeadDays) || 0,
+  );
   if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
     throw new AppError(
       `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
+      409,
+    );
+  }
+
+  /**
+   * And a slot the shop actually offers.
+   *
+   * `commerce.deliveryTimeSlots` was read by the admin page that edits it and
+   * the storefront dropdown that renders it, and by nothing else — so a slot
+   * the bakery had removed was still accepted, then printed on the invoice and
+   * pushed into the WhatsApp alert as a delivery it is expected to make.
+   *
+   * Only for a cart that was never quoted, for the same reason as the minimum
+   * order and the payment method: refusing after the gateway has captured would
+   * strand a paying customer because an admin edited the slot list in between.
+   * The quote endpoint refuses it while it is still free.
+   */
+  if (
+    !draft &&
+    input.deliverySlot?.timeSlot &&
+    !isOfferedTimeSlot(input.deliverySlot.timeSlot, commerce.deliveryTimeSlots ?? [])
+  ) {
+    throw new AppError(
+      "That delivery time is not one this shop offers. Please choose another.",
       409,
     );
   }
@@ -313,6 +363,34 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   if (minimum.below) {
     throw new AppError(
       `This shop's minimum order is ${formatCurrency(commerce.minOrderValue, currency)}. Please add ${formatCurrency(minimum.shortfall, currency)} more to continue.`,
+      409,
+    );
+  }
+
+  /**
+   * A method the shop actually offers.
+   *
+   * `commerce.paymentMethods` was read in four places and every one of them was
+   * in the browser. Not just a devtools hole either: the checkout page starts
+   * from `defaultCommerceSettings`, where every method is on, and pins the
+   * selected method to the first one that local copy allows — "cod". Hydration
+   * then arrives and removes the COD radio from the screen, but nothing resets
+   * the SELECTION, so an ordinary first-time customer submits `cod` to a shop
+   * that switched it off and the server takes it.
+   *
+   * Cash on Delivery is the one that hurts: a disabled card or UPI still needs
+   * a priced draft and a captured payment to land as paid, but a COD order goes
+   * straight to `confirmed` — a cake the bakery is expected to make and hand
+   * over for cash it decided it would no longer accept.
+   *
+   * Only for a cart that was never quoted, for the same reason the minimum is:
+   * refusing here would strand a customer whose card the gateway has already
+   * captured because an admin changed a switch in between. The quote endpoint
+   * refuses it before any money moves.
+   */
+  if (!draft && commerce.paymentMethods?.[input.paymentMethod] === false) {
+    throw new AppError(
+      "That payment method is not available at this shop. Please choose another.",
       409,
     );
   }
@@ -581,20 +659,27 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // an unsupplied one renders as the literal `{{invoice_url}}` in the customer's
   // inbox, which is how this was caught.
   const base = await publicBaseUrl();
-  const mail = await sendTemplatedEmail("order_confirmation", placed.address.email, {
-    customer_name: placed.address.fullName?.trim() || "there",
-    order_number: placed.orderNumber,
-    order_total: formatCurrency(placed.totals.total, currency),
-    payment_method: placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
-    delivery_date: placed.deliverySlot?.date
-      ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
-      : new Date(placed.estimatedDelivery).toDateString(),
-    invoice_url: base
-      ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
-      : "Reply to this email and we will send your invoice.",
-  });
+  // The Payment Notifications screen calls this "Payment Success". Its switches
+  // stored a preference that nothing read, so an admin who turned this off
+  // because customers complained about volume got a green toast and the next
+  // order sent it anyway.
+  const mail = (await isNotificationEnabled("cust_payment_success", "email"))
+    ? await sendTemplatedEmail("order_confirmation", placed.address.email, {
+        customer_name: placed.address.fullName?.trim() || "there",
+        order_number: placed.orderNumber,
+        order_total: formatCurrency(placed.totals.total, currency),
+        payment_method:
+          placed.paymentMethod === "cod" ? "Cash on delivery" : "Paid online",
+        delivery_date: placed.deliverySlot?.date
+          ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+          : new Date(placed.estimatedDelivery).toDateString(),
+        invoice_url: base
+          ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
+          : "Reply to this email and we will send your invoice.",
+      })
+    : null;
 
-  if (!mail.sent) {
+  if (mail && !mail.sent) {
     console.error(
       `[orders] Could not email the confirmation for ${placed.orderNumber}: ${mail.error}`
     );
@@ -607,19 +692,28 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   // rather than logging a failure on every order. Note that this passes no
   // `invoice_url` — a link has to be inside the wording Meta approved, so it
   // cannot be supplied per-message the way it can in an email.
-  await notifyWhatsApp(
-    "order_confirmation",
-    placed.address.phone,
-    {
-      customer_name: placed.address.fullName?.trim() || "there",
-      order_number: placed.orderNumber,
-      order_total: formatCurrency(placed.totals.total, currency),
-      delivery_date: placed.deliverySlot?.date
-        ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
-        : new Date(placed.estimatedDelivery).toDateString(),
-    },
-    `confirmation for ${placed.orderNumber}`,
-  );
+  //
+  // GATED ON THE SAME SWITCH AS THE EMAIL ABOVE IT. That gate was added with
+  // the comment "Its switches stored a preference that nothing read" — and its
+  // sibling thirty lines down went on sending unconditionally, so the Payment
+  // Notifications screen showed the WhatsApp chip OFF while WhatsApp kept
+  // going out. Every `isNotificationEnabled` call in this file passed "email";
+  // nothing anywhere passed "whatsapp".
+  if (await isNotificationEnabled("cust_payment_success", "whatsapp")) {
+    await notifyWhatsApp(
+      "order_confirmation",
+      placed.address.phone,
+      {
+        customer_name: placed.address.fullName?.trim() || "there",
+        order_number: placed.orderNumber,
+        order_total: formatCurrency(placed.totals.total, currency),
+        delivery_date: placed.deliverySlot?.date
+          ? `${placed.deliverySlot.date}${placed.deliverySlot.timeSlot ? `, ${placed.deliverySlot.timeSlot}` : ""}`
+          : new Date(placed.estimatedDelivery).toDateString(),
+      },
+      `confirmation for ${placed.orderNumber}`,
+    );
+  }
 
   // And tell the BAKERY.
   //
@@ -653,6 +747,8 @@ async function notifyShopOfOrder(
     .map((item) => `  ${item.quantity} x ${item.name}`)
     .join("\n");
 
+  // "Payment Received" on the Payment Notifications screen.
+  if (!(await isNotificationEnabled("admin_payment_received", "email"))) return;
   const mail = await sendTemplatedEmail("admin_new_order", shopEmail, {
     order_number: order.orderNumber,
     order_total: formatCurrency(order.totals.total, currency),
@@ -742,6 +838,19 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
   const order = await requireOrder(id);
   if (order.status === status) return order;
 
+  // The rule lives HERE, not on a dropdown.
+  //
+  // There was no server-side transition check at all: `isTerminalOrderStatus`
+  // had a single caller, a `disabled` prop on the detail page's select. The
+  // Orders list gives every row a checkbox including under the Cancelled and
+  // Refunded tabs, so select-all → bulk status → Apply wrote a refunded order
+  // back to `delivered`. Its total then re-entered the Revenue card having
+  // already been paid back, it re-entered the fulfilment queue, and cancelling
+  // it a second time put its stock back a second time — the shop oversold what
+  // it had never got back.
+  const refusal = orderStatusTransitionError(order.status, status);
+  if (refusal) throw new AppError(refusal, 409);
+
   const now = new Date().toISOString();
   const updated = await repo.patch(id, {
     status,
@@ -796,6 +905,11 @@ export async function emailInvoice(order: PlacedOrder): Promise<{ sent: boolean;
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
   const base = await publicBaseUrl();
 
+  // "Invoice Generated" on the Payment Notifications screen.
+  if (!(await isNotificationEnabled("cust_invoice_generated", "email"))) {
+    return { sent: false, error: "Invoice emails are switched off in notification settings." };
+  }
+
   return sendTemplatedEmail("invoice", order.address.email, {
     customer_name: order.address.fullName?.trim() || "there",
     order_number: order.orderNumber,
@@ -805,6 +919,31 @@ export async function emailInvoice(order: PlacedOrder): Promise<{ sent: boolean;
       ? `${base}${routes.store.orderDetail(order.orderNumber)}/invoice`
       : "Reply to this email and we will send your invoice as a PDF.",
   });
+}
+
+/**
+ * Tell a customer their order was cancelled, and what happens to their money.
+ *
+ * `refund_note` is the honest part. Whether anything is coming back depends on
+ * whether anything was taken, and that is the first thing they will ask.
+ */
+async function notifyOrderCancelled(order: PlacedOrder, holdsPayment: boolean): Promise<void> {
+  const { general } = (await getSettings()) as unknown as { general: GeneralSettings };
+
+  const mail = await sendTemplatedEmail("order_cancelled", order.address.email, {
+    customer_name: order.address.fullName?.trim() || "there",
+    order_number: order.orderNumber,
+    order_total: formatCurrency(order.totals.total, general?.currency),
+    refund_note: holdsPayment
+      ? "You paid for this order, so a refund is on its way. It usually takes 5–7 working days to reach your account."
+      : "No payment was taken for this order, so there is nothing to refund.",
+  });
+
+  if (!mail.sent) {
+    console.error(
+      `[orders] Could not send the cancellation email for ${order.orderNumber}: ${mail.error}`,
+    );
+  }
 }
 
 async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
@@ -851,9 +990,23 @@ async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
  * report counted those redemptions forever. Best effort: a miscount is a
  * reporting problem, and failing a cancellation over it would be far worse.
  */
-async function releaseCoupon(order: PlacedOrder) {
+/**
+ * Give a coupon redemption back. Once per order, whichever path gets there.
+ *
+ * Cancelling releases it and so does a full settled refund — and refunding a
+ * cancelled order is the ordinary sequence, so both ran and the customer's
+ * single-use code came back twice. The refund tracked its own
+ * `refundRecord.couponReleased`; cancellation never saw that flag and had none
+ * of its own.
+ *
+ * The claim is on the ORDER, so it is the same claim for both paths.
+ */
+async function releaseCoupon(order: PlacedOrder): Promise<void> {
   const code = order.coupon?.code;
   if (!code) return;
+
+  if (!(await repo.claimCouponRelease(order.id))) return;
+
   try {
     await releaseCouponRedemption(code);
   } catch (error) {
@@ -871,16 +1024,27 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   if (order.status === "cancelled" || order.status === "refunded") return order;
 
   const now = new Date().toISOString();
-  const updated = await repo.patch(id, {
+
+  // THE STATUS CHANGE IS THE GUARD.
+  //
+  // This was a read, a check and a patch — three steps — with a comment saying
+  // the check kept the work below from running twice. It did not: a
+  // double-clicked Cancel, or two operators on the same order, both read
+  // `confirmed`, both passed, and both restored the stock and released the
+  // coupon. A three-cake order ended up six on the shelf.
+  const updated = await repo.cancelIfActive(id, {
     status: "cancelled",
     cancellationReason: cancellationReason?.trim() || undefined,
     statusHistory: [...order.statusHistory, { status: "cancelled", at: now }],
   });
 
+  // Someone else cancelled it between the read and the write. They are doing
+  // the work below; this request must not repeat any of it.
+  if (!updated) return await requireOrder(id);
+
   // The cakes are back on the shelf. Nothing in this repo ever added stock, so
   // a cancelled order used to destroy inventory permanently — the shop's own
-  // counts drifted down every time it corrected a mistake. The early return
-  // above is what keeps this from running twice.
+  // counts drifted down every time it corrected a mistake.
   //
   // Not for a DELIVERED order, though: those cakes have left the building. Adding
   // them back invents stock, and `createOrderWithStockReduction` will then
@@ -892,11 +1056,24 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   // Cancelling does not move money. A paid order cancelled here still has the
   // customer's payment sitting in the gateway account, and this is the state
   // `requestRefund` expects — so say so rather than leaving it to be noticed.
-  if (order.paymentStatus === "paid") {
+  const holdsPayment = order.paymentStatus === "paid";
+  if (holdsPayment) {
     console.info(
       `[orders] Cancelled ${order.orderNumber} still holds a captured payment — it needs a refund.`,
     );
   }
+
+  // TELL THE CUSTOMER.
+  //
+  // Cancelling wrote a status, put the stock back and released the coupon, and
+  // sent nothing at all. The customer found out by the cake never arriving —
+  // and if they had paid, their money was sitting in the gateway with nothing
+  // anywhere saying so. Every other status change they care about has an email;
+  // the one they most need was the one that did not.
+  //
+  // Awaited but never allowed to fail the cancellation: the order IS cancelled,
+  // and reporting that as a failure would have an operator do it twice.
+  await notifyOrderCancelled(updated, holdsPayment);
 
   await releaseCoupon(order);
 
@@ -930,6 +1107,29 @@ export async function updateAdminNotes(id: string, adminNotes: string, ctx: Requ
   await requireOrder(id);
   const updated = await repo.patch(id, { adminNotes: adminNotes.trim() || undefined });
   await audit(ctx, "order.notes", id);
+  return updated;
+}
+
+/**
+ * Assign the person bringing this order — or clear the assignment.
+ *
+ * A blank name clears it, so a wrong rider can be taken back off the
+ * customer's tracking page. The tracking page shows no partner card at all
+ * until this is set; it used to invent one for every order.
+ */
+export async function updateDeliveryPartner(
+  id: string,
+  input: { name: string; phone?: string; vehicle?: string },
+  ctx: RequestCtx,
+) {
+  await requireOrder(id);
+  const name = input.name.trim();
+  const partner = name
+    ? { name, phone: input.phone?.trim() || undefined, vehicle: input.vehicle?.trim() || undefined }
+    : undefined;
+
+  const updated = await repo.patch(id, { deliveryPartner: partner });
+  await audit(ctx, "order.delivery_partner", id, { assigned: Boolean(partner) });
   return updated;
 }
 
@@ -991,6 +1191,38 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   const reason = (input.reason as RefundRecord["reason"]) ?? "customer_request";
   let appended: GatewayRefund | null = null;
 
+  // CLAIM THE SLOT BEFORE THE MONEY MOVES.
+  //
+  // The compare-and-set used to run at the END, after the gateway had already
+  // paid out — so it protected the RECORD and not the MONEY. Two admins
+  // refunding ₹1,000 each on a ₹2,000 payment both passed `planRefund`, because
+  // Razorpay's own cap is the captured total and ₹1,000 + ₹1,000 is inside it.
+  // Both payouts happened; the second write lost the CAS and answered 409 for a
+  // refund that had really been made. The shop was ₹1,000 down with no record.
+  //
+  // Now the loser of the race is refused here, having moved nothing. A retry
+  // arriving while an attempt is still open is refused for the same reason.
+  if (existing?.pendingAttempt) {
+    throw new AppError(
+      `A refund of ${formatRefundAmount(existing.pendingAttempt.amount)} for this order is already in progress. ` +
+        "Check the refund history before trying again — the money may already have moved.",
+      409,
+    );
+  }
+
+  const claimed = await repo.claimRefundAttempt(id, priorVersion, {
+    amount: plan.amount,
+    at: now,
+    actorEmail: ctx.actorEmail,
+  });
+
+  if (!claimed) {
+    throw new AppError(
+      "Another refund for this order was started at the same moment. Reload and check the refund history before retrying.",
+      409,
+    );
+  }
+
   if (plan.kind === "gateway") {
     // THE MONEY MOVES HERE. Everything above decides whether it should, and
     // everything below only writes down what happened. Before this call existed,
@@ -1008,12 +1240,39 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
         // Accepted but unidentifiable. The money may well be moving and we have
         // nothing to record it against; the refund webhook will recognise it and
         // attach it. Loud, because it needs a human to confirm.
+        //
+        // The claim STAYS. This is the one case where retrying could pay twice,
+        // and an operator has to reconcile before anything else is attempted.
         console.error(
-          `[orders] Razorpay accepted a refund for ${order.orderNumber} but returned no refund id.`,
+          `[orders] Razorpay accepted a refund for ${order.orderNumber} but returned no refund id. ` +
+            "The refund attempt is left open deliberately — reconcile before retrying.",
+        );
+      } else {
+        // The gateway said no, or could not be reached. Nothing moved, so the
+        // slot has to go back: a claim left behind here would block the retry
+        // that a 503 explicitly invites.
+        await repo.releaseRefundAttempt(id, priorVersion + 1, Boolean(existing));
+      }
+
+      // Say whether the money moved, because only this code knows.
+      //
+      // The Refund Centre used to append "No money has moved. Nothing was
+      // recorded." to EVERY refusal — including this one, where the gateway
+      // accepted a payout it would not name. That is the single case where the
+      // money is most likely already gone, and the screen was the most confident
+      // it had not.
+      if (outcome.ok) {
+        throw new AppError(
+          "The gateway accepted a refund but did not identify it. The money may already be on its way — " +
+            "check the refund in your gateway dashboard before trying again.",
+          503,
         );
       }
+
       throw new AppError(
-        outcome.refused ?? outcome.unavailable ?? "The refund was not accepted by the gateway.",
+        outcome.refused
+          ? `${outcome.refused} No money has moved.`
+          : `${outcome.unavailable ?? "The payment gateway could not be reached."} No money has moved — try again.`,
         outcome.refused ? 409 : 503,
       );
     }
@@ -1053,7 +1312,12 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   const releaseCouponNow = fully && settled && !existing?.couponReleased;
 
   const refundRecord: RefundRecord = {
-    version: priorVersion + 1,
+    // The claim took priorVersion + 1; recording the outcome moves it on again,
+    // so a request holding either number cannot overwrite this.
+    version: priorVersion + 2,
+    // `pendingAttempt` is deliberately absent: writing the whole record clears
+    // it, which is what marks this attempt finished. One left behind means the
+    // request died between asking the gateway and writing the answer down.
     status: recordStatus,
     reason,
     reasonDetail: input.reasonDetail?.trim() || existing?.reasonDetail,
@@ -1084,7 +1348,10 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   // Only a settled, complete refund flips the order itself. A refund the gateway
   // has accepted but not yet paid out is `processing`, and saying "refunded"
   // then would be the same lie in a different field.
-  const updated = await repo.compareAndSetRefund(id, priorVersion, {
+  // Compare against the version the CLAIM took, not the one read at the start —
+  // the claim already moved it. Nothing else can be holding this number, so this
+  // write cannot lose a race for a payout that has already happened.
+  const updated = await repo.compareAndSetRefund(id, priorVersion + 1, {
     refundRecord,
     refundReference: refundRecord.reference,
     ...(fully && settled
@@ -1141,6 +1408,10 @@ function formatRefundAmount(amount: number): string {
 async function sendRefundEmail(order: PlacedOrder, amount: number, settled: boolean) {
   const email = order.address?.email;
   if (!email) return;
+
+  // "Refund Completed" on the Payment Notifications screen — a switch that
+  // stored a preference nothing read.
+  if (!(await isNotificationEnabled("cust_refund_completed", "email"))) return;
 
   const settings = await getSettings().catch(() => null);
   const currency = (settings?.general as GeneralSettings | undefined)?.currency;
@@ -1403,21 +1674,38 @@ export async function settleGatewayRefund(input: {
 
 export async function updateRefundNotes(id: string, notes: RefundNotesInput["notes"], ctx: RequestCtx) {
   const order = await requireOrder(id);
-  if (!order.refundRecord) return order;
+  if (!order.refundRecord) {
+    // Returning the order unchanged made the endpoint answer 200 with the note
+    // discarded — the admin typed it, saw it accepted, and it was never stored.
+    throw new AppError("This order has no refund to add notes to.", 409);
+  }
 
-  const updated = await repo.patch(id, {
-    refundRecord: {
-      ...order.refundRecord,
-      notes: notes.trim() || undefined,
-    },
-  });
+  // ONE FIELD. This used to spread the whole `refundRecord` into a plain patch,
+  // outside the version protocol: a webhook settle landing between the read and
+  // the write was erased, taking `stockRestored` and `couponReleased` with it,
+  // and the next settle then restored the stock and released the coupon again.
+  const updated = await repo.setRefundNotes(id, notes.trim() || undefined);
+  if (!updated) throw new AppError("This order has no refund to add notes to.", 409);
+
   await audit(ctx, "order.refund.notes", id);
   return updated;
 }
 
 export async function requestRefund(id: string, input: RefundRequestInput, ctx: RequestCtx) {
   const order = await requireOrder(id);
-  if (order.status !== "cancelled" || order.refundRecord) return order;
+
+  // Both refusals used to be `return order`, so the controller answered 200
+  // "Refund requested" having recorded nothing. The admin logged the request,
+  // closed the ticket, and no refund was ever queued.
+  if (order.status !== "cancelled") {
+    throw new AppError(
+      "A refund can only be requested for a cancelled order. Cancel it first, or use Refund to pay one out directly.",
+      409,
+    );
+  }
+  if (order.refundRecord) {
+    throw new AppError("A refund has already been requested for this order.", 409);
+  }
 
   const now = new Date().toISOString();
   const reason = (input.reason as RefundRecord["reason"]) ?? "order_cancelled";

@@ -278,12 +278,34 @@ describe("settings writes", () => {
     ).resolves.toMatchObject({ persisted: false });
   });
 
-  it("still applies the section locally, so the edit is not lost while it is reported", async () => {
+  it("hands the edit back so it is not lost, and rolls the CACHE back", async () => {
+    /**
+     * The contract changed, deliberately.
+     *
+     * This used to assert that a refused write stayed in the cache so the
+     * admin's typing survived. Half of that is right and half of it caused a
+     * real defect: every settings form writes its WHOLE section back from this
+     * cache, so a rejected payload left there was re-sent on the next edit to
+     * an unrelated field — a change the admin had been told failed, landing
+     * later by the back door.
+     *
+     * So the two halves are separated. The RETURNED value keeps the edit, which
+     * is what the form renders and what lets the admin retry. The CACHE goes
+     * back, which is what every other form reads. The appearance, header,
+     * footer and SEO stores were all fixed the same way.
+     */
     mockServer(false);
 
-    await saveGeneralSettings({ ...defaultGeneralSettings, siteName: "Local Only Bakes" });
+    const result = await saveGeneralSettings({
+      ...defaultGeneralSettings,
+      siteName: "Local Only Bakes",
+    });
 
-    expect(getGeneralSettings().siteName).toBe("Local Only Bakes");
+    expect(result.persisted).toBe(false);
+    // Not lost: the form still has it.
+    expect(result.value.siteName).toBe("Local Only Bakes");
+    // And not lurking: the next section write cannot carry it to the server.
+    expect(getGeneralSettings().siteName).not.toBe("Local Only Bakes");
   });
 });
 

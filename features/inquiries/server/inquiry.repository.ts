@@ -17,14 +17,23 @@ function toInquiry(raw: Raw): Inquiry {
   return { ...rest, id: String(_id) } as Inquiry;
 }
 
+/**
+ * Insert a NEW enquiry. Never an upsert.
+ *
+ * This was `updateOne({_id}, {$set}, {upsert: true})` — for idempotency on a
+ * re-sent dual-write — and the only caller is the unauthenticated contact form,
+ * whose schema took the id from the request body. The stored ids are `inq-1`,
+ * `inq-7`, `inq-11`, so an anonymous POST carrying a guessed one rewrote that
+ * enquiry in place. Proved against a running shop before this change.
+ *
+ * The id is minted server-side now, so a re-sent create makes a second row
+ * rather than destroying a first — the failure mode of a duplicate enquiry is a
+ * duplicate the shop can see and delete, which is strictly better than a real
+ * one silently replaced.
+ */
 export async function create(inquiry: Inquiry): Promise<Inquiry> {
   await connectDB();
-  // Upsert on the app id so a re-sent create (best-effort dual-write) is idempotent.
-  await InquiryModel.updateOne(
-    { _id: inquiry.id },
-    { $set: toDoc(inquiry) },
-    { upsert: true },
-  );
+  await InquiryModel.create(toDoc(inquiry));
   return inquiry;
 }
 

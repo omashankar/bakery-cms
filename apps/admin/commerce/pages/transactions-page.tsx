@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import {
   fetchOrder,
@@ -45,6 +46,17 @@ export function TransactionsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  /**
+   * The three states these cards have, rather than the one they assumed.
+   *
+   * Each renders its zeroed EMPTY_* constant with no gate, so a cold load
+   * stated "Pending amount ₹0.00 — All clear" in green, "Volume ₹0.00 · all
+   * time" and "Paid 0 · all time" as the shop's figures — and a FAILED load
+   * left them standing. The loading and failed flags were already here; they
+   * simply never reached the cards. Same wiring as the dashboard and reports.
+   */
+  const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
   const [overview, setOverview] = useState<TransactionsOverviewResponse>(EMPTY_TRANSACTIONS_OVERVIEW);
   const [filters, setFilters] = useState<TransactionFilters>(defaultTransactionFilters);
   const [page, setPage] = useState(1);
@@ -114,6 +126,15 @@ export function TransactionsPage() {
   }
 
   async function handleExport() {
+    // `total` is 0 after a FAILED load too, and telling the admin the shop has
+    // no transactions is a different claim from admitting the list never arrived.
+    // orders-list and invoices already make this distinction.
+    if (failed) {
+      toast.error("Could not load the transactions to export", {
+        description: "The server did not answer — reload and try again.",
+      });
+      return;
+    }
     if (total === 0) {
       toast.error("No transactions to export");
       return;
@@ -165,6 +186,7 @@ export function TransactionsPage() {
           change={`${total} transactions`}
           icon={IndianRupee}
           tone="bakery"
+          figures={statFigures}
         />
         <DashboardStatCard
           title="Successful"
@@ -172,6 +194,7 @@ export function TransactionsPage() {
           change="captured / paid"
           icon={TrendingUp}
           tone="gold"
+          figures={statFigures}
         />
         <DashboardStatCard
           title="Total records"
@@ -179,6 +202,7 @@ export function TransactionsPage() {
           change="all time"
           icon={Receipt}
           tone="neutral"
+          figures={statFigures}
         />
       </section>
 

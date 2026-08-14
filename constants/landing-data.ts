@@ -19,6 +19,8 @@ export interface LandingProduct {
   reviewCount?: number;
   isEggless?: boolean;
   flavours?: string[];
+  /** Occasion names this cake is tagged with, for the storefront filter. */
+  occasions?: string[];
   inStock?: boolean;
   shapes?: string[];
   allowsMessage?: boolean;
@@ -57,6 +59,12 @@ export interface LandingOffer {
   description: string;
   discount: string;
   code?: string;
+  /**
+   * The minimum spend the code needs, already formatted — shown on the card so
+   * an offer with a condition does not send a customer to a checkout that
+   * refuses it.
+   */
+  minSpend?: string;
   image: string;
   expiresAt: string;
 }
@@ -77,7 +85,11 @@ export const brandInfo = {
 export const contactInfo = {
   address: "123 Baker Street, Mumbai, Maharashtra 400001",
   phone: "+91 1800-123-4567",
-  email: "hello@monginis.com",
+  // A real, reachable address. `hello@monginis.com` is a domain this project
+  // does not own, and it is the fallback the storefront shows whenever
+  // Settings → Contact is empty — so a customer clicking "email us" was
+  // writing to nobody.
+  email: "sumanom7014106@gmail.com",
   mapEmbedUrl:
     "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3771.626326424726!2d72.8776559!3d19.0759837!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c6306644edc1%3A0x5da4ed8f8d648c69!2sMumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin",
 };
@@ -494,32 +506,6 @@ export const specialOffers: LandingOffer[] = [
   },
 ];
 
-export const whyChooseUs = [
-  {
-    icon: "Award",
-    title: "Legacy of Excellence",
-    description:
-      "Over six decades of baking expertise, trusted by generations of families across India.",
-  },
-  {
-    icon: "Leaf",
-    title: "Premium Ingredients",
-    description:
-      "Only the finest Belgian chocolate, fresh cream, and seasonal fruits in every creation.",
-  },
-  {
-    icon: "Truck",
-    title: "Same-Day Delivery",
-    description:
-      "Order by 2 PM for same-day delivery across 500+ cities. Freshness guaranteed.",
-  },
-  {
-    icon: "Palette",
-    title: "Custom Designs",
-    description:
-      "Personalized cakes crafted to your vision — from birthdays to grand weddings.",
-  },
-];
 
 export const testimonials: LandingTestimonial[] = [
   {
@@ -599,13 +585,13 @@ export const faqs: LandingFaq[] = [
     id: "3",
     question: "What are your delivery areas and charges?",
     answer:
-      "We deliver across 500+ cities in India. Delivery is free for orders above ₹999 within city limits. Same-day delivery is available for orders placed before 2 PM.",
+      "Delivery areas, charges and lead times are set in your shop's Commerce settings — update this answer to match them.",
   },
   {
     id: "4",
     question: "Can I customize the design and flavour of my cake?",
     answer:
-      "Absolutely! Our expert bakers can create custom designs based on your theme, colours, and preferences. Share your ideas during checkout or visit your nearest outlet for a design consultation.",
+      "Absolutely! Our bakers can create custom designs based on your theme, colours and preferences. Share your ideas during checkout, or get in touch for a design consultation.",
   },
   {
     id: "5",

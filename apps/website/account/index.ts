@@ -7,9 +7,10 @@ export { AccountOrdersPage } from "./pages/account-orders-page";
 export { AccountAddressesPage } from "./pages/account-addresses-page";
 export { useCustomerAuth } from "./hooks/use-customer-auth";
 export {
-  setCustomerSession,
+  adoptCustomerSession,
   getCustomerSession,
-  clearCustomerSession,
+  signOutCustomer,
+  syncCustomerSession,
   hasCustomerSession,
   getCustomerDisplayName,
   updateCustomerProfile,

@@ -39,6 +39,7 @@ import {
   FilterPanelSearch,
 } from "@/components/shared/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
@@ -366,7 +367,12 @@ export function DeliveryZonesAdminPage() {
         {/* "No zones" and "no zones MATCH" are different facts, and the second
             one needs a way back. This showed "Create zones" to an admin whose
             shop had twelve, hidden behind a filter they had forgotten. */}
-        {paginated.length === 0 ? (
+        {!mounted ? (
+          // A third fact, and the one that was missing: we have not looked yet.
+          // `mounted` gated the stat cards only, so a cold load offered "Create
+          // zones" to a shop that already has twelve.
+          <ListLoading rows={4} label="Loading delivery zones" />
+        ) : paginated.length === 0 ? (
           zones.length === 0 ? (
             <EmptyState
               icon={MapPin}

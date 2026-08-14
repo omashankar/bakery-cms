@@ -53,7 +53,24 @@ const orderSchema = new mongoose.Schema(
     estimatedDelivery: { type: String, default: "" },
     deliverySlot: { type: mongoose.Schema.Types.Mixed },
     adminNotes: { type: String },
+    /**
+     * Who is bringing this order, once the bakery has said.
+     *
+     * The tracking page used to invent one: three hardcoded people picked by
+     * hashing the order id, complete with a name, a phone number and a star
+     * rating. A customer could ring it.
+     */
+    deliveryPartner: { type: mongoose.Schema.Types.Mixed },
     cancellationReason: { type: String },
+    /**
+     * The coupon redemption has been handed back for this order.
+     *
+     * On the ORDER rather than on the refund record, because two paths release
+     * it — cancellation and a full settled refund — and refunding a cancelled
+     * order is the ordinary sequence. The refund tracked its own flag, which
+     * cancellation never saw, so the customer's single-use code came back twice.
+     */
+    couponReleased: { type: Boolean },
     refundReference: { type: String },
     refundRecord: { type: mongoose.Schema.Types.Mixed },
     createdAt: { type: String },

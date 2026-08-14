@@ -21,6 +21,7 @@ import {
 } from "@/components/shared/filter-panel";
 import { SafeImage } from "@/components/shared/safe-image";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -38,6 +39,8 @@ import {
   setUnlimitedStock,
   type InventoryListFilters,
 } from "@/apps/admin/commerce/lib/inventory-repository";
+import { fetchInventoryOverview } from "@/apps/admin/commerce/lib/inventory-api";
+import { PRODUCTS_UPDATED_EVENT } from "@/features/products/lib/products-repository";
 import type { InventoryItem, InventoryOverview, InventorySettings } from "@/types/inventory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,9 +96,22 @@ export function InventoryAdminPage() {
     ensureHydrated: ensureInventoryHydrated,
   });
 
+  /**
+   * The stat cards come from the SERVER.
+   *
+   * They were derived from this browser's product cache — a copy, and a stale
+   * one on any tab left open while another admin was working. These are the
+   * numbers that decide whether anyone goes and bakes more, and they were also
+   * counting archived cakes, so the restock alert never cleared.
+   *
+   * The local computation stays as the fallback for a failed read, which is
+   * approximately right rather than absent.
+   */
+  const [serverOverview, setServerOverview] = useState<InventoryOverview | null>(null);
+
   const overview = useMemo(
-    () => (mounted ? getInventoryOverview() : EMPTY_OVERVIEW),
-    [mounted, refreshKey]
+    () => serverOverview ?? (mounted ? getInventoryOverview() : EMPTY_OVERVIEW),
+    [serverOverview, mounted, refreshKey]
   );
   const items = useMemo(() => (mounted ? getInventoryItems() : []), [mounted, refreshKey]);
   const history = useMemo(
@@ -112,12 +128,31 @@ export function InventoryAdminPage() {
     setMounted(true);
     setRefreshKey(1);
 
-    function onInventoryUpdated() {
-      setRefreshKey((value) => value + 1);
+    let cancelled = false;
+
+    // Re-read after every adjustment as well as on mount: the cards must show
+    // what the server holds now, not what it held when the page opened.
+    async function refreshOverview() {
+      const next = await fetchInventoryOverview();
+      if (!cancelled && next) setServerOverview(next);
     }
 
+    function onInventoryUpdated() {
+      setRefreshKey((value) => value + 1);
+      void refreshOverview();
+    }
+
+    void refreshOverview();
     window.addEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
-    return () => window.removeEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
+    // The product cache arrives from the server AFTER this screen has read it.
+    // Without this the item list showed whatever localStorage held at mount for
+    // the whole visit — on a fresh browser, the demo seed's stock levels.
+    window.addEventListener(PRODUCTS_UPDATED_EVENT, onInventoryUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
+      window.removeEventListener(PRODUCTS_UPDATED_EVENT, onInventoryUpdated);
+    };
   }, []);
 
   function updateFilters(patch: Partial<InventoryListFilters>) {
@@ -274,7 +309,9 @@ export function InventoryAdminPage() {
             <CardTitle className="text-base">Recent history</CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0">
-            {history.length === 0 ? (
+            {!mounted ? (
+              <ListLoading rows={3} label="Loading recent adjustments" />
+            ) : history.length === 0 ? (
               <div className="flex h-full min-h-28 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-3 py-6 text-center">
                 <p className="text-sm text-muted-foreground">No adjustments yet</p>
               </div>
@@ -340,7 +377,12 @@ export function InventoryAdminPage() {
       </FilterPanel>
 
       <section className={adminShell.tableCard}>
-        {paginated.length === 0 ? (
+        {!mounted ? (
+          // `mounted` gated the stat cards and the derived lists, but not this:
+          // a cold load told the admin there were "No inventory records" and
+          // suggested adding cakes to a catalogue that already has them.
+          <ListLoading rows={5} label="Loading inventory" />
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={Package}
             title="No inventory records found"

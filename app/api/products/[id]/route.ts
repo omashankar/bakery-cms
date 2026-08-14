@@ -6,7 +6,7 @@ import {
   updateProduct,
 } from "@/features/products/data/products-service";
 import { productFormSchema } from "@/features/products/server/product.validators";
-import { slugExists } from "@/features/products/server/product.repository";
+import { isDuplicateSlugError } from "@/features/products/server/product.repository";
 import { requireProductAdmin } from "@/features/products/server/guard";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
@@ -18,6 +18,13 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * One product. Unpublished ones are admin-only — see the note on the collection
+ * GET; a per-id read was the same leak with a guessable address.
+ *
+ * An anonymous caller gets 404 rather than 403 for a draft, so the endpoint does
+ * not confirm that an unreleased product exists.
+ */
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
@@ -25,6 +32,12 @@ export async function GET(_request: Request, context: RouteContext) {
     const product = await getProductById(id);
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    if (product.status !== "published") {
+      const auth = await requireProductAdmin();
+      if (auth instanceof NextResponse) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
     }
     return NextResponse.json({ product });
   } catch {
@@ -49,11 +62,6 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   try {
-    // Slug must stay unique across OTHER products.
-    if (await slugExists(body.slug, id)) {
-      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
-    }
-
     const updated = await updateProduct(id, body);
     if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -66,7 +74,12 @@ export async function PUT(request: Request, context: RouteContext) {
       ...requestContext(request),
     });
     return NextResponse.json({ product: updated });
-  } catch {
+  } catch (error) {
+    // The unique index decides, not a scan-then-write that two requests can both
+    // pass. See the note on `isDuplicateSlugError`.
+    if (isDuplicateSlugError(error)) {
+      return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
 }

@@ -6,13 +6,18 @@ import {
   emailTemplatesHydration,
   whatsappTemplatesHydration,
   notificationSettingsHydration,
+  notificationStateHydration,
   fetchEmailTemplates,
   fetchWhatsAppTemplates,
   fetchNotificationSettings,
+  fetchNotificationState,
 } from "./communications-api";
 import { persistServerEmailTemplates } from "./email-templates-repository";
 import { persistServerWhatsAppTemplates } from "./whatsapp-templates-repository";
-import { persistServerNotificationSettings } from "@/apps/admin/commerce/lib/notifications-repository";
+import {
+  persistServerNotificationSettings,
+  persistServerNotificationState,
+} from "@/apps/admin/commerce/lib/notifications-repository";
 
 /**
  * Hydrates email + WhatsApp templates and notification settings from the server
@@ -48,10 +53,11 @@ export async function ensureCommunicationsHydrated(): Promise<{
   email: boolean;
   whatsapp: boolean;
 }> {
-  const [email, whatsapp, settings] = await Promise.all([
+  const [email, whatsapp, settings, state] = await Promise.all([
     emailTemplatesHydration.hasSettled() ? null : fetchEmailTemplates(),
     whatsappTemplatesHydration.hasSettled() ? null : fetchWhatsAppTemplates(),
     notificationSettingsHydration.hasSettled() ? null : fetchNotificationSettings(),
+    notificationStateHydration.hasSettled() ? null : fetchNotificationState(),
   ]);
 
   // Each write opens only its OWN gate. A `null` is a failed read, not an empty
@@ -67,6 +73,14 @@ export async function ensureCommunicationsHydrated(): Promise<{
   if (settings) {
     persistServerNotificationSettings(settings);
     notificationSettingsHydration.markSettled();
+  }
+  // AFTER the settings, on purpose: applying the settings re-derives the alert
+  // list, and doing that second would rebuild it from ids this admin has
+  // already read and dismissed on another device — the bell jumping back up for
+  // a moment before settling.
+  if (state) {
+    persistServerNotificationState(state);
+    notificationStateHydration.markSettled();
   }
 
   return {

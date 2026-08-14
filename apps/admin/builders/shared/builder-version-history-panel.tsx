@@ -18,9 +18,19 @@ interface BuilderVersionHistoryPanelProps<TSection> {
   open: boolean;
   revisions: BuilderRevision<TSection>[];
   onOpenChange: (open: boolean) => void;
-  onRestore: (revisionId: string) => void;
+  onRestore: (revisionId: string) => void | Promise<void>;
   /** When true, Restore asks for confirmation first */
   confirmRestore?: boolean;
+}
+
+/** Date AND time — five publishes in one day were five identical rows. */
+function revisionStamp(savedAt: string): string {
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) return formatDate(savedAt);
+  return `${formatDate(savedAt)} · ${date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 export function BuilderVersionHistoryPanel<TSection>({
@@ -31,24 +41,46 @@ export function BuilderVersionHistoryPanel<TSection>({
   confirmRestore = true,
 }: BuilderVersionHistoryPanelProps<TSection>) {
   const [pendingRestoreId, setPendingRestoreId] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   function handleOpenChange(next: boolean) {
+    if (isRestoring) return;
     if (!next) setPendingRestoreId(null);
     onOpenChange(next);
   }
 
   function requestRestore(revisionId: string) {
+    if (isRestoring) return;
     if (confirmRestore) {
       setPendingRestoreId(revisionId);
       return;
     }
-    onRestore(revisionId);
+    void runRestore(revisionId);
+  }
+
+  /**
+   * Held open until the write lands.
+   *
+   * This used to fire `onRestore` un-awaited and clear `pendingRestoreId` on the
+   * next line, so the full revision list snapped back with every Restore button
+   * live while the first request was still going. An admin who read that as a
+   * missed click and pressed Restore on a second revision sent two writes: the
+   * server serialised them, the client applied them in response order, and the
+   * editor could end up showing revision A while the stored draft held B.
+   */
+  async function runRestore(revisionId: string) {
+    setIsRestoring(true);
+    try {
+      await onRestore(revisionId);
+    } finally {
+      setIsRestoring(false);
+      setPendingRestoreId(null);
+    }
   }
 
   function confirmPendingRestore() {
-    if (!pendingRestoreId) return;
-    onRestore(pendingRestoreId);
-    setPendingRestoreId(null);
+    if (!pendingRestoreId || isRestoring) return;
+    void runRestore(pendingRestoreId);
   }
 
   const pendingLabel = revisions.find((item) => item.id === pendingRestoreId)?.label;
@@ -63,18 +95,25 @@ export function BuilderVersionHistoryPanel<TSection>({
           </DialogTitle>
           <DialogDescription>
             {pendingRestoreId
-              ? `“${pendingLabel ?? "This revision"}” will replace your current draft. Unsaved edits will be lost.`
+              ? // Says what actually happens. A restore is a server write that
+                // replaces the saved draft the moment it is confirmed — it is
+                // not a local edit you can back out of afterwards.
+                `“${pendingLabel ?? "This revision"}” replaces your saved draft on the server straight away. The draft you have now is not kept, and this cannot be undone.`
               : "Published snapshots saved on the server. Restore loads a revision into your draft."}
           </DialogDescription>
         </DialogHeader>
 
         {pendingRestoreId ? (
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingRestoreId(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setPendingRestoreId(null)}
+              disabled={isRestoring}
+            >
               Back
             </Button>
-            <Button variant="bakery" onClick={confirmPendingRestore}>
-              Restore into draft
+            <Button variant="destructive" onClick={confirmPendingRestore} disabled={isRestoring}>
+              {isRestoring ? "Restoring…" : "Restore into draft"}
             </Button>
           </DialogFooter>
         ) : (
@@ -93,13 +132,16 @@ export function BuilderVersionHistoryPanel<TSection>({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{revision.label}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(revision.savedAt)}
+                        {revisionStamp(revision.savedAt)} ·{" "}
+                        {revision.sections.length}{" "}
+                        {revision.sections.length === 1 ? "section" : "sections"}
                       </p>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => requestRestore(revision.id)}
+                      disabled={isRestoring}
                     >
                       Restore
                     </Button>

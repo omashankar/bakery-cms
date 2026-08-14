@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { SECURITY_RANGES } from "@/features/settings/server/settings.validators";
 import {
   reportSettingsReset,
   reportSettingsWrite,
@@ -31,8 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { clearDemoSession } from "@/features/auth/lib/session";
-import { logoutRequest } from "@/features/auth/lib/auth-api";
+import { SIGN_OUT_FAILED, signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import type { SecuritySettings } from "@/types/settings";
@@ -62,12 +62,20 @@ import {
 import { SettingsSectionShell } from "./settings-section-shell";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import { securityCenterHydration } from "@/features/settings/lib/security-center-api";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
-/** Shared by the number inputs and the save-time clamp so the two cannot drift apart. */
-const SESSION_TIMEOUT = { min: 15, max: 480 } as const;
-const LOGIN_ATTEMPTS = { min: 3, max: 10 } as const;
+/**
+ * The SERVER's ranges, not the page's own.
+ *
+ * These were 15–480 and 3–10 while the schema allowed 1–1440 and 1–20 and
+ * the policy helpers clamped to something else again — so an admin could
+ * pick a number the page offered, watch it save, and have a different one
+ * enforced. One source now, exported from the validator that decides.
+ */
+const SESSION_TIMEOUT = SECURITY_RANGES.sessionTimeoutMinutes;
+const LOGIN_ATTEMPTS = SECURITY_RANGES.maxLoginAttempts;
 
 function clamp(value: number, { min, max }: { min: number; max: number }): number {
   return Math.min(max, Math.max(min, value));
@@ -92,6 +100,8 @@ export function SecuritySettingsPage() {
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  /** Whether /api/security-center has answered — see the header above. */
+  const [centerLoaded, setCenterLoaded] = useState(false);
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [clearFailedOpen, setClearFailedOpen] = useState(false);
   const [logoutEverywhereOpen, setLogoutEverywhereOpen] = useState(false);
@@ -107,6 +117,9 @@ export function SecuritySettingsPage() {
     // The security CENTRE — login history, sessions, devices — has its own
     // store and its own event. The settings form above is the hook's business.
     refreshCenter();
+    // The COUNT comes from /api/security-center, so the header waits for that
+    // request rather than for the synchronous cache read above it.
+    void securityCenterHydration.waitForSettled().then(() => setCenterLoaded(true));
 
     function handleUpdate() {
       refreshCenter();
@@ -181,16 +194,26 @@ export function SecuritySettingsPage() {
     // Revoke OTHER devices (fires with the current cookie) AND this device's own
     // session/cookie, so "everywhere" truly includes the current browser.
     const { persisted } = await logoutAllDevices();
-    const selfLoggedOut = await logoutRequest()
-      .then(() => true)
-      .catch(() => false);
-    clearDemoSession();
+    const selfLoggedOut = await signOutOfThisDevice();
     setLogoutEverywhereOpen(false);
 
-    // This browser is signed out either way — the local session is cleared and
-    // we are leaving for the login page — so the only thing worth reporting is
-    // whether the OTHER devices really went with it.
-    if (persisted && selfLoggedOut) {
+    /**
+     * "This browser is signed out either way" was the part that was untrue.
+     *
+     * Only the server's `clearAuthCookies()` signs this browser out; clearing
+     * the local marker gates nothing. So when the self-logout fails, the error
+     * this used to show blamed the OTHER devices while this one was still
+     * signed in — and it navigated to the login page anyway, which is what an
+     * admin reads as proof. Now the failure that is reported is the one that
+     * happened, and the browser only leaves for the login page once it really
+     * is signed out.
+     */
+    if (!selfLoggedOut) {
+      toast.error(SIGN_OUT_FAILED.title, { description: SIGN_OUT_FAILED.description });
+      return;
+    }
+
+    if (persisted) {
       toast.success("Signed out on all devices");
     } else {
       toast.error("Signed out here, but some devices may still be signed in", {
@@ -222,8 +245,23 @@ export function SecuritySettingsPage() {
         // dragging the timeout slider or flipping 2FA restated the header as
         // though the change were already in effect — on the one screen where
         // what is actually enforced is the whole question.
+        //
+        // 2FA is deliberately gone from this line. A shop with
+        // `twoFactorEnabled: true` stored — saved before the toggle was
+        // disabled — would read "2FA on" here while the switch below it says
+        // "Not built yet". The header is the sentence an owner scans, and
+        // claiming a second factor that does not exist is the one thing this
+        // screen must never do. The attempt limit IS enforced, so it takes the
+        // place.
         hydration === "ready"
-          ? `${saved.sessionTimeoutMinutes}m timeout · 2FA ${saved.twoFactorEnabled ? "on" : "off"} · ${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+          ? // The session COUNT comes from /api/security-center, not from the
+            // settings read this line is gated on — so "· 0 sessions" was
+            // stated as fact while that request was still open, and stayed
+            // stated if it failed. A dash says "not counted yet"; a zero is a
+            // claim that nobody is signed in anywhere.
+            `${saved.sessionTimeoutMinutes}m timeout · ${saved.maxLoginAttempts} login attempts/min · ${
+              centerLoaded ? `${sessions.length} session${sessions.length === 1 ? "" : "s"}` : "— sessions"
+            }`
           : "Session policies, login history, active devices, and access controls."
       }
       isDirty={isDirty}
@@ -235,6 +273,9 @@ export function SecuritySettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
       <Tabs
@@ -262,7 +303,12 @@ export function SecuritySettingsPage() {
             <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Session &amp; access</CardTitle>
-                <CardDescription>Controls how admin sessions behave in this demo.</CardDescription>
+                {/* Not "in this demo": the timeout and the attempt limit are
+                    enforced on every sign-in now, and calling them a demo
+                    invites an owner to ignore them. */}
+                <CardDescription>
+                  How long a session lasts and how many sign-in attempts an address gets.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -304,13 +350,23 @@ export function SecuritySettingsPage() {
               <CardHeader>
                 <CardTitle className="text-base">Policies</CardTitle>
                 <CardDescription>
-                  Toggle security features for future backend integration.
+                  {/* This sat above three switches, two of which are now
+                      disabled and labelled "Not built yet" and one of which
+                      is enforced on every password change — so the sentence
+                      was wrong about all three. */}
+                  Password rules are enforced. The two below are not built yet.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <PolicySwitch
                   title="Strong passwords"
-                  description="Require 8+ chars with mixed case and numbers."
+                  // Always on, and now actually applied. The rule was a bare
+                  // length check while this line claimed mixed case and
+                  // numbers; the rule matches the sentence now. The switch is
+                  // fixed rather than removed because turning it OFF would be
+                  // a request to weaken the shop, which is not worth building.
+                  description="Always on: at least 8 characters, with letters and numbers."
+                  alwaysOn
                   checked={settings.requireStrongPasswords}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, requireStrongPasswords: checked }))
@@ -318,7 +374,8 @@ export function SecuritySettingsPage() {
                 />
                 <PolicySwitch
                   title="Two-factor authentication"
-                  description="OTP verification on login (demo toggle)."
+                  description="Not built yet — sign-in asks for a password only."
+                  notBuilt
                   checked={settings.twoFactorEnabled}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, twoFactorEnabled: checked }))
@@ -326,7 +383,8 @@ export function SecuritySettingsPage() {
                 />
                 <PolicySwitch
                   title="Login notifications"
-                  description="Email alert when a new device signs in."
+                  description="Not built yet — no email is sent on a new sign-in."
+                  notBuilt
                   checked={settings.loginNotifications}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, loginNotifications: checked }))
@@ -365,7 +423,7 @@ export function SecuritySettingsPage() {
                         <span className="text-sm font-medium">{entry.email}</span>
                       </div>
                       <p className="text-sm text-muted-foreground">{entry.deviceLabel}</p>
-                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress}</p>
+                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatRelativeTime(entry.timestamp)}
@@ -410,7 +468,7 @@ export function SecuritySettingsPage() {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{entry.email}</p>
                       <p className="text-sm text-muted-foreground">{entry.reason}</p>
-                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress}</p>
+                      <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatRelativeTime(entry.timestamp)}
@@ -464,7 +522,7 @@ export function SecuritySettingsPage() {
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {session.email} · IP {session.ipAddress}
+                        {session.email} · IP {session.ipAddress || "unknown"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Last active {formatRelativeTime(session.lastActiveAt)}
@@ -521,7 +579,7 @@ export function SecuritySettingsPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        IP {device.ipAddress} · Last seen {formatRelativeTime(device.lastSeenAt)}
+                        IP {device.ipAddress || "unknown"} · Last seen {formatRelativeTime(device.lastSeenAt)}
                       </p>
                     </div>
                     <Button
@@ -597,11 +655,24 @@ function PolicySwitch({
   description,
   checked,
   onCheckedChange,
+  notBuilt,
+  alwaysOn,
 }: {
   title: string;
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /**
+   * Nothing enforces this one yet.
+   *
+   * A switch an owner can flip is a promise that flipping it changes
+   * something. Leaving these live let someone turn on a protection that does
+   * not exist and walk away believing their shop was covered — which is worse
+   * than the feature simply being absent.
+   */
+  notBuilt?: boolean;
+  /** Enforced unconditionally — the switch shows it, and cannot turn it off. */
+  alwaysOn?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -609,7 +680,12 @@ function PolicySwitch({
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={title} />
+      <Switch
+        checked={alwaysOn ? true : notBuilt ? false : checked}
+        onCheckedChange={onCheckedChange}
+        disabled={notBuilt || alwaysOn}
+        aria-label={title}
+      />
     </div>
   );
 }

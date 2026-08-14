@@ -433,6 +433,15 @@ html.dark {
     color: #111 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    /*
+      The admin shell locks `overflow: hidden` and a fixed height on <html> and
+      <body> so the app scrolls in its own panes. On paper that is a clipping
+      box: everything past the first viewport-height of an invoice was cut off,
+      so a two-page order printed as one page with the totals missing. Printing
+      an invoice is the one thing this admin does that leaves the screen.
+    */
+    overflow: visible !important;
+    height: auto !important;
   }
 
   /* Keep invoice chrome out of the printed page */

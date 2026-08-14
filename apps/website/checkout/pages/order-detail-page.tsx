@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -59,7 +62,39 @@ export function OrderDetailPage() {
         return;
       }
     }
-    setOrder(getOrderByNumber(orderNumber));
+
+    /**
+     * The local copy is a FALLBACK, not a replacement for what is on screen.
+     *
+     * Two things this has to get right, and it got each one wrong in turn.
+     *
+     * A failed refresh must not blank the page: the local cache is empty for
+     * any order this browser did not itself write — one placed by the Razorpay
+     * webhook, or opened from a tracking link on another device — so falling
+     * through to it unconditionally replaced a loaded order with `null` and
+     * rendered "Order Not Found" for an order the customer was just reading.
+     *
+     * And a failed refresh must not go BACKWARDS. Adopting the local copy
+     * whenever it existed made the error toast below unreachable for everyone
+     * who placed the order on this device, and that copy is frozen at placement
+     * — so pressing "Refresh status" on a cancelled, refunded order with the
+     * request dropping silently reverted the page to "Confirmed · Total paid
+     * ₹1,200". The customer asked for the newest state and got an older one,
+     * with nothing to say so.
+     */
+    if (!order) {
+      const local = getOrderByNumber(orderNumber);
+      if (local) {
+        setOrder(local);
+        return;
+      }
+    }
+
+    toast.error("Could not refresh this order", {
+      description: order
+        ? "Showing the details we already have. Please try again in a moment."
+        : "The server did not answer. Please try again in a moment.",
+    });
   }
 
   useEffect(() => {
@@ -116,7 +151,15 @@ export function OrderDetailPage() {
   if (!ready) {
     return (
       <div className={layoutSpacing.container}>
-        <div className="my-16 h-40 animate-pulse rounded-xl border border-border bg-cream-100" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="my-16 h-40 animate-pulse rounded-xl border border-border bg-cream-100"
+        >
+          {/* A bare pulsing box is silence to a screen reader — which then
+              hears nothing at all until the verdict below replaces it. */}
+          <span className="sr-only">Loading your order…</span>
+        </div>
       </div>
     );
   }
@@ -193,7 +236,14 @@ export function OrderDetailPage() {
                     <h2 className="font-heading text-lg font-semibold">Order timeline</h2>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Estimated delivery: {formatDate(order.estimatedDelivery)}
+                    {/* The booked day, like the card above it — these two
+                        disagreed for every shop west of UTC. */}
+                    Estimated delivery:{" "}
+                    {formatOrderDeliveryDay(order, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </p>
                   <div className="mt-6">
                     <OrderStatusTimeline steps={timeline} />
@@ -250,6 +300,10 @@ export function OrderDetailPage() {
                 items={order.items}
                 totals={order.totals}
                 showEditLink={false}
+                // A placed order: no free-delivery nudge, and the refund shown
+                // beside the total the way the invoice already shows it.
+                placed
+                refunded={settledRefundAmount(order)}
               />
               <div className="rounded-xl border border-border bg-cream-50 p-4 text-sm">
                 <div className="flex justify-between">

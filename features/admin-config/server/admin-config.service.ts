@@ -1,6 +1,7 @@
 import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
+import { allowlisted } from "@/lib/server/http/allowlist";
 
 /**
  * Admin-only singleton config blobs that were client-only localStorage stores:
@@ -33,7 +34,7 @@ export type AdminConfigKey = keyof typeof stores;
 export const ADMIN_CONFIG_KEYS = Object.keys(stores) as AdminConfigKey[];
 
 function storeFor(key: string) {
-  const store = stores[key as AdminConfigKey];
+  const store = allowlisted(stores, key);
   if (!store) throw new NotFoundError("Unknown admin-config section");
   return store;
 }

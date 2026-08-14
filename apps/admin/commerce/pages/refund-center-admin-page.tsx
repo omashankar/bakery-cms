@@ -33,6 +33,7 @@ import {
   type RefundOverview,
 } from "@/apps/admin/commerce/lib/refund-utils";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   refundOrder,
   type PlacedOrder,
@@ -46,6 +47,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
@@ -118,13 +120,32 @@ function RefundCaseDetail({
           {order.refundRecord ? (
             <div className="rounded-lg border border-border bg-muted/80 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
+                {/*
+                  "Refunded" is what has actually been PAID OUT.
+
+                  This printed `refundRecord.amount` — the total asked for across
+                  every attempt — under the word "refunded". A gateway refund
+                  starts `pending` and settles at the bank's pace, so the moment
+                  an operator issued one this screen said the money was back with
+                  the customer. It is the screen they open to answer exactly that
+                  question, and it answered it wrong for as long as the payout
+                  took.
+                */}
                 <p className="font-semibold text-foreground">
-                  {formatCurrency(order.refundRecord.amount)} refunded
+                  {settledRefundAmount(order) > 0
+                    ? `${formatCurrency(settledRefundAmount(order))} refunded`
+                    : `${formatCurrency(order.refundRecord.amount)} sent to the gateway`}
                 </p>
                 <Badge variant={order.refundRecord.amount < order.totals.total ? "outline" : "accent"}>
                   {order.refundRecord.amount < order.totals.total ? "Partial" : "Full"}
                 </Badge>
               </div>
+              {settledRefundAmount(order) < order.refundRecord.amount ? (
+                <p className="mt-0.5 text-xs text-warning">
+                  {formatCurrency(order.refundRecord.amount - settledRefundAmount(order))} is still
+                  with the gateway — it has not reached the customer yet.
+                </p>
+              ) : null}
               {order.refundRecord.amount < order.totals.total ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Remaining {formatCurrency(order.totals.total - order.refundRecord.amount)} of{" "}
@@ -184,6 +205,17 @@ export function RefundCenterAdminPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  /**
+   * The three states these cards have, rather than the one they assumed.
+   *
+   * Each renders its zeroed EMPTY_* constant with no gate, so a cold load
+   * stated "Pending amount ₹0.00 — All clear" in green, "Volume ₹0.00 · all
+   * time" and "Paid 0 · all time" as the shop's figures — and a FAILED load
+   * left them standing. The loading and failed flags were already here; they
+   * simply never reached the cards. Same wiring as the dashboard and reports.
+   */
+  const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -293,14 +325,15 @@ export function RefundCenterAdminPage() {
     setSelectedId(updated.id);
 
     if (!persisted) {
-      // The server's own words. This used to say "Refund recorded on this device
-      // only — the server rejected it", which was wrong twice: nothing was
-      // recorded anywhere, and it named no cause. The reasons are all things an
-      // admin can act on — nothing left to refund, the payment was never
-      // captured, this COD order was never delivered, the gateway is down.
-      toast.error(refundError ?? "The refund was not accepted.", {
-        description: "No money has moved. Nothing was recorded.",
-      });
+      // The server's own words, and ONLY those.
+      //
+      // This appended "No money has moved. Nothing was recorded." to every
+      // refusal. It is not true of all of them: a gateway that accepts a payout
+      // and returns no id has almost certainly moved the money, and a refund
+      // already in flight may have too — and those are exactly the two the
+      // screen was most confident about. Whether the money moved is something
+      // only the refund path knows, so it says so in the message itself.
+      toast.error(refundError ?? "The refund was not accepted.");
       return;
     }
 
@@ -311,6 +344,15 @@ export function RefundCenterAdminPage() {
   }
 
   async function handleExport() {
+    // `total` is 0 after a FAILED load too, and telling the admin the shop has
+    // no refund cases is a different claim from admitting the list never arrived.
+    // orders-list and invoices already make this distinction.
+    if (failed) {
+      toast.error("Could not load the refund cases to export", {
+        description: "The server did not answer — reload and try again.",
+      });
+      return;
+    }
     if (total === 0) {
       toast.error("No refund cases to export");
       return;
@@ -371,6 +413,7 @@ export function RefundCenterAdminPage() {
             changeTone="neutral"
             icon={RotateCcw}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -380,6 +423,7 @@ export function RefundCenterAdminPage() {
           changeTone={openCases > 0 ? "warning" : "positive"}
           icon={Clock3}
           tone="gold"
+          figures={statFigures}
         />
         <button
           type="button"
@@ -393,6 +437,7 @@ export function RefundCenterAdminPage() {
             changeTone="positive"
             icon={CheckCircle2}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -402,6 +447,7 @@ export function RefundCenterAdminPage() {
           changeTone="neutral"
           icon={Banknote}
           tone="gold"
+          figures={statFigures}
         />
       </section>
 

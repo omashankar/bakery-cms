@@ -261,6 +261,9 @@ export function SeoAdminPage() {
       onSave={handleSaveGlobal}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
       saveDisabled={
         !isValidJson(global.organizationSchemaJson ?? "") || hydration !== "ready"
       }

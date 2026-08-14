@@ -170,31 +170,41 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   with orders, custom designs, and delivery.
                 </p>
 
+                {/* Only the ways this shop can actually be reached — see the
+                    contact page for why a blank must not become a demo number. */}
                 <div className="mt-6 space-y-3">
-                  <a
-                    href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
-                  >
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                      <Phone className="size-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold text-foreground">Call us</span>
-                      <span className="block text-xs text-muted-foreground">{contactInfo.phone}</span>
-                    </span>
-                  </a>
-                  <a
-                    href={`mailto:${contactInfo.email}`}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
-                  >
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                      <Mail className="size-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold text-foreground">Email us</span>
-                      <span className="block text-xs text-muted-foreground">{contactInfo.email}</span>
-                    </span>
-                  </a>
+                  {contactInfo.phone ? (
+                    <a
+                      href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                    >
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
+                        <Phone className="size-4" />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-semibold text-foreground">Call us</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {contactInfo.phone}
+                        </span>
+                      </span>
+                    </a>
+                  ) : null}
+                  {contactInfo.email ? (
+                    <a
+                      href={`mailto:${contactInfo.email}`}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                    >
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
+                        <Mail className="size-4" />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-semibold text-foreground">Email us</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {contactInfo.email}
+                        </span>
+                      </span>
+                    </a>
+                  ) : null}
                 </div>
 
                 <Button

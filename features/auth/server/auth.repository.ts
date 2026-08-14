@@ -43,6 +43,25 @@ export async function createSession(input: {
   return SessionModel.create(input);
 }
 
+/**
+ * The session row, for the idle-timeout check on refresh.
+ *
+ * `lastSeenAt` is what makes the shop's configured "session timeout" mean
+ * something. The access token cannot express it — it is unrevocable for its
+ * lifetime, so it is deliberately kept short — and a cookie expiry only governs
+ * a browser that cooperates.
+ */
+export async function findSessionById(sessionId: string) {
+  await connectDB();
+  return SessionModel.findById(sessionId);
+}
+
+/** Marks the session as used, restarting the idle window. */
+export async function touchSession(sessionId: string) {
+  await connectDB();
+  return SessionModel.findByIdAndUpdate(sessionId, { $set: { lastSeenAt: new Date() } });
+}
+
 export async function deleteSession(sessionId: string) {
   await connectDB();
   return SessionModel.findByIdAndDelete(sessionId);

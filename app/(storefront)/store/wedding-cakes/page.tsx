@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { WeddingPage } from "@/apps/website";
+import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { isWeddingEnabledOnServer } from "@/features/settings/server/modules.server";
 
@@ -28,5 +29,7 @@ export default async function Page(props: PageProps) {
   if (!(await isWeddingEnabledOnServer())) notFound();
 
   const { cmsPreview } = await props.searchParams;
-  return <WeddingPage isPreview={cmsPreview === "wedding"} />;
+  // The parameter asks; the session decides — see the homepage route.
+  const isPreview = cmsPreview === "wedding" && (await canPreviewDraft());
+  return <WeddingPage isPreview={isPreview} />;
 }

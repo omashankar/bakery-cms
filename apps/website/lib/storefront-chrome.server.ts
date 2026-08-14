@@ -1,4 +1,5 @@
 import { getSettings } from "@/features/settings/server/settings.service";
+import { getStorefrontCategories } from "./storefront-categories.server";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { defaultHeaderSettings, selectVisibleNavItems } from "@/features/site-layout/lib/header-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
@@ -14,6 +15,7 @@ import {
   defaultAppearanceSettings,
 } from "@/features/site-layout/lib/appearance-tokens";
 import type { AppearanceSettings } from "@/types/appearance";
+import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
 
 /**
  * The "chrome" (navbar + footer) data for the storefront, read on the SERVER
@@ -23,6 +25,8 @@ import type { AppearanceSettings } from "@/types/appearance";
  */
 export interface StorefrontChrome {
   siteName: string;
+  /** The shop's own categories, for the header's Shop menu. */
+  categories: { id: string; name: string; slug: string; image?: string }[];
   /** General settings logo URL. Empty means "render the letter mark instead". */
   logo: string;
   logoLetter: string;
@@ -62,6 +66,8 @@ export interface StorefrontChrome {
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
+    // The settings read failed; the demo taxonomy is the only list there is.
+    categories: [],
     logo: "",
     logoLetter: defaultHeaderSettings.logoLetter,
     showSearch: defaultHeaderSettings.showSearch,
@@ -92,11 +98,15 @@ function fallbackChrome(): StorefrontChrome {
 
 export async function getStorefrontChrome(): Promise<StorefrontChrome> {
   try {
-    const [settingsRaw, headerRaw, footerRaw, appearanceRaw] = await Promise.all([
+    // Concurrently with the rest. The categories read was added as a serial
+    // `await` further down, which put a whole extra round trip on the critical
+    // path of every storefront render for a value the others do not depend on.
+    const [settingsRaw, headerRaw, footerRaw, appearanceRaw, categories] = await Promise.all([
       getSettings(),
       getSiteLayout("header"),
       getSiteLayout("footer"),
       getSiteLayout("appearance"),
+      getStorefrontCategories(),
     ]);
 
     const settings = settingsRaw as unknown as Record<string, unknown>;
@@ -148,17 +158,39 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
         href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
       },
       navItems: selectVisibleNavItems(header.nav ?? []),
+      /**
+       * The shop's own categories, for the header's Shop menu.
+       *
+       * That menu rendered `shopMegaMenu.categories` from constants — the
+       * shipped demo taxonomy — on every storefront page. A category the shop
+       * deleted still had a link (to an empty grid) and one it created never
+       * appeared, so the header and the collections page below it described two
+       * different shops. The collections pills were moved onto the real
+       * taxonomy already; this is the other half of that fix.
+       */
+      categories,
       brand: {
         name,
         tagline: general.siteTagline || brandInfo.tagline,
         description: general.siteDescription || brandInfo.description,
       },
+      // The same rule the social block ten lines below already follows, and for
+      // the same reason. Deactivating every social link is a deliberate "we are
+      // not on social"; clearing the address is a deliberate "we do not publish
+      // one". Answering the first with instagram.com was called out as pointing
+      // visitors at accounts the shop does not own — answering the second with
+      // `|| defaultContact.address` put "123 Baker Street, Mumbai" in the
+      // footer of EVERY storefront page of a bakery in Delhi, next to a phone
+      // number nobody can answer. `fallbackChrome()` keeps the defaults, and
+      // should: that is the database-unreachable path.
       contact: {
-        address: contact.address || defaultContact.address,
-        phone: contact.phone || defaultContact.phone,
-        email: contact.email || defaultContact.email,
+        address: chosen(contact.address, defaultContact.address),
+        phone: chosen(contact.phone, defaultContact.phone),
+        email: chosen(contact.email, defaultContact.email),
       },
-      businessHours: contact.businessHours?.length ? contact.businessHours : defaultHours,
+      // See storefront-contact.server.ts: the footer published the shipped
+      // demo hours as this shop's own in exactly the same way.
+      businessHours: chosenList(contact.businessHours, defaultHours, hoursIdentity),
       // No fallback to the demo profiles. Deactivating every link is a
       // deliberate "we are not on social", and answering that with
       // instagram.com/facebook.com pointed visitors at accounts the shop does

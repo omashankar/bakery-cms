@@ -149,7 +149,22 @@ export async function updateSection(section: string, value: unknown, ctx: Reques
 }
 
 export async function resetSection(section: string, ctx: RequestCtx) {
-  if (!(section in SECTION_DEFAULTS)) throw new NotFoundError("Unknown settings section");
+  /**
+   * `Object.hasOwn`, because `in` walks the prototype chain.
+   *
+   * `"__proto__" in SECTION_DEFAULTS` is true, and so are `constructor`,
+   * `toString` and `valueOf`. Every one of them passed this guard, took
+   * `SECTION_DEFAULTS[section]` — a function, or `Object.prototype` — into
+   * `doc.set()`, and came back 200 "Settings reset". Mongoose's strict schema
+   * dropped the write, so nothing was damaged; what was left behind was an
+   * endpoint reporting a reset that never happened and an audit row
+   * (`settings.reset.__proto__`) recording it, in the same trail the Security
+   * Center and the Activity screen read as the record of what was done to
+   * this shop.
+   */
+  if (!Object.hasOwn(SECTION_DEFAULTS, section)) {
+    throw new NotFoundError("Unknown settings section");
+  }
   const doc = await repo.updateSection(section, SECTION_DEFAULTS[section]);
   if (section === "smtp") resetMailTransport();
   await writeAuditLog({

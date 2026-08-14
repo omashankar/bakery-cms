@@ -53,6 +53,7 @@ import {
   FilterPanelSearch,
 } from "@/components/shared/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -530,7 +531,9 @@ export function EmailTemplatesAdminPage() {
             </p>
           </CardHeader>
           <CardContent>
-            {filtered.length === 0 ? (
+            {!mounted ? (
+              <ListLoading rows={4} label="Loading templates" />
+            ) : filtered.length === 0 ? (
               <EmptyState
                 icon={Mail}
                 title="No templates found"

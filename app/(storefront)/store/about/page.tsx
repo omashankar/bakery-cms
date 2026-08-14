@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AboutPage } from "@/apps/website";
+import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 
 /**
@@ -19,5 +20,9 @@ interface PageProps {
 
 export default async function Page(props: PageProps) {
   const { preview } = await props.searchParams;
-  return <AboutPage preview={preview === "1"} />;
+  // The parameter asks; the session decides — an admin who sets this page
+  // back to Draft to rework it must not still be publishing it at
+  // ?preview=1. Same rule as /store/pages/[slug] and the CMS builders.
+  const isPreview = preview === "1" && (await canPreviewDraft());
+  return <AboutPage preview={isPreview} />;
 }

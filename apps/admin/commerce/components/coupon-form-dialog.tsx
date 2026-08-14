@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { toExpiryInputValue, toExpiryInstant } from "@/lib/expiry-date";
 import { createCoupon, loadCoupons, updateCoupon } from "@/features/commerce/lib/coupons-repository";
 
 type CouponFormValues = {
@@ -80,7 +81,7 @@ export function CouponFormDialog({
         percentOff: editingCoupon.percentOff?.toString() ?? "",
         flatOff: editingCoupon.flatOff?.toString() ?? "",
         minSubtotal: editingCoupon.minSubtotal?.toString() ?? "",
-        expiresAt: editingCoupon.expiresAt?.slice(0, 10) ?? "",
+        expiresAt: toExpiryInputValue(editingCoupon.expiresAt),
         isActive: editingCoupon.isActive,
       });
       return;
@@ -97,7 +98,8 @@ export function CouponFormDialog({
       minSubtotal: values.minSubtotal ? Number(values.minSubtotal) : undefined,
       percentOff: values.discountType === "percent" ? Number(values.percentOff) : undefined,
       flatOff: values.discountType === "flat" ? Number(values.flatOff) : undefined,
-      expiresAt: values.expiresAt ? new Date(values.expiresAt).toISOString() : undefined,
+      // End of the chosen day, in the shop's timezone — see lib/expiry-date.ts.
+      expiresAt: toExpiryInstant(values.expiresAt),
       isActive: values.isActive,
     };
 

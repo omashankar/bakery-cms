@@ -21,6 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ListLoading } from "@/components/shared/list-loading";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
@@ -31,6 +33,7 @@ import {
   deleteNewsletterSubscribers,
   filterNewsletterSubscribers,
   loadNewsletterSubscribers,
+  newsletterHydration,
   NEWSLETTER_UPDATED_EVENT,
   updateNewsletterSubscriber,
   type NewsletterFilters,
@@ -39,7 +42,15 @@ import {
 const PAGE_SIZE = 12;
 
 export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const [mounted, setMounted] = useState(false);
+  /**
+   * "Have I heard from the SERVER", not "have I read the cache" — the exact
+   * twin of the inquiries list next door. This localStorage key is a cache the
+   * server fills, so on a first login the read answers `[]` in the first frame
+   * and the page said the shop had no mailing list, with a "0" total, over one
+   * that may have thousands of names in it.
+   */
+  const [figures, setFigures] = useState<FiguresState>("loading");
+  const known = figures === "ready";
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [filters, setFilters] = useState<NewsletterFilters>(defaultNewsletterFilters);
   const [page, setPage] = useState(1);
@@ -48,13 +59,24 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
 
   function refresh() {
     setSubscribers(loadNewsletterSubscribers());
-    setMounted(true);
   }
 
   useEffect(() => {
     refresh();
     window.addEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Resolves immediately when the sync has already settled; false on timeout,
+    // which is "I could not find out", not "there are none".
+    void newsletterHydration.waitForSettled().then((settled) => {
+      if (!cancelled) setFigures(settled ? "ready" : "unavailable");
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(
@@ -65,11 +87,11 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const activeCount = mounted
+  const activeCount = known
     ? subscribers.filter((item) => item.isActive).length
     : 0;
-  const inactiveCount = mounted ? subscribers.length - activeCount : 0;
-  const totalCount = mounted ? subscribers.length : 0;
+  const inactiveCount = known ? subscribers.length - activeCount : 0;
+  const totalCount = known ? subscribers.length : 0;
 
   function updateFilters(patch: Partial<NewsletterFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -155,6 +177,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="neutral"
             icon={Users}
             tone="bakery"
+            figures={figures}
           />
         </button>
         <button
@@ -169,6 +192,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="positive"
             icon={UserCheck}
             tone="gold"
+            figures={figures}
           />
         </button>
         <button
@@ -183,6 +207,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
             changeTone="neutral"
             icon={UserX}
             tone="neutral"
+            figures={figures}
           />
         </button>
       </section>
@@ -239,7 +264,18 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
           </div>
         ) : null}
 
-        {filtered.length === 0 ? (
+        {figures === "loading" ? (
+          <section className={adminShell.tableCard}>
+            <ListLoading rows={4} label="Loading subscribers" />
+          </section>
+        ) : figures === "unavailable" && filtered.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Subscribers could not be loaded"
+            description="The server did not answer. Reload to try again — this is not a claim that the list is empty."
+            className="py-14"
+          />
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={Users}
             title="No subscribers found"

@@ -15,6 +15,8 @@ export const quoteLineSchema = z.object({
   flavour: z.string().trim().optional(),
   shape: z.string().trim().optional(),
   message: z.string().trim().max(500).optional(),
+  // A URL this server minted, so it is length-bounded and never rendered as HTML.
+  photoUrl: z.string().trim().max(500).optional(),
   deliveryDate: z.string().trim().optional(),
   deliveryTime: z.string().trim().optional(),
   variantSelections: z.record(z.string(), z.string()).optional(),
@@ -52,7 +54,31 @@ export const quoteSchema = z.object({
       pincode: z.string().trim().min(1),
     })
     .optional(),
-  deliverySlot: z.object({ date: z.string(), timeSlot: z.string() }).partial().optional(),
+  /**
+   * Same shape as placement, so the quote refuses an impossible date where it
+   * is still free rather than letting it through to be refused (or, as it was,
+   * accepted) after the gateway has captured. `.partial()` stays: the quote runs
+   * before the customer has necessarily chosen a slot.
+   */
+  deliverySlot: z
+    .object({
+      date: z
+        .string()
+        .trim()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Delivery date must be a calendar date (YYYY-MM-DD)")
+        .refine((value) => {
+          const [year, month, day] = value.split("-").map(Number);
+          const stamp = new Date(Date.UTC(year, month - 1, day));
+          return (
+            stamp.getUTCFullYear() === year &&
+            stamp.getUTCMonth() === month - 1 &&
+            stamp.getUTCDate() === day
+          );
+        }, "That is not a real date"),
+      timeSlot: z.string().trim().max(60),
+    })
+    .partial()
+    .optional(),
   orderNotes: z.string().trim().max(1000).optional(),
 });
 

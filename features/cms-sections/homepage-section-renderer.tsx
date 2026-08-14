@@ -14,9 +14,7 @@ import {
   MapPin,
   Phone,
   Quote,
-  Search,
   Send,
-  Star,
   Store,
   Tag,
   Truck,
@@ -24,6 +22,7 @@ import {
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader } from "@/components/shared/section-header";
+import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
@@ -35,18 +34,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  galleryCaptions,
-  galleryImages,
-  instagramPosts,
-  specialOffers,
   weddingCakes,
   type LandingCategory,
+  type LandingOffer,
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
 import type { Banner } from "@/types/media";
-import { parseHeroSlides } from "@/constants/section-registry";
+import {
+  limitRows,
+  parseHeroSlides,
+  parseListField,
+  photoRows,
+  renderableRows,
+} from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import {
   getStorefrontFaqs,
@@ -58,12 +60,12 @@ import {
   getHomepageProducts,
   type HomepageProductSource,
   getHomepageCategories,
+  getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
 import {
   isWeddingEnabled,
@@ -72,6 +74,7 @@ import {
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
+import { formatCurrency } from "@/utils/format";
 
 interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
@@ -94,10 +97,43 @@ interface HomepageSectionRendererProps {
   testimonials?: Testimonial[];
   faqs?: FaqItem[];
   /**
+   * The shop's live coupons as offer cards, read on the server. When absent
+   * (admin builder preview) the offers section falls back to the browser coupon
+   * cache. It never falls back to the hardcoded demo offers — see
+   * features/commerce/lib/coupon-offers.ts for why.
+   */
+  offers?: LandingOffer[];
+  /**
+   * The shop's real address, phone and hours from Settings → Contact, read on
+   * the server. Absent in the builder preview, where the locator says so rather
+   * than inventing outlets.
+   */
+  storeLocation?: {
+    address: string;
+    phone: string;
+    mapUrl: string;
+    hours: { day: string; hours: string }[];
+  } | null;
+  /**
    * The shop's Instagram from Settings → Social, read on the server. Absent in
    * the admin builder preview, where the section falls back to its own content.
    */
   instagram?: { url: string; handle: string } | null;
+  /**
+   * The shop's own rating, delivery speed and free-delivery threshold, read on
+   * the server.
+   *
+   * These were constants — "4.9 Rating · 2000+ reviews", "Same-Day Delivery",
+   * "On orders over ₹999" — and every one of them is a figure this CMS already
+   * stores, so each was a stale second copy of an answer the shop had already
+   * given. Absent in the builder preview, where each tile shows its label with
+   * no figure rather than inventing one.
+   */
+  trust?: {
+    freeDeliveryThreshold: number;
+    deliveryPromise: string;
+    rating: { count: number; average: number } | null;
+  } | null;
   selected?: boolean;
   onSelect?: () => void;
   interactive?: boolean;
@@ -173,12 +209,35 @@ function SectionShell({
   );
 }
 
-const heroTrustBar = [
-  { icon: "Truck", title: "Free Delivery", subtitle: "On orders over ₹999" },
-  { icon: "Clock", title: "Same-Day Delivery", subtitle: "Order today, get today" },
-  { icon: "BadgeCheck", title: "100% Quality", subtitle: "Premium ingredients" },
-  { icon: "Heart", title: "Made with Love", subtitle: "Since 1956" },
-] as const;
+/**
+ * The trust bar, with its two figures taken from the shop.
+ *
+ * It read "Free Delivery · On orders over ₹999" and "Same-Day Delivery · Order
+ * today, get today" as constants. The threshold is `freeDeliveryThreshold` and
+ * the speed is `deliveryLeadDays`, both stored — and on this shop the second
+ * was simply false: lead days is 1, so it cannot deliver same-day. The ₹999
+ * happened to match today's setting, which is worse, not better: it would have
+ * gone on saying ₹999 the moment an admin changed it.
+ *
+ * "Since 1956" is a claim with nothing behind it — and it disagreed with the
+ * "Since 1965" in the hero badge a few hundred pixels above. It goes; the tile
+ * keeps its title.
+ */
+function heroTrustBarFor(trust: HomepageSectionRendererProps["trust"]) {
+  const freeDelivery =
+    trust == null
+      ? ""
+      : trust.freeDeliveryThreshold > 0
+        ? `On orders over ${formatCurrency(trust.freeDeliveryThreshold)}`
+        : "On every order";
+
+  return [
+    { icon: "Truck", title: "Free Delivery", subtitle: freeDelivery },
+    { icon: "Clock", title: trust?.deliveryPromise ?? "Delivery", subtitle: "" },
+    { icon: "BadgeCheck", title: "100% Quality", subtitle: "Premium ingredients" },
+    { icon: "Heart", title: "Made with Love", subtitle: "" },
+  ] as const;
+}
 
 const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
 
@@ -200,10 +259,14 @@ function HeroSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props} className="bg-white py-10 sm:py-12 lg:py-16">
-      <HeroCarousel slides={slides} />
+      <HeroCarousel
+        slides={slides}
+        rating={props.trust?.rating ?? null}
+        stats={renderableRows(parseListField(props.section.content, "stats"))}
+      />
 
       <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:mt-12 sm:gap-6 sm:p-6 lg:grid-cols-4">
-        {heroTrustBar.map((item) => {
+        {heroTrustBarFor(props.trust).map((item) => {
           const Icon = heroTrustIcons[item.icon as keyof typeof heroTrustIcons];
           return (
             <div key={item.title} className="flex items-center gap-3">
@@ -212,7 +275,9 @@ function HeroSection(props: HomepageSectionRendererProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                {item.subtitle ? (
+                  <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                ) : null}
               </div>
             </div>
           );
@@ -264,47 +329,53 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function StoreLocatorForm({ buttonLabel }: { buttonLabel: string }) {
-  const [pincode, setPincode] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!pincode.trim()) return;
-    setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    toast.success("Stores found", {
-      description: `Showing outlets near ${pincode}.`,
-    });
-    setLoading(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-      <Input
-        value={pincode}
-        onChange={(event) => setPincode(event.target.value)}
-        inputMode="numeric"
-        placeholder="Enter your pincode"
-        aria-label="Pincode"
-        className="h-11 flex-1 bg-white"
-      />
-      <Button type="submit" variant="bakery" disabled={loading} className="h-11 shrink-0">
-        <Search className="size-4" />
-        {loading ? "Searching…" : buttonLabel}
-      </Button>
-    </form>
-  );
-}
-
-const locatorStores = [
-  { name: "Monginis — Andheri West", address: "Shop 4, Link Road, Mumbai", distance: "1.2 km" },
-  { name: "Monginis — Bandra", address: "Hill Road, Bandra West, Mumbai", distance: "3.5 km" },
-  { name: "Monginis — Powai", address: "Central Avenue, Powai, Mumbai", distance: "6.8 km" },
-];
-
+/**
+ * Where to find the shop.
+ *
+ * This section used to be entirely fictional. A pincode box waited 600ms and
+ * toasted "Stores found — showing outlets near <whatever they typed>" having
+ * searched nothing, beside three hardcoded Mumbai outlets at fixed distances of
+ * 1.2 / 3.5 / 6.8 km. A customer in Delhi was told three shops in Mumbai were
+ * around the corner. The NewsletterSection further down this same file was fixed
+ * for exactly this — a form that said "Subscribed!" and wrote nothing — and the
+ * fix stopped at that form.
+ *
+ * There is no outlet list in this CMS to search: Settings → Contact holds one
+ * address, one phone and one set of opening hours. So this shows those, and the
+ * search that never happened is gone.
+ */
 function StoreLocatorSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const location = props.storeLocation ?? null;
+
+  // The heading, description and button label are the admin's own words, shown
+  // as typed. An earlier attempt here swapped the shipped copy at render time,
+  // which meant an admin who deliberately typed "Find a Store Near You" saw
+  // something else on the storefront — and saw it differ from their own editor
+  // field two inches away in the builder preview. The seeded wording is fixed
+  // where it belongs, in the registry defaults, so new sections and resets get
+  // honest copy and existing content stays the admin's.
+  const title = contentString(c, "title");
+  const description = contentString(c, "description");
+  const buttonLabel = contentString(c, "buttonLabel", "Get Directions");
+
+  // Nothing to show means nothing to show. Rendering the heading alone left a
+  // shop advertising "Find a Store Near You" above an empty panel — the seeded
+  // copy is still in most stored layouts, so on a shop that has not filled in
+  // its address that heading is the last thing that should survive. The builder
+  // says why instead, so the admin is not left guessing.
+  if (!location) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+          This section shows your shop&apos;s address and opening hours from
+          Settings → Contact. Until you set a real address there it stays hidden
+          on the live homepage — the shipped example address is in Mumbai.
+        </div>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -317,30 +388,57 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
             <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
               {contentString(c, "overline")}
             </p>
-            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{contentString(c, "title")}</h2>
-            <p className="text-muted-foreground">{contentString(c, "description")}</p>
+            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{title}</h2>
+            <p className="text-muted-foreground">{description}</p>
           </div>
-          <StoreLocatorForm buttonLabel={contentString(c, "buttonLabel", "Find Stores")} />
+          <Button
+            variant="bakery"
+            className="h-11"
+            render={<a href={location.mapUrl} target="_blank" rel="noopener noreferrer" />}
+          >
+            <MapPin className="size-4" />
+            {buttonLabel}
+          </Button>
         </div>
 
         <div className="space-y-3">
-          {locatorStores.map((store) => (
-            <div
-              key={store.name}
-              className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4"
-            >
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
-                <Store className="size-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{store.name}</p>
-                <p className="text-xs text-muted-foreground">{store.address}</p>
-              </div>
-              <span className="shrink-0 text-xs font-medium text-bakery-700">
-                {store.distance}
-              </span>
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
+              <Store className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium text-foreground">{location.address}</p>
+              {location.phone ? (
+                <a
+                  href={`tel:${location.phone.replace(/\s+/g, "")}`}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-bakery-700"
+                >
+                  <Phone className="size-3" />
+                  {location.phone}
+                </a>
+              ) : null}
             </div>
-          ))}
+          </div>
+
+          {/* Only the shop's own hours. The three shipped rows are dropped as a
+              set upstream — printing seeded opening times is a claim about when
+              a stranger can turn up at the door. */}
+          {location.hours.length > 0 ? (
+            <div className="rounded-xl border border-border bg-cream-50 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Clock className="size-3.5 text-bakery-700" />
+                Opening hours
+              </p>
+              <dl className="space-y-1">
+                {location.hours.map((entry) => (
+                  <div key={entry.day} className="flex justify-between gap-3 text-xs">
+                    <dt className="text-muted-foreground">{entry.day}</dt>
+                    <dd className="font-medium text-foreground">{entry.hours}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
         </div>
       </div>
     </SectionShell>
@@ -440,6 +538,19 @@ function WeddingSection(props: HomepageSectionRendererProps) {
 
   const c = props.section.content;
   const showcase = weddingCakes[0];
+  /**
+   * Never set, versus cleared on purpose — two different things.
+   *
+   * The key being absent means the section was created before it had an image
+   * field, so the showcase photo stands in. The key being present and empty is
+   * the "Clear image" button in the media field, and it has to mean cleared:
+   * falling back there would put a stock Unsplash cake back on the live homepage
+   * the moment an admin removed the demo photo, which is the opposite of what
+   * they asked for.
+   */
+  const storedImage = c.imageUrl;
+  const teaserImage =
+    typeof storedImage === "string" ? storedImage.trim() : showcase?.image ?? "";
 
   if (!weddingEnabled) return null;
 
@@ -486,26 +597,33 @@ function WeddingSection(props: HomepageSectionRendererProps) {
         <ScrollReveal delay={120} className="relative mx-auto w-full max-w-lg lg:max-w-none">
           <div className="rounded-[2rem] border border-border bg-white p-2.5 shadow-md">
             <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-cream-100 sm:aspect-[4/3] lg:aspect-square">
-              <Image
-                src={contentString(c, "imageUrl", showcase?.image ?? "")}
-                alt="Wedding cake"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 45vw"
-              />
+              {/* An empty string is a string, so `contentString`'s fallback never
+                  fired for a CLEARED field — and the media field's "Clear image"
+                  button sets exactly that. The result was `src=""`: next/image
+                  does not throw, it just ships an empty grey panel to every
+                  visitor. The wedding renderer's twin guards this the same way. */}
+              {teaserImage ? (
+                <Image
+                  src={teaserImage}
+                  alt="Wedding cake"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 45vw"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  {props.interactive ? "Choose an image for this section." : null}
+                </div>
+              )}
             </div>
           </div>
-          {showcase ? (
-            <div className="absolute right-5 bottom-5 rounded-2xl border border-border bg-white/95 p-4 shadow-sm">
-              <div className="mb-1 flex gap-0.5 text-gold-300">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="size-3 fill-current" />
-                ))}
-              </div>
-              <p className="text-sm font-semibold text-foreground">{showcase.name}</p>
-              <p className="text-sm font-bold text-bakery-700">{formatCurrency(showcase.price)}</p>
-            </div>
-          ) : null}
+          {/* A floating card used to sit here naming a specific cake, quoting a
+              specific price and awarding it five filled stars — all three read
+              from the hardcoded `weddingCakes[0]`, not from the catalogue and not
+              from any review. The price never followed the product: an admin who
+              repriced that cake still had the old figure on their homepage, with
+              no field anywhere in the builder to correct it. The teaser links to
+              the wedding page, where the real cakes carry their real prices. */}
         </ScrollReveal>
       </div>
     </SectionShell>
@@ -517,28 +635,20 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const items = [
-    {
-      icon: "Award",
-      title: "Legacy of Excellence",
-      description: "Over six decades of baking expertise trusted by generations.",
-    },
-    {
-      icon: "Leaf",
-      title: "Premium Ingredients",
-      description: "Finest chocolate, fresh cream, and seasonal fruits in every creation.",
-    },
-    {
-      icon: "Truck",
-      title: "Same-Day Delivery",
-      description: "Order by 2 PM for same-day delivery across major cities.",
-    },
-    {
-      icon: "Palette",
-      title: "Custom Designs",
-      description: "Personalized cakes crafted to your vision for every celebration.",
-    },
-  ];
+  /**
+   * The cards, from the section's own content.
+   *
+   * They were a hardcoded array in this function: "Over six decades of baking
+   * expertise", "Finest chocolate", "Order by 2 PM for same-day delivery across
+   * major cities", each asserted for whichever shop runs this CMS. The heading
+   * above them was editable while the claims underneath were not.
+   *
+   * Empty renders no section — a heading over nothing is worse than nothing.
+   */
+  const items = renderableRows(parseListField(c, "items"));
+
+
+  if (items.length === 0) return null;
 
   return (
     <SectionShell {...props}>
@@ -548,20 +658,24 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
         description={contentString(c, "description")}
       />
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
             <div
-              key={item.title}
+              key={`${item.title}-${index}`}
               className="rounded-xl border border-border bg-white p-5 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
               </div>
-              <p className="font-heading font-semibold">{item.title}</p>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                {item.description}
-              </p>
+              {item.title ? (
+                <p className="font-heading font-semibold">{item.title}</p>
+              ) : null}
+              {item.description ? (
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
+              ) : null}
             </div>
           );
         })}
@@ -588,11 +702,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
             key={item.id}
             className="flex flex-col rounded-xl border border-border bg-white p-6 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
           >
-            <div className="mb-4 flex items-center gap-0.5 text-gold-300">
-              {Array.from({ length: 5 }).map((_, star) => (
-                <Star key={star} className="size-4 fill-current" />
-              ))}
-            </div>
+            <RatingStars rating={item.rating} className="mb-4 text-gold-300" />
             <Quote className="mb-2 size-6 text-gold-300/60" />
             <p className="flex-1 text-sm leading-relaxed text-muted-foreground">
               {item.content}
@@ -615,6 +725,16 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
 
 function GallerySection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  /**
+   * The shop's own photographs, or no grid.
+   *
+   * This rendered `galleryImages` — twelve stock Unsplash photos of somebody
+   * else's cakes — as this shop's work, on every install, with no field to
+   * change them. A customer choosing a bakery by its photographs was choosing
+   * on someone else's.
+   */
+  const photos = limitRows(photoRows(c, "images"), contentNumber(c, "maxCount", 8));
+  if (photos.length === 0) return null;
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -625,28 +745,37 @@ function GallerySection(props: HomepageSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-        {galleryImages.slice(0, 8).map((src, index) => {
-          const caption = galleryCaptions[index];
+        {photos.map((photo, index) => {
+          const src = photo.image;
+          // An untouched column is "" from the editor, not undefined, so `??`
+          // could never fire and the object literal was always truthy: every
+          // tile shipped alt="" and an empty white pill on hover.
+          const title = photo.title?.trim() ?? "";
+          const tag = photo.tag?.trim() ?? "";
           return (
             <figure
-              key={src}
+              key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
               <Image
                 src={src}
-                alt={caption?.title ?? `Gallery ${index + 1}`}
+                alt={title || `Gallery ${index + 1}`}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
-              {caption ? (
+              {title || tag ? (
                 <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/0 p-3 opacity-0 transition-all duration-300 group-hover:bg-bakery-950/45 group-hover:opacity-100">
-                  <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
-                    {caption.tag}
-                  </span>
-                  <span className="mt-1.5 font-heading text-sm font-semibold text-white">
-                    {caption.title}
-                  </span>
+                  {tag ? (
+                    <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
+                      {tag}
+                    </span>
+                  ) : null}
+                  {title ? (
+                    <span className="mt-1.5 font-heading text-sm font-semibold text-white">
+                      {title}
+                    </span>
+                  ) : null}
                 </figcaption>
               ) : null}
             </figure>
@@ -781,6 +910,31 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
 function OffersSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 3);
+  // The shop's live coupons, read on the server. This row used to map the
+  // hardcoded `specialOffers`, so it advertised BDAY20 whether or not the coupon
+  // existed, was still active, or still gave 20% — and checkout refused the code
+  // it had just shown the customer.
+  const offers = (props.offers ?? getHomepageOffers(maxCount)).slice(0, maxCount);
+
+  // A shop with no live coupon has no special offers. Saying so in the builder
+  // is useful; saying it to a customer under a "Special Offers" heading is not,
+  // so on the storefront the section simply does not appear.
+  if (offers.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+        <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No active coupons, so this section is hidden on the live homepage. Add
+          one under Commerce → Coupons and it appears here.
+        </p>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -790,24 +944,33 @@ function OffersSection(props: HomepageSectionRendererProps) {
         description={contentString(c, "description")}
       />
       <div className="mt-8 grid gap-6 md:grid-cols-3">
-        {specialOffers.slice(0, maxCount).map((offer) => (
+        {offers.map((offer) => (
           <article
             key={offer.id}
             className="overflow-hidden rounded-xl border border-border bg-white"
           >
             <div className="relative aspect-[3/2] bg-muted">
-              <Image src={offer.image} alt={offer.title} fill className="object-cover" sizes="33vw" />
+              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
               <Badge variant="gold" className="absolute top-3 left-3">
                 {offer.discount}
               </Badge>
             </div>
             <div className="space-y-3 p-5">
-              <h3 className="font-heading text-lg font-semibold">{offer.title}</h3>
+              {/* Empty when the coupon's label just repeats the discount the badge
+                  already shows — see sameCopy in coupon-offers.ts. */}
+              {offer.title ? (
+                <h3 className="font-heading text-lg font-semibold">{offer.title}</h3>
+              ) : null}
               <p className="text-sm text-muted-foreground">{offer.description}</p>
               {offer.code ? (
-                <div className="flex items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-2">
                   <Tag className="size-3.5 text-gold-700" />
                   <span className="font-mono text-sm font-semibold text-gold-800">{offer.code}</span>
+                  {/* The condition checkout holds them to. Without it the card
+                      sends a small basket to a checkout that refuses the code. */}
+                  {offer.minSpend ? (
+                    <span className="text-xs text-gold-800/80">{offer.minSpend}</span>
+                  ) : null}
                 </div>
               ) : null}
               <Button variant="bakery" className="w-full" render={<Link href={routes.store.collections} />}>
@@ -824,6 +987,17 @@ function OffersSection(props: HomepageSectionRendererProps) {
 function InstagramSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 6);
+  /**
+   * The shop's own posts, or no strip.
+   *
+   * This rendered six stock photos as though they were the shop's feed — under
+   * a heading naming the shop's REAL handle, with every tile linking to that
+   * profile. So it invited a customer to a feed that looked nothing like the
+   * pictures above it. There is no Instagram API here; these are photos the
+   * shop uploads, and without them the section does not appear.
+   */
+  const posts = limitRows(photoRows(c, "posts"), maxCount);
+  if (posts.length === 0) return null;
   // The section's own content wins when the admin has set it in the builder;
   // otherwise the shop's real Instagram from Settings → Social. The shipped
   // placeholders count as "not set" — they were seeded, not chosen, and a shop
@@ -867,9 +1041,9 @@ function InstagramSection(props: HomepageSectionRendererProps) {
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {instagramPosts.slice(0, maxCount).map((post) => (
+        {posts.map((post, index) => (
           <a
-            key={post.id}
+            key={`${post.image}-${index}`}
             href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"

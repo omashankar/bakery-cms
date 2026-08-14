@@ -125,6 +125,12 @@ describe("the customer's first paint", () => {
           ? { primaryColor: "#123456", accentColor: "#abcdef", surfaceColor: "#fefefe", borderRadius: 16, preset: "custom" }
           : {},
     }));
+    // The chrome read also fetches the header menu's categories. Not this
+    // test's subject, but left unmocked it reaches for a real catalog document
+    // and makes a unit test depend on a database being up.
+    vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
+      getStorefrontCategories: async () => [],
+    }));
 
     const { getStorefrontChrome } = await import(
       "@/apps/website/lib/storefront-chrome.server"
@@ -341,14 +347,19 @@ describe("the server side", () => {
     expect(service).toContain("metadata: { before, after: value }");
   });
 
-  it("opens the gates before a restore instead of waiting each one out", () => {
-    const page = code("apps/admin/settings/components/backup-settings-page.tsx");
+  it("opens the gates inside the restore, not at the call site", () => {
     // Every guarded PUT waits out the full hydration deadline when its gate is
     // shut, sequentially — so a restore from a tab that never hydrated took
-    // minutes and then blamed the server.
-    expect(page).toMatch(
-      /await ensureSiteLayoutHydrated\(\);\s*\r?\n\s*const result = await restoreBackupToServer/,
-    );
+    // minutes and then blamed the server for refusing.
+    //
+    // This first landed as one opener at the call site, which left the
+    // function usable wrongly and covered only one of the gates. It belongs
+    // inside `restoreBackupToServer`, where it cannot be forgotten.
+    const repo = code("apps/admin/settings/lib/backup-repository.ts");
+    expect(repo).toContain("const gatesOpen = await openEveryGate();");
+
+    const page = code("apps/admin/settings/components/backup-settings-page.tsx");
+    expect(page).not.toContain("ensureSiteLayoutHydrated");
   });
 });
 

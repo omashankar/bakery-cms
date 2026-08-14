@@ -477,10 +477,24 @@ describe("a shop that was already running", () => {
     );
 
     const restoredSlugs = (plan.restored as { slug: string }[]).map((row) => row.slug).sort();
-    // Exactly the two that were sending from hardcoded fallbacks with no row
-    // for the admin to edit — including the only email a customer receives
-    // about their money.
-    expect(restoredSlugs).toEqual(["admin_new_order", "refund_processed"]);
+    // Exactly the wired emails this shop's stored set never had — the two that
+    // were sending from hardcoded fallbacks with no row for the admin to edit,
+    // and the cancellation email added later.
+    //
+    // This list growing when a template is wired is the mechanism working: a
+    // shop set up before it existed gets it, which is the whole point of the
+    // backfill. A template added to the seed WITHOUT being wired must not appear
+    // here — the test below pins that.
+    // `customer_sign_in` joined the list when storefront customer accounts were
+    // built: a shop running before that gains the sign-in email its customers
+    // now receive, and can word it, rather than having it sent from a hardcoded
+    // fallback it cannot see.
+    expect(restoredSlugs).toEqual([
+      "admin_new_order",
+      "customer_sign_in",
+      "order_cancelled",
+      "refund_processed",
+    ]);
     expect(plan.empty).toBe(false);
   });
 

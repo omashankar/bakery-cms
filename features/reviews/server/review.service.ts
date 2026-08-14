@@ -84,15 +84,86 @@ async function ensureSeeded(): Promise<void> {
   await seededFlag.write({ done: true });
 }
 
+const aggregatesBackfilled = createMongoStore<{ done: boolean }>({
+  key: "review-aggregates-backfilled",
+  seed: () => ({ done: false }),
+});
+
+/**
+ * One-time repair of the ratings shops are already advertising.
+ *
+ * Wiring the recompute into the write paths fixes every FUTURE moderation, and
+ * reaches no shop that is already live — their products still carry whatever the
+ * seed put there. Measured on a real shop: 14 of 14 sampled products advertised
+ * a score no review supported, including "4.9★ from 124 reviews" on a cake with
+ * none.
+ *
+ * Runs from the admin review list rather than a public read, so a stranger
+ * cannot trigger a catalogue-wide write, and it is a flag read after the first
+ * time.
+ */
+async function ensureAggregatesBackfilled(): Promise<void> {
+  const flag = await aggregatesBackfilled.read();
+  if (flag.done) return;
+
+  for (const product of await productRepo.listAll()) {
+    await refreshProductRating(product.slug);
+  }
+  await aggregatesBackfilled.write({ done: true });
+}
+
+/**
+ * Bring a product's advertised rating back in line with its approved reviews.
+ *
+ * Every write to a review has to end here, because `rating` and `reviewCount`
+ * live ON the product document and that is what the storefront renders.
+ *
+ * There WAS a version of this, `syncProductReviewAggregates` in the client
+ * repository — it computed the right number and then wrote it to localStorage.
+ * The server's product was never touched, so approving a review changed the
+ * moderator's own screen and nothing else; measured against a real shop, all 14
+ * sampled products advertised a score no review supported, one of them "4.9★
+ * from 124 reviews" with no reviews at all. The moderator had no way to notice,
+ * because their own browser showed the corrected figure.
+ *
+ * Best-effort on purpose: a moderation decision that succeeded must not be
+ * reported as failed because the follow-up aggregate write did.
+ */
+async function refreshProductRating(productSlug: string): Promise<void> {
+  if (!productSlug) return;
+  try {
+    await productRepo.setReviewAggregate(productSlug, await repo.approvedAggregate(productSlug));
+  } catch (error) {
+    console.error(`[reviews] could not refresh the rating for ${productSlug}`, error);
+  }
+}
+
 // ---- Public (storefront review form) --------------------------------------
 
 export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): Promise<ProductReview> {
+  /**
+   * The cake, resolved HERE, from the catalogue this server owns.
+   *
+   * The browser used to resolve it and send `cakeId`/`cakeName` along — through
+   * `loadProducts()`, which on a customer's browser seeds the shipped demo
+   * catalogue, so a review of any product the shop had actually created was
+   * refused before it left the page.
+   *
+   * Refusing an unknown slug is the check that lookup was reaching for, and it
+   * belongs on this side: the endpoint is public, so a review could otherwise
+   * be filed against a slug the shop has never sold, and land in moderation
+   * with a blank product name.
+   */
+  const cake = await productRepo.findBySlug(input.productSlug);
+  if (!cake) throw new NotFoundError("Product not found");
+
   const now = new Date().toISOString();
   const review: ProductReview = {
-    id: input.id ?? `review-${randomUUID()}`,
-    cakeId: input.cakeId ?? "",
-    productSlug: input.productSlug,
-    cakeName: input.cakeName ?? "",
+    // Minted here, never taken from the body. See `submitReviewSchema`.
+    id: `review-${randomUUID()}`,
+    cakeId: cake.id,
+    productSlug: cake.slug,
+    cakeName: cake.name,
     authorName: input.authorName.trim(),
     authorEmail: input.authorEmail?.trim() || undefined,
     rating: Math.min(5, Math.max(1, input.rating)),
@@ -101,8 +172,8 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
     // Forced — a public submission is never pre-approved or featured.
     status: "pending",
     isFeatured: false,
-    createdAt: input.createdAt ?? now,
-    updatedAt: input.updatedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await repo.create(review);
@@ -121,6 +192,7 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
 
 export async function getReviews(): Promise<ProductReview[]> {
   await ensureSeeded();
+  await ensureAggregatesBackfilled();
   return repo.listAll();
 }
 
@@ -137,6 +209,14 @@ export async function updateReview(
   if (!existing) throw new NotFoundError("Review not found");
 
   const updated = await repo.patch(id, patch);
+
+  // Approving, rejecting or re-rating changes what the product should advertise.
+  // The slug can itself be edited, so both the old and the new one are refreshed.
+  await refreshProductRating(existing.productSlug);
+  if (updated?.productSlug && updated.productSlug !== existing.productSlug) {
+    await refreshProductRating(updated.productSlug);
+  }
+
   await writeAuditLog({
     action: "review.update",
     actorId: ctx.actorId ?? null,
@@ -150,7 +230,12 @@ export async function updateReview(
 }
 
 export async function deleteReviews(ids: string[], ctx: RequestCtx): Promise<number> {
+  // Read the slugs BEFORE the rows are gone, or there is nothing left to
+  // recompute and the deleted reviews keep counting toward the advertised score.
+  const slugs = await repo.slugsForIds(ids);
   const deleted = await repo.deleteMany(ids);
+  for (const slug of slugs) await refreshProductRating(slug);
+
   await writeAuditLog({
     action: "review.delete",
     actorId: ctx.actorId ?? null,

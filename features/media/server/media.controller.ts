@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./media.service";
-import { mediaFilesSchema, mediaFoldersSchema, uploadSchema } from "./media.validators";
+import { mediaFilesPayloadSchema, mediaFoldersSchema, uploadSchema } from "./media.validators";
 
 const MEDIA_ROLES = ["owner", "admin"] as const;
 
@@ -16,12 +16,18 @@ export const getFilesController = withErrorHandler(async () => {
 
 export const replaceFilesController = withErrorHandler(async (request: Request) => {
   const session = await requireRole(...MEDIA_ROLES);
-  const files = validate(mediaFilesSchema, await readJson(request));
-  const result = await service.replaceFiles(files as never, {
-    ...requestContext(request),
-    actorId: session.sub,
-    actorEmail: session.email,
-  });
+  const payload = validate(mediaFilesPayloadSchema, await readJson(request));
+  const files = Array.isArray(payload) ? payload : payload.files;
+  const deletedIds = Array.isArray(payload) ? [] : payload.deletedIds;
+  const result = await service.replaceFiles(
+    files as never,
+    {
+      ...requestContext(request),
+      actorId: session.sub,
+      actorEmail: session.email,
+    },
+    deletedIds,
+  );
   return ok(result, "Media files saved");
 });
 

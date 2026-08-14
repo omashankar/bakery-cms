@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { StoreHomePage } from "@/apps/website";
+import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 
 /**
@@ -19,5 +20,8 @@ interface PageProps {
 
 export default async function Page(props: PageProps) {
   const { cmsPreview } = await props.searchParams;
-  return <StoreHomePage isPreview={cmsPreview === "1"} />;
+  // The parameter asks; the session decides. Without this anyone holding the URL
+  // read the unpublished homepage.
+  const isPreview = cmsPreview === "1" && (await canPreviewDraft());
+  return <StoreHomePage isPreview={isPreview} />;
 }

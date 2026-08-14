@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useState, type Ref } from "react";
 import { KeyRound, LogOut, Menu, PanelLeft, PanelLeftClose, Search, User, X } from "lucide-react";
 import { LogoutConfirmDialog } from "@/apps/admin/profile/components/logout-confirm-dialog";
-import { getAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
+import {
+  ADMIN_PROFILE_UPDATED_EVENT,
+  getAdminProfile,
+} from "@/apps/admin/profile/lib/admin-profile";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -59,11 +62,27 @@ export function AdminHeader({
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    const session = getDemoSession();
-    if (session?.email) setInitials(initialsFromEmail(session.email));
-    const profile = getAdminProfile();
-    setDisplayName(profile.fullName);
-    setEmail(profile.email);
+    /**
+     * Re-read on ADMIN_PROFILE_UPDATED_EVENT, which every profile write fires.
+     *
+     * This ran once on mount, so the account menu kept the name it happened to
+     * find — and it is the same cache the profile screen edits. An admin who
+     * corrected their name saw the old one in the menu for the rest of the
+     * session; on a first load it was the name DERIVED from the email address,
+     * which is nobody's choice. The same event now also carries the server's
+     * real account fields, which land after this mounts. The sidebar already
+     * subscribes to its store this way.
+     */
+    const sync = () => {
+      const profile = getAdminProfile();
+      setDisplayName(profile.fullName || "Administrator");
+      setEmail(profile.email);
+      if (profile.email) setInitials(initialsFromEmail(profile.email));
+    };
+
+    sync();
+    window.addEventListener(ADMIN_PROFILE_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(ADMIN_PROFILE_UPDATED_EVENT, sync);
   }, []);
 
   return (

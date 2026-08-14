@@ -347,9 +347,11 @@ export async function upsertSeoRouteForPath(
       updatedAt: nowIso(),
     };
     store.routes.push(merged);
-    persist(store);
-    serverStore = store;
-    return { value: merged, persisted: await replaceSeoRequest(store) };
+    // Through `persistAndSync`, like every other write in this file. Writing
+    // the cache and the module-level `serverStore` by hand left a refused
+    // write in both with no rollback and nothing reported — and because the SEO
+    // store is pushed WHOLE, the next accepted save carried it to the server.
+    return { value: merged, persisted: await persistAndSync(store) };
   }
 
   const updated: SeoRouteEntry = {
@@ -359,7 +361,5 @@ export async function upsertSeoRouteForPath(
     updatedAt: nowIso(),
   };
   store.routes[index] = updated;
-  persist(store);
-  serverStore = store;
-  return { value: updated, persisted: await replaceSeoRequest(store) };
+  return { value: updated, persisted: await persistAndSync(store) };
 }

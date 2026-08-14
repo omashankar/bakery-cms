@@ -24,6 +24,37 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "imageUrl", label: "Image URL", type: "url", isImage: true },
+      {
+        /**
+         * The chips under the hero copy. They were a constant ending in "60+
+         * years of craft" — the demo brand's age, asserted for whichever shop
+         * runs this CMS.
+         */
+        key: "highlights",
+        label: "Highlight chips",
+        type: "list",
+        emptyHint: "No chips — they will not appear on the page.",
+        itemFields: [
+          { key: "label", label: "Text", type: "text", placeholder: "Bespoke tiered designs" },
+        ],
+      },
+      {
+        /**
+         * The floating card over the hero image. It read "Award-winning /
+         * wedding studio" as a constant — an award nobody here has verified,
+         * for a studio that might not have one. Empty renders no card.
+         */
+        key: "badgeTitle",
+        label: "Image badge — title",
+        type: "text",
+        placeholder: "Award-winning",
+      },
+      {
+        key: "badgeSubtitle",
+        label: "Image badge — subtitle",
+        type: "text",
+        placeholder: "wedding studio",
+      },
     ],
   },
   {
@@ -33,11 +64,41 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       title: "Why Choose Us",
-      description: "Trusted by couples across India for unforgettable wedding celebrations.",
+      // "Trusted by couples across India" is a reach this CMS stores nothing
+      // to support — it holds ONE address.
+      description: "",
     },
     fields: [
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
+      {
+        /**
+         * These cards came from `whyChooseUs` in landing-data — the same shared
+         * constant the About page used to render, claiming six decades of
+         * expertise, Belgian chocolate, and same-day delivery across 500+
+         * cities. None of it is true of every shop, and the delivery line
+         * contradicted the shop's own lead time.
+         */
+        key: "items",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          {
+            key: "icon",
+            label: "Icon",
+            type: "select",
+            options: [
+              { label: "Award", value: "Award" },
+              { label: "Leaf", value: "Leaf" },
+              { label: "Truck", value: "Truck" },
+              { label: "Palette", value: "Palette" },
+            ],
+          },
+          { key: "title", label: "Title", type: "text" },
+          { key: "description", label: "Description", type: "text" },
+        ],
+      },
     ],
   },
   {
@@ -86,6 +147,28 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       ctaHref: routes.store.gallery,
     },
     fields: [
+      {
+        /**
+         * The shop's OWN photographs.
+         *
+         * This grid rendered `galleryImages` from landing-data — twelve stock
+         * Unsplash photos of somebody else's cakes, shown as this shop's work on
+         * every install, with no field anywhere to change them. A customer
+         * choosing a bakery by its photographs was choosing on someone else's.
+         *
+         * Empty renders no grid: a section that admits it has no photos yet is
+         * better than one showing another bakery's.
+         */
+        key: "images",
+        label: "Photos",
+        type: "list",
+        emptyHint: "No photos — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Photo", type: "url", isImage: true },
+          { key: "title", label: "Caption", type: "text" },
+          { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
+        ],
+      },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },

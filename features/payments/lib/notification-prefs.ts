@@ -33,10 +33,30 @@ function read(): PrefStore {
 
 async function write(store: PrefStore): Promise<boolean> {
   if (typeof window === "undefined") return false;
+
+  const previous = localStorage.getItem(KEY);
   localStorage.setItem(KEY, JSON.stringify(store));
   // write() is only reached via genuine admin toggles (no seed/load path), so
   // dual-writing to the server here cannot clobber with defaults.
   const persisted = await replacePaymentNotifPrefsRequest(store);
+
+  /**
+   * Undo a refused toggle.
+   *
+   * This is a whole-blob replace, so a refusal left in the cache is carried to
+   * the server by the next accepted toggle — a preference the admin was told
+   * had not saved, going live because they later changed a different one.
+   * Only if the cache still holds our write: restoring unconditionally would
+   * undo a concurrent toggle the server HAD accepted.
+   */
+  if (!persisted) {
+    const stillOurs = localStorage.getItem(KEY) === JSON.stringify(store);
+    if (stillOurs) {
+      if (previous === null) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, previous);
+    }
+  }
+
   window.dispatchEvent(new Event(NOTIF_PREFS_UPDATED_EVENT));
   return persisted;
 }

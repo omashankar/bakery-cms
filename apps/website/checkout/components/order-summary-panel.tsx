@@ -16,6 +16,16 @@ interface OrderSummaryPanelProps {
   showEditLink?: boolean;
   discountLabel?: string;
   giftWrapLabel?: string;
+  /**
+   * This panel is describing an order that has already been placed.
+   *
+   * The order page reuses it, where the free-delivery nudge is advice nobody
+   * can act on — the basket is closed and the delivery was charged at whatever
+   * it was charged. Worse on a DELIVERED order: it reads as a live offer.
+   */
+  placed?: boolean;
+  /** Settled refunds, so a partially refunded order does not read as fully paid. */
+  refunded?: number;
 }
 
 function getCommerceLabels() {
@@ -45,6 +55,8 @@ export function OrderSummaryPanel({
   showEditLink = true,
   discountLabel,
   giftWrapLabel,
+  placed = false,
+  refunded = 0,
 }: OrderSummaryPanelProps) {
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const labels = getCommerceLabels();
@@ -109,7 +121,26 @@ export function OrderSummaryPanel({
         </p>
       ) : null}
 
-      {totals.subtotal > 0 && totals.subtotal < freeDeliveryThreshold ? (
+      {refunded && refunded > 0 ? (
+        <div className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
+          {/*
+            A partially refunded order used to show only "Total paid", the full
+            amount, with no mention of the refund — while the INVOICE for the
+            same order shows both. The sentence was true, but a customer reading
+            this to work out what they were left charged got no answer here.
+          */}
+          <div className="flex justify-between text-muted-foreground">
+            <span>Refunded</span>
+            <span>−{formatCurrency(refunded)}</span>
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>Net paid</span>
+            <span>{formatCurrency(Math.max(0, totals.total - refunded))}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {!placed && totals.subtotal > 0 && totals.subtotal < freeDeliveryThreshold ? (
         <p className="mt-3 text-xs text-muted-foreground">
           Add {formatCurrency(freeDeliveryThreshold - totals.subtotal)} more for free delivery.
         </p>

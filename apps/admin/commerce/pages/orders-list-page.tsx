@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
+import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -21,6 +22,7 @@ import {
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   defaultOrderFilters,
   exportOrdersToCsv,
@@ -86,6 +88,7 @@ export function OrdersListPage() {
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
   const [statsFailed, setStatsFailed] = useState(false);
+  const [statsLoaded, setStatsLoaded] = useState(false);
   const [totalMatching, setTotalMatching] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -153,6 +156,7 @@ export function OrdersListPage() {
       // one reading an admin must never get from a request that simply failed.
       setStatsFailed(!summary);
       if (summary) setStats(summary);
+      setStatsLoaded(true);
     })();
 
     return () => {
@@ -168,7 +172,20 @@ export function OrdersListPage() {
   // shown as pending. A request the admin has already caused counts as in flight.
   const pending = loading || requestKey !== liveKey;
 
-  /** Cards must read "unavailable", not zero, when the aggregation did not answer. */
+  /**
+   * Cards must read "unavailable", not zero, when the aggregation did not
+   * answer — and must say nothing at all until it has.
+   *
+   * `statsFailed` knew failure from success and counted "has not answered yet"
+   * as success, so a cold load printed nine confident zeros and captioned "In
+   * progress 0" as "All clear" in green: the sentence that tells a baker there
+   * is nothing waiting to be made.
+   */
+  const statFigures: FiguresState = !statsLoaded
+    ? "loading"
+    : statsFailed
+      ? "unavailable"
+      : "ready";
   const statValue = (value: string | number) => (statsFailed ? "—" : value);
   const statChange = (change: string) => (statsFailed ? "Unavailable" : change);
   const statTone = <T,>(tone: T) => (statsFailed ? ("warning" as const) : tone);
@@ -198,7 +215,7 @@ export function OrdersListPage() {
    * "All 0", "Pending 0", "Delivered 0" — directly above ten visible orders.
    */
   function countForStatus(status: OrderListFilters["status"]): string | number {
-    if (statsFailed) return "—";
+    if (statFigures !== "ready") return "—";
     if (status === "all") return stats.total;
     if (status === "out_for_delivery") return stats.outForDelivery;
     return stats[status];
@@ -218,22 +235,74 @@ export function OrdersListPage() {
     setSelectedIds((prev) => [...new Set([...prev, ...pageIds])]);
   }
 
+  /**
+   * Selected orders whose status this action cannot change.
+   *
+   * Cancelled and refunded orders have checkboxes like any other row, and the
+   * status tabs let an admin filter to exactly those — so select-all here used
+   * to write a refunded order back to `delivered`. The server refuses that now;
+   * this stops the screen offering it in the first place, and says why.
+   */
+  const lockedSelection = useMemo(
+    () =>
+      orders.filter(
+        (order) => selectedIds.includes(order.id) && isTerminalOrderStatus(order.status)
+      ),
+    [orders, selectedIds]
+  );
+
   async function handleBulkStatusUpdate() {
-    if (selectedIds.length === 0 || applying) return;
+    if (selectedIds.length === 0 || applying || lockedSelection.length > 0) return;
 
     setApplying(true);
     // Named apart from the `failed` fetch state above — they mean different things.
-    const { updated, failed: rejected } = await bulkUpdateOrderStatus(selectedIds, bulkStatus);
+    const {
+      updated,
+      failed: rejected,
+      refused,
+      reason,
+    } = await bulkUpdateOrderStatus(selectedIds, bulkStatus);
     setApplying(false);
     setSelectedIds([]);
     setReloadKey((value) => value + 1);
 
-    if (rejected > 0) {
-      toast.error(`${rejected} of ${selectedIds.length} did not reach the server`, {
+    /**
+     * A rule the server enforces is not a request that went missing.
+     *
+     * Every failure was reported as "did not reach the server — those changes
+     * exist on this device only", which for a refused transition is wrong
+     * twice: the server answered, and nothing was kept anywhere. The
+     * fulfilment ladder does not run backwards, so that message sent the admin
+     * into a retry that could never succeed. Refusals carry the server's own
+     * sentence now, and the optimistic cache write is undone for them.
+     */
+    if (refused > 0) {
+      toast.error(
+        `${refused} of ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"} could not be moved to ${bulkStatus}`,
+        {
+          description:
+            reason ?? "An order cannot go back down the fulfilment ladder. Nothing was changed.",
+        },
+      );
+    }
+
+    /**
+     * Not `else` — a batch can contain both.
+     *
+     * The refusal branch used to return, so in a mixed batch the admin was told
+     * about the permanent refusals and never about the requests that merely
+     * dropped. Those are the ones whose optimistic write is deliberately KEPT,
+     * so they are the ones worth retrying — and the only ones the second
+     * sentence is true of.
+     */
+    const dropped = rejected - refused;
+    if (dropped > 0) {
+      toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
         description: "Those changes exist on this device only — reload to see the server's version.",
       });
-      return;
     }
+
+    if (rejected > 0) return;
 
     toast.success(`Applied to ${updated} order${updated === 1 ? "" : "s"}`);
   }
@@ -368,6 +437,7 @@ export function OrdersListPage() {
             changeTone={statTone("neutral" as const)}
             icon={ShoppingBag}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <button
@@ -387,6 +457,7 @@ export function OrdersListPage() {
             changeTone={statTone(inProgress > 0 ? ("warning" as const) : ("positive" as const))}
             icon={Send}
             tone="gold"
+            figures={statFigures}
           />
         </button>
         <button
@@ -406,6 +477,7 @@ export function OrdersListPage() {
             changeTone={statTone("positive" as const)}
             icon={CheckCircle2}
             tone="bakery"
+            figures={statFigures}
           />
         </button>
         <DashboardStatCard
@@ -415,6 +487,7 @@ export function OrdersListPage() {
           changeTone={statTone("neutral" as const)}
           icon={IndianRupee}
           tone="gold"
+          figures={statFigures}
         />
       </section>
 
@@ -519,10 +592,17 @@ export function OrdersListPage() {
                 size="sm"
                 variant="outline"
                 onClick={handleBulkStatusUpdate}
-                disabled={applying}
+                disabled={applying || lockedSelection.length > 0}
               >
                 {applying ? "Applying..." : "Apply"}
               </Button>
+              {lockedSelection.length > 0 ? (
+                <span className="text-xs text-destructive">
+                  {lockedSelection.length} cancelled or refunded order
+                  {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
+                  cannot be changed.
+                </span>
+              ) : null}
               <Button size="sm" variant="outline" onClick={handleExport}>
                 Export
               </Button>

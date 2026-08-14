@@ -1,7 +1,7 @@
+import { hasExpired } from "@/lib/expiry-date";
 import {
   getActiveCoupons,
   getCouponByCode,
-  incrementCouponUsage,
 } from "@/features/commerce/lib/coupons-repository";
 import type { CartTotals } from "./cart-totals";
 
@@ -43,11 +43,20 @@ export interface CouponRule {
  * was valid because the customer's browser said so — and the order carried a
  * `coupon` object the caller could invent outright, discount included.
  */
+/** Rounds to the currency's minor unit — whole rupees, cents elsewhere. */
+function roundToCurrency(value: number, currency = "INR"): number {
+  const digits = ["INR", "JPY", "KRW", "VND"].includes(currency.toUpperCase()) ? 0 : 2;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 export function evaluateCoupon(
   coupons: CouponRule[],
   code: string,
   subtotal: number,
   now = Date.now(),
+  /** Defaults to rupees, so every existing caller's arithmetic is unchanged. */
+  currency?: string,
 ): { ok: true; coupon: AppliedCoupon } | { ok: false; message: string } {
   const normalized = code.trim().toUpperCase();
   if (!normalized) {
@@ -59,7 +68,9 @@ export function evaluateCoupon(
     return { ok: false, message: "Invalid coupon code" };
   }
 
-  if (definition.expiresAt && new Date(definition.expiresAt).getTime() < now) {
+  // Fails closed on an unparseable value: `NaN < now` is false, so a coupon
+  // with expiresAt "31/12/2026" used to be permanently live.
+  if (hasExpired(definition.expiresAt, now)) {
     return { ok: false, message: "This coupon has expired" };
   }
 
@@ -72,7 +83,11 @@ export function evaluateCoupon(
 
   let discountAmount = 0;
   if (definition.percentOff) {
-    discountAmount = Math.round(subtotal * (definition.percentOff / 100));
+    // Rounded to the CURRENCY's minor unit, like every other money figure in
+    // the pipeline. A bare `Math.round` is whole units, so a USD shop's 10%
+    // coupon on $12.50 gave $1.00 — an 8% discount, quietly — and every
+    // fractional-cent shop rounded a customer's saving away.
+    discountAmount = roundToCurrency(subtotal * (definition.percentOff / 100), currency);
   } else if (definition.flatOff) {
     discountAmount = definition.flatOff;
   }
@@ -108,9 +123,15 @@ export function applyCouponCode(
   return evaluateCoupon(definition ? [definition as CouponRule] : [], normalized, subtotal);
 }
 
-export function recordCouponUsage(code: string): Promise<void> {
-  return incrementCouponUsage(code);
-}
+// `recordCouponUsage` lived here and is gone.
+//
+// It called the browser's `incrementCouponUsage`, which read the local coupon
+// cache, bumped one counter and PUT THE WHOLE LIST back to `/api/coupons` — a
+// replace-all, fired from a customer's checkout. A visitor whose cache was stale
+// or partial replaced the shop's coupons with it.
+//
+// It was also a second count: `placeOrder` already increments the redemption
+// server-side, atomically, against the code the shop itself resolved.
 
 export function getCouponHint(): string {
   return `Try ${getAvailableCouponCodes().slice(0, 3).join(", ")}`;

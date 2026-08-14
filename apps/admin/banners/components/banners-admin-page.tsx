@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { bannersWritable } from "@/features/content/lib/content-api";
 import {
   CalendarClock,
   ExternalLink,
@@ -13,7 +14,6 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
@@ -139,7 +139,25 @@ export function BannersAdminPage() {
   }
 
   useEffect(() => {
+    // Read the local cache, then read it AGAIN once the server's copy has
+    // landed in it.
+    //
+    // This list is whatever this browser happens to hold. On a device that has
+    // never opened this page — a second laptop, a new profile, cleared site
+    // data — that is the shipped demo seed, and the page kept showing it: the
+    // hydration write lands in localStorage a moment later but nothing re-read
+    // it. Because every mutation here is a replace-all that sends the whole
+    // list, the admin's next save then pushed those demo rows to the server and
+    // destroyed the shop's real ones. The hydration gate already refuses a write
+    // sent BEFORE the server copy arrives; this is the other half of it.
     refresh();
+    let cancelled = false;
+    void bannersWritable.waitForSettled().then((settled) => {
+      if (settled && !cancelled) refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => filterBanners(banners, filters), [banners, filters]);
@@ -212,12 +230,16 @@ export function BannersAdminPage() {
     );
   }
 
-  function confirmReset() {
-    resetBanners();
+  async function confirmReset() {
+    // Reported the way every other write on this page is: on what the server
+    // said. This used to toast success for a reset that only ever touched
+    // localStorage — the database kept the shop's real banners, the storefront
+    // never changed, and the next hydration silently undid it.
+    const { persisted } = await resetBanners();
     refresh();
     setSelectedIds([]);
     setResetOpen(false);
-    toast.success("Banners reset to defaults");
+    reportWrite(persisted, "Banners reset to defaults");
   }
 
   return (
@@ -272,7 +294,11 @@ export function BannersAdminPage() {
           <DashboardStatCard
             title="Active"
             value={overview.active}
-            change="Live on storefront"
+            // Not "Live on storefront": this counts every banner inside its
+            // schedule window whatever its position, and only hero banners have
+            // a renderer. The Hero strip card beside it is the one that says
+            // what a visitor actually sees.
+            change="Switched on and in date"
             changeTone="positive"
             icon={LayoutTemplate}
             tone="bakery"

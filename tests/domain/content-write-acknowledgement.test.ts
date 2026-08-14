@@ -48,7 +48,11 @@ import {
 } from "@/apps/admin/communications/lib/email-templates-repository";
 import { saveCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
 import { saveAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
-import { contentHydration } from "@/features/content/lib/content-api";
+import {
+  bannersWritable,
+  faqsWritable,
+  testimonialsWritable,
+} from "@/features/content/lib/content-api";
 import { couponsHydration, zonesHydration } from "@/features/commerce/lib/commerce-api";
 import { seoHydration, siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
 import { catalogHydration } from "@/features/catalog/lib/catalog-api";
@@ -78,7 +82,12 @@ function mockServer(ok: boolean, status = ok ? 200 : 500) {
  * replace-all write refuses to send — see the "hydration gate" block below.
  */
 function markHydrated() {
-  contentHydration.markSettled();
+  // One gate per collection here too, and each is settled only by a FULL
+  // read: a visitor's subset is missing exactly the rows a replace-all would
+  // delete.
+  bannersWritable.markSettled();
+  faqsWritable.markSettled();
+  testimonialsWritable.markSettled();
   couponsHydration.markSettled();
   zonesHydration.markSettled();
   siteLayoutHydration.markSettled();
@@ -290,15 +299,58 @@ describe("the hydration gate", () => {
   });
 });
 
-describe("the local half still lands", () => {
-  it("keeps a rejected banner in local storage, so the admin's work is not lost", async () => {
+describe("a write the server refused", () => {
+  /**
+   * This block used to assert the opposite — that a rejected banner STAYS in
+   * local storage, "so the admin's work is not lost". That reasoning does not
+   * survive contact with how these collections are written.
+   *
+   * Every write here is a replace-all that sends the WHOLE list. So a rejected
+   * row left in the cache is not a saved draft, it is a queued write nobody
+   * approved: the next save from that tab, about an entirely different row,
+   * carries it to the server. `coupons-repository.ts` documents exactly this —
+   * a 401'd edit dropping WELCOME10 from 10% to 5% stayed cached, and the next
+   * unrelated save made 5% live. Delivery zones already rolled back; content
+   * was the outlier.
+   *
+   * The admin's work is not lost, because it is in the form they typed it into
+   * and the write reports that it failed. The cache is a mirror of the server,
+   * not a draft store.
+   */
+  it("does not leave the rejected row in the cache to ride along on the next save", async () => {
     mockServer(false);
-
-    const { value: banner } = await createBanner({ title: "Diwali", image: "/x.jpg" } as never);
-
-    // Read it back out of the STORE, not off the returned object — asserting on
-    // the return value only proves the input was echoed.
     const { loadBanners } = await import("@/features/content/lib/banners-repository");
-    expect(loadBanners().map((item) => item.id)).toContain(banner.id);
+    const before = loadBanners().map((item) => item.id);
+
+    const { value: banner, persisted } = await createBanner({
+      title: "Diwali",
+      image: "/x.jpg",
+    } as never);
+
+    // The caller is TOLD, which is what stops the UI claiming a save.
+    expect(persisted, "a refused write reported success").toBe(false);
+
+    // And the cache is back where it started, so the next write cannot smuggle
+    // this one to the server. Read the STORE, not the returned object —
+    // asserting on the return value only proves the input was echoed.
+    expect(loadBanners().map((item) => item.id)).toEqual(before);
+    if (banner) {
+      expect(loadBanners().map((item) => item.id)).not.toContain(banner.id);
+    }
+  });
+
+  it("leaves an accepted write alone", async () => {
+    // The other half: rolling back unconditionally would undo good writes.
+    mockServer(true);
+    const { loadBanners } = await import("@/features/content/lib/banners-repository");
+
+    const { value: banner, persisted } = await createBanner({
+      title: "Diwali",
+      image: "/x.jpg",
+    } as never);
+
+    expect(persisted).toBe(true);
+    expect(banner).not.toBeNull();
+    expect(loadBanners().map((item) => item.id)).toContain(banner!.id);
   });
 });

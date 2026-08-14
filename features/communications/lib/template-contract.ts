@@ -38,6 +38,25 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
     "delivery_date",
     "delivery_address",
   ],
+  /**
+   * The one status change a customer is never glad to read, and was never told.
+   *
+   * Cancelling wrote a status, put the stock back and released the coupon, and
+   * sent nothing. A customer whose order was cancelled found out by it never
+   * arriving — and if they had paid, their money was still sitting in the
+   * gateway with nothing anywhere saying so.
+   *
+   * `refund_note` is what makes this honest rather than merely polite: whether
+   * money is coming back depends on whether any was taken, and that is the first
+   * thing they will want to know.
+   */
+  order_cancelled: [
+    ...STORE_VARIABLES,
+    "customer_name",
+    "order_number",
+    "order_total",
+    "refund_note",
+  ],
   invoice: [
     ...STORE_VARIABLES,
     "customer_name",
@@ -47,6 +66,13 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
     "invoice_url",
   ],
   password_reset: [...STORE_VARIABLES, "customer_name", "reset_code", "expires_in"],
+  /**
+   * The storefront's own sign-in code. Its own variable name rather than
+   * reusing `reset_code`: an admin wording one of these should not have to
+   * work out which flow the word "reset" belongs to, and the two emails say
+   * different things to different people.
+   */
+  customer_sign_in: [...STORE_VARIABLES, "customer_name", "sign_in_code", "expires_in"],
   refund_processed: [
     ...STORE_VARIABLES,
     "customer_name",

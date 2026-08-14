@@ -4,6 +4,7 @@
  * — never throws.
  */
 import type { SecurityCenterState } from "@/types/security";
+import { createHydrationGate } from "@/lib/hydration-gate";
 
 interface Envelope<T> {
   success: boolean;
@@ -69,3 +70,13 @@ export async function logoutAllRequest(): Promise<{ ok: boolean; revoked: number
     return { ok: false, revoked: 0 };
   }
 }
+
+/**
+ * Settled by `useSecurityCenterServerSync` once /api/security-center answers.
+ *
+ * The Security header's session count used to open on a flag set inside
+ * `refreshCenter()`, which reads the local cache synchronously — so "· 0
+ * sessions" was stated as fact before the request had been made, which is
+ * exactly what the dash was added to prevent.
+ */
+export const securityCenterHydration = createHydrationGate();

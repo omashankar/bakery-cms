@@ -18,3 +18,15 @@ export const uploadSchema = z.object({
   source: z.string().min(1, "An image is required"),
   folder: z.string().optional(),
 });
+
+/**
+ * A media save, optionally naming the ids being deleted.
+ *
+ * Only ids listed here have their Cloudinary asset destroyed — see
+ * media.service.replaceFiles. A bare array is still accepted so an older
+ * client keeps working; it simply destroys nothing.
+ */
+export const mediaFilesPayloadSchema = z.union([
+  mediaFilesSchema,
+  z.object({ files: mediaFilesSchema, deletedIds: z.array(z.string()).default([]) }),
+]);

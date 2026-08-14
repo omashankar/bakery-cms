@@ -2,7 +2,13 @@ import type { FaqCategory, FaqItem, FaqFormData } from "@/types/content";
 import type { WriteResult } from "@/lib/write-result";
 import type { LandingFaq } from "@/constants/landing-data";
 import { faqs as seedFaqs } from "@/constants/landing-data";
-import { replaceFaqsRequest } from "./content-api";
+import {
+  faqsLoaded,
+  faqsWritable,
+  fetchFaqs,
+  replaceFaqsRequest,
+} from "./content-api";
+import { ensureWritable, readWritableList, saveWithRollback } from "./content-write";
 
 const STORAGE_KEY = "bakery-cms-faq";
 const STORAGE_VERSION_KEY = "bakery-cms-faq-version";
@@ -80,8 +86,33 @@ function lowPersist(items: FaqItem[]): void {
 
 /** Mutation write: local first, then the server, reporting what the server did. */
 async function persist(items: FaqItem[]): Promise<boolean> {
-  lowPersist(items);
-  return replaceFaqsRequest(items);
+  return saveWithRollback({
+    storageKey: STORAGE_KEY,
+    next: items,
+    writeLocal: lowPersist,
+    request: replaceFaqsRequest,
+  });
+}
+
+/** The list a replace-all may be composed from — see `readWritableList`. */
+async function readWritableFaqs(): Promise<FaqItem[] | null> {
+  return readWritableList({
+    writable: faqsWritable,
+    loaded: faqsLoaded,
+    fetch: fetchFaqs,
+    persistServer: persistServerFaqs,
+    loadLocal: loadFaqs,
+  });
+}
+
+/** Whether this browser may compose a replace-all yet. */
+export function ensureFaqsWritable(): Promise<boolean> {
+  return ensureWritable({
+    writable: faqsWritable,
+    loaded: faqsLoaded,
+    fetch: fetchFaqs,
+    persistServer: persistServerFaqs,
+  });
 }
 
 /** Hydration: write the server's FAQs into the local cache (no re-push). */
@@ -102,10 +133,10 @@ export function loadFaqs(): FaqItem[] {
 
   try {
     const parsed = JSON.parse(raw) as FaqItem[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // An empty list is an ANSWER, not a missing one — see banners-repository.ts
+    // for the full account. Only a missing or non-array value seeds.
+    if (!Array.isArray(parsed)) {
       const seeded = seedFromLanding();
-      // Local-only: re-seeding must NOT push defaults back to the server, or an
-      // admin who deleted every FAQ would have them resurrected on reload.
       lowPersist(seeded);
       localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
       return seeded;
@@ -154,8 +185,9 @@ export function createEmptyFaqForm(): FaqFormData {
   };
 }
 
-export async function createFaq(data: FaqFormData): Promise<WriteResult<FaqItem>> {
-  const items = loadFaqs();
+export async function createFaq(data: FaqFormData): Promise<WriteResult<FaqItem | null>> {
+  const items = await readWritableFaqs();
+  if (!items) return { value: null, persisted: false };
   const timestamp = nowIso();
   const created: FaqItem = {
     ...data,
@@ -170,7 +202,8 @@ export async function updateFaq(
   id: string,
   patch: Partial<FaqFormData>
 ): Promise<WriteResult<FaqItem | null>> {
-  const items = loadFaqs();
+  const items = await readWritableFaqs();
+  if (!items) return { value: null, persisted: false };
   const index = items.findIndex((item) => item.id === id);
   if (index === -1) return { value: null, persisted: false };
 
@@ -185,7 +218,8 @@ export async function updateFaq(
 }
 
 export async function deleteFaqs(ids: string[]): Promise<WriteResult<number>> {
-  const items = loadFaqs();
+  const items = await readWritableFaqs();
+  if (!items) return { value: 0, persisted: false };
   const next = items.filter((item) => !ids.includes(item.id));
   const count = items.length - next.length;
   return { value: count, persisted: await persist(next) };
@@ -195,7 +229,8 @@ export async function bulkUpdateFaqStatus(
   ids: string[],
   status: FaqItem["status"]
 ): Promise<WriteResult<number>> {
-  const items = loadFaqs();
+  const items = await readWritableFaqs();
+  if (!items) return { value: 0, persisted: false };
   let count = 0;
   const next = items.map((item) => {
     if (!ids.includes(item.id)) return item;

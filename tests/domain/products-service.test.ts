@@ -11,29 +11,82 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // In-memory stand-in for the Mongo-backed product repository.
+//
+// It models the two things that matter about the real one: writes address a
+// SINGLE document, and the slug is unique in the database rather than checked in
+// JS beforehand. A mock that accepted a duplicate slug would let the service
+// look correct while the real collection refused the write.
 vi.mock("@/features/products/server/product.repository", async () => {
   const { seedProducts } = await import("@/features/products/lib/products-repository");
-  let store: import("@/types/product").Product[] | null = null;
+  type P = import("@/types/product").Product;
+  let store: P[] | null = null;
+
+  const rows = () => {
+    if (store === null) store = seedProducts();
+    return store;
+  };
+
+  const duplicateSlug = (slug: string, exceptId?: string) => {
+    if (!rows().some((p) => p.slug === slug && p.id !== exceptId)) return null;
+    const error = new Error(`E11000 duplicate key error collection: products index: slug_1`);
+    (error as unknown as { code: number; keyPattern: Record<string, number> }).code = 11000;
+    (error as unknown as { keyPattern: Record<string, number> }).keyPattern = { slug: 1 };
+    return error;
+  };
 
   return {
     async listAll() {
-      if (store === null) store = seedProducts();
-      return store;
+      return rows();
     },
-    async replaceAll(products: import("@/types/product").Product[]) {
+    async insertOne(product: P) {
+      const clash = duplicateSlug(product.slug);
+      if (clash) throw clash;
+      // The real repository sorts newest-first, so a new product leads the list.
+      store = [product, ...rows()];
+      return product;
+    },
+    async replaceOne(id: string, product: P) {
+      const list = rows();
+      const index = list.findIndex((p) => p.id === id);
+      if (index === -1) return null;
+      const clash = duplicateSlug(product.slug, id);
+      if (clash) throw clash;
+      list[index] = product;
+      return product;
+    },
+    async deleteOne(id: string) {
+      const list = rows();
+      const next = list.filter((p) => p.id !== id);
+      store = next;
+      return next.length !== list.length;
+    },
+    async setStatusMany(ids: string[], status: P["status"]) {
+      let updated = 0;
+      store = rows().map((p) => {
+        if (!ids.includes(p.id)) return p;
+        updated += 1;
+        return { ...p, status };
+      });
+      return updated;
+    },
+    async setReviewAggregate() {},
+    async replaceAll(products: P[]) {
       store = [...products];
     },
     async reset() {
       store = null;
     },
     async findById(id: string) {
-      return (store ?? []).find((p) => p.id === id) ?? null;
+      return rows().find((p) => p.id === id) ?? null;
     },
     async findBySlug(slug: string) {
-      return (store ?? []).find((p) => p.slug === slug) ?? null;
+      return rows().find((p) => p.slug === slug) ?? null;
     },
     async slugExists(slug: string, exceptId?: string) {
-      return (store ?? []).some((p) => p.slug === slug && p.id !== exceptId);
+      return rows().some((p) => p.slug === slug && p.id !== exceptId);
+    },
+    isDuplicateSlugError(error: unknown) {
+      return error instanceof Error && error.message.includes("E11000");
     },
   };
 });
@@ -125,7 +178,11 @@ describe("writes persist to the store", () => {
     expect(await deleteProduct(created.id)).toBe(false);
   });
 
-  it("does not interleave concurrent writes", async () => {
+  it("does not lose concurrent writes", async () => {
+    // Concurrency safety used to come from an in-process queue around a
+    // read-all/write-all cycle. It now comes from each write addressing one
+    // document, which also protects against the writers that were never IN that
+    // queue — order placement and stock adjustments.
     const before = (await getProducts()).length;
 
     await Promise.all([
@@ -139,6 +196,31 @@ describe("writes persist to the store", () => {
     expect(slugs).toContain("c2");
     expect(slugs).toContain("c3");
     expect(await getProducts()).toHaveLength(before + 3);
+  });
+
+  it("refuses a duplicate slug at the database, not with a prior scan", async () => {
+    await createProduct(form({ slug: "taken", name: "First" }));
+    // A scan-then-write is a check two requests can both pass. The slug is the
+    // storefront's product URL, so a collision leaves one cake unreachable.
+    await expect(createProduct(form({ slug: "taken", name: "Second" }))).rejects.toThrow(
+      /E11000/,
+    );
+  });
+
+  it("does not let an edit form write back the review aggregate", async () => {
+    const created = await createProduct(form({ slug: "rated", name: "Rated" }));
+
+    // The reviews aggregate owns these and writes them directly. A form opened
+    // before a moderation decision would otherwise carry the old figures back
+    // and undo it.
+    const updated = await updateProduct(created.id, {
+      ...form({ slug: "rated" }),
+      rating: 4.9,
+      reviewCount: 124,
+    } as ProductFormData);
+
+    expect(updated?.rating).toBe(created.rating);
+    expect(updated?.reviewCount).toBe(created.reviewCount);
   });
 });
 
@@ -174,10 +256,28 @@ describe("storefront projections", () => {
 
     expect(card).toBeDefined();
     expect(card?.name).toBe("Card Me");
-    expect(card?.price).toBe(800);
+
+    /**
+     * The price the SHOP would charge, not the base on the record.
+     *
+     * This asserted 800 — the base — and that is what the cards were showing
+     * while checkout charged something else. Here the fixture sets `price: 800`
+     * and leaves the form's default weight tiers, which are priced from 999, so
+     * the shop charges the tier: `priceLine` in pricing.server.ts reads
+     * `product.weights[0].price` before it falls back to the base. 999 is the
+     * number a customer is charged, so 999 is the number the card must show.
+     */
+    const stored = await getProductBySlug("card-me");
+    expect(card?.price).toBe(stored?.weights?.[0]?.price);
+    expect(card?.price).toBe(999);
     // Dropped to keep the RSC payload small.
     expect(card?.description).toBe("");
     expect(card?.variantGroups).toBeUndefined();
-    expect(card?.weights).toBeUndefined();
+
+    // `weights` is NOT dropped any more. The collections page filters this
+    // projection on the client, and the weight filter matches tier labels — with
+    // no tiers on the card it matched every product, so the filter did nothing.
+    // Only the labels travel; the per-tier prices do not.
+    expect(card?.weights?.every((tier) => tier.price === 0)).toBe(true);
   });
 });

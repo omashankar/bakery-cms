@@ -13,12 +13,13 @@ import type { BusinessLabels } from "@/config/business-labels";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
-  DEFAULT_COLLECTION_FILTERS,
   applyCollectionFilters,
+  collectionPriceCeiling,
   countActiveFilters,
+  defaultCollectionFilters,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
-import { categories } from "@/constants/landing-data";
+import { categories as demoCategories } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,15 +47,60 @@ interface CollectionsPageProps {
   categorySlug?: string;
   /** Catalogue fetched on the server, so the grid renders into the HTML. */
   catalog: LandingProduct[];
+  /**
+   * The SHOP's own categories, from Catalog settings.
+   *
+   * The pills below were `categories` from landing-data — the shipped demo
+   * taxonomy — so a category the shop added had no pill and could only be
+   * reached by typing its URL, a renamed one still showed its old name, and a
+   * deleted one kept a pill that led nowhere. This shop has 13 categories and
+   * the hardcoded list has 9.
+   */
+  categories?: { id: string; name: string; slug: string }[];
 }
 
 export function CollectionsPage({
   categorySlug: categorySlugProp,
   catalog,
+  categories: categoriesFromShop,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
-  const activeCategory = categories.find((cat) => cat.slug === categorySlug);
-  const [filters, setFilters] = useState<CollectionFilters>(DEFAULT_COLLECTION_FILTERS);
+  /**
+   * De-duplicated by slug: the categories list is admin-typed and this shop
+   * already has two rows called "Seasonal" with the same slug, which would
+   * render two identical pills pointing at the same page.
+   */
+  const categoryPills = useMemo(() => {
+    const source = categoriesFromShop?.length ? categoriesFromShop : demoCategories;
+    const bySlug = new Map<string, { id: string; name: string; slug: string }>();
+    for (const category of source) {
+      if (category.slug && !bySlug.has(category.slug)) bySlug.set(category.slug, category);
+    }
+    return [...bySlug.values()];
+  }, [categoriesFromShop]);
+
+  // Filtering stays on the client (it is interactive), but the catalogue it
+  // filters arrives from the server, so the first paint shows real cakes. The
+  // pills are passed too: a category's slug and its name are edited
+  // independently, so only this list can say which product belongs to which
+  // route — "Birthday Cakes" lives at /birthday here.
+  const inCategory = useMemo(
+    () => filterProductsByCategory(catalog, categorySlug || undefined, categoryPills),
+    [catalog, categorySlug, categoryPills],
+  );
+
+  const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
+  /**
+   * The top of the price slider, from the shop's OWN catalogue.
+   *
+   * Computed over the whole catalogue rather than the current category, so
+   * moving between categories does not move the slider under the customer —
+   * and so the ceiling is never below a price on screen.
+   */
+  const priceCeiling = useMemo(() => collectionPriceCeiling(catalog), [catalog]);
+  const [filters, setFilters] = useState<CollectionFilters>(() =>
+    defaultCollectionFilters(collectionPriceCeiling(catalog)),
+  );
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   // Public labels vary by business type (bakery keeps the original wording).
@@ -62,17 +108,29 @@ export function CollectionsPage({
   const [labels, setLabels] = useState<BusinessLabels | null>(null);
   // Filtering stays on the client (it is interactive), but the catalogue it
   // filters now arrives from the server, so the first paint shows real cakes.
-  const filtered = useMemo(() => {
-    let byCategory = filterProductsByCategory(catalog, categorySlug || undefined);
-    // Never dead-end a valid category page — fall back to the full catalogue.
-    if (categorySlug && byCategory.length === 0) byCategory = catalog;
-    return applyCollectionFilters(byCategory, filters);
-  }, [catalog, categorySlug, filters]);
+
+  /**
+   * A category with nothing in it shows nothing.
+   *
+   * This used to fall back to the entire catalogue — "Never dead-end a valid
+   * category page" — under that category's heading and its own description:
+   * "Browse our wedding cakes — premium quality, freshly baked", above every
+   * cheesecake and cupcake the shop sells. A customer filtering to a category
+   * was shown the opposite of what they asked for and given no sign of it.
+   * An honest empty state is the smaller disappointment.
+   */
+  const filtered = useMemo(
+    () => applyCollectionFilters(inCategory, filters),
+    [inCategory, filters],
+  );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const activeFilterCount = countActiveFilters(filters);
+  const activeFilterCount = countActiveFilters(filters, priceCeiling);
+  // Nothing here at all, versus nothing that matches what was ticked. "Try
+  // adjusting your filters" is useless advice when no filter is the reason.
+  const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
 
   useEffect(() => {
     setPage(1);
@@ -108,6 +166,7 @@ export function CollectionsPage({
           <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
             <CollectionFiltersPanel
               filters={filters}
+              priceCeiling={priceCeiling}
               onChange={updateFilters}
               className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
             />
@@ -142,6 +201,7 @@ export function CollectionsPage({
                       </DialogHeader>
                       <CollectionFiltersPanel
                         filters={filters}
+                        priceCeiling={priceCeiling}
                         onChange={(next) => {
                           updateFilters(next);
                         }}
@@ -174,13 +234,15 @@ export function CollectionsPage({
                 {`Showing ${paginated.length} of ${filtered.length} ${(labels?.productWordPlural ?? "Cakes").toLowerCase()}`}
               </p>
 
-              <div className="mb-8 flex flex-wrap gap-2">
+              {/* Named, so it reads as one group of related links rather than
+                  a loose row of anchors. */}
+              <nav aria-label="Categories" className="mb-8 flex flex-wrap gap-2">
                 <CategoryPill
                   label="All"
                   active={!categorySlug}
                   href={routes.store.collections}
                 />
-                {categories.map((cat) => (
+                {categoryPills.map((cat) => (
                   <CategoryPill
                     key={cat.id}
                     label={cat.name}
@@ -188,24 +250,36 @@ export function CollectionsPage({
                     href={routes.store.collection(cat.slug)}
                   />
                 ))}
-              </div>
+              </nav>
 
               {paginated.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">
                   <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-cream-100 text-bakery-700">
                     <SearchX className="size-6" />
                   </div>
-                  <p className="font-medium">{`No ${(labels?.productWordPlural ?? "Cakes").toLowerCase()} found`}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Try adjusting your search or filters.
+                  <p className="font-medium">
+                    {categoryIsEmpty && activeCategory
+                      ? `No ${(labels?.productWordPlural ?? "Cakes").toLowerCase()} in ${activeCategory.name} yet`
+                      : `No ${(labels?.productWordPlural ?? "Cakes").toLowerCase()} found`}
                   </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => updateFilters(DEFAULT_COLLECTION_FILTERS)}
-                  >
-                    Clear filters
-                  </Button>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {categoryIsEmpty
+                      ? "Have a look at the rest of our collections."
+                      : "Try adjusting your search or filters."}
+                  </p>
+                  {categoryIsEmpty ? (
+                    <Button variant="outline" className="mt-4" render={<Link href={routes.store.collections} />}>
+                      Browse all collections
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => updateFilters(defaultCollectionFilters(priceCeiling))}
+                    >
+                      Clear filters
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <StaggerReveal

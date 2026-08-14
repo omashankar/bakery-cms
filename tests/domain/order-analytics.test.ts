@@ -4,19 +4,28 @@
  * unchanged, and nothing may depend on the machine's own timezone — the server's
  * timezone is not the admin's.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
   filterOrdersInPreviousWindow,
   filterOrdersInWindow,
   getAnalyticsWindow,
+  getCityBreakdown,
+  getCouponBreakdown,
+  getPaymentBreakdown,
+  getStatusBreakdown,
   getRangeStart,
   getRevenueTrend,
   getReportsSummary,
+  getTopCustomers,
   getTopProducts,
   type ReportDateRange,
 } from "@/features/orders/lib/order-analytics";
 import { isValidTimeZone } from "@/features/orders/lib/viewer-time";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 
 function order(overrides: Partial<PlacedOrder> = {}): PlacedOrder {
@@ -323,5 +332,241 @@ describe("top products", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ slug: "choc", quantity: 4, revenue: 400 });
+  });
+});
+
+/**
+ * Revenue is what the shop KEPT.
+ *
+ * Every figure here summed `totals.total` and excluded whole statuses — but an
+ * order only becomes `refunded` when the refund is BOTH full and settled, so a
+ * partial refund left it `delivered` and its full total kept counting. A ₹260
+ * order refunded ₹100 reported ₹260 across the summary, the trend, the payment
+ * mix, top products, top customers and the city breakdown.
+ */
+describe("partial refunds come off revenue", () => {
+  const partly = (over: Partial<PlacedOrder> = {}) =>
+    order({
+      ...over,
+      refundRecord: {
+        status: "completed",
+        reason: "customer_request",
+        amount: 100,
+        history: [],
+      },
+    } as Partial<PlacedOrder>);
+
+  it("the summary reports the net, not the billed total", () => {
+    expect(getReportsSummary([partly()]).revenue).toBe(160);
+  });
+
+  it("a full refund on a still-delivered order nets to zero, never negative", () => {
+    const whole = order({
+      refundRecord: {
+        status: "completed",
+        reason: "customer_request",
+        amount: 500,
+        history: [],
+      },
+    } as Partial<PlacedOrder>);
+    expect(getReportsSummary([whole]).revenue).toBe(0);
+  });
+
+  it("an unrefunded order is untouched", () => {
+    expect(getReportsSummary([order()]).revenue).toBe(260);
+  });
+
+  it("top customers net the refund too", () => {
+    const [top] = getTopCustomers([partly()]);
+    expect(top.revenue).toBe(160);
+  });
+
+  it("the city breakdown nets the refund too", () => {
+    const [city] = getCityBreakdown([partly()]);
+    expect(city.revenue).toBe(160);
+  });
+
+  it("top products share the refund across the lines, not the delivery fee", () => {
+    // Items gross ₹200 of a ₹260 total; ₹100 refunded is half of the goods.
+    // Scaling by `kept / gross` instead would have inflated every unrefunded
+    // line by the ₹50 delivery and ₹10 tax.
+    const [product] = getTopProducts([partly()]);
+    expect(product.revenue).toBe(100);
+    // Quantity is what was ordered, refund or not.
+    expect(product.quantity).toBe(2);
+  });
+
+  it("an unrefunded order's products stay at their gross", () => {
+    const [product] = getTopProducts([order()]);
+    expect(product.revenue).toBe(200);
+  });
+});
+
+/**
+ * Every surface that reports revenue, not just the ones that had a test.
+ *
+ * A mutation aimed at the city breakdown landed on the payment breakdown
+ * instead — the two share a line shape — and passed, because nothing covered
+ * the payment breakdown at all. The status breakdown was uncovered too.
+ */
+describe("every revenue surface nets the refund", () => {
+  const partly = () =>
+    order({
+      refundRecord: {
+        status: "completed",
+        reason: "customer_request",
+        amount: 100,
+        history: [],
+      },
+    } as Partial<PlacedOrder>);
+
+  it("the payment breakdown", () => {
+    const [row] = getPaymentBreakdown([partly()]);
+    expect(row.revenue).toBe(160);
+  });
+
+  it("the status breakdown", () => {
+    const row = getStatusBreakdown([partly()]).find((item) => item.count > 0);
+    expect(row?.revenue).toBe(160);
+  });
+
+  it("the revenue trend", () => {
+    const total = getRevenueTrend([partly()], "all").reduce((sum, p) => sum + p.revenue, 0);
+    expect(total).toBe(160);
+  });
+});
+
+/**
+ * The Orders screen's Revenue card comes from a Mongo aggregation, which no
+ * in-memory test reaches. It has to apply the same rule.
+ */
+describe("the stats aggregation uses the same definition", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "features/orders/server/order.repository.ts"),
+    "utf8",
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "");
+
+  const fn = source.slice(
+    source.indexOf("export async function stats("),
+    source.indexOf("\n}", source.indexOf("export async function stats(")),
+  );
+
+  it("subtracts the refunded amount from each order's total", () => {
+    expect(fn).toContain("$subtract");
+    expect(fn).toContain('"$refundRecord.amount"');
+    // The shape that counted a partly-refunded order at its full total.
+    expect(fn).not.toMatch(/revenue: \{ \$sum: "\$totals\.total" \}/);
+  });
+
+  it("still drops cancelled and fully refunded orders entirely", () => {
+    expect(fn).toMatch(/row\._id !== "cancelled" && row\._id !== "refunded"/);
+  });
+});
+
+/**
+ * Reports and the Coupons page have to be able to agree.
+ *
+ * `usageCount` on a coupon is a server counter: `placeOrder` increments it, and
+ * the shop gives the redemption BACK when the order is cancelled, or when a
+ * refund is both full and settled — which is the moment the order becomes
+ * `refunded`. Reports counted redemptions over every order in the window
+ * regardless of status, so the two surfaces described the same coupon with two
+ * different numbers and neither was wrong on its own terms.
+ */
+describe("coupon redemptions match what the coupon counter keeps", () => {
+  const used = (code: string, status: PlacedOrder["status"], discount = 100) =>
+    order({
+      status,
+      coupon: { code, discountAmount: discount },
+      totals: { ...order().totals, discount },
+    } as Partial<PlacedOrder>);
+
+  it("does not count a redemption the shop handed back on cancellation", () => {
+    const rows = getCouponBreakdown([used("WELCOME10", "delivered"), used("WELCOME10", "cancelled")]);
+
+    expect(rows).toEqual([{ code: "WELCOME10", uses: 1, discount: 100 }]);
+  });
+
+  it("does not count one handed back by a full refund", () => {
+    const rows = getCouponBreakdown([used("BDAY20", "delivered"), used("BDAY20", "refunded")]);
+
+    expect(rows[0].uses).toBe(1);
+  });
+
+  it("still counts a partial refund, because that redemption is not given back", () => {
+    // Not `refunded`: a part-refunded order stays delivered, and
+    // `releaseCouponNow` requires a FULL settled refund.
+    const partly = used("WED2026", "delivered");
+    const rows = getCouponBreakdown([{ ...partly, refundRecord: { amount: 60 } } as PlacedOrder]);
+
+    expect(rows[0].uses).toBe(1);
+  });
+
+  it("drops a code from the table entirely when every order for it fell away", () => {
+    expect(getCouponBreakdown([used("GONE", "cancelled"), used("GONE", "refunded")])).toEqual([]);
+  });
+
+  it("keeps the summary's discount total on the same set as the table", () => {
+    const orders = [
+      used("WELCOME10", "delivered"),
+      used("WELCOME10", "cancelled"),
+      used("BDAY20", "refunded"),
+    ];
+
+    const fromTable = getCouponBreakdown(orders).reduce((sum, row) => sum + row.discount, 0);
+    expect(getReportsSummary(orders).couponDiscount).toBe(fromTable);
+    // Money never given away is not a discount the shop granted.
+    expect(getReportsSummary(orders).couponDiscount).toBe(100);
+  });
+});
+
+describe("revenue against a refund that has not settled", () => {
+  /**
+   * Only money that ACTUALLY LEFT counts against revenue.
+   *
+   * `keptRevenue` subtracted `refundRecord.amount` — the total refunded across
+   * every attempt, including gateway refunds still `pending` and cash records
+   * not yet marked completed. Every other money surface in the admin subtracts
+   * `settledRefundAmount`, so from the moment a refund was requested and until
+   * it processed, Reports, the Payments overview and the Refund Centre stated
+   * three different figures for the same order — and Reports, the one an owner
+   * checks, was the one that moved first.
+   */
+  const requested = order({
+    totals: { ...order().totals, total: 2000 },
+    refundRecord: {
+      status: "processing",
+      amount: 1500,
+      gatewayRefunds: [{ id: "rfnd_1", amount: 1500, status: "pending" }],
+    },
+  } as Partial<PlacedOrder>);
+
+  const settled = order({
+    totals: { ...order().totals, total: 2000 },
+    refundRecord: {
+      status: "processing",
+      amount: 1500,
+      gatewayRefunds: [{ id: "rfnd_1", amount: 1500, status: "processed" }],
+    },
+  } as Partial<PlacedOrder>);
+
+  it("keeps the full total while the gateway refund is still pending", () => {
+    expect(
+      getReportsSummary([requested]).revenue,
+      "revenue was reduced by money the gateway has not sent back yet",
+    ).toBe(2000);
+  });
+
+  it("subtracts it once the gateway has processed it", () => {
+    expect(getReportsSummary([settled]).revenue).toBe(500);
+  });
+
+  it("agrees with the figure every other money surface computes", () => {
+    // The point of the fix: one definition of "refunded", shared.
+    expect(getReportsSummary([requested]).revenue - getReportsSummary([settled]).revenue).toBe(
+      settledRefundAmount(settled),
+    );
   });
 });

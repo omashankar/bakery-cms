@@ -2,6 +2,16 @@ import type { MediaFile, MediaType } from "@/types/media";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { countMediaUsage } from "./media-usage";
 
+/**
+ * The one event the media screens redraw on.
+ *
+ * It lives here rather than in the repository because the FOLDER store has to
+ * dispatch it too, and importing the repository from there would close a cycle
+ * (the repository imports the folder ids). The repository re-exports it, so
+ * every existing importer is unchanged.
+ */
+export const MEDIA_UPDATED_EVENT = "bakery-media-updated";
+
 /** Resolve a stored media URL for display (fixes legacy dead Unsplash links) */
 export function resolveMediaImageUrl(url: string): string {
   if (!url) return url;

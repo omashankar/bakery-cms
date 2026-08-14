@@ -29,7 +29,8 @@ export type SectionFieldType =
   | "number"
   | "select"
   | "boolean"
-  | "slides";
+  | "slides"
+  | "list";
 
 export interface SectionFieldDef {
   key: string;
@@ -38,6 +39,16 @@ export interface SectionFieldDef {
   placeholder?: string;
   isImage?: boolean;
   options?: { label: string; value: string }[];
+  /**
+   * For `type: "list"` — the columns of one row.
+   *
+   * A list is stored as a JSON string, like `slides`, because a section's
+   * content values are primitives: `contentIsUsable` refuses anything that is
+   * not a string, number or boolean with a 400.
+   */
+  itemFields?: SectionFieldDef[];
+  /** For `type: "list"` — shown in place of the rows when there are none. */
+  emptyHint?: string;
 }
 
 /**
@@ -73,4 +84,15 @@ export interface HomepageBuilderSnapshot {
 export interface HomepageBuilderState {
   draft: HomepageBuilderSnapshot;
   published: HomepageBuilderSnapshot;
+  /**
+   * Bumped by every write, so a save can say which state it was composed
+   * against.
+   *
+   * The builder is replace-all: it PUTs the whole section array. With nothing to
+   * compare against, a tab left open at 09:00 and saved at 09:15 silently
+   * replaced everything done in between — and Publish pushed that stale copy to
+   * the live storefront. Absent on documents written before this existed, which
+   * reads as version 0.
+   */
+  version?: number;
 }

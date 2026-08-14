@@ -316,6 +316,57 @@ describe("pricing a cart from the shop's own records", () => {
     );
   });
 
+  /**
+   * A weight label the product does not sell used to price at index 0 — the
+   * smallest, cheapest tier — via `Math.max(0, findIndex(...))`, while the line
+   * kept the label the caller sent. So the order read "2 kg" and charged for
+   * 0.5 kg, and the bakery baked and delivered the 2 kg cake.
+   *
+   * The comment on that line claimed it stopped a stale cart buying the largest
+   * cake at the smallest price. It was the mechanism for doing exactly that.
+   */
+  it("refuses a weight the product does not sell, rather than pricing the smallest", async () => {
+    const withWeights = {
+      ...cake,
+      weights: [
+        { label: "0.5 kg", price: 700 },
+        { label: "1 kg", price: 1299 },
+        { label: "2 kg", price: 2400 },
+      ],
+    };
+    const { priceCart, UnknownWeightError } = await loadPricing(withWeights);
+
+    await expect(
+      priceCart({ items: [{ productSlug: "truffle", quantity: 1, weight: "5 kg" }] }),
+    ).rejects.toBeInstanceOf(UnknownWeightError);
+  });
+
+  it("still prices a weight the product does sell", async () => {
+    const withWeights = {
+      ...cake,
+      weights: [
+        { label: "0.5 kg", price: 700 },
+        { label: "1 kg", price: 1299 },
+        { label: "2 kg", price: 2400 },
+      ],
+    };
+    const { priceCart } = await loadPricing(withWeights);
+
+    const quote = await priceCart({
+      items: [{ productSlug: "truffle", quantity: 1, weight: "2 kg" }],
+    });
+    // Not the 700 the old fallback would have charged.
+    expect(quote.totals.subtotal).toBe(2400);
+  });
+
+  it("prices a line with no weight at all at the default tier", async () => {
+    // Choosing nothing is not the same as choosing something the shop does not
+    // have — a cart without a size must still price.
+    const { priceCart } = await loadPricing(cake);
+    const quote = await priceCart({ items: [{ productSlug: "truffle", quantity: 1 }] });
+    expect(quote.totals.subtotal).toBe(1299);
+  });
+
   it("floors the quantity at one, so a fractional line cannot shrink the bill", async () => {
     const { priceCart } = await loadPricing(cake);
     const quote = await priceCart({ items: [{ productSlug: "truffle", quantity: 1.9 }] });

@@ -9,6 +9,7 @@ import {
   type LandingProduct,
 } from "@/constants/landing-data";
 import { loadProducts } from "@/features/products/lib/products-repository";
+import { slugify } from "@/utils/slug";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
 import { getWeightOptions } from "@/features/catalog/lib/catalog-repository";
 import { defaultWeightOptions } from "@/features/catalog/lib/catalog-utils";
@@ -56,56 +57,100 @@ export function getProductBySlug(slug: string): LandingProduct | undefined {
   return getAllProducts().find((cake) => cake.slug === slug);
 }
 
+/**
+ * Everything a search term is allowed to match on one cake.
+ *
+ * Search used to be name, category and DESCRIPTION — and the storefront's
+ * search page runs on the card projection, where `toCard` deliberately sets
+ * `description: ""` to keep the payload small. So a third of the predicate
+ * matched nothing on the one surface that uses it, and a customer searching
+ * for a word that appears only in a cake's description was told there were no
+ * results.
+ *
+ * The flavours and occasions were already in that payload — carried for the
+ * filter panel — and are what customers actually type ("chocolate",
+ * "wedding"). The description stays in the haystack for callers that pass full
+ * products, where it is real.
+ */
+function searchHaystack(cake: LandingProduct): string {
+  return [
+    cake.name,
+    cake.category,
+    cake.description,
+    ...(cake.flavours ?? []),
+    ...(cake.occasions ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 export function searchProducts(query: string, catalog?: LandingProduct[]): LandingProduct[] {
   const source = catalog ?? getAllProducts();
   const normalized = query.trim().toLowerCase();
   if (!normalized) return source;
 
-  return source.filter(
-    (cake) =>
-      cake.name.toLowerCase().includes(normalized) ||
-      cake.description.toLowerCase().includes(normalized) ||
-      cake.category.toLowerCase().includes(normalized)
-  );
+  return source.filter((cake) => searchHaystack(cake).includes(normalized));
 }
 
 export function filterProductsByCategory(
   cakes: LandingProduct[],
-  categorySlug?: string
+  categorySlug?: string,
+  /** The shop's own categories, so a slug can be resolved to its name. */
+  categories?: { name: string; slug: string }[],
 ): LandingProduct[] {
   if (!categorySlug) return cakes;
-  const slug = categorySlug.toLowerCase();
+  const slug = slugify(categorySlug);
 
-  const cat = (cake: LandingProduct) => cake.category.toLowerCase();
-  const text = (cake: LandingProduct) => `${cake.name} ${cake.slug}`.toLowerCase();
-  // Occasion categories aren't stored on cakes directly (cakes are tagged by
-  // flavour), so map each occasion to the relevant flavour sets / keywords.
-  const CELEBRATION = ["chocolate", "classic", "premium", "fruit", "international"];
+  /**
+   * The shop's own taxonomy, resolved through the shop's own list.
+   *
+   * `cake.category` is the category's NAME — `product-mapper` resolves the id
+   * to it — while the route carries its SLUG, and the two are edited
+   * independently. This shop has "Birthday Cakes" at `/birthday`, "Eggless
+   * Cakes" at `/eggless` and "Custom Cakes" at `/custom`, so neither comparing
+   * them directly (`"birthday cakes".includes("birthday")` — false) nor
+   * slugifying the name (`"birthday-cakes" !== "birthday"`) can work. Only the
+   * category list knows which name goes with which slug.
+   *
+   * Passing it is optional so the homepage rails and the demo catalogue keep
+   * working; without it this falls back to matching the slugified name, which
+   * is right whenever a shop has not renamed a category away from its slug.
+   */
+  const named = categories?.find((category) => slugify(category.slug) === slug);
+  const byCategory = (cake: LandingProduct) =>
+    named
+      ? cake.category.trim().toLowerCase() === named.name.trim().toLowerCase()
+      : slugify(cake.category) === slug;
 
-  const slugMatchers: Record<string, (cake: LandingProduct) => boolean> = {
-    "photo-cakes": (cake) => cat(cake).includes("photo") || cake.allowsPhotoUpload === true,
-    eggless: (cake) => cake.isEggless === true || cat(cake).includes("eggless"),
-    seasonal: (cake) => cat(cake).includes("seasonal"),
-    wedding: (cake) => cat(cake).includes("wedding"),
-    birthday: (cake) => CELEBRATION.includes(cat(cake)) || /birthday/.test(text(cake)),
-    anniversary: (cake) =>
-      ["premium", "classic", "international", "fruit"].includes(cat(cake)) ||
-      /anniversary/.test(text(cake)),
-    pastries: (cake) =>
-      /pastry|brownie|tiramisu|mousse|gateau|gâteau/.test(text(cake)) ||
-      cat(cake) === "international",
-    cupcakes: (cake) => /cupcake|muffin|brownie/.test(text(cake)),
-    custom: (cake) =>
-      cake.allowsPhotoUpload === true ||
-      cake.allowsMessage === true ||
-      cat(cake).includes("photo") ||
-      cat(cake).includes("custom"),
+  /**
+   * Occasion categories match the cake's OCCASION TAGS.
+   *
+   * These used to be guessed from flavour whitelists and name regexes — a
+   * "birthday" page showed every chocolate, classic, premium, fruit and
+   * international cake in the shop, whether or not the baker had tagged it for
+   * birthdays, and "pastries" was a regex over the cake's name. `product-mapper`
+   * already carries the real tags, and its own comment records why guessing was
+   * wrong for exactly this: "a cake tagged Wedding was missed unless it happened
+   * to say so in prose, and anything mentioning it in passing was included."
+   */
+  const byOccasion = (cake: LandingProduct) =>
+    (cake.occasions ?? []).some((occasion) => slugify(occasion) === slug);
+
+  /**
+   * Two categories are properties of the cake rather than a taxonomy entry, and
+   * the shop tags them on the product itself. Kept because they are real
+   * fields, unlike the keyword guessing above.
+   */
+  const byAttribute = (cake: LandingProduct) => {
+    if (slug === "photo-cakes" || slug === "photo") return cake.allowsPhotoUpload === true;
+    if (slug === "eggless") return cake.isEggless === true;
+    return false;
   };
 
-  const matcher = slugMatchers[slug];
-  if (matcher) return cakes.filter(matcher);
-
-  return cakes.filter((cake) => cat(cake).includes(slug) || cake.slug.includes(slug));
+  return cakes.filter(
+    (cake) => byCategory(cake) || byOccasion(cake) || byAttribute(cake),
+  );
 }
 
 /** Weight options from catalog admin (falls back to defaults on server) */

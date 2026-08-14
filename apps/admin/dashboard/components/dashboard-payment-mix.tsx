@@ -2,6 +2,11 @@
 
 import { CreditCard } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  PanelLoading,
+  PanelUnavailable,
+  type FiguresState,
+} from "@/components/shared/panel-loading";
 import { formatCurrency } from "@/utils/format";
 import {
   getDashboardRangeLabel,
@@ -10,9 +15,17 @@ import {
 
 interface DashboardPaymentMixProps {
   analytics: DashboardCommerceAnalytics;
+  /**
+   * Whether the range's figures have arrived.
+   *
+   * Without this the panel reads its empty branch off
+   * `EMPTY_DASHBOARD_COMMERCE_ANALYTICS` and states, on every cold load, that
+   * the shop has none of whatever it counts.
+   */
+  figures?: FiguresState;
 }
 
-export function DashboardPaymentMix({ analytics }: DashboardPaymentMixProps) {
+export function DashboardPaymentMix({ analytics, figures = "ready" }: DashboardPaymentMixProps) {
   const items = analytics.paymentBreakdown;
 
   const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
@@ -30,7 +43,11 @@ export function DashboardPaymentMix({ analytics }: DashboardPaymentMixProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
-        {items.length === 0 ? (
+        {figures === "loading" ? (
+          <PanelLoading label="Loading the payment mix" rows={3} />
+        ) : figures === "unavailable" ? (
+          <PanelUnavailable />
+        ) : items.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border bg-muted/50 px-4 py-8 text-center text-sm text-muted-foreground">
             No payment data in this period.
           </p>

@@ -197,15 +197,30 @@ export function PagesListPage() {
 
   async function applyBulkStatus(status: CmsPage["status"]) {
     if (selectedIds.length === 0) return;
-    await Promise.allSettled(selectedIds.map((id) => updatePageRequest(id, { status })));
-    await refresh();
-    toast.success(
-      status === "published"
-        ? "Selected pages published"
-        : status === "draft"
-          ? "Selected pages set to draft"
-          : "Selected pages archived"
+
+    // Count what the server actually took.
+    //
+    // This threw the settled results away and toasted success unconditionally,
+    // so an expired session or a failing write left every row still reading
+    // "Draft" under the words "Selected pages published" — and the admin walked
+    // away believing the pages were live. `confirmDelete` twelve lines above
+    // already counts fulfilled against rejected; this is the same rule.
+    const results = await Promise.allSettled(
+      selectedIds.map((id) => updatePageRequest(id, { status })),
     );
+    const ok = results.filter(
+      (result) => result.status === "fulfilled" && result.value,
+    ).length;
+    const failed = results.length - ok;
+
+    await refresh();
+
+    const verb =
+      status === "published" ? "published" : status === "draft" ? "set to draft" : "archived";
+    if (ok > 0) toast.success(`${ok} page${ok === 1 ? "" : "s"} ${verb}`);
+    if (failed > 0) {
+      toast.error(`${failed} page${failed === 1 ? "" : "s"} could not be ${verb}`);
+    }
   }
 
   return (

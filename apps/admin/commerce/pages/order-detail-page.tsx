@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
+import { Input } from "@/components/ui/input";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { CancelOrderDialog } from "@/apps/admin/commerce/components/cancel-order-dialog";
@@ -24,6 +25,7 @@ import {
   getOrderById,
   refundOrder,
   updateOrderAdminNotes,
+  updateOrderDeliveryPartner,
   updateOrderStatus,
   type OrderStatus,
   type PlacedOrder,
@@ -42,40 +44,76 @@ interface OrderDetailPageProps {
   orderId: string;
 }
 
+/** The rider on an order, in the shape the form holds. */
+function toPartnerForm(order: { deliveryPartner?: { name: string; phone?: string; vehicle?: string } }) {
+  return {
+    name: order.deliveryPartner?.name ?? "",
+    phone: order.deliveryPartner?.phone ?? "",
+    vehicle: order.deliveryPartner?.vehicle ?? "",
+  };
+}
+
 export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter();
   const [order, setOrder] = useState<PlacedOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [adminNotes, setAdminNotes] = useState("");
+  const [partner, setPartner] = useState({ name: "", phone: "", vehicle: "" });
   const [cancelOpen, setCancelOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    // The cache is a starting point, never the answer.
+    //
+    // This returned as soon as localStorage had the order, and that cache holds
+    // only the most recent page of orders written by whatever this browser last
+    // did. So an order refunded on another device, settled by a webhook, or
+    // cancelled by a colleague rendered here in its old state for the whole
+    // visit — on the one screen an operator opens to find out what happened to
+    // it. The server is asked every time; the cached copy only fills the gap
+    // while the request is in flight, so the page does not flash empty.
     const current = getOrderById(orderId);
     if (current) {
       setOrder(current);
       setAdminNotes(current.adminNotes ?? "");
-      setLoading(false);
-    } else {
-      // Not in the local cache yet (deep link, or placed on another device) —
-      // read it straight from the server before deciding it doesn't exist.
-      // `fetchOrder` resolves null on any failure, so it cannot reject.
-      void fetchOrder(orderId).then((fetched) => {
-        if (cancelled) return;
-        if (fetched) {
-          setOrder(fetched);
-          setAdminNotes(fetched.adminNotes ?? "");
-        }
-        setLoading(false);
-      });
+      setPartner(toPartnerForm(current));
     }
 
+    // `fetchOrder` resolves null on any failure, so it cannot reject.
+    void fetchOrder(orderId).then((fetched) => {
+      if (cancelled) return;
+      if (fetched) {
+        setOrder(fetched);
+        setAdminNotes(fetched.adminNotes ?? "");
+        setPartner(toPartnerForm(fetched));
+      }
+      setLoading(false);
+    });
+
+    // After any write, take the SERVER's version.
+    //
+    // This re-read the local cache, which is where the optimistic copy of the
+    // write that just happened lives. So after a refund the screen kept showing
+    // the record the client had composed — including one the server had refused
+    // and the write path had already rolled back — instead of what the order
+    // actually holds. The cached read stays as the immediate paint; the fetch
+    // corrects it.
     function refresh() {
       const next = getOrderById(orderId);
-      if (!next) return;
-      setOrder(next);
-      setAdminNotes(next.adminNotes ?? "");
+      if (next) {
+        setOrder(next);
+        setAdminNotes(next.adminNotes ?? "");
+        setPartner(toPartnerForm(next));
+      }
+
+      void fetchOrder(orderId).then((fetched) => {
+        if (cancelled || !fetched) return;
+        setOrder(fetched);
+        setAdminNotes(fetched.adminNotes ?? "");
+        setPartner(toPartnerForm(fetched));
+      });
     }
 
     window.addEventListener("bakery-orders-updated", refresh);
@@ -125,6 +163,15 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     toast.success("Internal notes saved");
   }
 
+  async function handleSavePartner() {
+    if (!order) return;
+    const { order: updated, persisted } = await updateOrderDeliveryPartner(order.id, partner);
+    if (!updated) return reportUnreachable();
+    setOrder(updated);
+    if (!persisted) return reportUnpersisted("Delivery partner saved");
+    toast.success(partner.name.trim() ? "Delivery partner assigned" : "Delivery partner cleared");
+  }
+
   async function handleCancel(reason: string) {
     if (!order) return;
     const { order: updated, persisted } = await cancelOrder(order.id, reason);
@@ -137,12 +184,30 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   async function handleRefund(input: RefundOrderInput) {
     if (!order) return;
-    const { order: updated, persisted } = await refundOrder(order.id, input);
+    const { order: updated, persisted, error } = await refundOrder(order.id, input);
     if (!updated) return reportUnreachable();
     setOrder(updated);
-    if (!persisted) return reportUnpersisted("Refund recorded");
-    toast.success("Refund recorded", {
-      description: updated.refundReference,
+
+    if (!persisted) {
+      // The server's reason, not a generic one.
+      //
+      // This called `reportUnpersisted("Refund recorded")`, which toasts
+      // "Refund recorded on this device only — the server rejected the change.
+      // Reload to see the server's version." Both halves were wrong: the write
+      // path ROLLS BACK on refusal, so nothing was recorded anywhere, and the
+      // server's actual explanation — nothing left to refund, the payment was
+      // never captured, the gateway is down and this is worth retrying — was
+      // thrown away. An admin read "recorded", closed the ticket, and no refund
+      // was ever made. The Refund Centre was fixed for exactly this; this screen
+      // was not.
+      toast.error(error ?? "The refund was not accepted.");
+      return;
+    }
+
+    toast.success("Refund sent to the gateway", {
+      description:
+        updated.refundReference ??
+        "It usually settles in a few days. This screen updates when the gateway confirms.",
     });
   }
 
@@ -246,6 +311,27 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                         Message: {item.message}
                       </p>
                     ) : null}
+                    {/*
+                      The photo to print.
+
+                      The storefront's upload used to keep only the file NAME,
+                      in the customer's browser, so this order arrived with a
+                      photo-cake surcharge on it and nothing to print. Opened in
+                      a new tab rather than shown inline: the baker needs it at
+                      full size, and an <img> here would slow a list of orders
+                      down for a photo most of them do not have.
+                    */}
+                    {item.photoUrl ? (
+                      <a
+                        href={item.photoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-bakery-700 hover:underline"
+                      >
+                        <ImageIcon className="size-3.5" />
+                        Customer photo
+                      </a>
+                    ) : null}
                   </div>
                   <p className="font-medium">{formatCurrency(item.price * item.quantity)}</p>
                 </li>
@@ -266,6 +352,51 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <p className="mt-2 text-sm text-muted-foreground">{order.orderNotes}</p>
             </div>
           ) : null}
+
+          {/*
+            Who is taking it out.
+
+            The customer's tracking page showed a delivery partner on every
+            order — a name, a phone number they could ring, and a star rating —
+            invented by hashing the order id against three hardcoded people. It
+            now shows nobody until this is filled in, so this card is the only
+            thing that can put a courier in front of a customer.
+          */}
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <h2 className="font-heading text-lg font-semibold">Delivery partner</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Shown to the customer on their tracking page. Leave the name blank to remove it.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium">Name</span>
+                <Input
+                  value={partner.name}
+                  onChange={(event) => setPartner((p) => ({ ...p, name: event.target.value }))}
+                  placeholder="Who is delivering"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium">Phone</span>
+                <Input
+                  value={partner.phone}
+                  onChange={(event) => setPartner((p) => ({ ...p, phone: event.target.value }))}
+                  placeholder="Optional"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium">Vehicle</span>
+                <Input
+                  value={partner.vehicle}
+                  onChange={(event) => setPartner((p) => ({ ...p, vehicle: event.target.value }))}
+                  placeholder="Optional"
+                />
+              </label>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={handleSavePartner}>
+              {partner.name.trim() ? "Save delivery partner" : "Clear delivery partner"}
+            </Button>
+          </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="font-heading text-lg font-semibold">Internal notes</h2>
@@ -443,6 +574,11 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         open={refundOpen}
         orderNumber={order.orderNumber}
         totalLabel={formatCurrency(order.totals.total)}
+        // Without this the dialog has no ceiling to validate a partial refund
+        // against, so it accepts any amount and the refusal comes from the
+        // gateway after the operator has typed it. The Refund Centre passed it;
+        // this screen did not.
+        orderTotal={order.totals.total}
         onOpenChange={setRefundOpen}
         onConfirm={handleRefund}
       />

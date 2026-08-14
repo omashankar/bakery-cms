@@ -206,6 +206,15 @@ export interface PlaceOrderResponse {
    * looking at a generic "could not reach the server".
    */
   closed?: string;
+  /**
+   * The shop's own reason for a refusal it will keep making.
+   *
+   * Distinct from an absent one, which means the request never got an answer.
+   * The two were reported identically — "we couldn't reach the bakery" — so a
+   * customer whose order the server had ANSWERED, instantly and permanently,
+   * was told the network had failed and invited to retry it forever.
+   */
+  refusal?: string;
 }
 
 export async function placeOrderRequest(
@@ -218,12 +227,12 @@ export async function placeOrderRequest(
   for (let attempt = 0; attempt < PLACE_ORDER_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await delay(PLACE_ORDER_BACKOFF_MS * 2 ** (attempt - 1));
 
-    const { ok, status, data, closed } = await sendWithStatus("/api/orders", "POST", body);
+    const { ok, status, data, closed, error } = await sendWithStatus("/api/orders", "POST", body);
     if (ok) return { ok: true, order: data ?? undefined };
     // A closed shop will refuse every attempt. Retrying only makes the customer
     // wait out the backoff before being told the same thing.
     if (closed) return { ok: false, closed };
-    if (!isWorthRetrying(status)) return { ok: false };
+    if (!isWorthRetrying(status)) return { ok: false, refusal: error };
   }
 
   return { ok: false };
@@ -231,6 +240,28 @@ export async function placeOrderRequest(
 
 export function updateStatusRequest(orderId: string, status: OrderStatus): Promise<boolean> {
   return send(`/api/orders/${orderId}/status`, "PATCH", { status });
+}
+
+/**
+ * The same write, with the server's answer intact.
+ *
+ * The bulk path counted booleans, so a transition the server refuses BY RULE —
+ * moving an order back down the fulfilment ladder — was indistinguishable from
+ * a dropped request, and got reported as "did not reach the server … changes
+ * exist on this device only". Both halves were wrong: the server answered, and
+ * nothing was kept anywhere. The admin's only move was to retry, forever.
+ */
+export async function updateStatusWithReason(
+  orderId: string,
+  status: OrderStatus,
+): Promise<{ ok: boolean; refused: boolean; reason?: string }> {
+  const { ok, status: code, error } = await sendWithStatus(
+    `/api/orders/${orderId}/status`,
+    "PATCH",
+    { status },
+  );
+  // 4xx is the server deciding; anything else is the request not landing.
+  return { ok, refused: !ok && code >= 400 && code < 500, reason: error };
 }
 
 export function cancelOrderRequest(
@@ -303,6 +334,14 @@ export function paymentStatusRequest(
 
 export function adminNotesRequest(orderId: string, adminNotes: string): Promise<boolean> {
   return send(`/api/orders/${orderId}/notes`, "PATCH", { adminNotes });
+}
+
+/** Assign (or, with a blank name, clear) the rider on an order. */
+export function deliveryPartnerRequest(
+  orderId: string,
+  partner: { name: string; phone?: string; vehicle?: string },
+): Promise<boolean> {
+  return send(`/api/orders/${orderId}/delivery-partner`, "PATCH", partner);
 }
 
 export function refundNotesRequest(orderId: string, notes: string): Promise<boolean> {

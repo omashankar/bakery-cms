@@ -5,6 +5,11 @@ import { ArrowRight } from "lucide-react";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  PanelLoading,
+  PanelUnavailable,
+  type FiguresState,
+} from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import {
@@ -13,9 +18,17 @@ import {
 
 interface DashboardOrderPipelineProps {
   analytics: DashboardCommerceAnalytics;
+  /**
+   * Whether the range's figures have arrived.
+   *
+   * Without this the panel reads its empty branch off
+   * `EMPTY_DASHBOARD_COMMERCE_ANALYTICS` and states, on every cold load, that
+   * the shop has none of whatever it counts.
+   */
+  figures?: FiguresState;
 }
 
-export function DashboardOrderPipeline({ analytics }: DashboardOrderPipelineProps) {
+export function DashboardOrderPipeline({ analytics, figures = "ready" }: DashboardOrderPipelineProps) {
   const breakdown = analytics.statusBreakdown;
 
   const total = breakdown.reduce((sum, item) => sum + item.count, 0);
@@ -36,7 +49,11 @@ export function DashboardOrderPipeline({ analytics }: DashboardOrderPipelineProp
         </Button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between gap-3 pt-0">
-        {breakdown.length === 0 ? (
+        {figures === "loading" ? (
+          <PanelLoading label="Loading the order pipeline" rows={3} />
+        ) : figures === "unavailable" ? (
+          <PanelUnavailable />
+        ) : breakdown.length === 0 ? (
           <p className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center text-sm text-muted-foreground">
             No orders yet
           </p>

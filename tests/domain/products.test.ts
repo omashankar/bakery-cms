@@ -52,10 +52,27 @@ describe("cakes repository", () => {
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 
-  it("re-seeds when stored data is corrupt rather than throwing", () => {
+  it("returns nothing when the stored data cannot be read, rather than throwing", () => {
     localStorage.setItem("bakery-cms-admin-cakes", "{ not json");
 
     expect(() => loadProducts()).not.toThrow();
+
+    // It used to re-seed here, and this catch also covers a failed localStorage
+    // WRITE — a full quota, or private browsing. So a storage error replaced the
+    // shop's cached catalogue with 34 demo cakes: the screens reading this cache
+    // showed demo products to an admin whose real ones were fine on the server,
+    // and a save from one of those screens could publish them.
+    //
+    // Empty is the honest answer. `useProductCacheSync` refills it from the
+    // server on the next pass.
+    expect(loadProducts()).toEqual([]);
+  });
+
+  it("still re-seeds when the stored value is structurally wrong", () => {
+    // A JSON object where an array belongs is not a cache at all, and there is
+    // no partial read to preserve.
+    localStorage.setItem("bakery-cms-admin-cakes", JSON.stringify({ nope: true }));
+
     expect(loadProducts().length).toBeGreaterThan(0);
   });
 

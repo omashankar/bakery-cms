@@ -9,10 +9,12 @@ import {
   fetchOrder,
   placeOrderRequest,
   updateStatusRequest,
+  updateStatusWithReason,
   cancelOrderRequest,
   refundOrderRequest,
   paymentStatusRequest,
   adminNotesRequest,
+  deliveryPartnerRequest,
   refundNotesRequest,
   requestRefundRequest,
   type PlaceOrderResponse,
@@ -39,6 +41,22 @@ export interface OrderStatusEvent {
   at: string;
 }
 
+/**
+ * The person bringing an order, as the BAKERY entered them.
+ *
+ * Only a name, and optionally a phone and what they are driving. There is no
+ * rating and no partner id, deliberately: the tracking page used to show
+ * "4.9 ★" for a delivery that had not happened, next to a partner id from a
+ * hardcoded list — numbers that described nothing. A shop with no rider
+ * management has a name and a phone, and that is what a customer wants anyway.
+ */
+export interface DeliveryPartner {
+  name: string;
+  phone?: string;
+  /** "Bike", "Refrigerated van" — free text, because every shop's fleet differs. */
+  vehicle?: string;
+}
+
 export interface PlacedOrder {
   id: string;
   orderNumber: string;
@@ -57,7 +75,24 @@ export interface PlacedOrder {
   /** The delivery window agreed at checkout, when one was chosen. */
   deliverySlot?: DeliverySlot;
   adminNotes?: string;
+  /**
+   * The person bringing this order, as the bakery entered them.
+   *
+   * Absent until they say. The tracking page used to fabricate one by hashing
+   * the order id against three hardcoded riders — a name, a phone number a
+   * customer could ring, and a star rating for a delivery that had not
+   * happened yet.
+   */
+  deliveryPartner?: DeliveryPartner;
   cancellationReason?: string;
+  /**
+   * The coupon redemption has been handed back for this order.
+   *
+   * Claimed atomically, on the order rather than on the refund record, because
+   * cancellation and a full settled refund both release it — and refunding a
+   * cancelled order is the ordinary sequence.
+   */
+  couponReleased?: boolean;
   refundReference?: string;
   refundRecord?: RefundRecord;
 }
@@ -243,6 +278,16 @@ export interface PlaceOrderResult {
    * the caller must say so instead of offering a retry that cannot work.
    */
   closed?: string;
+  /**
+   * The shop's own reason for refusing, when it gave one and means to keep
+   * giving it — a cart that needs re-pricing, a payment method switched off.
+   *
+   * Also distinct from a plain `persisted: false`. Both were reported to the
+   * customer as "we couldn't reach the bakery", so a refusal the server made
+   * INSTANTLY read as a network fault and was offered a retry that could only
+   * ever be refused the same way.
+   */
+  refusal?: string;
 }
 
 /**
@@ -257,9 +302,19 @@ export interface PlaceOrderResult {
  * to write down, which is exactly the pause that outlasts fifteen seconds.
  *
  * So the retry sends the order it already has, byte for byte.
+ *
+ * WITH THE DRAFT ID. Without it the server has no priced cart to place against,
+ * and for anything other than cash it refuses outright — `order.service.ts`:
+ * "This cart needs to be priced again before payment." That refusal is
+ * permanent, so a customer whose card had already been captured could press
+ * Retry confirmation forever and never get an order out of it. The caller has
+ * to hold the draft id from the original attempt and hand it back here.
  */
-export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult> {
-  return adoptStoredOrder(order, await placeOrderRequest(order));
+export async function confirmOrder(
+  order: PlacedOrder,
+  draftId?: string,
+): Promise<PlaceOrderResult> {
+  return adoptStoredOrder(order, await placeOrderRequest(order, draftId));
 }
 
 /**
@@ -271,7 +326,14 @@ export async function confirmOrder(order: PlacedOrder): Promise<PlaceOrderResult
  * otherwise the customer's confirmation matches no order in the bakery.
  */
 function adoptStoredOrder(local: PlacedOrder, response: PlaceOrderResponse): PlaceOrderResult {
-  if (!response.ok) return { order: local, persisted: false, closed: response.closed };
+  if (!response.ok) {
+    return {
+      order: local,
+      persisted: false,
+      closed: response.closed,
+      refusal: response.refusal,
+    };
+  }
 
   const stored = response.order;
   if (!stored || stored.orderNumber === local.orderNumber) {
@@ -321,7 +383,12 @@ export async function placeOrder(input: {
   // Re-send rather than assume the first attempt reached the server: a customer
   // pressing the button again is often doing so BECAUSE it did not. The POST is
   // idempotent on the order id, so this cannot create a second order.
-  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent));
+  //
+  // `input.draftId` goes with it. It used to be dropped here, which turned the
+  // second press of Place Order on an online payment into a 409 — the server
+  // refuses a card payment with no priced cart behind it — reported to the
+  // customer as an unreachable bakery.
+  if (recent) return adoptStoredOrder(recent, await placeOrderRequest(recent, input.draftId));
 
   const order: PlacedOrder = {
     id: newOrderId(),
@@ -498,6 +565,31 @@ export async function updateOrderAdminNotes(
   return { order: updated, persisted: await adminNotesRequest(orderId, adminNotes) };
 }
 
+/**
+ * Assign the rider on an order, or clear it with a blank name.
+ *
+ * The customer's tracking page shows a partner card only once this is set. It
+ * used to invent one for every order by hashing the order id against three
+ * hardcoded people, phone number included.
+ */
+export async function updateOrderDeliveryPartner(
+  orderId: string,
+  partner: { name: string; phone?: string; vehicle?: string },
+): Promise<OrderMutationResult> {
+  const current = await resolveOrderForMutation(orderId);
+  if (!current) return { order: null, persisted: false };
+
+  const name = partner.name.trim();
+  const updated = commitOrder(orderId, current, (order) => ({
+    ...order,
+    deliveryPartner: name
+      ? { name, phone: partner.phone?.trim() || undefined, vehicle: partner.vehicle?.trim() || undefined }
+      : undefined,
+  }));
+
+  return { order: updated, persisted: await deliveryPartnerRequest(orderId, partner) };
+}
+
 export async function updatePaymentStatus(
   orderId: string,
   paymentStatus: PaymentStatus,
@@ -551,7 +643,7 @@ export async function bulkUpdatePaymentStatus(
     if (!result.persisted) failed += 1;
   }
 
-  return { updated, failed };
+  return { updated, failed, refused: 0 };
 }
 
 export async function cancelOrder(
@@ -707,17 +799,28 @@ export async function requestRefundForCancelledOrder(
 export interface BulkOrderResult {
   updated: number;
   failed: number;
+  /** Of the failures, how many the SERVER refused by rule rather than dropped. */
+  refused: number;
+  /** The server's own explanation, when it gave one. */
+  reason?: string;
 }
 
 export async function bulkUpdateOrderStatus(
   orderIds: string[],
   status: OrderStatus
 ): Promise<BulkOrderResult> {
-  if (orderIds.length === 0) return { updated: 0, failed: 0 };
+  if (orderIds.length === 0) return { updated: 0, failed: 0, refused: 0 };
 
   const orders = readOrders();
   const now = new Date().toISOString();
   let touchedCache = false;
+  /** What each row showed before the optimistic write, so a refusal can undo it. */
+  const before = new Map(
+    orders.map((order) => [
+      order.id,
+      { status: order.status, statusHistory: order.statusHistory },
+    ]),
+  );
 
   // Optimistically update the rows the cache happens to hold. The cache covers
   // only the newest orders while the list is paginated over all of them, so this
@@ -747,11 +850,47 @@ export async function bulkUpdateOrderStatus(
   // after a rejected batch that is true of every one of them, and skipping would
   // turn the admin's retry into a silent no-op.
   const results = await Promise.all(
-    orderIds.map((orderId) => updateStatusRequest(orderId, status))
+    orderIds.map((orderId) => updateStatusWithReason(orderId, status))
   );
 
-  const failed = results.filter((persisted) => !persisted).length;
-  return { updated: orderIds.length - failed, failed };
+  const failures = results.filter((result) => !result.ok);
+  const refusals = failures.filter((result) => result.refused);
+
+  /**
+   * Undo the optimistic cache write for anything the server REFUSED.
+   *
+   * A refusal is permanent — the fulfilment ladder does not run backwards — so
+   * leaving the target status in the cache shows the admin a change that will
+   * never exist, and invites the retry that can never succeed.
+   */
+  if (refusals.length > 0 && touchedCache) {
+    const stale = readOrders();
+    const refusedIds = new Set(
+      results.flatMap((result, index) => (result.refused ? [orderIds[index]] : [])),
+    );
+    const restored = stale.map((order) => {
+      if (!refusedIds.has(order.id)) return order;
+      const previous = before.get(order.id);
+      return {
+        ...order,
+        status: previous?.status ?? order.status,
+        // The HISTORY goes back too. Restoring only the status left the entry
+        // the optimistic pass appended, so the order's timeline showed a
+        // transition the server had refused — visible on the order page, and
+        // carried into the next full write of that row.
+        statusHistory: previous?.statusHistory ?? order.statusHistory,
+      };
+    });
+    writeOrders(restored);
+  }
+
+  return {
+    updated: orderIds.length - failures.length,
+    failed: failures.length,
+    refused: refusals.length,
+    // One reason for the batch: they are all the same rule.
+    reason: refusals.find((result) => result.reason)?.reason,
+  };
 }
 
 export function getLatestOrder(): PlacedOrder | null {

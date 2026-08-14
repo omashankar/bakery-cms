@@ -6,6 +6,7 @@ import { ArrowRight, ShoppingBag } from "lucide-react";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
@@ -14,10 +15,21 @@ import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
 export function DashboardRecentOrders() {
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
+  /**
+   * Whether the first effect has run.
+   *
+   * The read below is synchronous, but `useEffect` fires after the browser
+   * paints — so without this there is a real frame stating the shop has none of
+   * these. It cannot be read eagerly instead: this renders on the server too,
+   * where the browser-held store is empty, and seeding from it would be a
+   * hydration mismatch.
+   */
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     function refresh() {
       setOrders(getRecentOrders(4));
+      setLoaded(true);
     }
 
     refresh();
@@ -39,7 +51,9 @@ export function DashboardRecentOrders() {
         </Button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pt-0">
-        {orders.length === 0 ? (
+        {!loaded ? (
+          <PanelLoading label="Loading recent orders" rows={4} />
+        ) : orders.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center">
             <div>
               <ShoppingBag className="mx-auto mb-2 size-5 text-muted-foreground" />

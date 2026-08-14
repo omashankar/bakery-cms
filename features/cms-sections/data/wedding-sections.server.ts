@@ -5,6 +5,12 @@ import {
   appendRevision,
   findRevisionSections,
 } from "@/features/cms-sections/lib/builder-revision-utils";
+import {
+  assertVersion,
+  nextVersion,
+  versionOf,
+  type VersionedSnapshot,
+} from "@/features/cms-sections/lib/builder-conflict";
 import type { BuilderRevision } from "@/features/builders/lib/builder-revisions";
 import type {
   WeddingBuilderSnapshot,
@@ -69,7 +75,11 @@ function isScheduleDue(snapshot: WeddingBuilderSnapshot): boolean {
  */
 async function readWithSchedule(): Promise<WeddingStoreState> {
   const state = await store.read();
-  if (!isScheduleDue(state.draft)) return state;
+  // Always REPORTS a version, even for a document written before versioning
+  // existed. A reader that answers `undefined` forces every caller to write
+  // `?? 0` and turns a forgotten one into a versionless — now refused — write.
+  const versioned = { ...state, version: versionOf(state) };
+  if (!isScheduleDue(versioned.draft)) return versioned;
 
   return store.mutate((current) => {
     // Re-check under the mutate lock so a concurrent read can't double-fire.
@@ -79,6 +89,7 @@ async function readWithSchedule(): Promise<WeddingStoreState> {
       draft: { ...snapshot },
       published: snapshot,
       revisions: appendRevision(current.revisions, snapshot.sections, "Scheduled publish"),
+      version: nextVersion(current),
     };
     return { next, result: next };
   });
@@ -114,41 +125,76 @@ export async function restoreWeddingRevision(
   return store.mutate((state) => {
     const sections = findRevisionSections(state.revisions, revisionId);
     if (!sections) return { next: state, result: null };
-    const draft = createSnapshot(sections);
-    return { next: { ...state, draft }, result: draft };
+    // Sorted, and the pending schedule carried over — see the homepage store for
+    // why each matters.
+    const draft = createSnapshot(sortSections(sections), state.draft.scheduledPublishAt);
+    return {
+      next: { ...state, draft, version: nextVersion(state) },
+      result: draft,
+    };
   });
 }
 
+/** `expectedVersion` is what the builder read on load — see the homepage store. */
 export async function saveWeddingDraft(
   sections: WeddingSectionInstance[],
-  scheduledPublishAt?: string | null
-): Promise<WeddingBuilderSnapshot> {
+  scheduledPublishAt?: string | null,
+  expectedVersion?: number
+): Promise<VersionedSnapshot<WeddingBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const draft = createSnapshot(sections, scheduledPublishAt ?? undefined);
-    return { next: { ...state, draft }, result: draft };
+    const version = nextVersion(state);
+    return {
+      next: { ...state, draft, version },
+      result: { snapshot: draft, version },
+    };
   });
 }
 
 export async function publishWeddingSections(
-  sections: WeddingSectionInstance[]
-): Promise<WeddingBuilderSnapshot> {
+  sections: WeddingSectionInstance[],
+  expectedVersion?: number
+): Promise<VersionedSnapshot<WeddingBuilderSnapshot>> {
   return store.mutate((state) => {
+    assertVersion(state, expectedVersion);
     const snapshot = createSnapshot(sections);
+    const version = nextVersion(state);
     return {
       next: {
         draft: { ...snapshot },
         published: snapshot,
         revisions: appendRevision(state.revisions, snapshot.sections, "Wedding publish"),
+        version,
       },
-      result: snapshot,
+      result: { snapshot, version },
     };
   });
 }
 
+/**
+ * Back to the registry defaults, keeping the revision log and capturing the
+ * layout that was live so the reset can be undone — see the homepage store for
+ * the full account of what this used to destroy.
+ */
 export async function resetWeddingSections(): Promise<WeddingBuilderState> {
-  return store.mutate(() => {
-    const next = { draft: createSnapshot(), published: createSnapshot() };
-    return { next, result: next };
+  return store.mutate((state) => {
+    const draft = createSnapshot();
+    const published = createSnapshot();
+    const version = nextVersion(state);
+    return {
+      next: {
+        draft,
+        published,
+        revisions: appendRevision(
+          state.revisions,
+          state.published.sections,
+          "Before reset to defaults"
+        ),
+        version,
+      },
+      result: { draft, published, version },
+    };
   });
 }
 

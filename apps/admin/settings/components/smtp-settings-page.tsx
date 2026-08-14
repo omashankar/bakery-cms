@@ -52,10 +52,21 @@ export function SmtpSettingsPage() {
   const encryptionLabel =
     saved.encryption === "none" ? "None" : saved.encryption.toUpperCase();
 
+  /**
+   * A password accepted by the server, before the next hydration confirms it.
+   *
+   * `saved.passwordSet` is only refreshed by a full read, so the hint under the
+   * field kept saying "No password saved" beside the toast that had just said
+   * the opposite. Reset clears it again, because a reset removes the password.
+   */
+  const [justSavedPassword, setJustSavedPassword] = useState(false);
+
   async function handleSave() {
     if (!canSave) return;
+    const sendingPassword = Boolean(settings.password?.trim());
     await runWrite(async () => {
       const { value, persisted } = await saveSmtpSettings(settings);
+      if (persisted && sendingPassword) setJustSavedPassword(true);
       // Only mark clean when the SERVER has it — the dirty flag is what keeps
       // the Save button enabled, and greying it out would remove the only retry.
       return { value, accepted: reportSettingsWrite(persisted, "SMTP settings") };
@@ -71,6 +82,7 @@ export function SmtpSettingsPage() {
     if (!canSave) return;
     await runWrite(async () => {
       const { value, persisted } = await resetSmtpSettings();
+      if (persisted) setJustSavedPassword(false);
       return { value, accepted: reportSettingsReset(persisted, "SMTP settings") };
     });
   }
@@ -124,12 +136,19 @@ export function SmtpSettingsPage() {
       onSave={handleSave}
       onDiscard={handleDiscard}
       onReset={handleReset}
+      // Reset sits outside the gated form, so without this it is clickable
+      // before hydration and its handler simply returns.
+      resetDisabled={!canSave}
       extraActions={
         <Button
           variant="outline"
           className="w-full sm:w-auto"
           onClick={() => void handleTestEmail()}
-          disabled={testing}
+          // Gated like Reset. The handler checks `saved.enabled`, and before
+          // hydration that is the shipped default — so on a hard load the
+          // admin was told "Enable SMTP before sending a test" about a shop
+          // whose SMTP is enabled.
+          disabled={testing || hydration !== "ready"}
         >
           {testing ? "Sending…" : "Send test email"}
         </Button>
@@ -211,7 +230,14 @@ export function SmtpSettingsPage() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              {saved.passwordSet
+              {/*
+                `passwordSet` only ever came from a full hydration read, so
+                after a successful save of a NEW password this line still read
+                "No password saved" — directly beside the success toast that had
+                just said otherwise. `justSavedPassword` covers the gap until
+                the next read confirms it.
+              */}
+              {saved.passwordSet || justSavedPassword
                 ? "A password is saved on the server. Leave this blank to keep it, or type a new one to replace it."
                 : "No password saved. An internal relay on a trusted network may not need one."}
             </p>

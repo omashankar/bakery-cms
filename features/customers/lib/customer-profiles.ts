@@ -24,7 +24,17 @@ export interface CustomerRecord {
   email: string;
   name: string;
   phone: string;
+  /** Every order they placed, cancelled ones included — this is history. */
   orderCount: number;
+  /**
+   * Orders that were not cancelled or refunded.
+   *
+   * The segment rule used  and awarded VIP at five — so a
+   * customer who placed five orders and cancelled all five was labelled the
+   * shop's best, and two cancellations were enough for "at risk". 
+   * already excluded them; the count did not.
+   */
+  countableOrderCount: number;
   totalSpent: number;
   lastOrderAt: string;
   lastOrderNumber: string;
@@ -115,6 +125,7 @@ export function buildCustomerRecords(orders: PlacedOrder[]): CustomerRecord[] {
         name: order.address.fullName,
         phone: order.address.phone,
         orderCount: 1,
+        countableOrderCount: UNCOUNTABLE_STATUSES.has(order.status) ? 0 : 1,
         totalSpent: countableSpend(order),
         lastOrderAt: order.placedAt,
         lastOrderNumber: order.orderNumber,
@@ -130,6 +141,8 @@ export function buildCustomerRecords(orders: PlacedOrder[]): CustomerRecord[] {
       name: order.address.fullName || existing.name,
       phone: order.address.phone || existing.phone,
       orderCount: existing.orderCount + 1,
+      countableOrderCount:
+        existing.countableOrderCount + (UNCOUNTABLE_STATUSES.has(order.status) ? 0 : 1),
       totalSpent: existing.totalSpent + countableSpend(order),
       lastOrderAt: isNewer ? order.placedAt : existing.lastOrderAt,
       lastOrderNumber: isNewer ? order.orderNumber : existing.lastOrderNumber,
@@ -145,11 +158,11 @@ export function deriveCustomerSegment(
   customer: CustomerRecord,
   nowMs = Date.now()
 ): CustomerSegment {
-  if (customer.orderCount >= 5 || customer.totalSpent >= 5000) return "vip";
+  if (customer.countableOrderCount >= 5 || customer.totalSpent >= 5000) return "vip";
 
   const days = Math.floor((nowMs - new Date(customer.lastOrderAt).getTime()) / 86_400_000);
-  if (days > 90) return customer.orderCount >= 2 ? "at_risk" : "inactive";
-  if (customer.orderCount === 1) return "new";
+  if (days > 90) return customer.countableOrderCount >= 2 ? "at_risk" : "inactive";
+  if (customer.countableOrderCount === 1) return "new";
   return "returning";
 }
 

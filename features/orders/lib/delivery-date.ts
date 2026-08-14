@@ -64,3 +64,41 @@ export function isBeforeLeadTime(
   const floor = earliestDeliveryDateString(leadDays, now);
   return chosen < addDays(floor, -1);
 }
+
+/**
+ * Is this one of the slots the shop actually offers?
+ *
+ * `commerce.deliveryTimeSlots` was read in exactly two places — the admin page
+ * that edits it, and the storefront dropdown that renders it. Nothing on the
+ * server ever looked at it, so a slot the bakery had REMOVED (because nobody is
+ * there at 8pm any more) was still accepted from a tab opened before the
+ * change, or from a direct POST — and then printed on the invoice, pushed into
+ * the WhatsApp alert, and shown on the order screen as a delivery the shop is
+ * expected to make.
+ *
+ * Forgiving about how the same slot is written and strict about which slots
+ * exist: case, surrounding and inner whitespace, and the choice of hyphen or
+ * dash are all normalised, because "10:00 AM - 12:00 PM" typed by hand is the
+ * same delivery window as the stored "10:00 AM – 12:00 PM".
+ *
+ * An empty `offered` list means the shop has not defined slots, so there is
+ * nothing to check against — and a blank choice is always allowed, since the
+ * customer may simply not have picked one.
+ */
+export function normaliseTimeSlot(slot: string): string {
+  return slot
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/\s+/g, " ");
+}
+
+export function isOfferedTimeSlot(chosen: string, offered: readonly string[]): boolean {
+  const wanted = normaliseTimeSlot(chosen);
+  if (!wanted) return true;
+
+  const list = offered.map(normaliseTimeSlot).filter(Boolean);
+  if (list.length === 0) return true;
+
+  return list.includes(wanted);
+}

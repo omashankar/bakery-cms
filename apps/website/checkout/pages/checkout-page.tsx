@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Banknote,
@@ -10,7 +10,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
+import {
+  getCustomerSession,
+  syncCustomerSession,
+} from "@/apps/website/account/lib/customer-session";
 import {
   createSavedAddress,
   getDefaultAddress,
@@ -55,13 +58,18 @@ import {
   getMinDeliveryDate,
 } from "@/apps/website/lib/product-details";
 import type { AppliedCoupon } from "@/features/orders/lib/coupons";
-import { recordCouponUsage, revalidateCoupon } from "@/features/orders/lib/coupons";
+import { applyCouponCode } from "@/features/orders/lib/coupons";
 import {
   hasBlockingCartIssues,
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
+import {
+  clearUnconfirmedOrder,
+  readUnconfirmedOrder,
+  saveUnconfirmedOrder,
+} from "@/features/orders/lib/unconfirmed-order";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
@@ -82,7 +90,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency } from "@/utils/format";
+import { formatCalendarDate, formatCurrency } from "@/utils/format";
+import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -219,12 +228,35 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     [ready, commerce.paymentMethods, onlinePaymentReady]
   );
 
+  /**
+   * Keep the SELECTED method among the ones still on offer.
+   *
+   * This only ever handled one case — the Razorpay gateway turning out to have
+   * no keys — and left the general one. The page starts from
+   * `defaultCommerceSettings`, where every method is enabled, and pins the
+   * selection to the first of them: Cash on Delivery. Hydration then brings the
+   * shop's real settings, `availablePaymentOptions` re-filters and the COD
+   * radio disappears from the screen — but nothing moved the selection, so an
+   * ordinary first-time customer submitted `cod` to a shop that had switched it
+   * off, and a COD order lands as `confirmed`: a cake the bakery is expected to
+   * bake and hand over for cash it decided it would no longer take.
+   *
+   * Nothing to do while the list is empty — that is the pre-hydration instant,
+   * not a shop that accepts no payment at all.
+   */
   useEffect(() => {
-    if (onlinePaymentReady !== false || paymentMethod !== "razorpay") return;
-    const fallback = availablePaymentOptions[0]?.value ?? "cod";
-    setPaymentMethod(fallback);
-  }, [onlinePaymentReady, paymentMethod, availablePaymentOptions]);
+    if (availablePaymentOptions.length === 0) return;
+    if (availablePaymentOptions.some((option) => option.value === paymentMethod)) return;
+    setPaymentMethod(availablePaymentOptions[0].value);
+  }, [paymentMethod, availablePaymentOptions]);
 
+  /**
+   * This checkout has produced an order, so an emptied cart is expected.
+   *
+   * A ref, not state: the cart subscriber below reads it from inside a
+   * subscription registered once, which would close over a stale state value.
+   */
+  const orderCommitted = useRef(false);
   // Online payment processing / failure overlay state.
   const [payUI, setPayUI] = useState<{ state: PaymentUIState; reason?: string } | null>(null);
   /**
@@ -236,6 +268,23 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     order: PlacedOrder;
     paymentStatus: "paid" | "cod";
     paymentReference?: string;
+    /**
+     * The priced cart this order was placed against.
+     *
+     * Held BECAUSE the retry needs it. It used to be dropped here, and the
+     * retry sent the order on its own — which for anything but cash the server
+     * refuses outright, permanently, because a card payment must be placed
+     * against a cart the shop priced. The customer had been charged, was told
+     * the bakery could not be reached, and could press Retry confirmation for
+     * as long as they liked without ever getting an order.
+     */
+    draftId?: string;
+    /**
+     * The shop's own maintenance notice, when THAT is why this could not be
+     * confirmed. Retrying cannot help until the shop reopens, so the overlay
+     * says so and does not offer a button that would only loop.
+     */
+    closed?: string;
   } | null>(null);
 
   const {
@@ -250,9 +299,40 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+    /**
+     * A payment this browser made that the bakery never acknowledged.
+     *
+     * Checked FIRST, before the sign-in and empty-cart bounces, because it
+     * outranks both: a customer who has been charged must see that before they
+     * see anything else, whatever state the rest of the page is in. Restoring
+     * it also puts the blocking overlay back, which is what stops the page from
+     * quietly offering to take the money a second time.
+     */
+    const held = readUnconfirmedOrder();
+    if (held) {
+      setUnconfirmed(held);
+      setReady(true);
+      return;
+    }
+
+    /**
+     * Ask the SERVER before bouncing anyone.
+     *
+     * This read the browser's cached copy, which is empty on a cold load — so
+     * opening /store/checkout directly, or in a new tab, threw a signed-in
+     * customer back to the cart with "Please sign in" while their session
+     * cookie was perfectly valid. The cache is a render hint; only the server
+     * knows.
+     */
+    const signedIn = await syncCustomerSession();
+    if (cancelled) return;
+
     // Being bounced back to the cart with no explanation reads as a broken
     // button, so say why before moving them.
-    if (!getCustomerSession()) {
+    if (!signedIn) {
       toast.info("Please sign in to continue to checkout");
       router.replace(routes.store.cart);
       return;
@@ -332,6 +412,11 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     }
 
     setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [reset, router, searchParams]);
 
   /** Moves between steps and records it in history, so Back walks the flow. */
@@ -363,6 +448,17 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     return subscribeToCart(() => {
       const next = getCartItems();
       if (next.length === 0) {
+        /**
+         * Unless WE emptied it, one line before the success page.
+         *
+         * `commitPlacedOrder` clears the cart on a successful order, which
+         * fires this subscriber. So at the exact moment the order went through,
+         * the customer got "Your cart is now empty — add a cake to check out"
+         * and a `router.replace` to the cart, racing the push to the success
+         * page — a contradiction and a coin toss over where they landed.
+         */
+        if (orderCommitted.current) return;
+
         toast.info("Your cart is now empty — add a cake to check out");
         router.replace(routes.store.cart);
         return;
@@ -400,7 +496,22 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
   );
-  const validCoupon = useMemo(() => revalidateCoupon(coupon, subtotal), [coupon, subtotal]);
+  /**
+   * The coupon re-checked against the cart being paid for, and WHY when it no
+   * longer holds.
+   *
+   * The reason used to be discarded — `revalidateCoupon` returns the coupon or
+   * null — so an edited cart silently lost its discount while the green
+   * "SAVE20 (₹200 off)" chip stayed on screen. The totals beside it had no
+   * discount line in them. Nothing said the coupon had stopped applying, and
+   * nothing said what would bring it back.
+   */
+  const couponCheck = useMemo(
+    () => (coupon ? applyCouponCode(coupon.code, subtotal) : null),
+    [coupon, subtotal],
+  );
+  const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
+  const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
 
   /**
    * The SHOP's totals, once it has priced this cart.
@@ -413,6 +524,15 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
    * server's and the customer is asked to look again before committing.
    */
   const [serverTotals, setServerTotals] = useState<CartTotals | null>(null);
+  /**
+   * The SHOP's line prices, held alongside its totals.
+   *
+   * The summary priced each line from the browser's cart while the total below
+   * them came from the server, so after "Prices have changed" the order summary
+   * did not add up — the customer was asked to review a list whose numbers
+   * contradicted the number they were being asked to pay.
+   */
+  const [serverItems, setServerItems] = useState<CartLineItem[] | null>(null);
 
   const localTotals = useMemo(
     () =>
@@ -455,6 +575,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
   // Anything that changes the price invalidates the shop's last answer.
   useEffect(() => {
     setServerTotals(null);
+    setServerItems(null);
   }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
 
   function persistDraft(
@@ -559,6 +680,30 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       // what actually happened, in the admin's own words.
       setPlacing(false);
       setPayUI(null);
+
+      /**
+       * Unless they have already been charged.
+       *
+       * This branch was added after the one below it and skipped what that one
+       * exists for. `finalizeOrder("paid", …)` is only reached once Razorpay
+       * has CAPTURED — so an admin flipping maintenance on while the modal was
+       * open left a customer who had genuinely paid looking at a toast, with
+       * the payment reference in scope and thrown away. It is not even lost
+       * money: the webhook places the order regardless, under an order number
+       * it mints itself, so the bakery holds a paid order the customer has
+       * never seen the number of. The reference is the only thing that ties the
+       * two together, and they need it in front of them before they navigate
+       * away.
+       */
+      if (paymentStatus === "paid" || paymentReference) {
+        const held = { order, paymentStatus, paymentReference, draftId, closed };
+        setUnconfirmed(held);
+        // Survives a reload. Without this the page comes back as an ordinary
+        // checkout and offers to charge them again.
+        saveUnconfirmedOrder(held);
+        return;
+      }
+
       toast.error("The store is closed right now", { description: closed, duration: 10000 });
       return;
     }
@@ -569,27 +714,35 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       // overlay, so leaving it up on a failed RETRY would strand the customer
       // behind a "Verifying payment…" spinner with no way back to the button.
       setPayUI(null);
-      setUnconfirmed({ order, paymentStatus, paymentReference });
+      const held = { order, paymentStatus, paymentReference, draftId };
+      setUnconfirmed(held);
+      saveUnconfirmedOrder(held);
       return;
     }
 
     commitPlacedOrder(order);
   };
 
+
   /** The steps that must happen exactly once, and only once the server has it. */
   const commitPlacedOrder = (order: PlacedOrder) => {
-    if (validCoupon) {
-      // Deliberately not awaited or reported: the customer cannot act on a
-      // failed usage counter, and holding up their confirmation for it would be
-      // worse than an undercount the shop can reconcile.
-      void recordCouponUsage(validCoupon.code);
-    }
+    orderCommitted.current = true;
+    // The coupon redemption is NOT counted here.
+    //
+    // `placeOrder` already does it, atomically, against the code the shop itself
+    // resolved — `recordCouponRedemption` in order.service. This fired a second
+    // count from the browser, and it did it by PUTting the visitor's entire
+    // cached coupon list to `/api/coupons`, a whole-collection replace. On a
+    // browser whose cache was stale or partial that replaced the shop's coupons
+    // with it, deleting every code added since that cache was filled — from a
+    // customer's checkout.
 
     clearCart();
     clearCartPreferences();
     clearCheckoutDraft();
     setPlacing(false);
     setUnconfirmed(null);
+    clearUnconfirmedOrder();
     setPayUI(null);
 
     toast.success("Order placed!", {
@@ -619,10 +772,27 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
     if (!unconfirmed || placing) return;
     setPlacing(true);
 
-    const { order, persisted } = await confirmOrder(unconfirmed.order);
+    // With the draft id from the original attempt. Without it the server has no
+    // priced cart to place a card payment against and refuses — every time.
+    const { order, persisted, refusal } = await confirmOrder(
+      unconfirmed.order,
+      unconfirmed.draftId,
+    );
     setPlacing(false);
 
     if (!persisted) {
+      // A refusal is not an outage. The server answered, and it will answer the
+      // same way to the next press, so saying "couldn't reach the bakery" sends
+      // the customer round a loop that cannot end. Their own words, and the
+      // reference, so support can act on it.
+      if (refusal) {
+        toast.error("The bakery could not accept this order", {
+          description: `${refusal} Please contact support with the reference shown — your payment is safe.`,
+          duration: 15000,
+        });
+        return;
+      }
+
       toast.error("Still couldn't reach the bakery", {
         description:
           "Your order is safe here. Try again, or contact support with the reference shown.",
@@ -667,10 +837,40 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       return;
     }
 
+    /**
+     * A coupon the SHOP will not honour.
+     *
+     * The quote has carried `rejectedCoupon` all along — its own comment says
+     * "so the customer can be told" — and nothing here read it. The refused
+     * code left the total higher than the browser expected, which tripped the
+     * price-change branch below, so a customer whose coupon had expired or run
+     * out of uses was told "Prices have changed" and shown a bigger number with
+     * no explanation, while the coupon chip still said it was applied.
+     *
+     * Checked first, because it is the REASON for the difference the next
+     * branch would otherwise report as a mystery.
+     */
+    if (quote.rejectedCoupon) {
+      setServerTotals(quote.totals);
+      setServerItems(quote.items);
+      setCoupon(undefined);
+      persistDraft({ coupon: undefined });
+      setPlacing(false);
+      toast.error(`${quote.rejectedCoupon} could not be applied`, {
+        description: `The bakery did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
+        duration: 10000,
+      });
+      return;
+    }
+
     // The shop's number is the one that will be charged, so it is the one the
     // customer has to see before they commit to paying.
     if (Math.abs(quote.totals.total - totals.total) >= 0.01) {
       setServerTotals(quote.totals);
+      // The lines the customer is about to re-read have to be the shop's too,
+      // or the summary asks them to review a list that does not add up to the
+      // number underneath it.
+      setServerItems(quote.items);
       setPlacing(false);
       toast.error("Prices have changed", {
         description: `This order now comes to ${formatCurrency(quote.totals.total)}. Please review and place it again.`,
@@ -685,6 +885,8 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
       try {
         const result = await openRazorpayCheckout({
           draftId: quote.draftId,
+          // The sheet is headed with the shop's name, not a hardcoded one.
+          brandName: getStorefrontBrandInfo().name,
           name: address.fullName,
           email: address.email,
           phone: address.phone,
@@ -739,11 +941,13 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <ProcessingState
             state="failed"
-            title="Order not confirmed yet"
+            title={unconfirmed.closed ? "Your payment went through" : "Order not confirmed yet"}
             message={
-              unconfirmed.paymentStatus === "paid"
-                ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
-                : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+              unconfirmed.closed
+                ? `The shop closed while your payment was going through, so we could not confirm the order here. Your payment is safe and the bakery has it — quote the reference below when you get in touch. ${unconfirmed.closed}`
+                : unconfirmed.paymentStatus === "paid"
+                  ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
+                  : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
             }
             reason={
               unconfirmed.paymentReference
@@ -752,12 +956,18 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
             }
             className="w-full max-w-md"
             actions={[
-              {
-                label: placing ? "Retrying…" : "Retry confirmation",
-                onClick: () => void retryConfirmation(),
-                variant: "bakery",
-                icon: "retry",
-              },
+              // No retry while the shop is shut: it cannot succeed, and a
+              // button that only loops is worse than no button.
+              ...(unconfirmed.closed
+                ? []
+                : [
+                    {
+                      label: placing ? "Retrying…" : "Retry confirmation",
+                      onClick: () => void retryConfirmation(),
+                      variant: "bakery" as const,
+                      icon: "retry" as const,
+                    },
+                  ]),
               {
                 label: "Contact support",
                 onClick: () => router.push(routes.store.contact),
@@ -1173,13 +1383,15 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
                       {hasDeliverySlot(deliverySlot) ? (
                         <ReviewBlock title="Delivery slot">
-                          <p className="font-medium">
-                            {new Date(deliverySlot.date).toLocaleDateString("en-IN", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                            })}
-                          </p>
+                          {/*
+                            The calendar day the customer picked, not an
+                            instant. `new Date("2026-08-16")` is midnight UTC,
+                            and rendering that anywhere west of UTC shows the
+                            day before — so a customer confirmed a Sunday
+                            delivery on a page that said Saturday, while the
+                            order stored Sunday.
+                          */}
+                          <p className="font-medium">{formatCalendarDate(deliverySlot.date)}</p>
                           <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
                         </ReviewBlock>
                       ) : null}
@@ -1252,7 +1464,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
 
             <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
               <OrderSummaryPanel
-                items={items}
+                items={serverItems ?? items}
                 totals={totals}
                 giftWrapLabel={commerce.giftWrapLabel}
               />
@@ -1280,6 +1492,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
                   <CouponInput
                     subtotal={totals.subtotal}
                     applied={coupon}
+                    lapsedReason={couponLapsedReason}
                     onApply={(next) => {
                       setCoupon(next);
                       persistDraft({ coupon: next });

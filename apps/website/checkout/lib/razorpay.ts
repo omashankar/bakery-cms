@@ -41,32 +41,74 @@ declare global {
   }
 }
 
+/**
+ * Only a SUCCESSFUL load is remembered.
+ *
+ * This used to cache the outcome either way, so one failed load — a dropped
+ * connection at the wrong second, a blocked request — was the answer for the
+ * rest of the tab. "Retry payment" called back in, got the cached `false`
+ * without touching the network, and threw "Payment gateway failed to load"
+ * again. And again. The only way out of a checkout was a full page reload,
+ * which nothing on screen suggested.
+ */
 let scriptPromise: Promise<boolean> | null = null;
+
+/**
+ * A gateway that never answers is a customer stuck on "Redirecting…".
+ *
+ * The `existing` branch below attaches a `load` listener to a script that may
+ * have already finished — or already failed — and neither fires again. Without
+ * a deadline that promise is simply never settled, and the await above it never
+ * returns.
+ */
+const SCRIPT_LOAD_TIMEOUT_MS = 15_000;
 
 function loadRazorpayScript(): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (window.Razorpay) return Promise.resolve(true);
   if (scriptPromise) return scriptPromise;
 
-  scriptPromise = new Promise<boolean>((resolve) => {
+  const attempt = new Promise<boolean>((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (ok: boolean, node?: HTMLScriptElement) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      // A script tag that failed stays in the DOM and matches the selector
+      // below, so leaving it there would send the next attempt straight into
+      // the `existing` branch to wait on events that have already fired.
+      if (!ok) node?.remove();
+      resolve(ok);
+    };
+
     const existing = document.querySelector<HTMLScriptElement>(
       `script[src="${CHECKOUT_SCRIPT}"]`
     );
     if (existing) {
-      existing.addEventListener("load", () => resolve(true));
-      existing.addEventListener("error", () => resolve(false));
-      if (window.Razorpay) resolve(true);
+      existing.addEventListener("load", () => finish(true));
+      existing.addEventListener("error", () => finish(false, existing));
+      if (window.Razorpay) finish(true);
+      timer = setTimeout(() => finish(Boolean(window.Razorpay), existing), SCRIPT_LOAD_TIMEOUT_MS);
       return;
     }
+
     const script = document.createElement("script");
     script.src = CHECKOUT_SCRIPT;
     script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
+    script.onload = () => finish(true);
+    script.onerror = () => finish(false, script);
+    timer = setTimeout(() => finish(Boolean(window.Razorpay), script), SCRIPT_LOAD_TIMEOUT_MS);
     document.body.appendChild(script);
   });
 
-  return scriptPromise;
+  scriptPromise = attempt;
+  void attempt.then((ok) => {
+    if (!ok && scriptPromise === attempt) scriptPromise = null;
+  });
+
+  return attempt;
 }
 
 export class RazorpayError extends Error {}
@@ -101,7 +143,17 @@ export async function openRazorpayCheckout(options: OpenOptions): Promise<Razorp
       amount: orderData.amount,
       currency: orderData.currency,
       order_id: orderData.orderId,
-      name: options.brandName || "Monginis",
+      // The shop's configured site name, not a hardcoded demo brand.
+      //
+      // `brandName` was declared in these options and never supplied by the one
+      // caller, so every payment sheet was headed "Monginis" — a different
+      // company from the storefront the customer is on, the invoice they get
+      // and the confirmation they read. Nothing is misdirected (the merchant
+      // account comes from the server's `keyId` and the signature is verified
+      // there), but an unfamiliar name on a payment sheet is a reason to close
+      // it. The caller reads the configured name; this fallback stands only if
+      // it somehow arrives empty.
+      name: options.brandName?.trim() || "Checkout",
       description: "Order payment",
       prefill: {
         name: options.name,

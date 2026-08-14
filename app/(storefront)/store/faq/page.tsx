@@ -4,6 +4,7 @@ import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server
 import { getContent } from "@/features/content/server/content.service";
 import { getStorefrontContact } from "@/apps/website/lib/storefront-contact.server";
 import type { FaqItem } from "@/types/content";
+import { publishedOnly } from "@/features/content/lib/storefront-content";
 
 /**
  * Per request, not at module load.
@@ -23,7 +24,7 @@ export default async function Page() {
   ]);
   return (
     <FaqPage
-      faqs={(faqsRaw ?? []) as FaqItem[]}
+      faqs={publishedOnly(faqsRaw as FaqItem[] | null)}
       contact={{ phone: contact.phone, email: contact.email }}
     />
   );

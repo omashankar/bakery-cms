@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";
-import { forgotPasswordRequest } from "@/features/auth/lib/auth-api";
+import { AuthRequestError, forgotPasswordRequest, isDeliveryFailure } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,16 +22,50 @@ type ForgotPasswordForm = {
 export function ForgotPasswordFormPage() {
   const router = useRouter();
   const [sent, setSent] = useState(false);
+  /**
+   * Not prefilled, and not with a real person's address.
+   *
+   * This page is public and shipped with a real inbox typed into it, so any
+   * visitor could land here and press Send — a password-reset code to somebody
+   * else's mailbox, with nothing typed. The login page carried the same
+   * address as a default (see there); this is the one where a single click
+   * sends mail.
+   */
   const { register, handleSubmit, formState } = useForm<ForgotPasswordForm>({
-    defaultValues: { email: "admin@bakery.com" },
+    defaultValues: { email: "" },
   });
 
   const onSubmit = async (data: ForgotPasswordForm) => {
     try {
       await forgotPasswordRequest(data.email);
-    } catch {
-      // Endpoint never reveals whether the email exists; proceed regardless so
-      // the flow (and messaging) stays identical for every input.
+    } catch (error) {
+      /**
+       * Keep the existence-hiding, drop the rest.
+       *
+       * The endpoint never reveals whether the email is registered, and the
+       * flow must stay identical for every input — that part is deliberate.
+       * But this caught EVERY error, so a rate-limited or failed request still
+       * showed "Reset code sent", turned the panel green and pushed the
+       * customer to an OTP screen backed by no reset row. They then sat typing
+       * codes from an email that was never sent.
+       */
+      if (isDeliveryFailure(error)) {
+        /**
+         * A throttle is not a connection problem.
+         *
+         * `isDeliveryFailure` counts a 429 as "not sent", which is right — but
+         * the message told the customer to check their connection, a remedy
+         * that cannot work, and threw away the server's own sentence, which is
+         * the one that says how long to wait.
+         */
+        const throttled = error instanceof AuthRequestError && error.status === 429;
+        toast.error(throttled ? "Too many attempts" : "Could not send the reset code", {
+          description: throttled
+            ? error.message
+            : "The server did not answer. Check your connection and try again.",
+        });
+        return;
+      }
     }
     startResetFlow(data.email);
     setSent(true);
@@ -61,7 +95,7 @@ export function ForgotPasswordFormPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="admin@bakery.com"
+            placeholder="you@example.com"
             disabled={sent}
             {...register("email", { required: "Email is required" })}
           />

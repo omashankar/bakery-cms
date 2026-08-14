@@ -21,6 +21,8 @@ interface SettingsSectionShellProps {
   onSave: () => void;
   onDiscard: () => void;
   onReset: () => void;
+  /** Disables the Reset button — see the destructure below for why. */
+  resetDisabled?: boolean;
   children: React.ReactNode;
   extraActions?: React.ReactNode;
   mounted?: boolean;
@@ -46,6 +48,14 @@ export function SettingsSectionShell({
   onSave,
   onDiscard,
   onReset,
+  /**
+   * Reset lives in the page header, outside the gated form, so it is
+   * reachable before hydration — and every handler that guards on `canSave`
+   * simply returns, after the admin has confirmed a destructive dialog. A
+   * button that looks available and does nothing is worse than a disabled
+   * one.
+   */
+  resetDisabled = false,
   children,
   extraActions,
   mounted = true,
@@ -85,6 +95,7 @@ export function SettingsSectionShell({
               variant="outline"
               className="w-full sm:w-auto"
               onClick={() => setResetOpen(true)}
+              disabled={resetDisabled}
             >
               <RotateCcw className="size-4" />
               Reset

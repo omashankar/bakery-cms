@@ -4,9 +4,11 @@ import { getCoupons, getZones } from "@/features/commerce/server/commerce.servic
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { getProductVariantGroups } from "@/apps/website/lib/product-details";
-import { calculateProductUnitPrice } from "@/apps/website/lib/product-pricing";
+import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
+import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
-import type { CommerceSettings, GeneralSettings } from "@/types/settings";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { DeliveryZone } from "@/types/delivery";
 
@@ -36,6 +38,7 @@ export interface QuoteLineInput {
   flavour?: string;
   shape?: string;
   message?: string;
+  photoUrl?: string;
   deliveryDate?: string;
   deliveryTime?: string;
   variantSelections?: Record<string, string>;
@@ -80,24 +83,59 @@ export class UnknownProductError extends Error {
   }
 }
 
+/**
+ * The cart asked for a size this product does not sell.
+ *
+ * The same situation as an unknown slug — the cart and the shop disagree about
+ * what is on offer — and it is refused the same way, rather than priced.
+ */
+export class UnknownWeightError extends Error {
+  constructor(
+    readonly slug: string,
+    readonly weight: string,
+  ) {
+    super(`No such weight on ${slug}: ${weight}`);
+    this.name = "UnknownWeightError";
+  }
+}
+
 /** The unit price of one line, given the options the customer picked. */
-function priceLine(product: LandingProduct, line: QuoteLineInput): number {
+function priceLine(
+  product: LandingProduct,
+  line: QuoteLineInput,
+  /** The modules this shop has switched on. A group it does not sell is not priced. */
+  modules: ModuleSettings,
+): number {
   const weightOptions = getProductWeightOptions(product);
-  // The cart carries the weight LABEL, which is what the customer saw. An
-  // unrecognised label falls back to the first option rather than to no
-  // modifier, so a stale cart cannot quietly buy the largest cake at the
-  // smallest price.
-  const index = Math.max(
-    0,
-    weightOptions.findIndex((option) => option.label === line.weight),
-  );
+
+  // An unrecognised weight label is REFUSED, not repriced.
+  //
+  // This was `Math.max(0, findIndex(...))`, so a label the product does not
+  // have priced at index 0 — the smallest, cheapest tier — while the line kept
+  // the label the customer sent. The order then read "2 kg" and charged for
+  // 0.5 kg, and the bakery baked and delivered the 2 kg cake. The comment here
+  // said this stopped a stale cart buying the largest cake at the smallest
+  // price; it was the mechanism for doing exactly that.
+  //
+  // No label at all is different, and still fine: the customer did not choose a
+  // size, so the default tier applies.
+  let index = 0;
+  if (line.weight) {
+    index = weightOptions.findIndex((option) => option.label === line.weight);
+    if (index < 0) throw new UnknownWeightError(product.slug, line.weight);
+  }
+
   const chosen = weightOptions[index] ?? weightOptions[0];
   const weightPrice = product.weights?.[index]?.price ?? product.price + (chosen?.modifier ?? 0);
 
   return calculateProductUnitPrice({
     basePrice: product.price,
     weightPrice,
-    variantGroups: getProductVariantGroups(product),
+    // Only the groups this shop sells. A module that is off used to hide the
+    // picker and keep charging its default option's surcharge — and since the
+    // adjustment falls back to that default whenever no selection is sent,
+    // omitting the selection would not have stopped it either.
+    variantGroups: variantGroupsEnabledBy(getProductVariantGroups(product), modules),
     variantSelections: line.variantSelections ?? {},
   });
 }
@@ -112,6 +150,12 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
   const settings = settingsRaw as unknown as Record<string, unknown>;
   const commerce = (settings.commerce ?? {}) as CommerceSettings;
   const currency = ((settings.general ?? {}) as GeneralSettings).currency;
+  // Defaults are every module ON, so a settings document written before these
+  // switches existed prices exactly as it did before.
+  const modules: ModuleSettings = {
+    ...defaultModuleSettings,
+    ...((settings.modules ?? {}) as Partial<ModuleSettings>),
+  };
 
   const items: QuotedLine[] = [];
   for (const line of input.items) {
@@ -127,7 +171,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       quantity,
       name: product.name,
       image: product.image,
-      price: priceLine(product, line),
+      price: priceLine(product, line, modules),
     });
   }
 

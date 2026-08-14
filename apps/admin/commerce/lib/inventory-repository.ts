@@ -145,14 +145,34 @@ export function getInventoryItems(): InventoryItem[] {
   });
 }
 
+/**
+ * The SERVER's two rules, which this local twin did not have.
+ *
+ * `getOverview()` on the server drops archived products entirely, and counts a
+ * low/out-of-stock product as an ALERT only when it is `published` — a draft
+ * cannot be oversold because nobody can buy it. This counted every product in
+ * the catalogue, so the Dashboard's alert strip and the sidebar badge showed
+ * stock warnings for cakes that were archived months ago or had never been
+ * published, while the Inventory page's own cards — which read the server —
+ * showed a different, smaller number for the same shop.
+ */
 export function getInventoryOverview(): InventoryOverview {
-  const items = getInventoryItems();
+  const products = new Map(loadProducts().map((product) => [product.id, product]));
+  const items = getInventoryItems().filter(
+    (item) => products.get(item.cakeId)?.status !== "archived",
+  );
+  const onSale = (item: InventoryItem) => products.get(item.cakeId)?.status === "published";
 
+  const alerting = (status: InventoryItem["stockStatus"]) => (item: InventoryItem) =>
+    item.stockStatus === status && onSale(item);
+
+  const lowStock = items.filter(alerting("low_stock")).length;
+  const outOfStock = items.filter(alerting("out_of_stock")).length;
+  // Everything countable that is not an alert — including a low or empty
+  // DRAFT, which the server also folds in here.
   const inStock = items.filter(
-    (item) => !item.unlimitedStock && item.stockStatus === "in_stock"
+    (item) => !item.unlimitedStock && !alerting("low_stock")(item) && !alerting("out_of_stock")(item),
   ).length;
-  const lowStock = items.filter((item) => item.stockStatus === "low_stock").length;
-  const outOfStock = items.filter((item) => item.stockStatus === "out_of_stock").length;
   const unlimited = items.filter((item) => item.unlimitedStock).length;
 
   return {
@@ -205,20 +225,26 @@ export async function adjustStock({
   if (!cake) return { item: null, persisted: false };
 
   const quantityBefore = cake.stockQuantity;
-  let quantityAfter = quantityBefore;
 
-  if (type === "add") {
-    quantityAfter = quantityBefore + Math.max(quantity, 0);
-  } else if (type === "remove") {
-    quantityAfter = Math.max(quantityBefore - Math.max(quantity, 0), 0);
-  } else {
-    quantityAfter = Math.max(quantity, 0);
-  }
+  // The SERVER first, and it does the arithmetic.
+  //
+  // This used to compute the new figure here, write it to the local cache, add a
+  // local history row, and only then ask the server. A refusal left all of it in
+  // place: a stock level the shop does not have, and an audit row for an
+  // adjustment that never happened — with the count reverting on the next
+  // hydration, after the admin had moved on believing it was set.
+  const applied = await adjustStockRequest({ cakeId, type, quantity, reason, note });
+  if (!applied) return { item: null, persisted: false };
+
+  // Its number, not ours. They differ the moment an order or a second admin
+  // touches the same row, and only one of them is what the shop will sell
+  // against.
+  const quantityAfter = applied.stockQuantity;
 
   const stockFields = resolveStockFields({
     ...cake,
     stockQuantity: quantityAfter,
-    unlimitedStock: false,
+    unlimitedStock: applied.unlimitedStock,
   });
 
   const updated = updateProduct(cakeId, {
@@ -226,8 +252,10 @@ export async function adjustStock({
     ...stockFields,
   });
 
-  if (!updated) return { item: null, persisted: false };
+  if (!updated) return { item: null, persisted: true };
 
+  // The server writes its own history row. This one is the local mirror of it,
+  // so it records the figure the server landed on.
   appendStockHistory({
     id: `stock-${Date.now()}`,
     cakeId: cake.id,
@@ -241,13 +269,10 @@ export async function adjustStock({
     createdAt: nowIso(),
   });
 
-  // Durable write to the server (updates the Mongo product stock + history).
-  const persisted = await adjustStockRequest({ cakeId, type, quantity, reason, note });
-
   emitInventoryUpdated();
   return {
     item: getInventoryItems().find((item) => item.cakeId === cakeId) ?? null,
-    persisted,
+    persisted: true,
   };
 }
 
@@ -263,12 +288,24 @@ export async function setUnlimitedStock(
     unlimitedStock: unlimited,
   });
 
+  /**
+   * Ask first, write second — the ordering `adjustStock` above was rewritten to.
+   *
+   * This wrote the product cache and then asked the server, with no rollback.
+   * A refusal left the row showing ∞ stock, so that item dropped out of the
+   * low-stock alerts and the notification feed on this device while the shop
+   * still had a finite, dwindling count of it — until the next hydration put it
+   * back, after the admin had moved on believing it was set.
+   */
+  const persisted = await setUnlimitedRequest(cakeId, unlimited);
+  if (!persisted) {
+    return { item: getInventoryItems().find((entry) => entry.cakeId === cakeId) ?? null, persisted };
+  }
+
   updateProduct(cakeId, {
     ...cake,
     ...stockFields,
   });
-
-  const persisted = await setUnlimitedRequest(cakeId, unlimited);
 
   emitInventoryUpdated();
   return {

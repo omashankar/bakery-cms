@@ -10,6 +10,9 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ListLoading } from "@/components/shared/list-loading";
+import { Skeleton } from "@/components/ui/skeleton";
+import { type FiguresState } from "@/components/shared/panel-loading";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
@@ -46,6 +49,25 @@ const emptyComparison: ReportsComparison = {
   averageOrderValue: { label: "—", tone: "neutral" },
   itemsSold: { label: "—", tone: "neutral" },
 };
+
+/**
+ * A single figure that has not arrived, in place of the zero it would print.
+ *
+ * These sit inline in the cards rather than in a list, so they cannot use
+ * ListLoading: they need to hold one number's worth of space.
+ */
+function FigurePlaceholder({
+  figures,
+  className,
+}: {
+  figures: FiguresState;
+  className?: string;
+}) {
+  if (figures === "unavailable") {
+    return <p className="mt-1 font-heading text-xl font-semibold text-muted-foreground">—</p>;
+  }
+  return <Skeleton className={className} />;
+}
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -143,6 +165,16 @@ export function ReportsPage() {
   const summary = analytics?.summary ?? emptySummary;
   const comparison = analytics?.comparison ?? emptyComparison;
   const trend = useMemo(() => analytics?.trend ?? [], [analytics]);
+  /**
+   * Whether the shop has answered for this range yet.
+   *
+   * `analytics` is null until it has. The three breakdowns below read
+   * `?? []` off it, so before the answer arrived they each rendered "No
+   * orders in this range" — a statement about the range, made without having
+   * looked at it, and wrong on every cold load of a shop with orders.
+   */
+  const figures: FiguresState = analytics ? "ready" : failed ? "unavailable" : "loading";
+  const awaitingAnalytics = figures === "loading";
   const statusBreakdown = analytics?.statusBreakdown ?? [];
   const paymentBreakdown = analytics?.paymentBreakdown ?? [];
   const topProducts = (analytics?.topProducts ?? []).slice(0, LIST_ROWS);
@@ -170,6 +202,25 @@ export function ReportsPage() {
   const showComparison = shownRange !== "all";
 
   function handleExport() {
+    /**
+     * A file of zeroes is worse than no file.
+     *
+     * Every figure on this page falls back to `emptySummary` and empty lists
+     * while the analytics read has not succeeded — which is right for the
+     * screen, because the header beside it says so. The export inherited those
+     * fallbacks and said nothing: the admin got `bakery-reports-30d-….csv`
+     * reading ₹0 revenue, 0 orders, no products and no customers, under a green
+     * "Full report exported to CSV", and a CSV outlives the toast. The same
+     * shape was already repaired on the Orders screen, whose cards read "—" and
+     * "Unavailable" rather than "0 orders, ₹0".
+     */
+    if (!analytics) {
+      toast.error("No figures loaded — nothing to export", {
+        description: "The report could not be read from the server. Try again.",
+      });
+      return;
+    }
+
     exportReportsCsv(
       summary,
       topProducts,
@@ -211,7 +262,14 @@ export function ReportsPage() {
                 </option>
               ))}
             </AdminSelect>
-            <Button variant="bakery" className="shrink-0" onClick={handleExport}>
+            {/* Disabled while there is nothing from the server, so the refusal
+                above is a backstop rather than the first thing the admin meets. */}
+            <Button
+              variant="bakery"
+              className="shrink-0"
+              disabled={!analytics}
+              onClick={handleExport}
+            >
               <Download className="size-4" />
               <span className="sm:hidden">Export</span>
               <span className="hidden sm:inline">Export CSV</span>
@@ -228,6 +286,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.revenue.tone : "neutral"}
           icon={IndianRupee}
           tone="gold"
+          figures={figures}
         />
         <DashboardStatCard
           title="Orders"
@@ -236,6 +295,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.orders.tone : "neutral"}
           icon={ShoppingBag}
           tone="bakery"
+          figures={figures}
           href={routes.admin.orders.list}
         />
         <DashboardStatCard
@@ -245,6 +305,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.averageOrderValue.tone : "neutral"}
           icon={BarChart3}
           tone="neutral"
+          figures={figures}
         />
         <DashboardStatCard
           title="Items sold"
@@ -253,6 +314,7 @@ export function ReportsPage() {
           changeTone={showComparison ? comparison.itemsSold.tone : "neutral"}
           icon={Package}
           tone="bakery"
+          figures={figures}
         />
       </section>
 
@@ -267,7 +329,16 @@ export function ReportsPage() {
                 ref={trendScrollRef}
                 className="flex flex-1 flex-col overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
               >
-                {!hasTrendData ? (
+                {figures !== "ready" ? (
+                  <div className="flex flex-1 items-center justify-center py-10">
+                    {/* Every sibling panel in this file is gated; the trend was
+                        the one left asserting "No sales data yet" while the
+                        analytics request was in flight, and after it failed. */}
+                    <p className="text-sm text-muted-foreground">
+                      {figures === "loading" ? "Loading the revenue trend…" : "Figures unavailable"}
+                    </p>
+                  </div>
+                ) : !hasTrendData ? (
                   <div className="flex flex-1 items-center justify-center py-10">
                     <p className="text-sm text-muted-foreground">No sales data yet</p>
                   </div>
@@ -329,7 +400,9 @@ export function ReportsPage() {
               <CardTitle className="min-w-0 truncate text-base">Order status</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-0">
-              {statusBreakdown.length === 0 ? (
+              {awaitingAnalytics ? (
+                <ListLoading rows={3} label="Loading order status" />
+              ) : statusBreakdown.length === 0 ? (
                 <EmptyState message="No orders in this range" />
               ) : (
                 <ul className="divide-y divide-border">
@@ -361,16 +434,23 @@ export function ReportsPage() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-4 pt-0">
             <div className="grid grid-cols-2 gap-3 border-b border-border pb-3">
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">COD</p>
-                <p className="mt-0.5 font-heading text-lg font-semibold">{summary.codOrders}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Prepaid</p>
-                <p className="mt-0.5 font-heading text-lg font-semibold">{summary.prepaidOrders}</p>
-              </div>
+              {[
+                { label: "COD", value: summary.codOrders },
+                { label: "Prepaid", value: summary.prepaidOrders },
+              ].map((item) => (
+                <div key={item.label} className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                  {figures === "ready" ? (
+                    <p className="mt-0.5 font-heading text-lg font-semibold">{item.value}</p>
+                  ) : (
+                    <FigurePlaceholder figures={figures} className="mt-1 h-5 w-10" />
+                  )}
+                </div>
+              ))}
             </div>
-            {paymentBreakdown.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading payment data" />
+            ) : paymentBreakdown.length === 0 ? (
               <EmptyState message="No payment data" />
             ) : (
               <div className="space-y-3">
@@ -417,9 +497,13 @@ export function ReportsPage() {
                   className="rounded-lg border border-border bg-muted/80 px-3 py-3"
                 >
                   <p className="text-[11px] text-muted-foreground">{item.label}</p>
-                  <p className={cn("mt-1 font-heading text-xl font-semibold", item.tone)}>
-                    {item.value}
-                  </p>
+                  {figures === "ready" ? (
+                    <p className={cn("mt-1 font-heading text-xl font-semibold", item.tone)}>
+                      {item.value}
+                    </p>
+                  ) : (
+                    <FigurePlaceholder figures={figures} className="mt-1.5 h-6 w-10" />
+                  )}
                 </div>
               ))}
             </div>
@@ -431,7 +515,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top cities</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {cities.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading city data" />
+            ) : cities.length === 0 ? (
               <EmptyState message="No city data" />
             ) : (
               <ul className="divide-y divide-border">
@@ -456,7 +542,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top products</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {topProducts.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={4} label="Loading top products" />
+            ) : topProducts.length === 0 ? (
               <EmptyState message="No product sales" />
             ) : (
               <ul className="divide-y divide-border">
@@ -479,7 +567,9 @@ export function ReportsPage() {
             <CardTitle className="text-base">Top customers</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
-            {topCustomers.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={4} label="Loading top customers" />
+            ) : topCustomers.length === 0 ? (
               <EmptyState message="No customer orders" />
             ) : (
               <ul className="divide-y divide-border">
@@ -505,10 +595,12 @@ export function ReportsPage() {
             <div className="border-b border-border pb-3">
               <p className="text-[11px] text-muted-foreground">Total savings</p>
               <p className="mt-0.5 font-heading text-lg font-semibold">
-                {formatCurrency(summary.couponDiscount)}
+                {figures === "ready" ? formatCurrency(summary.couponDiscount) : "—"}
               </p>
             </div>
-            {coupons.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={3} label="Loading coupon usage" />
+            ) : coupons.length === 0 ? (
               <EmptyState message="No coupons used" />
             ) : (
               <ul className="divide-y divide-border">
@@ -538,7 +630,9 @@ export function ReportsPage() {
             <CardTitle className="min-w-0 truncate text-base">Orders in range</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            {recentOrders.length === 0 ? (
+            {awaitingAnalytics ? (
+              <ListLoading rows={5} label="Loading orders in range" />
+            ) : recentOrders.length === 0 ? (
               <EmptyState message="No orders in this range" />
             ) : (
               <>

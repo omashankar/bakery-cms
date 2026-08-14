@@ -61,13 +61,27 @@ export interface CustomerMetaResult {
   persisted: boolean;
 }
 
+/**
+ * Save a PATCH of one customer's metadata — only the fields being changed.
+ *
+ * This took a whole `CustomerAdminMeta`, composed by every caller as
+ * `{ ...current, notes }`, and the server `$set` all of it. So two admins on
+ * the same customer — one adding a tag, one writing a note — each carried the
+ * other's field at its old value and overwrote it, and both were toasted as
+ * saved. Sending only what changed makes the two edits independent.
+ *
+ * `current` is still taken, for the LOCAL cache and the returned value, so the
+ * screen has something complete to render.
+ */
 export async function saveCustomerAdminMeta(
-  meta: CustomerAdminMeta
+  current: CustomerAdminMeta,
+  patch: Partial<Omit<CustomerAdminMeta, "email">>
 ): Promise<CustomerMetaResult> {
-  const key = meta.email.trim().toLowerCase();
+  const key = current.email.trim().toLowerCase();
   const saved: CustomerAdminMeta = {
     ...defaultCustomerAdminMeta(key),
-    ...meta,
+    ...current,
+    ...patch,
     email: key,
     updatedAt: new Date().toISOString(),
   };
@@ -76,7 +90,7 @@ export async function saveCustomerAdminMeta(
   store[key] = saved;
   writeAllMeta(store);
 
-  const persisted = await saveCustomerMetaRequest(saved);
+  const persisted = await saveCustomerMetaRequest({ email: key, ...patch });
   // Announce only after a write the server ACCEPTED. Listeners refetch when they
   // hear this; doing so before the write lands — or after one the server
   // rejected — reads the stale value back over the admin's own edit, while the
@@ -114,14 +128,14 @@ export function updateCustomerNotes(
   current: CustomerAdminMeta,
   notes: string
 ): Promise<CustomerMetaResult> {
-  return saveCustomerAdminMeta({ ...current, notes });
+  return saveCustomerAdminMeta(current, { notes });
 }
 
 export function updateCustomerMarketingOptIn(
   current: CustomerAdminMeta,
   marketingOptIn: boolean
 ): Promise<CustomerMetaResult> {
-  return saveCustomerAdminMeta({ ...current, marketingOptIn });
+  return saveCustomerAdminMeta(current, { marketingOptIn });
 }
 
 /** `persisted` is meaningless when nothing was written — the caller must not toast. */
@@ -145,15 +159,14 @@ export function addCustomerTag(
     ? current.tags
     : [...current.tags, normalizedTag];
 
-  return saveCustomerAdminMeta({ ...current, tags });
+  return saveCustomerAdminMeta(current, { tags });
 }
 
 export function removeCustomerTag(
   current: CustomerAdminMeta,
   tag: string
 ): Promise<CustomerMetaResult> {
-  return saveCustomerAdminMeta({
-    ...current,
+  return saveCustomerAdminMeta(current, {
     tags: current.tags.filter((item) => item !== tag),
   });
 }

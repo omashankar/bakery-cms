@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { getWishlistSlugs } from "@/apps/website/lib/wishlist";
+import { toast } from "sonner";
+import { getWishlistSlugs, pruneWishlist } from "@/apps/website/lib/wishlist";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -25,12 +26,31 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
   const labels = useBusinessLabels();
 
   useEffect(() => {
+    /**
+     * Saved cakes the shop no longer publishes are forgotten here.
+     *
+     * This page resolves slugs against the published catalogue and drops the
+     * ones it cannot find, but the header badge counts the RAW slugs — so a
+     * customer with two unpublished cakes saw "5" beside the heart and three
+     * cards below it, with no row for the missing two and therefore no way to
+     * remove them. This is the only screen that holds the catalogue, so it is
+     * the only place that can tell a stale entry from a live one.
+     */
+    const removed = pruneWishlist(catalog.map((cake) => cake.slug));
+    if (removed > 0) {
+      toast.info(
+        `${removed} saved ${removed === 1 ? "item is" : "items are"} no longer available and ${
+          removed === 1 ? "has" : "have"
+        } been removed from your wishlist.`,
+      );
+    }
+
     const load = () => setSlugs(getWishlistSlugs());
     load();
     setLoaded(true);
     window.addEventListener("bakery-wishlist-updated", load);
     return () => window.removeEventListener("bakery-wishlist-updated", load);
-  }, []);
+  }, [catalog]);
 
   const bySlug = new Map(catalog.map((cake) => [cake.slug, cake]));
   const cakes = slugs

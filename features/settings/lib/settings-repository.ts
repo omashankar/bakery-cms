@@ -29,6 +29,7 @@ import {
   fetchFullSettings,
   fetchPublicSettings,
   pushSection,
+  resetSectionRequest,
   SERVER_SECTIONS,
   settingsHydration,
 } from "./settings-api";
@@ -41,9 +42,29 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * What actually goes into localStorage — never the mail password.
+ *
+ * The SERVER stopped handing this out (`redactMailPassword`), and its comment
+ * lists exactly why: the password "was written to `localStorage` by the
+ * settings store, survived logout (only the session key is cleared), rode along
+ * to every device that admin signed in from, was readable by any script on any
+ * admin page, and was swept into every downloadable backup file". Redacting the
+ * READ left the other end of that list open — the admin TYPES it into the SMTP
+ * form, and every one of those consequences followed from the save.
+ *
+ * The value still reaches the server: `updateStore` pushes from the in-memory
+ * object, and only the cached copy is scrubbed. A blank password means "keep
+ * the stored one" on the way back in, so nothing is lost by not holding it.
+ */
+function scrubbedForCache(settings: AppSettings): AppSettings {
+  if (!settings.smtp?.password) return settings;
+  return { ...settings, smtp: { ...settings.smtp, password: "" } };
+}
+
 function persist(settings: AppSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubbedForCache(settings)));
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
@@ -159,6 +180,32 @@ export async function ensureSettingsHydrated(): Promise<boolean> {
 }
 
 /**
+ * The commerce section, but only once the server's copy is actually in it.
+ *
+ * A section PUT is a replace-all, and `updateStore`'s own comment is explicit
+ * about the limit of the gate it waits on: it protects the sections NOT in the
+ * patch, and "the section that IS in `patch` came from the caller — protecting
+ * that one is the form's job". Every settings FORM does that job, by staying
+ * behind a skeleton until hydration lands. `setGatewayEnabled` is not a form:
+ * it read `getCommerceSettings()` synchronously and only then awaited, so the
+ * whole commerce object was frozen before anything had been read from the
+ * server — and one click on the Cash-on-Delivery switch PUT that frozen copy
+ * back. On a cache as old as the last page load that silently reverts the
+ * delivery fee, the free-delivery threshold, the tax rate and label, gift wrap,
+ * the minimum order value, the order-number prefix, the checkout terms and the
+ * delivery time slots to whatever this browser last saw; on a genuinely empty
+ * one it writes the demo seed. The toast said "Gateway disabled" either way.
+ *
+ * `null` means hydration never settled, and then the caller must send nothing
+ * and report the refusal — the same shape as `readHydratedCoupons`, which this
+ * codebase already wrote for the identical mistake.
+ */
+export async function readHydratedCommerce(): Promise<CommerceSettings | null> {
+  if (!(await ensureSettingsHydrated())) return null;
+  return getCommerceSettings();
+}
+
+/**
  * A settings slice, plus whether the SERVER took it.
  *
  * `SettingsServerSync` merges the server's copy over the local one on every
@@ -187,6 +234,18 @@ async function updateStore(
   // same hydration has landed.
   const hydrated = await ensureSettingsHydrated();
 
+  /**
+   * The cache exactly as it stands, so a refused write can be undone.
+   *
+   * Without this a rejected save stayed in localStorage, and every settings
+   * form writes its whole section back from that cache — so the next edit to
+   * one unrelated field carried the rejected payload to the server. A change
+   * the admin was told had failed landed later, by the back door. The
+   * appearance, header, footer and SEO stores all carry this guard now.
+   */
+  const previousRaw =
+    typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+
   const current = loadSettings();
   let next = mergeAppSettings({ ...current, ...patch });
   if (activity) {
@@ -206,6 +265,7 @@ async function updateStore(
   // after burning the gate's 8-second timeout each time, with the Save button
   // sitting there enabled and unlabelled. Report the failure now instead.
   if (!hydrated && sections.length > 0) {
+    rollBackCache(previousRaw, saved);
     return { value: saved, persisted: false };
   }
 
@@ -215,7 +275,56 @@ async function updateStore(
 
   // A patch touching no server-backed section (the activity log) has nothing
   // that could fail, so it is trivially persisted.
-  return { value: saved, persisted: results.every(Boolean) };
+  const persisted = results.every(Boolean);
+  if (!persisted) rollBackCache(previousRaw, saved);
+
+  // The attempted value goes back to the FORM even on refusal: it is the
+  // admin's own typing and they must be able to retry it. Only the cache is
+  // undone — that is the copy every other form reads its section from.
+  return { value: saved, persisted };
+}
+
+/**
+ * Undoes a refused write in the CACHE, leaving the caller's value alone.
+ *
+ * Every settings form writes its whole section back from this cache, so a
+ * rejected payload left there reaches the server by the back door on the next
+ * edit to an unrelated field — a change the admin was told had failed,
+ * landing later. The form keeps the attempted value so the admin can retry;
+ * the cache must not.
+ *
+ * Restores only if this write is still the one in the cache: undoing
+ * unconditionally would destroy a concurrent save the server had accepted.
+ */
+function rollBackCache(previousRaw: string | null, attempted: AppSettings): void {
+  if (typeof window === "undefined") return;
+
+  // Compared against what was WRITTEN, which is the scrubbed copy — the
+  // in-memory object still carries the typed mail password and would never
+  // match, quietly turning this guard into "never roll back".
+  const stillOurs =
+    localStorage.getItem(STORAGE_KEY) === JSON.stringify(scrubbedForCache(attempted));
+  if (!stillOurs) return;
+
+  if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
+  else localStorage.setItem(STORAGE_KEY, previousRaw);
+
+  /**
+   * The undo has to be announced, exactly as the write was.
+   *
+   * `persist()` dispatches SETTINGS_UPDATED_EVENT and every live consumer reads
+   * the store on it — the sidebar, the storefront module gates, the currency
+   * and timezone. The rollback wrote to localStorage silently, so a refused
+   * save left the whole admin sitting on the value the server had turned down:
+   * the Wedding Builder entry gone from the sidebar, Photo Cake absent from the
+   * product form, the business type switched — all from a write that never
+   * landed, until something else happened to fire the event or the page was
+   * reloaded. The toast said "saved on this device only"; it was not even here.
+   *
+   * The raw string goes back rather than routing through `persist()`, so the
+   * restored value is byte-identical to the one the `stillOurs` guard compared.
+   */
+  window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
 export function getGeneralSettings(): GeneralSettings {
@@ -382,45 +491,115 @@ export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLo
   return { value: value.activity, persisted };
 }
 
+/**
+ * A reset, reporting what is ACTUALLY in place when the server refuses one.
+ *
+ * `runWrite` commits the returned value as the form's working copy whatever the
+ * server answered — it has to, because on a refused SAVE that value is the
+ * admin's own typing and they must be able to retry it. A reset is not typing.
+ * Handing back the defaults after a refusal left the form showing the demo
+ * values over settings the shop still had: the toast said "the saved settings
+ * are unchanged" while the screen said the opposite, and the admin's next Save
+ * pushed those defaults up for real.
+ *
+ * Four of the nine resets were repaired for this, one at a time, each with its
+ * own copy of the explanation — and five were left on the old behaviour,
+ * Commerce among them, which carries the tax rate, the delivery fee, the
+ * minimum order value and which payment methods are switched on. One helper, so
+ * the tenth reset cannot be written the wrong way.
+ *
+ * `readCurrent` is called only on refusal, so it reads the last value the
+ * server confirmed rather than the one it turned down.
+ *
+ * AND IT DRIVES THE RESET ENDPOINT, not a PUT of the defaults. For eight
+ * sections those are the same thing; for SMTP they are not.
+ * `defaultSmtpSettings.password` is `""`, and the server reads a blank password
+ * as "keep the stored one" — a rule that must exist, because the form is never
+ * sent the password back. So a "reset" wrote the demo host, port and username
+ * with the shop's OLD password reattached, said "SMTP settings reset to
+ * defaults", and flipped the hint to "No password saved" while the mail
+ * transport went on authenticating with it. `POST /api/settings/<section>/reset`
+ * skips that rule and files a `settings.reset.<section>` audit row instead of an
+ * update. See `resetSectionRequest`.
+ */
+async function resetToDefaults<K extends keyof AppSettings>(
+  section: K & string,
+  defaults: AppSettings[K],
+  readCurrent: () => AppSettings[K],
+  details: string,
+): Promise<SettingsWriteResult<AppSettings[K]>> {
+  // The local cache is rewritten from the defaults below, and doing that to an
+  // unhydrated cache leaves the demo seed where the next save will push it.
+  if (!(await ensureSettingsHydrated())) return { value: readCurrent(), persisted: false };
+  if (!(await resetSectionRequest(section))) return { value: readCurrent(), persisted: false };
+
+  // The server has already done it, so this is a LOCAL write only — pushing
+  // the defaults back would be the PUT this exists to avoid.
+  const current = loadSettings();
+  const next = appendActivity(
+    mergeAppSettings({ ...current, [section]: defaults } as Partial<AppSettings>),
+    "reset",
+    "settings",
+    details,
+  );
+  const saved = saveSettings(next);
+  return { value: saved[section], persisted: true };
+}
+
 /** Section-scoped resets — do not wipe sibling settings slices. */
 export function resetGeneralSettings(): Promise<SettingsWriteResult<GeneralSettings>> {
-  return saveGeneralSettings({ ...defaultGeneralSettings });
+  return resetToDefaults("general", { ...defaultGeneralSettings }, getGeneralSettings, "General settings reset");
 }
 
 export function resetContactSettings(): Promise<SettingsWriteResult<ContactSettings>> {
-  return saveContactSettings({ ...defaultContactSettings });
+  return resetToDefaults("contact", { ...defaultContactSettings }, getContactSettings, "Contact settings reset");
 }
 
 export function resetSocialLinks(): Promise<SettingsWriteResult<SocialLinkSettings[]>> {
-  return saveSocialLinks(defaultSocialLinks.map((link) => ({ ...link })));
+  return resetToDefaults(
+    "social",
+    defaultSocialLinks.map((link) => ({ ...link })),
+    getSocialLinks,
+    "Social links reset",
+  );
 }
 
 export function resetSecuritySettings(): Promise<SettingsWriteResult<SecuritySettings>> {
-  return saveSecuritySettings({ ...defaultSecuritySettings });
+  return resetToDefaults("security", { ...defaultSecuritySettings }, getSecuritySettings, "Security settings reset");
 }
 
 export function resetSmtpSettings(): Promise<SettingsWriteResult<SmtpSettings>> {
-  return saveSmtpSettings({ ...defaultSmtpSettings });
+  return resetToDefaults("smtp", { ...defaultSmtpSettings }, getSmtpSettings, "SMTP settings reset");
 }
 
 export function resetAnalyticsSettings(): Promise<SettingsWriteResult<AnalyticsSettings>> {
-  return saveAnalyticsSettings({ ...defaultAnalyticsSettings });
+  return resetToDefaults("analytics", { ...defaultAnalyticsSettings }, getAnalyticsSettings, "Analytics settings reset");
 }
 
 export function resetMaintenanceSettings(): Promise<SettingsWriteResult<MaintenanceSettings>> {
-  return saveMaintenanceSettings({ ...defaultMaintenanceSettings });
+  return resetToDefaults(
+    "maintenance",
+    { ...defaultMaintenanceSettings },
+    getMaintenanceSettings,
+    "Maintenance settings reset",
+  );
 }
 
 export function resetCommerceSettings(): Promise<SettingsWriteResult<CommerceSettings>> {
-  return saveCommerceSettings({
-    ...defaultCommerceSettings,
-    paymentMethods: { ...defaultCommerceSettings.paymentMethods },
-    deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
-  });
+  return resetToDefaults(
+    "commerce",
+    {
+      ...defaultCommerceSettings,
+      paymentMethods: { ...defaultCommerceSettings.paymentMethods },
+      deliveryTimeSlots: [...defaultCommerceSettings.deliveryTimeSlots],
+    },
+    getCommerceSettings,
+    "Commerce settings reset",
+  );
 }
 
 export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSettings>> {
-  return saveModuleSettings({ ...defaultModuleSettings });
+  return resetToDefaults("modules", { ...defaultModuleSettings }, getModuleSettings, "Module settings reset");
 }
 
 export function exportLocalStorageBackup(): Record<string, string | null> {
@@ -436,6 +615,23 @@ export function exportLocalStorageBackup(): Record<string, string | null> {
   return backup;
 }
 
+/**
+ * The list of rollback points is not shop data, and a restore never writes it.
+ *
+ * `bakery-cms-backup-history` starts with `bakery-cms` like everything else, so
+ * it rode along in both directions: every snapshot embedded the whole previous
+ * history (doubling in size per export until localStorage threw and export
+ * simply stopped working), and every restore replaced this machine's history
+ * with the one from the file — including the "Before import" snapshot the
+ * import dialog had written seconds earlier and promised the admin they could
+ * roll back to. The one rollback point they need is the one the restore
+ * deleted.
+ *
+ * Named here rather than only at the call sites because this function is the
+ * choke point every restore path goes through, including the legacy one.
+ */
+const BACKUP_HISTORY_KEY = "bakery-cms-backup-history";
+
 export function importLocalStorageBackup(
   backup: Record<string, string | null>
 ): number {
@@ -444,6 +640,7 @@ export function importLocalStorageBackup(
   let count = 0;
   for (const [key, value] of Object.entries(backup)) {
     if (!key.startsWith("bakery-cms") || value === null) continue;
+    if (key === BACKUP_HISTORY_KEY) continue;
     localStorage.setItem(key, value);
     count += 1;
   }

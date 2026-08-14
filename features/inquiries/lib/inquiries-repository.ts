@@ -1,3 +1,4 @@
+import { createHydrationGate } from "@/lib/hydration-gate";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
 import {
   createInquiryRequest,
@@ -8,6 +9,18 @@ import {
 const STORAGE_KEY = "bakery-cms-inquiries";
 
 export const INQUIRIES_UPDATED_EVENT = "bakery-inquiries-updated";
+
+/**
+ * Open once the SERVER's inquiries have been read, not once localStorage has.
+ *
+ * The server is the source of truth here and this key is only a cache, so on a
+ * fresh browser — a first login, another device, a cleared profile — the read
+ * below returns `[]` in the first frame. A screen that treats that as an
+ * answer paints "0" captioned "All clear" in green, and "No inquiries found",
+ * over an inbox with unanswered customers in it. Settled here rather than in
+ * the sync hook so it cannot drift from the write it stands for.
+ */
+export const inquiriesHydration = createHydrationGate();
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -195,23 +208,37 @@ function persistInquiries(inquiries: Inquiry[]): void {
 /** Hydration: replace the local cache with the server's inquiries (no re-push). */
 export function persistServerInquiries(inquiries: Inquiry[]): void {
   persistInquiries(inquiries);
+  inquiriesHydration.markSettled();
 }
 
+/**
+ * The admin's cached enquiry list. A CACHE — never a source of enquiries.
+ *
+ * Empty used to mean "not seeded yet": `parsed.length > 0 ? parsed : seed()`.
+ * So an admin who cleared the list watched the 12 demo enquiries reappear on
+ * the next read, and the counts and badges counted them. There is no way to
+ * have no enquiries.
+ *
+ * The SERVER seeds a demo shop once, against a flag that survives deletions —
+ * `ensureSeeded` in inquiry.service.ts. That is the right place for the
+ * decision: one shop, once, visible to everyone. Empty here now means empty,
+ * and the list fills when `useInquiriesServerSync` hydrates it.
+ *
+ * The `getItem` call is inside the try because it throws in a browser that
+ * denies storage — private mode, blocked cookies — and an admin screen must
+ * fall back to the server rather than crash.
+ */
 export function loadInquiries(): Inquiry[] {
-  if (typeof window === "undefined") return seedInquiries();
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedInquiries();
-    persistInquiries(seeded);
-    return seeded;
-  }
+  if (typeof window === "undefined") return [];
 
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
     const parsed = JSON.parse(raw) as Inquiry[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedInquiries();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return seedInquiries();
+    return [];
   }
 }
 
@@ -247,7 +274,19 @@ export async function addInquiry(
     updatedAt: timestamp,
   };
   persistInquiries([created, ...inquiries]);
-  return { inquiry: created, persisted: await createInquiryRequest(created) };
+
+  const stored = await createInquiryRequest(created);
+  if (!stored) return { inquiry: created, persisted: false };
+
+  // The server mints the id, so the local row adopts it. Without this every
+  // later admin edit or delete of this enquiry addresses an id the server has
+  // never heard of — the row looks editable and quietly changes nothing.
+  if (stored.id !== created.id) {
+    created.id = stored.id;
+    persistInquiries([created, ...inquiries]);
+  }
+
+  return { inquiry: created, persisted: true };
 }
 
 export async function updateInquiry(

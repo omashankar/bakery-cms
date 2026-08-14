@@ -21,7 +21,7 @@ import {
   adminCategories,
   adminFlavours,
   adminOccasions,
-  getDefaultWeights,
+  rederiveWeights,
 } from "@/features/products/lib/catalog-options";
 import { slugify } from "@/features/products/lib/product-utils";
 import { createEmptyProductForm } from "@/features/products/lib/products-repository";
@@ -65,7 +65,12 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
+  /** The status the SERVER holds, which is the only one the storefront honours. */
+  const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(null);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
+  // Once the admin types a meta title of their own, the name stops driving it.
+  // In edit mode the stored value is already theirs.
+  const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
@@ -90,6 +95,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         if (cancelled) return;
         const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
         setForm(data);
+        setSavedStatus(data.status);
         setIsLoading(false);
       } catch {
         if (cancelled) return;
@@ -116,7 +122,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugTouched ? prev.slug : slugify(name),
       seo: {
         ...prev.seo,
-        metaTitle: prev.seo.metaTitle || `${name} | Monginis`,
+        // Tracks the name until the admin edits the meta title themselves.
+        //
+        // This was `prev.seo.metaTitle || `${name} | Monginis``, so the FIRST
+        // keystroke made it truthy and the `||` short-circuited for every one
+        // after: typing "Rose Truffle Delight" left the SEO tab, the search
+        // preview card and the stored record all reading "R | Monginis". The
+        // brand was hard-coded too, in a CMS meant to run more than one shop.
+        metaTitle: metaTitleTouched ? prev.seo.metaTitle : name,
       },
     }));
   }
@@ -125,7 +138,11 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     setForm((prev) => ({
       ...prev,
       price,
-      weights: getDefaultWeights(price),
+      // Only re-derive the tiers the admin has not priced by hand. Replacing
+      // them wholesale meant editing the base price by one rupee silently
+      // discarded every weight price that had been typed in — the tiers the
+      // customer actually pays.
+      weights: rederiveWeights(prev.weights, price, prev.price),
     }));
   }
 
@@ -177,7 +194,10 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       ...resolveStockFields(form),
       ...syncLegacyFlagsFromVariants(
         form.variantGroups,
-        getDefaultVariantSelections(form.variantGroups)
+        getDefaultVariantSelections(form.variantGroups),
+        // Without the form's own flags, a product with no egg variant group
+        // had its "Eggless" tick overwritten with false on every save.
+        { isEggless: form.isEggless, isPhotoCake: form.isPhotoCake },
       ),
     };
 
@@ -187,6 +207,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         toast.success(status === "published" ? "Cake published" : "Cake saved as draft");
       } else if (cakeId) {
         await updateProductRequest(cakeId, payload);
+        setSavedStatus(payload.status);
         toast.success(status === "published" ? "Cake updated & published" : "Draft saved");
       }
     } catch (error) {
@@ -200,11 +221,42 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     if (redirectToList) router.push(routes.admin.cakes.list);
   }
 
+  /**
+   * Open the cake as a customer sees it.
+   *
+   * The storefront route serves published products only, so this opened a 404
+   * for every draft and for anything not yet saved — a button labelled Preview
+   * that could not preview the two things an admin most wants to check. The
+   * admin preview screen renders the same product from the server and works for
+   * both, so an unpublished cake goes there instead.
+   */
   function openPreview() {
     if (!form.slug) {
       toast.error("Add a slug before previewing");
       return;
     }
+
+    if (mode === "add" || !cakeId) {
+      toast.error("Save the cake first", {
+        description: "There is nothing to preview until it exists.",
+      });
+      return;
+    }
+
+    /**
+     * The SERVER's status, not the dropdown's.
+     *
+     * `form.status` is the unsaved value, so switching the dropdown to
+     * "Published" and pressing Preview before saving opened
+     * /store/cakes/<slug> for a product the server still holds as a draft —
+     * the shop's own 404, from the admin's preview button.
+     */
+    if (savedStatus !== "published") {
+      // A draft has no public page; show the admin preview rather than a 404.
+      router.push(routes.admin.cakes.preview(cakeId));
+      return;
+    }
+
     window.open(routes.store.cake(form.slug), "_blank", "noopener,noreferrer");
   }
 
@@ -287,8 +339,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     id="shortDescription"
                     value={form.shortDescription ?? ""}
                     onChange={(e) => patchForm({ shortDescription: e.target.value })}
-                    placeholder="One-line summary for cards"
+                    placeholder="One line, shown in Google results"
                   />
+                  {/*
+                    The placeholder said "One-line summary for cards" and no card
+                    rendered it — nothing did. It is now the meta description
+                    this cake's page ships when the SEO tab is left blank, which
+                    is a real destination, so the hint says that instead.
+                  */}
+                  <p className="text-xs text-muted-foreground">
+                    Used as the search-result description when the SEO tab is empty.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Full description</Label>
@@ -640,32 +701,29 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   ) : null}
                 </div>
 
+                {/*
+                  Shown, not edited.
+
+                  Both were editable number inputs whose values `updateProduct`
+                  deliberately re-imposes from the stored record — its comment
+                  says so: they are "owned by the reviews aggregate". So the
+                  admin typed a rating, pressed Save, read "Cake updated &
+                  published", and the number went back to what it was. The one
+                  thing the form must not do is invite a change it discards.
+                */}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="rating">Rating (1–5)</Label>
-                    <Input
-                      id="rating"
-                      type="number"
-                      min={1}
-                      max={5}
-                      step={0.1}
-                      value={form.rating}
-                      onChange={(e) => patchForm({ rating: Number(e.target.value) || 0 })}
-                    />
+                    <Label htmlFor="rating">Rating</Label>
+                    <Input id="rating" value={form.rating || "No reviews yet"} readOnly disabled />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reviewCount">Review count</Label>
-                    <Input
-                      id="reviewCount"
-                      type="number"
-                      min={0}
-                      value={form.reviewCount}
-                      onChange={(e) =>
-                        patchForm({ reviewCount: Number(e.target.value) || 0 })
-                      }
-                    />
+                    <Input id="reviewCount" value={form.reviewCount} readOnly disabled />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Set by customer reviews. Moderate them under Commerce → Reviews.
+                </p>
               </TabsContent>
 
               <TabsContent value="media" className="space-y-4">
@@ -709,9 +767,10 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   <Input
                     id="metaTitle"
                     value={form.seo.metaTitle ?? ""}
-                    onChange={(e) =>
-                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } })
-                    }
+                    onChange={(e) => {
+                      setMetaTitleTouched(true);
+                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } });
+                    }}
                   />
                 </div>
                 <div className="space-y-2">

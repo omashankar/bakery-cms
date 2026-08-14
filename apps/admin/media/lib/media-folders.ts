@@ -1,5 +1,6 @@
 import type { MediaFolder } from "@/types/media";
 import { replaceMediaFoldersRequest } from "./media-api";
+import { MEDIA_UPDATED_EVENT } from "./media-utils";
 import type { WriteResult } from "@/lib/write-result";
 
 const FOLDERS_STORAGE_KEY = "bakery-cms-media-folders";
@@ -56,7 +57,8 @@ export function loadMediaFolders(): MediaFolder[] {
 
   try {
     const parsed = JSON.parse(raw) as MediaFolder[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    // Only a missing or unreadable value seeds — see the other content caches.
+    if (!Array.isArray(parsed)) {
       persist(defaultMediaFolders);
       return defaultMediaFolders;
     }
@@ -77,13 +79,47 @@ export async function saveMediaFolders(
 /** Hydration: write the server's folders into the local cache (no re-push). */
 export function persistServerMediaFolders(folders: MediaFolder[]): void {
   persist(folders);
+  /**
+   * Announced on its own, rather than depending on a sibling's write order.
+   *
+   * This wrote silently and relied on `persistServerMedia` — which does
+   * dispatch — happening afterwards. Ordering is now correct in the sync, but a
+   * write nobody is told about is a trap for the next caller: the folder
+   * sidebar is only ever redrawn by this event.
+   */
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(MEDIA_UPDATED_EVENT));
+  }
 }
 
-export async function createMediaFolder(name: string): Promise<WriteResult<MediaFolder>> {
+/** Trimmed and case-folded, so "cakes" and "Cakes " are the same folder name. */
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+export function mediaFolderNameTaken(name: string): boolean {
+  return loadMediaFolders().some((folder) => sameName(folder.name, name));
+}
+
+/**
+ * `value` is null when the name is already taken.
+ *
+ * There was no check at all, and the sidebar and the Move dialog show only the
+ * name — the option's value is the id. So a second folder called "Cakes" was
+ * visually identical to the built-in one, and files scattered across two folders
+ * the admin believed were one, with no way to tell them apart or to merge them.
+ */
+export async function createMediaFolder(
+  name: string,
+): Promise<WriteResult<MediaFolder | null>> {
+  const trimmed = name.trim();
+  if (!trimmed) return { value: null, persisted: false };
+  if (mediaFolderNameTaken(trimmed)) return { value: null, persisted: false };
+
   const folders = loadMediaFolders();
   const folder: MediaFolder = {
     id: `folder-${Date.now()}`,
-    name: name.trim(),
+    name: trimmed,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };

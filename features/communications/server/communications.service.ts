@@ -12,6 +12,7 @@ import { sendMail } from "@/lib/server/mail/send-mail";
 import { toEmailHtml } from "./email.service";
 import { renderTemplate } from "@/lib/template-render";
 import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { allowlisted } from "@/lib/server/http/allowlist";
 import {
   TEMPLATE_VARIABLE_CONTRACT,
   WHATSAPP_VARIABLE_CONTRACT,
@@ -39,7 +40,7 @@ export type TemplateKey = keyof typeof templateStores;
 export const TEMPLATE_KEYS = Object.keys(templateStores) as TemplateKey[];
 
 function templateStoreFor(key: string) {
-  const store = templateStores[key as TemplateKey];
+  const store = allowlisted(templateStores, key);
   if (!store) throw new NotFoundError("Unknown template collection");
   return store;
 }
@@ -193,26 +194,50 @@ export async function writeTemplates(key: string, items: unknown[]): Promise<voi
  * Meta on live orders. So the stored value wins, and a template the server has
  * never seen starts at `not_submitted` no matter what arrived with it.
  *
- * Changing the Meta NAME resets it too: the approval belonged to the old name.
+ * Changing the Meta NAME OR LANGUAGE resets it too: the approval belonged to
+ * the old pair.
  */
+/** The fields this function actually reads. Named, so a caller cannot pass a
+ *  binding it will silently ignore. */
+interface ApprovalCarrier {
+  id?: string;
+  metaName?: string;
+  metaLanguage?: string;
+  approval?: string;
+}
+
 export function keepServerApproval(
-  incoming: { id?: string }[],
-  stored: { id?: string }[],
+  incoming: ApprovalCarrier[],
+  stored: ApprovalCarrier[],
 ): unknown[] {
   const byId = new Map(
     stored
       .filter((item) => item.id)
-      .map((item) => [item.id as string, item as { approval?: string; metaName?: string }]),
+      .map((item) => [item.id as string, item] as const),
   );
+
+  /**
+   * Meta approves a template per NAME AND LANGUAGE, so both are identity.
+   *
+   * This compared the name alone. `listMetaTemplates` keys its results
+   * `name|language` and `planMetaSync` builds its lookup the same way, for
+   * exactly this reason — the language is as identity-bearing as the name. So an
+   * admin who kept the name and switched the language from `en` to `hi` carried
+   * the old approval across: the send path gates only on that flag
+   * (`if (template.approval !== "approved") return`) and then passes the NEW
+   * language straight to Meta, which has approved nothing under it. Every send
+   * is rejected, and the screen still shows the template as approved.
+   */
+  const identity = (value: ApprovalCarrier | undefined) =>
+    `${(value?.metaName ?? "").trim()}|${(value?.metaLanguage ?? "").trim()}`;
 
   return incoming.map((item) => {
     const previous = item.id ? byId.get(item.id) : undefined;
-    const sameName =
-      (previous?.metaName ?? "").trim() === ((item as { metaName?: string }).metaName ?? "").trim();
+    const sameBinding = identity(previous) === identity(item);
 
     return {
       ...item,
-      approval: previous && sameName ? (previous.approval ?? "not_submitted") : "not_submitted",
+      approval: previous && sameBinding ? (previous.approval ?? "not_submitted") : "not_submitted",
     };
   });
 }
@@ -316,13 +341,26 @@ export async function sendTemplateTest(
   if (!template) return { sent: false, error: "That template no longer exists." };
 
   const sample = getSampleDataForVariables(template.variables ?? [], { slug: template.slug });
+  const body = renderTemplate(template.body, sample);
+
   return sendMail({
     to,
     subject: `[Test] ${renderTemplate(template.subject, sample)}`,
     // Including the preview line, so a test shows what an inbox will.
     html: toEmailHtml(
-      renderTemplate(template.body, sample),
+      body,
       template.previewText ? renderTemplate(template.previewText, sample) : undefined,
     ),
+    /**
+     * The plain-text alternative, given explicitly — as the real sender does.
+     *
+     * Without it `sendMail` derives text from the HTML, and the HTML carries
+     * the hidden preheader block: thirty repetitions of `&#847;&zwnj;&nbsp;`,
+     * padding that exists to stop an inbox preview spilling into the body. A
+     * text-only client showed the test as a wall of entities that no real
+     * order confirmation contains — so the one thing the button exists to
+     * check, "what will the customer see", was the one thing it got wrong.
+     */
+    text: body,
   });
 }

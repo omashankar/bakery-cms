@@ -6,6 +6,18 @@ import {
   importLocalStorageBackup,
 } from "@/features/settings/lib/settings-repository";
 import { mergeAppSettings } from "@/features/settings/lib/settings-utils";
+import { ensureSettingsHydrated } from "@/features/settings/lib/settings-repository";
+import {
+  fetchEmailTemplates,
+  fetchWhatsAppTemplates,
+  restoreEmailTemplatesRequest,
+  restoreWhatsAppTemplatesRequest,
+} from "@/apps/admin/communications/lib/communications-api";
+import { ensureCommunicationsHydrated } from "@/apps/admin/communications/lib/use-communications-server-sync";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { ensureSeoHydrated } from "@/features/site-layout/lib/site-layout-hydration";
+import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
+import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import {
   fetchFullSettings,
   pushSection,
@@ -38,7 +50,7 @@ import {
   fetchZones,
   restoreZonesRequest,
   fetchCoupons,
-  replaceCouponsRequest,
+  restoreCouponsRequest,
 } from "@/features/commerce/lib/commerce-api";
 import {
   fetchInvoiceSettings,
@@ -88,22 +100,44 @@ function replacer<T>(fn: (value: T) => Promise<boolean>): (value: unknown) => Pr
   return (value) => fn(value as T);
 }
 
+/**
+ * False when there was nothing recognisable to send.
+ *
+ * `[].every(Boolean)` is `true`, so a payload whose keys match no known
+ * section reported a successful push having contacted the server zero
+ * times — and the restore then listed it among the sections it had
+ * restored. On the one screen where an admin cannot check by eye, that is
+ * the worst direction to be wrong in.
+ */
 async function pushSettingsSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
+  const present = SERVER_SECTIONS.filter((section) => record[section] !== undefined);
+  if (present.length === 0) return false;
+
   const results = await Promise.all(
-    SERVER_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
-      pushSection(section, record[section])
-    )
+    present.map((section) => pushSection(section, record[section]))
   );
   return results.every(Boolean);
 }
 
+/**
+ * The same guard, for the same reason — this twin was left without it.
+ *
+ * A `bakery-cms-catalog` blob carrying no recognised section pushed nothing,
+ * returned true, and was listed among the restored sections. Worse than the
+ * settings case: `loadCatalogStore` substitutes `defaultCategories`,
+ * `defaultFlavours`, `defaultOccasions` and `defaultWeightOptions` for every
+ * section the blob is missing, so the admin was told their catalogue had been
+ * restored while the demo seed sat in the cache waiting for the Catalog page's
+ * next replace-all save to ship it to Mongo.
+ */
 async function pushCatalogSections(value: unknown): Promise<boolean> {
   const record = (value ?? {}) as Record<string, unknown>;
+  const present = CATALOG_SECTIONS.filter((section) => record[section] !== undefined);
+  if (present.length === 0) return false;
+
   const results = await Promise.all(
-    CATALOG_SECTIONS.filter((section) => record[section] !== undefined).map((section) =>
-      pushCatalogSection(section, record[section])
-    )
+    present.map((section) => pushCatalogSection(section, record[section]))
   );
   return results.every(Boolean);
 }
@@ -161,7 +195,44 @@ const SERVER_BACKUP_SECTIONS: ServerBackupSection[] = [
     // deletes nothing, leaving rows the backup does not contain.
     push: replacer(restoreZonesRequest),
   },
-  { key: "bakery-cms-coupons", title: "Coupons", fetch: fetchCoupons, push: replacer(replaceCouponsRequest) },
+  {
+    key: "bakery-cms-coupons",
+    title: "Coupons",
+    fetch: fetchCoupons,
+    // restore, not save: a bare replaceCouponsRequest sends no knownIds and so
+    // deletes nothing, leaving codes the backup does not contain live and
+    // redeemable.
+    push: replacer(restoreCouponsRequest),
+  },
+  /**
+   * The two template collections, which were missing from this list entirely.
+   *
+   * Both have a whole-value server endpoint, and `exportLocalStorageBackup()`
+   * copies every `bakery-cms*` key — so the templates were IN the file and not
+   * in `serverBackedKeys`. A restore therefore dropped them into the
+   * browser-only bucket and wrote them straight to localStorage, pushing
+   * nothing. That is the back door this file exists to close: the admin
+   * templates screen composes its next save from that cache, so the FIRST
+   * unrelated template edit shipped the whole restored set to Mongo — a
+   * restore the admin was told was local, landing later, over wording the shop
+   * had since replaced.
+   *
+   * Restore-style pushes, like coupons and zones above: the current server ids
+   * go up as `knownIds`, so a template the backup does not contain is actually
+   * removed rather than left behind sending old wording.
+   */
+  {
+    key: "bakery-cms-email-templates",
+    title: "Email templates",
+    fetch: fetchEmailTemplates,
+    push: replacer(restoreEmailTemplatesRequest),
+  },
+  {
+    key: "bakery-cms-whatsapp-templates",
+    title: "WhatsApp templates",
+    fetch: fetchWhatsAppTemplates,
+    push: replacer(restoreWhatsAppTemplatesRequest),
+  },
   {
     key: "bakery-cms-invoice-settings",
     title: "Invoice settings",
@@ -208,6 +279,16 @@ export interface RestoreResult {
   serverSections: string[];
   /** Titles the server refused — restored in this browser only. */
   failedSections: string[];
+  /**
+   * Whether every hydration gate opened before the push.
+   *
+   * A guarded PUT refuses before any request leaves the browser when its
+   * gate is shut, and that refusal is indistinguishable from the server
+   * saying no — so a restore from a cold or signed-out tab blamed the
+   * server for sections it never contacted. The screen needs to tell those
+   * two apart, because they have completely different remedies.
+   */
+  gatesOpen: boolean;
 }
 
 function nowIso(): string {
@@ -292,6 +373,19 @@ export interface ServerBackupData {
  */
 export async function buildServerBackup(): Promise<ServerBackupData> {
   const base = exportLocalStorageBackup();
+  /**
+   * A snapshot must not contain the shelf it is about to be put on.
+   *
+   * `exportLocalStorageBackup()` copies EVERY `bakery-cms*` key, and this
+   * store's own history is one of them. So each snapshot embedded the whole
+   * previous history, and the next snapshot embedded that — the size roughly
+   * doubling per export until `localStorage.setItem` threw QuotaExceededError
+   * and every export and import failed with "please try again" and no file.
+   *
+   * It also made the history a thing a RESTORE could overwrite; see the filter
+   * in `restoreBackupToServer`.
+   */
+  delete base[STORAGE_KEY];
   const unavailableSections: string[] = [];
 
   await Promise.all(
@@ -346,9 +440,44 @@ export async function buildServerBackupData(): Promise<Record<string, string | n
  * have no whole-value endpoint — are written either way, because for them the
  * browser IS the destination.
  */
+/**
+ * Opens every gate a restore will push through, before it pushes anything.
+ *
+ * Each guarded PUT waits out the full hydration deadline when its gate is
+ * shut, and a restore writes sixteen sections in sequence — so a restore from
+ * a tab that never hydrated took minutes and then reported the server as
+ * having refused, which it never did. Opening them here rather than at the
+ * call site means the function cannot be used wrongly.
+ *
+ * Failures are ignored on purpose: a gate that will not open is exactly the
+ * case the per-section refusal reporting already handles honestly.
+ */
+async function openEveryGate(): Promise<boolean> {
+  const results = await Promise.allSettled([
+    ensureSettingsHydrated(),
+    ensureSiteLayoutHydrated(),
+    ensureSeoHydrated(),
+    ensureAdminConfigHydrated(),
+    ensureInvoiceSettingsHydrated(),
+    // The template gates, now that the two collections round-trip through
+    // the server. Without this every template push waits out its full
+    // deadline and then reports the server as having refused, which it never did.
+    ensureCommunicationsHydrated().then((r) => r.email && r.whatsapp),
+  ]);
+
+  // An opener that rejected, or resolved false, means its gate is still
+  // shut — and every write behind it will refuse without contacting the
+  // server.
+  return results.every(
+    (result) => result.status === "fulfilled" && result.value !== false,
+  );
+}
+
 export async function restoreBackupToServer(
   data: Record<string, string | null>
 ): Promise<RestoreResult> {
+  const gatesOpen = await openEveryGate();
+
   const serverSections: string[] = [];
   const failedSections: string[] = [];
   const accepted: Record<string, string | null> = {};
@@ -375,13 +504,26 @@ export async function restoreBackupToServer(
     }
   }
 
+  /**
+   * The backup history is never restored FROM a backup.
+   *
+   * It is not shop data, it is the list of rollback points on this machine —
+   * and it fell into the browser-only bucket, so importing a file replaced it
+   * with whatever snapshots existed on the machine that produced that file,
+   * months ago. Including, specifically, the "Before import" snapshot written
+   * moments earlier by the very dialog that promises "A snapshot of your
+   * current data is archived first, so you can roll back from history". The one
+   * rollback point an admin needs is the one the restore deleted.
+   */
   const browserOnly = Object.fromEntries(
-    Object.entries(data).filter(([key]) => !serverBackedKeys.includes(key)),
+    Object.entries(data).filter(
+      ([key]) => !serverBackedKeys.includes(key) && key !== STORAGE_KEY,
+    ),
   );
 
   const localCount = importLocalStorageBackup({ ...browserOnly, ...accepted });
 
-  return { localCount, serverSections, failedSections };
+  return { localCount, serverSections, failedSections, gatesOpen };
 }
 
 export async function restoreBackupSnapshotToServer(

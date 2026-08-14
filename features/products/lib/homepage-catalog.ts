@@ -1,6 +1,8 @@
-import type { LandingProduct, LandingCategory } from "@/constants/landing-data";
+import type { LandingProduct, LandingCategory, LandingOffer } from "@/constants/landing-data";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { getCategories } from "@/features/catalog/lib/catalog-repository";
+import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
+import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
 import { getAllProducts } from "@/features/products/lib/product-catalog";
 import {
   buildHomepageProducts,
@@ -48,9 +50,14 @@ export function selectHomepageCategories(
           name: category.name,
           slug: category.slug,
           image: category.image ?? "",
-          count:
-            category.cakeCount ??
-            published.filter((cake) => cake.categoryId === category.id).length,
+          // Counted, never declared.
+          //
+          // This was `category.cakeCount ?? <the real count>`, so a number typed
+          // into the category form OVERRODE the shop's actual catalogue — and
+          // the seed had typed one for nine of them. Measured on a real shop:
+          // the homepage advertised "48 cakes" under Birthday and 271 across all
+          // categories, while the whole shop held 25 products.
+          count: published.filter((cake) => cake.categoryId === category.id).length,
         }) satisfies LandingCategory
     )
     .filter((category) => category.image)
@@ -59,4 +66,15 @@ export function selectHomepageCategories(
 
 export function getHomepageCategories(maxCount = 6): LandingCategory[] {
   return selectHomepageCategories(loadProducts(), getCategories(), maxCount);
+}
+
+/**
+ * Browser-side offers, for the builder preview only.
+ *
+ * The storefront reads coupons on the server and passes the cards down; this is
+ * the fallback the admin's preview panel uses, exactly as `getHomepageProducts`
+ * and `getHomepageCategories` above are.
+ */
+export function getHomepageOffers(maxCount = 3): LandingOffer[] {
+  return selectStorefrontOffers(getActiveCoupons(), maxCount);
 }

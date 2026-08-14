@@ -3,7 +3,10 @@
 import { AlertTriangle, CheckCircle2, Clock, HelpCircle } from "lucide-react";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { availableVariablesFor } from "@/features/communications/lib/template-contract";
-import { countUnfilledSlots } from "@/apps/admin/communications/lib/whatsapp-template-utils";
+import {
+  countSurplusParameters,
+  countUnfilledSlots,
+} from "@/apps/admin/communications/lib/whatsapp-template-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
@@ -79,6 +82,7 @@ export function WhatsAppMetaBindingFields({
   const variableOptions = availableVariablesFor(draft.slug, draft.variables, "whatsapp");
 
   const unfilled = countUnfilledSlots(slots, parameters);
+  const surplus = countSurplusParameters(slots, parameters);
 
   function setParameter(index: number, value: string) {
     const next = Array.from({ length: slots }, (_, position) =>
@@ -234,6 +238,25 @@ export function WhatsAppMetaBindingFields({
           <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
             {unfilled} of {slots} placeholder{slots === 1 ? "" : "s"} has no value. Meta refuses a
             message that does not fill every one of them.
+          </p>
+        ) : null}
+
+        {/*
+          And the other direction, which nothing said.
+
+          `countUnfilledSlots` walks Meta's slot count, so a mapping LONGER than
+          the approved body counted zero blanks and this alert never rendered.
+          Meta rejects a mismatch in either direction — with `parameterCount: 0`
+          the panel above positively says "This template takes no variables"
+          while the surplus rows sit in the record — so the send failed with
+          nothing on screen to explain it. Said here, where the count is known
+          and the admin can still fix it.
+        */}
+        {surplus > 0 ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
+            {surplus} more value{surplus === 1 ? " is" : "s are"} mapped than Meta&apos;s approved
+            wording takes ({slots} placeholder{slots === 1 ? "" : "s"}). Meta refuses a message
+            whose parameter count does not match, in either direction.
           </p>
         ) : null}
 

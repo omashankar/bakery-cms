@@ -65,7 +65,11 @@ export function ResetPasswordFormPage() {
   return (
     <AuthCard
       title="Create new password"
-      description="Use at least 8 characters with letters and numbers."
+      // The rule the SERVER applies. This said "letters and numbers" while
+      // `strongPassword` also requires an uppercase letter, so a password
+      // typed to match this sentence was refused — on the one screen a user
+      // reaches when they are already locked out.
+      description="At least 8 characters, with letters and numbers."
       footer={
         <Link
           href={routes.auth.login}
@@ -87,6 +91,11 @@ export function ResetPasswordFormPage() {
               {...register("password", {
                 required: "Password is required",
                 minLength: { value: 8, message: "Minimum 8 characters" },
+                // Checked here too, so the answer arrives before a round
+                // trip rather than as a refusal from the server.
+                validate: (value: string) =>
+                  (/[a-zA-Z]/.test(value) && /[0-9]/.test(value)) ||
+                  "Include letters and numbers",
               })}
             />
             <button

@@ -91,11 +91,11 @@ describe("customer grouping", () => {
 });
 
 describe("segment derivation", () => {
-  const base = { id: "a", email: "a@x.com", name: "A", phone: "1", lastOrderNumber: "BK-1" };
+  const base = { id: "a", email: "a@x.com", name: "A", phone: "1", lastOrderNumber: "BK-1", countableOrderCount: 0 };
 
   it("calls five orders or ₹5000 spent a VIP", () => {
-    const byCount = { ...base, orderCount: 5, totalSpent: 100, lastOrderAt: new Date(NOW).toISOString() };
-    const bySpend = { ...base, orderCount: 1, totalSpent: 5000, lastOrderAt: new Date(NOW).toISOString() };
+    const byCount = { ...base, orderCount: 5, countableOrderCount: 5, totalSpent: 100, lastOrderAt: new Date(NOW).toISOString() };
+    const bySpend = { ...base, orderCount: 1, countableOrderCount: 1, totalSpent: 5000, lastOrderAt: new Date(NOW).toISOString() };
 
     expect(deriveCustomerSegment(byCount, NOW)).toBe("vip");
     expect(deriveCustomerSegment(bySpend, NOW)).toBe("vip");
@@ -105,15 +105,15 @@ describe("segment derivation", () => {
     const stale = new Date(NOW - 120 * DAY).toISOString();
 
     expect(
-      deriveCustomerSegment({ ...base, orderCount: 2, totalSpent: 100, lastOrderAt: stale }, NOW)
+      deriveCustomerSegment({ ...base, orderCount: 2, countableOrderCount: 2, totalSpent: 100, lastOrderAt: stale }, NOW)
     ).toBe("at_risk");
     expect(
-      deriveCustomerSegment({ ...base, orderCount: 1, totalSpent: 100, lastOrderAt: stale }, NOW)
+      deriveCustomerSegment({ ...base, orderCount: 1, countableOrderCount: 1, totalSpent: 100, lastOrderAt: stale }, NOW)
     ).toBe("inactive");
   });
 
   it("takes the clock as an argument so the server does not decide it", () => {
-    const customer = { ...base, orderCount: 1, totalSpent: 100, lastOrderAt: new Date(NOW).toISOString() };
+    const customer = { ...base, orderCount: 1, countableOrderCount: 1, totalSpent: 100, lastOrderAt: new Date(NOW).toISOString() };
 
     expect(deriveCustomerSegment(customer, NOW)).toBe("new");
     // Same customer, judged 200 days later.
@@ -229,5 +229,81 @@ describe("buildCustomerProfiles", () => {
 
     expect(profile.meta.tags).toEqual([]);
     expect(profile.meta.marketingOptIn).toBe(true);
+  });
+});
+
+/**
+ * A segment is a judgement about a customer's value.
+ *
+ * It read `orderCount`, which counts every order placed — cancelled ones
+ * included. So a customer who placed five orders and cancelled all five was
+ * labelled the shop's best, and two cancellations were enough for "at risk".
+ * `totalSpent` already excluded them; the count did not.
+ */
+describe("segments count orders that stood", () => {
+  const base = {
+    id: "a",
+    email: "a@x.com",
+    name: "A",
+    phone: "1",
+    lastOrderNumber: "BK-1",
+    lastOrderAt: new Date(NOW).toISOString(),
+  };
+
+  it("does not call five cancelled orders a VIP", () => {
+    const allCancelled = { ...base, orderCount: 5, countableOrderCount: 0, totalSpent: 0 };
+    expect(deriveCustomerSegment(allCancelled, NOW)).not.toBe("vip");
+  });
+
+  it("still calls five orders that stood a VIP", () => {
+    const stood = { ...base, orderCount: 5, countableOrderCount: 5, totalSpent: 100 };
+    expect(deriveCustomerSegment(stood, NOW)).toBe("vip");
+  });
+
+  it("does not call a customer who only ever cancelled 'at risk'", () => {
+    const stale = new Date(NOW - 120 * DAY).toISOString();
+    const cancelledTwice = {
+      ...base,
+      lastOrderAt: stale,
+      orderCount: 2,
+      countableOrderCount: 0,
+      totalSpent: 0,
+    };
+    expect(deriveCustomerSegment(cancelledTwice, NOW)).toBe("inactive");
+  });
+
+  it("the builder counts them separately", () => {
+    const records = buildCustomerRecords([
+      order({ id: "a", status: "delivered" } as Partial<PlacedOrder>),
+      order({ id: "b", status: "cancelled" } as Partial<PlacedOrder>),
+    ]);
+
+    // History is history: both were placed.
+    expect(records[0].orderCount).toBe(2);
+    // Only one of them stood.
+    expect(records[0].countableOrderCount).toBe(1);
+  });
+
+  it("counts correctly when the FIRST order is the cancelled one", () => {
+    // The builder has two branches — the first order for a customer, and every
+    // one after it. A fixture whose first order is countable exercises only the
+    // second, and a mutation to the first branch passes unseen.
+    const records = buildCustomerRecords([
+      order({ id: "a", status: "cancelled" } as Partial<PlacedOrder>),
+      order({ id: "b", status: "delivered" } as Partial<PlacedOrder>),
+    ]);
+
+    expect(records[0].orderCount).toBe(2);
+    expect(records[0].countableOrderCount).toBe(1);
+  });
+
+  it("counts zero when every order was cancelled", () => {
+    const records = buildCustomerRecords([
+      order({ id: "a", status: "cancelled" } as Partial<PlacedOrder>),
+      order({ id: "b", status: "refunded" } as Partial<PlacedOrder>),
+    ]);
+
+    expect(records[0].orderCount).toBe(2);
+    expect(records[0].countableOrderCount).toBe(0);
   });
 });
