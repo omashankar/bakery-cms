@@ -204,6 +204,30 @@ describe("the store that tracks the session", () => {
     expect(second, "the old cleanup silenced the new confirmer").toBe(1);
   });
 
+  it("has no back door that changes the answer without telling anyone", async () => {
+    /**
+     * `resetSessionTracking` assigned `state` directly rather than publishing.
+     * A subscriber — the dialog — would have gone on rendering "expired" while
+     * `sessionState()` answered "active", and the next real renewal would then
+     * publish nothing, because `publish` early-returns when the state already
+     * matches. The dialog would have stayed up forever, and the one call that
+     * could remove it would have been the one that could not.
+     *
+     * Anything that writes `state` must go through `publish`.
+     */
+    const source = stripComments(read("features/auth/lib/session-expiry.ts"));
+    const assignments = source.match(/^\s*state = /gm) ?? [];
+
+    expect(
+      assignments,
+      "something sets the state without notifying subscribers",
+    ).toHaveLength(1);
+    expect(
+      source.slice(source.indexOf("function publish")),
+      "the one assignment is not the one inside publish",
+    ).toMatch(/^\s*state = /m);
+  });
+
   it("offers no way to assert a session is fine without the server saying so", async () => {
     /**
      * `markSessionActive` published "active" AND reset the idle clock, and had

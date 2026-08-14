@@ -130,12 +130,19 @@ export function idleForMs(): number {
 type Confirmer = () => void;
 let confirmExpiry: Confirmer = () => {};
 
-/** Test helper: forget the registered confirmer and reset the idle clock. */
-export function resetSessionTracking(): void {
-  confirmExpiry = () => {};
-  state = "active";
-  renewedAt = Date.now();
-}
+/*
+ * There is deliberately no `resetSessionTracking` either.
+ *
+ * It was added as a test helper, had no callers, and assigned `state` directly
+ * instead of going through `publish` — so it changed the answer without telling
+ * anyone. A subscriber (the dialog) would have kept rendering "expired" while
+ * `sessionState()` said "active", and worse: the next REAL renewal would then
+ * publish nothing at all, because `publish` early-returns when the state it is
+ * given already matches. The dialog would have stayed on screen forever, and
+ * the one thing that could take it down would have been the thing that could
+ * not. Tests reset by calling `markSessionRenewed()` and re-registering a
+ * confirmer, which are the same calls production makes.
+ */
 
 const NO_CONFIRMER: Confirmer = () => {};
 
