@@ -67,7 +67,9 @@ export function ProductGridSkeleton({ cards = 6 }: { cards?: number }) {
  */
 export function StoreLoadingShell({ children }: { children: React.ReactNode }) {
   return (
-    <div aria-busy="true" aria-live="polite">
+    // `relative` anchors the absolutely-positioned `sr-only` span — see
+    // PanelLoading for why an unanchored one grows the document.
+    <div className="relative" aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading</span>
       {children}
     </div>

@@ -56,7 +56,20 @@ export function PanelLoading({
   label?: string;
 }) {
   return (
-    <div className="flex-1 space-y-3" role="status" aria-live="polite">
+    /*
+     * `relative` is load-bearing, not styling.
+     *
+     * Tailwind's `sr-only` is `position: absolute`, and with no positioned
+     * ancestor its containing block is the INITIAL one — so it escapes every
+     * `overflow: hidden` between here and <body>, including the admin shell's,
+     * and lays itself out at its static position inside the scrolled content.
+     * On a panel far enough down the page that position is past the viewport,
+     * which grows `documentElement.scrollHeight` and paints a SECOND window
+     * scrollbar beside the shell's own — on the dashboard and reports, for as
+     * long as their figures are loading. Anchoring it here keeps it inside the
+     * box that clips.
+     */
+    <div className="relative flex-1 space-y-3" role="status" aria-live="polite">
       <span className="sr-only">{label}</span>
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className="space-y-1.5">

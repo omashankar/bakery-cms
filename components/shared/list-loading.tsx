@@ -23,7 +23,9 @@ export function ListLoading({
   label?: string;
 }) {
   return (
-    <div className="divide-y divide-border" role="status" aria-live="polite">
+    // `relative` anchors the absolutely-positioned `sr-only` span below — see
+    // PanelLoading for what it costs when the containing block is <body>.
+    <div className="relative divide-y divide-border" role="status" aria-live="polite">
       <span className="sr-only">{label}</span>
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className="flex items-center gap-4 px-4 py-4">
