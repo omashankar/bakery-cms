@@ -27,7 +27,21 @@ const SURFACES = [
   "features/cms-sections/homepage-section-renderer.tsx",
   "features/cms-sections/wedding-section-renderer.tsx",
   "apps/website/landing/components/landing-gallery.tsx",
+  // The dedicated gallery page and the route that feeds it. Both were missing
+  // here, and `GalleryPage` declares `photos` as an optional prop defaulting to
+  // `[]` — so dropping the wiring at the call site type-checks and degrades to
+  // "Photographs of our work are on their way." with nothing red anywhere.
+  "app/(storefront)/store/gallery/page.tsx",
+  "apps/website/pages/gallery-page.tsx",
 ];
+
+/** One renderer function's own body, so an assertion cannot match a sibling's. */
+function bodyOf(source: string, component: string): string {
+  const at = source.indexOf(`function ${component}(`);
+  expect(at, `${component} is not defined here`).toBeGreaterThan(-1);
+  const next = source.indexOf("\nfunction ", at + 1);
+  return source.slice(at, next < 0 ? source.length : next);
+}
 
 describe("every surface that shows photographs", () => {
   it("no longer reads the shipped demo pictures", () => {
@@ -41,15 +55,54 @@ describe("every surface that shows photographs", () => {
   });
 
   it("renders nothing rather than someone else's work", () => {
+    /**
+     * Pinned to each SECTION's own body.
+     *
+     * Counting the guards file-wide was already satisfied by two that predate
+     * this work (Menu Strip and Why Choose Us), so both gallery guards could be
+     * deleted — restoring a heading over an empty grid — with this test, named
+     * for exactly that, still green.
+     */
     const homepage = stripComments(read(SURFACES[0]));
     const wedding = stripComments(read(SURFACES[1]));
 
-    // Each gallery-ish section bails out when the shop has given it no photos.
-    expect(homepage).toContain('renderableRows(parseListField(c, "images"))');
-    expect(homepage).toContain('renderableRows(parseListField(c, "posts"))');
-    expect(wedding).toContain('renderableRows(parseListField(c, "images"))');
-    expect((homepage.match(/if \(\w+\.length === 0\) return null;/g) ?? []).length).toBeGreaterThan(
-      1,
+    const sections = [
+      { body: bodyOf(homepage, "GallerySection"), key: "images", where: "the homepage gallery" },
+      { body: bodyOf(homepage, "InstagramSection"), key: "posts", where: "the Instagram strip" },
+      { body: bodyOf(wedding, "WeddingGallerySection"), key: "images", where: "the wedding gallery" },
+    ];
+
+    for (const { body, key, where } of sections) {
+      expect(body, `${where} no longer reads the shop's own "${key}"`).toContain(
+        `photoRows(c, "${key}")`,
+      );
+      expect(body, `${where} renders a heading over an empty grid`).toMatch(
+        /if \(\w+\.length === 0\) return null;/,
+      );
+    }
+  });
+
+  it("does not let the homepage strip govern the standalone gallery page", () => {
+    /**
+     * Hiding a section means "not on the homepage", not "throw the content
+     * away". /store/gallery is a nav item of its own that sources its photos
+     * from the Gallery section because there is no second place to upload them
+     * — read through the visibility-filtered accessor, an admin who hid the
+     * homepage strip emptied a different page while the builder still showed
+     * every photo.
+     */
+    const route = stripComments(read("app/(storefront)/store/gallery/page.tsx"));
+
+    expect(route, "the standalone page reads the visibility-filtered list").not.toContain(
+      "getPublishedHomepageSections",
+    );
+    expect(route).toContain('getPublishedSectionContent("gallery")');
+    expect(route, "the photos never reach the page").toMatch(/photos=\{photos\}/);
+
+    const accessor = stripComments(read("features/cms-sections/data/homepage-sections.server.ts"));
+    const body = accessor.slice(accessor.indexOf("export async function getPublishedSectionContent"));
+    expect(body.slice(0, body.indexOf("\n}")), "the unfiltered accessor filters after all").not.toContain(
+      "getVisibleSections",
     );
   });
 });

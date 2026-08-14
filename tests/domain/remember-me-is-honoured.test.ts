@@ -62,6 +62,43 @@ describe("the refresh cookie", () => {
   });
 });
 
+describe("the login itself", () => {
+  /**
+   * The headline defect, and until now the only part with no assertion.
+   *
+   * Everything below tested the ROTATION. Deleting the fourth argument from
+   * `setAuthCookies` in `issueTokens` — the original bug, verbatim — left every
+   * test in this file green, and the checkbox inert again. Dropping
+   * `remember: rememberMe` from the token was green too: the claim is optional,
+   * so TypeScript accepts it and the first rotation then reads `undefined` as
+   * remembered and re-stamps 30 days on a session the admin asked not to keep.
+   */
+  const service = () =>
+    import("node:fs").then(({ readFileSync }) =>
+      readFileSync("features/auth/server/auth.service.ts", "utf8"),
+    );
+
+  it("hands the admin's choice to the token issuer", async () => {
+    expect(await service(), "login collects rememberMe and drops it again").toMatch(
+      // `[^;]` rather than `.` with the /s flag: the tsconfig target predates it.
+      /issueTokens\([^;]*input\.rememberMe/,
+    );
+  });
+
+  it("writes the refresh cookie with it, not with the default", async () => {
+    expect(
+      await service(),
+      "the cookie is written with the default, so unticking the box changes nothing",
+    ).toMatch(/setAuthCookies\(accessToken, refreshToken, accessTtl, rememberMe\)/);
+  });
+
+  it("seals it into the token so the first rotation cannot undo it", async () => {
+    expect(await service(), "the choice does not survive one background refresh").toMatch(
+      /remember: rememberMe/,
+    );
+  });
+});
+
 describe("a token rotation", () => {
   /**
    * The choice has to survive the refresh, and it nearly did not.
@@ -88,19 +125,26 @@ describe("a token rotation", () => {
     );
 
     // Read from the incoming token…
-    expect(source).toMatch(/claims\.remember !== false/);
+    expect(source).toMatch(/isRemembered\(claims\)/);
     // …and handed to BOTH the new token and the cookie that carries it.
     expect(source).toMatch(/remember: remembered/);
     expect(source).toMatch(/setAuthCookies\(accessToken, newRefresh, accessTtl, remembered\)/);
   });
 
-  it("treats a token minted before the claim existed as remembered", () => {
-    // Those sessions were 30-day by definition; `undefined` must not silently
-    // downgrade them to session-only on the next refresh.
-    const remembered = (claim: boolean | undefined) => claim !== false;
+  it("treats a token minted before the claim existed as remembered", async () => {
+    /**
+     * Those sessions were 30-day by definition, so `undefined` must not
+     * silently downgrade them to session-only on the next refresh.
+     *
+     * This asserted against a lambda declared in the test body — it imported
+     * nothing and read no source, so `claims.remember === true` (which signs
+     * every legacy session out on its next background refresh) passed it. The
+     * decision is one exported function now, and this exercises that function.
+     */
+    const { isRemembered } = await import("@/lib/server/auth/jwt");
 
-    expect(remembered(undefined)).toBe(true);
-    expect(remembered(true)).toBe(true);
-    expect(remembered(false)).toBe(false);
+    expect(isRemembered({}), "a legacy session was downgraded to browser-only").toBe(true);
+    expect(isRemembered({ remember: true })).toBe(true);
+    expect(isRemembered({ remember: false })).toBe(false);
   });
 });

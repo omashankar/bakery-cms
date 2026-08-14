@@ -37,6 +37,19 @@ export interface RefreshClaims {
 }
 
 /**
+ * Whether a rotation should keep the session past a browser restart.
+ *
+ * One expression, in one place, because the two readings differ only by a
+ * negation and the wrong one is silent: `claims.remember === true` would
+ * downgrade every session minted before the claim existed to browser-only on
+ * its next background refresh, signing those admins out with nothing to
+ * indicate why.
+ */
+export function isRemembered(claims: Pick<RefreshClaims, "remember">): boolean {
+  return claims.remember !== false;
+}
+
+/**
  * A signed-in STOREFRONT customer. Not a user of the admin.
  *
  * `type: "customer"` is inside the signed payload, and every verifier here

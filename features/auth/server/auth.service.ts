@@ -1,5 +1,6 @@
 import { hashPassword, verifyPassword } from "@/lib/server/auth/password";
 import {
+  isRemembered,
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
@@ -205,7 +206,7 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
     accessTtl,
   );
   // Carried forward, not re-defaulted — see `RefreshClaims.remember`.
-  const remembered = claims.remember !== false;
+  const remembered = isRemembered(claims);
   const newRefresh = await signRefreshToken({
     sub: claims.sub,
     sid: claims.sid,

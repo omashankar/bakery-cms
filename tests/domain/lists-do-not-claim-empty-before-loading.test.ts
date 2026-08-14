@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -37,8 +37,14 @@ const LISTS: { file: string; gate: string }[] = [
   { file: "apps/admin/commerce/pages/inventory-admin-page.tsx", gate: "!mounted" },
   { file: "apps/admin/commerce/pages/coupons-admin-page.tsx", gate: "!mounted" },
   { file: "apps/admin/commerce/pages/notifications-admin-page.tsx", gate: "!loaded" },
-  { file: "apps/admin/inquiries/components/inquiries-list-page.tsx", gate: "!mounted" },
-  { file: "apps/admin/inquiries/components/newsletter-subscribers-page.tsx", gate: "!mounted" },
+  // Gates on the SERVER having answered, not on having read the local cache —
+  // see `inquiriesHydration`. The others below are still cache-read gates; that
+  // is correct only where localStorage is the source of truth.
+  { file: "apps/admin/inquiries/components/inquiries-list-page.tsx", gate: 'figures === "loading"' },
+  {
+    file: "apps/admin/inquiries/components/newsletter-subscribers-page.tsx",
+    gate: 'figures === "loading"',
+  },
   { file: "apps/admin/communications/pages/email-templates-admin-page.tsx", gate: "!mounted" },
   { file: "apps/admin/communications/pages/whatsapp-templates-admin-page.tsx", gate: "!mounted" },
   { file: "apps/admin/reports/components/reports-page.tsx", gate: "awaitingAnalytics" },
@@ -91,6 +97,58 @@ describe("a list that has not loaded yet", () => {
       gateAt,
       `${file} renders "nothing here" before it checks whether it has looked`,
     ).toBeLessThan(emptyAt);
+  });
+});
+
+describe("a list whose localStorage is only a cache", () => {
+  /**
+   * A gate that stands for the wrong thing is not a gate.
+   *
+   * Inquiries and newsletter subscribers live on the SERVER; their localStorage
+   * key is a cache a `*ServerSync` hook fills on entering the admin. Both
+   * pages gated on having read that cache — so on a first login, another
+   * device, or a cleared profile, the empty read counted as an answer and the
+   * screen stated "0" under "All clear" in green and "No inquiries found",
+   * about an inbox with customers waiting in it. Every marker this file checks
+   * for was present; they simply opened one fetch too early.
+   */
+  const GATED = [
+    {
+      name: "inquiries",
+      load: () => import("@/features/inquiries/lib/inquiries-repository"),
+      gate: (m: Record<string, unknown>) => m.inquiriesHydration as { hasSettled(): boolean },
+      fill: (m: Record<string, unknown>) => (m.persistServerInquiries as (rows: never[]) => void)([]),
+    },
+    {
+      name: "newsletter",
+      load: () => import("@/features/inquiries/lib/newsletter-repository"),
+      gate: (m: Record<string, unknown>) => m.newsletterHydration as { hasSettled(): boolean },
+      fill: (m: Record<string, unknown>) =>
+        (m.persistServerSubscribers as (rows: never[]) => void)([]),
+    },
+  ];
+
+  it.each(GATED)("is closed until the server has answered — $name", async ({ load, gate, fill }) => {
+    vi.resetModules();
+    const repo = (await load()) as unknown as Record<string, unknown>;
+
+    expect(gate(repo).hasSettled(), "open before the server said anything").toBe(false);
+    // An EMPTY server answer still opens it: "the shop has none" is an answer,
+    // and the difference from "I have not looked" is the whole point.
+    fill(repo);
+    expect(gate(repo).hasSettled(), "the server answered and the gate stayed shut").toBe(true);
+  });
+
+  it.each([
+    "apps/admin/inquiries/components/inquiries-list-page.tsx",
+    "apps/admin/inquiries/components/newsletter-subscribers-page.tsx",
+  ])("gates its figures on that, not on a mount flag — %s", (file) => {
+    const source = read(file);
+
+    expect(source, "the page still gates on having read the cache").not.toContain("setMounted(");
+    expect(source).toMatch(/Hydration\.waitForSettled\(\)/);
+    // A failed load says so rather than settling on a zero — a zero is an answer.
+    expect(source).toContain('setFigures(settled ? "ready" : "unavailable")');
   });
 });
 

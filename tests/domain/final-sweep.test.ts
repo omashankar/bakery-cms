@@ -85,6 +85,12 @@ describe("bulk moderation writes only what the server took", () => {
   const fn = bodyOf(read("features/reviews/lib/reviews-repository.ts"), "async function setStatusBulk(");
 
   it("asks first, then writes", () => {
+    // Existence first. `indexOf` answers -1 for a needle that is gone, and -1
+    // is less than any real index — so an ordering check on its own passes when
+    // the call it is ordering has been deleted. Two assertions in this repo
+    // were found to be vacuous for exactly this reason.
+    expect(fn, "the server is no longer asked").toContain("updateReviewRequest");
+    expect(fn).toContain("writeReviews(");
     expect(fn.indexOf("updateReviewRequest")).toBeLessThan(fn.indexOf("writeReviews("));
   });
 
@@ -197,6 +203,9 @@ describe("deleting a product takes its traces with it", () => {
 
   it("reads the product BEFORE deleting it, or there is no slug to clean up", () => {
     const fn = bodyOf(read("features/products/data/products-service.ts"), "export async function deleteProduct(");
+    // Both needles asserted before they are ordered — see the note above.
+    expect(fn, "the product is no longer read before the delete").toContain("getProductById(id)");
+    expect(fn).toContain("deleteOne(id)");
     expect(fn.indexOf("getProductById(id)")).toBeLessThan(fn.indexOf("deleteOne(id)"));
     expect(fn).toContain("purgeProductTraces(existing.slug, existing.id)");
   });

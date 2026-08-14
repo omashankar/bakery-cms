@@ -171,9 +171,12 @@ test("inquiries does not say all clear before it has counted", async ({ page }) 
    * failed for the gate behaving correctly. With unread inquiries present,
    * "All clear" is wrong at every moment, which is the claim under test.
    *
-   * Unlike the cases above there is nothing to stall here: this page reads its
-   * counts from localStorage synchronously, so the window is the single frame
-   * before its first effect runs — which is exactly what the recorder catches.
+   * The precondition counts MONGO because the page now waits for Mongo. It
+   * used to gate on having read localStorage — a cache the server fills — so
+   * on a fresh browser the empty read counted as an answer and the cards
+   * painted "0 · All clear" over an inbox with customers in it. Keying a Mongo
+   * precondition to a localStorage-derived caption meant this test could only
+   * skip or fail, never demonstrate the gate.
    */
   const db = await connect();
   const unread = await db
@@ -183,10 +186,14 @@ test("inquiries does not say all clear before it has counted", async ({ page }) 
 
   await adminSession(page);
   await recordText(page);
+  await stall(page, "**/api/inquiries**");
 
   await page.goto("/admin/inquiries");
   await expect(page.getByRole("heading", { name: /inquiries/i }).first()).toBeVisible();
 
   const said_ = await said(page);
   expect(said_, "said all clear while unread inquiries were waiting").not.toMatch(/All clear/i);
+  expect(said_, "claimed the inbox was empty before the server answered").not.toMatch(
+    /No inquiries found/i,
+  );
 });

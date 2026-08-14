@@ -277,11 +277,24 @@ describe("bulk status update", () => {
     // can never succeed.
     persistServerOrders([order({ id: "a", status: "delivered" })]);
     mockServer(false, 409);
+    const before = getOrderById("a")!.statusHistory;
 
     await bulkUpdateOrderStatus(["a"], "preparing");
 
     const cached = getOrderById("a");
     expect(cached?.status, "the refused status was left in the cache").toBe("delivered");
+    /**
+     * The TIMELINE goes back too, and only the status was checked.
+     *
+     * Restoring the status alone left the entry the optimistic pass appended,
+     * so the order page kept showing a "Preparing" transition the server had
+     * refused — and the next full write of that row carried it to the server.
+     */
+    expect(
+      cached?.statusHistory.some((entry) => entry.status === "preparing"),
+      "the refused transition stayed in the order's timeline",
+    ).toBe(false);
+    expect(cached?.statusHistory).toEqual(before);
   });
 
   it("still keeps the optimistic write when the request merely dropped", async () => {
