@@ -5,6 +5,7 @@
 import type { CustomerAdminMeta } from "@/types/customer";
 import type { CustomerProfile } from "@/features/customers/lib/customer-profiles";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -32,6 +33,7 @@ export async function saveCustomerMetaRequest(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(meta),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -42,7 +44,10 @@ export async function saveCustomerMetaRequest(
 export async function fetchCustomerMetaMap(): Promise<Record<string, CustomerAdminMeta> | null> {
   try {
     const res = await fetch("/api/customers", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<ServerCustomer[]>;
     if (!json.success || !json.data) return null;
     const map: Record<string, CustomerAdminMeta> = {};
@@ -65,7 +70,10 @@ export async function fetchCustomerMetaMap(): Promise<Record<string, CustomerAdm
 export async function fetchCustomerProfiles(): Promise<CustomerProfile[] | null> {
   try {
     const res = await fetch("/api/customers", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<CustomerProfile[]>;
     return json.success ? json.data : null;
   } catch {
@@ -93,7 +101,10 @@ export async function fetchCustomerDetail(
     const res = await fetch(`/api/customers/${encodeURIComponent(email)}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<CustomerDetailResponse>;
     return json.success ? json.data : null;
   } catch {

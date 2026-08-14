@@ -4,6 +4,7 @@
  */
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { InvoiceSettings, InvoiceSettingsFormData } from "@/types/invoice";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -28,7 +29,10 @@ export async function fetchInvoiceSettings(): Promise<Partial<InvoiceSettings> |
     const res = await fetch("/api/payments/invoice-settings", {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<Partial<InvoiceSettings>>;
     return json.success ? json.data : null;
   } catch {
@@ -58,6 +62,7 @@ export async function saveInvoiceSettingsRequest(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;

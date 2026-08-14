@@ -5,6 +5,7 @@
  */
 import type { CatalogStore } from "@/types/catalog";
 import { createHydrationGate } from "@/lib/hydration-gate";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -18,7 +19,10 @@ export const CATALOG_SECTIONS = ["categories", "flavours", "occasions", "weights
 export async function fetchCatalog(): Promise<Partial<CatalogStore> | null> {
   try {
     const res = await fetch("/api/catalog", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<Partial<CatalogStore>>;
     return json.success ? json.data : null;
   } catch {
@@ -72,6 +76,7 @@ export async function resetCatalogSection(section: string): Promise<boolean> {
 
   try {
     const res = await fetch(`/api/catalog/${section}/reset`, { method: "POST" });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -94,6 +99,7 @@ export async function pushCatalogSection(section: string, value: unknown): Promi
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(value),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;

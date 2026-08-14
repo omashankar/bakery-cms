@@ -4,6 +4,7 @@
  */
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { MediaFile, MediaFolder } from "@/types/media";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -13,7 +14,10 @@ interface Envelope<T> {
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -38,6 +42,7 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -97,7 +102,10 @@ export async function uploadMediaRequest(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source, folder }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<UploadedAsset & { configured: boolean }>;
     if (!json.success || !json.data?.configured) return null;
     return json.data;

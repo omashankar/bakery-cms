@@ -24,6 +24,7 @@ import type {
 import type { InvoiceOverview, RefundOverview } from "./order-overviews";
 import type { PaymentAnalytics } from "@/features/payments/lib/payment-analytics";
 import type { TransactionView } from "@/features/payments/lib/transactions";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /** Mirrors `CommerceOverviews` from the server analytics module. */
 export interface CommerceOverviewsResponse {
@@ -121,6 +122,7 @@ async function sendWithStatus(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) {
+      noteAuthStatus(res.status);
       // One read of the body, two answers out of it — a Response can only be
       // consumed once, so the maintenance marker and the plain message have to
       // come from the same parse.
@@ -298,7 +300,10 @@ export async function fetchOrderByNumber(
       `/api/orders/by-number/${encodeURIComponent(orderNumber)}?${params.toString()}`,
       { headers: { Accept: "application/json" } },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     return await readOrderBody(res);
   } catch {
     return null;
@@ -359,7 +364,10 @@ export function requestRefundRequest(
 export async function fetchOrders(): Promise<PlacedOrder[] | null> {
   try {
     const res = await fetch("/api/orders", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<PlacedOrder[]>;
     return json.success ? json.data : null;
   } catch {
@@ -388,7 +396,10 @@ export async function fetchOrdersPage(
     const res = await fetch(`/api/orders?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as PagedEnvelope<PlacedOrder[]>;
     if (!json.success || !json.data) return null;
     return { items: json.data, pagination: json.pagination };
@@ -415,7 +426,10 @@ export async function fetchOrderAnalytics(
     const res = await fetch(`/api/orders/analytics?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<OrderAnalyticsResponse>;
     return json.success ? json.data : null;
   } catch {
@@ -439,7 +453,10 @@ export async function fetchCommerceOverviews(): Promise<CommerceOverviewsRespons
     const res = await fetch(`/api/orders/overviews?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<CommerceOverviewsResponse>;
     return json.success ? json.data : null;
   } catch {
@@ -451,7 +468,10 @@ export async function fetchCommerceOverviews(): Promise<CommerceOverviewsRespons
 export async function fetchOrderStats(): Promise<OrderStatsSummary | null> {
   try {
     const res = await fetch("/api/orders/stats", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<OrderStatsSummary>;
     return json.success ? json.data : null;
   } catch {
@@ -467,7 +487,10 @@ export async function fetchOrderStats(): Promise<OrderStatsSummary | null> {
 export async function fetchOrder(orderId: string): Promise<PlacedOrder | null> {
   try {
     const res = await fetch(`/api/orders/${orderId}`, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<PlacedOrder>;
     return json.success ? json.data : null;
   } catch {
@@ -493,7 +516,10 @@ async function fetchListPage<T>(path: string, query: Record<string, unknown>): P
     const res = await fetch(`${path}?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -557,6 +583,7 @@ export async function emailInvoiceRequest(
       { method: "POST", headers: { Accept: "application/json" } },
     );
     if (res.ok) return { sent: true };
+    noteAuthStatus(res.status);
 
     // `message`, not `error` — that is the shape of the failure envelope.
     const json = (await res.json().catch(() => null)) as { message?: string } | null;

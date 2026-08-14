@@ -3,6 +3,12 @@
 import { useEffect } from "react";
 
 import { refreshSession } from "./auth-api";
+import {
+  markSessionActive,
+  markSessionExpired,
+  markSessionExpiring,
+  sessionState,
+} from "./session-expiry";
 import { getSecuritySettings } from "@/features/settings/lib/settings-repository";
 
 /**
@@ -48,6 +54,25 @@ const MIN_GAP_MS = 60 * 1000; // coalesce focus/visibility bursts
 const PRESENCE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
+ * How much notice someone gets before the idle timeout takes their session.
+ *
+ * Long enough to finish a sentence and click, short enough that it is not
+ * nagging an admin who simply paused to read something. The countdown is a
+ * PREDICTION from the shop's own timeout and the last sign of a human — the
+ * server decides the real moment, and that decision still arrives as a 401.
+ */
+const WARN_BEFORE_MS = 60 * 1000;
+
+/** How often to compare "how long since a human" against the shop's timeout. */
+const WATCH_TICK_MS = 10 * 1000;
+
+function sessionTimeoutMs(): number {
+  const minutes = Number(getSecuritySettings().sessionTimeoutMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return minutes * 60 * 1000;
+}
+
+/**
  * Keeps the admin session alive by silently rotating the access token:
  *  - once on mount (renews a token that expired while the tab was closed/idle),
  *  - on a timer derived from the shop's session timeout, and
@@ -69,16 +94,31 @@ export function useSessionRefresh(): void {
 
     const markPresent = () => {
       lastSeen = Date.now();
+      // Typing again after the warning has appeared takes it away. Not after
+      // the session has actually ended — no amount of activity brings that
+      // back, and pretending otherwise would hide the dialog asking them to
+      // sign in.
+      if (sessionState() === "expiring") markSessionActive();
     };
 
     const tick = (requirePresence: boolean) => {
       const now = Date.now();
+      // Once the session is over, stop asking. The answer cannot change until
+      // somebody signs in, and a heartbeat against a dead session is a request
+      // every few minutes for as long as the tab stays open.
+      if (sessionState() === "expired") return;
       if (now - last < MIN_GAP_MS) return;
       // The TIMER has to show a human was here; a focus event or a mount is
       // itself the evidence, so those pass straight through.
       if (requirePresence && now - lastSeen > PRESENCE_WINDOW_MS) return;
       last = now;
-      void refreshSession();
+      void refreshSession().then((outcome) => {
+        // `unreachable` is deliberately not an expiry: the server never
+        // answered, so nothing is known, and signing an admin out mid-edit for
+        // a dropped request would be the wrong cure. The next tick asks again.
+        if (outcome === "expired") markSessionExpired();
+        else if (outcome === "renewed") markSessionActive();
+      });
     };
 
     tick(false); // renew immediately in case the access token already expired
@@ -95,6 +135,30 @@ export function useSessionRefresh(): void {
       }, refreshIntervalMs());
     };
     arm();
+
+    /**
+     * Warn while there is still time to act.
+     *
+     * The heartbeat only renews when somebody has been present, so an idle tab
+     * stops asking and the server's clock runs out — correctly. What was
+     * missing is that the person comes back to a session already gone, having
+     * had no chance to keep it. This watches the same `lastSeen` the heartbeat
+     * uses, so the two cannot disagree about who is here.
+     */
+    let watch = 0;
+    const armWatch = () => {
+      watch = window.setTimeout(() => {
+        const timeout = sessionTimeoutMs();
+        // Read fresh each round, like the heartbeat's own delay: an owner who
+        // changes the timeout on the Security screen has both follow it in the
+        // same session, with neither needing to hear about the change.
+        if (timeout > 0 && sessionState() !== "expired") {
+          if (Date.now() - lastSeen >= timeout - WARN_BEFORE_MS) markSessionExpiring();
+        }
+        armWatch();
+      }, WATCH_TICK_MS);
+    };
+    armWatch();
 
     const onFocus = () => {
       markPresent();
@@ -117,6 +181,7 @@ export function useSessionRefresh(): void {
 
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(watch);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       for (const event of PRESENCE_EVENTS) {

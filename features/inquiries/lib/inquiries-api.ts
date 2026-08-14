@@ -6,6 +6,7 @@
  * offline/unauthenticated.
  */
 import type { Inquiry } from "@/types/inquiry";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -27,6 +28,7 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -52,7 +54,10 @@ export async function createInquiryRequest(inquiry: Inquiry): Promise<Inquiry | 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(inquiry),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as { success: boolean; data: Inquiry | null };
     return json.success ? json.data : null;
   } catch {
@@ -72,7 +77,10 @@ export function deleteInquiriesRequest(ids: string[]): Promise<boolean> {
 export async function fetchInquiries(): Promise<Inquiry[] | null> {
   try {
     const res = await fetch("/api/inquiries", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<Inquiry[]>;
     return json.success ? json.data : null;
   } catch {

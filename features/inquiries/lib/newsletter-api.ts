@@ -4,6 +4,7 @@
  * + deletions and hydrates the full list. Best-effort — never throws.
  */
 import type { NewsletterSubscriber } from "@/types/inquiry";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -25,6 +26,7 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -55,7 +57,10 @@ export function deleteSubscribersRequest(ids: string[]): Promise<boolean> {
 export async function fetchSubscribers(): Promise<NewsletterSubscriber[] | null> {
   try {
     const res = await fetch("/api/newsletter", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<NewsletterSubscriber[]>;
     return json.success ? json.data : null;
   } catch {

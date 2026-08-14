@@ -6,6 +6,7 @@
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { Banner } from "@/types/media";
 import type { Testimonial, FaqItem } from "@/types/content";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -39,7 +40,10 @@ export interface ContentRead<T> {
 async function getJson<T>(path: string): Promise<ContentRead<T> | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     // Optional-chained: a fetch stand-in need not carry headers, and losing
     // the version must never turn a good read into a failed one.
     const version = res.headers?.get?.("X-Content-Version");
@@ -85,6 +89,7 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
       return false;
     }
 
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;

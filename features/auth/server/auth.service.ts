@@ -154,22 +154,45 @@ async function issueTokens(
 
 // ---- Refresh (rotation) ---------------------------------------------------
 
+/**
+ * End the session in the BROWSER too, not only in the database.
+ *
+ * Every path below deleted the session row and threw, and left the refresh
+ * cookie in place. `proxy.ts` gates `/admin` on that cookie's presence alone —
+ * deliberately, it does no database work — so the browser went on being treated
+ * as signed in and was never sent to the login page. The admin stayed on a
+ * fully rendered panel where every read answered 401 and was mapped to "no
+ * data", so the lists emptied out one by one and each save reported "saved on
+ * this device only", with nothing anywhere saying the session had ended.
+ *
+ * Clearing here is what lets the proxy do its job on the next navigation, and
+ * what lets the client tell "signed out" from "server is down".
+ */
+async function endSession(sessionId: string | null, message: string): Promise<never> {
+  if (sessionId) await repo.deleteSession(sessionId).catch(() => undefined);
+  await clearAuthCookies();
+  throw new AuthError(message);
+}
+
 export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx): Promise<PublicUser> {
   if (!refreshCookie) throw new AuthError("No refresh token");
 
   const claims = await verifyRefreshToken(refreshCookie);
-  if (!claims) throw new AuthError("Invalid refresh token");
+  // A cookie we cannot read is not a session. Left in place it keeps the proxy
+  // waving the browser into /admin on every navigation.
+  if (!claims) return endSession(null, "Invalid refresh token");
 
   const stored = await repo.findActiveRefreshToken(sha256(refreshCookie));
   if (!stored) {
     // Token valid by signature but not active in DB → reuse/revoked. Kill the
     // whole session as a precaution against stolen-token replay.
-    await repo.deleteSession(claims.sid).catch(() => undefined);
-    throw new AuthError("Refresh token is no longer valid");
+    return endSession(claims.sid, "Refresh token is no longer valid");
   }
 
   const user = await repo.findUserById(claims.sub);
-  if (!user || user.status !== "active") throw new AuthError("Account unavailable");
+  if (!user || user.status !== "active") {
+    return endSession(claims.sid, "Account unavailable");
+  }
 
   const policy = await getSecurityPolicy();
 
@@ -191,8 +214,7 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   if (session) {
     const idleMs = Date.now() - new Date(session.lastSeenAt).getTime();
     if (idleMs > sessionTimeoutMs(policy)) {
-      await repo.deleteSession(claims.sid).catch(() => undefined);
-      throw new AuthError("Session timed out");
+      return endSession(claims.sid, "Session timed out");
     }
   }
 

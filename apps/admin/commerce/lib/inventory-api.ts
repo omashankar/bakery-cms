@@ -5,6 +5,7 @@
  */
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { InventoryOverview, InventorySettings, StockHistoryEntry } from "@/types/inventory";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -25,7 +26,10 @@ export const inventoryHydration = createHydrationGate();
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -40,7 +44,10 @@ async function post<T>(path: string, body: unknown, method = "POST"): Promise<T 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
