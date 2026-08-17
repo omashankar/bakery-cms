@@ -56,19 +56,44 @@ async function samplesDuringLoad(page: Page, path: string) {
   );
 }
 
+/**
+ * More than one viewport, because the defect is a HEIGHT comparison.
+ *
+ * Neither this spec nor the chromium project set a viewport, so every
+ * measurement was taken at Playwright's 1280×720 default. Whether an escaped
+ * `sr-only` pushes the document past the fold depends entirely on how far down
+ * the page it sits, so one height tests one arrangement of the content: a
+ * laptop where more fits above the fold, and a short window where less does,
+ * are different experiments. A guard for "the document must not exceed the
+ * viewport" that only ever saw one viewport was measuring a coincidence.
+ */
+const VIEWPORTS = [
+  { name: "laptop", width: 1440, height: 900 },
+  { name: "short", width: 1280, height: 600 },
+  { name: "tablet", width: 834, height: 1112 },
+];
+
 for (const target of PAGES) {
-  test(`${target.name} does not grow a second scrollbar while it loads`, async ({ page }) => {
-    await adminSession(page);
+  for (const viewport of VIEWPORTS) {
+    test(`${target.name} does not grow a second scrollbar while it loads (${viewport.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await adminSession(page);
 
-    const sizes = await samplesDuringLoad(page, target.path);
-    expect(sizes.length, "no measurements were taken").toBeGreaterThan(0);
+      const sizes = await samplesDuringLoad(page, target.path);
+      expect(sizes.length, "no measurements were taken").toBeGreaterThan(0);
+      // The viewport really applied — otherwise all three runs are the same
+      // experiment wearing three names.
+      expect(sizes[0].clientH, "the viewport was not applied").toBeLessThanOrEqual(viewport.height);
 
-    for (const { at, scrollH, clientH } of sizes) {
-      expect(
-        scrollH,
-        `${target.name} at t+${at}ms: the document is ${scrollH - clientH}px taller than the ` +
-          `viewport, so the window paints a scrollbar beside the shell's own`,
-      ).toBeLessThanOrEqual(clientH);
-    }
-  });
+      for (const { at, scrollH, clientH } of sizes) {
+        expect(
+          scrollH,
+          `${target.name} at ${viewport.name} t+${at}ms: the document is ${scrollH - clientH}px ` +
+            `taller than the viewport, so the window paints a scrollbar beside the shell's own`,
+        ).toBeLessThanOrEqual(clientH);
+      }
+    });
+  }
 }
