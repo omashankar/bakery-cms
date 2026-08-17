@@ -501,9 +501,9 @@ describe("the server, when a session ends", () => {
       "Account unavailable",
       "Session timed out",
     ]) {
-      expect(source, `"${reason}" still ends the session without clearing it`).toContain(
-        `endSession(`,
-      );
+      // (No file-wide `toContain("endSession(")` here: repeated once per
+      // reason it asserted the same thing four times and mentioned none of
+      // them. The per-reason check below is the whole point.)
       const at = source.indexOf(`"${reason}"`);
       expect(at, `"${reason}" is no longer raised`).toBeGreaterThan(-1);
       // The reason has to be the ARGUMENT to endSession, not a bare throw.
@@ -727,6 +727,26 @@ describe("the expiry countdown", () => {
       expect(timer, `the countdown reaches the server via ${reach}`).not.toContain(reach);
     }
 
+    /**
+     * And the blocklist is not the whole check.
+     *
+     * A helper declared outside ExpiringSoon — `async function askTheServer()
+     * { return refreshSession(); }` — defeats every name above and the count
+     * below, because neither looks outside the component. So the timer must
+     * call NOTHING declared in this file except the state setters it needs:
+     * anything else is a route out that no list of names can enumerate.
+     */
+    const declared = [...source.matchAll(/(?:function|const) (\w+)\s*[=(]/g)].map((m) => m[1]);
+    const allowed = new Set(["secondsLeft", "setLeft", "setChecking", "ExpiringSoon"]);
+
+    for (const name of declared) {
+      if (allowed.has(name)) continue;
+      expect(
+        timer,
+        `the countdown calls ${name}(), which is a route to the server no blocklist can enumerate`,
+      ).not.toMatch(new RegExp(`(?<![.\\w])${name}\\(`));
+    }
+
     // And exactly one caller survives in the whole component: the button's.
     expect(expiring.match(/refreshSession\(\)/g) ?? []).toHaveLength(1);
     expect(expiring.slice(stayAt), "the button no longer renews").toContain("refreshSession()");
@@ -856,8 +876,19 @@ describe("a write refused because the session ended", () => {
        * into holding its own.
        */
       if (declares) {
-        expect(source, `${path} ignores a session it has asked about`).toContain('"checking"');
-        expect(source, `${path} ignores a session known to have ended`).toContain('"expired"');
+        /**
+         * Inside the CHECK's own body.
+         *
+         * Searching the whole file found the literals wherever they appeared —
+         * including in a sibling exported function that has nothing to do with
+         * the guard — so `reportedAsSignedOut` could stop handling either state
+         * and this still passed.
+         */
+        const from = source.indexOf("function reportedAsSignedOut");
+        const check = source.slice(from, source.indexOf("\n}", from));
+
+        expect(check, `${path} ignores a session it has asked about`).toContain('"checking"');
+        expect(check, `${path} ignores a session known to have ended`).toContain('"expired"');
       }
 
       /**
@@ -888,6 +919,9 @@ describe("a write refused because the session ended", () => {
          * admin was never checked at all.
          */
         if (!/toast\.error\(/.test(body)) continue;
+        // The check itself emits the messages it emits ON BEHALF of the
+        // callers. It is not a caller.
+        if (name === "reportedAsSignedOut") continue;
         guarded += 1;
 
         const guardAt = body.indexOf("reportedAsSignedOut()");
@@ -899,6 +933,18 @@ describe("a write refused because the session ended", () => {
           guardAt,
           `${path} — ${name}() reaches its misleading message first`,
         ).toBeLessThan(body.indexOf("toast.error("));
+        /**
+         * And ACTS on the answer.
+         *
+         * Order alone was satisfied by a bare `reportedAsSignedOut();` on its
+         * own line — the guard runs, emits its toast, and the caller then emits
+         * the misleading one underneath it. The return value has to change what
+         * happens next.
+         */
+        expect(
+          body.slice(guardAt - 20, guardAt + 40),
+          `${path} — ${name}() calls the check and speaks anyway`,
+        ).toMatch(/(if \(!?reportedAsSignedOut\(\)\)|return reportedAsSignedOut\(\))/);
       }
 
       expect(guarded, `${path} — no reporter bodies were checked`).toBeGreaterThan(0);
@@ -953,10 +999,26 @@ describe("a write refused because the session ended", () => {
       const requests = (source.match(/(?<![.\w])fetch\(/g) ?? []).length;
       const noted = (source.match(/noteAuthStatus\(/g) ?? []).length;
 
-      expect(requests, `${path} makes no requests — is the path still right?`).toBeGreaterThan(0);
+      // (`requests > 0` is guaranteed by the discovery — a file is only in
+      // MODULES because its source matched the same `fetch(` pattern — so
+      // asserting it here proved nothing. The count comparison is the check.)
       expect(noted, `${path} makes ${requests} request(s) but reports a 401 ${noted}×`).toBe(
         requests,
       );
+
+      /**
+       * And each notice reads the response it belongs to.
+       *
+       * A count alone says nothing about WHERE. `noteAuthStatus(0)`, or a call
+       * reading some other variable, satisfies the arithmetic while never
+       * observing a 401 — the shape the count was written to rule out.
+       */
+      for (const call of source.matchAll(/noteAuthStatus\(([^)]*)\)/g)) {
+        expect(
+          call[1],
+          `${path} calls noteAuthStatus(${call[1]}) — that is not a response status`,
+        ).toMatch(/^\w+\.status$/);
+      }
     }
   });
 });
