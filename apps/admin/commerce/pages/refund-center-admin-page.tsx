@@ -51,6 +51,7 @@ import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 8;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -314,7 +315,7 @@ export function RefundCenterAdminPage() {
       // The order was not cached and the server read failed too. The dialog has
       // already closed itself, so without this the click produces nothing at all.
       setRefundTarget(null);
-      toast.error("Could not load that order", {
+      if (!reportedAsSignedOut()) toast.error("Could not load that order", {
         description: "The server did not answer — reload and try again.",
       });
       return;
@@ -334,7 +335,11 @@ export function RefundCenterAdminPage() {
       // already in flight may have too — and those are exactly the two the
       // screen was most confident about. Whether the money moved is something
       // only the refund path knows, so it says so in the message itself.
-      toast.error(refundError ?? "The refund was not accepted.");
+      // A 401 is not the gateway declining a refund — it is this browser not
+      // being recognised. The two send an operator to completely different
+      // places, and money is involved.
+      if (!reportedAsSignedOut())
+        toast.error(refundError ?? "The refund was not accepted.");
       return;
     }
 
@@ -349,7 +354,7 @@ export function RefundCenterAdminPage() {
     // no refund cases is a different claim from admitting the list never arrived.
     // orders-list and invoices already make this distinction.
     if (failed) {
-      toast.error("Could not load the refund cases to export", {
+      if (!reportedAsSignedOut()) toast.error("Could not load the refund cases to export", {
         description: "The server did not answer — reload and try again.",
       });
       return;

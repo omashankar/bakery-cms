@@ -135,6 +135,10 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
    */
   /** The order was not cached and the server read failed — never say nothing. */
   function reportUnreachable() {
+    // "The server did not answer" is false for a 401: it answered, and said it
+    // does not know who is asking. The read has already put that question to
+    // the server, so this only has to stop contradicting the reply.
+    if (reportedAsSignedOut()) return;
     toast.error("Could not load that order", {
       description: "The server did not answer — reload and try again.",
     });
@@ -201,7 +205,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       // thrown away. An admin read "recorded", closed the ticket, and no refund
       // was ever made. The Refund Centre was fixed for exactly this; this screen
       // was not.
-      toast.error(error ?? "The refund was not accepted.");
+      if (!reportedAsSignedOut()) toast.error(error ?? "The refund was not accepted.");
       return;
     }
 

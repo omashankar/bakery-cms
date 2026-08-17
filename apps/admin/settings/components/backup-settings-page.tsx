@@ -32,6 +32,7 @@ import {
   restoreBackupSnapshotToServer,
   serverBackedKeys,
 } from "../lib/backup-repository";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 export function BackupSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +185,10 @@ export function BackupSettingsPage() {
    */
   function reportRestore(result: RestoreResult) {
     if (result.failedSections.length > 0) {
+      // A third failure the two below do not cover: the server answered, and
+      // what it said was that it does not know who is asking. "The server
+      // refused" is true of a value, not of a session.
+      if (reportedAsSignedOut()) return;
       /**
        * Two different failures, two different remedies.
        *
