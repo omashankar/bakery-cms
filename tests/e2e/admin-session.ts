@@ -2,6 +2,8 @@ import { expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { createHash } from "node:crypto";
+import { ObjectId } from "mongodb";
 import { SignJWT } from "jose";
 
 import { connect } from "./shop-state";
@@ -35,11 +37,61 @@ export async function adminSession(page: Page): Promise<{ email: string }> {
     .setExpirationTime("15m")
     .sign(new TextEncoder().encode(env.JWT_ACCESS_SECRET));
 
-  const refresh = await new SignJWT({ sub: String(user!._id), sid: "e2e", type: "refresh" })
+  /**
+   * A session the SERVER also knows about.
+   *
+   * The refresh token used to carry `sid: "e2e"` with nothing behind it, so the
+   * very first heartbeat took the reuse/revoked branch — `findActiveRefreshToken`
+   * found no row — and the server ended the session before any test had done
+   * anything. Every browser test therefore ran against a session that was
+   * already dead: the expiry dialog appeared on its own, which made it
+   * impossible to prove that anything ELSE raised it, and quietly weakened
+   * every other spec that assumed it was signed in.
+   *
+   * Fixed ids, upserted, so repeated runs reuse one row rather than piling up.
+   */
+  const sessionId = new ObjectId("000000000000000000000e2e");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await db.collection("sessions").updateOne(
+    { _id: sessionId },
+    {
+      $set: {
+        userId: user!._id,
+        userAgent: "playwright",
+        ip: "127.0.0.1",
+        lastSeenAt: new Date(),
+        expiresAt,
+      },
+    },
+    { upsert: true },
+  );
+
+  const refresh = await new SignJWT({
+    sub: String(user!._id),
+    sid: String(sessionId),
+    type: "refresh",
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("15m")
     .sign(new TextEncoder().encode(env.JWT_REFRESH_SECRET));
+
+  // The server stores only the hash, and matches on it — same digest here.
+  const tokenHash = createHash("sha256").update(refresh).digest("hex");
+  await db.collection("refreshtokens").updateOne(
+    { tokenHash },
+    {
+      $set: {
+        userId: user!._id,
+        sessionId,
+        tokenHash,
+        expiresAt,
+        revokedAt: null,
+      },
+    },
+    { upsert: true },
+  );
 
   await page.context().addCookies([
     { name: "access_token", value: access, url: "http://localhost:3000" },

@@ -12,13 +12,40 @@ import { adminSession } from "./admin-session";
  * only". A structural test cannot see which one paints.
  */
 
-/** Make the next admin read answer as an ended session. */
-async function serverEndsTheSession(page: Page): Promise<void> {
+/**
+ * Make the next admin read answer as an ended session.
+ *
+ * `refreshAlso` decides whether the HEARTBEAT is 401ed too. Leaving it on for
+ * every test made the spec unable to fail for the thing it is named after:
+ * with `/api/auth/refresh` returning 401, `useSessionRefresh` raises the dialog
+ * on its own, so deleting the entire `noteAuthStatus` fanout — the mechanism
+ * that lets a 401 from ANY module surface — left every assertion green.
+ */
+async function serverEndsTheSession(
+  page: Page,
+  { refreshAlso = true }: { refreshAlso?: boolean } = {},
+): Promise<void> {
   await page.route("**/api/**", async (route) => {
     const url = route.request().url();
     // Everything EXCEPT the login the dialog is about to perform, so the
     // recovery path stays reachable.
     if (url.includes("/api/auth/login")) return route.continue();
+    if (!refreshAlso && url.includes("/api/auth/refresh")) {
+      /**
+       * A SUCCEEDING heartbeat, stubbed rather than passed through.
+       *
+       * `adminSession` signs a refresh token with `sid: "e2e"` and inserts no
+       * matching row, so the real endpoint takes the reuse/revoked branch and
+       * answers 401 on the first beat. Passing it through therefore let the
+       * heartbeat raise the dialog anyway — and this test exists precisely to
+       * take that route away.
+       */
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, message: "ok", data: null }),
+      });
+    }
     await route.fulfill({
       status: 401,
       contentType: "application/json",
@@ -43,6 +70,26 @@ test("the admin is told, rather than left on a panel that empties", async ({ pag
   ).toBeVisible({ timeout: 20_000 });
   await expect(page.getByLabel(/password/i)).toBeVisible();
 });
+
+/*
+ * NOT tested here, deliberately: that a 401 from an ORDINARY api module — as
+ * opposed to the heartbeat — is what raises the dialog.
+ *
+ * It is the mechanism the fanout exists for, and it cannot be isolated in a
+ * browser: `useSessionRefresh` beats once on mount, so on any page load the
+ * heartbeat and the fanout ask the same question within milliseconds of each
+ * other, and 401ing everything makes either one sufficient. Stubbing the
+ * heartbeat to SUCCEED does not isolate it either — a 401 read plus a healthy
+ * refresh is exactly the routine expired-access-token case, where the dialog
+ * correctly does not appear at all.
+ *
+ * An attempt at it lived here and was deleted rather than kept: it passed with
+ * the entire fanout removed, which is worse than no test. The fanout's
+ * completeness is held by
+ * tests/domain/session-expiry-is-announced.test.ts instead — every module that
+ * makes a request must report its status — and that one fails when a single
+ * call site is dropped.
+ */
 
 test("the dialog cannot be dismissed back onto the dead panel", async ({ page }) => {
   await adminSession(page);
@@ -105,10 +152,20 @@ test("the server takes the cookie back, so the proxy stops waving the browser th
 
   expect(res.status(), "an unreadable token was accepted").toBe(401);
 
-  const setCookie = res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie");
-  const cleared = setCookie.map((h) => h.value).join("\n");
+  /**
+   * The REFRESH cookie's own header, not all of them joined.
+   *
+   * Joining every Set-Cookie meant `/refresh_token=/` could match one header
+   * while the deletion marker came from a different one — so clearing only the
+   * access cookie would have passed the pair.
+   */
+  const refreshHeader = res
+    .headersArray()
+    .filter((h) => h.name.toLowerCase() === "set-cookie")
+    .map((h) => h.value)
+    .find((value) => value.startsWith("refresh_token="));
 
-  expect(cleared, "the refresh cookie was left in the browser").toMatch(/refresh_token=/);
+  expect(refreshHeader, "the refresh cookie was left in the browser").toBeTruthy();
   // A deletion is expressed as an immediate expiry or an empty value.
-  expect(cleared).toMatch(/refresh_token=;|Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+  expect(refreshHeader!).toMatch(/refresh_token=;|Max-Age=0|Expires=Thu, 01 Jan 1970/i);
 });
