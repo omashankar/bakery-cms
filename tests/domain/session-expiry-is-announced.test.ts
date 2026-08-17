@@ -252,16 +252,34 @@ describe("the store that tracks the session", () => {
      * Anything that writes `state` must go through `publish`.
      */
     const source = stripComments(read("features/auth/lib/session-expiry.ts"));
-    const assignments = source.match(/^\s*state = /gm) ?? [];
+
+    /**
+     * Not anchored to the start of a line.
+     *
+     * `/^\s*state = /gm` missed every assignment with anything in front of it
+     * on the same line — and `if (…) x = y;` is this very file's house style,
+     * so the back door the check exists to close was the shape it could not
+     * see.
+     */
+    const assignments = [...source.matchAll(/(?<![.\w])state\s*=(?!=)/g)];
 
     expect(
-      assignments,
+      assignments.map((m) => source.slice(Math.max(0, (m.index ?? 0) - 30), (m.index ?? 0) + 20)),
       "something sets the state without notifying subscribers",
     ).toHaveLength(1);
-    expect(
-      source.slice(source.indexOf("function publish")),
-      "the one assignment is not the one inside publish",
-    ).toMatch(/^\s*state = /m);
+
+    /**
+     * And the one that remains is INSIDE publish, bounded by publish's own
+     * body. Slicing from `function publish` to the end of file was satisfied by
+     * an assignment in any function declared after it.
+     */
+    const publishAt = source.indexOf("function publish");
+    expect(publishAt, "publish was not found").toBeGreaterThan(-1);
+    const publishBody = source.slice(publishAt, source.indexOf("\n}", publishAt));
+
+    expect(publishBody, "the one assignment is not the one inside publish").toMatch(
+      /(?<![.\w])state\s*=(?!=)/,
+    );
   });
 
   it("offers no way to assert a session is fine without the server saying so", async () => {
@@ -514,11 +532,32 @@ describe("the client heartbeat", () => {
      * mid-edit for a dropped packet is a worse failure than the one being
      * fixed, and the next tick asks again anyway.
      */
-    const source = hook();
-    const expiredAt = source.indexOf('outcome === "expired"');
+    /**
+     * The PROPERTY, not one spelling of its opposite.
+     *
+     * This forbade the literal `outcome === "unreachable" … markSessionExpired`.
+     * Appending `else markSessionExpired();` to the outcome chain reintroduces
+     * the defect exactly — a 500 or a dropped packet drops the password dialog
+     * over an admin mid-edit — and never spells the word, so it passed.
+     *
+     * The rule is: within the chain that reads the outcome, the ONLY way to
+     * reach `markSessionExpired` is a branch that tests for "expired".
+     */
+    const source = stripComments(hook());
+    const renewAt = source.indexOf("const renew =");
+    expect(renewAt, "the outcome chain was not found").toBeGreaterThan(-1);
+    const chain = source.slice(renewAt, source.indexOf("setExpiryConfirmer(", renewAt));
 
-    expect(expiredAt, "expiry is no longer distinguished").toBeGreaterThan(-1);
-    expect(source).not.toMatch(/outcome === "unreachable"[\s\S]{0,80}markSessionExpired/);
+    expect(chain, "expiry is no longer distinguished").toContain('outcome === "expired"');
+
+    for (const call of chain.matchAll(/markSessionExpired\(\)/g)) {
+      const guard = chain.slice(0, call.index ?? 0);
+      const branch = guard.slice(guard.lastIndexOf("outcome"));
+      expect(
+        branch,
+        "markSessionExpired is reachable from a branch that does not test for expiry",
+      ).toMatch(/^outcome === "expired"/);
+    }
   });
 
   it("stops asking once the session is over", () => {
@@ -560,15 +599,35 @@ describe("the client heartbeat", () => {
      * was never touched — and the admin believed they had kept the session
      * they had just lost.
      */
+    /**
+     * Every presence path, not just `markPresent`'s own body.
+     *
+     * Sliced to that function, the same defect one line away passed: putting
+     * `markSessionRenewed()` into `onFocus`, or into the listener registration
+     * beside `markPresent`, clears the warning and resets the client's idle
+     * clock off a bare pointerdown with no server round trip — the admin
+     * believes they kept a session the server is still counting down.
+     *
+     * So: nothing that a human's mere presence triggers may claim a renewal.
+     */
     const source = stripComments(hook());
-    const markPresent = source.slice(
-      source.indexOf("const markPresent ="),
-      source.indexOf("const renew ="),
-    );
+    const paths = [
+      ["const markPresent =", "const renew ="],
+      ["const onFocus =", "const onVisibility ="],
+      ["const onVisibility =", "window.addEventListener"],
+      ["const PRESENCE_EVENTS", "return () => {"],
+    ];
 
-    expect(markPresent, "the warning is cleared by mere presence again").not.toMatch(
-      /markSession(Active|Renewed)/,
-    );
+    for (const [start, end] of paths) {
+      const from = source.indexOf(start);
+      expect(from, `${start} was not found — has the hook been restructured?`).toBeGreaterThan(-1);
+      const region = source.slice(from, source.indexOf(end, from));
+
+      expect(
+        region,
+        `${start} claims a renewal off mere presence, with no server round trip`,
+      ).not.toMatch(/markSession(Renewed|Active)/);
+    }
   });
 
   it("actually calls the undo when it tears down", () => {
@@ -582,8 +641,23 @@ describe("the client heartbeat", () => {
     const cleanupAt = source.indexOf("return () => {");
 
     expect(cleanupAt, "the effect no longer cleans up at all").toBeGreaterThan(-1);
+
+    /**
+     * UNCONDITIONALLY.
+     *
+     * Requiring only that the text appear somewhere after the cleanup opens
+     * would pass for `if (somethingElse) forgetConfirmer();` — a cleanup that
+     * runs sometimes leaves the callback registered the rest of the time, which
+     * is the whole defect. The call must sit at the cleanup's own statement
+     * level, with nothing branching in front of it.
+     */
+    const cleanup = source.slice(cleanupAt);
+    expect(cleanup, "the confirmer is unregistered only under some condition").toMatch(
+      /return \(\) => \{\s*forgetConfirmer\(\);/,
+    );
+
     expect(
-      source.slice(cleanupAt),
+      cleanup,
       "the confirmer is left registered after the layout unmounts",
     ).toContain("forgetConfirmer()");
   });
@@ -677,10 +751,26 @@ describe("the expiry countdown", () => {
      * their own, so saying they had would be this dialog reporting something
      * that did not happen.
      */
+    /**
+     * The CLAIM, not one dead sentence.
+     *
+     * This forbade the exact string "the data behind this dialog is real
+     * again", which no longer appears anywhere — so it could only fail if
+     * someone retyped that one phrase, and any other wording making the same
+     * promise sailed through. What must not happen is the success message
+     * telling the admin their data is back when nothing refetched it.
+     */
     const source = guard();
+    const success = source.slice(
+      source.indexOf('toast.success("Signed back in"'),
+      source.indexOf("} catch"),
+    );
 
-    expect(source).not.toContain("the data behind this dialog is real again");
-    expect(source).toMatch(/reload to refresh/i);
+    expect(success.length, "the re-login success message was not found").toBeGreaterThan(40);
+    expect(success, "the dialog claims the page's data came back on its own").not.toMatch(
+      /(data|lists|figures)[^"]{0,40}(back|real|refreshed|reloaded|up to date)/i,
+    );
+    expect(success, "the admin is not told how to get the data back").toMatch(/reload/i);
   });
 
   it("writes the re-entry into the security log, and lets the server correct it", () => {
