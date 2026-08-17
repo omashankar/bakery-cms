@@ -99,6 +99,20 @@ export async function revokeRefreshTokensByUser(userId: string) {
   return RefreshTokenModel.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() });
 }
 
+/**
+ * Revoke every token in ONE session's chain.
+ *
+ * Deleting the session row does not end the session: a refresh token names its
+ * session but is not stored inside it, so a chain whose row is gone keeps
+ * rotating — and `security.repository.revokeSession` has always known that,
+ * doing exactly this alongside its delete. The auth service did not, so every
+ * "kill the whole session" it performed left the live token untouched.
+ */
+export async function revokeRefreshTokensBySession(sessionId: string) {
+  await connectDB();
+  return RefreshTokenModel.updateMany({ sessionId, revokedAt: null }, { revokedAt: new Date() });
+}
+
 // ---- Password reset (OTP) -------------------------------------------------
 
 export async function createPasswordReset(input: {
