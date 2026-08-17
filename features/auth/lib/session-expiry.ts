@@ -60,18 +60,58 @@ export function subscribeToSession(listener: (next: SessionState) => void): () =
  * `expiring` is only a prediction, so it must never overwrite this.
  */
 export function markSessionExpired(): void {
+  asking = false;
   publish("expired");
 }
+
+/**
+ * Whether a question is actually in flight, as opposed to merely published.
+ *
+ * These were the same thing, and conflating them wedged the store. A refresh
+ * that never landed left the state at "checking" — and `noteAuthStatus`
+ * declined to ask again while it read "checking", so nothing could ever
+ * re-ask. Every write then reported "checking whether you are still signed in"
+ * about a question nobody was asking, on a session that was very likely fine.
+ *
+ * The published state says what this browser believes. This says whether
+ * anyone is currently finding out.
+ */
+let asking = false;
 
 /**
  * The idle timeout is close.
  *
  * A prediction, so it yields to anything better informed: a session already
- * known to have ended, and a question already put to the server.
+ * known to have ended, and a question actually in flight. It does NOT yield to
+ * a stale "checking" — that is not better information, it is a question that
+ * was never answered.
  */
 export function markSessionExpiring(): void {
-  if (state === "expired" || state === "checking") return;
+  if (state === "expired" || asking) return;
   publish("expiring");
+}
+
+/**
+ * The question came back with no answer.
+ *
+ * The state stays "checking" — nothing was learned, and claiming otherwise
+ * would be inventing an answer — but the next 401 may ask again.
+ */
+export function markQuestionUnanswered(): void {
+  asking = false;
+}
+
+/**
+ * A request SUCCEEDED, which is direct proof the session is alive.
+ *
+ * Only clears a "checking" left over from a question that went unanswered. It
+ * deliberately does not touch the idle clock: a 2xx on an admin endpoint does
+ * not move the server's `lastSeenAt`, so the warning countdown is still right
+ * and must not be reset by one.
+ */
+function markSessionAlive(): void {
+  asking = false;
+  if (state === "checking") publish("active");
 }
 
 /*
@@ -100,6 +140,7 @@ let renewedAt = Date.now();
 
 /** Called when a refresh SUCCEEDS — the one moment the server's clock moves. */
 export function markSessionRenewed(): void {
+  asking = false;
   renewedAt = Date.now();
   publish("active");
 }
@@ -166,14 +207,26 @@ export function setExpiryConfirmer(confirmer: Confirmer): () => void {
 }
 
 export function noteAuthStatus(status: number): boolean {
+  // A success is evidence, and the only evidence that arrives on its own. It
+  // clears a "checking" left behind by a question that never came back —
+  // without which the store could sit there for the life of the tab.
+  if (status >= 200 && status < 300) {
+    markSessionAlive();
+    return false;
+  }
+
   if (status !== 401) return false;
-  // Already answered, or already asking — a failed page load fires a 401 from
-  // every panel on it, and one question is enough.
-  if (state === "expired" || state === "checking") return true;
+
+  // Already answered, or a question is genuinely in flight — a failed page load
+  // fires a 401 from every panel on it, and one question is enough. Gated on
+  // `asking` rather than on the published state, so an unanswered question does
+  // not silence every later one.
+  if (state === "expired" || asking) return true;
 
   // Published BEFORE the question goes out, because the caller reports its
   // refused write on the very next line and has to have something true to say.
   publish("checking");
+  asking = true;
   confirmExpiry();
   return true;
 }

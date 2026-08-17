@@ -277,6 +277,99 @@ describe("the store that tracks the session", () => {
     expect(store.markSessionRenewed, "the honest one went too").toBeTypeOf("function");
   });
 
+  it("can ask again after a question that never came back", async () => {
+    /**
+     * The store wedged. A refresh that never landed left the state at
+     * "checking", and `noteAuthStatus` declined to ask again while it READ
+     * "checking" — so nothing could re-ask for the life of the tab, and every
+     * write went on reporting "checking whether you are still signed in" about
+     * a question nobody was asking, on a session that was probably fine.
+     */
+    const { markQuestionUnanswered, noteAuthStatus, sessionState, setExpiryConfirmer } =
+      await import("@/features/auth/lib/session-expiry");
+
+    let asked = 0;
+    setExpiryConfirmer(() => {
+      asked += 1;
+    });
+
+    noteAuthStatus(401);
+    expect(asked).toBe(1);
+    expect(sessionState()).toBe("checking");
+
+    // A second 401 while the first question is genuinely in flight asks nothing
+    // more — one question is enough for a page full of failing panels.
+    noteAuthStatus(401);
+    expect(asked, "every failing panel put its own question to the server").toBe(1);
+
+    markQuestionUnanswered();
+    noteAuthStatus(401);
+
+    expect(asked, "an unanswered question silenced every later one").toBe(2);
+    expect(sessionState(), "an unanswered question invented an answer").toBe("checking");
+  });
+
+  it("takes a successful request as proof the session is alive", async () => {
+    /**
+     * The only evidence that arrives on its own. Without it a "checking" left
+     * by an unanswered question sits there while the admin works normally —
+     * every request succeeding, every write still saying we are not sure who
+     * they are.
+     */
+    const { markQuestionUnanswered, noteAuthStatus, sessionState, setExpiryConfirmer } =
+      await import("@/features/auth/lib/session-expiry");
+
+    setExpiryConfirmer(() => {});
+    noteAuthStatus(401);
+    markQuestionUnanswered();
+    expect(sessionState()).toBe("checking");
+
+    expect(noteAuthStatus(200), "a success was reported as a refusal").toBe(false);
+    expect(sessionState(), "a successful request did not clear the doubt").toBe("active");
+  });
+
+  it("does not let a successful request reset the idle clock", async () => {
+    /**
+     * A 2xx on an admin endpoint proves someone is signed in. It does NOT move
+     * the server's `lastSeenAt` — only a refresh does — so treating it as a
+     * renewal would push the warning countdown forward on a session the server
+     * is still counting down, and the admin would lose the minute's notice this
+     * feature exists to give them.
+     */
+    const { idleForMs, markSessionRenewed, noteAuthStatus } = await import(
+      "@/features/auth/lib/session-expiry"
+    );
+
+    markSessionRenewed();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const before = idleForMs();
+
+    noteAuthStatus(200);
+
+    expect(idleForMs(), "a plain success was treated as a renewal").toBeGreaterThanOrEqual(before);
+  });
+
+  it("does not let a stale question suppress the warning", async () => {
+    /**
+     * The warning yields to a question in flight — right, because an answer is
+     * on its way. It must NOT yield to a "checking" nobody is pursuing: that is
+     * not better information, and suppressing the countdown for it takes away
+     * the admin's one chance to keep the session.
+     */
+    const { markQuestionUnanswered, markSessionExpiring, noteAuthStatus, sessionState, setExpiryConfirmer } =
+      await import("@/features/auth/lib/session-expiry");
+
+    setExpiryConfirmer(() => {});
+    noteAuthStatus(401);
+
+    markSessionExpiring();
+    expect(sessionState(), "a prediction overwrote a question in flight").toBe("checking");
+
+    markQuestionUnanswered();
+    markSessionExpiring();
+    expect(sessionState(), "a stale question kept the warning off screen").toBe("expiring");
+  });
+
   it("does not let the warning overwrite a session that has actually ended", async () => {
     const { markSessionExpired, markSessionExpiring, sessionState } = await import(
       "@/features/auth/lib/session-expiry"
@@ -506,6 +599,18 @@ describe("the client heartbeat", () => {
     expect(renew.length, "the renew helper was not found").toBeGreaterThan(50);
 
     expect(renew).toMatch(/outcome === "renewed"[\s\S]{0,60}markSessionRenewed/);
+    /**
+     * And SAYS SO when nothing was learned.
+     *
+     * The store cannot tell an unanswered question from one still in flight
+     * unless the hook tells it, and without that it refuses to let anything ask
+     * again — for the life of the tab. The store's own behaviour has a test;
+     * this is the wiring that reaches it, which is a separate thing to get
+     * wrong and did not have one.
+     */
+    expect(renew, "an unanswered refresh leaves the store believing it is still asking").toContain(
+      "markQuestionUnanswered()",
+    );
   });
 });
 

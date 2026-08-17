@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { refreshSession } from "./auth-api";
 import {
   idleForMs,
+  markQuestionUnanswered,
   markSessionExpired,
   markSessionExpiring,
   markSessionRenewed,
@@ -115,9 +116,12 @@ export function useSessionRefresh(): void {
       refreshSession().then((outcome) => {
         // `unreachable` is deliberately not an expiry: the server never
         // answered, so nothing is known, and signing an admin out mid-edit for
-        // a dropped request would be the wrong cure. The next tick asks again.
+        // a dropped request would be the wrong cure.
         if (outcome === "expired") markSessionExpired();
         else if (outcome === "renewed") markSessionRenewed();
+        // Nothing was learned — but say so, or the store goes on believing a
+        // question is in flight and refuses to let anything ask again.
+        else markQuestionUnanswered();
         return outcome;
       });
 
