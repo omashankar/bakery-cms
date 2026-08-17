@@ -202,10 +202,42 @@ describe("an admin write that the server refused", () => {
   it("found some to check, so an empty pass cannot look like a clean one", () => {
     const checked = FILES.flatMap(blamingToasts);
 
-    expect(
-      checked.length,
-      "no write-failure messages found at all — has the walk broken?",
-    ).toBeGreaterThan(10);
+    /**
+     * EVERY root contributes, rather than a total with slack in it.
+     *
+     * `> 10` against 18 discovered sites let the walk lose nearly two fifths of
+     * the tree and stay green — and a threshold tight enough to catch that is
+     * a number someone must keep re-tuning, which is how it got loose in the
+     * first place. Dropping a whole root is the failure that actually happens
+     * (a rename, a broken recursion), and this notices it without a magic
+     * number to maintain.
+     */
+    /**
+     * Two separate questions, because they fail separately.
+     *
+     * Whether the walk still DESCENDS into each root, and whether the phrase
+     * matching still finds anything. Requiring blaming messages from every root
+     * conflated them and was simply false: `features/` carries none today, so
+     * that check failed on a healthy tree while a dropped root passed.
+     */
+    /**
+     * Named files, not the ROOTS constant.
+     *
+     * Iterating ROOTS cannot notice ROOTS shrinking — drop `features` and the
+     * loop simply checks one fewer root and passes. So the check names actual
+     * files the scan must reach: if a root stops being walked, its
+     * representative goes missing and this says which one.
+     */
+    const MUST_REACH = [
+      "apps/admin/commerce/pages/orders-list-page.tsx",
+      "features/orders/lib/orders-api.ts",
+    ];
+
+    for (const path of MUST_REACH) {
+      expect(FILES, `the walk no longer reaches ${path}`).toContain(path);
+    }
+
+    expect(checked.length, "the walk found almost no messages at all").toBeGreaterThan(10);
   });
 
   it("keeps the check itself in one place", () => {
@@ -226,7 +258,15 @@ describe("an admin write that the server refused", () => {
       ).toBe(true);
     }
 
-    const declarations = REPORTERS.filter((path) =>
+    /**
+     * Counted across the WHOLE tree, not the two files named above.
+     *
+     * Filtering the hardcoded REPORTERS array meant the answer could only ever
+     * be 0, 1 or 2 — so a third copy of the check, anywhere else, was
+     * structurally invisible to the assertion whose entire job is to notice a
+     * copy.
+     */
+    const declarations = sourceFilesUnder(ROOTS).filter((path) =>
       /function reportedAsSignedOut/.test(mask(readFileSync(join(process.cwd(), path), "utf8"))),
     );
 

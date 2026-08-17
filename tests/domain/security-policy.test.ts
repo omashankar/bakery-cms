@@ -255,7 +255,23 @@ describe("the regressions the first attempt introduced", () => {
     // a single extra second.
     expect(service).toContain("sessionTimeoutMs(policy)");
     expect(service).toMatch(/if \(idleMs > sessionTimeoutMs\(policy\)\)/);
-    expect(service).toContain("repo.deleteSession(claims.sid)");
+
+    /**
+     * The idle BRANCH ends the session — checked where the branch is.
+     *
+     * `expect(service).toContain("repo.deleteSession(claims.sid)")` was
+     * file-wide, and the deletion has since moved into `endSession` while
+     * `logout` grew its own call. So the timeout branch could stop ending
+     * anything and this stayed green, on the one assertion that exists to
+     * prove it does.
+     */
+    const branchAt = service.indexOf("if (idleMs > sessionTimeoutMs(policy))");
+    const branch = service.slice(branchAt, service.indexOf("\n  }", branchAt));
+
+    expect(branch, "an idle session is no longer ended").toMatch(
+      /endSession\(claims\.sid, "Session timed out"\)/,
+    );
+
     // And a continuing session restarts the idle window.
     expect(service).toContain("repo.touchSession(claims.sid)");
   });

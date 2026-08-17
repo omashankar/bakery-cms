@@ -204,13 +204,43 @@ describe("a screen does not state the live shop from an unsaved draft", () => {
  */
 describe("the session heartbeat follows the shop's own timeout", () => {
   it("is derived, floored and capped", () => {
+    /**
+     * Scoped to the function that computes the DELAY.
+     *
+     * All four assertions were file-wide, and the file has since grown a second
+     * reader of the same setting (`sessionTimeoutMs`, for the expiry warning)
+     * and a second timer (`armWatch`). So every one of them was satisfied by
+     * code that has nothing to do with the heartbeat: the interval could go
+     * back to a fixed ten minutes — the exact defect this describe block names
+     * — and all four still passed.
+     */
     const hook = source("features/auth/lib/use-session-refresh.ts");
+    const from = hook.indexOf("function refreshIntervalMs");
+    expect(from, "the heartbeat's delay function was not found").toBeGreaterThan(-1);
+    const derive = hook.slice(from, hook.indexOf("\n}", from));
 
-    expect(hook).toContain("getSecuritySettings().sessionTimeoutMinutes");
-    expect(hook).toContain("REFRESH_FLOOR_MS");
-    expect(hook).toContain("REFRESH_CEILING_MS");
-    // Recomputed each round, so a policy change lands in the same session.
-    expect(hook).toContain("window.setTimeout(");
-    expect(hook).not.toContain("window.setInterval(");
+    expect(derive, "the heartbeat no longer reads the shop's timeout").toContain(
+      "getSecuritySettings().sessionTimeoutMinutes",
+    );
+    expect(derive, "the floor is gone").toContain("REFRESH_FLOOR_MS");
+    expect(derive, "the cap is gone").toContain("REFRESH_CEILING_MS");
+
+    /**
+     * And the heartbeat's OWN timer re-reads it each round. `arm` is the
+     * heartbeat; `armWatch` is the expiry warning, and finding `setTimeout` in
+     * that one told us nothing about this one.
+     */
+    const armAt = hook.indexOf("const arm =");
+    expect(armAt, "the heartbeat timer was not found").toBeGreaterThan(-1);
+    // Bounded by the function's own closing `};` — slicing to the next `arm();`
+    // stopped at the SELF-RESCHEDULE inside it, cutting off the delay argument
+    // this is about.
+    const arm = hook.slice(armAt, hook.indexOf("\n    };", armAt));
+
+    expect(arm, "the delay is no longer recomputed each round").toContain("refreshIntervalMs()");
+    expect(arm).toContain("window.setTimeout(");
+    expect(arm, "a fixed interval cannot follow a policy change").not.toContain(
+      "window.setInterval(",
+    );
   });
 });

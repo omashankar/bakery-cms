@@ -484,8 +484,16 @@ describe("the server, when a session ends", () => {
       source.indexOf("export async function refresh"),
     );
 
-    expect(endSession, "the browser is left holding a session cookie").toContain(
-      "await clearAuthCookies()",
+    /**
+     * UNCONDITIONALLY.
+     *
+     * Plain containment cannot tell "always clears" from "clears only when
+     * something happens to be true" — and a cookie left behind on any path is
+     * a browser the proxy keeps waving into /admin, which is the entire defect.
+     * The call must sit at the function's own statement level.
+     */
+    expect(endSession, "the browser is left holding a session cookie").toMatch(
+      /\n {2}await clearAuthCookies\(\);/,
     );
   });
 
