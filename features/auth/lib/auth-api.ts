@@ -82,21 +82,34 @@ export function loginRequest(input: { email: string; password: string; rememberM
 }
 
 /**
+ * What a renewal attempt found.
+ *
+ * It used to answer a bare boolean, and `false` conflated two situations that
+ * need opposite handling: the server ENDED this session (sign in again), and
+ * the request never landed (try again shortly). Treating a flaky network as an
+ * expiry would throw an admin out mid-edit for a dropped packet; treating an
+ * expiry as a network blip leaves them on a panel that quietly stops working.
+ */
+export type RefreshOutcome = "renewed" | "expired" | "unreachable";
+
+/**
  * Silently renew the short-lived access token from the (30-day) refresh cookie.
  * Single-flight: many callers (the periodic tick, a tab refocus) can ask at once,
- * but only one request goes out and everyone awaits it. Returns false when the
- * refresh token is missing/expired/revoked (i.e. the user must sign in again).
+ * but only one request goes out and everyone awaits it.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
-export function refreshSession(): Promise<boolean> {
+export function refreshSession(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     try {
       const res = await fetch("/api/auth/refresh", { method: "POST" });
-      return res.ok;
+      if (res.ok) return "renewed";
+      // 401 is the server saying this session is over. A 5xx is the server
+      // failing, and signing the admin out for it would be the wrong cure.
+      return res.status === 401 ? "expired" : "unreachable";
     } catch {
-      return false;
+      return "unreachable";
     } finally {
       refreshInFlight = null;
     }

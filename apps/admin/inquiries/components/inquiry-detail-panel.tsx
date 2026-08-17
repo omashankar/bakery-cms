@@ -10,6 +10,7 @@ import type { Inquiry, InquiryStatus } from "@/types/inquiry";
 import { updateInquiry } from "@/features/inquiries/lib/inquiries-repository";
 import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "./inquiry-status-badge";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 interface InquiryDetailPanelProps {
   inquiry: Inquiry | null;
@@ -52,7 +53,7 @@ export function InquiryDetailPanel({
     const { inquiry: updated, persisted } = await updateInquiry(current.id, patch);
     if (updated) onUpdate(updated);
     if (!persisted) {
-      toast.error(`${what} saved on this device only — the server rejected it`, {
+      if (!reportedAsSignedOut()) toast.error(`${what} saved on this device only — the server rejected it`, {
         description: "Reload to see the server's version.",
       });
     }

@@ -234,7 +234,7 @@ export function CustomersListPage() {
         {paginated.length === 0 && !mounted ? (
           // Saying "No customers found" before the server has answered would be
           // a guess, and a wrong one on every cold load in a shop that has them.
-          <div className="flex min-h-48 items-center justify-center py-14">
+          <div className="relative flex min-h-48 items-center justify-center py-14">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
             <span className="sr-only">Loading customers</span>
           </div>

@@ -45,6 +45,7 @@ import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 10;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -276,7 +277,7 @@ export function OrdersListPage() {
      * into a retry that could never succeed. Refusals carry the server's own
      * sentence now, and the optimistic cache write is undone for them.
      */
-    if (refused > 0) {
+    if (refused > 0 && !reportedAsSignedOut()) {
       toast.error(
         `${refused} of ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"} could not be moved to ${bulkStatus}`,
         {
@@ -297,7 +298,7 @@ export function OrdersListPage() {
      */
     const dropped = rejected - refused;
     if (dropped > 0) {
-      toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
+      if (!reportedAsSignedOut()) toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
         description: "Those changes exist on this device only — reload to see the server's version.",
       });
     }
@@ -620,7 +621,7 @@ export function OrdersListPage() {
         {paginated.length === 0 && pending ? (
           // Saying "No orders found" before the server has answered would be a
           // guess, and a wrong one on every cold load in a shop that has orders.
-          <div className="flex min-h-48 items-center justify-center py-14">
+          <div className="relative flex min-h-48 items-center justify-center py-14">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
             <span className="sr-only">Loading orders</span>
           </div>

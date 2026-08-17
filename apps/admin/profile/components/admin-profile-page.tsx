@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatDate } from "@/utils/format";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 /** Shown only while hydration is pending, behind the skeleton. */
 const EMPTY_PROFILE: AdminProfile = {
@@ -113,7 +114,7 @@ export function AdminProfilePage() {
       // `if (!promise)` is always false — the guard would be dead.
       const accepted = await saveAdminProfile(form);
       if (!accepted) {
-        toast.error("Profile was not saved", {
+        if (!reportedAsSignedOut()) toast.error("Profile was not saved", {
           description: "The server rejected it, or the photo is too large for browser storage.",
         });
         // The working copy stays as typed so the admin can retry; the saved

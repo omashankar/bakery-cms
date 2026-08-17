@@ -1,0 +1,232 @@
+"use client";
+
+/**
+ * Whether this browser's admin session has ended, and whether it is about to.
+ *
+ * Nothing tracked this. The server ends a session — idle past the shop's
+ * timeout, revoked, or the account disabled — and answers 401; `refreshSession`
+ * returned a boolean that `useSessionRefresh` discarded with `void`. Meanwhile
+ * every `*-api.ts` maps a non-ok response to `null`/`false`, deliberately, so
+ * the caller can tell "no data" from "bad data". The result was an admin panel
+ * that stayed on screen and quietly emptied: lists went to their loading or
+ * empty states, saves reported "saved on this device only — the server rejected
+ * it", and nothing said the person was signed out.
+ *
+ * A module-level store rather than context: the 401 can surface from any api
+ * module, none of which sit under a provider, and there is exactly one session
+ * per browser.
+ */
+
+/**
+ * `checking` exists because the answer takes a round trip.
+ *
+ * A 401 used to publish "expired" synchronously, and the write reporters were
+ * built on that: they read `sessionState()` the instant a refused write
+ * returned. Making the 401 into a QUESTION — the right fix, since a routine
+ * expired access token is not a dead session — quietly broke them. The question
+ * is asked, `noteAuthStatus` returns, the reporter reads "active", and the
+ * admin is told "saved on this device only — the server rejected it" a
+ * heartbeat before the sign-in dialog lands on top of it, contradicting it and
+ * advising a reload that would destroy the unsaved edits the dialog promises
+ * are safe.
+ *
+ * So the question itself is a state. It is published SYNCHRONOUSLY, which is
+ * what the reporters need, and it says exactly what is true at that moment:
+ * we have asked and do not yet know.
+ */
+export type SessionState = "active" | "checking" | "expiring" | "expired";
+
+let state: SessionState = "active";
+const listeners = new Set<(next: SessionState) => void>();
+
+function publish(next: SessionState): void {
+  if (state === next) return;
+  state = next;
+  for (const listener of [...listeners]) listener(next);
+}
+
+export function sessionState(): SessionState {
+  return state;
+}
+
+export function subscribeToSession(listener: (next: SessionState) => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/**
+ * The session is over. Irreversible until a successful re-authentication.
+ *
+ * `expiring` is only a prediction, so it must never overwrite this.
+ */
+export function markSessionExpired(): void {
+  asking = false;
+  publish("expired");
+}
+
+/**
+ * Whether a question is actually in flight, as opposed to merely published.
+ *
+ * These were the same thing, and conflating them wedged the store. A refresh
+ * that never landed left the state at "checking" — and `noteAuthStatus`
+ * declined to ask again while it read "checking", so nothing could ever
+ * re-ask. Every write then reported "checking whether you are still signed in"
+ * about a question nobody was asking, on a session that was very likely fine.
+ *
+ * The published state says what this browser believes. This says whether
+ * anyone is currently finding out.
+ */
+let asking = false;
+
+/**
+ * The idle timeout is close.
+ *
+ * A prediction, so it yields to anything better informed: a session already
+ * known to have ended, and a question actually in flight. It does NOT yield to
+ * a stale "checking" — that is not better information, it is a question that
+ * was never answered.
+ */
+export function markSessionExpiring(): void {
+  if (state === "expired" || asking) return;
+  publish("expiring");
+}
+
+/**
+ * The question came back with no answer.
+ *
+ * The state stays "checking" — nothing was learned, and claiming otherwise
+ * would be inventing an answer — but the next 401 may ask again.
+ */
+export function markQuestionUnanswered(): void {
+  asking = false;
+}
+
+/**
+ * A request SUCCEEDED, which is direct proof the session is alive.
+ *
+ * Only clears a "checking" left over from a question that went unanswered. It
+ * deliberately does not touch the idle clock: a 2xx on an admin endpoint does
+ * not move the server's `lastSeenAt`, so the warning countdown is still right
+ * and must not be reset by one.
+ */
+function markSessionAlive(): void {
+  asking = false;
+  if (state === "checking") publish("active");
+}
+
+/*
+ * There is deliberately no `markSessionActive`.
+ *
+ * It existed and had no callers left, which made it worse than unused: it
+ * published "active" AND reset the idle clock, so the next person to reach for
+ * the obvious-sounding name would silently have told the warning that the
+ * server had just renewed a session it had not. Going back to "active" is not
+ * a thing anything is entitled to assert on its own — only a renewal the
+ * server confirmed is, and that is `markSessionRenewed` below.
+ */
+
+/**
+ * When the SERVER's idle clock was last moved, as far as this browser knows.
+ *
+ * The server times a session out against `lastSeenAt`, which only advances on a
+ * successful refresh. The warning used to predict against the client's last
+ * KEYSTROKE instead, and those are not the same instant — the heartbeat renews
+ * up to PRESENCE_WINDOW_MS after the last input, so the prediction fired minutes
+ * early on a session that was nowhere near ending. Then the countdown "asked"
+ * the server, which renewed it, and the whole cycle began again: an unattended
+ * tab warned, renewed, warned, renewed, roughly every seventy seconds, forever.
+ */
+let renewedAt = Date.now();
+
+/** Called when a refresh SUCCEEDS — the one moment the server's clock moves. */
+export function markSessionRenewed(): void {
+  asking = false;
+  renewedAt = Date.now();
+  publish("active");
+}
+
+/** How long the server has considered this session idle. */
+export function idleForMs(): number {
+  return Date.now() - renewedAt;
+}
+
+/**
+ * Record what a response says about the session, and answer whether the caller
+ * was refused for that reason.
+ *
+ * A 401 is NOT proof the session is over, and treating it as proof was wrong in
+ * the routine case: the access token is short-lived and expires on its own every
+ * few minutes, which is the exact condition the refresh flow exists to repair.
+ * Publishing "expired" for it put a password prompt over a perfectly live
+ * session — and, because the heartbeat stops once expired, killed the very
+ * renewal that would have fixed it.
+ *
+ * So a 401 raises a QUESTION, and the caller supplied by `setExpiryConfirmer`
+ * puts it to the server. Only the server's answer ends a session.
+ *
+ * 403 and 5xx are not even questions: a 403 is a permission this account does
+ * not have — a real answer from a live session — and a 5xx is the server
+ * failing, which signing in again cannot fix.
+ */
+type Confirmer = () => void;
+let confirmExpiry: Confirmer = () => {};
+
+/*
+ * There is deliberately no `resetSessionTracking` either.
+ *
+ * It was added as a test helper, had no callers, and assigned `state` directly
+ * instead of going through `publish` — so it changed the answer without telling
+ * anyone. A subscriber (the dialog) would have kept rendering "expired" while
+ * `sessionState()` said "active", and worse: the next REAL renewal would then
+ * publish nothing at all, because `publish` early-returns when the state it is
+ * given already matches. The dialog would have stayed on screen forever, and
+ * the one thing that could take it down would have been the thing that could
+ * not. Tests reset by calling `markSessionRenewed()` and re-registering a
+ * confirmer, which are the same calls production makes.
+ */
+
+const NO_CONFIRMER: Confirmer = () => {};
+
+/**
+ * Wired by the admin shell; kept here so api modules import no React.
+ *
+ * Returns its own undo, and the shell MUST call it on unmount. Without that
+ * the callback outlives the layout that registered it: an admin who navigates
+ * to the storefront leaves a live confirmer behind, and a 401 from any module
+ * both surfaces share then renews the admin session from a page that has no
+ * admin on it — the unattended renewal this feature exists to prevent, through
+ * a second door.
+ */
+export function setExpiryConfirmer(confirmer: Confirmer): () => void {
+  confirmExpiry = confirmer;
+  return () => {
+    // Only if it is still ours. A remount registers before the old effect's
+    // cleanup runs, and clearing unconditionally would unregister the LIVE one.
+    if (confirmExpiry === confirmer) confirmExpiry = NO_CONFIRMER;
+  };
+}
+
+export function noteAuthStatus(status: number): boolean {
+  // A success is evidence, and the only evidence that arrives on its own. It
+  // clears a "checking" left behind by a question that never came back —
+  // without which the store could sit there for the life of the tab.
+  if (status >= 200 && status < 300) {
+    markSessionAlive();
+    return false;
+  }
+
+  if (status !== 401) return false;
+
+  // Already answered, or a question is genuinely in flight — a failed page load
+  // fires a 401 from every panel on it, and one question is enough. Gated on
+  // `asking` rather than on the published state, so an unanswered question does
+  // not silence every later one.
+  if (state === "expired" || asking) return true;
+
+  // Published BEFORE the question goes out, because the caller reports its
+  // refused write on the very next line and has to have something true to say.
+  publish("checking");
+  asking = true;
+  confirmExpiry();
+  return true;
+}

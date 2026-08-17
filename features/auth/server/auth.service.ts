@@ -154,22 +154,68 @@ async function issueTokens(
 
 // ---- Refresh (rotation) ---------------------------------------------------
 
+/**
+ * End the session in the BROWSER too, not only in the database.
+ *
+ * Every path below deleted the session row and threw, and left the refresh
+ * cookie in place. `proxy.ts` gates `/admin` on that cookie's presence alone —
+ * deliberately, it does no database work — so the browser went on being treated
+ * as signed in and was never sent to the login page. The admin stayed on a
+ * fully rendered panel where every read answered 401 and was mapped to "no
+ * data", so the lists emptied out one by one and each save reported "saved on
+ * this device only", with nothing anywhere saying the session had ended.
+ *
+ * Clearing here is what lets the proxy do its job on the next navigation, and
+ * what lets the client tell "signed out" from "server is down".
+ */
+async function endSession(sessionId: string | null, message: string): Promise<never> {
+  if (sessionId) {
+    /**
+     * The CHAIN first, then the row.
+     *
+     * Deleting the row alone does not end anything. A refresh token names its
+     * session but is not stored inside it, so the chain keeps rotating — and
+     * the rotation below skipped its idle check entirely when the row was
+     * missing, which made a killed session strictly harder to kill: it could
+     * no longer time out, it vanished from the Security Center's own list of
+     * sessions to revoke, and neither "Revoke session" nor "Log out
+     * everywhere" could reach it, because both work from rows.
+     *
+     * So the comment above the reuse branch — "kill the whole session as a
+     * precaution against stolen-token replay" — described something that did
+     * not happen. On a replayed token the victim's live token was never
+     * revoked, and `clearAuthCookies()` writes its deletions onto the
+     * REPLAYER's response, which costs an attacker nothing.
+     *
+     * `security.repository.revokeSession` has always done both. This is the
+     * same pair, in the place the auth service ends sessions.
+     */
+    await repo.revokeRefreshTokensBySession(sessionId).catch(() => undefined);
+    await repo.deleteSession(sessionId).catch(() => undefined);
+  }
+  await clearAuthCookies();
+  throw new AuthError(message);
+}
+
 export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx): Promise<PublicUser> {
   if (!refreshCookie) throw new AuthError("No refresh token");
 
   const claims = await verifyRefreshToken(refreshCookie);
-  if (!claims) throw new AuthError("Invalid refresh token");
+  // A cookie we cannot read is not a session. Left in place it keeps the proxy
+  // waving the browser into /admin on every navigation.
+  if (!claims) return endSession(null, "Invalid refresh token");
 
   const stored = await repo.findActiveRefreshToken(sha256(refreshCookie));
   if (!stored) {
     // Token valid by signature but not active in DB → reuse/revoked. Kill the
     // whole session as a precaution against stolen-token replay.
-    await repo.deleteSession(claims.sid).catch(() => undefined);
-    throw new AuthError("Refresh token is no longer valid");
+    return endSession(claims.sid, "Refresh token is no longer valid");
   }
 
   const user = await repo.findUserById(claims.sub);
-  if (!user || user.status !== "active") throw new AuthError("Account unavailable");
+  if (!user || user.status !== "active") {
+    return endSession(claims.sid, "Account unavailable");
+  }
 
   const policy = await getSecurityPolicy();
 
@@ -187,13 +233,29 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
    * continues or does not, so refusing here ends it for a real client without
    * giving a replayed token a single extra second.
    */
-  const session = await repo.findSessionById(claims.sid).catch(() => null);
-  if (session) {
-    const idleMs = Date.now() - new Date(session.lastSeenAt).getTime();
-    if (idleMs > sessionTimeoutMs(policy)) {
-      await repo.deleteSession(claims.sid).catch(() => undefined);
-      throw new AuthError("Session timed out");
-    }
+  /**
+   * A session with no row is not a session.
+   *
+   * This read `.catch(() => null)` and then `if (session) { …idle check… }`, so
+   * a missing row skipped the check and the rotation went ahead — minting
+   * another thirty-day token for a session the shop's timeout could no longer
+   * reach, that the Security Center could not list, and that neither revoke
+   * action could find. A row can go missing for ordinary reasons: the TTL index
+   * purges it thirty days after login while every rotation slides the token's
+   * own expiry forward, and a concurrent double-refresh can delete it out from
+   * under a live chain.
+   *
+   * The `catch` is gone with it. A database error is not "no row" — answering
+   * either way would be guessing, and rotating on a guess is what this whole
+   * check exists to prevent. It surfaces as a 500, which the client reads as
+   * "unreachable" and does not act on.
+   */
+  const session = await repo.findSessionById(claims.sid);
+  if (!session) return endSession(claims.sid, "Session no longer exists");
+
+  const idleMs = Date.now() - new Date(session.lastSeenAt).getTime();
+  if (idleMs > sessionTimeoutMs(policy)) {
+    return endSession(claims.sid, "Session timed out");
   }
 
   // Rotate: revoke the used token, issue a fresh pair.
@@ -228,9 +290,27 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
 export async function logout(refreshCookie: string | undefined, ctx: RequestCtx): Promise<void> {
   if (refreshCookie) {
     const claims = await verifyRefreshToken(refreshCookie);
-    const stored = await repo.findActiveRefreshToken(sha256(refreshCookie));
-    if (stored) await repo.revokeRefreshToken(String(stored._id));
-    if (claims?.sid) await repo.deleteSession(claims.sid).catch(() => undefined);
+    /**
+     * The whole CHAIN, not the one token this tab happens to hold.
+     *
+     * Signing out revoked only the token presented and deleted the row. A
+     * second tab refreshing at the same moment has already rotated that token
+     * — so `stored` is null, nothing is revoked, and the browser walks away
+     * holding the successor while being told it is signed out. On a shared
+     * machine that is the whole point of the button failing.
+     *
+     * Revoking by session covers the presented token and every successor,
+     * whichever tab minted it.
+     */
+    if (claims?.sid) {
+      await repo.revokeRefreshTokensBySession(claims.sid).catch(() => undefined);
+      await repo.deleteSession(claims.sid).catch(() => undefined);
+    } else {
+      // No readable claims, so no session to name: revoke what was presented,
+      // which is all there is to go on.
+      const stored = await repo.findActiveRefreshToken(sha256(refreshCookie));
+      if (stored) await repo.revokeRefreshToken(String(stored._id));
+    }
     if (claims?.sub) {
       await writeAuditLog({ action: "auth.logout", actorId: claims.sub, status: "success", ...ctx });
     }

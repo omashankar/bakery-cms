@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { MetaSyncSummary, WhatsAppConnectionStatus } from "@/types/whatsapp-provider";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 /**
  * Connecting the shop's WhatsApp Business number.
@@ -133,7 +134,7 @@ export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectio
     setBusy(null);
 
     if (accepted) toast.success("WhatsApp connection saved");
-    else toast.error("The server refused the connection", { description: "Nothing was saved." });
+    else if (!reportedAsSignedOut()) toast.error("The server refused the connection", { description: "Nothing was saved." });
   }
 
   async function handleVerify() {

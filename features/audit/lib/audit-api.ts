@@ -4,6 +4,7 @@
  * degrade gracefully.
  */
 import type { AuditLogEntry } from "@/types/audit";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 export interface AuditPagination {
   page: number;
@@ -44,7 +45,10 @@ export async function fetchAuditLogs(
     const res = await fetch(`/api/audit-logs${qs ? `?${qs}` : ""}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<AuditLogEntry[]>;
     if (!json.success || !json.data) return null;
     return { items: json.data, pagination: json.pagination };

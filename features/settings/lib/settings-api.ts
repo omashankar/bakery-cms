@@ -5,6 +5,7 @@
  */
 import type { AppSettings } from "@/types/settings";
 import { createHydrationGate } from "@/lib/hydration-gate";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -43,7 +44,10 @@ export const SERVER_SECTIONS = [
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -78,6 +82,7 @@ export async function pushSection(section: string, value: unknown): Promise<bool
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(value),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -111,6 +116,7 @@ export async function resetSectionRequest(section: string): Promise<boolean> {
 
   try {
     const res = await fetch(`/api/settings/${section}/reset`, { method: "POST" });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -135,6 +141,7 @@ export async function sendTestEmailRequest(): Promise<TestEmailResult> {
   try {
     const res = await fetch("/api/settings/smtp/test", { method: "POST" });
     if (res.ok) return { sent: true };
+    noteAuthStatus(res.status);
 
     // `message`, not `error`. The failure envelope is
     // `{ success, message, errors }` (lib/server/http/response.ts `fail`), so

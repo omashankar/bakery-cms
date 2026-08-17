@@ -54,6 +54,7 @@ import { ensureInventoryHydrated } from "@/apps/admin/commerce/lib/use-inventory
 import { SettingsFormGate, SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 10;
 
@@ -175,7 +176,7 @@ export function InventoryAdminPage() {
         // Local-only means this browser warns and nobody else does. The saved
         // baseline stays put — it used to move regardless, so a REJECTED save
         // greyed the button out and removed the only retry.
-        toast.error("Settings saved on this device only — the server rejected them", {
+        if (!reportedAsSignedOut()) toast.error("Settings saved on this device only — the server rejected them", {
           description: "Reload to see the server's version.",
         });
         return { value, accepted: false };
@@ -195,7 +196,7 @@ export function InventoryAdminPage() {
     bump();
 
     if (!persisted) {
-      toast.error("Changed on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Changed on this device only — the server rejected it", {
         description: "The shop is still selling against the old setting.",
       });
       return;

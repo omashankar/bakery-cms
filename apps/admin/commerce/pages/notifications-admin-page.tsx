@@ -54,6 +54,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 12;
 
@@ -191,7 +192,7 @@ export function NotificationsAdminPage() {
     if (!persisted) {
       // Applied locally, but the server refused it — say so rather than leaving
       // the admin to discover on another device that the toggle never stuck.
-      toast.error("Applied on this device only — the server rejected the change.");
+      if (!reportedAsSignedOut()) toast.error("Applied on this device only — the server rejected the change.");
       return;
     }
 

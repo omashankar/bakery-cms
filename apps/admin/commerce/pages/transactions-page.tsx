@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 12;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -120,7 +121,7 @@ export function TransactionsPage() {
     }
     // Silently doing nothing reads as a broken row; with an expired session that
     // is every row on the page.
-    toast.error("Could not load that order", {
+    if (!reportedAsSignedOut()) toast.error("Could not load that order", {
       description: "The server did not answer — reload and try again.",
     });
   }
@@ -130,7 +131,7 @@ export function TransactionsPage() {
     // no transactions is a different claim from admitting the list never arrived.
     // orders-list and invoices already make this distinction.
     if (failed) {
-      toast.error("Could not load the transactions to export", {
+      if (!reportedAsSignedOut()) toast.error("Could not load the transactions to export", {
         description: "The server did not answer — reload and try again.",
       });
       return;
@@ -283,7 +284,7 @@ export function TransactionsPage() {
         {paginated.length === 0 && loading ? (
           // Asserting there are none before the server has answered is a
           // guess, and a wrong one on every cold load in a shop that has them.
-          <div className="flex min-h-48 items-center justify-center py-14">
+          <div className="relative flex min-h-48 items-center justify-center py-14">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
             <span className="sr-only">Loading transactions</span>
           </div>

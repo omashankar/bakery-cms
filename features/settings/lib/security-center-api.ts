@@ -5,6 +5,7 @@
  */
 import type { SecurityCenterState } from "@/types/security";
 import { createHydrationGate } from "@/lib/hydration-gate";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -25,6 +26,7 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -35,7 +37,10 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
 export async function fetchSecurityCenter(): Promise<SecurityCenterState | null> {
   try {
     const res = await fetch("/api/security-center", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<SecurityCenterState>;
     return json.success ? json.data : null;
   } catch {
@@ -62,7 +67,10 @@ export async function logoutAllRequest(): Promise<{ ok: boolean; revoked: number
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
-    if (!res.ok) return { ok: false, revoked: 0 };
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return { ok: false, revoked: 0 };
+    }
 
     const json = (await res.json().catch(() => null)) as { data?: { revoked?: number } } | null;
     return { ok: true, revoked: json?.data?.revoked ?? 0 };

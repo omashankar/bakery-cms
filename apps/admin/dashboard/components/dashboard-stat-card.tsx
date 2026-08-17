@@ -53,7 +53,8 @@ export function DashboardStatCard({
           {title}
         </p>
         {figures === "loading" ? (
-          <div role="status" aria-live="polite" className="space-y-1.5 py-1">
+          // `relative` anchors the `sr-only` span — see PanelLoading.
+          <div role="status" aria-live="polite" className="relative space-y-1.5 py-1">
             <span className="sr-only">Loading {title.toLowerCase()}</span>
             <Skeleton className="h-5 w-20 sm:h-6" />
             <Skeleton className="h-3 w-24" />

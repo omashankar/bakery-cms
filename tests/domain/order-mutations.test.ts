@@ -271,6 +271,37 @@ describe("bulk status update", () => {
     expect(result.reason, "the server's explanation was discarded").toBeTruthy();
   });
 
+  it("does not call a 401 a rule the server enforces", async () => {
+    /**
+     * A refusal here is reported as a permanent rule — "an order cannot go back
+     * down the fulfilment ladder. Nothing was changed." — and the caller undoes
+     * its optimistic write on the strength of it. 401 was inside the `4xx means
+     * the server decided` band, so on an expired session every id in the batch
+     * landed there: the admin was told a rule they had not broken, about orders
+     * nothing had happened to, and given no reason to try again after signing
+     * back in.
+     *
+     * 403 stays a refusal — a permission this account does not have is a real
+     * answer from a live session.
+     */
+    persistServerOrders([order({ id: "a", status: "confirmed" })]);
+    mockServer(false, 401);
+
+    const result = await bulkUpdateOrderStatus(["a"], "preparing");
+
+    expect(result.failed).toBe(1);
+    expect(result.refused, "a 401 was reported as a rule the shop enforces").toBe(0);
+  });
+
+  it("still calls a 403 a refusal", async () => {
+    persistServerOrders([order({ id: "a", status: "confirmed" })]);
+    mockServer(false, 403);
+
+    const result = await bulkUpdateOrderStatus(["a"], "preparing");
+
+    expect(result.refused, "a permission decision stopped counting as one").toBe(1);
+  });
+
   it("undoes the optimistic write for an order the server refused", async () => {
     // A refusal is permanent, so leaving the target status in the cache shows
     // the admin a change that will never exist — and invites the retry that

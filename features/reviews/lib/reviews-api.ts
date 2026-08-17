@@ -5,6 +5,7 @@
  */
 import type { ProductReview, ProductReviewFormData } from "@/types/review";
 import { createHydrationGate } from "@/lib/hydration-gate";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -26,6 +27,7 @@ async function send(path: string, method: string, body?: unknown): Promise<boole
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -52,7 +54,10 @@ export async function submitReviewRequest(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(review),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<ProductReview>;
     return json.success ? json.data : null;
   } catch {
@@ -90,7 +95,10 @@ export async function fetchApprovedReviews(
     const res = await fetch(`/api/reviews?productSlug=${encodeURIComponent(productSlug)}`, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<ProductReview[]>;
     return json.success ? (json.data ?? []) : null;
   } catch {
@@ -102,7 +110,10 @@ export async function fetchApprovedReviews(
 export async function fetchReviews(): Promise<ProductReview[] | null> {
   try {
     const res = await fetch("/api/reviews", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<ProductReview[]>;
     return json.success ? json.data : null;
   } catch {

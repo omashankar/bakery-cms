@@ -18,6 +18,7 @@ import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-s
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { FilterPanel, FilterPanelSearch } from "@/components/shared/filter-panel";
 import { reportWrite } from "@/apps/admin/lib/report-write";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 type Category = "all" | "online" | "offline";
 
@@ -53,7 +54,7 @@ export function GatewayManagerPage() {
     // rejected" one click away. `verified === false` is a real answer and must
     // not be rounded up to connected.
     fetch("/api/razorpay/config?verify=1")
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((s: { configured?: boolean; verified?: boolean | null } | null) => {
         if (!s?.configured || s.verified === false) {
           setRazorpayStatus("not_configured");

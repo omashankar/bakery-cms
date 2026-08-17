@@ -1,0 +1,123 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * Deleting the session row does not end a session.
+ *
+ * A refresh token NAMES its session but is not stored inside it, so a chain
+ * whose row is gone keeps rotating. Three places got this wrong at once, and
+ * they compounded:
+ *
+ *  - `endSession` deleted the row and left the chain live, under a comment
+ *    saying it "kills the whole session as a precaution against stolen-token
+ *    replay". On a replayed token the victim's live token was never revoked,
+ *    and the cookie clearing landed on the REPLAYER's response, which costs an
+ *    attacker nothing.
+ *  - The rotation's idle check ran only `if (session)`, so a missing row
+ *    skipped it entirely and minted another thirty-day token. A killed session
+ *    therefore became HARDER to kill: it could no longer time out, it vanished
+ *    from the Security Center's list (which is built from rows), and neither
+ *    "Revoke session" nor "Log out everywhere" could reach it, because both
+ *    work from rows too.
+ *  - `logout` revoked only the token that tab presented. A second tab
+ *    refreshing at the same moment had already rotated it, so nothing was
+ *    revoked and the browser walked away holding the successor while being
+ *    told it was signed out.
+ *
+ * `security.repository.revokeSession` had it right the whole time — delete the
+ * row AND revoke the chain. These are the same pair, in the auth service.
+ */
+
+const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const stripComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+
+/** One function's body, so an assertion cannot be satisfied by its neighbour. */
+function bodyOf(source: string, declaration: string): string {
+  const at = source.indexOf(declaration);
+  expect(at, `${declaration} was not found`).toBeGreaterThan(-1);
+  const rest = source.slice(at);
+  // To the next top-level declaration, or the end.
+  const next = rest.search(/\n(?:export )?(?:async )?function /);
+  return next > 0 ? rest.slice(0, next) : rest;
+}
+
+const service = () => stripComments(read("features/auth/server/auth.service.ts"));
+
+describe("ending a session", () => {
+  it("revokes the token chain, not just the row", () => {
+    const body = bodyOf(service(), "async function endSession");
+
+    expect(body, "the chain keeps rotating after the row is gone").toContain(
+      "revokeRefreshTokensBySession",
+    );
+    expect(body).toContain("deleteSession");
+    /**
+     * Order matters. Revoking after the delete would still work here, but the
+     * pair has to be inseparable — and reading them together is what stops the
+     * next person removing one.
+     */
+    expect(body.indexOf("revokeRefreshTokensBySession")).toBeLessThan(
+      body.indexOf("deleteSession"),
+    );
+  });
+
+  it("is what signing out does, so a racing tab cannot keep the successor", () => {
+    const body = bodyOf(service(), "export async function logout");
+
+    expect(body, "sign-out still revokes only the token this tab presented").toContain(
+      "revokeRefreshTokensBySession",
+    );
+  });
+
+  it("is reachable by the same repository call the security screen uses", () => {
+    // Two implementations of "revoke a session's chain" is how the two drifted
+    // in the first place. This one is shared.
+    const repository = stripComments(read("features/auth/server/auth.repository.ts"));
+
+    expect(repository).toContain("export async function revokeRefreshTokensBySession");
+    expect(repository).toMatch(/updateMany\(\{\s*sessionId,\s*revokedAt: null\s*\}/);
+  });
+});
+
+describe("the rotation's idle check", () => {
+  it("refuses a session whose row is gone rather than skipping the check", () => {
+    /**
+     * `if (session) { …idle check… }` let a missing row through. A row goes
+     * missing for ordinary reasons — the TTL index purges it thirty days after
+     * login while every rotation slides the token's own expiry forward, and a
+     * concurrent double-refresh deletes it out from under a live chain.
+     */
+    const body = bodyOf(service(), "export async function refresh");
+    const lookup = body.indexOf("repo.findSessionById");
+
+    expect(lookup, "the session row is no longer read").toBeGreaterThan(-1);
+
+    const after = body.slice(lookup);
+    expect(after, "a missing row still skips the timeout").toMatch(
+      /if \(!session\) return endSession\(/,
+    );
+    // The idle comparison must not be nested back inside an `if (session)`.
+    expect(after, "the idle check is conditional again").not.toMatch(
+      /if \(session\)[\s\S]{0,120}idleMs/,
+    );
+  });
+
+  it("does not treat a database error as 'no row'", () => {
+    /**
+     * The read carried `.catch(() => null)`, which made a failed query
+     * indistinguishable from a session that had ended — and with the fix above
+     * that would sign an admin out because the database hiccuped. Letting it
+     * throw surfaces a 500, which the client reads as "unreachable" and does
+     * not act on.
+     */
+    const body = bodyOf(service(), "export async function refresh");
+    const line = body.slice(body.indexOf("repo.findSessionById"));
+
+    expect(line.slice(0, 120), "a database error is being read as an ended session").not.toContain(
+      ".catch(",
+    );
+  });
+});

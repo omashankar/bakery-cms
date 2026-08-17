@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 interface StockAdjustmentDialogProps {
   item: InventoryItem | null;
@@ -97,7 +98,16 @@ export function StockAdjustmentDialog({
     setSubmitting(false);
 
     if (!updated) {
-      toast.error("Could not update stock");
+      /**
+       * THIS is the branch a refused write reaches.
+       *
+       * `adjustStock` answers `{ item: null, persisted: false }` for every
+       * failure — it never returns an item alongside `persisted: false` — so
+       * the guarded `!persisted` branch below cannot fire, and the guard was
+       * sitting on the one path that does not happen while this one, the path
+       * that does, said "Could not update stock" for a session that had ended.
+       */
+      if (!reportedAsSignedOut()) toast.error("Could not update stock");
       return;
     }
 
@@ -111,7 +121,7 @@ export function StockAdjustmentDialog({
       // server applied it to the untouched one, so a "successful" retry would
       // end with the two further apart than before, and the toast would quote
       // the local number.
-      toast.error("Stock changed on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Stock changed on this device only — the server rejected it", {
         description: "The shop is still selling against the old count. Reload and try again.",
       });
       onOpenChange(false);

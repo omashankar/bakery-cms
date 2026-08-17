@@ -13,6 +13,7 @@ import {
   replacePaymentGatewaysRequest,
 } from "@/features/admin-config/lib/admin-config-api";
 import type { PaymentMethodSettings } from "@/types/settings";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * Runtime gateway state — the NON-SECRET part.
@@ -197,6 +198,7 @@ export async function saveGatewayCredentials(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(credentials),
     });
+    noteAuthStatus(response.status);
     return response.ok;
   } catch {
     return false;
@@ -209,7 +211,10 @@ export async function fetchGatewayCredentialStatus(
 ): Promise<GatewayCredentialStatus | null> {
   try {
     const response = await fetch(`/api/payments/gateways/${encodeURIComponent(id)}/credentials`);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      noteAuthStatus(response.status);
+      return null;
+    }
     return (await response.json()) as GatewayCredentialStatus;
   } catch {
     return null;

@@ -11,6 +11,7 @@ import type {
 } from "@/types/communication";
 import type { NotificationSettings } from "@/types/notification";
 import type { MetaSyncSummary, WhatsAppConnectionStatus } from "@/types/whatsapp-provider";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 interface Envelope<T> {
   success: boolean;
@@ -20,7 +21,10 @@ interface Envelope<T> {
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -45,6 +49,7 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -184,6 +189,7 @@ export async function pushNotificationState(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(delta),
     });
+    noteAuthStatus(res.status);
     return res.ok;
   } catch {
     return false;
@@ -213,6 +219,7 @@ async function postJson<T>(
       | null;
 
     if (res.ok) return { ok: true, data: json?.data ?? null };
+    noteAuthStatus(res.status);
     return { ok: false, error: json?.message ?? `The server refused (${res.status}).` };
   } catch {
     return { ok: false, error: "Could not reach the server." };

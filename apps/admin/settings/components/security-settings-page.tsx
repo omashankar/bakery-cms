@@ -63,6 +63,7 @@ import { SettingsSectionShell } from "./settings-section-shell";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 import { securityCenterHydration } from "@/features/settings/lib/security-center-api";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
@@ -167,6 +168,10 @@ export function SecuritySettingsPage() {
       return;
     }
 
+    // "Check your connection" blames the network for a refusal that was about
+    // who was asking — and this is the screen for ending sessions, so being
+    // wrong about WHY one could not be ended is worse here than anywhere.
+    if (reportedAsSignedOut()) return;
     toast.error("Could not revoke that session", {
       description: "It is still active. Check your connection and try again.",
     });
@@ -177,6 +182,7 @@ export function SecuritySettingsPage() {
     refreshCenter();
 
     if (!persisted) {
+      if (reportedAsSignedOut()) return;
       toast.error("Could not sign out the other devices", {
         description: "They are still signed in. Check your connection and try again.",
       });

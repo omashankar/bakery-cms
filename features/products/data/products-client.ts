@@ -1,4 +1,5 @@
 import type { Product, ProductFormData } from "@/types/product";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * Browser-side product access for the admin panel.
@@ -19,6 +20,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    noteAuthStatus(response.status);
     // The server sends per-field detail in `errors` and the route sends a
     // summary in `error`. Only the summary was read, so a product rejected for
     // one bad field toasted a bare "Validation failed" and the admin had no way

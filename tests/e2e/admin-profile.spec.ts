@@ -1,26 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
-import { SignJWT } from "jose";
 
 import { connect } from "./shop-state";
-
-/** The signing secret, from the same .env.local the server reads. */
-function readEnv(): Record<string, string> {
-  const lines = readFileSync(join(process.cwd(), ".env.local"), "utf8").split(/\r?\n/);
-  const entries = lines
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#") && line.includes("="))
-    .map((line) => {
-      const at = line.indexOf("=");
-      const key = line.slice(0, at).trim();
-      const value = line.slice(at + 1).trim().replace(/^["']|["']$/g, "");
-      return [key, value] as const;
-    });
-  return Object.fromEntries(entries);
-}
+import { adminSession } from "./admin-session";
 
 /**
  * Admin → Profile, with the account fields the server has not answered for.
@@ -42,43 +25,16 @@ test.describe("the admin profile page", () => {
     expect(user, "no admin user to sign in as").toBeTruthy();
 
     /**
-     * An admin session, minted rather than logged into.
+     * The SHARED fixture, not a second copy of it.
      *
-     * The admin's password is not something a test should hold, and an
-     * ADMIN_PASSWORD env var would just move the problem. The token is signed
-     * with the same secret and the same claims `signAccessToken` uses, so the
-     * server validates it exactly as it validates a real login — this skips the
-     * password, not the authentication.
+     * This minted its own pair with `sid: "e2e"` and no session row behind
+     * it — the same fiction `adminSession` used to carry. The server refuses
+     * that now: a refresh whose session row is missing ends the session rather
+     * than rotating past the check, so the first heartbeat cleared the cookies
+     * and this page redirected to /login. Two fixtures for one job is how the
+     * second one gets left behind.
      */
-    const secret = new TextEncoder().encode(readEnv().JWT_ACCESS_SECRET);
-    const token = await new SignJWT({
-      sub: String(user!._id),
-      role: String(user!.role ?? "owner"),
-      email: String(user!.email),
-      type: "access",
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("15m")
-      .sign(secret);
-
-    /**
-     * BOTH cookies. `proxy.ts` gates /admin on the presence of the REFRESH
-     * cookie — an optimistic check that does no database work — while the DAL
-     * authenticates with the ACCESS one. Setting only the access token gets you
-     * redirected to /login before anything reads it, which is how the first
-     * version of this test ended up asserting against the sign-in page.
-     */
-    const refresh = await new SignJWT({ sub: String(user!._id), sid: "e2e", type: "refresh" })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("15m")
-      .sign(new TextEncoder().encode(readEnv().JWT_REFRESH_SECRET));
-
-    await page.context().addCookies([
-      { name: "access_token", value: token, url: "http://localhost:3000" },
-      { name: "refresh_token", value: refresh, url: "http://localhost:3000" },
-    ]);
+    await adminSession(page);
 
     /**
      * The state that crashed: a user the server answers for, with no dates on

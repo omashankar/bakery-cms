@@ -50,6 +50,8 @@ import { cn } from "@/lib/utils";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 8;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -273,7 +275,7 @@ export function RefundCenterAdminPage() {
     reconciledRef.current = true;
 
     void fetch("/api/orders/refunds/reconcile", { method: "POST" })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((result: { settled?: number } | null) => {
         if (result?.settled) setReloadKey((key) => key + 1);
       })
@@ -313,7 +315,7 @@ export function RefundCenterAdminPage() {
       // The order was not cached and the server read failed too. The dialog has
       // already closed itself, so without this the click produces nothing at all.
       setRefundTarget(null);
-      toast.error("Could not load that order", {
+      if (!reportedAsSignedOut()) toast.error("Could not load that order", {
         description: "The server did not answer — reload and try again.",
       });
       return;
@@ -333,7 +335,11 @@ export function RefundCenterAdminPage() {
       // already in flight may have too — and those are exactly the two the
       // screen was most confident about. Whether the money moved is something
       // only the refund path knows, so it says so in the message itself.
-      toast.error(refundError ?? "The refund was not accepted.");
+      // A 401 is not the gateway declining a refund — it is this browser not
+      // being recognised. The two send an operator to completely different
+      // places, and money is involved.
+      if (!reportedAsSignedOut())
+        toast.error(refundError ?? "The refund was not accepted.");
       return;
     }
 
@@ -348,7 +354,7 @@ export function RefundCenterAdminPage() {
     // no refund cases is a different claim from admitting the list never arrived.
     // orders-list and invoices already make this distinction.
     if (failed) {
-      toast.error("Could not load the refund cases to export", {
+      if (!reportedAsSignedOut()) toast.error("Could not load the refund cases to export", {
         description: "The server did not answer — reload and try again.",
       });
       return;
@@ -533,7 +539,7 @@ export function RefundCenterAdminPage() {
             {paginated.length === 0 && loading ? (
               // Asserting there are none before the server has answered is a
               // guess, and a wrong one on every cold load in a shop that has them.
-              <div className="flex min-h-48 items-center justify-center py-14">
+              <div className="relative flex min-h-48 items-center justify-center py-14">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
                 <span className="sr-only">Loading refund cases</span>
               </div>

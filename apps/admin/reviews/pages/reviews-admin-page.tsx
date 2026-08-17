@@ -54,6 +54,7 @@ import { ReviewFormDialog } from "../components/review-form-dialog";
 import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
 import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 10;
 
@@ -142,7 +143,7 @@ export function ReviewsAdminPage() {
    * rejected write means the moderator moves on believing it is done.
    */
   function reportUnpersisted(what: string) {
-    toast.error(`${what} on this device only — the server rejected it`, {
+    if (!reportedAsSignedOut()) toast.error(`${what} on this device only — the server rejected it`, {
       description: "Reload to see the server's version.",
     });
   }
@@ -188,7 +189,7 @@ export function ReviewsAdminPage() {
     if (failed > 0) {
       // Counted per id, so a partly-rejected batch says so instead of claiming
       // the whole selection went through.
-      toast.error(`${verb} ${updated} of ${updated + failed} — the server refused ${failed}`, {
+      if (!reportedAsSignedOut()) toast.error(`${verb} ${updated} of ${updated + failed} — the server refused ${failed}`, {
         description: "Those are unchanged on the server. Reload and try again.",
       });
       return;

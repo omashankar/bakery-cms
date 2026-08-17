@@ -4,6 +4,7 @@ import type {
   WeddingBuilderState,
   WeddingSectionInstance,
 } from "@/types/wedding-builder";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /** Browser-side wedding section access for the admin builder. */
 
@@ -28,6 +29,7 @@ async function request<T>(init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    noteAuthStatus(response.status);
     throw new BuilderRequestError(
       payload?.error ?? `Request failed (${response.status})`,
       response.status,
@@ -110,6 +112,7 @@ async function revisionsRequest<T>(init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    noteAuthStatus(response.status);
     throw new Error(payload?.error ?? `Request failed (${response.status})`);
   }
   return payload as T;

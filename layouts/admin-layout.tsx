@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
 import { useSessionRefresh } from "@/features/auth/lib/use-session-refresh";
+import { SessionGuard } from "@/features/auth/components/session-guard";
 import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 import { useInventoryServerSync } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
@@ -255,6 +256,12 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
           <AdminSidebar collapsed={false} inDrawer onNavigate={closeMobile} />
         </aside>
       </div>
+
+      {/*
+        Inside the shell so it is present on every admin screen, and mounted
+        once: the session belongs to the browser, not to a page.
+      */}
+      <SessionGuard />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible">
         <div className="shrink-0 print:hidden">

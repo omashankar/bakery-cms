@@ -1,5 +1,11 @@
 import { toast } from "sonner";
 
+// Imported, not re-implemented. This file held a second copy, which is how the
+// two drifted: the shared one learned about the "checking" state and this one
+// did not, so the settings screens kept saying "the server rejected it" for a
+// write the server had not seen. One check, one place.
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+
 /**
  * Report a settings write honestly, and tell the caller whether it may treat the
  * section as saved.
@@ -21,6 +27,8 @@ export function reportSettingsWrite(persisted: boolean, subject: string): boolea
     return true;
   }
 
+  if (reportedAsSignedOut()) return false;
+
   // NOT "saved on this device only" — it is saved nowhere. The cache rollback
   // undoes the refused write and now announces it, so every other screen is
   // back on the value the server actually holds. What survives is the form in
@@ -37,6 +45,8 @@ export function reportSettingsReset(persisted: boolean, subject: string): boolea
     toast.success(`${subject} reset to defaults`);
     return true;
   }
+
+  if (reportedAsSignedOut()) return false;
 
   toast.error(`${subject} reset on this device only — the server rejected it`, {
     description: "The saved settings are unchanged. Try again, or reload.",
