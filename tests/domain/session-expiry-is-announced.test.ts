@@ -193,7 +193,7 @@ describe("the store that tracks the session", () => {
      * session from a page with no admin on it — the unattended renewal this
      * whole feature exists to prevent, through a second door.
      */
-    const { noteAuthStatus, setExpiryConfirmer } = await import(
+    const { markSessionRenewed, noteAuthStatus, setExpiryConfirmer } = await import(
       "@/features/auth/lib/session-expiry"
     );
 
@@ -204,6 +204,16 @@ describe("the store that tracks the session", () => {
 
     noteAuthStatus(401);
     expect(asked).toBe(1);
+
+    /**
+     * Back to "active" between the two calls, or this proves nothing.
+     *
+     * The first 401 leaves the store in "checking", and `noteAuthStatus` early-
+     * returns from that state — so without this the second call was a no-op and
+     * the count below stayed at 1 whether or not the unregister worked. The
+     * assertion read as proof and was a tautology.
+     */
+    markSessionRenewed();
 
     forget();
     noteAuthStatus(401);
