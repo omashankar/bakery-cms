@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 interface StockAdjustmentDialogProps {
   item: InventoryItem | null;
@@ -111,7 +112,7 @@ export function StockAdjustmentDialog({
       // server applied it to the untouched one, so a "successful" retry would
       // end with the two further apart than before, and the toast would quote
       // the local number.
-      toast.error("Stock changed on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Stock changed on this device only — the server rejected it", {
         description: "The shop is still selling against the old count. Reload and try again.",
       });
       onOpenChange(false);

@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -140,7 +141,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   }
 
   function reportUnpersisted(what: string) {
-    toast.error(`${what} on this device only — the server rejected the change.`, {
+    if (!reportedAsSignedOut()) toast.error(`${what} on this device only — the server rejected the change.`, {
       description: "Reload to see the server's version.",
     });
   }

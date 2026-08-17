@@ -38,6 +38,7 @@ import {
   updateNewsletterSubscriber,
   type NewsletterFilters,
 } from "@/features/inquiries/lib/newsletter-repository";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 12;
 
@@ -115,7 +116,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
     if (!persisted) {
       // This flag decides who gets the next campaign, and that send reads the
       // server. A local-only deactivation still receives mail.
-      toast.error("Changed on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Changed on this device only — the server rejected it", {
         description: "Reload to see the server's version.",
       });
       return;
@@ -145,7 +146,7 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
     setDeleteOpen(false);
 
     if (!persisted) {
-      toast.error("Removed on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Removed on this device only — the server rejected it", {
         description: "They are still subscribed. Reload and try again.",
       });
       return;

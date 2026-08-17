@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 const PAGE_SIZE = 8;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -273,7 +274,7 @@ export function RefundCenterAdminPage() {
     reconciledRef.current = true;
 
     void fetch("/api/orders/refunds/reconcile", { method: "POST" })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((result: { settled?: number } | null) => {
         if (result?.settled) setReloadKey((key) => key + 1);
       })

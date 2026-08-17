@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 import { formatCurrency } from "@/utils/format";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * Captured payments with no order behind them.
@@ -38,7 +39,7 @@ export function UnclaimedPaymentsAlert() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/payments/unclaimed")
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((data: { items?: UnclaimedPayment[]; amount?: number } | null) => {
         if (cancelled || !data) return;
         setItems(data.items ?? []);
@@ -61,7 +62,10 @@ export function UnclaimedPaymentsAlert() {
     try {
       const res = await fetch(`/api/payments/unclaimed/${id}/refunded`, { method: "POST" });
       if (res.ok) setReloadKey((key) => key + 1);
-      else toast.error("Could not record that — reload and try again.");
+      // A 401 here is not "could not record that" — it is "we do not know who
+      // you are", and the dialog will say so rather than this line guessing.
+      else if (!noteAuthStatus(res.status))
+        toast.error("Could not record that — reload and try again.");
     } catch {
       toast.error("Could not reach the server.");
     } finally {

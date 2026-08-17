@@ -45,6 +45,7 @@ import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 10;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -297,7 +298,7 @@ export function OrdersListPage() {
      */
     const dropped = rejected - refused;
     if (dropped > 0) {
-      toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
+      if (!reportedAsSignedOut()) toast.error(`${dropped} of ${selectedIds.length} did not reach the server`, {
         description: "Those changes exist on this device only — reload to see the server's version.",
       });
     }

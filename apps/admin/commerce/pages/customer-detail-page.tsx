@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 interface CustomerDetailPageProps {
   customerId: string;
@@ -148,7 +149,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
    * hydration without ever telling them.
    */
   function reportUnpersisted(what: string) {
-    toast.error(`${what} on this device only — the server rejected the change.`, {
+    if (!reportedAsSignedOut()) toast.error(`${what} on this device only — the server rejected the change.`, {
       description: "Reload to see the server's version.",
     });
   }

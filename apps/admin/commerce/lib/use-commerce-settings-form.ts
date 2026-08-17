@@ -11,6 +11,7 @@ import {
   useSettingsSection,
   type SectionHydration,
 } from "@/features/settings/lib/use-settings-section";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 /**
  * The commerce section, for the admin screens that edit part of it.
@@ -59,7 +60,7 @@ export function useCommerceSettingsForm(): CommerceSettingsForm {
         // `saved` is left where it was: the dirty flag is what keeps Save
         // enabled, and these are delivery fees and tax rates the storefront
         // charges against.
-        toast.error("Saved on this device only — the server rejected it", {
+        if (!reportedAsSignedOut()) toast.error("Saved on this device only — the server rejected it", {
           description: "Your changes are still here. Try again, or reload to discard them.",
         });
         return { value, accepted: false };

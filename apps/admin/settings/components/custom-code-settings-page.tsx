@@ -22,6 +22,7 @@ import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
 import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
 import { SettingsHydrationNotice } from "./settings-field-error";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 function countLines(value: string): number {
   const trimmed = value.trim();
@@ -60,7 +61,7 @@ export function CustomCodeSettingsPage() {
   async function persist(next: CustomCode): Promise<boolean> {
     const saved = await saveCustomCode(next);
     if (!saved) {
-      toast.error("Custom code was not saved", {
+      if (!reportedAsSignedOut()) toast.error("Custom code was not saved", {
         description: "The server rejected it, or browser storage is unavailable.",
       });
     }

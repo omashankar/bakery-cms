@@ -28,8 +28,20 @@ const stripComments = (source: string) =>
  * An exemption has to be argued for, which is the point of naming them here
  * rather than leaving them out of a list nobody would notice them missing from.
  */
-/** Every `*-api.ts` under the given roots, found on disk rather than listed. */
-function apiModulesUnder(roots: string[]): string[] {
+/**
+ * Every file that makes a request, found by what it DOES.
+ *
+ * Discovery by filename failed three times over. First it was a hand-written
+ * array of fourteen paths in a repo with nineteen `*-api.ts` modules. Then it
+ * knew `*-api.ts` but not `*-client.ts`, so the two builders, the CMS pages and
+ * the products module were invisible. Then `payment-gateway-settings.ts`, which
+ * matches neither name, went unnoticed while holding two admin writes. A naming
+ * convention is not a property; calling `fetch` is.
+ *
+ * `(?<![.\w])fetch\(` so `section.fetch()` and `opts.fetch()` — injected
+ * callbacks, not requests — are not counted as either.
+ */
+function requestMakersUnder(roots: string[]): string[] {
   const found: string[] = [];
 
   const walk = (dir: string) => {
@@ -38,9 +50,11 @@ function apiModulesUnder(roots: string[]): string[] {
       if (entry.isDirectory()) {
         if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
         walk(path);
-      } else if (entry.name.endsWith("-api.ts")) {
-        found.push(path);
+        continue;
       }
+      if (!/\.tsx?$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) continue;
+      const source = stripComments(readFileSync(join(process.cwd(), path), "utf8"));
+      if (/(?<![.\w])fetch\(/.test(source)) found.push(path);
     }
   };
 
@@ -75,7 +89,19 @@ const EXEMPT = [
   // A storefront customer getting a delivery quote has no admin session to end,
   // and marking one would put a sign-in dialog over a shopper's checkout.
   "features/checkout/lib/quote-api.ts",
+  // Runs on the SERVER and calls WhatsApp, not this app. There is no browser
+  // session here to have ended.
+  "features/communications/server/whatsapp-client.server.ts",
 ];
+
+/**
+ * The storefront, whole.
+ *
+ * A shopper has no admin session, and marking one expired would drop a
+ * password dialog over a checkout. Kept as a prefix rather than a file list
+ * because the reason applies to the surface, not to individual files.
+ */
+const STOREFRONT = "apps/website/";
 
 describe("the store that tracks the session", () => {
   beforeEach(async () => {
@@ -607,18 +633,27 @@ describe("a write refused because the session ended", () => {
     for (const path of reporters) {
       const source = stripComments(read(path));
 
+      const declares = /function reportedAsSignedOut/.test(source);
+
       expect(
-        source,
+        declares || /reportedAsSignedOut/.test(source),
         `${path} cannot tell an ended session from a refused value`,
-      ).toContain("sessionState()");
+      ).toBe(true);
+
       /**
-       * BOTH answers, because a 401 asks rather than declares.
+       * BOTH answers, from whichever file actually holds the check.
        *
-       * Handling only "expired" left the guard dead on the ordinary path: the
-       * question takes a round trip and this reporter runs before it lands.
+       * Handling only "expired" left the guard dead on the ordinary path: a 401
+       * asks rather than declares, and the question takes a round trip these
+       * reporters run before. The settings reporter delegates now instead of
+       * keeping the copy that drifted, so the states are asserted where they
+       * live — demanding the literals in every file would have pushed it back
+       * into holding its own.
        */
-      expect(source, `${path} ignores a session it has asked about`).toContain('"checking"');
-      expect(source, `${path} ignores a session known to have ended`).toContain('"expired"');
+      if (declares) {
+        expect(source, `${path} ignores a session it has asked about`).toContain('"checking"');
+        expect(source, `${path} ignores a session known to have ended`).toContain('"expired"');
+      }
 
       /**
        * Scoped to the FUNCTION that emits it.
@@ -685,21 +720,38 @@ describe("a write refused because the session ended", () => {
      * settings-api and security-center-api slipped through: a list cannot
      * notice what is missing from itself.
      */
-    const MODULES = apiModulesUnder(["features", "apps/admin"]).filter(
-      (path) => !EXEMPT.some((exempt) => path.endsWith(exempt)),
+    const MODULES = requestMakersUnder(["features", "apps"]).filter(
+      (path) => !path.startsWith(STOREFRONT) && !EXEMPT.some((exempt) => path.endsWith(exempt)),
     );
 
-    expect(MODULES.length, "no api modules found — has the layout changed?").toBeGreaterThan(12);
+    expect(MODULES.length, "no request-making modules found — has the layout changed?").toBeGreaterThan(
+      20,
+    );
 
     for (const path of MODULES) {
-      // Comments stripped: several of these EXPLAIN why the `res.ok` check
-      // matters, and counting those would let a real site go unnoticed.
+      // Comments stripped: several of these EXPLAIN why the ok-check matters,
+      // and counting those would let a real site go unnoticed.
       const source = stripComments(read(path));
-      const checks = (source.match(/res\.ok/g) ?? []).length;
-      const noted = (source.match(/noteAuthStatus\(res\.status\)/g) ?? []).length;
+      /**
+       * REQUESTS counted, not ok-checks.
+       *
+       * The first version matched the literal `res.ok`. Five client modules
+       * name their variable `response`, so they were invisible to the fix AND
+       * to the guard meant to prove the fix complete — a test for a spelling,
+       * not for a property. Widening it to any `x.ok` then over-counted, since
+       * `result.ok` on a plain object is not a response either.
+       *
+       * Every `fetch` produces exactly one response, and every response must be
+       * examined once. That is the actual invariant, and it cannot be dodged by
+       * renaming anything.
+       */
+      const requests = (source.match(/(?<![.\w])fetch\(/g) ?? []).length;
+      const noted = (source.match(/noteAuthStatus\(/g) ?? []).length;
 
-      expect(checks, `${path} reads no responses — is the path still right?`).toBeGreaterThan(0);
-      expect(noted, `${path} checks res.ok ${checks}× but reports a 401 ${noted}×`).toBe(checks);
+      expect(requests, `${path} makes no requests — is the path still right?`).toBeGreaterThan(0);
+      expect(noted, `${path} makes ${requests} request(s) but reports a 401 ${noted}×`).toBe(
+        requests,
+      );
     }
   });
 });

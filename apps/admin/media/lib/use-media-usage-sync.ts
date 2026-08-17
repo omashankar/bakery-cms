@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { setRemoteUsageIndex } from "./media-usage";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * Loads every place a media URL can be referenced that no longer lives in this
@@ -40,7 +41,10 @@ const SOURCES: Source[] = [
 async function loadSource(source: Source): Promise<string | null> {
   try {
     const response = await fetch(source.url, { headers: { Accept: "application/json" } });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      noteAuthStatus(response.status);
+      return null;
+    }
     return JSON.stringify(await response.json());
   } catch {
     return null;

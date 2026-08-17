@@ -48,6 +48,7 @@ import {
 import { DeleteInquiryDialog } from "./delete-inquiry-dialog";
 import { InquiryDetailPanel } from "./inquiry-detail-panel";
 import { InquiryStatusBadge } from "./inquiry-status-badge";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 10;
 
@@ -198,7 +199,7 @@ export function InquiriesListPage({
       // They are gone from this screen but not from the server, so they will be
       // back on the next reload. Saying "deleted" invites the admin to assume a
       // customer enquiry has been dealt with.
-      toast.error("Deleted on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Deleted on this device only — the server rejected it", {
         description: "Reload to see the server's version.",
       });
       return;

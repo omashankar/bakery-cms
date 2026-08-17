@@ -7,6 +7,7 @@ import { CheckCircle2, Lock, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * The Razorpay credentials form.
@@ -55,7 +56,7 @@ export function RazorpayKeysForm({ onStatusChange }: { onStatusChange?: (s: Razo
     // present. A `.env.local` holding the literal placeholder
     // `rzp_test_xxxxxxxxxxxxxx` used to show a green "Connected" badge.
     fetch("/api/razorpay/config?verify=1")
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((next: RazorpayStatus | null) => {
         if (!cancelled && next) apply(next);
       })
@@ -69,6 +70,7 @@ export function RazorpayKeysForm({ onStatusChange }: { onStatusChange?: (s: Razo
     setChecking(true);
     try {
       const res = await fetch("/api/razorpay/config?verify=1");
+      noteAuthStatus(res.status);
       if (res.ok) apply((await res.json()) as RazorpayStatus);
     } catch {
       toast.error("Could not reach the server");
@@ -110,6 +112,7 @@ export function RazorpayKeysForm({ onStatusChange }: { onStatusChange?: (s: Razo
         }),
       });
       const data = await res.json();
+      noteAuthStatus(res.status);
       if (!res.ok) {
         toast.error(data.error || "Could not save");
         return;
@@ -131,6 +134,7 @@ export function RazorpayKeysForm({ onStatusChange }: { onStatusChange?: (s: Razo
     try {
       const res = await fetch("/api/razorpay/config", { method: "DELETE" });
       const data = await res.json();
+      noteAuthStatus(res.status);
       if (!res.ok) {
         toast.error(data.error || "Could not disconnect");
         return;

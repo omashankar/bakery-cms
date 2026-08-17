@@ -21,6 +21,7 @@ import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settin
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activity";
 import { ListLoading } from "@/components/shared/list-loading";
+import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 const actionTone: Record<string, string> = {
   published: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -105,7 +106,7 @@ export function ActivitySettingsPage() {
     setClearOpen(false);
 
     if (!persisted) {
-      toast.error("Cleared on this device only — the server rejected it", {
+      if (!reportedAsSignedOut()) toast.error("Cleared on this device only — the server rejected it", {
         description: "Reload to see the server’s version.",
       });
       return;

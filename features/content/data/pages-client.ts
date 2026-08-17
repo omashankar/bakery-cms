@@ -1,4 +1,5 @@
 import type { CmsPage, CmsPageFormData } from "@/types/content";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /** Browser-side CMS page access for the admin editor. */
 
@@ -10,6 +11,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    noteAuthStatus(response.status);
     throw new Error(payload?.error ?? `Request failed (${response.status})`);
   }
   return payload as T;

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import type { RazorpayStatus } from "@/apps/admin/commerce/components/razorpay-keys-card";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 /**
  * Whether online payments are working, and a way through to fix them.
@@ -28,7 +29,7 @@ export function RazorpaySummaryCard() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/razorpay/config?verify=1")
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (noteAuthStatus(res.status) ? null : res.ok ? res.json() : null))
       .then((next: RazorpayStatus | null) => {
         if (!cancelled && next) setStatus(next);
       })

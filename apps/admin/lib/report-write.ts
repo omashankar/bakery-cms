@@ -16,9 +16,18 @@ import { sessionState } from "@/features/auth/lib/session-expiry";
  * path: the misleading toast went out, and the sign-in dialog landed on top of
  * it a moment later, contradicting it.
  *
- * Returns true when it has already said what happened.
+ * EXPORTED, because most admin writes do not go through the reporters below.
+ * Fifteen screens build their own `toast.error` with wording tuned to what they
+ * just did — a stock adjustment, a refund, a template — and every one of them
+ * said "the server rejected it" for a write the server had merely not
+ * recognised. Copying this check into each of them is how the last four rounds
+ * of this bug happened, so there is one of it and every caller reaches for the
+ * same one.
+ *
+ * Returns true when it has already said what happened; the caller must then say
+ * nothing more.
  */
-function reportedAsSignedOut(): boolean {
+export function reportedAsSignedOut(): boolean {
   const state = sessionState();
 
   if (state === "expired") {
