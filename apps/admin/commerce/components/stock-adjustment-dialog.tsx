@@ -98,7 +98,16 @@ export function StockAdjustmentDialog({
     setSubmitting(false);
 
     if (!updated) {
-      toast.error("Could not update stock");
+      /**
+       * THIS is the branch a refused write reaches.
+       *
+       * `adjustStock` answers `{ item: null, persisted: false }` for every
+       * failure — it never returns an item alongside `persisted: false` — so
+       * the guarded `!persisted` branch below cannot fire, and the guard was
+       * sitting on the one path that does not happen while this one, the path
+       * that does, said "Could not update stock" for a session that had ended.
+       */
+      if (!reportedAsSignedOut()) toast.error("Could not update stock");
       return;
     }
 

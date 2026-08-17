@@ -110,7 +110,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
     // a wrong one every single time an admin opens a customer that does exist.
     return (
       <AdminPage>
-        <div className="flex min-h-64 items-center justify-center">
+        <div className="relative flex min-h-64 items-center justify-center">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
           <span className="sr-only">Loading customer</span>
         </div>

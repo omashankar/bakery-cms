@@ -17,12 +17,18 @@ import { describe, expect, it } from "vitest";
  * fixed those two pages and left the identical wrappers inline on the dashboard
  * itself — the fixed twin, in the very commit that documented the cause.
  *
- * SCOPE: loading indicators, i.e. a `role="status"` wrapper holding an
- * `sr-only` label. That is where the defect occurred and where the shape is
- * uniform enough to check by reading. `sr-only` also appears on form labels and
- * dialog titles; those sit inside Radix dialog content, which is
- * `position: fixed` and therefore already anchors them, and a browser probe of
- * the pages carrying the rest found no overflow.
+ * SCOPE: loading indicators — a wrapper holding an `sr-only` label that is
+ * announcing progress. Keying on `role="status"` alone was too narrow and
+ * missed five of them: the orders, transactions, invoices, refunds and
+ * customers lists all centre a spinner in a bare `flex min-h-48 …` with an
+ * `sr-only` caption and no role at all. The guard written to stop this class
+ * reappearing could not see the largest group of it.
+ *
+ * `sr-only` also appears on form labels and dialog titles. Those sit inside
+ * Radix dialog content, which is `position: fixed` and already anchors them,
+ * and a browser probe of the pages carrying the rest found no overflow — so
+ * the rule here is about wrappers that ANNOUNCE, matched by role or by the
+ * spinner shape, not about every `sr-only` in the tree.
  *
  * Only a browser can prove the SIZE — tests/e2e/no-second-window-scrollbar.spec.ts
  * does that. This is the structural half, so a new loading skeleton cannot
@@ -64,9 +70,18 @@ function tsxFilesUnder(roots: string[]): string[] {
  */
 function statusRegions(source: string): { tag: string; body: string }[] {
   const regions: { tag: string; body: string }[] = [];
-  let at = source.indexOf('role="status"');
+  /**
+   * Both shapes that announce progress.
+   *
+   * `role="status"` is the labelled one; the lists use a bare centring wrapper
+   * with a spinner and an `sr-only` caption. Matching only the first left five
+   * live instances invisible to a guard whose whole job was to find them.
+   */
+  const marks = [...source.matchAll(/role="status"|min-h-4[0-9] items-center|min-h-6[0-9] items-center/g)]
+    .map((m) => m.index ?? -1)
+    .filter((index) => index > -1);
 
-  while (at > -1) {
+  for (const at of marks) {
     const start = source.lastIndexOf("<", at);
     const close = source.indexOf(">", at);
     const name = /^<([A-Za-z][\w.]*)/.exec(source.slice(start))?.[1];
@@ -102,8 +117,6 @@ function statusRegions(source: string): { tag: string; body: string }[] {
         regions.push({ tag: source.slice(start, close + 1), body: source.slice(close + 1, end) });
       }
     }
-
-    at = source.indexOf('role="status"', at + 1);
   }
 
   return regions;

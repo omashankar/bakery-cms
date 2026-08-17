@@ -277,7 +277,7 @@ export function OrdersListPage() {
      * into a retry that could never succeed. Refusals carry the server's own
      * sentence now, and the optimistic cache write is undone for them.
      */
-    if (refused > 0) {
+    if (refused > 0 && !reportedAsSignedOut()) {
       toast.error(
         `${refused} of ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"} could not be moved to ${bulkStatus}`,
         {
@@ -621,7 +621,7 @@ export function OrdersListPage() {
         {paginated.length === 0 && pending ? (
           // Saying "No orders found" before the server has answered would be a
           // guess, and a wrong one on every cold load in a shop that has orders.
-          <div className="flex min-h-48 items-center justify-center py-14">
+          <div className="relative flex min-h-48 items-center justify-center py-14">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
             <span className="sr-only">Loading orders</span>
           </div>

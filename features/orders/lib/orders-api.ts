@@ -262,8 +262,19 @@ export async function updateStatusWithReason(
     "PATCH",
     { status },
   );
-  // 4xx is the server deciding; anything else is the request not landing.
-  return { ok, refused: !ok && code >= 400 && code < 500, reason: error };
+  /**
+   * 4xx is the server deciding — EXCEPT 401, which is it not knowing who asked.
+   *
+   * A refusal here is reported as a permanent rule ("an order cannot go back
+   * down the fulfilment ladder"), and the caller undoes its optimistic write on
+   * the strength of that. On an expired session every id in the batch landed in
+   * that branch, so an admin was told a rule they had not broken, about orders
+   * nothing had happened to, and given no reason to try again after signing in.
+   *
+   * 403 stays a refusal: a permission this account does not have is a real
+   * answer from a live session.
+   */
+  return { ok, refused: !ok && code >= 400 && code < 500 && code !== 401, reason: error };
 }
 
 export function cancelOrderRequest(
