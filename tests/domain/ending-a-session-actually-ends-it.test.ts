@@ -121,3 +121,63 @@ describe("the rotation's idle check", () => {
     );
   });
 });
+
+describe("a second tab that lost the rotation race", () => {
+  const service = () => stripComments(read("features/auth/server/auth.service.ts"));
+
+  it("is not treated as a stolen token", () => {
+    /**
+     * Every admin tab beats once on mount and the single-flight guard is per
+     * tab, so two tabs opened together both present the same token. One wins
+     * and rotates it; the other arrives holding the token just revoked.
+     *
+     * Killing the chain there revokes the SUCCESSOR the winner handed the
+     * browser — its only live credential — so a routine second tab signed the
+     * admin out of everything, over their unsaved work. Before the chain was
+     * revoked in `endSession` the loser merely deleted the row and the winner
+     * carried on; adding the revoke turned a harmless race into a destructive
+     * one, which is the shape of a fix disabling something it did not know it
+     * depended on.
+     */
+    const body = bodyOf(service(), "export async function refresh");
+
+    expect(body, "a revoked token cannot be told from one that never existed").toContain(
+      "repo.findRefreshToken(",
+    );
+    expect(body, "there is no window in which a rotation race is still a race").toContain(
+      "ROTATION_RACE_MS",
+    );
+
+    // And inside that window it must NOT end the session.
+    const raceAt = body.indexOf("ROTATION_RACE_MS");
+    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
+
+    expect(branch, "the losing tab is still signed out").not.toContain("endSession");
+    expect(branch, "the losing tab is not answered at all").toMatch(/return toPublicUser\(/);
+  });
+
+  it("still ends the session for a token that was never issued", () => {
+    // A replay outside the window, or a token with no row at all, is not a
+    // race. The window is a concession to timing, not to unknown tokens.
+    const body = bodyOf(service(), "export async function refresh");
+    const notActive = body.slice(body.indexOf("if (!stored) {"));
+
+    expect(notActive, "an unknown token no longer ends the session").toMatch(
+      /return endSession\(claims\.sid, "Refresh token is no longer valid"\)/,
+    );
+  });
+
+  it("mints nothing for the loser, so the window costs an attacker nothing", () => {
+    /**
+     * The browser already holds the successor the winner set. Issuing another
+     * pair here would hand a replayer inside the window a working credential,
+     * which is the only thing that would make the concession expensive.
+     */
+    const body = bodyOf(service(), "export async function refresh");
+    const raceAt = body.indexOf("ROTATION_RACE_MS");
+    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
+
+    expect(branch, "the losing tab is issued a fresh token").not.toContain("signRefreshToken");
+    expect(branch, "the losing tab is issued fresh cookies").not.toContain("setAuthCookies");
+  });
+});

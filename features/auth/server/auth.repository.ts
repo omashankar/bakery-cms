@@ -89,6 +89,19 @@ export async function findActiveRefreshToken(tokenHash: string) {
   return RefreshTokenModel.findOne({ tokenHash, revokedAt: null });
 }
 
+/**
+ * A token by hash, REVOKED OR NOT.
+ *
+ * `findActiveRefreshToken` answers null for a token that was rotated a moment
+ * ago and for one that never existed, and those need opposite treatment: the
+ * first is a second tab that lost a harmless race, the second is a replay.
+ * Telling them apart needs the revoked row itself.
+ */
+export async function findRefreshToken(tokenHash: string) {
+  await connectDB();
+  return RefreshTokenModel.findOne({ tokenHash });
+}
+
 export async function revokeRefreshToken(id: string) {
   await connectDB();
   return RefreshTokenModel.findByIdAndUpdate(id, { revokedAt: new Date() });

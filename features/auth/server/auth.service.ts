@@ -197,6 +197,18 @@ async function endSession(sessionId: string | null, message: string): Promise<ne
   throw new AuthError(message);
 }
 
+/**
+ * How long after a rotation a presentation of the OLD token is still a race
+ * rather than a replay.
+ *
+ * Long enough to cover a second tab whose request was already in flight when
+ * the first one answered — a few round trips on a slow connection — and short
+ * enough that reuse detection still means something. Inside it the loser is
+ * given no new credential, so the window hands an attacker nothing it does not
+ * hand the honest second tab: an answer, and no token.
+ */
+const ROTATION_RACE_MS = 15_000;
+
 export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx): Promise<PublicUser> {
   if (!refreshCookie) throw new AuthError("No refresh token");
 
@@ -205,10 +217,37 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
   // waving the browser into /admin on every navigation.
   if (!claims) return endSession(null, "Invalid refresh token");
 
-  const stored = await repo.findActiveRefreshToken(sha256(refreshCookie));
+  const tokenHash = sha256(refreshCookie);
+  const stored = await repo.findActiveRefreshToken(tokenHash);
   if (!stored) {
-    // Token valid by signature but not active in DB → reuse/revoked. Kill the
-    // whole session as a precaution against stolen-token replay.
+    /**
+     * A token that is not active is either a REPLAY or a lost race, and the
+     * two need opposite treatment.
+     *
+     * Every admin tab runs its own heartbeat and beats once on mount, and the
+     * single-flight guard is per tab — so two tabs opened together (a browser
+     * restore, a Ctrl-click) both present the same token. One wins and rotates
+     * it; the other arrives moments later holding the token that was just
+     * revoked. Treating that as a replay and killing the chain revokes the
+     * SUCCESSOR the winner just handed the browser — the only live credential
+     * it has — so a routine second tab signed the admin out of everything,
+     * over their unsaved work. Before the chain was revoked here the loser
+     * merely deleted the row and the winner carried on.
+     *
+     * So: a token revoked within the rotation window is that race. Answer
+     * success and mint NOTHING — the browser already holds the successor, and
+     * a replayer inside the same window gains no credential either, which is
+     * why the window costs little. Anything older, or never issued at all, is
+     * a replay and still ends the session.
+     */
+    const seen = await repo.findRefreshToken(tokenHash);
+    const revokedAt = seen?.revokedAt ? new Date(seen.revokedAt).getTime() : 0;
+
+    if (revokedAt && Date.now() - revokedAt < ROTATION_RACE_MS) {
+      const owner = await repo.findUserById(claims.sub);
+      if (owner && owner.status === "active") return toPublicUser(owner);
+    }
+
     return endSession(claims.sid, "Refresh token is no longer valid");
   }
 
