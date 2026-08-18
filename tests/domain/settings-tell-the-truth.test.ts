@@ -226,6 +226,73 @@ describe("the session heartbeat follows the shop's own timeout", () => {
     expect(derive, "the cap is gone").toContain("REFRESH_CEILING_MS");
 
     /**
+     * RUN, not read.
+     *
+     * Everything above is token containment: it proves the three names appear
+     * somewhere in the function and nothing about what it computes. Swap the
+     * clamp for `Math.max(REFRESH_CEILING_MS, Math.min(REFRESH_FLOOR_MS, …))`
+     * and every heartbeat fires a minute apart forever; divide by 1 instead of
+     * 3 and a five-minute policy gets one chance to be seen instead of two,
+     * which is the signed-out-while-typing bug this whole constant exists to
+     * prevent. Both mutations keep all three tokens.
+     *
+     * So the body is lifted out and executed against real numbers, with the
+     * shop's timeout as a parameter and the two bounds passed in as they are
+     * written in the file.
+     */
+    const constant = (name: string): number => {
+      const at = hook.indexOf(`const ${name} =`);
+      expect(at, `${name} is gone from the hook`).toBeGreaterThan(-1);
+      return Number(
+        new Function(`return (${hook.slice(hook.indexOf("=", at) + 1, hook.indexOf(";", at))})`)(),
+      );
+    };
+    const FLOOR = constant("REFRESH_FLOOR_MS");
+    const CEILING = constant("REFRESH_CEILING_MS");
+
+    const body = derive
+      .slice(derive.indexOf("{") + 1)
+      .split("getSecuritySettings().sessionTimeoutMinutes")
+      .join("__minutes");
+    const compiled = new Function("__minutes", "REFRESH_FLOOR_MS", "REFRESH_CEILING_MS", body) as (
+      minutes: unknown,
+      floor: number,
+      ceiling: number,
+    ) => number;
+    const every = (minutes: unknown) => compiled(minutes, FLOOR, CEILING);
+
+    // Divides the shop's timeout rather than passing it through: 15 minutes is
+    // far enough from both bounds that /1, /2 and /4 all give a different
+    // answer, so this pins the divisor and not merely "some clamp happened".
+    expect(every(15), "the heartbeat no longer divides the shop's timeout").toBe((15 * 60 * 1000) / 3);
+    // Below the floor, and above the ceiling — the clamp, in the direction each
+    // bound is for. Swapping min for max fails both.
+    expect(every(1), "a short timeout is no longer floored").toBe(FLOOR);
+    expect(every(24 * 60), "a long timeout is no longer capped").toBe(CEILING);
+    // Nothing readable: fall back to the quietest interval, never to zero, or a
+    // shop with a corrupt setting turns into a request storm.
+    for (const nonsense of [0, -5, Number.NaN, "", null, undefined, "abc"]) {
+      expect(every(nonsense), `a ${String(nonsense)} timeout does not fall back to the cap`).toBe(
+        CEILING,
+      );
+    }
+
+    /**
+     * And the PROPERTY the comment claims: two chances to be seen.
+     *
+     * The server's idle check runs against `lastSeenAt`, which only moves when
+     * the client asks — so one heartbeat per timeout means a single dropped
+     * request signs an admin out mid-edit. Checked across the whole range the
+     * Security screen offers, not at one convenient value.
+     */
+    for (let minutes = 5; minutes <= 1440; minutes += 5) {
+      expect(
+        every(minutes) * 2,
+        `at a ${minutes}-minute timeout the heartbeat gets one chance, not two`,
+      ).toBeLessThanOrEqual(minutes * 60 * 1000);
+    }
+
+    /**
      * And the heartbeat's OWN timer re-reads it each round. `arm` is the
      * heartbeat; `armWatch` is the expiry warning, and finding `setTimeout` in
      * that one told us nothing about this one.

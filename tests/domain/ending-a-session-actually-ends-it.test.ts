@@ -107,12 +107,32 @@ describe("ending a session", () => {
      */
     const security = stripComments(read("features/security/server/security.repository.ts"));
 
-    expect(security, "the security screen holds its own copy again").toContain(
-      "revokeRefreshTokensBySession(sessionId)",
+    /**
+     * Both of the security screen's revokes, each in its own body.
+     *
+     * File scope could not tell "fixed" from "gone". `not.toContain(
+     * "RefreshTokenModel.updateMany")` passes just as green if the file is
+     * emptied, renamed, or if only ONE of the two functions was converted —
+     * and "log out everywhere" is the one that matters most here, because it
+     * is what an owner reaches for after losing a laptop. So each is named,
+     * each must reach the shared helper, and neither may hold a chain revoke
+     * of its own.
+     */
+    expect(security, "the security screen no longer imports the shared revoke").toContain(
+      'import { revokeRefreshTokensBySession } from "@/features/auth/server/auth.repository"',
     );
-    expect(security, "a second implementation of the chain revoke").not.toContain(
-      "RefreshTokenModel.updateMany",
-    );
+
+    for (const [declaration, argument] of [
+      ["export async function revokeSession", "revokeRefreshTokensBySession(sessionId)"],
+      ["export async function revokeOtherSessions", "revokeRefreshTokensBySession(ids)"],
+    ]) {
+      const body = bodyOf(security, declaration);
+
+      expect(body, `${declaration} no longer revokes the chain it just deleted`).toContain(argument);
+      expect(body, `${declaration} holds a second implementation of the chain revoke`).not.toContain(
+        "RefreshTokenModel.updateMany",
+      );
+    }
     expect(repository, "the revoke no longer targets the session’s tokens").toContain(
       "sessionId: { $in: ids }",
     );

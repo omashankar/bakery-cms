@@ -254,7 +254,32 @@ describe("an admin write that the server refused", () => {
       expect(FILES, `the walk no longer reaches ${path}`).toContain(path);
     }
 
-    expect(checked.length, "the walk found almost no messages at all").toBeGreaterThan(10);
+    /**
+     * And no magic total.
+     *
+     * `> 10` against the 28 sites that exist let the phrase list, the argument
+     * parser or the walk lose nearly two thirds of them and stay green — and a
+     * number tight enough to catch that is one somebody must re-tune every time
+     * a message is reworded, which is how it came to be loose. What needs
+     * proving is that the scan still FINDS messages in each part of the admin,
+     * so these name one file per subtree and require each to contribute. A
+     * narrowed phrase list, a parser that drops long calls, or a walk that
+     * stops descending makes a named file go silent, and this says which one.
+     */
+    const MUST_CONTRIBUTE = [
+      "apps/admin/commerce/pages/orders-list-page.tsx",
+      "apps/admin/inquiries/components/newsletter-subscribers-page.tsx",
+      "apps/admin/profile/components/admin-profile-page.tsx",
+      "apps/admin/reviews/pages/reviews-admin-page.tsx",
+      "apps/admin/settings/components/security-settings-page.tsx",
+    ];
+
+    for (const path of MUST_CONTRIBUTE) {
+      expect(
+        checked.filter((site) => site.file === path).length,
+        `the scan no longer finds the blaming message in ${path}`,
+      ).toBeGreaterThan(0);
+    }
   });
 
   it("keeps the check itself in one place", () => {

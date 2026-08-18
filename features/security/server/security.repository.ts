@@ -78,6 +78,6 @@ export async function revokeOtherSessions(
   if (ids.length === 0) return 0;
 
   await SessionModel.deleteMany({ _id: { $in: ids } });
-await revokeRefreshTokensBySession(ids);
+  await revokeRefreshTokensBySession(ids);
   return ids.length;
 }

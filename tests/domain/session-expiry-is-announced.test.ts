@@ -837,8 +837,31 @@ describe("the expiry countdown", () => {
     );
 
     expect(success.length, "the re-login success message was not found").toBeGreaterThan(40);
+
+    /**
+     * A vocabulary wide enough to be worth having, in both orders.
+     *
+     * Three nouns and five verbs, one direction only, is a canary that catches
+     * the sentence someone already thought of. "Your orders are back", "the
+     * numbers are current again", "refreshed this page's records" — every one
+     * makes the same false promise and every one sailed through.
+     *
+     * The two directions are NOT the same list. English puts the claim after
+     * the noun ("the data is back"), so that side can take the loose words;
+     * the reverse only holds for past participles, because the honest message
+     * this test also requires — "reload to refresh this page's data" — is an
+     * INSTRUCTION with the verb in front, and banning that shape outright would
+     * forbid the one sentence that tells the truth.
+     */
+    const THING = "(data|lists?|figures|numbers|orders|records|content|page|screen|dashboard|report|table)";
+    const CLAIMED = "(back|real|current|live|fresh|refreshed|reloaded|restored|returned|up to date|in sync|synced|loaded)";
+    const ALREADY_DONE = "(refreshed|reloaded|restored|recovered|re-?fetched|brought back|up to date|back in sync)";
+
     expect(success, "the dialog claims the page's data came back on its own").not.toMatch(
-      /(data|lists|figures)[^"]{0,40}(back|real|refreshed|reloaded|up to date)/i,
+      new RegExp(`${THING}[^"]{0,40}${CLAIMED}`, "i"),
+    );
+    expect(success, "the dialog says it has already refreshed the page's data").not.toMatch(
+      new RegExp(`${ALREADY_DONE}[^"]{0,30}${THING}`, "i"),
     );
     expect(success, "the admin is not told how to get the data back").toMatch(/reload/i);
   });
@@ -852,13 +875,38 @@ describe("the expiry countdown", () => {
      * re-hydrates from the server. This dialog does not navigate, so it has to
      * ask for the correction itself.
      */
+    /**
+     * Inside the SUBMIT handler, in order.
+     *
+     * Three file-scoped `toContain`s proved the three names appear somewhere in
+     * a 300-line component — the import block alone satisfies two of them. The
+     * correction could be moved into the countdown, into a dead branch, or run
+     * BEFORE the invention it exists to overwrite, and all three still passed.
+     * Order is the whole point: fetch first and the optimistic row lands on top
+     * of the server's answer, which is the cache state this test is named for.
+     */
     const source = guard();
+    const from = source.indexOf("const submit = async");
+    expect(from, "the re-entry submit handler was not found").toBeGreaterThan(-1);
+    const submit = source.slice(from, source.indexOf("\n  };", from));
 
-    expect(source).toContain("recordLoginSuccess(user.email)");
-    expect(source, "the invented session row is left in the cache").toContain(
-      "fetchSecurityCenter()",
+    const invents = submit.indexOf("recordLoginSuccess(user.email)");
+    const asks = submit.indexOf("fetchSecurityCenter()");
+    const adopts = submit.indexOf("persistServerSecurityCenter(state)");
+
+    expect(invents, "signing back in is no longer written to the security log").toBeGreaterThan(-1);
+    expect(asks, "the invented session row is left in the cache").toBeGreaterThan(-1);
+    expect(adopts, "the server's answer is fetched and then thrown away").toBeGreaterThan(-1);
+    expect(asks, "the correction is asked for before the row it corrects exists").toBeGreaterThan(
+      invents,
     );
-    expect(source).toContain("persistServerSecurityCenter(state)");
+    expect(adopts, "the server's answer is adopted before it arrives").toBeGreaterThan(asks);
+
+    // And in the branch that SUCCEEDED. Below `catch`, none of it runs on the
+    // path that just signed in.
+    const caught = submit.indexOf("} catch");
+    expect(caught, "the submit handler no longer handles a failed sign-in").toBeGreaterThan(-1);
+    expect(adopts, "the correction sits in the failure branch").toBeLessThan(caught);
   });
 });
 
@@ -980,6 +1028,57 @@ describe("a write refused because the session ended", () => {
       const bodies = source.split(/export (?:async )?(?:function |const )/).slice(1);
       expect(bodies.length, `${path} exports nothing to check`).toBeGreaterThan(0);
 
+      /**
+       * Which functions in this file put a message on the screen — INCLUDING
+       * through a delegate.
+       *
+       * The loop below used to skip any body without `toast.error(` in it, so
+       * the moment a reporter handed its wording to a local helper —
+       * `function refused(subject) { toast.error(...) }`, the obvious next
+       * refactor when eleven settings pages share three sentences — it stopped
+       * being checked at all. Not a hypothetical shape: it is exactly how the
+       * settings copy of the signed-out check came to exist, and the skip made
+       * the guard silently optional for whichever reporter took that step.
+       *
+       * So emission is computed to a fixed point: a function emits if it says
+       * `toast.error(` itself, or calls something in this file that does.
+       */
+      const FUNCTIONS =
+        /(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s+)?(?:function\b|\())/g;
+      const declarations = [...source.matchAll(FUNCTIONS)]
+        .map((m) => ({ name: m[1] ?? m[2], at: m.index ?? 0 }))
+        .sort((a, b) => a.at - b.at);
+      // Bounded by the NEXT declaration, so a helper's body is attributed to
+      // the helper and not to whoever happens to be declared above it.
+      const chunks = new Map<string, string>(
+        declarations.map(({ name, at }, index) => [
+          name,
+          source.slice(at, declarations[index + 1]?.at ?? source.length),
+        ]),
+      );
+
+      const emits = new Set<string>();
+      for (const [name, chunk] of chunks) if (chunk.includes("toast.error(")) emits.add(name);
+      for (let pass = 0; pass <= chunks.size; pass += 1) {
+        let grew = false;
+        for (const [name, chunk] of chunks) {
+          if (emits.has(name)) continue;
+          for (const speaker of emits) {
+            if (speaker !== name && chunk.includes(`${speaker}(`)) {
+              emits.add(name);
+              grew = true;
+              break;
+            }
+          }
+        }
+        if (!grew) break;
+      }
+
+      // The check is an emitter too — it speaks ON BEHALF of these callers, so
+      // reaching it is the right answer, not the offence.
+      const CHECKS = ["reportedAsSignedOut", "reportedAsSignedOutOnRead"];
+      const speakers = [...emits].filter((name) => !CHECKS.includes(name));
+
       let guarded = 0;
 
       for (const body of bodies) {
@@ -994,11 +1093,29 @@ describe("a write refused because the session ended", () => {
          * it" instead. So the guard on the single most-used reporter in the
          * admin was never checked at all.
          */
-        if (!/toast\.error\(/.test(body)) continue;
+        // Delegates included — see the fixed point above. `toast.error(` in the
+        // body is no longer the entry fee.
+        if (!emits.has(name)) continue;
         // The check itself emits the messages it emits ON BEHALF of the
         // callers. It is not a caller.
-        if (name === "reportedAsSignedOut" || name === "reportedAsSignedOutOnRead") continue;
+        if (CHECKS.includes(name)) continue;
         guarded += 1;
+
+        /**
+         * Where this body first SPEAKS — its own `toast.error(`, or the call to
+         * whichever local helper does the speaking for it.
+         *
+         * Comparing against `body.indexOf("toast.error(")` alone gave -1 for a
+         * delegating reporter, and `toBeLessThan(-1)` is not a check anyone
+         * meant to write.
+         */
+        const speaksAt = [body.indexOf("toast.error(")]
+          .concat(speakers.filter((who) => who !== name).map((who) => body.indexOf(`${who}(`)))
+          .filter((at) => at > -1);
+        expect(speaksAt.length, `${path} — ${name}() was counted but says nothing`).toBeGreaterThan(
+          0,
+        );
+        const speaks = Math.min(...speaksAt);
 
         const guardAt = body.indexOf("reportedAsSignedOut()");
         expect(
@@ -1008,7 +1125,7 @@ describe("a write refused because the session ended", () => {
         expect(
           guardAt,
           `${path} — ${name}() reaches its misleading message first`,
-        ).toBeLessThan(body.indexOf("toast.error("));
+        ).toBeLessThan(speaks);
         /**
          * And ACTS on the answer.
          *
