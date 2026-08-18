@@ -141,6 +141,61 @@ function toastArguments(masked: string, from: number): string | null {
  * the raw text was the one place comments were not masked, so a comment
  * mentioning the check could pass as the check.
  */
+const CHECKS = ["reportedAsSignedOut", "reportedAsSignedOutOnRead"];
+
+/**
+ * `if (check(…)) return` — with whatever the caller passes the check.
+ *
+ * This was two string literals, `"if (reportedAsSignedOut()) return"` and its
+ * read-side twin, which forced every caller to consult the check with EMPTY
+ * arguments. That is not the rule; the rule is that a refused write must not be
+ * blamed on the server. The backup restore has something specific to say — how
+ * many sections landed before the session ended — and passing it in was
+ * indistinguishable, to this function, from having no guard at all.
+ *
+ * So the arguments are skipped on balanced parentheses and the next thing after
+ * the `if (…)` must still be `return`. A branch that consults the check and
+ * then speaks anyway does not match, which is what the literals were protecting.
+ */
+function earlyReturnOn(body: string, check: string): boolean {
+  for (let at = body.indexOf("if ("); at > -1; at = body.indexOf("if (", at + 1)) {
+    const open = at + "if ".length;
+    let depth = 0;
+    let close = -1;
+
+    for (let cursor = open; cursor < body.length; cursor += 1) {
+      if (body[cursor] === "(") depth += 1;
+      else if (body[cursor] === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          close = cursor;
+          break;
+        }
+      }
+    }
+
+    if (close < 0) continue;
+
+    /**
+     * The CONDITION is the check itself, not merely somewhere inside it.
+     *
+     * Whitespace-tolerant, because prettier breaks the line the moment the
+     * check takes an argument — but `!check()` deliberately does not count:
+     * that is the wrapping shape, which speaks when the session is fine and is
+     * handled separately below.
+     */
+    const condition = body.slice(open + 1, close).trim();
+    if (!condition.startsWith(`${check}(`)) continue;
+
+    const after = body.slice(close + 1).trimStart();
+    if (after.startsWith("return")) return true;
+    // `{ return; }` — the block form prettier produces for a multi-line test.
+    if (after.startsWith("{") && after.slice(1).trimStart().startsWith("return")) return true;
+  }
+
+  return false;
+}
+
 function guardPrecedes(masked: string, toastAt: number): boolean {
   const head = masked.slice(0, toastAt);
   const from = Math.max(
@@ -164,13 +219,9 @@ function guardPrecedes(masked: string, toastAt: number): boolean {
    * eaten twice by the tooling that edits it, leaving patterns that matched
    * nothing while still reading like a check.
    */
-  const RETURNS = [
-    "if (reportedAsSignedOut()) return",
-    "if (reportedAsSignedOutOnRead()) return",
-  ];
   const WRAPS = ["!reportedAsSignedOut())", "!reportedAsSignedOutOnRead())"];
 
-  const earlyReturn = RETURNS.some((shape) => body.includes(shape));
+  const earlyReturn = CHECKS.some((check) => earlyReturnOn(body, check));
   const before = masked.slice(Math.max(0, toastAt - 45), toastAt).trimEnd();
   const wrapsThisCall = WRAPS.some((shape) => before.endsWith(shape));
 

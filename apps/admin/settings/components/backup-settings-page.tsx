@@ -185,10 +185,27 @@ export function BackupSettingsPage() {
    */
   function reportRestore(result: RestoreResult) {
     if (result.failedSections.length > 0) {
-      // A third failure the two below do not cover: the server answered, and
-      // what it said was that it does not know who is asking. "The server
-      // refused" is true of a value, not of a session.
-      if (reportedAsSignedOut()) return;
+      /**
+       * A third failure the two below do not cover: the server answered, and
+       * what it said was that it does not know who is asking. "The server
+       * refused" is true of a value, not of a session.
+       *
+       * But NOT the bare "Not saved" this used to send. A restore pushes its
+       * sections one at a time and then replaces this browser's own stores
+       * regardless, so a session ending part-way leaves some sections on the
+       * server, some not, and the local half already overwritten. "Not saved"
+       * is false about all three, and it threw away the only list saying which
+       * was which — on the one screen where an admin cannot check by eye.
+       */
+      const attempted = result.serverSections.length + result.failedSections.length;
+      if (
+        reportedAsSignedOut({
+          title: `Restored ${result.serverSections.length} of ${attempted} sections to the server`,
+          detail: `${result.failedSections.join(", ")} did not go, and this browser's own data (${result.localCount} keys) was replaced from the backup either way.`,
+        })
+      ) {
+        return;
+      }
       /**
        * Two different failures, two different remedies.
        *
@@ -200,7 +217,7 @@ export function BackupSettingsPage() {
        * data is not.
        */
       toast.error(
-        `Restored ${result.serverSections.length} of ${result.serverSections.length + result.failedSections.length} sections to the server`,
+        `Restored ${result.serverSections.length} of ${attempted} sections to the server`,
         {
           description: result.gatesOpen
             ? `The server refused: ${result.failedSections.join(", ")}. Those are not restored anywhere — try again.`
