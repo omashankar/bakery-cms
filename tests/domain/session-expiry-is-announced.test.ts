@@ -261,7 +261,7 @@ describe("the store that tracks the session", () => {
      * so the back door the check exists to close was the shape it could not
      * see.
      */
-    const assignments = [...source.matchAll(/(?<![.\w])state\s*=(?!=)/g)];
+    const assignments = [...source.matchAll(new RegExp("(?<![.A-Za-z0-9_])state[ ]*=(?!=)", "g"))];
 
     expect(
       assignments.map((m) => source.slice(Math.max(0, (m.index ?? 0) - 30), (m.index ?? 0) + 20)),
@@ -557,6 +557,17 @@ describe("the client heartbeat", () => {
     const chain = source.slice(renewAt, source.indexOf("setExpiryConfirmer(", renewAt));
 
     expect(chain, "expiry is no longer distinguished").toContain('outcome === "expired"');
+    /**
+     * The loop below is vacuous if the call has been moved out of the chain.
+     * A one-line helper declared just above `const renew =` leaves zero
+     * literal matches inside it, the loop body never executes, and the
+     * assertion passes while a 500 drops the password dialog on an admin
+     * mid-edit.
+     */
+    expect(
+      (chain.match(/markSessionExpired()/g) ?? []).length,
+      "the expiry call has been moved out of the outcome chain",
+    ).toBe(1);
 
     for (const call of chain.matchAll(/markSessionExpired\(\)/g)) {
       const guard = chain.slice(0, call.index ?? 0);
@@ -572,10 +583,19 @@ describe("the client heartbeat", () => {
     // A heartbeat against a dead session is a request every few minutes for as
     // long as the tab stays open, and the answer cannot change until somebody
     // signs in.
-    const source = hook();
-    const tick = source.slice(source.indexOf("const tick ="), source.indexOf("tick(false);"));
+    // Comments stripped, and the guard must be the FIRST thing the tick does:
+    // a prose mention satisfied plain containment, and moving the check behind
+    // `requirePresence` left the TIMER path hammering a session the server had
+    // already ended, once a minute, for as long as the tab stayed open.
+    const stripped = stripComments(hook());
+    const tick = stripped.slice(
+      stripped.indexOf("const tick ="),
+      stripped.indexOf("tick(false);"),
+    );
 
-    expect(tick).toContain('sessionState() === "expired"');
+    expect(tick, "the tick no longer refuses outright once the session is over").toContain(
+      "if (sessionState() === \"expired\") return;",
+    );
   });
 
   it("predicts the warning from the SERVER's clock, not the last keystroke", () => {
@@ -744,7 +764,12 @@ describe("the expiry countdown", () => {
      * call NOTHING declared in this file except the state setters it needs:
      * anything else is a route out that no list of names can enumerate.
      */
-    const declared = [...source.matchAll(/(?:function|const) (\w+)\s*[=(]/g)].map((m) => m[1]);
+    // `let` and `var` too: this sweep exists to catch a helper declared just
+    // outside the component, and one declared with `let` was invisible to it,
+    // to the blocklist, and to the occurrence count all at once.
+    const declared = [
+      ...source.matchAll(new RegExp("(?:function|const|let|var) ([A-Za-z0-9_]+)[ ]*[=(]", "g")),
+    ].map((m) => m[1]);
     const allowed = new Set(["secondsLeft", "setLeft", "setChecking", "ExpiringSoon"]);
 
     for (const name of declared) {
@@ -895,8 +920,34 @@ describe("a write refused because the session ended", () => {
         const from = source.indexOf("function reportedAsSignedOut");
         const check = source.slice(from, source.indexOf("\n}", from));
 
-        expect(check, `${path} ignores a session it has asked about`).toContain('"checking"');
-        expect(check, `${path} ignores a session known to have ended`).toContain('"expired"');
+        /**
+         * The branch must RETURN, not merely mention the state.
+         *
+         * `toContain('"checking"')` proved the literal was present, so the
+         * body could be changed to `if (state === "checking") { return false; }`
+         * — the guard falls through, every refused write on the ordinary path
+         * goes back to "on this device only — the server rejected it", and the
+         * sign-in dialog lands on top contradicting it. That is exactly the
+         * defect this assertion is named after.
+         */
+        /**
+         * The branch must ACT, not merely mention the state.
+         *
+         * Containment of the literal let the body become
+         * `if (state === "checking") { return false; }` — the guard falls
+         * through, every refused write on the ordinary path goes back to "on
+         * this device only — the server rejected it", and the sign-in dialog
+         * lands on top contradicting it. That is the defect this assertion is
+         * named after.
+         */
+        for (const state of ['"checking"', '"expired"']) {
+          const at = check.indexOf(`state === ${state}`);
+          expect(at, `${path} ignores a session in ${state}`).toBeGreaterThan(-1);
+          expect(
+            check.slice(at, at + 240),
+            `${path} looks at ${state} and then says nothing about it`,
+          ).toContain("return true;");
+        }
       }
 
       /**
@@ -1028,5 +1079,34 @@ describe("a write refused because the session ended", () => {
         ).toMatch(/^\w+\.status$/);
       }
     }
+  });
+});
+
+describe("signing in inside the dialog", () => {
+  it("takes the dialog down too", () => {
+    /**
+     * The fixed twin. "Signing in on the login page takes the expiry dialog
+     * down" guards the login PAGE — which is the dialog's SECONDARY route, the
+     * "sign in on the login page instead" link. Its own form is the primary
+     * one and had no guard at all.
+     *
+     * Delete `markSessionRenewed()` from SignInAgain.submit and an admin who
+     * signs in successfully stays at "expired": the non-dismissible dialog
+     * never comes down, and `tick` early-returns on "expired" so the heartbeat
+     * never restarts for the session they just created.
+     */
+    const source = stripComments(read("features/auth/components/session-guard.tsx"));
+    const submitAt = source.indexOf("const submit = async");
+    expect(submitAt, "the dialog's own form was not found").toBeGreaterThan(-1);
+
+    const success = source.slice(
+      source.indexOf("const user = await loginRequest", submitAt),
+      source.indexOf("} catch", submitAt),
+    );
+
+    expect(success.length, "the success path was not found").toBeGreaterThan(40);
+    expect(success, "signing in inside the dialog leaves the dialog up").toMatch(
+      /markSessionRenewed\(\)/,
+    );
   });
 });
