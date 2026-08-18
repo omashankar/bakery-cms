@@ -12,40 +12,13 @@ import { adminSession } from "./admin-session";
  * only". A structural test cannot see which one paints.
  */
 
-/**
- * Make the next admin read answer as an ended session.
- *
- * `refreshAlso` decides whether the HEARTBEAT is 401ed too. Leaving it on for
- * every test made the spec unable to fail for the thing it is named after:
- * with `/api/auth/refresh` returning 401, `useSessionRefresh` raises the dialog
- * on its own, so deleting the entire `noteAuthStatus` fanout — the mechanism
- * that lets a 401 from ANY module surface — left every assertion green.
- */
-async function serverEndsTheSession(
-  page: Page,
-  { refreshAlso = true }: { refreshAlso?: boolean } = {},
-): Promise<void> {
+/** Make the next admin read answer as an ended session. */
+async function serverEndsTheSession(page: Page): Promise<void> {
   await page.route("**/api/**", async (route) => {
     const url = route.request().url();
     // Everything EXCEPT the login the dialog is about to perform, so the
     // recovery path stays reachable.
     if (url.includes("/api/auth/login")) return route.continue();
-    if (!refreshAlso && url.includes("/api/auth/refresh")) {
-      /**
-       * A SUCCEEDING heartbeat, stubbed rather than passed through.
-       *
-       * `adminSession` signs a refresh token with `sid: "e2e"` and inserts no
-       * matching row, so the real endpoint takes the reuse/revoked branch and
-       * answers 401 on the first beat. Passing it through therefore let the
-       * heartbeat raise the dialog anyway — and this test exists precisely to
-       * take that route away.
-       */
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ success: true, message: "ok", data: null }),
-      });
-    }
     await route.fulfill({
       status: 401,
       contentType: "application/json",
@@ -72,22 +45,31 @@ test("the admin is told, rather than left on a panel that empties", async ({ pag
 });
 
 /*
- * NOT tested here, deliberately: that a 401 from an ORDINARY api module — as
- * opposed to the heartbeat — is what raises the dialog.
+ * STILL NOT COVERED HERE: that a 401 from an ORDINARY api module — rather than
+ * the heartbeat — is what raises the dialog.
  *
- * It is the mechanism the fanout exists for, and it cannot be isolated in a
- * browser: `useSessionRefresh` beats once on mount, so on any page load the
- * heartbeat and the fanout ask the same question within milliseconds of each
- * other, and 401ing everything makes either one sufficient. Stubbing the
- * heartbeat to SUCCEED does not isolate it either — a 401 read plus a healthy
- * refresh is exactly the routine expired-access-token case, where the dialog
- * correctly does not appear at all.
+ * The note that used to stand here said this was impossible in a browser,
+ * because “the heartbeat and the fanout ask the same question within
+ * milliseconds”. That was WRONG, and being wrong it stood in the file as the
+ * reason nobody tried again. `useSessionRefresh` is mounted in the PERSISTENT
+ * admin shell, so its effect runs once per FULL page load — and after that
+ * mount beat `MIN_GAP_MS` bars another tick for sixty seconds, from the timer,
+ * from focus and from visibilitychange alike. Every earlier attempt used
+ * goto/reload, which remount the shell and fire a fresh beat.
  *
- * An attempt at it lived here and was deleted rather than kept: it passed with
- * the entire fanout removed, which is worse than no test. The fanout's
- * completeness is held by
- * tests/domain/session-expiry-is-announced.test.ts instead — every module that
- * makes a request must report its status — and that one fails when a single
+ * So the shape that should work is: let the mount beat succeed, 401 everything,
+ * then move to a screen that FETCHES on mount using a client-side navigation,
+ * which leaves the hook mounted. Inside that minute only an api module can put
+ * the question.
+ *
+ * What stopped it: in this harness a click on the sidebar link does not
+ * navigate — the link is present and visible, the click lands, and the URL does
+ * not change (probed twice, by role and by href). That is a harness problem to
+ * solve, not a property that cannot be tested, and the difference matters:
+ * the fanout is real behaviour with no browser coverage.
+ *
+ * Its completeness is held meanwhile by
+ * tests/domain/session-expiry-is-announced.test.ts, which fails when a single
  * call site is dropped.
  */
 
