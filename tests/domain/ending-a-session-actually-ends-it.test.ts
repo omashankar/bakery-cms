@@ -50,9 +50,25 @@ describe("ending a session", () => {
   it("revokes the token chain, not just the row", () => {
     const body = bodyOf(service(), "async function endSession");
 
+    /**
+     * Unconditionally, at the statement level. Containment could not see a gate
+     * that skips the revoke in exactly the case this test's docblock describes —
+     * "delete the row AND revoke the chain" is one act, not two options.
+     */
     expect(body, "the chain keeps rotating after the row is gone").toContain(
-      "revokeRefreshTokensBySession",
+      "await repo.revokeRefreshTokensBySession(sessionId)",
     );
+    // Statement level, not nested in a branch: the revoke and the delete are
+    // Statement level, not nested in a branch: the revoke and the delete are
+    // one act. Built with fromCharCode because every escape written into this
+    // file so far has been eaten by the tooling before it landed.
+    const NEWLINE = String.fromCharCode(10);
+    expect(
+      body
+        .split(NEWLINE)
+        .some((line) => line.trim().startsWith("await repo.revokeRefreshTokensBySession")),
+      "the revoke happens only under some condition",
+    ).toBe(true);
     expect(body).toContain("deleteSession");
     /**
      * Order matters. Revoking after the delete would still work here, but the
@@ -68,8 +84,11 @@ describe("ending a session", () => {
     const body = bodyOf(service(), "export async function logout");
 
     expect(body, "sign-out still revokes only the token this tab presented").toContain(
-      "revokeRefreshTokensBySession",
+      "await repo.revokeRefreshTokensBySession(claims.sid)",
     );
+    // And the delete comes with it: revoking without deleting leaves a row the
+    // Security Center still lists as an active device.
+    expect(body).toContain("await repo.deleteSession(claims.sid)");
   });
 
   it("is reachable by the same repository call the security screen uses", () => {
@@ -78,7 +97,29 @@ describe("ending a session", () => {
     const repository = stripComments(read("features/auth/server/auth.repository.ts"));
 
     expect(repository).toContain("export async function revokeRefreshTokensBySession");
-    expect(repository).toMatch(/updateMany\(\{\s*sessionId,\s*revokedAt: null\s*\}/);
+
+    /**
+     * And the security screen ACTUALLY uses it.
+     *
+     * The comment said “this one is shared” while the security repository kept
+     * its own inline updateMany — two implementations of the same act, which is
+     * how the auth side went without one at all for so long. Reading only the
+     * auth repository could never notice.
+     */
+    const security = stripComments(read("features/security/server/security.repository.ts"));
+
+    expect(security, "the security screen holds its own copy again").toContain(
+      "revokeRefreshTokensBySession(sessionId)",
+    );
+    expect(security, "a second implementation of the chain revoke").not.toContain(
+      "RefreshTokenModel.updateMany",
+    );
+    expect(repository, "the revoke no longer targets the session’s tokens").toContain(
+      "sessionId: { $in: ids }",
+    );
+    expect(repository, "it would revoke tokens that were already revoked").toContain(
+      "revokedAt: null",
+    );
   });
 });
 

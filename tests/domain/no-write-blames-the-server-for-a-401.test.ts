@@ -143,21 +143,38 @@ function toastArguments(masked: string, from: number): string | null {
  */
 function guardPrecedes(masked: string, toastAt: number): boolean {
   const head = masked.slice(0, toastAt);
-  // The nearest thing that opens a function body above this call.
-  const starts = [
+  const from = Math.max(
+    0,
     head.lastIndexOf("function "),
     head.lastIndexOf("=> {"),
     head.lastIndexOf("async ("),
-  ];
-  const from = Math.max(0, ...starts);
+  );
   const body = masked.slice(from, toastAt);
 
-  // `!` for the wrapping shape; a bare call is the early-return shape, which
-  // only counts when it is actually acted on.
-  return (
-    /!\s*reportedAsSignedOut(OnRead)?\(\)/.test(body) ||
-    /if \(reportedAsSignedOut(OnRead)?\(\)\)\s*return/.test(body)
-  );
+  /**
+   * The two shapes are NOT interchangeable, and treating them as one let a
+   * guard in one branch vouch for every later toast in the same function.
+   *
+   * An early return is sound anywhere above: nothing after it runs unless the
+   * session is fine. A WRAPPING guard protects only the call it wraps, so it
+   * must be adjacent to THIS one — a handler with two failure branches had
+   * its first branch's wrapper silently covering the second's.
+   *
+   * Plain string work rather than regexes: the escapes in this file have been
+   * eaten twice by the tooling that edits it, leaving patterns that matched
+   * nothing while still reading like a check.
+   */
+  const RETURNS = [
+    "if (reportedAsSignedOut()) return",
+    "if (reportedAsSignedOutOnRead()) return",
+  ];
+  const WRAPS = ["!reportedAsSignedOut())", "!reportedAsSignedOutOnRead())"];
+
+  const earlyReturn = RETURNS.some((shape) => body.includes(shape));
+  const before = masked.slice(Math.max(0, toastAt - 45), toastAt).trimEnd();
+  const wrapsThisCall = WRAPS.some((shape) => before.endsWith(shape));
+
+  return earlyReturn || wrapsThisCall;
 }
 
 function blamingToasts(file: string): Site[] {

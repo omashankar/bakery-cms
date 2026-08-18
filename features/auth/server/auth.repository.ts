@@ -121,9 +121,14 @@ export async function revokeRefreshTokensByUser(userId: string) {
  * doing exactly this alongside its delete. The auth service did not, so every
  * "kill the whole session" it performed left the live token untouched.
  */
-export async function revokeRefreshTokensBySession(sessionId: string) {
+export async function revokeRefreshTokensBySession(sessionId: string | string[]) {
   await connectDB();
-  return RefreshTokenModel.updateMany({ sessionId, revokedAt: null }, { revokedAt: new Date() });
+  // One or many, so “log out everywhere” does not need a second copy of this.
+  const ids = Array.isArray(sessionId) ? sessionId : [sessionId];
+  return RefreshTokenModel.updateMany(
+    { sessionId: { $in: ids }, revokedAt: null },
+    { revokedAt: new Date() },
+  );
 }
 
 // ---- Password reset (OTP) -------------------------------------------------
