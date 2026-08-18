@@ -18,7 +18,7 @@
  * seed over the shop's real settings. Gating only the Save button is not
  * enough: the gate is already open by the time it is consulted.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -27,6 +27,63 @@ const ROOT = process.cwd();
 
 function source(relativePath: string): string {
   return readFileSync(join(ROOT, relativePath), "utf8");
+}
+
+/**
+ * Comments stripped before anything is matched.
+ *
+ * Several of these files DISCUSS the hooks and states being scanned for, at
+ * length, in docblocks explaining the very bug this file guards — so a raw
+ * scan reports a screen as using a hook it only talks about, and reports a gate
+ * where there is only a paragraph about gates.
+ */
+const stripComments = (code: string) =>
+  code.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+
+/** The byte range inside each `.then(...)`, matched on balanced parentheses. */
+function thenSpans(code: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+
+  for (let at = code.indexOf(".then("); at > -1; at = code.indexOf(".then(", at + 1)) {
+    const open = code.indexOf("(", at);
+    let depth = 0;
+
+    for (let cursor = open; cursor < code.length; cursor += 1) {
+      if (code[cursor] === "(") depth += 1;
+      else if (code[cursor] === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          spans.push([open, cursor]);
+          break;
+        }
+      }
+    }
+  }
+
+  return spans;
+}
+
+/** Every `name(...)` call and where it starts, arguments bounded by their own parenthesis. */
+function callsTo(code: string, name: string): Array<{ at: number; text: string }> {
+  const calls: Array<{ at: number; text: string }> = [];
+
+  for (let at = code.indexOf(`${name}(`); at > -1; at = code.indexOf(`${name}(`, at + 1)) {
+    const open = at + name.length;
+    let depth = 0;
+
+    for (let cursor = open; cursor < code.length; cursor += 1) {
+      if (code[cursor] === "(") depth += 1;
+      else if (code[cursor] === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          calls.push({ at, text: code.slice(at, cursor + 1) });
+          break;
+        }
+      }
+    }
+  }
+
+  return calls;
 }
 
 /**
@@ -189,6 +246,46 @@ const REPLACE_ALL_FORMS: Array<{ name: string; file: string; fieldGate: "shell" 
     file: "apps/admin/profile/components/admin-profile-page.tsx",
     fieldGate: "early-return",
   },
+  // Found by the discovery sweep at the bottom of this file, not by a person
+  // reading the tree: it had reimplemented the whole hook — `{current, saved}`,
+  // the resync listener, the writing ref, `runWrite` — and had already been
+  // patched for all three of the failures the shared one documents, in a copy
+  // nothing else shared.
+  {
+    name: "Invoice design",
+    file: "apps/admin/commerce/components/invoice-design-panel.tsx",
+    fieldGate: "gate",
+  },
+];
+
+/**
+ * Screens that gate on hydration WITHOUT a shared form hook, because their
+ * shape does not fit one.
+ *
+ * The two template pages edit one record chosen from a list, with a
+ * `draftOrigin` to tell an admin's edit apart from an arriving server value;
+ * the WhatsApp card is a credentials form with no dirty state at all. Forcing
+ * `useHydratedForm` on them would be the wrong shape, so what they share with
+ * the forms above is the INVARIANT rather than the implementation: a real
+ * hydration state, fields held closed, saving blocked, and a visible notice
+ * when the read never lands.
+ *
+ * They belong in a registry regardless — every one of them is a screen whose
+ * gate could be deleted without a single test noticing.
+ */
+const GATED_SCREENS: Array<{ name: string; file: string }> = [
+  {
+    name: "Email templates",
+    file: "apps/admin/communications/pages/email-templates-admin-page.tsx",
+  },
+  {
+    name: "WhatsApp templates",
+    file: "apps/admin/communications/pages/whatsapp-templates-admin-page.tsx",
+  },
+  {
+    name: "WhatsApp connection",
+    file: "apps/admin/communications/components/whatsapp-connection-card.tsx",
+  },
 ];
 
 describe("admin forms that replace a whole document in their own store", () => {
@@ -306,5 +403,158 @@ describe("the commerce form wrapper", () => {
   it("exposes the hydration state its callers need to gate their fields", () => {
     expect(code).toContain("hydration");
     expect(code).toContain("canSave");
+  });
+});
+describe("admin screens that gate on hydration by hand", () => {
+  it.each(GATED_SCREENS)("$name opens only from a resolved read", ({ file }) => {
+    /**
+     * Structural, not a spelling.
+     *
+     * The first version of this demanded the literal
+     * `setHydration(settled ? "ready" : "unavailable")` — which is one screen's
+     * wording. The other two resolve `settled.email` and `settled.whatsapp`,
+     * and the connection card has no `ensure*Hydrated` at all: it awaits its
+     * own fetch. A guard that only recognises one shape of the thing it is
+     * looking for is the defect this whole file keeps finding elsewhere.
+     *
+     * What all three must share is WHEN the gate opens: inside the callback of
+     * a resolved read, never on the way past. `mounted` was the original bug on
+     * several of these — it flips on the first effect, long before the server's
+     * copy arrives, so the gate opened onto the demo seed.
+     */
+    const code = stripComments(source(file));
+
+    expect(code, "the gate starts open").toMatch(
+      /useState<"pending" \| "ready" \| "unavailable">\("pending"\)/,
+    );
+
+    const inAThen = thenSpans(code);
+    const opens = callsTo(code, "setHydration").filter((call) => call.text.includes('"ready"'));
+
+    expect(opens.length, "nothing ever opens this screen's gate").toBeGreaterThan(0);
+
+    const early = opens.filter(
+      ({ at }) => !inAThen.some(([from, to]) => at > from && at < to),
+    );
+    expect(
+      early.map(({ text }) => text),
+      "the gate opens outside a resolved read — so it opens on the seed",
+    ).toEqual([]);
+  });
+
+  it.each(GATED_SCREENS)("$name holds its fields closed until then", ({ file }) => {
+    expect(source(file)).toContain("<SettingsFormGate hydration={hydration}>");
+  });
+
+  it.each(GATED_SCREENS)("$name says so when the read never landed", ({ file }) => {
+    // Otherwise the fields simply never appear and the screen looks broken
+    // rather than offline.
+    expect(source(file)).toContain("<SettingsHydrationNotice hydration={hydration}");
+  });
+
+  it.each(GATED_SCREENS)("$name blocks its writes on the same state", ({ file }) => {
+    // The BUTTON, as above — a click-handler early return leaves a control that
+    // looks available and refuses after the click.
+    expect(source(file)).toMatch(/disabled=\{[^}]*hydration !== "ready"/);
+  });
+});
+
+/**
+ * The registries above are LISTS, and a list cannot notice what is missing from
+ * itself.
+ *
+ * That is not a theoretical objection here — it is how this file has failed
+ * four times. Each round fixed the screens someone had thought to name, and the
+ * next round found more: the fourth door into the commerce section, then the
+ * nine replace-all stores outside settings, then the invoice panel, then three
+ * communications screens. Every one of them was in the tree the whole time.
+ *
+ * So the tree is swept for the SHAPE instead. Anything that calls a shared form
+ * hook, or renders the hydration gate, is a screen this file is about — and if
+ * it is not in one of the three registries above, it is being held to no rule
+ * at all. The failure names the file, so registering it is the obvious fix and
+ * the assertions above then apply.
+ */
+describe("the registries", () => {
+  const CALLS = ["useSettingsSection", "useHydratedForm", "useCommerceSettingsForm"];
+  const RENDERS = ["SettingsFormGate", "SettingsSectionShell"];
+
+  /**
+   * Not screens: the hook wrapper that EXISTS to be shared.
+   *
+   * Deliberately a short list with a reason each, rather than a pattern like
+   * "anything under lib/" — an exclusion that matches by folder is how a real
+   * form disappears from the sweep by being moved.
+   */
+  const NOT_A_SCREEN = new Set([
+    // Wraps `useSettingsSection` for the four commerce screens; held to its own
+    // rules in "the commerce form wrapper" above.
+    "apps/admin/commerce/lib/use-commerce-settings-form.ts",
+  ]);
+
+  function screensUnder(root: string): string[] {
+    const found: string[] = [];
+
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+          walk(path);
+        } else if (/\.tsx?$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name)) {
+          // Comments stripped first: three of these files DISCUSS
+          // `useSettingsSection` in a docblock while not calling it, and a raw
+          // scan reported them as unregistered forms.
+          const code = stripComments(readFileSync(join(ROOT, path), "utf8"));
+          const uses =
+            CALLS.some((name) => code.includes(`${name}(`) || code.includes(`${name}<`)) ||
+            RENDERS.some((name) => code.includes(`<${name}`));
+          if (uses) found.push(path);
+        }
+      }
+    };
+
+    walk(root);
+    return found.sort();
+  }
+
+  const DISCOVERED = screensUnder("apps");
+
+  it("swept something, so an empty pass cannot look like a clean one", () => {
+    expect(DISCOVERED.length, "the walk found no settings-shaped screens at all").toBeGreaterThan(
+      15,
+    );
+  });
+
+  it("names every settings-shaped screen in the tree", () => {
+    const registered = new Set([
+      ...SECTION_FORMS.map((form) => form.file),
+      ...REPLACE_ALL_FORMS.map((form) => form.file),
+      ...GATED_SCREENS.map((screen) => screen.file),
+    ]);
+
+    const unheld = DISCOVERED.filter(
+      (path) => !registered.has(path) && !NOT_A_SCREEN.has(path),
+    );
+
+    expect(
+      unheld,
+      "these gate on hydration or use a shared form hook, and no rule in this file " +
+        `applies to them — add each to SECTION_FORMS, REPLACE_ALL_FORMS or GATED_SCREENS:\n  ${unheld.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("does not name a screen that has since been deleted or moved", () => {
+    // The other direction: a registry entry pointing at nothing passes every
+    // `it.each` above by never running, so a renamed file silently drops out of
+    // coverage while the suite stays green.
+    const registered = [
+      ...SECTION_FORMS.map((form) => form.file),
+      ...REPLACE_ALL_FORMS.map((form) => form.file),
+      ...GATED_SCREENS.map((screen) => screen.file),
+    ];
+
+    const missing = registered.filter((path) => !existsSync(join(ROOT, path)));
+    expect(missing, `registered but not in the tree:\n  ${missing.join("\n  ")}`).toEqual([]);
   });
 });
