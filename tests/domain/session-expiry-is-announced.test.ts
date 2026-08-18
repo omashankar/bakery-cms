@@ -54,7 +54,13 @@ function requestMakersUnder(roots: string[]): string[] {
       }
       if (!/\.tsx?$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) continue;
       const source = stripComments(readFileSync(join(process.cwd(), path), "utf8"));
-      if (/(?<![.\w])fetch\(/.test(source)) found.push(path);
+      // `window.fetch(` counts too: the lookbehind exists to skip injected
+      // `opts.fetch()` callbacks, and it skipped the global spelt through
+      // `window` along with them.
+      const REQUEST = new RegExp(
+        "(?<![.A-Za-z0-9_])fetch[(]|window[.]fetch[(]",
+      );
+      if (REQUEST.test(source)) found.push(path);
     }
   };
 
@@ -1060,10 +1066,31 @@ describe("a write refused because the session ended", () => {
 
       // (`requests > 0` is guaranteed by the discovery — a file is only in
       // MODULES because its source matched the same `fetch(` pattern — so
-      // asserting it here proved nothing. The count comparison is the check.)
-      expect(noted, `${path} makes ${requests} request(s) but reports a 401 ${noted}×`).toBe(
-        requests,
-      );
+      expect(
+        noted,
+        `${path} makes ${requests} request(s) but reports a 401 ${noted}x`,
+      ).toBe(requests);
+
+      /**
+       * And each notice FOLLOWS a request, rather than the totals merely
+       * agreeing. Two notices on one response balanced a second response with
+       * none, so a module could examine one call twice and the other never
+       * while the arithmetic came out even.
+       */
+      const order: string[] = [];
+      for (const m of source.matchAll(new RegExp("fetch[(]|noteAuthStatus[(]", "g"))) {
+        order.push(m[0].startsWith("fetch") ? "request" : "notice");
+      }
+
+      let outstanding = 0;
+      for (const event of order) {
+        if (event === "request") outstanding += 1;
+        else outstanding -= 1;
+        expect(
+          outstanding,
+          `${path} reports a 401 for a response it has not asked for yet`,
+        ).toBeGreaterThanOrEqual(0);
+      }
 
       /**
        * And each notice reads the response it belongs to.

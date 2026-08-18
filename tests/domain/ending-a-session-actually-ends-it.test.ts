@@ -59,7 +59,6 @@ describe("ending a session", () => {
       "await repo.revokeRefreshTokensBySession(sessionId)",
     );
     // Statement level, not nested in a branch: the revoke and the delete are
-    // Statement level, not nested in a branch: the revoke and the delete are
     // one act. Built with fromCharCode because every escape written into this
     // file so far has been eaten by the tooling before it landed.
     const NEWLINE = String.fromCharCode(10);
@@ -157,9 +156,16 @@ describe("the rotation's idle check", () => {
     const body = bodyOf(service(), "export async function refresh");
     const line = body.slice(body.indexOf("repo.findSessionById"));
 
-    expect(line.slice(0, 120), "a database error is being read as an ended session").not.toContain(
+    // Neither spelling. `.catch(` is one way to swallow it; wrapping the
+    // lookup in try/catch is the other, and matching only the first left
+    // the identical behaviour a rename away.
+    expect(line.slice(0, 160), "a database error is being read as an ended session").not.toContain(
       ".catch(",
     );
+    expect(
+      bodyOf(service(), "export async function refresh"),
+      "the row read is wrapped in a try/catch, which swallows it just the same",
+    ).not.toContain("try {");
   });
 });
 

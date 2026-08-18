@@ -284,7 +284,12 @@ describe("an admin write that the server refused", () => {
      * copy.
      */
     const declarations = sourceFilesUnder(ROOTS).filter((path) =>
-      /function reportedAsSignedOut/.test(mask(readFileSync(join(process.cwd(), path), "utf8"))),
+      // Either declaration style. Matching only the `function` keyword let a
+      // second copy written as a const arrow — the other style used
+      // throughout this codebase — pass as no copy at all.
+      /(?:function|const) reportedAsSignedOut/.test(
+        mask(readFileSync(join(process.cwd(), path), "utf8")),
+      ),
     );
 
     expect(declarations, "the check has been copied again").toHaveLength(1);
