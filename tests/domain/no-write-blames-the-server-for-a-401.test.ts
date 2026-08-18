@@ -155,8 +155,8 @@ function guardPrecedes(masked: string, toastAt: number): boolean {
   // `!` for the wrapping shape; a bare call is the early-return shape, which
   // only counts when it is actually acted on.
   return (
-    /!\s*reportedAsSignedOut\(\)/.test(body) ||
-    /if \(reportedAsSignedOut\(\)\)\s*return/.test(body)
+    /!\s*reportedAsSignedOut(OnRead)?\(\)/.test(body) ||
+    /if \(reportedAsSignedOut(OnRead)?\(\)\)\s*return/.test(body)
   );
 }
 
@@ -271,5 +271,61 @@ describe("an admin write that the server refused", () => {
     );
 
     expect(declarations, "the check has been copied again").toHaveLength(1);
+  });
+});
+
+describe("a READ that failed because the session ended", () => {
+  it("is not reported with the write reporter's sentence", () => {
+    /**
+     * `reportedAsSignedOut` says "Not saved — …". That is right for a refused
+     * write and wrong for a failed load: it was wired into "Could not load that
+     * order" and two exports, so the only thing an admin was told about a
+     * failed READ is that something had not been saved. Same question,
+     * different sentence — `reportedAsSignedOutOnRead` says the other one.
+     */
+    const offenders: string[] = [];
+
+    for (const path of sourceFilesUnder(ROOTS)) {
+      if (REPORTERS.includes(path)) continue;
+      const masked = mask(readFileSync(join(process.cwd(), path), "utf8"));
+
+      let at = masked.indexOf("toast.error(");
+      while (at > -1) {
+        const args = toastArguments(masked, at);
+        // A load, not a save. These are the ones whose guard must be the read
+        // variant, because the write one narrates the wrong event.
+        if (args && /could not load/i.test(args)) {
+          const head = masked.slice(0, at);
+          const from = Math.max(
+            0,
+            head.lastIndexOf("function "),
+            head.lastIndexOf("=> {"),
+            head.lastIndexOf("async ("),
+          );
+          const body = masked.slice(from, at);
+          // Guarded by the WRITE reporter and not the read one.
+          if (/reportedAsSignedOut\(\)/.test(body) && !/reportedAsSignedOutOnRead\(\)/.test(body)) {
+            offenders.push(`${path} — ${masked.slice(at, at + 50).replace(/\s+/g, " ")}`);
+          }
+        }
+        at = masked.indexOf("toast.error(", at + 1);
+      }
+    }
+
+    expect(
+      offenders,
+      `these tell the admin nothing was SAVED when what failed was a load:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("has a read-side reporter to use", () => {
+    const source = mask(readFileSync(join(process.cwd(), REPORTERS[0]), "utf8"));
+
+    expect(source).toContain("export function reportedAsSignedOutOnRead");
+    // And it handles both answers, like its write-side twin.
+    const from = source.indexOf("function reportedAsSignedOutOnRead");
+    const body = source.slice(from, source.indexOf("\n}", from));
+    expect(body).toContain('"checking"');
+    expect(body).toContain('"expired"');
   });
 });

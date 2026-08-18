@@ -181,3 +181,25 @@ describe("a second tab that lost the rotation race", () => {
     expect(branch, "the losing tab is issued fresh cookies").not.toContain("setAuthCookies");
   });
 });
+
+describe("signing out", () => {
+  it("does not swallow its own failures", () => {
+    /**
+     * Both calls carried `.catch(() => undefined)`, so every database failure in
+     * the sign-out path was discarded and the controller answered 200 "Signed
+     * out". `signOutOfThisDevice` exists to say whether it ACTUALLY happened —
+     * that is its whole contract, written because landing on the login form is
+     * not proof — and swallowing here took away its ability to find out. On a
+     * shared machine the admin walks away believing they are signed out while
+     * the chain is still live.
+     */
+    const body = bodyOf(stripComments(read("features/auth/server/auth.service.ts")), "export async function logout");
+
+    expect(body, "the revoke is fire-and-forget again").not.toMatch(
+      /revokeRefreshTokensBySession\([^)]*\)\.catch/,
+    );
+    expect(body, "the session delete is fire-and-forget again").not.toMatch(
+      /deleteSession\([^)]*\)\.catch/,
+    );
+  });
+});

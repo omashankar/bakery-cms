@@ -341,9 +341,23 @@ export async function logout(refreshCookie: string | undefined, ctx: RequestCtx)
      * Revoking by session covers the presented token and every successor,
      * whichever tab minted it.
      */
+    /**
+     * NOT swallowed.
+     *
+     * Both calls carried `.catch(() => undefined)`, so every database failure
+     * in the sign-out path was discarded and the controller answered 200
+     * "Signed out". `signOutOfThisDevice` exists to say whether it ACTUALLY
+     * happened — that is its whole contract, written because landing on the
+     * login form is not proof — and swallowing here took away its ability to
+     * find out. On a shared machine the admin walks away believing they are
+     * signed out while the chain is still live.
+     *
+     * A throw here becomes a 500, which is what the client already treats as
+     * "could not sign you out".
+     */
     if (claims?.sid) {
-      await repo.revokeRefreshTokensBySession(claims.sid).catch(() => undefined);
-      await repo.deleteSession(claims.sid).catch(() => undefined);
+      await repo.revokeRefreshTokensBySession(claims.sid);
+      await repo.deleteSession(claims.sid);
     } else {
       // No readable claims, so no session to name: revoke what was presented,
       // which is all there is to go on.

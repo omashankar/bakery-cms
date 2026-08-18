@@ -293,6 +293,39 @@ describe("bulk status update", () => {
     expect(result.refused, "a 401 was reported as a rule the shop enforces").toBe(0);
   });
 
+  it("undoes the optimistic write for a 401, not only for a rule refusal", async () => {
+    /**
+     * Excluding 401 from `refused` fixed the message and turned the ROLLBACK
+     * off with it — the gate was `refusals.length > 0`. So a batch on a dead
+     * session left the fabricated status and its fabricated history entry in
+     * the cache, and that poisoned row then became the baseline: the retry
+     * skips ids whose status already matches, so nothing is written and the
+     * rollback can never fire for that row again.
+     */
+    persistServerOrders([order({ id: "a", status: "confirmed" })]);
+    mockServer(false, 401);
+    const before = getOrderById("a")!.statusHistory;
+
+    await bulkUpdateOrderStatus(["a"], "preparing");
+
+    const cached = getOrderById("a");
+    expect(cached?.status, "a refused-by-401 status was left in the cache").toBe("confirmed");
+    expect(cached?.statusHistory, "a transition that never happened is in the timeline").toEqual(
+      before,
+    );
+  });
+
+  it("keeps the optimistic write when the request merely dropped, even now", async () => {
+    // The rollback widened to cover 401; it must not have swallowed the case it
+    // was always meant to leave alone.
+    persistServerOrders([order({ id: "a", status: "confirmed" })]);
+    mockServer(false, 0);
+
+    await bulkUpdateOrderStatus(["a"], "delivered");
+
+    expect(getOrderById("a")?.status).toBe("delivered");
+  });
+
   it("still calls a 403 a refusal", async () => {
     persistServerOrders([order({ id: "a", status: "confirmed" })]);
     mockServer(false, 403);

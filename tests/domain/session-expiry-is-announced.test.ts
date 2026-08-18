@@ -929,7 +929,7 @@ describe("a write refused because the session ended", () => {
         if (!/toast\.error\(/.test(body)) continue;
         // The check itself emits the messages it emits ON BEHALF of the
         // callers. It is not a caller.
-        if (name === "reportedAsSignedOut") continue;
+        if (name === "reportedAsSignedOut" || name === "reportedAsSignedOutOnRead") continue;
         guarded += 1;
 
         const guardAt = body.indexOf("reportedAsSignedOut()");

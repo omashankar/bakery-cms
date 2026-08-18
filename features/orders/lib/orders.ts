@@ -857,16 +857,31 @@ export async function bulkUpdateOrderStatus(
   const refusals = failures.filter((result) => result.refused);
 
   /**
-   * Undo the optimistic cache write for anything the server REFUSED.
+   * Undo the optimistic cache write for anything that DEFINITELY did not land.
    *
-   * A refusal is permanent — the fulfilment ladder does not run backwards — so
-   * leaving the target status in the cache shows the admin a change that will
-   * never exist, and invites the retry that can never succeed.
+   * Two cases, not one. A refusal is permanent — the fulfilment ladder does not
+   * run backwards — so leaving the target status shows the admin a change that
+   * will never exist. A 401 did not happen either: the server never looked at
+   * the value.
+   *
+   * Gating this on refusals alone was a hole opened by excluding 401 from
+   * `refused` — that fixed the message and turned the rollback off with it. The
+   * fabricated status and its fabricated history entry stayed in the cache, and
+   * then became the baseline: the optimistic loop skips ids whose status
+   * already matches, so a retry writes nothing, `touchedCache` stays false, and
+   * this can never fire again for that row.
+   *
+   * A DROPPED request is deliberately not here. That one is worth retrying, and
+   * blanking the row would hide what the admin just did.
    */
-  if (refusals.length > 0 && touchedCache) {
+  const undoable = results.filter((result) => result.refused || result.unauthorized);
+
+  if (undoable.length > 0 && touchedCache) {
     const stale = readOrders();
     const refusedIds = new Set(
-      results.flatMap((result, index) => (result.refused ? [orderIds[index]] : [])),
+      results.flatMap((result, index) =>
+        result.refused || result.unauthorized ? [orderIds[index]] : [],
+      ),
     );
     const restored = stale.map((order) => {
       if (!refusedIds.has(order.id)) return order;

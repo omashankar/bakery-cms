@@ -256,7 +256,7 @@ export function updateStatusRequest(orderId: string, status: OrderStatus): Promi
 export async function updateStatusWithReason(
   orderId: string,
   status: OrderStatus,
-): Promise<{ ok: boolean; refused: boolean; reason?: string }> {
+): Promise<{ ok: boolean; refused: boolean; unauthorized: boolean; reason?: string }> {
   const { ok, status: code, error } = await sendWithStatus(
     `/api/orders/${orderId}/status`,
     "PATCH",
@@ -274,7 +274,24 @@ export async function updateStatusWithReason(
    * 403 stays a refusal: a permission this account does not have is a real
    * answer from a live session.
    */
-  return { ok, refused: !ok && code >= 400 && code < 500 && code !== 401, reason: error };
+  /**
+   * `unauthorized` is separate because it shares the ROLLBACK with a refusal
+   * while sharing none of the message.
+   *
+   * Excluding 401 from `refused` fixed the wrong sentence and silently turned
+   * off the cache rollback with it — the gate is `refusals.length > 0`. So a
+   * 401 batch left the fabricated status AND its fabricated history entry in
+   * the cache. Worse, that poisoned row then becomes the baseline: the retry
+   * skips every id whose status already matches, so nothing is written, the
+   * rollback never fires again, and the invented history entry is permanent.
+   */
+  const unauthorized = !ok && code === 401;
+  return {
+    ok,
+    refused: !ok && code >= 400 && code < 500 && !unauthorized,
+    unauthorized,
+    reason: error,
+  };
 }
 
 export function cancelOrderRequest(

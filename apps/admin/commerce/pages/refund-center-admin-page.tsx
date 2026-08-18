@@ -51,7 +51,7 @@ import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
-import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 
 const PAGE_SIZE = 8;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -315,7 +315,7 @@ export function RefundCenterAdminPage() {
       // The order was not cached and the server read failed too. The dialog has
       // already closed itself, so without this the click produces nothing at all.
       setRefundTarget(null);
-      if (!reportedAsSignedOut()) toast.error("Could not load that order", {
+      if (!reportedAsSignedOutOnRead()) toast.error("Could not load that order", {
         description: "The server did not answer — reload and try again.",
       });
       return;
@@ -354,7 +354,7 @@ export function RefundCenterAdminPage() {
     // no refund cases is a different claim from admitting the list never arrived.
     // orders-list and invoices already make this distinction.
     if (failed) {
-      if (!reportedAsSignedOut()) toast.error("Could not load the refund cases to export", {
+      if (!reportedAsSignedOutOnRead()) toast.error("Could not load the refund cases to export", {
         description: "The server did not answer — reload and try again.",
       });
       return;

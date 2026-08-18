@@ -132,6 +132,32 @@ export async function restoreShop(): Promise<string> {
     .then((r) => r.deletedCount)
     .catch(() => 0);
 
+  /**
+   * The session the fixture planted, taken back out.
+   *
+   * `adminSession` upserts a real `sessions` row and real `refreshtokens` rows
+   * so the server treats the test as genuinely signed in. Nothing removed
+   * them, so a run left a LIVE admin session behind — and the Security Center
+   * lists it as an active device ("Browser on Desktop", 127.0.0.1) beside the
+   * owner’s real ones, indistinguishable from an intruder, with a Revoke
+   * button next to it. Every later run re-stamped its expiry, so it never aged
+   * out either.
+   *
+   * Deleted BY ID, not by a query: the fixture owns exactly this session and
+   * the tokens pointing at it, and nothing else here may be touched.
+   */
+  const fixtureSessionId = new mongoose.Types.ObjectId("000000000000000000000e2e");
+  const fixtureTokens = await db
+    .collection("refreshtokens")
+    .deleteMany({ sessionId: fixtureSessionId })
+    .then((r) => r.deletedCount)
+    .catch(() => 0);
+  const fixtureSessions = await db
+    .collection("sessions")
+    .deleteOne({ _id: fixtureSessionId })
+    .then((r) => r.deletedCount)
+    .catch(() => 0);
+
   await mongoose.disconnect();
   fs.rmSync(SNAPSHOT_PATH, { force: true });
 
@@ -141,5 +167,6 @@ export async function restoreShop(): Promise<string> {
     `products restocked: ${restocked}`,
     `stock flags restored: ${restatused}`,
     `checkout drafts removed: ${draftsRemoved}`,
+    `fixture session removed: ${fixtureSessions} (+${fixtureTokens} token rows)`,
   ].join(" · ");
 }
