@@ -1,3 +1,4 @@
+import { withStableLineIds } from "@/features/cart/lib/cart";
 import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/server/db/mongoose";
@@ -35,10 +36,23 @@ function toDoc(order: PlacedOrder): OrderDoc {
   return { _id: id, ...rest } as OrderDoc;
 }
 
+/**
+ * Repaired on read, like the settings migration.
+ *
+ * Orders placed before the priced line carried an `id` are in the database with
+ * items that have none, and tightening a type never touches data at rest.
+ * Filling it here means every server read — the detail page, the invoice, the
+ * customer's own order list — sees the same repaired order, rather than each
+ * screen inventing a fallback key of its own.
+ *
+ * Not written back: the value is derived from the line and is identical every
+ * time, so persisting it would only add a way for the two to disagree.
+ */
 function toOrder(raw: Raw): PlacedOrder {
   const { _id, __v, ...rest } = raw as Record<string, unknown>;
   void __v;
-  return { ...rest, id: String(_id) } as PlacedOrder;
+  const order = { ...rest, id: String(_id) } as PlacedOrder;
+  return order.items ? { ...order, items: withStableLineIds(order.items) } : order;
 }
 
 export interface StockReduction {

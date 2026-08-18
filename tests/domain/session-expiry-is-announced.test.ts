@@ -23,6 +23,24 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 
 /**
+ * What counts as a request — ONE definition, used by the discovery below and by
+ * the per-module count further down.
+ *
+ * These were two patterns that had drifted: discovery accepted `window.fetch(`
+ * while the counter still used a bare lookbehind that the `.` in `window.fetch`
+ * defeats. A module written that way was discovered into the list and then
+ * measured at zero requests — so the assertion that every response must be
+ * examined demanded, of that module, that it examine NONE. The guard read as
+ * coverage and enforced the opposite.
+ *
+ * The lookbehind exists to skip an injected `opts.fetch()` callback; the second
+ * alternative puts back the global spelt through `window`, which it was
+ * skipping along with them. Built fresh at each use: a `g` regex carries
+ * `lastIndex` between calls.
+ */
+const REQUEST_PATTERN = "(?<![.A-Za-z0-9_])fetch[(]|window[.]fetch[(]";
+
+/**
  * The two api modules that must NOT report a 401, with the reason.
  *
  * An exemption has to be argued for, which is the point of naming them here
@@ -54,13 +72,7 @@ function requestMakersUnder(roots: string[]): string[] {
       }
       if (!/\.tsx?$/.test(entry.name) || /\.(test|spec)\./.test(entry.name)) continue;
       const source = stripComments(readFileSync(join(process.cwd(), path), "utf8"));
-      // `window.fetch(` counts too: the lookbehind exists to skip injected
-      // `opts.fetch()` callbacks, and it skipped the global spelt through
-      // `window` along with them.
-      const REQUEST = new RegExp(
-        "(?<![.A-Za-z0-9_])fetch[(]|window[.]fetch[(]",
-      );
-      if (REQUEST.test(source)) found.push(path);
+      if (new RegExp(REQUEST_PATTERN).test(source)) found.push(path);
     }
   };
 
@@ -1189,7 +1201,7 @@ describe("a write refused because the session ended", () => {
        * examined once. That is the actual invariant, and it cannot be dodged by
        * renaming anything.
        */
-      const requests = (source.match(/(?<![.\w])fetch\(/g) ?? []).length;
+      const requests = (source.match(new RegExp(REQUEST_PATTERN, "g")) ?? []).length;
       const noted = (source.match(/noteAuthStatus\(/g) ?? []).length;
 
       // (`requests > 0` is guaranteed by the discovery — a file is only in

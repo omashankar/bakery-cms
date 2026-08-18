@@ -62,12 +62,36 @@ describe("ending a session", () => {
     // one act. Built with fromCharCode because every escape written into this
     // file so far has been eaten by the tooling before it landed.
     const NEWLINE = String.fromCharCode(10);
+    const INDENT = String.fromCharCode(32);
+    /**
+     * The INDENT is the check, and `trim()` was throwing it away.
+     *
+     * `line.trim().startsWith(…)` is true at any nesting depth, so the very
+     * thing this assertion is documented to catch — the revoke moved inside a
+     * branch while the delete stays unconditional — passed it. The revoke sits
+     * one level inside `if (sessionId) {`, so its own statement indent is fixed
+     * and anything deeper is a condition that was not there before.
+     */
+    const revokeLine = body
+      .split(NEWLINE)
+      .find((line) => line.includes("await repo.revokeRefreshTokensBySession"));
+
+    expect(revokeLine, "the chain revoke is gone from endSession").toBeDefined();
+
+    const depth = (revokeLine ?? "").length - (revokeLine ?? "").trimStart().length;
+    const deleteLine =
+      body.split(NEWLINE).find((line) => line.includes("await repo.deleteSession")) ?? "";
+    const deleteDepth = deleteLine.length - deleteLine.trimStart().length;
+
+    expect(deleteLine, "the row delete is gone from endSession").not.toBe("");
     expect(
-      body
-        .split(NEWLINE)
-        .some((line) => line.trim().startsWith("await repo.revokeRefreshTokensBySession")),
-      "the revoke happens only under some condition",
-    ).toBe(true);
+      depth,
+      `the revoke is nested ${(depth - deleteDepth) / 2} level(s) deeper than the delete — ` +
+        "it happens only under some condition the delete does not share",
+    ).toBe(deleteDepth);
+    expect(INDENT.repeat(depth) + "await", "the revoke is not a statement of its own").toBe(
+      (revokeLine ?? "").slice(0, depth + 5),
+    );
     expect(body).toContain("deleteSession");
     /**
      * Order matters. Revoking after the delete would still work here, but the
@@ -133,10 +157,24 @@ describe("ending a session", () => {
         "RefreshTokenModel.updateMany",
       );
     }
-    expect(repository, "the revoke no longer targets the session’s tokens").toContain(
+    /**
+     * Inside the revoke's OWN body.
+     *
+     * Both of these read the whole repository file, where `revokedAt: null`
+     * already appears twice — in `findActiveRefreshToken` and in
+     * `revokeRefreshTokensByUser` — so the filter could be deleted from the
+     * function this test is named after and it stayed green. That filter is not
+     * cosmetic: without it every sign-out and every session revoke restamps
+     * `revokedAt` on tokens revoked long ago, and `ROTATION_RACE_MS` reads
+     * exactly those timestamps to decide whether a presented token is a race or
+     * a replay. Losing it re-opens the window this file spends fifty lines on.
+     */
+    const revoke = bodyOf(repository, "export async function revokeRefreshTokensBySession");
+
+    expect(revoke, "the revoke no longer targets the session’s tokens").toContain(
       "sessionId: { $in: ids }",
     );
-    expect(repository, "it would revoke tokens that were already revoked").toContain(
+    expect(revoke, "it would restamp tokens that were already revoked").toContain(
       "revokedAt: null",
     );
   });
@@ -246,6 +284,43 @@ describe("a second tab that lost the rotation race", () => {
 
     expect(branch, "the losing tab is issued a fresh token").not.toContain("signRefreshToken");
     expect(branch, "the losing tab is issued fresh cookies").not.toContain("setAuthCookies");
+  });
+
+  it("is told apart from a session somebody deliberately revoked", () => {
+    /**
+     * `revokedAt` is not a rotation marker.
+     *
+     * Every revocation stamps it: `revokeRefreshTokensBySession` for "Revoke
+     * session" and "Log out everywhere", `revokeRefreshTokensByUser` for a
+     * password change or reset. Keyed on the timestamp alone, the window
+     * answered a lost laptop's heartbeat with 200 and the full user record for
+     * fifteen seconds after its owner revoked it — the client then published
+     * "active" and reset its idle clock against a `lastSeenAt` the server had
+     * never touched, and the branch skipped `clearAuthCookies`, so the device
+     * kept its access-token cookie rather than being cut off then and there.
+     *
+     * The SESSION ROW is what separates them: the honest loser's row is alive
+     * because the winner just rotated and touched that same session, while
+     * every deliberate revocation deletes the row before stamping the chain.
+     */
+    const body = bodyOf(service(), "export async function refresh");
+    const raceAt = body.indexOf("ROTATION_RACE_MS");
+    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
+
+    expect(branch, "the race window never looks for the session row").toContain(
+      "findSessionById(claims.sid)",
+    );
+
+    /**
+     * And the answer is a CONDITION, not a read whose result is dropped.
+     *
+     * Fetching the row and returning regardless is the shape this repo keeps
+     * producing — the gate that guards the mechanism but not its wiring.
+     */
+    const success = branch.slice(branch.indexOf("return toPublicUser"));
+    const guard = branch.slice(0, branch.indexOf("return toPublicUser"));
+    expect(success.length, "the race branch no longer answers success at all").toBeGreaterThan(0);
+    expect(guard, "the row is read and then ignored").toMatch(/if \([^)]*session[^)]*\)/);
   });
 });
 

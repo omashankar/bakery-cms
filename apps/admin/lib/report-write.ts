@@ -27,23 +27,69 @@ import { sessionState } from "@/features/auth/lib/session-expiry";
  * Returns true when it has already said what happened; the caller must then say
  * nothing more.
  */
-export function reportedAsSignedOut(): boolean {
+export interface WhatDidLand {
+  /**
+   * Replaces "Not saved" when the caller knows something more precise.
+   *
+   * "Not saved" is right for a single write and FALSE for one that got part of
+   * the way: a backup restore pushes its sections one at a time, so a session
+   * that ends half-way through leaves some of them on the server and the
+   * browser's own stores already replaced. Telling that admin "not saved"
+   * discards the only report of what actually landed — and it is the moment
+   * they are least able to check by eye.
+   */
+  title?: string;
+  /** What DID happen, said before the remedy. */
+  detail?: string;
+}
+
+interface Wording {
+  /** Used when the caller has nothing more precise to say. */
+  fallback: string;
+  /** The same fact, as a sentence, for when the caller supplies the headline. */
+  cause: string;
+  remedy: string;
+}
+
+const ENDED: Wording = {
+  fallback: "Not saved — your session had ended",
+  cause: "Your session had ended.",
+  remedy: "Sign in again in the dialog, then try once more.",
+};
+
+// Deliberately not a verdict. We asked and have not heard back, and saying
+// either "the server rejected it" or "you are signed out" would be a claim this
+// moment cannot support.
+const ASKING: Wording = {
+  fallback: "Not saved — checking whether you are still signed in",
+  cause: "We are checking whether you are still signed in.",
+  remedy: "Wait a moment, then try again.",
+};
+
+/**
+ * One message, built from what the caller knows and what the session says.
+ *
+ * With a caller's own headline the sentence about the session has to move into
+ * the description — dropping it leaves a message that explains nothing.
+ */
+function announce(said: Wording, landed?: WhatDidLand): void {
+  toast.error(landed?.title ?? said.fallback, {
+    description: landed
+      ? [landed.detail, said.cause, said.remedy].filter(Boolean).join(" ")
+      : said.remedy,
+  });
+}
+
+export function reportedAsSignedOut(landed?: WhatDidLand): boolean {
   const state = sessionState();
 
   if (state === "expired") {
-    toast.error("Not saved — your session had ended", {
-      description: "Sign in again in the dialog, then try once more.",
-    });
+    announce(ENDED, landed);
     return true;
   }
 
   if (state === "checking") {
-    // Deliberately not a verdict. We asked and have not heard back, and saying
-    // either "the server rejected it" or "you are signed out" would be a claim
-    // this moment cannot support.
-    toast.error("Not saved — checking whether you are still signed in", {
-      description: "Wait a moment, then try again.",
-    });
+    announce(ASKING, landed);
     return true;
   }
 

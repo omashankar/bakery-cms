@@ -6,7 +6,19 @@ import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { cn } from "@/lib/utils";
 
 interface SafeImageProps {
-  src: string;
+  /**
+   * Optional, because the data this renders often has no image.
+   *
+   * It was `src: string`, and the type was simply wrong about what reaches it:
+   * an order's stored items carry no `image` at all — the server re-prices what
+   * the customer chose and older lines predate the field — so `src.trim()`
+   * threw, and the admin order detail page rendered "This page couldn't load"
+   * instead of the order. A whole screen lost to a missing thumbnail.
+   *
+   * The component already knew what to do with nothing: everything below
+   * `if (!resolvedSrc)` is the placeholder. It just never got there.
+   */
+  src?: string | null;
   alt: string;
   className?: string;
   fill?: boolean;
@@ -15,7 +27,9 @@ interface SafeImageProps {
 /** Native img with dead-Unsplash repair — avoids Next image optimizer 404 flash */
 export function SafeImage({ src, alt, className, fill = true }: SafeImageProps) {
   const resolvedSrc = useMemo(() => {
-    const trimmed = src.trim();
+    // Not `src ?? ""`: a number or an object from untyped JSON has no `.trim`
+    // either, and this component is downstream of Mixed-typed Mongo documents.
+    const trimmed = typeof src === "string" ? src.trim() : "";
     if (!trimmed) return "";
     if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed;
     return fixBrokenImageUrl(trimmed);

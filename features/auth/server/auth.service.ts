@@ -243,9 +243,32 @@ export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx
     const seen = await repo.findRefreshToken(tokenHash);
     const revokedAt = seen?.revokedAt ? new Date(seen.revokedAt).getTime() : 0;
 
+    /**
+     * And the SESSION must still exist, or this is not a race at all.
+     *
+     * `revokedAt` is stamped by every revocation path, not only by rotation:
+     * `revokeRefreshTokensBySession` runs for "Revoke session" and "Log out
+     * everywhere", `revokeRefreshTokensByUser` for a password change or reset.
+     * Keying on the timestamp alone meant that for fifteen seconds after an
+     * owner revoked a lost laptop, that laptop's next heartbeat was answered
+     * "Session refreshed" with the full user record — and the client published
+     * "active" and reset its idle clock off a lastSeenAt the server never
+     * touched. It also skipped `clearAuthCookies`, so the revoked device kept
+     * its access-token cookie until its own next beat instead of being cut off
+     * there and then. Reuse detection was suppressed for a genuine replay in
+     * the same window on top of that.
+     *
+     * The two are distinguishable right here: the honest loser of a two-tab
+     * race still has its session row — the WINNER rotated that same session and
+     * touched it — while every deliberate revocation deletes the row before
+     * stamping the chain.
+     */
     if (revokedAt && Date.now() - revokedAt < ROTATION_RACE_MS) {
-      const owner = await repo.findUserById(claims.sub);
-      if (owner && owner.status === "active") return toPublicUser(owner);
+      const [owner, session] = await Promise.all([
+        repo.findUserById(claims.sub),
+        repo.findSessionById(claims.sid),
+      ]);
+      if (session && owner && owner.status === "active") return toPublicUser(owner);
     }
 
     return endSession(claims.sid, "Refresh token is no longer valid");

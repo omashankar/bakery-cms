@@ -816,11 +816,50 @@ export function getOrdersPage(query: repo.OrderListQuery) {
 export function getStats() {
   return repo.stats();
 }
-export function getById(id: string) {
-  return repo.findById(id);
+/**
+ * Show the cake, when the order does not remember what it looked like.
+ *
+ * An order line stores its own picture on purpose — it is a historical record,
+ * and a product's gallery can change or the product be deleted. But the priced
+ * line read `product.image` through a cast to the STOREFRONT's view of a
+ * product, and the repository returns the stored one, which spells it
+ * `images: string[]`. So the field was `undefined` on every order this shop has
+ * priced, and the admin saw a grey placeholder where the cake should be.
+ *
+ * The source is fixed, and this is for what is already stored. Falling back to
+ * the catalogue's CURRENT picture is a small liberty — it may not be the image
+ * that was on the page that day — but the alternative is showing nothing at
+ * all about a cake the shop has to bake, and the name, size and price beside
+ * it are still the order's own.
+ *
+ * Only for the single-order reads. A list of five hundred orders would turn
+ * this into a second query per page for a thumbnail nobody is looking at.
+ */
+async function withItemImages<T extends PlacedOrder | null>(order: T): Promise<T> {
+  const items = order?.items;
+  if (!items?.length) return order;
+
+  const wanted = [...new Set(items.filter((item) => !item.image).map((item) => item.productSlug))];
+  if (wanted.length === 0) return order;
+
+  const found = await Promise.all(wanted.map((slug) => productRepo.findBySlug(slug)));
+  const pictures = new Map(
+    found.filter(Boolean).map((product) => [product!.slug, product!.images?.[0] ?? ""]),
+  );
+
+  return {
+    ...order,
+    items: items.map((item) =>
+      item.image ? item : { ...item, image: pictures.get(item.productSlug) ?? "" },
+    ),
+  } as T;
 }
-export function getByNumber(orderNumber: string) {
-  return repo.findByNumber(orderNumber);
+
+export async function getById(id: string) {
+  return withItemImages(await repo.findById(id));
+}
+export async function getByNumber(orderNumber: string) {
+  return withItemImages(await repo.findByNumber(orderNumber));
 }
 export function getByCustomer(email: string) {
   return repo.findByCustomerEmail(email);

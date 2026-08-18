@@ -1,3 +1,4 @@
+import { cartLineId } from "@/features/cart/lib/cart";
 import * as productRepo from "@/features/products/server/product.repository";
 import { getSettings } from "@/features/settings/server/settings.service";
 import { getCoupons, getZones } from "@/features/commerce/server/commerce.service";
@@ -52,6 +53,15 @@ export interface QuoteInput {
 }
 
 export interface QuotedLine extends QuoteLineInput {
+  /**
+   * Stable identity for the line, in the shape the cart uses.
+   *
+   * `QuoteLineInput` carries no id — the client sends what it CHOSE, not what
+   * the shop calls it — so the priced line had none either, and every order
+   * placed through checkout was stored with items that could not be told
+   * apart. Three screens key their rows on it.
+   */
+  id: string;
   name: string;
   image: string;
   /** The unit price the SHOP says, for the options chosen. */
@@ -160,7 +170,18 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
   const items: QuotedLine[] = [];
   for (const line of input.items) {
     const quantity = Math.max(1, Math.floor(line.quantity));
-    const product = (await productRepo.findBySlug(line.productSlug)) as LandingProduct | null;
+    /**
+     * Read as what it IS, not as what the pricing helpers want.
+     *
+     * This was cast straight to `LandingProduct`, which the repository does not
+     * return — that is the STOREFRONT's view of a product, built by
+     * `toLandingProduct`, and the difference is not academic: a `Product` holds
+     * `images: string[]` while a `LandingProduct` exposes `image: string`. So
+     * `product.image` below was `undefined` on every order this shop has ever
+     * priced, the cast made TypeScript agree, and every order item was stored
+     * with no picture.
+     */
+    const product = await productRepo.findBySlug(line.productSlug);
     // Refused rather than priced at zero: an unknown slug means the cart and the
     // catalogue disagree, and guessing which is right is how a shop gives away
     // a cake it has deleted.
@@ -168,10 +189,17 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
 
     items.push({
       ...line,
+      id: cartLineId(line),
       quantity,
       name: product.name,
-      image: product.image,
-      price: priceLine(product, line, modules),
+      // The gallery's first picture, which is what the storefront calls the
+      // product's image. Never undefined: an item without this field is what
+      // made the admin order page crash on `src.trim()`.
+      image: product.images?.[0] ?? "",
+      // The two shapes DO agree on everything the pricing reads — price,
+      // weights, variant groups — so this cast is narrow and deliberate, unlike
+      // the one above it replaced.
+      price: priceLine(product as unknown as LandingProduct, line, modules),
     });
   }
 

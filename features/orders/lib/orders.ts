@@ -1,4 +1,4 @@
-import { migrateLegacyCartItem, type CartLineItem } from "@/features/cart/lib/cart";
+import { migrateLegacyCartItem, withStableLineIds, type CartLineItem } from "@/features/cart/lib/cart";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
@@ -110,7 +110,13 @@ function normalizeOrder(order: PlacedOrder): PlacedOrder {
     ...order,
     // Order history predating the cakeSlug -> productSlug rename still stores the
     // old key; upgrade it so past orders keep resolving to their products.
-    items: order.items?.map((item) => migrateLegacyCartItem(item)) ?? order.items,
+    //
+    // And the same id repair the server does on its own reads: this cache holds
+    // orders fetched before the priced line carried one, and the screens read
+    // whichever copy answers first.
+    items: order.items
+      ? withStableLineIds(order.items.map((item) => migrateLegacyCartItem(item)))
+      : order.items,
     paymentStatus: order.paymentStatus ?? (order.paymentMethod === "cod" ? "cod" : "paid"),
     statusHistory:
       order.statusHistory?.length > 0

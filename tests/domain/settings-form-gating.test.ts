@@ -40,6 +40,59 @@ function source(relativePath: string): string {
 const stripComments = (code: string) =>
   code.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 
+
+/**
+ * The opening tag of every control that SAVES the form.
+ *
+ * Three of these assertions used to search the whole file for one
+ * `disabled={…canSave}` — and the invoice panel carries three such attributes
+ * (Save, the mobile Save, and "Import from site settings"), the template pages
+ * five each. So the guard on the button they are named after could be deleted
+ * and four matches remained. What has to be true is that EVERY save control is
+ * blocked, which means finding them rather than counting them.
+ *
+ * A control counts as a save if its own tag names a save handler, or if its
+ * rendered text says Save — the two ways these screens are written.
+ */
+function saveControls(code: string): string[] {
+  const controls: string[] = [];
+
+  for (let at = code.indexOf("<Button"); at > -1; at = code.indexOf("<Button", at + 1)) {
+    let depth = 0;
+    let close = -1;
+
+    // The tag ends at the `>` that is not inside a braced expression — an
+    // `onClick={() => void handleSave()}` carries its own.
+    for (let cursor = at; cursor < code.length; cursor += 1) {
+      const ch = code[cursor];
+      if (ch === "{") depth += 1;
+      else if (ch === "}") depth -= 1;
+      else if (ch === ">" && depth === 0) {
+        close = cursor;
+        break;
+      }
+    }
+
+    if (close < 0) continue;
+
+    const tag = code.slice(at, close + 1);
+    const shut = code.indexOf("</Button>", close);
+    const label = shut > -1 ? code.slice(close + 1, shut) : "";
+
+    // `handleReset` alone is NOT a save: on the commerce screens it is the
+    // Discard button, which reverts the working copy locally and sends nothing.
+    // A reset that WRITES is named for the defaults it writes.
+    const writes = /handleSave|handleSubmit|onSave|ResetDefaults|resetToDefaults/.test(tag);
+    const saysSave = /\bSave\b/.test(label) && !/Discard|Cancel/.test(label);
+
+    if (writes || saysSave) {
+      controls.push(tag);
+    }
+  }
+
+  return controls;
+}
+
 /** The byte range inside each `.then(...)`, matched on balanced parentheses. */
 function thenSpans(code: string): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
@@ -162,12 +215,24 @@ const SECTION_FORMS: Array<{ name: string; file: string; fieldGate: "shell" | "g
 
 describe("admin forms that replace a whole settings section", () => {
   it.each(SECTION_FORMS)("$name reads through the shared section form", ({ file }) => {
-    const code = source(file);
+    /**
+     * The CALL, not the mention — the fixed twin of the assertion two describes
+     * below, which was hardened for exactly this and left this one alone.
+     *
+     * `code.includes("useSettingsSection")` is satisfied by the IMPORT LINE
+     * every one of these files carries. So the hook call could be replaced with
+     * a hand-rolled `{current, saved}` pair and this stayed green — and the
+     * sibling assertion that would have caught it only forbids the one literal
+     * `const [savedSettings, setSavedSettings] = useState`, which any other
+     * variable name walks straight past.
+     */
+    const code = stripComments(source(file));
     // Either directly, or through `useCommerceSettingsForm`, which is itself a
     // thin wrapper over it (asserted below).
-    expect(
-      code.includes("useSettingsSection") || code.includes("useCommerceSettingsForm"),
-    ).toBe(true);
+    const calls =
+      /useSettingsSection<[^>]+>\(|useSettingsSection\(|useCommerceSettingsForm\(/.test(code);
+
+    expect(calls, "the shared hook is imported but never called").toBe(true);
   });
 
   it.each(SECTION_FORMS)("$name never hand-rolls the one-shot mount read", ({ file }) => {
@@ -189,16 +254,27 @@ describe("admin forms that replace a whole settings section", () => {
   });
 
   it.each(SECTION_FORMS)("$name blocks saving until hydration too", ({ file, fieldGate }) => {
-    const code = source(file);
+    const code = stripComments(source(file));
     // Belt as well as braces: the field gate stops the admin EDITING the seed,
     // and this stops a save going out if anything ever slips past it.
     //
     // `canSave` has to appear in whatever disables the button — several pages
     // combine it with their own validity check (`hasErrors || !canSave`), which
     // is correct and must keep passing.
-    expect(code).toMatch(
-      fieldGate === "shell" ? /saveDisabled=\{[^}]*canSave/ : /disabled=\{[^}]*canSave/,
-    );
+    if (fieldGate === "shell") {
+      expect(code).toMatch(/saveDisabled=\{[^}]*canSave/);
+      return;
+    }
+
+    // EVERY save control, not "somewhere in the file" — see `saveControls`.
+    const controls = saveControls(code);
+    expect(controls.length, `${file} renders no save control at all`).toBeGreaterThan(0);
+
+    const unguarded = controls.filter((tag) => !/disabled=\{[^}]*canSave/.test(tag));
+    expect(
+      unguarded.map((tag) => tag.slice(0, 100)),
+      "these save the form without waiting for the server's copy",
+    ).toEqual([]);
   });
 
   it.each(SECTION_FORMS)("$name says so when the settings could not be read", ({ file }) => {
@@ -324,9 +400,29 @@ describe("admin forms that replace a whole document in their own store", () => {
     // `saveDisabled={!canSave}` could be deleted from the JSX and this still
     // passed, leaving a button that looks available and refuses after the click.
     // Only the BUTTON guards count now.
-    expect(source(file)).toMatch(
-      /(saveDisabled=\{[^}]*|disabled=\{[^}]*)(canSave|hydration !== "ready")/,
+    const code = stripComments(source(file));
+
+    // The shell takes it as a prop rather than putting it on a button.
+    if (/saveDisabled=\{[^}]*(canSave|hydration !== "ready")/.test(code)) return;
+
+    /**
+     * Otherwise EVERY save control, not one match anywhere in the file.
+     *
+     * The invoice panel carries three `disabled={…canSave}` attributes — Save,
+     * the mobile Save, and "Import from site settings" — so deleting the guard
+     * from the button this is named after left two matches and the test stayed
+     * green, on the very screen the same commit added to this registry.
+     */
+    const controls = saveControls(code);
+    expect(controls.length, `${file} renders no save control at all`).toBeGreaterThan(0);
+
+    const unguarded = controls.filter(
+      (tag) => !/disabled=\{[^}]*(canSave|hydration !== "ready")/.test(tag),
     );
+    expect(
+      unguarded.map((tag) => tag.slice(0, 100)),
+      "these save the form without waiting for the server's copy",
+    ).toEqual([]);
   });
 });
 
@@ -455,7 +551,22 @@ describe("admin screens that gate on hydration by hand", () => {
   it.each(GATED_SCREENS)("$name blocks its writes on the same state", ({ file }) => {
     // The BUTTON, as above — a click-handler early return leaves a control that
     // looks available and refuses after the click.
-    expect(source(file)).toMatch(/disabled=\{[^}]*hydration !== "ready"/);
+    //
+    // And every one of them: these two template pages carry five
+    // `disabled={…hydration !== "ready"}` attributes each, so the one on the
+    // editor's Save could go and four matches remained.
+    const code = stripComments(source(file));
+    const controls = saveControls(code);
+
+    expect(controls.length, `${file} renders no save control at all`).toBeGreaterThan(0);
+
+    const unguarded = controls.filter(
+      (tag) => !/disabled=\{[^}]*hydration !== "ready"/.test(tag),
+    );
+    expect(
+      unguarded.map((tag) => tag.slice(0, 100)),
+      "these write while the server's copy has not been read",
+    ).toEqual([]);
   });
 });
 
