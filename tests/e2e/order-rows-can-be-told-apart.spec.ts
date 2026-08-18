@@ -83,6 +83,17 @@ test.describe("an order whose stored items have no ids", () => {
     }
 
     /**
+     * And the cake is SHOWN, not a grey box.
+     *
+     * `SafeImage`'s placeholder is the right rendering for an item with no
+     * picture — and every one of these items had none, because the priced line
+     * read `product.image` through a cast to a shape the repository does not
+     * return. Fixing the crash made the page load with a placeholder in every
+     * row, which looks deliberate and is not.
+     */
+    await expect(page.locator("main img, main [role=img]").first()).toBeVisible();
+
+    /**
      * The crash this page was ACTUALLY dying of, kept in the same test.
      *
      * `SafeImage` took `src: string` while an order line carries no image at
