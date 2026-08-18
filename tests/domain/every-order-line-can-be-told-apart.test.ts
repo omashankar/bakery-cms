@@ -26,8 +26,26 @@ import { describe, expect, it } from "vitest";
 
 import { cartLineId, withStableLineIds } from "@/features/cart/lib/cart";
 
-/** The shape the server actually stored: no id, no image. */
-const AS_STORED = [
+/**
+ * The shape the server actually stored: no id, no image.
+ *
+ * Typed loosely on purpose — these are the fields a stored order line HAS, not
+ * the ones `CartLineItem` says it should, and pretending otherwise is what let
+ * the missing `id` go unnoticed in the first place.
+ */
+interface StoredLine {
+  productSlug: string;
+  name: string;
+  price: number;
+  quantity: number;
+  weight?: string;
+  flavour?: string;
+  shape?: string;
+  variantSelections?: Record<string, string>;
+  id?: string;
+}
+
+const AS_STORED: StoredLine[] = [
   {
     productSlug: "chocolate-truffle-delight",
     name: "Chocolate Truffle Delight",

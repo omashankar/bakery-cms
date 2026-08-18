@@ -181,7 +181,10 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       id: cartLineId(line),
       quantity,
       name: product.name,
-      image: product.image,
+      // Never undefined: an order item without this field is what made the
+      // admin order page crash on `src.trim()`, and the placeholder path only
+      // runs for an empty string.
+      image: product.image ?? "",
       price: priceLine(product, line, modules),
     });
   }
