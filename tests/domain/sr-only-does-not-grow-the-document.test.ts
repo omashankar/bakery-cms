@@ -77,7 +77,11 @@ function statusRegions(source: string): { tag: string; body: string }[] {
    * with a spinner and an `sr-only` caption. Matching only the first left five
    * live instances invisible to a guard whose whole job was to find them.
    */
-  const marks = [...source.matchAll(/role="status"|min-h-4[0-9] items-center|min-h-6[0-9] items-center/g)]
+  // Any announcing wrapper, not two hand-picked size buckets. The previous
+  // set matched min-h-4x and min-h-6x only, and only with `items-center`
+  // immediately after — so min-h-28, min-h-52, min-h-72 and every reordered
+  // class list were invisible to the guard written to find exactly these.
+  const marks = [...source.matchAll(/role="status"|min-h-[0-9]+/g)]
     .map((m) => m.index ?? -1)
     .filter((index) => index > -1);
 

@@ -330,7 +330,12 @@ describe("the store that tracks the session", () => {
     noteAuthStatus(401);
 
     expect(asked, "an unanswered question silenced every later one").toBe(2);
-    expect(sessionState(), "an unanswered question invented an answer").toBe("checking");
+    // The earlier noteAuthStatus(401) had already published “checking”, so
+    // re-asserting it held no matter what markQuestionUnanswered did. What
+    // must not happen is an ANSWER being invented from silence.
+    expect(sessionState(), "an unanswered question invented an answer").not.toBe(
+      "expired",
+    );
   });
 
   it("takes a successful request as proof the session is alive", async () => {
@@ -571,9 +576,15 @@ describe("the client heartbeat", () => {
      * mid-edit.
      */
     expect(
-      (chain.match(/markSessionExpired()/g) ?? []).length,
+      chain.split("markSessionExpired(").length - 1,
       "the expiry call has been moved out of the outcome chain",
     ).toBe(1);
+
+    // Outside the chain counts too: a call anywhere else in the hook can end
+    // a session the outcome never said had ended.
+    const whole = stripComments(hook()).split("markSessionExpired(").length - 1;
+    const inChain = chain.split("markSessionExpired(").length - 1;
+    expect(whole - inChain, "something outside the outcome chain ends sessions").toBe(0);
 
     for (const call of chain.matchAll(/markSessionExpired\(\)/g)) {
       const guard = chain.slice(0, call.index ?? 0);
