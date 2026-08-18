@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -138,7 +138,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     // "The server did not answer" is false for a 401: it answered, and said it
     // does not know who is asking. The read has already put that question to
     // the server, so this only has to stop contradicting the reply.
-    if (reportedAsSignedOut()) return;
+    if (reportedAsSignedOutOnRead()) return;
     toast.error("Could not load that order", {
       description: "The server did not answer — reload and try again.",
     });

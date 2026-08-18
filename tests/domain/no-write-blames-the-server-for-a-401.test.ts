@@ -143,21 +143,38 @@ function toastArguments(masked: string, from: number): string | null {
  */
 function guardPrecedes(masked: string, toastAt: number): boolean {
   const head = masked.slice(0, toastAt);
-  // The nearest thing that opens a function body above this call.
-  const starts = [
+  const from = Math.max(
+    0,
     head.lastIndexOf("function "),
     head.lastIndexOf("=> {"),
     head.lastIndexOf("async ("),
-  ];
-  const from = Math.max(0, ...starts);
+  );
   const body = masked.slice(from, toastAt);
 
-  // `!` for the wrapping shape; a bare call is the early-return shape, which
-  // only counts when it is actually acted on.
-  return (
-    /!\s*reportedAsSignedOut\(\)/.test(body) ||
-    /if \(reportedAsSignedOut\(\)\)\s*return/.test(body)
-  );
+  /**
+   * The two shapes are NOT interchangeable, and treating them as one let a
+   * guard in one branch vouch for every later toast in the same function.
+   *
+   * An early return is sound anywhere above: nothing after it runs unless the
+   * session is fine. A WRAPPING guard protects only the call it wraps, so it
+   * must be adjacent to THIS one — a handler with two failure branches had
+   * its first branch's wrapper silently covering the second's.
+   *
+   * Plain string work rather than regexes: the escapes in this file have been
+   * eaten twice by the tooling that edits it, leaving patterns that matched
+   * nothing while still reading like a check.
+   */
+  const RETURNS = [
+    "if (reportedAsSignedOut()) return",
+    "if (reportedAsSignedOutOnRead()) return",
+  ];
+  const WRAPS = ["!reportedAsSignedOut())", "!reportedAsSignedOutOnRead())"];
+
+  const earlyReturn = RETURNS.some((shape) => body.includes(shape));
+  const before = masked.slice(Math.max(0, toastAt - 45), toastAt).trimEnd();
+  const wrapsThisCall = WRAPS.some((shape) => before.endsWith(shape));
+
+  return earlyReturn || wrapsThisCall;
 }
 
 function blamingToasts(file: string): Site[] {
@@ -237,7 +254,32 @@ describe("an admin write that the server refused", () => {
       expect(FILES, `the walk no longer reaches ${path}`).toContain(path);
     }
 
-    expect(checked.length, "the walk found almost no messages at all").toBeGreaterThan(10);
+    /**
+     * And no magic total.
+     *
+     * `> 10` against the 28 sites that exist let the phrase list, the argument
+     * parser or the walk lose nearly two thirds of them and stay green — and a
+     * number tight enough to catch that is one somebody must re-tune every time
+     * a message is reworded, which is how it came to be loose. What needs
+     * proving is that the scan still FINDS messages in each part of the admin,
+     * so these name one file per subtree and require each to contribute. A
+     * narrowed phrase list, a parser that drops long calls, or a walk that
+     * stops descending makes a named file go silent, and this says which one.
+     */
+    const MUST_CONTRIBUTE = [
+      "apps/admin/commerce/pages/orders-list-page.tsx",
+      "apps/admin/inquiries/components/newsletter-subscribers-page.tsx",
+      "apps/admin/profile/components/admin-profile-page.tsx",
+      "apps/admin/reviews/pages/reviews-admin-page.tsx",
+      "apps/admin/settings/components/security-settings-page.tsx",
+    ];
+
+    for (const path of MUST_CONTRIBUTE) {
+      expect(
+        checked.filter((site) => site.file === path).length,
+        `the scan no longer finds the blaming message in ${path}`,
+      ).toBeGreaterThan(0);
+    }
   });
 
   it("keeps the check itself in one place", () => {
@@ -267,9 +309,70 @@ describe("an admin write that the server refused", () => {
      * copy.
      */
     const declarations = sourceFilesUnder(ROOTS).filter((path) =>
-      /function reportedAsSignedOut/.test(mask(readFileSync(join(process.cwd(), path), "utf8"))),
+      // Either declaration style. Matching only the `function` keyword let a
+      // second copy written as a const arrow — the other style used
+      // throughout this codebase — pass as no copy at all.
+      /(?:function|const) reportedAsSignedOut/.test(
+        mask(readFileSync(join(process.cwd(), path), "utf8")),
+      ),
     );
 
     expect(declarations, "the check has been copied again").toHaveLength(1);
+  });
+});
+
+describe("a READ that failed because the session ended", () => {
+  it("is not reported with the write reporter's sentence", () => {
+    /**
+     * `reportedAsSignedOut` says "Not saved — …". That is right for a refused
+     * write and wrong for a failed load: it was wired into "Could not load that
+     * order" and two exports, so the only thing an admin was told about a
+     * failed READ is that something had not been saved. Same question,
+     * different sentence — `reportedAsSignedOutOnRead` says the other one.
+     */
+    const offenders: string[] = [];
+
+    for (const path of sourceFilesUnder(ROOTS)) {
+      if (REPORTERS.includes(path)) continue;
+      const masked = mask(readFileSync(join(process.cwd(), path), "utf8"));
+
+      let at = masked.indexOf("toast.error(");
+      while (at > -1) {
+        const args = toastArguments(masked, at);
+        // A load, not a save. These are the ones whose guard must be the read
+        // variant, because the write one narrates the wrong event.
+        if (args && /could not load/i.test(args)) {
+          const head = masked.slice(0, at);
+          const from = Math.max(
+            0,
+            head.lastIndexOf("function "),
+            head.lastIndexOf("=> {"),
+            head.lastIndexOf("async ("),
+          );
+          const body = masked.slice(from, at);
+          // Guarded by the WRITE reporter and not the read one.
+          if (/reportedAsSignedOut\(\)/.test(body) && !/reportedAsSignedOutOnRead\(\)/.test(body)) {
+            offenders.push(`${path} — ${masked.slice(at, at + 50).replace(/\s+/g, " ")}`);
+          }
+        }
+        at = masked.indexOf("toast.error(", at + 1);
+      }
+    }
+
+    expect(
+      offenders,
+      `these tell the admin nothing was SAVED when what failed was a load:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("has a read-side reporter to use", () => {
+    const source = mask(readFileSync(join(process.cwd(), REPORTERS[0]), "utf8"));
+
+    expect(source).toContain("export function reportedAsSignedOutOnRead");
+    // And it handles both answers, like its write-side twin.
+    const from = source.indexOf("function reportedAsSignedOutOnRead");
+    const body = source.slice(from, source.indexOf("\n}", from));
+    expect(body).toContain('"checking"');
+    expect(body).toContain('"expired"');
   });
 });

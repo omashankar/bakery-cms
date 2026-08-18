@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/server/db/mongoose";
+import { revokeRefreshTokensBySession } from "@/features/auth/server/auth.repository";
 import { AuditLogModel } from "@/lib/server/db/models/audit-log.model";
 import { SessionModel } from "@/lib/server/db/models/session.model";
-import { RefreshTokenModel } from "@/lib/server/db/models/refresh-token.model";
 
 /**
  * Security repository — reads the REAL security signals (login audit trail +
@@ -48,12 +48,16 @@ export async function activeSessionsForUser(userId: string): Promise<SessionRaw[
 export async function revokeSession(userId: string, sessionId: string): Promise<boolean> {
   await connectDB();
   const res = await SessionModel.deleteOne({ _id: sessionId, userId });
-  if (res.deletedCount) {
-    await RefreshTokenModel.updateMany(
-      { sessionId, revokedAt: null },
-      { revokedAt: new Date() },
-    );
-  }
+  /**
+   * Through the SHARED helper, not a second copy of it.
+   *
+   * This file and the auth service each held their own `updateMany` for
+   * “revoke this session’s chain”, and they had already drifted once: the auth
+   * side went years without one at all, so every session it “killed” kept
+   * rotating. A guard test even claimed the two were shared, and could not
+   * fail for the fact that they were not.
+   */
+  if (res.deletedCount) await revokeRefreshTokensBySession(sessionId);
   return (res.deletedCount ?? 0) > 0;
 }
 
@@ -74,9 +78,6 @@ export async function revokeOtherSessions(
   if (ids.length === 0) return 0;
 
   await SessionModel.deleteMany({ _id: { $in: ids } });
-  await RefreshTokenModel.updateMany(
-    { sessionId: { $in: ids }, revokedAt: null },
-    { revokedAt: new Date() },
-  );
+  await revokeRefreshTokensBySession(ids);
   return ids.length;
 }

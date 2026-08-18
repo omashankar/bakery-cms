@@ -51,6 +51,35 @@ export function reportedAsSignedOut(): boolean {
 }
 
 /**
+ * The same question, for a READ.
+ *
+ * `reportedAsSignedOut` says "Not saved — …", which is the right sentence for
+ * a refused write and the wrong one for a failed load: it was wired into
+ * "Could not load that order" and two exports, so the only thing an admin was
+ * told about a failed READ is that something had not been saved. Same
+ * question, different sentence.
+ */
+export function reportedAsSignedOutOnRead(): boolean {
+  const state = sessionState();
+
+  if (state === "expired") {
+    toast.error("Could not load it — your session had ended", {
+      description: "Sign in again in the dialog, then try once more.",
+    });
+    return true;
+  }
+
+  if (state === "checking") {
+    toast.error("Could not load it — checking whether you are still signed in", {
+      description: "Wait a moment, then try again.",
+    });
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Report an admin write honestly, and tell the caller whether it may treat the
  * change as saved.
  *
