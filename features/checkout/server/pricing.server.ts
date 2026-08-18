@@ -1,3 +1,4 @@
+import { cartLineId } from "@/features/cart/lib/cart";
 import * as productRepo from "@/features/products/server/product.repository";
 import { getSettings } from "@/features/settings/server/settings.service";
 import { getCoupons, getZones } from "@/features/commerce/server/commerce.service";
@@ -52,6 +53,15 @@ export interface QuoteInput {
 }
 
 export interface QuotedLine extends QuoteLineInput {
+  /**
+   * Stable identity for the line, in the shape the cart uses.
+   *
+   * `QuoteLineInput` carries no id — the client sends what it CHOSE, not what
+   * the shop calls it — so the priced line had none either, and every order
+   * placed through checkout was stored with items that could not be told
+   * apart. Three screens key their rows on it.
+   */
+  id: string;
   name: string;
   image: string;
   /** The unit price the SHOP says, for the options chosen. */
@@ -168,6 +178,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
 
     items.push({
       ...line,
+      id: cartLineId(line),
       quantity,
       name: product.name,
       image: product.image,
