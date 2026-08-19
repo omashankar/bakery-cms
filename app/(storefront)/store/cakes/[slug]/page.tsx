@@ -8,6 +8,8 @@ import {
   getStorefrontProductCards,
 } from "@/features/products/data/products-service";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
+import { buildCanonicalUrl } from "@/features/seo/lib/seo-metadata";
+import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -42,7 +44,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     "Product details, pricing, and order inquiry.";
 
   const typed = cake.seo?.metaTitle?.trim();
-  const { siteName } = await getSiteIdentity();
+  const [{ siteName }, { global }] = await Promise.all([getSiteIdentity(), getSeoStoreServer()]);
 
   // The root layout appends "| <shop>" to every title. An admin who writes the
   // shop's name into the meta title themselves — and every product here already
@@ -52,11 +54,48 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const alreadyBranded =
     !!typed && !!siteName && typed.toLowerCase().endsWith(siteName.trim().toLowerCase());
 
+  const path = cake.slug ? `/store/cakes/${cake.slug}` : "";
+  /**
+   * ABSOLUTE, like every other route on this site.
+   *
+   * This shipped `canonical: "/store/cakes/<slug>"` — a bare path — while every
+   * static route goes through `buildCanonicalUrl` and carries the shop's
+   * domain. There is no `metadataBase` to fill the gap, so it reached the
+   * browser relative, and the one job a canonical has is to say WHICH host owns
+   * this page: a relative one cannot tell www from apex, or staging from live.
+   * These are the pages a bakery is actually found for.
+   */
+  const canonical = path ? buildCanonicalUrl(path, global) : undefined;
+  const image = cake.images?.[0]?.trim() || global.defaultOgImage?.trim();
+  const title = alreadyBranded ? typed : typed || cake.name;
+
   return {
     title: alreadyBranded ? { absolute: typed } : typed || cake.name,
     // Search results truncate around here, and the admin field allows more.
     description: description.slice(0, 160),
-    alternates: cake.slug ? { canonical: `/store/cakes/${cake.slug}` } : undefined,
+    alternates: canonical ? { canonical } : undefined,
+    /**
+     * And a share card, which product pages had none of.
+     *
+     * Every static route emits Open Graph tags; these did not, so a cake shared
+     * to WhatsApp or Facebook — the way a bakery is passed around — arrived as
+     * a bare link with no picture, no name and no price context. The product's
+     * own photo is the right image; the shop's default is the fallback.
+     */
+    openGraph: {
+      title,
+      description: description.slice(0, 160),
+      url: canonical,
+      siteName: global.siteName,
+      images: image ? [{ url: image }] : undefined,
+      type: "website",
+    },
+    twitter: {
+      card: global.defaultTwitterCard ?? "summary_large_image",
+      title,
+      description: description.slice(0, 160),
+      images: image ? [image] : undefined,
+    },
   };
 }
 
