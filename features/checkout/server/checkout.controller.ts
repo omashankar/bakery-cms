@@ -1,3 +1,5 @@
+import { rateLimit } from "@/lib/server/http/rate-limit";
+import { requestContext } from "@/lib/server/audit/audit-log";
 import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, AppError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
@@ -30,6 +32,27 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
   }
 
   const input = validate(quoteSchema, await readJson(request));
+
+  /**
+   * A quote reserves nothing, so this is not about stock — it is about cost.
+   *
+   * Every call reads the settings, the coupons, the delivery zones and one
+   * product document PER LINE, then prices them. A loop against this endpoint is
+   * a database bill and a slow shop for everyone else, from an unauthenticated
+   * caller, for free.
+   *
+   * IP only: a quote carries no identity worth keying on — the email is
+   * optional here and a caller pricing a cart has not committed to anything. So
+   * this half sleeps until `TRUST_PROXY_HEADERS=true` behind a real proxy, and
+   * the order endpoint, which is where the damage actually is, does not depend
+   * on it.
+   *
+   * Loose on purpose: a customer editing their cart, applying a coupon and
+   * changing the delivery city re-quotes several times a minute, and a shared
+   * address may hold a whole office.
+   */
+  const { ip } = requestContext(request);
+  if (ip) rateLimit(`quote:ip:${ip}`, { limit: 120, windowMs: 60_000 });
 
   // PRICE the address the order is actually going to.
   //
