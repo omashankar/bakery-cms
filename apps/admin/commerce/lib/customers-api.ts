@@ -12,11 +12,6 @@ interface Envelope<T> {
   data: T | null;
 }
 
-interface ServerCustomer {
-  email: string;
-  meta: CustomerAdminMeta;
-}
-
 /**
  * Resolves false when the server rejected the write.
  *
@@ -40,21 +35,28 @@ export async function saveCustomerMetaRequest(
   }
 }
 
-/** Hydration: fetch the customers list and extract each one's metadata. */
+/**
+ * Hydration: the admin's own notes on customers — tags, notes, marketing.
+ *
+ * This asked `/api/customers` and kept only `c.meta` off each row. That
+ * endpoint DERIVES its answer: a customer exists only as the sum of their
+ * orders, so serving it reads every order in the shop, maps every one, builds
+ * every profile and serialises the lot — and this threw all of it away except
+ * the notes, which live in their own small collection.
+ *
+ * It runs from the admin LAYOUT, so that was the cost of opening any admin page
+ * at all. `/api/customers/meta` answers the same question with one query on one
+ * collection.
+ */
 export async function fetchCustomerMetaMap(): Promise<Record<string, CustomerAdminMeta> | null> {
   try {
-    const res = await fetch("/api/customers", { headers: { Accept: "application/json" } });
+    const res = await fetch("/api/customers/meta", { headers: { Accept: "application/json" } });
     if (!res.ok) {
       noteAuthStatus(res.status);
       return null;
     }
-    const json = (await res.json()) as Envelope<ServerCustomer[]>;
-    if (!json.success || !json.data) return null;
-    const map: Record<string, CustomerAdminMeta> = {};
-    for (const c of json.data) {
-      if (c.meta) map[c.email.trim().toLowerCase()] = c.meta;
-    }
-    return map;
+    const json = (await res.json()) as Envelope<Record<string, CustomerAdminMeta>>;
+    return json.success && json.data ? json.data : null;
   } catch {
     return null;
   }
