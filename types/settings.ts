@@ -109,6 +109,20 @@ export interface MaintenanceSettings {
 
 export interface PaymentMethodSettings {
   cod: boolean;
+  /**
+   * LEGACY, and inert. Nothing switches these and nothing reads them.
+   *
+   * They predate Razorpay, which unified UPI, cards, netbanking and wallets
+   * behind one "Pay Online" button. `setGatewayEnabled` writes only `cod` and
+   * `razorpay` — the two the shop can actually collect with — so these two sit
+   * at their defaults for the life of a shop and reach no customer either way.
+   *
+   * Kept in the shape rather than deleted because every stored settings
+   * document, and every backup file an owner has taken, already carries them:
+   * removing the field would make the Zod schema reject its own history. Do not
+   * list them, count them, or gate anything on them — an admin screen that did
+   * both told owners they had four payment methods when checkout offers two.
+   */
   upi: boolean;
   card: boolean;
   /** Online payment via Razorpay (unified UPI/Card/Netbanking/Wallet checkout). */

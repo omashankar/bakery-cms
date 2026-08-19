@@ -70,15 +70,24 @@ export function CommerceSettingsPage() {
   // The header status line describes what cart/checkout actually use, so it reads the
   // saved values — the Live preview below intentionally reflects the unsaved draft.
   //
-  // `razorpay` was missing from this count while being the ONLY online method
-  // checkout can actually take money with, so a shop with card and UPI off but
-  // Razorpay on was told it had "0 payment methods".
-  const livePaymentMethodsOn = [
-    saved.paymentMethods.cod,
-    saved.paymentMethods.upi,
-    saved.paymentMethods.card,
-    saved.paymentMethods.razorpay,
-  ].filter(Boolean).length;
+  /**
+   * The methods CHECKOUT offers, which is what this line claims to describe.
+   *
+   * `upi` and `card` were counted here and listed below, so a shop with the
+   * defaults was told it had four payment methods. It has two: Cash on
+   * Delivery, and Pay Online — and Pay Online IS UPI and cards, so the other
+   * two were the same thing counted twice more.
+   *
+   * They are not dead settings that need switching off; nothing switches them.
+   * `setGatewayEnabled` only writes `cod` and `razorpay` — the two gateways the
+   * shop can actually collect with — so `upi` and `card` sit at their defaults
+   * for the life of the shop and reach no customer either way. Counting them
+   * invented control the owner does not have, and would have sent them looking
+   * for a switch that does not exist.
+   */
+  const livePaymentMethodsOn = [saved.paymentMethods.cod, saved.paymentMethods.razorpay].filter(
+    Boolean,
+  ).length;
 
   // Priced by the same function checkout uses.
   //
@@ -361,12 +370,11 @@ export function CommerceSettingsPage() {
             </p>
             <p className="text-xs text-muted-foreground">
               {[
-                settings.paymentMethods.cod && "COD",
-                settings.paymentMethods.upi && "UPI",
-                settings.paymentMethods.card && "Card",
-                // Razorpay was left out of this list while being the only online
-                // method checkout can actually collect with.
-                settings.paymentMethods.razorpay && "Razorpay",
+                settings.paymentMethods.cod && "Cash on Delivery",
+                // Named for what the customer gets, not for the company that
+                // moves the money: one Pay Online button covering all of these.
+                settings.paymentMethods.razorpay &&
+                  "Online — UPI, cards, netbanking, wallets",
               ]
                 .filter(Boolean)
                 .join(" · ") || "No payment methods enabled"}
