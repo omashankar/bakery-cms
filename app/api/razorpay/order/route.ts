@@ -1,3 +1,5 @@
+import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
+import { RAZORPAY_CURRENCY, isRazorpayChargeable } from "@/features/payments/lib/razorpay-currency";
 import Razorpay from "razorpay";
 import { getRazorpayCredentials } from "@/lib/server/payments/razorpay-credentials";
 import { attachRazorpayOrder, findDraft } from "@/features/checkout/server/draft.repository";
@@ -62,11 +64,48 @@ export async function POST(request: Request) {
     return Response.json({ error: "This cart has no payable total." }, { status: 409 });
   }
 
+  /**
+   * The gateway is charged in the currency the SHOP quoted, or not at all.
+   *
+   * `currency: "INR"` was hard-coded while Admin → Settings → General offers
+   * USD, EUR and GBP, and every price the customer saw — the cart, the invoice,
+   * the confirmation email — is formatted in whichever of those is set. So a
+   * shop on USD showed "$1,200.00" and this asked Razorpay for ₹1,200: a
+   * fourteen-fold difference, with the order recording the amount the customer
+   * was NOT charged. That is the same class as the amount once coming from the
+   * client, and it is worse to debug because both numbers look deliberate.
+   *
+   * Refused rather than converted. There is no exchange rate anywhere in this
+   * system and inventing one would be a second wrong number; and Razorpay can
+   * only take a foreign currency if the account has international payments
+   * enabled, which is a Razorpay-side setting this code cannot see. So the rule
+   * is the honest one: charge what was quoted, and if the gateway cannot, say
+   * so instead of charging something else.
+   *
+   * The customer should never reach here — `/api/razorpay/availability` reports
+   * the same answer and checkout hides the option, exactly as it does when the
+   * keys are missing. This is the backstop for a direct call.
+   */
+  const { currency } = await getSiteIdentity();
+  if (!isRazorpayChargeable(currency)) {
+    console.error(
+      `[razorpay] Shop currency is ${currency}; this gateway is wired for ${RAZORPAY_CURRENCY} only. ` +
+        "Set Admin → Settings → General → Currency to INR, or take payment another way.",
+    );
+    return Response.json(
+      {
+        error:
+          "Online payment is unavailable for this shop's currency. Please choose Cash on Delivery.",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // rupees -> paise
-      currency: "INR",
+      amount: Math.round(amount * 100), // major unit -> minor unit
+      currency,
       // The draft id, so a gateway payment can be traced back to the cart it
       // was opened for. The old receipt was `rcpt_${amount}` and was stored
       // nowhere — the only link between a Razorpay order and this system, and

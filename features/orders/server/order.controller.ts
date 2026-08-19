@@ -4,12 +4,14 @@ import { getMaintenanceState } from "@/features/settings/server/maintenance.serv
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getSession, requireRole, requireSession } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
+import { rateLimit } from "@/lib/server/http/rate-limit";
 
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { OutOfStockError } from "./order.repository";
 import * as service from "./order.service";
 import {
   placeOrderSchema,
+  type PlaceOrderInput,
   statusSchema,
   cancelSchema,
   refundSchema,
@@ -36,6 +38,65 @@ const ORDER_ROLES = ["owner", "admin"] as const;
 type IdContext = { params: Promise<{ id: string }> };
 type NumberContext = { params: Promise<{ orderNumber: string }> };
 
+
+/**
+ * How many orders one contact may place before the shop stops believing them.
+ *
+ * A prepaid order limits itself: the caller has to actually pay for each one,
+ * and an unpaid attempt reserves nothing. Cash on delivery costs the caller
+ * NOTHING and still runs the full placement — which atomically decrements
+ * `stockQuantity` inside the same transaction, so a script can drive the whole
+ * catalogue to out-of-stock in seconds and every real customer is then refused
+ * at checkout. That is why the two are not held to the same number.
+ *
+ * Generous for a person: an ordinary customer places one order, occasionally a
+ * second within the hour after getting something wrong. A script rotating
+ * contacts still has to invent a fresh email AND a fresh phone per few orders,
+ * which is the point — it makes the abuse expensive rather than free.
+ */
+const ORDER_WINDOW_MS = 60 * 60 * 1000;
+const COD_PER_CONTACT = 5;
+const PREPAID_PER_CONTACT = 15;
+/**
+ * The IP budget covers a shared address — a college, an office, a phone network
+ * behind CGNAT — so it is far looser than the per-contact one and exists only to
+ * stop a single machine cycling contacts.
+ *
+ * It is also the half that is currently INERT: `clientIpFrom` returns "" unless
+ * `TRUST_PROXY_HEADERS=true`, which is deliberate (an untrusted
+ * `x-forwarded-for` is caller-controlled, so throttling on it would let anyone
+ * lock anyone else out). Until this shop is deployed behind a proxy that
+ * overwrites the header, the contact limits below are the whole defence.
+ */
+const ORDERS_PER_IP = 40;
+
+/**
+ * Exported for tests, which is the only way to prove the BUDGETS.
+ *
+ * A source-level check can show a `rateLimit(` call exists and runs before the
+ * placement. It cannot show that changing one field does not buy a fresh
+ * budget, and that is the whole question here.
+ */
+export function throttleOrderPlacement(input: PlaceOrderInput, ip: string): void {
+  const cod = input.paymentMethod === "cod";
+  const limit = cod ? COD_PER_CONTACT : PREPAID_PER_CONTACT;
+  const kind = cod ? "cod" : "prepaid";
+
+  const email = input.address?.email?.trim().toLowerCase();
+  const phone = input.address?.phone?.replace(/[^0-9]/g, "");
+
+  /**
+   * Email AND phone, not one of them.
+   *
+   * Both are required by `addressSchema`, and a caller changing only one is the
+   * cheapest way past a single-key limit. Keyed separately rather than combined
+   * so that neither can be varied to buy a fresh budget.
+   */
+  if (email) rateLimit(`order:${kind}:email:${email}`, { limit, windowMs: ORDER_WINDOW_MS });
+  if (phone) rateLimit(`order:${kind}:phone:${phone}`, { limit, windowMs: ORDER_WINDOW_MS });
+  if (ip) rateLimit(`order:ip:${ip}`, { limit: ORDERS_PER_IP, windowMs: ORDER_WINDOW_MS });
+}
+
 // ---- Public (customer) ----
 
 export const placeOrderController = withErrorHandler(async (request: Request) => {
@@ -60,9 +121,12 @@ export const placeOrderController = withErrorHandler(async (request: Request) =>
   }
 
   const input = validate(placeOrderSchema, await readJson(request));
+  const context = requestContext(request);
+
+  throttleOrderPlacement(input, context.ip);
 
   try {
-    const order = await service.placeOrder(input, requestContext(request));
+    const order = await service.placeOrder(input, context);
     return created(order, "Order placed");
   } catch (error) {
     // A line could not be reserved. 409 rather than 5xx so the checkout client

@@ -21,6 +21,18 @@ export const getCustomerController = withErrorHandler(async (_req: Request, ctx:
   return ok(await service.getCustomer(email), "Customer");
 });
 
+/**
+ * The meta map alone, for the admin layout.
+ *
+ * `listCustomersController` answers the same question by reading every order
+ * in the shop and deriving every profile, which is what the layout was calling
+ * on entering the admin — for a field kept in its own small collection.
+ */
+export const listCustomerMetaController = withErrorHandler(async () => {
+  await requireRole(...CUSTOMER_ROLES);
+  return ok(await service.getCustomerMeta(), "Customer notes");
+});
+
 export const saveCustomerMetaController = withErrorHandler(async (request: Request) => {
   const session = await requireRole(...CUSTOMER_ROLES);
   const input = validate(customerMetaSchema, await readJson(request));

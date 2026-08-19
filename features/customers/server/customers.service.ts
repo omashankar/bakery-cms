@@ -33,6 +33,26 @@ export async function getCustomers() {
 }
 
 /**
+ * Just the admin's own notes on customers — tags, notes, marketing consent.
+ *
+ * Separate from `getCustomers` because the shapes cost wildly different things.
+ * A customer PROFILE is derived: it only exists as the sum of that person's
+ * orders, so building the list reads every order in the shop and maps every one
+ * of them. This is a single small collection with one document per customer the
+ * admin has annotated, and nothing else touched.
+ *
+ * That difference is the whole reason this exists. The admin layout hydrates the
+ * meta on entering the admin, and it was doing it by calling `/api/customers`
+ * and keeping only the `meta` field off each row — so every admin page load
+ * pulled the entire orders collection, derived every profile, serialised the
+ * lot, and the browser threw all of it away except the notes.
+ */
+export async function getCustomerMeta() {
+  const map = await repo.listMeta();
+  return Object.fromEntries(map);
+}
+
+/**
  * Customer detail — their full profile, every order they have placed, and the
  * admin metadata.
  *
