@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import {
   mapAdminProductToStorefront,
   type TaxonomyNames,
@@ -50,23 +52,38 @@ async function categoryNames(): Promise<TaxonomyNames> {
   }
 }
 
+/**
+ * The product collection, read AT MOST ONCE per request.
+ *
+ * Five readers here take the whole list — `getProducts`, `getProductById`,
+ * `getProductBySlug`, `getStorefrontProducts` and `getHomepageRails` — and the
+ * homepage calls two of them side by side in the same `Promise.all`, so it
+ * loaded every product document TWICE (plus the `products-seeded` flag each
+ * `listAll` checks) for one render.
+ *
+ * Reads only, and only within one request. Every mutation below addresses its
+ * own document through `productRepo` and none of them read back through here,
+ * so a save is never answered from a copy taken before it.
+ */
+const readProductsOnce = cache(async (): Promise<Product[]> => readProducts());
+
 export async function getProducts(): Promise<Product[]> {
-  return readProducts();
+  return readProductsOnce();
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
-  const products = await readProducts();
+  const products = await readProductsOnce();
   return products.find((product) => product.id === id) ?? null;
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const products = await readProducts();
+  const products = await readProductsOnce();
   return products.find((product) => product.slug === slug) ?? null;
 }
 
 /** Published products in the shape the storefront renders. */
 export async function getStorefrontProducts(): Promise<LandingProduct[]> {
-  const [products, names] = await Promise.all([readProducts(), categoryNames()]);
+  const [products, names] = await Promise.all([readProductsOnce(), categoryNames()]);
   return products
     .filter((product) => product.status === "published")
     .map((product) => mapAdminProductToStorefront(product, names));
@@ -272,7 +289,7 @@ export async function getHomepageRails(
   maxCount = 8
 ): Promise<Record<HomepageProductSource, LandingProduct[]>> {
   const [products, names, modules] = await Promise.all([
-    readProducts(),
+    readProductsOnce(),
     categoryNames(),
     readModuleSettings(),
   ]);

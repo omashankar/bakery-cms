@@ -54,6 +54,7 @@ import { MediaMoveDialog } from "./media-move-dialog";
 import { MediaThumbnail } from "./media-thumbnail";
 import { MediaToolsDialog } from "./media-tools-dialog";
 import { MediaUploadDialog } from "./media-upload-dialog";
+import { useMediaUsageSync } from "../lib/use-media-usage-sync";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 
 const PAGE_SIZE = 12;
@@ -67,6 +68,23 @@ const EMPTY_STATS = {
 };
 
 export function MediaLibraryPage() {
+  /**
+   * The "is this file in use?" index, loaded HERE rather than in the admin
+   * layout.
+   *
+   * It costs SEVEN requests — the homepage and wedding layouts, the CMS pages,
+   * testimonials, header, footer and SEO — and it ran on entering any admin
+   * screen at all, so opening Settings → SMTP fetched the whole homepage
+   * layout to answer a question only this page asks. Two of those seven were
+   * also fetched a second time by the layout’s own page and SEO hydration.
+   *
+   * Nothing outside `apps/admin/media/` reads the index it fills — the
+   * library’s Used/Unused filter, the detail panel’s usage list and the delete
+   * dialog’s "still checking" caveat are all on this screen — so this is where
+   * it belongs. The retry/completeness behaviour inside the hook is unchanged.
+   */
+  useMediaUsageSync();
+
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [folders, setFolders] = useState<ReturnType<typeof loadMediaFolders>>([]);
   const [ready, setReady] = useState(false);

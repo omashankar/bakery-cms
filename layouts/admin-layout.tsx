@@ -19,7 +19,6 @@ import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-syn
 import { useInvoiceSettingsServerSync } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
-import { useMediaUsageSync } from "@/apps/admin/media/lib/use-media-usage-sync";
 import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
 import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
@@ -37,10 +36,36 @@ interface AdminLayoutShellProps {
   className?: string;
 }
 
-export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
-  // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
-  // the hydration calls below don't start 401-ing after the 15-min token expiry.
-  useSessionRefresh();
+/**
+ * True once the browser has nothing better to do — or once `timeoutMs` has
+ * passed, whichever comes first.
+ */
+function useIdle(timeoutMs: number): boolean {
+  const [idle, setIdle] = useState(false);
+
+  useEffect(() => {
+    // Safari has no requestIdleCallback; a plain timer is the same promise,
+    // just without the "and the main thread is free" part.
+    if (typeof window.requestIdleCallback !== "function") {
+      const timer = setTimeout(() => setIdle(true), timeoutMs);
+      return () => clearTimeout(timer);
+    }
+    const handle = window.requestIdleCallback(() => setIdle(true), { timeout: timeoutMs });
+    return () => window.cancelIdleCallback(handle);
+  }, [timeoutMs]);
+
+  return idle;
+}
+
+/**
+ * Every admin cache this browser keeps, refilled from the server.
+ *
+ * These are the SEARCH INDEX and the screens’ offline copies, not the data the
+ * page in front of the admin is rendering — each screen fetches its own. They
+ * are collected into a child component so the layout can mount them a beat
+ * later; see the call site.
+ */
+function AdminDataHydration(): null {
   // Refresh the browser product cache from the server, for the admin screens
   // that still read it synchronously (inventory, dashboard, global search).
   useProductCacheSync();
@@ -52,11 +77,10 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   useInvoiceSettingsServerSync();
   // Hydrate admin-managed customer metadata (tags/notes/marketing) from the server.
   useCustomersServerSync();
-  // Hydrate the media library (files + folders) from the server.
+  // Hydrate the media library (files + folders) from the server. Stays here,
+  // unlike the media USAGE index: the dashboard tiles, the global search and
+  // the product form’s media picker all read this one.
   useMediaServerSync();
-  // Load every server-held place a media URL can be referenced, so the library
-  // can tell an unused file from one it simply has not looked for yet.
-  useMediaUsageSync();
   // Hydrate the CMS pages so the admin global search finds the real ones.
   usePagesServerSync();
   // Hydrate email/WhatsApp templates + notification settings from the server.
@@ -73,7 +97,36 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   useAdminConfigServerSync();
   // Hydrate the Security Center — derived from the real audit trail + sessions.
   useSecurityCenterServerSync();
+  return null;
+}
 
+export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
+  // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
+  // the hydration calls don’t start 401-ing after the 15-min token expiry. Eager,
+  // and the only one that is: every deferred read below depends on it working.
+  useSessionRefresh();
+
+  /**
+   * The background caches start filling AFTER the page the admin actually
+   * opened has had its turn.
+   *
+   * Fifteen hooks ran in this component’s mount effect, and between them they
+   * fired around thirty requests — every order, every product, the whole media
+   * library, reviews, inquiries, templates — on entering ANY admin screen,
+   * Settings → SMTP included. The screen’s own fetch went out in the same
+   * flush and then queued behind all of them, on one Node process talking to a
+   * remote database. The dashboard was the worst hit because it is the one
+   * people open first.
+   *
+   * Nothing is dropped and no request is removed — they are deferred by a
+   * fraction of a second, so the current page goes first. That is safe because
+   * of how these caches are already written: every screen that must not act on
+   * a stale copy calls its own `ensure…Hydrated()` before unlocking a save
+   * (inventory, communications, profile, SEO, custom code, backup), and the
+   * screens that merely display a cache subscribe to its update event and
+   * re-render when it lands.
+   */
+  const backgroundDataReady = useIdle(1000);
   const pathname = usePathname();
   const isBuilder =
     pathname === routes.admin.builders.homepage ||
@@ -193,6 +246,9 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
         className
       )}
     >
+      {/* Renders nothing; it exists to own the background hydration effects. */}
+      {backgroundDataReady ? <AdminDataHydration /> : null}
+
       <aside
         className={cn(
           "hidden min-h-0 shrink-0 overflow-hidden border-r lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col print:hidden",

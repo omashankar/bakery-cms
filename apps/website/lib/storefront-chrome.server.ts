@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { getSettings } from "@/features/settings/server/settings.service";
 import { getStorefrontCategories } from "./storefront-categories.server";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
@@ -96,7 +98,19 @@ function fallbackChrome(): StorefrontChrome {
   };
 }
 
-export async function getStorefrontChrome(): Promise<StorefrontChrome> {
+/**
+ * Built at most ONCE per request.
+ *
+ * This runs several times over on a single storefront render — the layout
+ * needs it for the navbar and footer, and `/store/contact` and the 404 page
+ * ask for it again on top of that — and every run re-read the header, the
+ * footer and the appearance palette. Measured on `/store`: nine cms-store
+ * round trips for three documents that cannot change mid-render.
+ *
+ * A pure read, so there is nothing to keep consistent with a write: the admin
+ * saves these through `replaceSiteLayout`, which never comes through here.
+ */
+export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => {
   try {
     // Concurrently with the rest. The categories read was added as a serial
     // `await` further down, which put a whole extra round trip on the critical
@@ -233,4 +247,4 @@ export async function getStorefrontChrome(): Promise<StorefrontChrome> {
   } catch {
     return fallbackChrome();
   }
-}
+});
