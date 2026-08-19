@@ -138,6 +138,23 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      /**
+       * The front door is the SHOP.
+       *
+       * `app/page.tsx` renders this product's own marketing page — "Bakery CMS
+       * — Complete Bakery Business Management Platform", with a Pricing
+       * section. That is the right page for whoever sells this software and
+       * the wrong one for every shop running it: a customer arriving from
+       * Instagram, a printed card or a search result met an advert for a
+       * dashboard instead of the cakes. So did anyone following the shop's own
+       * "Powered by Bakery CMS" footer link.
+       *
+       * Temporary (307), not permanent. A permanent redirect is cached by the
+       * browser more or less forever, and this is a decision a deployment might
+       * reasonably reverse — the vendor's own site wants that page at its root.
+       * The component is left in place for exactly that reason.
+       */
+      { source: "/", destination: "/store", permanent: false },
       { source: "/landing", destination: "/store", permanent: true },
       { source: "/admin/website", destination: "/admin/settings", permanent: true },
       { source: "/admin/website/homepage", destination: "/admin/builders/homepage", permanent: true },

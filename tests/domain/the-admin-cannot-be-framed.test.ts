@@ -20,8 +20,23 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const config = () => readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+
+/**
+ * Block comments that START a line, and nothing else.
+ *
+ * The ordinary `/\/\*[\s\S]*?\*\//` stripper cannot be used on THIS file. It
+ * contains the image path `` `/${cloudinaryCloudName}/**` `` — and that `/**`
+ * opens a comment as far as the regex is concerned, so everything up to the
+ * next `*​/` disappeared, `async headers()` among it. The test then failed with
+ * "no headers are configured at all" against a config that configures them,
+ * and it would just as happily have PASSED a negative assertion by deleting the
+ * code it was meant to inspect.
+ *
+ * Every real docblock here begins its own line; a `/**` inside a string never
+ * does.
+ */
 const stripComments = (code: string) =>
-  code.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+  code.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, " ").replace(/^[ \t]*\/\/[^\n]*/gm, " ");
 
 describe("every response", () => {
   const headers = () => {
@@ -156,5 +171,42 @@ describe("the two that are conditional", () => {
     expect(stripComments(config()), "X-Powered-By still names Next.js").toContain(
       "poweredByHeader: false",
     );
+  });
+});
+
+describe("the front door", () => {
+  /**
+   * `app/page.tsx` renders this product's own marketing page — "Bakery CMS —
+   * Complete Bakery Business Management Platform", with a Pricing section. That
+   * is the right page for whoever SELLS this software and the wrong one for
+   * every shop running it: a customer arriving from Instagram, a printed card
+   * or a search result met an advert for a dashboard instead of the cakes, as
+   * did anyone following the shop's own "Powered by" footer link.
+   */
+  it("sends the bare domain to the shop", async () => {
+    const { default: loaded } = await import("../../next.config");
+    const rules = (await loaded.redirects?.()) ?? [];
+    const root = rules.find((rule) => rule.source === "/");
+
+    expect(root, "the bare domain still serves the CMS vendor's sales page").toBeDefined();
+    expect(root?.destination).toBe("/store");
+  });
+
+  it("keeps that redirect temporary", () => {
+    /**
+     * A permanent redirect is cached by the browser more or less forever, and
+     * this is a decision a deployment might reasonably reverse — the vendor's
+     * own site wants that page at its root. Shipping it as 308 would make
+     * "put the marketing page back" unreachable for every visitor who had
+     * already seen it once.
+     */
+    const code = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    const at = code.indexOf('source: "/",');
+    expect(at, "the root redirect is gone").toBeGreaterThan(-1);
+
+    expect(
+      code.slice(at, code.indexOf("}", at)),
+      "the root redirect is permanent — a visitor could never see the page again",
+    ).toContain("permanent: false");
   });
 });
