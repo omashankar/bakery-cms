@@ -250,19 +250,59 @@ async function main() {
     try {
       const db = mongoose.connection.db!;
       const settings = (await db.collection("settings").findOne({ key: "singleton" })) as {
-        smtp?: { host?: string; user?: string };
+        smtp?: {
+          host?: string;
+          username?: string;
+          password?: string;
+          fromEmail?: string;
+          fromName?: string;
+          enabled?: boolean;
+        };
         maintenance?: { isEnabled?: boolean };
       } | null;
 
+      /**
+       * The field is `username`, not `user`.
+       *
+       * This check read `smtp.user` — which no version of `SmtpSettings` has —
+       * so it reported a fully working relay as unconfigured. Wrong in the
+       * alarming direction, which is the expensive one: it sends someone to fix
+       * something that was never broken. The shape is pinned in
+       * `types/settings.ts` and seeded by `defaultSmtpSettings`.
+       */
       const smtp = settings?.smtp ?? {};
-      if (isSet(smtp.host) && isSet(smtp.user)) {
-        add("ok", "Outbound mail (SMTP)", `configured — ${String(smtp.host)}`);
-      } else {
+      const mailReady = isSet(smtp.host) && isSet(smtp.username) && isSet(smtp.password);
+
+      if (!mailReady) {
         add(
           "block",
           "Outbound mail (SMTP)",
           "not configured in Admin → Settings → SMTP",
-          "Order confirmations and invoices cannot be sent. Use a domain the bakery owns and publish SPF/DKIM, or mail lands in spam.",
+          "Order confirmations and invoices cannot be sent.",
+        );
+      } else if (smtp.enabled !== true) {
+        add(
+          "block",
+          "Outbound mail (SMTP)",
+          `credentials are stored for ${String(smtp.host)} but the switch is OFF`,
+          "Turn it on in Admin → Settings → SMTP, or nothing is sent.",
+        );
+      } else {
+        add("ok", "Outbound mail (SMTP)", `enabled — ${String(smtp.host)}`);
+
+        /**
+         * WHOSE domain the mail leaves from, which is a separate question from
+         * whether it sends. A relay only signs for a domain it has verified, so
+         * a shop borrowing the developer’s sender has no SPF/DKIM of its own and
+         * introduces itself to every customer under someone else’s name.
+         */
+        const fromEmail = String(smtp.fromEmail ?? "");
+        const fromName = String(smtp.fromName ?? "");
+        add(
+          "warn",
+          "Mail sender identity",
+          `mail goes out as "${fromName}" <${fromEmail}>`,
+          "If that domain is not the bakery’s own, customers see someone else’s brand in every confirmation — and the shop has no SPF/DKIM of its own, so more of it lands in spam.",
         );
       }
 
