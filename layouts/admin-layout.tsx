@@ -27,6 +27,8 @@ import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-
 import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-config-server-sync";
 import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
+import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import { useIdle } from "@/hooks/use-idle";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
@@ -34,27 +36,6 @@ const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
 interface AdminLayoutShellProps {
   children: React.ReactNode;
   className?: string;
-}
-
-/**
- * True once the browser has nothing better to do — or once `timeoutMs` has
- * passed, whichever comes first.
- */
-function useIdle(timeoutMs: number): boolean {
-  const [idle, setIdle] = useState(false);
-
-  useEffect(() => {
-    // Safari has no requestIdleCallback; a plain timer is the same promise,
-    // just without the "and the main thread is free" part.
-    if (typeof window.requestIdleCallback !== "function") {
-      const timer = setTimeout(() => setIdle(true), timeoutMs);
-      return () => clearTimeout(timer);
-    }
-    const handle = window.requestIdleCallback(() => setIdle(true), { timeout: timeoutMs });
-    return () => window.cancelIdleCallback(handle);
-  }, [timeoutMs]);
-
-  return idle;
 }
 
 /**
@@ -97,6 +78,19 @@ function AdminDataHydration(): null {
   useAdminConfigServerSync();
   // Hydrate the Security Center — derived from the real audit trail + sessions.
   useSecurityCenterServerSync();
+  /**
+   * Header, footer and appearance — moved off the ROOT providers.
+   *
+   * These three reads are admin-only (they answer 401 to anyone else), so
+   * mounting them globally meant three refused requests on every customer
+   * page view and nothing gained. Here they run for the only session that can
+   * actually read them. The admin screens that WRITE these still call
+   * `ensureSiteLayoutHydrated()` themselves before unlocking a save, which is
+   * what covers signing in through the login form and soft-navigating in.
+   */
+  useEffect(() => {
+    void ensureSiteLayoutHydrated();
+  }, []);
   return null;
 }
 
