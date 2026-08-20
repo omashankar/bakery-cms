@@ -24,6 +24,19 @@ const auditLogSchema = new mongoose.Schema({
   status: { type: String, enum: ["success", "failure"], default: "success" },
 });
 
+/**
+ * The Activity screen and the Security Center both page through this newest
+ * first, and neither `actorId` nor `action` helps with that — so every view of
+ * either screen was a COLLSCAN plus an in-memory sort of the WHOLE trail to
+ * hand back twenty rows (measured: 447 examined, 20 returned).
+ *
+ * This is the one collection here that grows without any bound at all: every
+ * meaningful admin action appends a row and nothing ever removes one. An
+ * in-memory sort is also capped at 32MB, so left alone this does not merely
+ * get slower — past that mark the query starts failing outright.
+ */
+auditLogSchema.index({ createdAt: -1 });
+
 applyBaseTransform(auditLogSchema);
 
 export type AuditLogDoc = InferSchemaType<typeof auditLogSchema>;

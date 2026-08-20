@@ -29,6 +29,10 @@ newsletterSchema.set("toJSON", {
   },
 });
 
+// Same reasoning as inquiries: read newest-first, one row per subscriber, and
+// unbounded. `email` is unique-indexed but says nothing about order.
+newsletterSchema.index({ createdAt: -1 });
+
 export type NewsletterDoc = { _id: string } & Omit<NewsletterSubscriber, "id">;
 
 export const NewsletterModel: Model<NewsletterDoc> =

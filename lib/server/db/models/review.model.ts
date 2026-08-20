@@ -45,6 +45,13 @@ reviewSchema.set("toJSON", {
   },
 });
 
+// The admin moderation list reads every review newest-first. ONLY the ordering
+// is indexed here — the storefront query (`productSlug` + `status`, sorted by
+// `isFeatured`) already resolves through the `productSlug` index and examines a
+// handful of rows (measured: 3 examined, 2 returned), so a compound index for
+// it would cost writes and buy nothing.
+reviewSchema.index({ createdAt: -1 });
+
 export type ReviewDoc = { _id: string } & Omit<ProductReview, "id">;
 
 export const ReviewModel: Model<ReviewDoc> =

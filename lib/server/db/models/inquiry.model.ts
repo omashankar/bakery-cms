@@ -42,6 +42,13 @@ inquirySchema.set("toJSON", {
   },
 });
 
+// Listed newest-first, and it gains a row per contact-form submission, so it
+// grows with the shop rather than with the catalogue. `createdAt` is an ISO
+// STRING here, which compares correctly lexically — the same thing the order
+// model relies on for `placedAt`. Indexed for the ordering itself: the sort was
+// running in memory, which Mongo caps at 32MB.
+inquirySchema.index({ createdAt: -1 });
+
 export type InquiryDoc = { _id: string } & Omit<Inquiry, "id">;
 
 export const InquiryModel: Model<InquiryDoc> =
