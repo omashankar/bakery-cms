@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template, which carries only placeholders and is the only
+# record of what the eighteen variables are for. It was caught by the rule
+# above, so a clone had no starting point at all.
+!.env.example
 
 # vercel
 .vercel

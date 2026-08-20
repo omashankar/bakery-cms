@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { seedGlobal, seedStore } from "@/features/seo/lib/seo-repository";
 import type { SeoStore } from "@/types/seo";
@@ -58,7 +60,21 @@ function usableGlobal(stored: SeoStore["global"]): SeoStore["global"] {
   };
 }
 
-export async function getSeoStoreServer(): Promise<SeoStore> {
+/**
+ * Read at most ONCE per request.
+ *
+ * Three separate callers want this on a single storefront render — the root
+ * layout metadata, the storefront layout organization schema, and the page’s
+ * own `generateMetadata` via `buildRouteMetadataServer` — and each was its own
+ * round trip for one document.
+ *
+ * Deliberately NOT applied to `getSiteLayout` underneath: `replaceSiteLayout`
+ * reads, writes, then reads again in one request to build its audit entry, so
+ * memoising that would make an admin’s header/footer save answer with the copy
+ * it had just replaced. Nothing writes through THIS function — it is a
+ * storefront read path only.
+ */
+export const getSeoStoreServer = cache(async (): Promise<SeoStore> => {
   try {
     const stored = (await getSiteLayout("seo")) as SeoStore | null;
     if (!stored?.global) return seedStore();
@@ -75,7 +91,7 @@ export async function getSeoStoreServer(): Promise<SeoStore> {
     // A database blip must not take the storefront's metadata down with it.
     return seedStore();
   }
-}
+});
 
 /**
  * The metadata for one route, from the database.

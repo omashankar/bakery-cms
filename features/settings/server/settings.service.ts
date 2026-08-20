@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import { resetMailTransport } from "@/lib/server/mail/transport";
@@ -53,15 +55,37 @@ function withLabels(json: SettingsJson) {
   };
 }
 
+/**
+ * The settings singleton, read AT MOST ONCE per request.
+ *
+ * Every render reads this document several times over: the root layout wants
+ * the site identity, the storefront layout wants maintenance, the chrome and
+ * the analytics scripts, and the page itself wants commerce and modules. Each
+ * of those went to Mongo for the same `{ key: "singleton" }` document, so one
+ * storefront render made SIX round trips for one value — measured, against a
+ * remote Atlas cluster where each is ~27ms of pure latency.
+ *
+ * `cache` is per-request, so a save is still visible on the very next request;
+ * this dedupes within one render, it does not hold anything between them.
+ *
+ * READ PATHS ONLY. The write paths keep calling `repo.getOrCreateSettings()`
+ * directly and deliberately: `updateSection` mutates and saves the document it
+ * is handed, and handing it a memoised instance that other readers in the same
+ * request already hold would let one save be seen half-applied by the rest of
+ * the render. They each want their own document, and they are one per request
+ * anyway.
+ */
+const readSettingsDoc = cache(async () => repo.getOrCreateSettings());
+
 /** Full settings (admin only) including internal sections. */
 export async function getSettings() {
-  const doc = await repo.getOrCreateSettings();
+  const doc = await readSettingsDoc();
   return withLabels(doc.toJSON() as SettingsJson);
 }
 
 /** Storefront-safe subset — no smtp/security/analytics secrets. */
 export async function getPublicSettings() {
-  const doc = await repo.getOrCreateSettings();
+  const doc = await readSettingsDoc();
   // Loosely typed on purpose — we cherry-pick storefront-safe fields below.
   const json = doc.toJSON() as Record<string, any>;
   const businessType = (json.general?.businessType ?? "bakery") as BusinessType;
@@ -98,7 +122,7 @@ export async function getPublicSettings() {
 
 /** Resolved white-label wording for the current business type. */
 export async function getLabels() {
-  const doc = await repo.getOrCreateSettings();
+  const doc = await readSettingsDoc();
   const json = doc.toJSON() as SettingsJson;
   const businessType = (json.general?.businessType ?? "bakery") as BusinessType;
   return resolveLabels(businessType, json.labelOverrides ?? {});

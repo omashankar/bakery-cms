@@ -18,6 +18,18 @@ const sessionSchema = new mongoose.Schema({
 // TTL index: Mongo purges the document once expiresAt passes.
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+/**
+ * The Security Center lists one admin’s own devices, newest-seen first.
+ * `userId` alone already narrows the match, but the ordering was still done in
+ * memory afterwards — and a row exists per login, so this list grows for as
+ * long as an admin keeps signing in (55 rows for the single admin here).
+ *
+ * The standalone `userId` index above is now a prefix of this one and could be
+ * dropped; left in place deliberately, because removing an index is a separate
+ * decision from adding one.
+ */
+sessionSchema.index({ userId: 1, lastSeenAt: -1 });
+
 applyBaseTransform(sessionSchema);
 
 export type SessionDoc = InferSchemaType<typeof sessionSchema>;

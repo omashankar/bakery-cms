@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import {
@@ -34,11 +36,21 @@ function toCatalog(json: Record<string, unknown>) {
   };
 }
 
-/** Full catalog — no secrets, so this doubles as the public read. */
-export async function getCatalog() {
+/**
+ * Full catalog — no secrets, so this doubles as the public read. Read at most
+ * ONCE per request.
+ *
+ * The homepage asks for the taxonomy three times over — the page itself, the
+ * header’s category menu via `getStorefrontCategories`, and every product
+ * mapping via `categoryNames()` in products-service — for one singleton.
+ *
+ * Reads only. `updateSection` and `resetSection` below still go through
+ * `repo.getOrCreateCatalog()` and answer with the document they just saved.
+ */
+export const getCatalog = cache(async () => {
   const doc = await repo.getOrCreateCatalog();
   return toCatalog(doc.toJSON() as Record<string, unknown>);
-}
+});
 
 export async function updateSection(section: string, value: unknown, ctx: RequestCtx) {
   const doc = await repo.updateSection(section, value);
