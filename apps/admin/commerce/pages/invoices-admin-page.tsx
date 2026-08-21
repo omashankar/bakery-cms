@@ -39,7 +39,7 @@ import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   FilterPanel,
   FilterPanelSearch,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";

@@ -37,7 +37,7 @@ import {
 import {
   FilterPanel,
   FilterPanelSearch,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";

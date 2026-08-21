@@ -65,7 +65,8 @@ test.describe("a customer with an account", () => {
     await page.goto("/store");
     const modal = await openSignIn(page, email);
     await modal.getByRole("button", { name: /email me a code/i }).click();
-    await expect(page.getByText(/enter the 6-digit code/i)).toBeVisible({ timeout: 30_000 });
+    // Same relay budget as `signInAsCustomer` — see the note there.
+    await expect(page.getByText(/enter the 6-digit code/i)).toBeVisible({ timeout: 60_000 });
 
     for (const index of [0, 1, 2, 3, 4, 5]) {
       await modal.getByLabel(`Code digit ${index + 1}`).fill("0");

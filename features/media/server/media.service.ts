@@ -6,7 +6,7 @@ import {
   deleteFromCloudinary,
   type UploadedAsset,
 } from "@/lib/server/media/cloudinary";
-import { defaultMediaFolders } from "@/apps/admin/media/lib/media-folders";
+import { defaultMediaFolders } from "@/features/media/lib/media-folder-defaults";
 import type { MediaFile, MediaFolder } from "@/types/media";
 
 interface RequestCtx {

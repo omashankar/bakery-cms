@@ -1,5 +1,26 @@
 "use client";
 
+/**
+ * This used to live at apps/admin/profile/lib/admin-profile.ts, so
+ * features/admin-config/lib/admin-config-hydration.ts — the thing that applies
+ * the server's stored config after a page load — had to import UP out of
+ * features into the admin app to hand the fetched profile and account back. The
+ * admin file it reached for imports admin-config-api, a sibling of the
+ * hydration module, so the two directories had closed into a cycle: exactly the
+ * knot the import rules in eslint.config.mjs exist to prevent.
+ *
+ * It is here rather than under apps/ because nothing in it is a screen. It is
+ * the signed-in admin's ACCOUNT: getDemoSession supplies the email, fetchCurrentUser
+ * in features/auth/lib/auth-api supplies the server fields, and
+ * features/auth/lib/sign-out.ts already lists both of the localStorage keys
+ * written here in ADMIN_DEVICE_KEYS — so the clearing half of this store was
+ * already in features/auth while the writing half sat in apps/admin.
+ *
+ * The key literals "bakery-cms-admin-profile" and "bakery-cms-admin-account" are
+ * load-bearing elsewhere (backup export/restore, sign-out, the avatar e2e) and
+ * did not change with the move.
+ */
+
 import { getDemoSession } from "@/features/auth/lib/session";
 import {
   replaceAdminProfileRequest,

@@ -2,44 +2,13 @@ import type { MediaFolder } from "@/types/media";
 import { replaceMediaFoldersRequest } from "./media-api";
 import { MEDIA_UPDATED_EVENT } from "./media-utils";
 import type { WriteResult } from "@/lib/write-result";
+import { defaultMediaFolders } from "@/features/media/lib/media-folder-defaults";
 
 const FOLDERS_STORAGE_KEY = "bakery-cms-media-folders";
-
-export const UPLOADS_FOLDER_ID = "folder-uploads";
-export const CAKES_FOLDER_ID = "folder-cakes";
-export const BANNERS_FOLDER_ID = "folder-banners";
-export const GALLERY_FOLDER_ID = "folder-gallery";
 
 function nowIso(): string {
   return new Date().toISOString();
 }
-
-export const defaultMediaFolders: MediaFolder[] = [
-  {
-    id: CAKES_FOLDER_ID,
-    name: "Cakes",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-  {
-    id: BANNERS_FOLDER_ID,
-    name: "Banners & Offers",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-  {
-    id: GALLERY_FOLDER_ID,
-    name: "Gallery",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-  {
-    id: UPLOADS_FOLDER_ID,
-    name: "Uploads",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-];
 
 function persist(folders: MediaFolder[]): void {
   if (typeof window === "undefined") return;

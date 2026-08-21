@@ -18,7 +18,7 @@ import {
   FilterPanel,
   FilterPanelSearch,
   FilterPanelToolbar,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";

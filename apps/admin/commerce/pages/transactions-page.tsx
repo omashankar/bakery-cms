@@ -23,7 +23,7 @@ import { PaymentStatusBadge } from "@/features/payments/components/payment-statu
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
 import { getGatewayConfig, PAYMENT_GATEWAYS } from "@/features/payments/registry/gateways";
 import { TransactionDetailDialog } from "@/apps/admin/commerce/components/transaction-detail-dialog";
-import { FilterPanel, FilterPanelSearch } from "@/components/shared/filter-panel";
+import { FilterPanel, FilterPanelSearch } from "@/apps/admin/components/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";

@@ -80,8 +80,22 @@ export async function signInAsCustomer(page: Page, email: string): Promise<void>
   const modal = await openSignIn(page, email);
   await modal.getByRole("button", { name: /email me a code/i }).click();
 
-  // Only advances once the SERVER says the email went out.
-  await expect(page.getByText(/enter the 6-digit code/i)).toBeVisible({ timeout: 30_000 });
+  /**
+   * Only advances once the SERVER says the email went out.
+   *
+   * Budgeted for a real SMTP relay rather than for the common case. This spent
+   * a long time at 30s and failed intermittently: measured against the dev
+   * server log, `POST /api/customer-auth/request-code` answers in ~1.0-1.4s
+   * almost every time, but one send in the same run took 28.5s — and that was
+   * application-code, not a cold compile (next.js: 13ms). A relay stall of that
+   * size plus the browser round trip overflows 30s, so the suite reported a
+   * broken sign-in when the shop was merely waiting on Brevo.
+   *
+   * 60s is what the other third-party waits in this suite already use for the
+   * payment window. It does not hide a real failure — a server that never sends
+   * still fails this line, thirty seconds later than it used to.
+   */
+  await expect(page.getByText(/enter the 6-digit code/i)).toBeVisible({ timeout: 60_000 });
 
   const db = await connect();
   const row = await db.collection("customerlogincodes").findOne({ email });

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   formatStockStatusLabel,
   getStockStatusVariant,
-} from "@/apps/admin/commerce/lib/inventory-utils";
+} from "@/apps/admin/commerce/lib/stock-status-presentation";
 
 interface StockStatusBadgeProps {
   status: StockStatus;

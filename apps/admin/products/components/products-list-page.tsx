@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   FilterPanel,
   FilterPanelSearch,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,7 +34,7 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
-import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import { routes } from "@/constants/routes";
 import type { Product as CakeEntity, EntityStatus } from "@/types";

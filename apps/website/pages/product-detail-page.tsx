@@ -31,7 +31,6 @@ import {
   getProductGalleryImages,
   getProductReviews,
   getProductShapeOptions,
-  getProductVariantGroups,
   getDeliveryTimeSlots,
   getDeliveryPromise,
   getMinDeliveryDate,
@@ -44,6 +43,7 @@ import {
 } from "@/features/products/lib/product-pricing";
 import {
   getDefaultVariantSelections,
+  getProductVariantGroups,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";

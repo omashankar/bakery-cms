@@ -1,3 +1,26 @@
+/**
+ * The shop's custom CSS/JS, cached in the browser.
+ *
+ * This used to live at apps/admin/settings/lib/custom-code-repository.ts, so
+ * features/admin-config/lib/admin-config-hydration.ts had to import UP into the
+ * admin app to apply the server's copy — while this file imports
+ * admin-config-api, a sibling of that hydration module. The two directories had
+ * closed into a cycle, and the lint rule never looked at
+ * features/admin-config, so nothing said so.
+ *
+ * It belongs in features/settings on the merits anyway: the server side of this
+ * exact data is already there, in
+ * features/settings/server/storefront-scripts.server.ts, which reads
+ * getAdminConfig("custom-code") to inject the CSS and JS into every storefront
+ * page. settings-repository.ts and security-center-repository.ts — the same
+ * shape of browser cache, the latter with the same hydration persister — are
+ * its neighbours here.
+ *
+ * The storage key "bakery-cms-custom-code" is read by Settings -> Backup and did
+ * not change with the move, and the file still carries no "use client"
+ * directive, as it did not before.
+ */
+
 import {
   replaceCustomCodeRequest,
 } from "@/features/admin-config/lib/admin-config-api";

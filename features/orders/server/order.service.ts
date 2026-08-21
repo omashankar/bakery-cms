@@ -4,7 +4,7 @@ import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
-import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { GatewayRefund, RefundRecord } from "@/types/refund";
 import {

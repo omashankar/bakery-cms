@@ -16,7 +16,7 @@ import {
   FilterPanel,
   FilterPanelSearch,
   FilterPanelToolbar,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { CUSTOMERS_UPDATED_EVENT } from "@/apps/admin/commerce/lib/customers-repository";
 import { fetchCustomerProfiles } from "@/apps/admin/commerce/lib/customers-api";
 import {

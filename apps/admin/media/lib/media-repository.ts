@@ -12,7 +12,7 @@ import {
   CAKES_FOLDER_ID,
   GALLERY_FOLDER_ID,
   UPLOADS_FOLDER_ID,
-} from "./media-folders";
+} from "@/features/media/lib/media-folder-defaults";
 import { countMediaUsage } from "./media-usage";
 import { fileNameFromUrl, isPersistableMediaUrl, MEDIA_UPDATED_EVENT } from "./media-utils";
 import { mediaHydration, replaceMediaFilesRequest } from "./media-api";

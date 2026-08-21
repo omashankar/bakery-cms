@@ -17,19 +17,12 @@ import {
   deriveStockStatus,
   getLowStockThreshold,
   resolveStockFields,
-} from "./inventory-utils";
+} from "@/features/inventory/lib/inventory-utils";
 import {
   adjustStockRequest,
   setUnlimitedRequest,
   saveInventorySettingsRequest,
 } from "./inventory-api";
-
-export {
-  deriveStockStatus,
-  formatStockStatusLabel,
-  getStockStatusVariant,
-  resolveStockFields,
-} from "./inventory-utils";
 
 const SETTINGS_KEY = "bakery-cms-inventory-settings";
 const HISTORY_KEY = "bakery-cms-inventory-history";

@@ -9,7 +9,7 @@ import {
   getInventorySettings,
   type AdjustStockInput,
 } from "@/apps/admin/commerce/lib/inventory-repository";
-import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { InventoryItem } from "@/types/inventory";
 import { Button } from "@/components/ui/button";
 import {

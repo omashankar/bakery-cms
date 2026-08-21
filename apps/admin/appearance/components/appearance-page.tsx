@@ -21,7 +21,7 @@ import {
   loadAppearanceSettings,
   resetAppearanceSettings,
   saveAppearanceSettings,
-} from "../lib/appearance-repository";
+} from "@/features/site-layout/lib/appearance-repository";
 import {
   applyAppearanceSettings,
   appearancePresets,
@@ -34,8 +34,8 @@ import {
   resolvePresetFromColors,
   settingsFromPreset,
   type AppearanceOverview,
-} from "../lib/appearance-utils";
-import { APPEARANCE_UPDATED_EVENT } from "../lib/appearance-utils";
+} from "@/features/site-layout/lib/appearance-utils";
+import { APPEARANCE_UPDATED_EVENT } from "@/features/site-layout/lib/appearance-utils";
 import { AppearancePreview } from "./appearance-preview";
 
 const EMPTY_OVERVIEW: AppearanceOverview = {

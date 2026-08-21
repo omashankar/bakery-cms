@@ -10,9 +10,15 @@ import type { AppearanceSettings } from "@/types/appearance";
  * `features/site-layout/server`, which seeds the store from these defaults.
  *
  * So the parts everyone needs — the defaults, the colour arithmetic and the
- * token map — live here, and the admin module re-exports them. One
- * implementation, because two copies of this arithmetic is exactly how a
- * server-rendered palette and a client-applied one drift into disagreeing.
+ * token map — live here. One implementation, because two copies of this
+ * arithmetic is exactly how a server-rendered palette and a client-applied one
+ * drift into disagreeing.
+ *
+ * The rest of that module has since followed it: `appearance-utils.ts` and
+ * `appearance-repository.ts` are neighbours in this directory now. The half
+ * that moved first was the half the SERVER needed; what kept the other half in
+ * apps/admin was only that the admin had written it, and components/shared was
+ * reaching across for it to paint the storefront.
  */
 
 export const defaultAppearanceSettings: AppearanceSettings = {

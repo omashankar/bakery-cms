@@ -5,7 +5,7 @@ import {
   isSendableSlug,
   type TemplateChannel,
 } from "@/features/communications/lib/template-contract";
-import { COMMON_TEMPLATE_VARIABLES } from "../lib/template-sample-data";
+import { COMMON_TEMPLATE_VARIABLES } from "@/features/communications/lib/template-sample-data";
 
 interface TemplateVariableChipsProps {
   variables: string[];

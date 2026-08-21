@@ -8,8 +8,8 @@ import { connect } from "./shop-state";
  * The hero chip said "4.9 Rating · 2000+ reviews" and the trust bar said
  * "Same-Day Delivery · Order today, get today" and "Free Delivery · On orders
  * over ₹999" — all constants, on every shop running this CMS. Two were wrong
- * here: the real rating is 4.7 across 27 approved reviews, and deliveryLeadDays
- * is 1, so same-day is impossible.
+ * when this was written: the rating was 4.7 across 27 approved reviews, and
+ * deliveryLeadDays is 1, so same-day is impossible.
  *
  * Only a browser can settle this: the source holds both branches either way.
  */
@@ -17,17 +17,36 @@ import { connect } from "./shop-state";
 test("shows the review score the shop actually has", async ({ page }) => {
   const db = await connect();
   const approved = await db.collection("reviews").find({ status: "approved" }).toArray();
-  expect(approved.length, "no approved reviews, so no chip is expected").toBeGreaterThan(0);
+
+  await page.goto("/store");
+  const body = (await page.locator("body").textContent()) ?? "";
+
+  // Neither branch may borrow the demo brand's figures.
+  expect(body, "the hero still advertises the invented review count").not.toContain("2000+ reviews");
+  expect(body, "the hero still advertises the invented score").not.toContain("4.9 Rating");
+
+  /**
+   * The empty branch, which this used to assert its way out of.
+   *
+   * It opened with `expect(approved.length).toBeGreaterThan(0)` — a precondition
+   * dressed as an assertion. The moment the shop's seeded demo reviews were
+   * deleted, leaving it with none, the test reported the HOMEPAGE as broken when
+   * the page was doing exactly what `hero-carousel.tsx` documents: a shop with
+   * nothing approved shows no chip rather than borrowing a score. That branch was
+   * the untested half of this test's own title, so it is asserted rather than
+   * skipped — a shop with no reviews must advertise no rating at all.
+   */
+  if (approved.length === 0) {
+    expect(body, "a shop with no approved reviews still shows a rating chip").not.toMatch(
+      /\d+(\.\d+)?\s*Rating/,
+    );
+    return;
+  }
 
   const average =
     Math.round((approved.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / approved.length) * 10) /
     10;
 
-  await page.goto("/store");
-  const body = (await page.locator("body").textContent()) ?? "";
-
-  expect(body, "the hero still advertises the invented review count").not.toContain("2000+ reviews");
-  expect(body, "the hero still advertises the invented score").not.toContain("4.9 Rating");
   expect(body, `the real score (${average}) is not on the page`).toContain(`${average} Rating`);
   expect(body).toContain(`${approved.length} review`);
 });

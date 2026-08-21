@@ -17,7 +17,7 @@ import {
   FilterPanel,
   FilterPanelSearch,
   FilterPanelToolbar,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order-dialog";
 import { RefundStatusBadge } from "@/apps/admin/commerce/components/refund-status-badge";

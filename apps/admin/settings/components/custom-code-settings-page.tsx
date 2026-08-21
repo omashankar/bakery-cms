@@ -16,7 +16,7 @@ import {
   CUSTOM_CODE_UPDATED_EVENT,
   EMPTY_CUSTOM_CODE as EMPTY_CODE,
   type CustomCode,
-} from "@/apps/admin/settings/lib/custom-code-repository";
+} from "@/features/settings/lib/custom-code-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";

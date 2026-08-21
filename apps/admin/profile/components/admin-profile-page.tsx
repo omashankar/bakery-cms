@@ -19,7 +19,7 @@ import {
   saveAdminProfile,
   ADMIN_PROFILE_UPDATED_EVENT,
   type AdminProfile,
-} from "@/apps/admin/profile/lib/admin-profile";
+} from "@/features/auth/lib/admin-profile";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
 import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";

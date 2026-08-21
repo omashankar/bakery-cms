@@ -18,7 +18,7 @@ import {
   mergeTemplateVariables,
   renderTemplate,
 } from "@/lib/template-render";
-import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
+import { seedEmailTemplates } from "@/features/communications/lib/email-template-seed";
 
 describe("template rendering", () => {
   it("substitutes every variable it is given", () => {

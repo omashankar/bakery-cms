@@ -1,8 +1,8 @@
 import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
-import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
-import { seedWhatsAppTemplates } from "@/apps/admin/communications/lib/whatsapp-templates-repository";
+import { seedEmailTemplates } from "@/features/communications/lib/email-template-seed";
+import { seedWhatsAppTemplates } from "@/features/communications/lib/whatsapp-template-seed";
 import type {
   EmailTemplateRecord,
   WhatsAppTemplateRecord,
@@ -11,7 +11,7 @@ import type { NotificationSettings } from "@/types/notification";
 import { sendMail } from "@/lib/server/mail/send-mail";
 import { toEmailHtml } from "./email.service";
 import { renderTemplate } from "@/lib/template-render";
-import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { getSampleDataForVariables } from "@/features/communications/lib/template-sample-data";
 import { allowlisted } from "@/lib/server/http/allowlist";
 import {
   TEMPLATE_VARIABLE_CONTRACT,

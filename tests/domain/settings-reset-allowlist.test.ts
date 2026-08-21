@@ -28,7 +28,16 @@ vi.mock("@/lib/server/audit/audit-log", () => ({
   ...audit,
   requestContext: () => ({ ip: "127.0.0.1", userAgent: "test" }),
 }));
-vi.mock("@/lib/server/mail/mailer", () => ({ resetMailTransport: vi.fn() }));
+/**
+ * The mail transport, which this mocked at a path that does not exist.
+ *
+ * It named `@/lib/server/mail/mailer`. There is no such module — the transport
+ * lives in `@/lib/server/mail/transport` — so vitest stubbed nothing, the real
+ * one was loaded, and the line read as protection while providing none. It was
+ * never noticed because no test here reset the one section that reaches it.
+ */
+const mail = vi.hoisted(() => ({ resetMailTransport: vi.fn() }));
+vi.mock("@/lib/server/mail/transport", () => mail);
 
 import { resetSection } from "@/features/settings/server/settings.service";
 
@@ -61,5 +70,25 @@ describe("resets refuse a section that only exists on Object.prototype", () => {
   it("rejects a plausible-looking name that is simply not a section", async () => {
     await expect(resetSection("smtp.password", ctx)).rejects.toThrow(/unknown settings section/i);
     await expect(resetSection("key", ctx)).rejects.toThrow(/unknown settings section/i);
+  });
+
+  /**
+   * And the one section with a side effect beyond the document.
+   *
+   * `getMailTransport` caches the built transport, so restoring the SMTP
+   * defaults without dropping that cache leaves the shop mailing through the
+   * credentials the admin just cleared — for the life of the process, with the
+   * settings screen showing the reset values. This is also what makes the mock
+   * above load-bearing: nothing here reset `smtp` before, which is why it went
+   * years pointing at a module that was never there.
+   */
+  it("drops the cached mail transport when the SMTP section is reset", async () => {
+    await resetSection("smtp", ctx);
+
+    expect(repo.updateSection).toHaveBeenCalledOnce();
+    expect(
+      mail.resetMailTransport,
+      "the shop keeps sending through the credentials that were just cleared",
+    ).toHaveBeenCalledOnce();
   });
 });

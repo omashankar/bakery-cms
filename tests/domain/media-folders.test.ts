@@ -23,11 +23,11 @@ vi.mock("@/apps/admin/media/lib/media-api", () => ({
 
 import {
   createMediaFolder,
-  defaultMediaFolders,
   deleteMediaFolder,
   loadMediaFolders,
   mediaFolderNameTaken,
 } from "@/apps/admin/media/lib/media-folders";
+import { defaultMediaFolders } from "@/features/media/lib/media-folder-defaults";
 
 describe("media folders", () => {
   beforeEach(() => {

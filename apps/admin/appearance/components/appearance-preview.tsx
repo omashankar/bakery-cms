@@ -15,7 +15,7 @@ import {
   defaultAppearanceSettings,
   isValidHexColor,
   normalizeHexColor,
-} from "../lib/appearance-utils";
+} from "@/features/site-layout/lib/appearance-utils";
 
 interface AppearancePreviewProps {
   settings: AppearanceSettings;

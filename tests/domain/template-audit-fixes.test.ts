@@ -17,7 +17,7 @@ import {
   offContractVariables,
   TEMPLATE_VARIABLE_CONTRACT,
 } from "@/features/communications/lib/template-contract";
-import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { getSampleDataForVariables } from "@/features/communications/lib/template-sample-data";
 import { toEmailHtml } from "@/features/communications/server/email.service";
 import {
   deriveTemplateVariables,
@@ -255,10 +255,10 @@ describe("the WhatsApp page header", () => {
 describe("every seeded template obeys its own contract", () => {
   it("declares no variable its sender will not supply", async () => {
     const { seedEmailTemplates } = await import(
-      "@/apps/admin/communications/lib/email-templates-repository"
+      "@/features/communications/lib/email-template-seed"
     );
     const { seedWhatsAppTemplates } = await import(
-      "@/apps/admin/communications/lib/whatsapp-templates-repository"
+      "@/features/communications/lib/whatsapp-template-seed"
     );
 
     // The shipped copy has to pass the rule the editor now enforces —

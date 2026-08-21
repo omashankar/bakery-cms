@@ -8,7 +8,7 @@ import {
   FilterPanel,
   FilterPanelSearch,
   FilterPanelToolbar,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

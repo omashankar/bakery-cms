@@ -16,7 +16,7 @@ import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-reposit
 import { GatewayCard } from "@/features/payments/components/gateway-card";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
-import { FilterPanel, FilterPanelSearch } from "@/components/shared/filter-panel";
+import { FilterPanel, FilterPanelSearch } from "@/apps/admin/components/filter-panel";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 

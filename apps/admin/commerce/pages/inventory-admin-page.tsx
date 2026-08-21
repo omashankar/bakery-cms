@@ -18,7 +18,7 @@ import {
   FilterPanel,
   FilterPanelSearch,
   FilterPanelToolbar,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { SafeImage } from "@/components/shared/safe-image";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
