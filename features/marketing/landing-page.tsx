@@ -511,7 +511,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 14 — Pricing                                         */}
         {/* ============================================================ */}
-        <Section id="pricing" className="bg-background">
+        <Section id="pricing" className="bg-white">
           <Container className="flex flex-col gap-12">
             <ScrollReveal>
               <SectionHeading
@@ -529,7 +529,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 15 — FAQ                                             */}
         {/* ============================================================ */}
-        <Section id="faq" className="bg-white">
+        <Section id="faq" className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -547,7 +547,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 16 — Call To Action                                  */}
         {/* ============================================================ */}
-        <Section className="bg-background">
+        <Section className="bg-white">
           <Container>
             <ScrollReveal>
               <div className="relative overflow-hidden rounded-[2rem] bg-primary px-6 py-16 text-center shadow-[0_30px_70px_-30px_rgba(74,51,36,0.6)] md:px-16 md:py-20">
