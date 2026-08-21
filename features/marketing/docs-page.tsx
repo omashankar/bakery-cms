@@ -4,6 +4,7 @@ import { routes } from "@/constants/routes";
 import { MarketingShell } from "./components/marketing-shell";
 import { Container, Eyebrow, Section, SectionHeading } from "./components/section";
 import { LinkButton } from "./components/link-button";
+import { vendorContact } from "./landing-data";
 import { docChapters, type DocStep } from "./docs-data";
 
 function Step({ step, index }: { step: DocStep; index: number }) {
@@ -123,9 +124,12 @@ export function DocsPage() {
               <LinkButton href={routes.admin.dashboard} variant="primary">
                 Open the admin
               </LinkButton>
-              <LinkButton href={routes.store.contact} variant="secondary">
-                Contact support
-              </LinkButton>
+              {/* Shown only once there is a vendor address; this was the shop’s. */}
+              {vendorContact ? (
+                <LinkButton href={vendorContact} variant="secondary">
+                  Contact support
+                </LinkButton>
+              ) : null}
             </div>
           </div>
         </Container>

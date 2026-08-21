@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { MarketingShell } from "./components/marketing-shell";
 import { Container, Eyebrow, Section, SectionHeading } from "./components/section";
 import { LinkButton } from "./components/link-button";
+import { vendorContact } from "./landing-data";
 import { pricingFaqs, pricingTiers, type PricingTier } from "./pricing-data";
 
 function TierCard({ tier }: { tier: PricingTier }) {
@@ -49,13 +50,24 @@ function TierCard({ tier }: { tier: PricingTier }) {
         )}
       </div>
 
-      <LinkButton
-        href={tier.cta.href}
-        variant={tier.featured ? "primary" : "secondary"}
-        className="mt-6 w-full justify-center"
-      >
-        {tier.cta.label}
-      </LinkButton>
+      {/*
+        A button only when there is somewhere of OURS to send people. These
+        pointed at the shop’s contact form. Until `vendorContact` is set this
+        says so plainly rather than inviting a click it cannot honour.
+      */}
+      {vendorContact ? (
+        <LinkButton
+          href={vendorContact}
+          variant={tier.featured ? "primary" : "secondary"}
+          className="mt-6 w-full justify-center"
+        >
+          Talk to us
+        </LinkButton>
+      ) : (
+        <p className="mt-6 rounded-full border border-dashed border-border px-5 py-3 text-center text-sm text-muted-foreground">
+          Contact details coming soon
+        </p>
+      )}
 
       <ul className="mt-7 flex flex-col gap-3 border-t border-border pt-6">
         {tier.includes.map((item) => (
@@ -136,9 +148,11 @@ export function PricingPage() {
               <LinkButton href={routes.store.home} variant="primary">
                 View the store
               </LinkButton>
-              <LinkButton href={routes.store.contact} variant="secondary">
-                Talk to us
-              </LinkButton>
+              {vendorContact ? (
+                <LinkButton href={vendorContact} variant="secondary">
+                  Talk to us
+                </LinkButton>
+              ) : null}
             </div>
           </div>
         </Container>

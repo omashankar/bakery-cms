@@ -1,5 +1,3 @@
-import { routes } from "@/constants/routes";
-
 /**
  * The plans, and what is in them.
  *
@@ -25,7 +23,6 @@ export interface PricingTier {
   price: { amount: string; period: string } | null;
   /** Drawn larger, with the accent border. Exactly one tier should set it. */
   featured?: boolean;
-  cta: { label: string; href: string };
   /** What this tier includes. Every line here is a real capability of the app. */
   includes: string[];
   /** Shown greyed with a line through — honest about what this tier does NOT do. */
@@ -37,7 +34,6 @@ export const pricingTiers: PricingTier[] = [
     name: "Starter",
     audience: "A single shop taking its first orders online.",
     price: null,
-    cta: { label: "Talk to us", href: routes.store.contact },
     includes: [
       "Customer-facing storefront with your own branding",
       "Product catalogue with categories, flavours and weights",
@@ -55,7 +51,6 @@ export const pricingTiers: PricingTier[] = [
     audience: "A shop that has outgrown a spreadsheet.",
     price: null,
     featured: true,
-    cta: { label: "Talk to us", href: routes.store.contact },
     includes: [
       "Everything in Starter",
       "Wedding cake pages with their own builder and enquiry form",
@@ -72,7 +67,6 @@ export const pricingTiers: PricingTier[] = [
     name: "Enterprise",
     audience: "More than one outlet, or a shop with its own rules.",
     price: null,
-    cta: { label: "Talk to us", href: routes.store.contact },
     includes: [
       "Everything in Growth",
       "White-label — run it as a cake shop, bakery, café or custom retail",

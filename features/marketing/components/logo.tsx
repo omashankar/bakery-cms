@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CroissantIcon } from "lucide-react";
+import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
 interface LogoProps {
@@ -12,7 +13,12 @@ interface LogoProps {
 export function Logo({ className, tone = "default" }: LogoProps) {
   return (
     <Link
-      href="/"
+      /*
+        `/` is the SHOP now — it 307s to /store. So the product wordmark, in
+        both the header and the footer of the marketing site, sent anyone who
+        clicked it to a bakery instead of back to the page they were reading.
+      */
+      href={routes.platform.home}
       aria-label="Bakery CMS home"
       className={cn("group inline-flex items-center gap-2.5", className)}
     >

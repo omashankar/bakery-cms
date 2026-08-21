@@ -85,13 +85,21 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
                             Soon
                           </span>
                         </span>
-                      ) : (
+                      ) : link.href ? (
                         <a
                           href={link.href}
                           className="text-sm text-[#B7A895] transition-colors hover:text-white"
                         >
                           {link.label}
                         </a>
+                      ) : (
+                        /*
+                          Listed, but not a link — there is no page of OURS behind it
+                          yet, and the shop’s own is the wrong answer. Rendered dimmer
+                          and with no hover so it does not invite a click it cannot
+                          honour; see the note in `footerColumns`.
+                        */
+                        <span className="cursor-default text-sm text-[#8f8171]">{link.label}</span>
                       )}
                     </li>
                   ))}

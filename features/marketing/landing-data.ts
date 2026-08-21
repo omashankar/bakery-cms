@@ -30,7 +30,6 @@ import {
   MonitorSmartphoneIcon,
   PanelsTopLeftIcon,
   PercentIcon,
-  PhoneIcon,
   RocketIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -65,6 +64,22 @@ export const navLinks: { label: string; href: string; soon?: boolean }[] = [
   { label: "Pricing", href: routes.platform.pricing },
   { label: "Documentation", href: routes.platform.docs },
 ];
+
+/**
+ * How someone reaches whoever SELLS this software. Null until there is one.
+ *
+ * Every call to action on this site used to point at `routes.store.contact` —
+ * the SHOP’s contact form, under the bakery’s own navbar. A person weighing up
+ * the software was handed a page for ordering cakes.
+ *
+ * Set this to a `mailto:` address or a real page and every button below turns
+ * back on by itself. Left null they state the position in plain text rather
+ * than moving anyone somewhere that is not ours.
+ *
+ * Note the demo links to `/store` are NOT this and should stay: showing the
+ * storefront is showing the product running, which is the point.
+ */
+export const vendorContact: string | null = null;
 
 export const ctaLinks = {
   admin: routes.admin.dashboard,
@@ -370,14 +385,28 @@ export const faqs: { question: string; answer: string }[] = [
 
 export const socialLinks: { icon: IconType; label: string; href: string }[] = [
   { icon: StoreIcon, label: "Visit our storefront", href: routes.store.home },
-  { icon: MailIcon, label: "Email our team", href: routes.store.contact },
-  { icon: MessageCircleIcon, label: "Chat with support", href: routes.store.contact },
-  { icon: PhoneIcon, label: "Call us", href: routes.store.contact },
+  // Mail, chat and phone used to sit here, and all three opened the SHOP’s
+  // contact form — three icons, one destination, and the wrong one. An icon
+  // that goes nowhere is decoration, so unlike the text links above they are
+  // removed rather than left inert. The storefront link stays: it is this
+  // software running, which is the thing a prospect actually wants to see.
 ];
 
 export const footerColumns: {
   heading: string;
-  links: { label: string; href: string; soon?: boolean }[];
+  /**
+   * `href` is optional on purpose. These five — Support, About, Contact,
+   * Privacy and Terms — pointed at the SHOP’s pages, so someone weighing up
+   * the software landed on a bakery’s About page, or a privacy policy about
+   * cake orders. Same mistake as serving the product page at `/`, in the
+   * other direction.
+   *
+   * The vendor has no such pages yet, and a privacy policy is not a thing to
+   * invent. So the labels stay — the footer keeps its shape and says what
+   * will be there — and they simply do not move anyone until a real address
+   * exists. Add the `href` back and it becomes a link again, nothing else.
+   */
+  links: { label: string; href?: string; soon?: boolean }[];
 }[] = [
   {
     heading: "Product",
@@ -392,7 +421,7 @@ export const footerColumns: {
     heading: "Resources",
     links: [
       { label: "Documentation", href: routes.platform.docs },
-      { label: "Support", href: routes.store.contact },
+      { label: "Support" },
       { label: "FAQ", href: `${routes.platform.home}#faq` },
       { label: "Roadmap", href: `${routes.platform.home}#roadmap` },
     ],
@@ -400,10 +429,10 @@ export const footerColumns: {
   {
     heading: "Company",
     links: [
-      { label: "About", href: routes.store.about },
-      { label: "Contact", href: routes.store.contact },
-      { label: "Privacy", href: routes.store.privacy },
-      { label: "Terms", href: routes.store.terms },
+      { label: "About" },
+      { label: "Contact" },
+      { label: "Privacy" },
+      { label: "Terms" },
     ],
   },
 ];
