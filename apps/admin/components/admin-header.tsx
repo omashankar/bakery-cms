@@ -10,7 +10,7 @@ import {
 } from "@/apps/admin/profile/lib/admin-profile";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,8 +38,24 @@ interface AdminHeaderProps {
   onSidebarToggle: () => void;
 }
 
-function initialsFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? "AU";
+/**
+ * Initials for the account menu — from the NAME when there is one.
+ *
+ * This read the email address and nothing else, so an admin called Om Suman
+ * signing in as sumanom7014106@ was labelled "SU". The name sits right beside
+ * it in the same menu, and the profile screen already derives its own avatar
+ * from `fullName`; the two disagreed on the same screen.
+ *
+ * The email stays as the fallback: a profile that has never been filled in has
+ * no name to use, and two letters from the address beat "AU" for nobody.
+ */
+export function initialsFor(fullName: string, email: string): string {
+  const named = fullName.trim().split(/\s+/).filter(Boolean);
+  if (named.length) {
+    return `${named[0]![0] ?? ""}${named[1]?.[0] ?? ""}`.toUpperCase();
+  }
+
+  const local = email.split("@")[0] ?? "";
   const parts = local.split(/[._-]/).filter(Boolean);
   if (parts.length >= 2) {
     return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
@@ -60,6 +76,7 @@ export function AdminHeader({
   const [initials, setInitials] = useState("AU");
   const [displayName, setDisplayName] = useState("Administrator");
   const [email, setEmail] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
 
   useEffect(() => {
     /**
@@ -77,7 +94,8 @@ export function AdminHeader({
       const profile = getAdminProfile();
       setDisplayName(profile.fullName || "Administrator");
       setEmail(profile.email);
-      if (profile.email) setInitials(initialsFromEmail(profile.email));
+      setPhotoUrl(profile.photoUrl ?? "");
+      setInitials(initialsFor(profile.fullName ?? "", profile.email ?? ""));
     };
 
     sync();
@@ -159,6 +177,8 @@ export function AdminHeader({
                 }
               >
                 <Avatar className="size-7 ring-1 ring-sidebar-border">
+                  {/* The uploaded photo, which had no way to reach this header before. */}
+                  {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
                   <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
@@ -167,6 +187,7 @@ export function AdminHeader({
               <DropdownMenuContent align="end" className="w-[min(100vw-1rem,15rem)]">
                 <div className="flex items-center gap-3 px-2 py-1.5">
                   <Avatar className="size-9 ring-1 ring-sidebar-border">
+                    {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
                     <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
                       {initials}
                     </AvatarFallback>
