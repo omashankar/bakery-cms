@@ -59,11 +59,11 @@ export type IconType = ComponentType<SVGProps<SVGSVGElement>>;
 /* ------------------------------------------------------------------ */
 
 export const navLinks: { label: string; href: string; soon?: boolean }[] = [
-  { label: "Features", href: "#features" },
-  { label: "Solutions", href: "#commerce" },
-  { label: "Modules", href: "#modules" },
-  { label: "Pricing", href: "#pricing", soon: true },
-  { label: "Documentation", href: "#docs", soon: true },
+  { label: "Features", href: `${routes.platform.home}#features` },
+  { label: "Solutions", href: `${routes.platform.home}#commerce` },
+  { label: "Modules", href: `${routes.platform.home}#modules` },
+  { label: "Pricing", href: routes.platform.pricing },
+  { label: "Documentation", href: routes.platform.docs },
 ];
 
 export const ctaLinks = {
@@ -382,19 +382,19 @@ export const footerColumns: {
   {
     heading: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "Solutions", href: "#commerce" },
-      { label: "Modules", href: "#modules" },
-      { label: "Pricing", href: "#pricing", soon: true },
+      { label: "Features", href: `${routes.platform.home}#features` },
+      { label: "Solutions", href: `${routes.platform.home}#commerce` },
+      { label: "Modules", href: `${routes.platform.home}#modules` },
+      { label: "Pricing", href: routes.platform.pricing },
     ],
   },
   {
     heading: "Resources",
     links: [
-      { label: "Documentation", href: "#docs", soon: true },
+      { label: "Documentation", href: routes.platform.docs },
       { label: "Support", href: routes.store.contact },
-      { label: "FAQ", href: "#faq" },
-      { label: "Roadmap", href: "#roadmap" },
+      { label: "FAQ", href: `${routes.platform.home}#faq` },
+      { label: "Roadmap", href: `${routes.platform.home}#roadmap` },
     ],
   },
   {
