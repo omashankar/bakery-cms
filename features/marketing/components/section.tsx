@@ -52,6 +52,15 @@ export function Eyebrow({
 
 interface SectionHeadingProps {
   eyebrow?: string;
+  /**
+   * The heading level. `h2` suits a section of a longer page, which is what
+   * every use on the landing page is.
+   *
+   * A page whose title comes from here needs `h1` instead — /platform/docs had
+   * none at all, so its title sat at the same level as the six chapter
+   * headings under it and a screen reader was given a page with no name.
+   */
+  as?: "h1" | "h2";
   title: React.ReactNode;
   description?: React.ReactNode;
   align?: "center" | "left";
@@ -60,6 +69,7 @@ interface SectionHeadingProps {
 
 export function SectionHeading({
   eyebrow,
+  as: Heading = "h2",
   title,
   description,
   align = "center",
@@ -74,9 +84,9 @@ export function SectionHeading({
       )}
     >
       {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
-      <h2 className="max-w-3xl text-balance text-3xl font-semibold tracking-tight md:text-[2.6rem] md:leading-[1.1]">
+      <Heading className="max-w-3xl text-balance text-3xl font-semibold tracking-tight md:text-[2.6rem] md:leading-[1.1]">
         {title}
-      </h2>
+      </Heading>
       {description ? (
         <p
           className={cn(

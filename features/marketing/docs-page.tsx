@@ -55,6 +55,7 @@ export function DocsPage() {
       <Section className="pb-10 pt-14 md:pb-12 md:pt-20">
         <Container>
           <SectionHeading
+            as="h1"
             eyebrow="Documentation"
             title="Running your shop"
             description="A guide to the admin panel, in the order you will actually need it — from naming the shop to taking your first order to keeping the whole thing safe."
