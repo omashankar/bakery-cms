@@ -61,7 +61,7 @@ export const navLinks: { label: string; href: string; soon?: boolean }[] = [
   { label: "Features", href: `${routes.platform.home}#features` },
   { label: "Solutions", href: `${routes.platform.home}#commerce` },
   { label: "Modules", href: `${routes.platform.home}#modules` },
-  { label: "Pricing", href: routes.platform.pricing },
+  { label: "Pricing", href: `${routes.platform.home}#pricing` },
   { label: "Documentation", href: routes.platform.docs },
 ];
 
@@ -332,6 +332,26 @@ export const businessTypes: { icon: IconType; name: string }[] = [
 ];
 
 export const faqs: { question: string; answer: string }[] = [
+  /*
+   * These three came from the short-lived /platform/pricing page. The other
+   * three it carried — business type, mobile, and payment methods — already
+   * had answers below, so only what was actually new moved here.
+   */
+  {
+    question: "What do I need before I can take a payment?",
+    answer:
+      "A Razorpay account for card, UPI and netbanking, and a Cloudinary account so you can upload your own photos. Both have free tiers. Cash on delivery works without either.",
+  },
+  {
+    question: "Is my data mine?",
+    answer:
+      "Yes. Orders, customers and products live in your own MongoDB database. There is a backup and restore screen in Settings, and nothing is locked to us.",
+  },
+  {
+    question: "What happens to an order if a payment fails halfway?",
+    answer:
+      "The payment webhook catches it. A payment taken with no order attached is flagged in the admin as an unclaimed payment so it can be refunded or matched, rather than quietly lost.",
+  },
   {
     question: "What is Bakery CMS?",
     answer:
@@ -414,7 +434,7 @@ export const footerColumns: {
       { label: "Features", href: `${routes.platform.home}#features` },
       { label: "Solutions", href: `${routes.platform.home}#commerce` },
       { label: "Modules", href: `${routes.platform.home}#modules` },
-      { label: "Pricing", href: routes.platform.pricing },
+      { label: "Pricing", href: `${routes.platform.home}#pricing` },
     ],
   },
   {

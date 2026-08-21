@@ -20,7 +20,9 @@ export const routes = {
    */
   platform: {
     home: "/platform",
-    pricing: "/platform/pricing",
+    // Pricing is a SECTION of the landing page (`#pricing`), not a route:
+    // three cards and a caption is not a page, and splitting it off made
+    // someone leave the feature sections to find out what it costs.
     docs: "/platform/docs",
   },
 

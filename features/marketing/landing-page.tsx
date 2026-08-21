@@ -14,6 +14,7 @@ import { DashboardMockup } from "./components/dashboard-mockup";
 import { FaqSection } from "./components/faq-section";
 import { LinkButton } from "./components/link-button";
 import { MarketingShell } from "./components/marketing-shell";
+import { PricingTiers } from "./components/pricing-tiers";
 import { Container, Eyebrow, Section, SectionHeading } from "./components/section";
 import { WeddingMockup } from "./components/wedding-mockup";
 import {
@@ -508,7 +509,25 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
-        {/* SECTION 14 — FAQ                                             */}
+        {/* SECTION 14 — Pricing                                         */}
+        {/* ============================================================ */}
+        <Section id="pricing" className="bg-background">
+          <Container className="flex flex-col gap-12">
+            <ScrollReveal>
+              <SectionHeading
+                eyebrow="Pricing"
+                title="Pay for the shop you have, not the one you might have"
+                description="Every plan is the whole product — the storefront, the admin, the orders. What changes is how much of the catalogue and how many of the extras you actually sell."
+              />
+            </ScrollReveal>
+            <ScrollReveal>
+              <PricingTiers />
+            </ScrollReveal>
+          </Container>
+        </Section>
+
+        {/* ============================================================ */}
+        {/* SECTION 15 — FAQ                                             */}
         {/* ============================================================ */}
         <Section id="faq" className="bg-white">
           <Container>
@@ -526,7 +545,7 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
-        {/* SECTION 15 — Call To Action                                  */}
+        {/* SECTION 16 — Call To Action                                  */}
         {/* ============================================================ */}
         <Section className="bg-background">
           <Container>
