@@ -30,14 +30,14 @@ import {
   validateSlug,
   WHATSAPP_VARIABLE_CONTRACT,
 } from "@/features/communications/lib/template-contract";
-import { seedWhatsAppTemplates } from "@/apps/admin/communications/lib/whatsapp-templates-repository";
-import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
+import { seedWhatsAppTemplates } from "@/features/communications/lib/whatsapp-template-seed";
+import { seedEmailTemplates } from "@/features/communications/lib/email-template-seed";
 import {
   countUnfilledSlots,
   getWhatsAppTemplateOverview,
   isSendable,
 } from "@/apps/admin/communications/lib/whatsapp-template-utils";
-import { defaultTemplateSampleData } from "@/apps/admin/communications/lib/template-sample-data";
+import { defaultTemplateSampleData } from "@/features/communications/lib/template-sample-data";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
 import type { MetaTemplateSummary } from "@/types/whatsapp-provider";
 

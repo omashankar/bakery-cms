@@ -14,5 +14,4 @@ export {
 export {
   loadMediaFolders,
   createMediaFolder,
-  UPLOADS_FOLDER_ID,
 } from "./lib/media-folders";

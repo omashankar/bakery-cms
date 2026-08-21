@@ -33,7 +33,7 @@ import {
 import {
   deriveStockStatus,
   resolveStockFields,
-} from "@/apps/admin/commerce/lib/inventory-utils";
+} from "@/features/inventory/lib/inventory-utils";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import type { ModuleSettings } from "@/types/settings";

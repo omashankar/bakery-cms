@@ -1,7 +1,7 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import * as productRepo from "@/features/products/server/product.repository";
-import { deriveStockStatus } from "@/apps/admin/commerce/lib/inventory-utils";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { InventorySettings } from "@/types/inventory";
 
 import * as repo from "./inventory.repository";

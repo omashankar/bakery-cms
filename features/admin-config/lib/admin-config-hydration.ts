@@ -10,11 +10,11 @@ import {
 import {
   persistServerAccount,
   persistServerAdminProfile,
-} from "@/apps/admin/profile/lib/admin-profile";
+} from "@/features/auth/lib/admin-profile";
 import { fetchCurrentUser } from "@/features/auth/lib/auth-api";
 import { persistServerGateways } from "@/features/payments/lib/payment-gateway-settings";
 import { persistServerNotifPrefs } from "@/features/payments/lib/notification-prefs";
-import { persistServerCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
+import { persistServerCustomCode } from "@/features/settings/lib/custom-code-repository";
 
 /**
  * Opens the admin-config gate, on demand and honestly.

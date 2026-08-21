@@ -119,7 +119,7 @@ describe("what the admin screens claim", () => {
  */
 describe("whose account the profile screen is showing", () => {
   it("takes the account fields from the server, not from a guess", () => {
-    const profile = source("apps/admin/profile/lib/admin-profile.ts");
+    const profile = source("features/auth/lib/admin-profile.ts");
 
     expect(profile).toContain("export function persistServerAccount");
     expect(profile).toContain('const ACCOUNT_KEY = "bakery-cms-admin-account"');
@@ -132,7 +132,7 @@ describe("whose account the profile screen is showing", () => {
 
   it("ships no real person's address as a form default anywhere in auth", () => {
     for (const path of [
-      "apps/admin/profile/lib/admin-profile.ts",
+      "features/auth/lib/admin-profile.ts",
       "features/auth/pages/login-form-page.tsx",
       "features/auth/pages/forgot-password-form-page.tsx",
     ]) {

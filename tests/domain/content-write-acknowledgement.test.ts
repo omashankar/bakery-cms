@@ -46,8 +46,8 @@ import {
   createEmailTemplate,
 
 } from "@/apps/admin/communications/lib/email-templates-repository";
-import { saveCustomCode } from "@/apps/admin/settings/lib/custom-code-repository";
-import { saveAdminProfile } from "@/apps/admin/profile/lib/admin-profile";
+import { saveCustomCode } from "@/features/settings/lib/custom-code-repository";
+import { saveAdminProfile } from "@/features/auth/lib/admin-profile";
 import {
   bannersWritable,
   faqsWritable,

@@ -27,7 +27,7 @@ import {
   TEMPLATE_VARIABLE_CONTRACT,
   validateSlug,
 } from "@/features/communications/lib/template-contract";
-import { defaultTemplateSampleData } from "@/apps/admin/communications/lib/template-sample-data";
+import { defaultTemplateSampleData } from "@/features/communications/lib/template-sample-data";
 
 function source(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");

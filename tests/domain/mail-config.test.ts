@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
+import { seedEmailTemplates } from "@/features/communications/lib/email-template-seed";
 import { TEMPLATE_VARIABLE_CONTRACT } from "@/features/communications/lib/template-contract";
 
 const state = vi.hoisted(() => ({
@@ -119,7 +119,7 @@ describe("the mail password at the HTTP boundary", () => {
 describe("every seeded template either has a sender or admits it does not", () => {
   it("wires the slugs the admin can edit to something that actually sends them", async () => {
     const { seedEmailTemplates } = await import(
-      "@/apps/admin/communications/lib/email-templates-repository"
+      "@/features/communications/lib/email-template-seed"
     );
     const senders = readFileSync(
       join(process.cwd(), "features/communications/server/email.service.ts"),

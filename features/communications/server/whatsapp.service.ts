@@ -10,7 +10,7 @@ import {
   type WhatsAppResult,
 } from "./whatsapp-client.server";
 import { WHATSAPP_VARIABLE_CONTRACT } from "@/features/communications/lib/template-contract";
-import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { getSampleDataForVariables } from "@/features/communications/lib/template-sample-data";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
 import type { ContactSettings, GeneralSettings } from "@/types/settings";
 import type { MetaSyncSummary, WhatsAppApprovalStatus } from "@/types/whatsapp-provider";

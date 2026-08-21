@@ -5,6 +5,7 @@ import type {
   ProductVariantOption,
   VariantOptionSemantic,
 } from "@/types/product";
+import type { LandingProduct } from "@/constants/landing-data";
 
 export function createVariantOption(
   label: string,
@@ -101,6 +102,34 @@ export function createDefaultVariantGroups(input?: {
   }
 
   return groups;
+}
+
+/**
+ * The variant groups a storefront product is actually sold in: the ones the
+ * merchant configured, or the shipped defaults.
+ *
+ * This used to live at apps/website/lib/product-details.ts, next to the gallery
+ * and badge formatters, because the product page was the first thing that had
+ * to render a picker. But server-side cart pricing calls it —
+ * features/checkout/server/pricing.server.ts feeds its result through
+ * variantGroupsEnabledBy and into calculateProductUnitPrice — so the shop could
+ * not work out what a cake COSTS without loading the customer website's UI
+ * layer, and no other storefront could reuse the pricing at all.
+ *
+ * Not the same function as normalizeVariantGroups below, despite the shape.
+ * That one runs backfillLegacyGroups and forces isDefault, and takes photo-ness
+ * straight off Product.isPhotoCake; this one does neither and DERIVES photo-ness
+ * from allowsPhotoUpload or the category name. They disagree on the pricing
+ * path, so folding them together would change what customers are charged.
+ */
+export function getProductVariantGroups(cake: LandingProduct): ProductVariantGroup[] {
+  if (cake.variantGroups?.length) return cake.variantGroups;
+
+  return createDefaultVariantGroups({
+    isEggless: cake.isEggless,
+    isPhotoCake:
+      cake.allowsPhotoUpload === true || cake.category.toLowerCase().includes("photo"),
+  });
 }
 
 export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isEggless" | "isPhotoCake">): ProductVariantGroup[] {

@@ -10,10 +10,12 @@ import { toast } from "sonner";
 import {
   createMediaFolder,
   deleteMediaFolder,
-  defaultMediaFolders,
   mediaFolderNameTaken,
-  UPLOADS_FOLDER_ID,
 } from "../lib/media-folders";
+import {
+  defaultMediaFolders,
+  UPLOADS_FOLDER_ID,
+} from "@/features/media/lib/media-folder-defaults";
 import { moveFilesToFolder } from "../lib/media-repository";
 import { cn } from "@/lib/utils";
 

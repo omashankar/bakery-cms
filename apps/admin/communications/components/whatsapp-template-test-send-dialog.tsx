@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { getSampleDataForVariables } from "@/apps/admin/communications/lib/template-sample-data";
+import { getSampleDataForVariables } from "@/features/communications/lib/template-sample-data";
 import { sendWhatsAppTestRequest } from "@/apps/admin/communications/lib/communications-api";
 import { renderTemplate } from "@/lib/template-render";
 import { Button } from "@/components/ui/button";

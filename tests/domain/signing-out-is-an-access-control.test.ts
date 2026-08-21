@@ -121,7 +121,7 @@ describe("what a refused write leaves behind", () => {
   const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
   it("the admin profile undoes its local write, like the store beside it", () => {
-    const text = source("apps/admin/profile/lib/admin-profile.ts");
+    const text = source("features/auth/lib/admin-profile.ts");
 
     // `ensureAdminConfigHydrated` returns early once settled, so nothing
     // re-reads the server for the rest of the session — the rejected value sat

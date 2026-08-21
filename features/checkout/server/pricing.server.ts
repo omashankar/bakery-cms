@@ -4,9 +4,11 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import { getCoupons, getZones } from "@/features/commerce/server/commerce.service";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
-import { getProductVariantGroups } from "@/apps/website/lib/product-details";
 import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
-import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
+import {
+  getProductVariantGroups,
+  variantGroupsEnabledBy,
+} from "@/features/products/lib/variant-utils";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";

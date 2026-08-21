@@ -9,7 +9,7 @@ import {
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { getInventoryItems } from "@/apps/admin/commerce/lib/inventory-repository";
-import { formatStockStatusLabel } from "@/apps/admin/commerce/lib/inventory-utils";
+import { formatStockStatusLabel } from "@/apps/admin/commerce/lib/stock-status-presentation";
 import { loadInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { formatInquiryStatus } from "@/features/inquiries/lib/inquiry-utils";
 import { loadMediaFiles } from "@/apps/admin/media/lib/media-repository";

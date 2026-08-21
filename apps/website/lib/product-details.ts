@@ -3,11 +3,9 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import {
-  createDefaultVariantGroups,
   formatPreparationTime,
   formatShelfLife,
 } from "@/features/products/lib/variant-utils";
-import type { ProductVariantGroup } from "@/types/product";
 import { fetchApprovedReviews } from "@/features/reviews/lib/reviews-api";
 
 export interface ProductReview {
@@ -46,16 +44,6 @@ export function getProductFlavourOptions(cake: LandingProduct): string[] {
 export function getProductShapeOptions(cake?: LandingProduct): string[] {
   if (cake?.shapes?.length) return cake.shapes;
   return ["Round", "Square", "Heart"];
-}
-
-export function getProductVariantGroups(cake: LandingProduct): ProductVariantGroup[] {
-  if (cake.variantGroups?.length) return cake.variantGroups;
-
-  return createDefaultVariantGroups({
-    isEggless: cake.isEggless,
-    isPhotoCake:
-      cake.allowsPhotoUpload === true || cake.category.toLowerCase().includes("photo"),
-  });
 }
 
 export function getProductDetailBadges(cake: LandingProduct): string[] {

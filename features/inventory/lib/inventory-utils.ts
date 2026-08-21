@@ -1,3 +1,29 @@
+/**
+ * The rule that decides whether a product is in_stock, low_stock or
+ * out_of_stock.
+ *
+ * This used to live at apps/admin/commerce/lib/inventory-utils.ts, because the
+ * admin's inventory table was the first screen that needed to colour a row. But
+ * the same rule is what the server enforces when a customer places an order, so
+ * features/orders/server/order.service.ts and
+ * features/inventory/server/inventory.service.ts both had to import an admin UI
+ * module to work out whether a cake could be sold at all. A shop that never
+ * loads the admin app still has to answer that question, and the domain layer
+ * could not answer it without reaching up into apps/admin.
+ *
+ * Nothing here was ever admin-specific: it reads stockQuantity, unlimitedStock
+ * and lowStockThreshold off a product, falls back to the shop's
+ * InventorySettings, and imports nothing but types.
+ *
+ * The English label and the Badge colour that used to sit alongside these did
+ * NOT come down; they are admin chrome and live in
+ * apps/admin/commerce/lib/stock-status-presentation.ts.
+ *
+ * Deliberately carries no "use client" directive. Three admin client
+ * components and two server services both call in here; a directive would
+ * break the server callers.
+ */
+
 import type { ProductFormData } from "@/types";
 import type { StockStatus } from "@/types/product";
 import type { InventorySettings } from "@/types/inventory";
@@ -42,18 +68,4 @@ export function resolveStockFields(
     lowStockThreshold: data.lowStockThreshold,
     stockStatus,
   };
-}
-
-export function formatStockStatusLabel(status: StockStatus): string {
-  if (status === "in_stock") return "In stock";
-  if (status === "low_stock") return "Low stock";
-  return "Out of stock";
-}
-
-export function getStockStatusVariant(
-  status: StockStatus
-): "success" | "warning" | "destructive" {
-  if (status === "in_stock") return "success";
-  if (status === "low_stock") return "warning";
-  return "destructive";
 }

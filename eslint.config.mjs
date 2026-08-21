@@ -60,24 +60,48 @@ const storefrontImportsAdmin = {
 /**
  * Domain modules are the reusable core: business logic only. They must not
  * depend on either app's UI layer, or they stop being reusable.
+ *
+ * This rule used to name the directories it guarded, one string at a time:
+ * features/products, /orders, /cart, /commerce, /catalog, /settings,
+ * /content, /reviews, /seo, /site-layout, /inquiries, /builders,
+ * /cms-sections, /payments. Fourteen entries -- and features/ held
+ * twenty-nine directories. The other fifteen were never argued to be exempt;
+ * nobody had typed them out yet, so a feature born after the list was written
+ * was born outside the boundary. The rule still READ like a complete
+ * architectural statement, which is why nobody went looking.
+ *
+ * What that cost: features/inventory, features/checkout,
+ * features/communications, features/media and features/admin-config all
+ * reached into an app's UI layer -- nine imports across six files -- and the
+ * linter reported none of them. The one violation it ever caught,
+ * features/orders pulling deriveStockStatus out of apps/admin, was caught
+ * only because /orders happened to be on the list. Two of the misses had
+ * already closed into cycles: apps/admin/profile/lib/admin-profile.ts and
+ * apps/admin/settings/lib/custom-code-repository.ts imported
+ * features/admin-config/lib/admin-config-api, a sibling of the very module
+ * that was importing them back.
+ *
+ * So the pattern is the whole of features/ and the default is now guarded. A
+ * directory added tomorrow is inside the boundary the moment it exists;
+ * nobody has to remember to widen anything. An exemption now has to be
+ * written into `ignores` with its reason beside it, which is the right way
+ * round -- silence should not grant one.
+ *
+ * One limit, stated here so this docblock does not repeat the mistake it
+ * describes by reading as absolute: `no-restricted-imports` sees static
+ * `import`/`export ... from` only. A dynamic `import("@/apps/...")` inside a
+ * feature passes, which was confirmed against this config rather than assumed.
+ * Nothing under features/ does that today -- the only dynamic imports there are
+ * type-position `import("@/types/...")` -- so this is a latent hole, not an open
+ * one. Close it with a `no-restricted-syntax` selector on ImportExpression if a
+ * real one ever appears.
  */
 const domainStaysPure = {
-  files: [
-    "features/products/**",
-    "features/orders/**",
-    "features/cart/**",
-    "features/commerce/**",
-    "features/catalog/**",
-    "features/settings/**",
-    "features/content/**",
-    "features/reviews/**",
-    "features/seo/**",
-    "features/site-layout/**",
-    "features/inquiries/**",
-    "features/builders/**",
-    "features/cms-sections/**",
-    "features/payments/**",
-  ],
+  files: ["features/**"],
+  // Deliberate exemptions only -- add a directory here WITH the reason it
+  // needs an app import. Empty on purpose: nothing under features/ has ever
+  // had a legitimate one.
+  ignores: [],
   rules: {
     "no-restricted-imports": [
       "error",

@@ -4,8 +4,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { TEMPLATE_VARIABLE_CONTRACT } from "@/features/communications/lib/template-contract";
-import { seedEmailTemplates } from "@/apps/admin/communications/lib/email-templates-repository";
-import { defaultTemplateSampleData } from "@/apps/admin/communications/lib/template-sample-data";
+import { seedEmailTemplates } from "@/features/communications/lib/email-template-seed";
+import { defaultTemplateSampleData } from "@/features/communications/lib/template-sample-data";
 
 function codeOf(relative: string): string {
   return readFileSync(path.join(process.cwd(), relative), "utf8")

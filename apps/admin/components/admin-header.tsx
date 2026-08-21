@@ -7,7 +7,7 @@ import { LogoutConfirmDialog } from "@/apps/admin/profile/components/logout-conf
 import {
   ADMIN_PROFILE_UPDATED_EVENT,
   getAdminProfile,
-} from "@/apps/admin/profile/lib/admin-profile";
+} from "@/features/auth/lib/admin-profile";
 import { getDemoSession } from "@/features/auth/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

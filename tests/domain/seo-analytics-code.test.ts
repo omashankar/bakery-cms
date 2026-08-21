@@ -276,7 +276,7 @@ describe("a refused write", () => {
   });
 
   it("is rolled back out of the custom-code cache", async () => {
-    const repo = await import("@/apps/admin/settings/lib/custom-code-repository");
+    const repo = await import("@/features/settings/lib/custom-code-repository");
     const { adminConfigHydration } = await import(
       "@/features/admin-config/lib/admin-config-api"
     );
