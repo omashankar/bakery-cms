@@ -30,7 +30,6 @@ import {
   MonitorSmartphoneIcon,
   PanelsTopLeftIcon,
   PercentIcon,
-  PhoneIcon,
   RocketIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -59,12 +58,28 @@ export type IconType = ComponentType<SVGProps<SVGSVGElement>>;
 /* ------------------------------------------------------------------ */
 
 export const navLinks: { label: string; href: string; soon?: boolean }[] = [
-  { label: "Features", href: "#features" },
-  { label: "Solutions", href: "#commerce" },
-  { label: "Modules", href: "#modules" },
-  { label: "Pricing", href: "#pricing", soon: true },
-  { label: "Documentation", href: "#docs", soon: true },
+  { label: "Features", href: `${routes.platform.home}#features` },
+  { label: "Solutions", href: `${routes.platform.home}#commerce` },
+  { label: "Modules", href: `${routes.platform.home}#modules` },
+  { label: "Pricing", href: `${routes.platform.home}#pricing` },
+  { label: "Documentation", href: routes.platform.docs },
 ];
+
+/**
+ * How someone reaches whoever SELLS this software. Null until there is one.
+ *
+ * Every call to action on this site used to point at `routes.store.contact` —
+ * the SHOP’s contact form, under the bakery’s own navbar. A person weighing up
+ * the software was handed a page for ordering cakes.
+ *
+ * Set this to a `mailto:` address or a real page and every button below turns
+ * back on by itself. Left null they state the position in plain text rather
+ * than moving anyone somewhere that is not ours.
+ *
+ * Note the demo links to `/store` are NOT this and should stay: showing the
+ * storefront is showing the product running, which is the point.
+ */
+export const vendorContact: string | null = null;
 
 export const ctaLinks = {
   admin: routes.admin.dashboard,
@@ -317,6 +332,26 @@ export const businessTypes: { icon: IconType; name: string }[] = [
 ];
 
 export const faqs: { question: string; answer: string }[] = [
+  /*
+   * These three came from the short-lived /platform/pricing page. The other
+   * three it carried — business type, mobile, and payment methods — already
+   * had answers below, so only what was actually new moved here.
+   */
+  {
+    question: "What do I need before I can take a payment?",
+    answer:
+      "A Razorpay account for card, UPI and netbanking, and a Cloudinary account so you can upload your own photos. Both have free tiers. Cash on delivery works without either.",
+  },
+  {
+    question: "Is my data mine?",
+    answer:
+      "Yes. Orders, customers and products live in your own MongoDB database. There is a backup and restore screen in Settings, and nothing is locked to us.",
+  },
+  {
+    question: "What happens to an order if a payment fails halfway?",
+    answer:
+      "The payment webhook catches it. A payment taken with no order attached is flagged in the admin as an unclaimed payment so it can be refunded or matched, rather than quietly lost.",
+  },
   {
     question: "What is Bakery CMS?",
     answer:
@@ -370,40 +405,54 @@ export const faqs: { question: string; answer: string }[] = [
 
 export const socialLinks: { icon: IconType; label: string; href: string }[] = [
   { icon: StoreIcon, label: "Visit our storefront", href: routes.store.home },
-  { icon: MailIcon, label: "Email our team", href: routes.store.contact },
-  { icon: MessageCircleIcon, label: "Chat with support", href: routes.store.contact },
-  { icon: PhoneIcon, label: "Call us", href: routes.store.contact },
+  // Mail, chat and phone used to sit here, and all three opened the SHOP’s
+  // contact form — three icons, one destination, and the wrong one. An icon
+  // that goes nowhere is decoration, so unlike the text links above they are
+  // removed rather than left inert. The storefront link stays: it is this
+  // software running, which is the thing a prospect actually wants to see.
 ];
 
 export const footerColumns: {
   heading: string;
-  links: { label: string; href: string; soon?: boolean }[];
+  /**
+   * `href` is optional on purpose. These five — Support, About, Contact,
+   * Privacy and Terms — pointed at the SHOP’s pages, so someone weighing up
+   * the software landed on a bakery’s About page, or a privacy policy about
+   * cake orders. Same mistake as serving the product page at `/`, in the
+   * other direction.
+   *
+   * The vendor has no such pages yet, and a privacy policy is not a thing to
+   * invent. So the labels stay — the footer keeps its shape and says what
+   * will be there — and they simply do not move anyone until a real address
+   * exists. Add the `href` back and it becomes a link again, nothing else.
+   */
+  links: { label: string; href?: string; soon?: boolean }[];
 }[] = [
   {
     heading: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "Solutions", href: "#commerce" },
-      { label: "Modules", href: "#modules" },
-      { label: "Pricing", href: "#pricing", soon: true },
+      { label: "Features", href: `${routes.platform.home}#features` },
+      { label: "Solutions", href: `${routes.platform.home}#commerce` },
+      { label: "Modules", href: `${routes.platform.home}#modules` },
+      { label: "Pricing", href: `${routes.platform.home}#pricing` },
     ],
   },
   {
     heading: "Resources",
     links: [
-      { label: "Documentation", href: "#docs", soon: true },
-      { label: "Support", href: routes.store.contact },
-      { label: "FAQ", href: "#faq" },
-      { label: "Roadmap", href: "#roadmap" },
+      { label: "Documentation", href: routes.platform.docs },
+      { label: "Support" },
+      { label: "FAQ", href: `${routes.platform.home}#faq` },
+      { label: "Roadmap", href: `${routes.platform.home}#roadmap` },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About", href: routes.store.about },
-      { label: "Contact", href: routes.store.contact },
-      { label: "Privacy", href: routes.store.privacy },
-      { label: "Terms", href: routes.store.terms },
+      { label: "About" },
+      { label: "Contact" },
+      { label: "Privacy" },
+      { label: "Terms" },
     ],
   },
 ];

@@ -10,8 +10,21 @@ export const routes = {
   /** Design system */
   designSystem: "/design-system",
 
-  /** Marketing landing — redirects to storefront */
+  /** Legacy address for the product page — 308s to `/platform`. */
   landing: "/landing",
+
+  /**
+   * The product’s own marketing site, for whoever is deciding whether to RUN
+   * this software. Deliberately not at `/` — that belongs to the shop, and a
+   * customer arriving from Instagram should meet cakes, not a dashboard advert.
+   */
+  platform: {
+    home: "/platform",
+    // Pricing is a SECTION of the landing page (`#pricing`), not a route:
+    // three cards and a caption is not a page, and splitting it off made
+    // someone leave the feature sections to find out what it costs.
+    docs: "/platform/docs",
+  },
 
   /** Public bakery website */
   store: {

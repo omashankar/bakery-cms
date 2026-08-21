@@ -152,10 +152,14 @@ const nextConfig: NextConfig = {
        * Temporary (307), not permanent. A permanent redirect is cached by the
        * browser more or less forever, and this is a decision a deployment might
        * reasonably reverse — the vendor's own site wants that page at its root.
-       * The component is left in place for exactly that reason.
+       * The page itself was not deleted — it moved to `/platform`, which is where
+       * `/landing` now points too. A shop reselling this CMS still needs an
+       * address to send a prospect to; it just must not be the one its own
+       * customers type. `app/page.tsx` stays as the escape hatch for a
+       * deployment that wants the vendor page back at the root.
        */
       { source: "/", destination: "/store", permanent: false },
-      { source: "/landing", destination: "/store", permanent: true },
+      { source: "/landing", destination: "/platform", permanent: true },
       { source: "/admin/website", destination: "/admin/settings", permanent: true },
       { source: "/admin/website/homepage", destination: "/admin/builders/homepage", permanent: true },
       { source: "/admin/website/header", destination: "/admin/header", permanent: true },

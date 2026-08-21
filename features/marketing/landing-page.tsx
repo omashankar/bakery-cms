@@ -13,9 +13,9 @@ import { BuilderMockup } from "./components/builder-mockup";
 import { DashboardMockup } from "./components/dashboard-mockup";
 import { FaqSection } from "./components/faq-section";
 import { LinkButton } from "./components/link-button";
-import { Logo } from "./components/logo";
+import { MarketingShell } from "./components/marketing-shell";
+import { PricingTiers } from "./components/pricing-tiers";
 import { Container, Eyebrow, Section, SectionHeading } from "./components/section";
-import { SiteHeader } from "./components/site-header";
 import { WeddingMockup } from "./components/wedding-mockup";
 import {
   adminModules,
@@ -24,35 +24,16 @@ import {
   commerceFeatures,
   ctaLinks,
   customerJourney,
-  footerColumns,
   type IconType,
   paymentMethods,
   reportMetrics,
   roadmap,
-  socialLinks,
   techStack,
   trustedFeatures,
   weddingBlocks,
   whyChoose,
 } from "./landing-data";
 
-const brandVars = {
-  "--background": "#FAF9F7",
-  "--card": "#FFFFFF",
-  "--foreground": "#26201B",
-  "--primary": "#7A4D2B",
-  "--primary-foreground": "#FFFFFF",
-  "--secondary": "#F3EEE7",
-  "--secondary-foreground": "#7A4D2B",
-  "--muted": "#F3EEE7",
-  "--muted-foreground": "#776E62",
-  "--accent": "#F3EEE7",
-  "--accent-foreground": "#7A4D2B",
-  "--border": "#ECE6DC",
-  "--border-soft": "#ECE6DC",
-  "--ring": "#D4A373",
-  "--brand-accent": "#D4A373",
-} as React.CSSProperties;
 
 const heroTrust = ["Trusted Bakery CMS", "Modern UI", "Future Ready", "Responsive"];
 
@@ -72,13 +53,7 @@ function IconTile({ icon: Icon, className }: { icon: IconType; className?: strin
 
 export function LandingPage() {
   return (
-    <div
-      className="storefront-light min-h-screen bg-background font-sans text-foreground"
-      style={brandVars}
-    >
-      <SiteHeader />
-
-      <main>
+    <MarketingShell>
         {/* ============================================================ */}
         {/* SECTION 2 — Hero                                             */}
         {/* ============================================================ */}
@@ -534,9 +509,27 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
-        {/* SECTION 14 — FAQ                                             */}
+        {/* SECTION 14 — Pricing                                         */}
         {/* ============================================================ */}
-        <Section id="faq" className="bg-white">
+        <Section id="pricing" className="bg-white">
+          <Container className="flex flex-col gap-12">
+            <ScrollReveal>
+              <SectionHeading
+                eyebrow="Pricing"
+                title="Pay for the shop you have, not the one you might have"
+                description="Every plan is the whole product — the storefront, the admin, the orders. What changes is how much of the catalogue and how many of the extras you actually sell."
+              />
+            </ScrollReveal>
+            <ScrollReveal>
+              <PricingTiers />
+            </ScrollReveal>
+          </Container>
+        </Section>
+
+        {/* ============================================================ */}
+        {/* SECTION 15 — FAQ                                             */}
+        {/* ============================================================ */}
+        <Section id="faq" className="bg-background">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -552,9 +545,9 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
-        {/* SECTION 15 — Call To Action                                  */}
+        {/* SECTION 16 — Call To Action                                  */}
         {/* ============================================================ */}
-        <Section className="bg-background">
+        <Section className="bg-white">
           <Container>
             <ScrollReveal>
               <div className="relative overflow-hidden rounded-[2rem] bg-primary px-6 py-16 text-center shadow-[0_30px_70px_-30px_rgba(74,51,36,0.6)] md:px-16 md:py-20">
@@ -602,70 +595,6 @@ export function LandingPage() {
             </ScrollReveal>
           </Container>
         </Section>
-      </main>
-
-      {/* ============================================================ */}
-      {/* SECTION 16 — Footer                                          */}
-      {/* ============================================================ */}
-      <footer className="bg-[#241810] text-[#E7DDD1]">
-        <Container className="py-16">
-          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-            <div className="flex flex-col gap-4">
-              <Logo tone="invert" />
-              <p className="max-w-xs text-sm leading-relaxed text-[#B7A895]">
-                The complete platform to manage, sell, and grow your bakery — website, orders,
-                payments, and more, from one modern dashboard.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                {socialLinks.map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    aria-label={social.label}
-                    className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#D8C9B6] outline-none transition-colors hover:border-[#D4A373]/60 hover:text-white focus-visible:ring-2 focus-visible:ring-[#D4A373]/60"
-                  >
-                    <social.icon className="size-4" aria-hidden />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {footerColumns.map((col) => (
-              <div key={col.heading} className="flex flex-col gap-4">
-                <p className="text-sm font-semibold text-white">{col.heading}</p>
-                <ul className="flex flex-col gap-3">
-                  {col.links.map((link) => (
-                    <li key={link.label}>
-                      {link.soon ? (
-                        <span className="inline-flex items-center gap-1.5 text-sm text-[#8f8171]">
-                          {link.label}
-                          <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#C7B49A]">
-                            Soon
-                          </span>
-                        </span>
-                      ) : (
-                        <a
-                          href={link.href}
-                          className="text-sm text-[#B7A895] transition-colors hover:text-white"
-                        >
-                          {link.label}
-                        </a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-[#8f8171] sm:flex-row">
-            <p>© {new Date().getFullYear()} Bakery CMS. All rights reserved.</p>
-            <p className="flex items-center gap-1.5">
-              Crafted for bakeries, cake shops &amp; custom retail
-            </p>
-          </div>
-        </Container>
-      </footer>
-    </div>
+    </MarketingShell>
   );
 }
