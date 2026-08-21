@@ -19,7 +19,7 @@ import { loadProducts } from "@/features/products/lib/products-repository";
 import {
   FilterPanel,
   FilterPanelSearch,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";

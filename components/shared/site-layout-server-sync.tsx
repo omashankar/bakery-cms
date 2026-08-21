@@ -10,7 +10,7 @@ import {
 } from "@/features/site-layout/lib/site-layout-api";
 import { persistServerHeader } from "@/features/site-layout/lib/header-repository";
 import { persistServerFooter } from "@/features/site-layout/lib/footer-repository";
-import { persistServerAppearance } from "@/apps/admin/appearance/lib/appearance-repository";
+import { persistServerAppearance } from "@/features/site-layout/lib/appearance-repository";
 
 /**
  * Hydrates header + footer settings from the server once on mount, so the

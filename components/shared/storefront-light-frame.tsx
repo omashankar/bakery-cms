@@ -4,11 +4,11 @@ import { useEffect, useRef } from "react";
 import {
   APPEARANCE_UPDATED_EVENT,
   applyAppearanceSettingsTo,
-} from "@/apps/admin/appearance/lib/appearance-utils";
+} from "@/features/site-layout/lib/appearance-utils";
 import {
   APPEARANCE_STORAGE_KEY,
   loadAppearanceSettings,
-} from "@/apps/admin/appearance/lib/appearance-repository";
+} from "@/features/site-layout/lib/appearance-repository";
 import { cn } from "@/lib/utils";
 
 interface StorefrontLightFrameProps {

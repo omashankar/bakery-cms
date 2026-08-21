@@ -126,6 +126,52 @@ const domainStaysPure = {
 };
 
 /**
+ * Shared UI is shared, which means it may not reach back into an app.
+ *
+ * The docblock at the top of this file names components/shared as the place UI
+ * goes when both sides need it — and components/shared was the one destination
+ * it named that had no rule of its own. So it drifted the way the domain
+ * modules had: six imports of `@/apps/admin` across four files, none reported.
+ *
+ * The two shapes it drifted into are worth naming, because they are different
+ * mistakes. `filter-panel.tsx` was never shared at all — all twenty-two of its
+ * importers were admin screens, and it pulled `adminShell` for its styling — so
+ * it moved to apps/admin, where it always belonged. The appearance modules were
+ * the opposite: genuinely needed by both, but parked under apps/admin because
+ * the admin wrote them first, so the storefront had to reach across to paint
+ * the shop palette. They moved down beside `appearance-tokens`, which had
+ * already made exactly that journey for exactly that reason.
+ *
+ * Ask which one a new violation is before reaching for an exemption: UI only
+ * one app uses belongs in that app, and UI both use belongs here with its logic
+ * in a domain module.
+ */
+const sharedUiStaysShared = {
+  files: ["components/shared/**"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: [
+              "@/apps/admin",
+              "@/apps/admin/*",
+              "**/apps/admin/*",
+              "@/apps/website",
+              "@/apps/website/*",
+              "**/apps/website/*",
+            ],
+            message:
+              "components/shared must not import from an app. If only one app uses it, move it into that app; if both do, move the logic into a domain module and keep the component here.",
+          },
+        ],
+      },
+    ],
+  },
+};
+
+/**
  * The codebase already marks deliberately-discarded bindings with a leading
  * underscore — `const { id: _id, ...data } = record` to strip a field. Honour
  * that convention so the real unused-variable warnings stay visible.
@@ -152,6 +198,7 @@ const eslintConfig = defineConfig([
   adminImportsStorefront,
   storefrontImportsAdmin,
   domainStaysPure,
+  sharedUiStaysShared,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

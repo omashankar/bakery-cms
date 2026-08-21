@@ -5,12 +5,12 @@ export {
   saveAppearanceSettings,
   resetAppearanceSettings,
   syncAppearanceTheme,
-} from "./lib/appearance-repository";
+} from "@/features/site-layout/lib/appearance-repository";
 export {
   appearancePresets,
   defaultAppearanceSettings,
   applyAppearanceSettings,
   applyAppearanceSettingsTo,
   APPEARANCE_UPDATED_EVENT,
-} from "./lib/appearance-utils";
-export { APPEARANCE_STORAGE_KEY } from "./lib/appearance-repository";
+} from "@/features/site-layout/lib/appearance-utils";
+export { APPEARANCE_STORAGE_KEY } from "@/features/site-layout/lib/appearance-repository";

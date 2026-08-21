@@ -82,7 +82,7 @@ describe("the palette as data", () => {
   it("is the single source both the server and the browser use", () => {
     // Two copies of this arithmetic is how a server-rendered palette and a
     // client-applied one drift into disagreeing — a flash again, just subtler.
-    const utils = code("apps/admin/appearance/lib/appearance-utils.ts");
+    const utils = code("features/site-layout/lib/appearance-utils.ts");
     expect(utils).toMatch(/appearanceCssVariables\(settings, options\)/);
     // The DOM applier iterates the map rather than repeating setProperty calls.
     expect(utils).not.toMatch(/el\.style\.setProperty\("--brand-primary"/);
@@ -164,7 +164,7 @@ describe("a refused save", () => {
     // Greps could spell the rollback without ever entering it: replacing the
     // body with a plain re-persist of the rejected palette passed 850 tests.
     const { saveAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
-      "@/apps/admin/appearance/lib/appearance-repository"
+      "@/features/site-layout/lib/appearance-repository"
     );
     const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
     siteLayoutHydration.markSettled();
@@ -193,7 +193,7 @@ describe("a refused save", () => {
   it("leaves a concurrent save that the server DID accept alone", async () => {
     // Restoring the entry snapshot unconditionally would undo a good write.
     const { saveAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
-      "@/apps/admin/appearance/lib/appearance-repository"
+      "@/features/site-layout/lib/appearance-repository"
     );
     const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
     siteLayoutHydration.markSettled();
@@ -219,7 +219,7 @@ describe("a refused save", () => {
     // field reading demo brown under a toast saying "nothing was changed" —
     // with Save enabled over the shop's real palette.
     const { resetAppearanceSettings, APPEARANCE_STORAGE_KEY } = await import(
-      "@/apps/admin/appearance/lib/appearance-repository"
+      "@/features/site-layout/lib/appearance-repository"
     );
     const { siteLayoutHydration } = await import("@/features/site-layout/lib/site-layout-api");
     siteLayoutHydration.markSettled();
@@ -234,7 +234,7 @@ describe("a refused save", () => {
   });
 
   it("routes reset through the same path", () => {
-    const store = code("apps/admin/appearance/lib/appearance-repository.ts");
+    const store = code("features/site-layout/lib/appearance-repository.ts");
     const reset = store.slice(store.indexOf("export async function resetAppearanceSettings"));
     // Reset wiped the cache to demo defaults and repainted before asking. A
     // refusal left the admin looking at the demo palette with their real one

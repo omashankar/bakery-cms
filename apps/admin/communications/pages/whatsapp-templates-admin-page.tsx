@@ -56,7 +56,7 @@ import { formatTemplateCategory } from "@/apps/admin/communications/lib/template
 import {
   FilterPanel,
   FilterPanelSearch,
-} from "@/components/shared/filter-panel";
+} from "@/apps/admin/components/filter-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
 import { Button } from "@/components/ui/button";

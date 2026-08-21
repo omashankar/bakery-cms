@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import {
   APPEARANCE_UPDATED_EVENT,
   applyAppearanceSettings,
-} from "@/apps/admin/appearance/lib/appearance-utils";
+} from "@/features/site-layout/lib/appearance-utils";
 import {
   APPEARANCE_STORAGE_KEY,
   loadAppearanceSettings,
-} from "@/apps/admin/appearance/lib/appearance-repository";
+} from "@/features/site-layout/lib/appearance-repository";
 import { applyThemeToDocument, isLightLockedPath } from "@/lib/theme";
 import { APPEARANCE_SSR_STYLE_ID } from "@/features/site-layout/lib/appearance-tokens";
 import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
