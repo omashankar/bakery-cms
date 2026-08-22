@@ -209,7 +209,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               ref={(node) => {
                 if (node?.complete && node.naturalWidth === 0) setLogoBroken(true);
               }}
-              className="h-9 w-auto max-w-[200px] object-contain object-left"
+              // 50px inside the 64px row. Taller than the letter badge it
+              // replaces on purpose: a wordmark carries lettering, and at 36px
+              // a logo's second line — a tagline, an "EST. 2026" — was a smear.
+              className="h-[50px] w-auto max-w-[200px] object-contain object-left"
             />
           ) : (
             <>

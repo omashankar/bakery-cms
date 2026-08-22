@@ -348,9 +348,17 @@ describe("the navbar logo", () => {
   it("gives a wordmark its own width instead of crushing it into a square", () => {
     // `size-9` is 36×36. A 2:1 wordmark rendered into it came out 36×18 and its
     // lettering was unreadable — the one thing a wordmark is for.
+    //
+    // The SHAPE is pinned, not the number: bound the height, leave the width
+    // free, cap it. Retuning the height is a design call and should not have to
+    // come here; rendering a logo into a fixed square is the defect.
     const { withLogo } = logoBranches();
     expect(withLogo).not.toContain("size-9");
-    expect(withLogo).toContain("h-9 w-auto");
+    // No trailing \b: after the `]` of an arbitrary value there is no word
+    // boundary, so `h-[50px]` failed to match while `h-9` passed — the
+    // assertion would have rejected the very form it was widened to allow.
+    expect(withLogo).toMatch(/\bh-(?:\d+|\[[^\]]+\])/);
+    expect(withLogo).toContain("w-auto");
     // Capped, or a very wide logo pushes the nav off the row.
     expect(withLogo).toMatch(/max-w-\[\d+px\]/);
   });
