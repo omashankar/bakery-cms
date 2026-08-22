@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppBrandImage } from "@/components/shared/app-brand-image";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +18,16 @@ interface AppBrandMarkProps {
   size?: "sm" | "md";
   /** The badge letter. Defaults to the product's. */
   letter?: string;
+  /**
+   * A square picture to fill the badge with — the shop's favicon.
+   *
+   * The favicon is the one image a shop already has that is guaranteed square,
+   * which is why it fits here and the wordmark logo does not: a 3:1 wordmark in
+   * a 32px box is 32×10 and unreadable. Empty falls back to the letter.
+   */
+  image?: string;
+  /** Titles the picture. Ignored when there is no image. */
+  name?: string;
   className?: string;
 }
 
@@ -24,20 +35,31 @@ interface AppBrandMarkProps {
 export function AppBrandMark({
   size = "md",
   letter = PRODUCT_LETTER,
+  image,
+  name = PRODUCT_NAME,
   className,
 }: AppBrandMarkProps) {
+  const hasImage = Boolean(image?.trim());
+
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center bg-primary shadow-sm",
+        "flex shrink-0 items-center justify-center shadow-sm",
         size === "sm" ? "size-8 rounded-lg" : "size-9 rounded-xl",
+        // A picture fills the badge the way an app icon does; the primary fill
+        // is the letter's backdrop and would show through a transparent PNG.
+        hasImage ? "overflow-hidden" : "bg-primary",
         className
       )}
       aria-hidden
     >
-      <span className="font-heading text-sm font-bold text-primary-foreground">
-        {letter}
-      </span>
+      {hasImage ? (
+        <AppBrandImage src={image!.trim()} letter={letter} name={name} />
+      ) : (
+        <span className="font-heading text-sm font-bold text-primary-foreground">
+          {letter}
+        </span>
+      )}
     </div>
   );
 }
@@ -54,6 +76,8 @@ interface AppBrandProps {
   name?: string;
   /** The badge letter. Defaults to the product's, then to the name's initial. */
   letter?: string;
+  /** A square picture for the badge — the shop's favicon. Falls back to the letter. */
+  image?: string;
   /**
    * The name has not loaded yet, so render a placeholder rather than a value
    * that is about to change. The settings store answers from the shipped seed
@@ -73,6 +97,7 @@ export function AppBrand({
   subtitle,
   name = PRODUCT_NAME,
   letter,
+  image,
   pending = false,
   href,
   size = "md",
@@ -85,7 +110,15 @@ export function AppBrand({
 
   const content = (
     <>
-      <AppBrandMark size={size} letter={pending ? PRODUCT_LETTER : badgeLetter} />
+      <AppBrandMark
+        size={size}
+        letter={pending ? PRODUCT_LETTER : badgeLetter}
+        // Nothing until the shop's own settings have landed: the seed carries
+        // no favicon, so drawing one before then would be the product's mark
+        // pretending to be the shop's.
+        image={pending ? undefined : image}
+        name={name}
+      />
       {!collapsed ? (
         <div className="min-w-0 flex-1">
           {pending ? (

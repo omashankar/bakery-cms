@@ -176,7 +176,8 @@ describe("the admin panel's brand", () => {
   it("names the shop, not the software", () => {
     const sidebar = code(SIDEBAR);
     // Read from settings, and handed to the brand block.
-    expect(sidebar).toContain("getGeneralSettings().siteName");
+    expect(sidebar).toContain("getGeneralSettings()");
+    expect(sidebar).toMatch(/general\.siteName/);
     expect(sidebar).toMatch(/name=\{shopName/);
     // The product's name may not be written into a shop's panel.
     expect(sidebar, "the sidebar hardcodes the product name").not.toContain("Bakery CMS");
@@ -207,5 +208,59 @@ describe("the admin panel's brand", () => {
     // And the default is still the product, so those pages keep it.
     expect(code(BRAND)).toMatch(/PRODUCT_NAME = "Bakery CMS"/);
     expect(code(BRAND)).toMatch(/name = PRODUCT_NAME/);
+  });
+});
+
+/**
+ * The badge beside the panel's name.
+ *
+ * A letter is a placeholder for a picture nobody supplied. The shop's FAVICON
+ * is the one image it is guaranteed to have made square, and this badge is
+ * 32px — the wordmark logo is typically 3:1, which in that box is ten pixels
+ * tall and unreadable.
+ */
+describe("the admin badge", () => {
+  const SIDEBAR = "apps/admin/components/admin-sidebar.tsx";
+  const BRAND = "components/shared/app-brand.tsx";
+  const IMAGE = "components/shared/app-brand-image.tsx";
+
+  it("uses the shop's own square icon, not the logo", () => {
+    const sidebar = code(SIDEBAR);
+    expect(sidebar).toContain("general.favicon");
+    expect(sidebar).toMatch(/image=\{shopIcon/);
+    // The wordmark belongs in the storefront header, where it has room.
+    expect(sidebar, "the sidebar puts the wide logo in a 32px box").not.toMatch(
+      /image=\{[^}]*\blogo\b/,
+    );
+  });
+
+  it("keeps the letter when no icon has been set", () => {
+    const brand = code(BRAND);
+    // Both arms present, and the picture only when there is one.
+    expect(brand).toMatch(/hasImage \?[\s\S]{0,400}<AppBrandImage/);
+    expect(brand).toMatch(/\) : \([\s\S]{0,300}\{letter\}/);
+    // The primary fill is the letter's backdrop; it would show through a
+    // transparent PNG, so a picture drops it.
+    expect(brand).toMatch(/hasImage \? "overflow-hidden" : "bg-primary"/);
+  });
+
+  it("falls back to the letter when the icon URL does not load", () => {
+    const image = code(IMAGE);
+    expect(image).toContain('"use client"');
+    expect(image).toContain("setBroken(true)");
+    // A 404 that resolves before hydration fires no React event, so the element
+    // is asked directly — the same rule the storefront mark follows.
+    expect(image).toContain("naturalWidth === 0");
+    expect(image).toMatch(/if \(broken\)[\s\S]{0,200}\{letter\}/);
+  });
+
+  it("shows no icon on the product's own pages", () => {
+    // They pass no image, so the badge stays the product's letter.
+    for (const vendorPage of [
+      "features/architecture/architecture-hub.tsx",
+      "features/design-system/design-system-page.tsx",
+    ]) {
+      expect(code(vendorPage)).not.toMatch(/<AppBrand[^>]*\bimage=/);
+    }
   });
 });

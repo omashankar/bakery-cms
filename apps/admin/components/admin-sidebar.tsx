@@ -419,6 +419,14 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
    */
   const [shopName, setShopName] = useState("");
   /**
+   * The shop's favicon fills the badge in place of the letter.
+   *
+   * The favicon rather than the logo: it is the one image a shop is guaranteed
+   * to have made square, and this badge is 32px. The wordmark logo is typically
+   * 3:1, which in that box is ten pixels tall.
+   */
+  const [shopIcon, setShopIcon] = useState("");
+  /**
    * The settings store answers from the shipped seed until the server's copy
    * lands, so rendering the name straight away would show the seed for a frame
    * and then swap it. `AppBrand` draws a placeholder while this is true.
@@ -440,9 +448,11 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     }
 
     function refreshBrand() {
-      // Both read together: hydration is what makes the name trustworthy, and
-      // the same event announces it, so they can never disagree.
-      setShopName(getGeneralSettings().siteName?.trim() ?? "");
+      // All read together: hydration is what makes these trustworthy, and the
+      // same event announces it, so they can never disagree.
+      const general = getGeneralSettings();
+      setShopName(general.siteName?.trim() ?? "");
+      setShopIcon(general.favicon?.trim() ?? "");
       setBrandPending(!settingsHydration.hasSettled());
     }
 
@@ -504,6 +514,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
           // The shop's name, not the product's. A blank one falls back to the
           // component's default rather than heading the panel with nothing.
           name={shopName || undefined}
+          image={shopIcon || undefined}
           pending={brandPending}
           subtitle="Admin Panel"
           size="sm"
