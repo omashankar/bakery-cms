@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildSitemapEntries } from "@/features/seo/lib/sitemap-generator";
 import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
+import { seedGlobal } from "@/features/seo/lib/seo-repository";
 import { routes } from "@/constants/routes";
 
 describe("the sitemap and a disabled module", () => {
@@ -41,12 +42,21 @@ describe("route titles", () => {
   it("does not let the root template append the site name a second time", () => {
     // `resolveRouteTitle` already appends the SEO title suffix, which carries the
     // shop's name. The root layout's "%s | <site name>" template then ran on top
-    // of it and produced "Wedding Cakes | Monginis | Monginis" in the browser tab.
+    // of it and produced "Wedding Cakes | Acme | Acme" in the browser tab.
+    //
+    // The name comes from the seed rather than a literal: this assertion used to
+    // spell the shipped brand out, so renaming that brand made `split(...)` find
+    // nothing and report zero occurrences. Zero is not one, so it failed loudly
+    // this time — but a guard whose subject can be renamed out from under it is
+    // one edit away from passing over the very bug it exists to catch.
+    const { siteName } = seedGlobal();
+    expect(siteName).not.toBe("");
+
     const meta = buildRouteMetadata("store-wedding");
     expect(meta.title).toHaveProperty("absolute");
 
     const { absolute } = meta.title as { absolute: string };
-    const occurrences = absolute.split("Monginis").length - 1;
+    const occurrences = absolute.split(siteName).length - 1;
     expect(occurrences).toBe(1);
   });
 

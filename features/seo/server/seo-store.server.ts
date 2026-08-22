@@ -16,7 +16,7 @@ import { buildRouteMetadataFrom } from "@/features/seo/lib/seo-metadata";
  * So on the server it is the DEMO SEED and nothing else, for the life of the
  * process — which meant robots.txt, sitemap.xml and the canonical/OG/title
  * metadata of every storefront page served the seeded values no matter what the
- * admin saved. The seeded canonical base is `https://www.monginis.example`, and
+ * admin saved. The seeded canonical base is `https://www.your-bakery.example`, and
  * `.example` is reserved by RFC 2606 precisely so that it never resolves: the
  * sitemap Google was handed pointed at a host that does not exist.
  *

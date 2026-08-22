@@ -26,28 +26,23 @@ export function seedGlobal(): GlobalSeoSettings {
     defaultKeywords: [
       "bakery",
       "cakes",
-      "monginis",
       "custom cakes",
       "wedding cakes",
       "pastries",
     ],
-    canonicalBaseUrl: "https://www.monginis.example",
+    canonicalBaseUrl: "https://www.your-bakery.example",
     allowIndexing: true,
     googleSiteVerification: "",
     defaultTwitterCard: "summary_large_image",
-    twitterSite: "@monginis",
-    twitterCreator: "@monginis",
-    organizationSchemaJson: JSON.stringify(
-      {
-        "@context": "https://schema.org",
-        "@type": "Bakery",
-        name: brandInfo.name,
-        description: brandInfo.description,
-        url: "https://www.monginis.example/store",
-      },
-      null,
-      2
-    ),
+    // Empty, not a handle. `twitter:site` attributes a page to an account; a
+    // seeded one credits somebody else's brand for every page the shop
+    // publishes. An absent tag is correct until the shop has an account.
+    twitterSite: "",
+    twitterCreator: "",
+    // Emitted only once the shop supplies it. A seeded Organization block
+    // asserts a name, description and URL to search engines as structured
+    // fact — the one place a placeholder does the most damage.
+    organizationSchemaJson: "",
   };
 }
 
@@ -109,7 +104,7 @@ function seedRoutes(): SeoRouteEntry[] {
       "About",
       "About Us",
       "Our bakery story, heritage, and commitment to quality.",
-      ["about monginis", "bakery story"]
+      ["bakery story"]
     ),
     route(
       "store-contact",

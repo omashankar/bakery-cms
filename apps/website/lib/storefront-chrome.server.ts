@@ -65,13 +65,18 @@ export interface StorefrontChrome {
   appearance: Record<string, string>;
 }
 
+/** The navbar badge falls back to the shop's initial rather than a seeded letter. */
+function firstLetterOf(siteName: string): string {
+  return siteName.trim().charAt(0).toUpperCase();
+}
+
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
     // The settings read failed; the demo taxonomy is the only list there is.
     categories: [],
     logo: "",
-    logoLetter: defaultHeaderSettings.logoLetter,
+    logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
     cta: {
       show: defaultHeaderSettings.showCta,
@@ -163,7 +168,11 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       // validated and read only by the invoice designer, so setting it changed
       // nothing a customer ever saw.
       logo: (general.logo ?? "").trim(),
-      logoLetter: header.logoLetter || defaultHeaderSettings.logoLetter,
+      // Derived from the shop's own name when it has not chosen a letter. The
+      // seed used to supply one, so a shop that never opened Appearance wore
+      // another brand's initial; `defaultHeaderSettings.logoLetter` is now ""
+      // precisely so this falls through to the name.
+      logoLetter: header.logoLetter?.trim() || firstLetterOf(name),
       showSearch: header.showSearch ?? defaultHeaderSettings.showSearch,
       cta: {
         show: header.showCta ?? defaultHeaderSettings.showCta,

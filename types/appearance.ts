@@ -1,4 +1,4 @@
-export type AppearancePreset = "monginis" | "espresso" | "rose-cocoa" | "custom";
+export type AppearancePreset = "classic" | "espresso" | "rose-cocoa" | "custom";
 
 export interface AppearanceSettings {
   preset: AppearancePreset;

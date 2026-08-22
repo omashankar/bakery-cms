@@ -7,7 +7,16 @@ function nowIso(): string {
 }
 
 export const defaultHeaderSettings: HeaderSettings = {
-  logoLetter: "M",
+  /**
+   * Empty, so it is derived from the shop's own name.
+   *
+   * This shipped as "M" — the initial of the brand whose identity used to be
+   * seeded throughout this repo. Every fresh install persisted that letter and
+   * rendered it in the navbar badge beside its OWN name, which is how a letter
+   * nobody chose outlived the name it came from. Consumers fall back to
+   * `siteName.charAt(0)`; see `storefront-chrome.server.ts`.
+   */
+  logoLetter: "",
   showSearch: true,
   showCta: true,
   ctaLabel: "Order Inquiry",

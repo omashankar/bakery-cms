@@ -31,7 +31,7 @@ export function seedPages(): CmsPage[] {
         block(
           "about-2",
           "paragraph",
-          "From a single neighborhood store to a household name, Monginis has been part of celebrations for generations across India."
+          "Tell your customers how your bakery started, in your own words."
         ),
         block(
           "about-3",
@@ -48,7 +48,7 @@ export function seedPages(): CmsPage[] {
       isSystem: true,
       sortOrder: 1,
       seo: {
-        metaTitle: "About Us | Monginis",
+        metaTitle: "About Us",
         metaDescription: brandInfo.description,
       },
       createdAt: timestamp,
@@ -86,7 +86,7 @@ export function seedPages(): CmsPage[] {
       isSystem: true,
       sortOrder: 2,
       seo: {
-        metaTitle: "Privacy Policy | Monginis",
+        metaTitle: "Privacy Policy",
         metaDescription: "How we collect, use, and protect your information.",
       },
       createdAt: timestamp,
@@ -124,7 +124,7 @@ export function seedPages(): CmsPage[] {
       isSystem: true,
       sortOrder: 3,
       seo: {
-        metaTitle: "Terms of Service | Monginis",
+        metaTitle: "Terms of Service",
         metaDescription: "Terms and conditions for using our bakery services.",
       },
       createdAt: timestamp,
@@ -145,7 +145,7 @@ export function seedPages(): CmsPage[] {
         block(
           "catering-2",
           "paragraph",
-          "From boardroom meetings to annual day celebrations, Monginis offers curated dessert spreads, branded cupcakes, and custom cakes for corporate clients."
+          "From boardroom meetings to annual day celebrations, we offer curated dessert spreads, branded cupcakes, and custom cakes for corporate clients."
         ),
         block(
           "catering-3",
@@ -335,7 +335,8 @@ export async function updatePage(
     // storefront renders its meta tags from the server copy, so a route entry
     // that never landed leaves a published page with no title or description.
     await upsertSeoRouteForPath(getStorefrontPageUrl(updated.slug), updated.title, {
-      metaTitle: updated.seo?.metaTitle ?? `${updated.title} | Monginis`,
+      // Title only — SEO → Title Suffix appends the shop's brand at render.
+      metaTitle: updated.seo?.metaTitle ?? updated.title,
       metaDescription: updated.seo?.metaDescription ?? updated.description,
       metaKeywords: updated.seo?.metaKeywords ?? [],
       ogImage: updated.seo?.ogImage,

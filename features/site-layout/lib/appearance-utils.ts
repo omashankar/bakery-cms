@@ -28,8 +28,8 @@ export type { ApplyAppearanceOptions };
 
 export const appearancePresets: AppearancePresetDefinition[] = [
   {
-    id: "monginis",
-    name: "Monginis Classic",
+    id: "classic",
+    name: "Classic Bakery",
     description: "Brown primary, cream surfaces, minimal gold accent.",
     primaryColor: "#6f4e37",
     accentColor: "#d4a373",

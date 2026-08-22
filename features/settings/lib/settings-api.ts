@@ -20,7 +20,7 @@ interface Envelope<T> {
  * general object, not the one field the admin touched. Before hydration the
  * local copy is the demo seed — `loadSettings()` writes `defaultAppSettings`
  * into an empty localStorage and returns it — so saving from a browser that had
- * not yet read the server would push "Monginis", `/images/logo.svg`,
+ * not yet read the server would push the seeded shop name, `/images/logo.svg`,
  * `Asia/Kolkata` and `INR` over the shop's real identity. One save, silent.
  *
  * Only a full read settles it: the public subset omits smtp/security/analytics,

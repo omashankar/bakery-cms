@@ -105,7 +105,7 @@ export function GeneralSettingsPage() {
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed: editing the seed
       // makes the form dirty, the resync then skips it to protect the edit, and
-      // Save pushes "Monginis"/INR/Asia-Kolkata over the shop's real identity.
+      // Save pushes the seeded name/INR/Asia-Kolkata over the shop's own identity.
       mounted={hydration !== "pending"}
       isSaving={isWriting}
       saveDisabled={hasErrors || !canSave}

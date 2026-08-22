@@ -40,13 +40,13 @@ afterEach(() => {
 
 describe("the origin used for links inside an email", () => {
   it("refuses the seeded demo domain", async () => {
-    // The SEO store seeds `canonicalBaseUrl` as "https://www.monginis.example".
+    // The SEO store seeds `canonicalBaseUrl` as "https://www.your-bakery.example".
     // `.example` is reserved by RFC 2606 so that it never resolves — so every
     // order confirmation went out with a "view your invoice" link pointing at a
     // host that does not exist. The mail sent, the customer clicked, nothing
     // happened. The caller's fallback is a sentence that actually works, so an
     // empty origin is strictly better than that link.
-    state.seoBase = "https://www.monginis.example";
+    state.seoBase = "https://www.your-bakery.example";
     expect(await publicBaseUrl()).toBe("");
   });
 

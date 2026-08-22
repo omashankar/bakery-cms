@@ -68,8 +68,8 @@ describe("each cake ships its own metadata", () => {
 
   it("does not repeat the shop name when the admin already wrote it", () => {
     // The root layout appends "| <shop>"; every product here already carries a
-    // "| Monginis" the old form appended, so the title read
-    // "Black Forest Supreme | Monginis | Monginis".
+    // brand suffix the old form appended, so the title read
+    // "Black Forest Supreme | Acme | Acme".
     expect(code).toContain("alreadyBranded");
     expect(code).toMatch(/endsWith\(siteName/);
     expect(code).toMatch(/absolute: typed/);
@@ -83,7 +83,7 @@ describe("the product form keeps what was typed", () => {
   const form = stripComments(read("apps/admin/products/components/product-form-page.tsx"));
 
   it("stops deriving the meta title once the admin edits it", () => {
-    // It was `prev.seo.metaTitle || `${name} | Monginis``, so the FIRST keystroke
+    // It was `prev.seo.metaTitle || `${name} | Acme``, so the FIRST keystroke
     // made it truthy and it froze there: "Rose Truffle Delight" left it as "R".
     expect(form).toContain("metaTitle: metaTitleTouched ? prev.seo.metaTitle : name");
     expect(form).toContain("setMetaTitleTouched(true)");

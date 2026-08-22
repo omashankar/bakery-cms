@@ -6,7 +6,7 @@ describe("site-layout validators", () => {
   it("accepts a valid SEO store", () => {
     expect(
       siteLayoutSchemas.seo.safeParse({
-        global: { siteName: "Monginis", allowIndexing: true },
+        global: { siteName: "Sweet Crumbs Bakery", allowIndexing: true },
         routes: [
           {
             id: "seo-store-home",
@@ -70,7 +70,7 @@ describe("site-layout validators", () => {
         accentColor: "#d4a373",
         surfaceColor: "#faf8f4",
         borderRadius: 12,
-        preset: "monginis",
+        preset: "classic",
       }).success,
     ).toBe(true);
   });

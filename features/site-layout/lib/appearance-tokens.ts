@@ -22,7 +22,7 @@ import type { AppearanceSettings } from "@/types/appearance";
  */
 
 export const defaultAppearanceSettings: AppearanceSettings = {
-  preset: "monginis",
+  preset: "classic",
   primaryColor: "#6f4e37",
   accentColor: "#d4a373",
   surfaceColor: "#faf8f4",

@@ -27,7 +27,7 @@ export const defaultTemplateSampleData: Record<string, string> = {
   delivery_date: "11 Jul 2026",
   delivery_address: "12 MG Road, Bengaluru 560001",
   payment_method: "UPI",
-  store_name: "Monginis Bakery",
+  store_name: "Your Bakery",
   store_phone: "+91 98765 43210",
   store_email: "sumanom7014106@gmail.com",
   support_url: "https://bakery.demo/store/contact",

@@ -123,7 +123,9 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     rating: cake.rating ?? 4.5,
     reviewCount: cake.reviewCount ?? 12,
     seo: {
-      metaTitle: `${cake.name} | Monginis`,
+      // Name only. The shop's brand comes from SEO → Title Suffix, which is
+      // applied once at render; baking it in here printed it twice.
+      metaTitle: cake.name,
       metaDescription: cake.description,
       ogImage: cake.image,
     },

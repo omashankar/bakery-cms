@@ -201,7 +201,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
         // The `||` meant the FIRST keystroke made this truthy and short-
         // circuited every one after: typing "Delivery Information" left the SEO
         // tab, the search preview and the stored record all reading
-        // "D | Monginis" — which is the page's browser-tab and search-result
+        // "D | Acme" — which is the page's browser-tab and search-result
         // title. The brand was hard-coded too, in a CMS meant to run more than
         // one shop. `product-form-page` already holds this fix; this was the
         // twin it was not applied to.

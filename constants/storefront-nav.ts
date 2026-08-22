@@ -16,11 +16,20 @@ export const shopMegaMenu = {
     { label: "Seasonal", href: routes.store.collection("seasonal") },
     { label: "Best Sellers", href: `${routes.store.collections}?sort=popular` },
   ] satisfies MegaMenuLink[],
+  /**
+   * These are hardcoded, and the catalogue they point into is not — so every
+   * entry here is a promise this file cannot keep on its own.
+   *
+   * "Kids Party" used to sit at the end, pointing at a "custom" category. A shop
+   * that has no such category — and the seeded catalogue is one — served a menu
+   * item that opened "0 cakes". Add an entry here only when the slug is one the
+   * shop is guaranteed to have; anything shop-specific belongs in the catalogue,
+   * where deleting the category also removes the way in.
+   */
   occasions: [
     { label: "Birthday", href: routes.store.collection("birthday") },
     { label: "Anniversary", href: routes.store.collection("anniversary") },
     { label: "Wedding", href: routes.store.weddingCakes },
-    { label: "Kids Party", href: routes.store.collection("custom") },
   ] satisfies MegaMenuLink[],
   featured: {
     title: "Seasonal Collection",

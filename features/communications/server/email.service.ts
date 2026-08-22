@@ -244,7 +244,7 @@ export async function publicBaseUrl(): Promise<string> {
 /**
  * Whether an origin is one a customer's mail client could actually open.
  *
- * The SEO store SEEDS `canonicalBaseUrl` as "https://www.monginis.example", and
+ * The SEO store SEEDS `canonicalBaseUrl` as "https://www.your-bakery.example", and
  * `.example` is reserved by RFC 2606 precisely so that it never resolves. Until
  * a shop edited its SEO settings or set NEXT_PUBLIC_SITE_URL, every order
  * confirmation therefore went out with a "view your invoice" link pointing at a

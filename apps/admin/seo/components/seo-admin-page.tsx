@@ -357,7 +357,7 @@ export function SeoAdminPage() {
                 onChange={(e) =>
                   editGlobal((prev) => ({ ...prev, titleSuffix: e.target.value }))
                 }
-                placeholder="| Monginis"
+                placeholder="| Your Bakery"
               />
             </div>
           </div>
@@ -470,7 +470,7 @@ export function SeoAdminPage() {
                 onChange={(e) =>
                   editGlobal((prev) => ({ ...prev, twitterSite: e.target.value }))
                 }
-                placeholder="@monginis"
+                placeholder="@yourbakery"
               />
             </div>
             <div className="space-y-2">
@@ -481,7 +481,7 @@ export function SeoAdminPage() {
                 onChange={(e) =>
                   editGlobal((prev) => ({ ...prev, twitterCreator: e.target.value }))
                 }
-                placeholder="@monginis"
+                placeholder="@yourbakery"
               />
             </div>
             <div className="space-y-2">

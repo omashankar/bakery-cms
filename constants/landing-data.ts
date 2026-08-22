@@ -75,23 +75,49 @@ export interface LandingFaq {
   answer: string;
 }
 
+/**
+ * Generic on purpose, and NOT blank.
+ *
+ * These three seed the hero headline, the About page's opening heading, and
+ * every `<meta name="description">` the site has. Blanking them to avoid
+ * publishing someone else's words went too far: a fresh install then rendered an
+ * empty `<h1>`, an empty `<h2>` and no meta description anywhere, with nothing
+ * in the admin to show the holes were there.
+ *
+ * The line the contact fields below draw is between a CLAIM and a CATEGORY. An
+ * address or a phone number asserts a fact that can be wrong, and a customer
+ * can act on it — turn up at a shut door, ring a dead line. "Freshly baked
+ * cakes" asserts nothing a bakery would want to deny. So these get neutral
+ * copy and `contactInfo` gets nothing.
+ */
 export const brandInfo = {
-  name: "Monginis",
-  tagline: "Crafting Sweet Memories Since 1956",
-  description:
-    "India's beloved bakery brand — premium cakes, pastries, and confections made with love for every celebration.",
+  name: "Your Bakery",
+  tagline: "Freshly baked, every day",
+  description: "Freshly baked cakes, pastries and confections, made to order.",
 };
 
+/**
+ * Every field here is BLANK on purpose, and blanking them was a fix.
+ *
+ * `defaultContactSettings` is what CREATES the settings singleton, so whatever
+ * sits here is what a shop that never opens Settings → Contact publishes as its
+ * own. It used to hold a real-looking Mumbai address, an 1800 number and a
+ * Mumbai map pin — so a bakery in Kota that installed this CMS advertised a
+ * shop 900 km away, as a live `tel:` link.
+ *
+ * Blank is the honest seed: `chosen()` maps both "empty" and "still equal to
+ * the shipped value" to `""`, and each render site then omits the row entirely
+ * rather than printing something nobody typed.
+ *
+ * `businessHours` below is deliberately NOT blanked — it is the identity
+ * `chosenList` compares against, and emptying it would make a seeded shop start
+ * publishing hours it never chose.
+ */
 export const contactInfo = {
-  address: "123 Baker Street, Mumbai, Maharashtra 400001",
-  phone: "+91 1800-123-4567",
-  // A real, reachable address. `hello@monginis.com` is a domain this project
-  // does not own, and it is the fallback the storefront shows whenever
-  // Settings → Contact is empty — so a customer clicking "email us" was
-  // writing to nobody.
-  email: "sumanom7014106@gmail.com",
-  mapEmbedUrl:
-    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3771.626326424726!2d72.8776559!3d19.0759837!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c6306644edc1%3A0x5da4ed8f8d648c69!2sMumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin",
+  address: "",
+  phone: "",
+  email: "",
+  mapEmbedUrl: "",
 };
 
 export const businessHours = [
