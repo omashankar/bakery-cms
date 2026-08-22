@@ -20,7 +20,7 @@ import {
   DesignSection,
 } from "@/components/design-system/design-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import { BakeryCmsBrand } from "@/components/shared/bakery-cms-brand";
+import { AppBrand } from "@/components/shared/app-brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Accordion,
@@ -251,7 +251,7 @@ export function DesignSystemPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 border-b border-border bg-card">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <BakeryCmsBrand subtitle="Design System" size="md" />
+          <AppBrand subtitle="Design System" size="md" />
           <div className="flex shrink-0 items-center gap-2">
             <Badge variant="outline" className="hidden sm:inline-flex">
               Mode: {modeLabel}

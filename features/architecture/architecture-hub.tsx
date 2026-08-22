@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, FolderTree } from "lucide-react";
-import { BakeryCmsBrand } from "@/components/shared/bakery-cms-brand";
+import { AppBrand } from "@/components/shared/app-brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,7 +94,7 @@ export function ArchitectureHub() {
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <BakeryCmsBrand subtitle="Architecture Hub" size="md" />
+          <AppBrand subtitle="Architecture Hub" size="md" />
           <div className="flex items-center gap-2">
             <Badge variant="accent">Phase 20</Badge>
             <ThemeToggle />

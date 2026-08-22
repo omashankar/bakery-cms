@@ -151,3 +151,61 @@ describe("whose account the profile screen is showing", () => {
     expect(fn).toContain("text: body,");
   });
 });
+
+/** Comments quoting old code are not the code. */
+const code = (path: string) =>
+  source(path)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+/**
+ * Whose name heads the admin panel.
+ *
+ * The sidebar wrote the CMS PRODUCT's name into itself, so every shop's control
+ * panel was headed with the vendor's brand instead of the shop's — and because
+ * that name carries a trade in it, nine of the ten business types this software
+ * runs were headed with a word for a trade they are not in. A florist's admin
+ * said "Bakery CMS".
+ *
+ * The vendor's own pages keep it. They are about the product.
+ */
+describe("the admin panel's brand", () => {
+  const SIDEBAR = "apps/admin/components/admin-sidebar.tsx";
+  const BRAND = "components/shared/app-brand.tsx";
+
+  it("names the shop, not the software", () => {
+    const sidebar = code(SIDEBAR);
+    // Read from settings, and handed to the brand block.
+    expect(sidebar).toContain("getGeneralSettings().siteName");
+    expect(sidebar).toMatch(/name=\{shopName/);
+    // The product's name may not be written into a shop's panel.
+    expect(sidebar, "the sidebar hardcodes the product name").not.toContain("Bakery CMS");
+  });
+
+  it("does not show the seeded name for a frame before the real one lands", () => {
+    // The settings store answers from the shipped seed until the server's copy
+    // arrives, so rendering straight away showed the seed and then swapped.
+    const sidebar = code(SIDEBAR);
+    expect(sidebar).toContain("settingsHydration.hasSettled()");
+    expect(sidebar).toMatch(/pending=\{brandPending\}/);
+
+    const brand = code(BRAND);
+    // A placeholder, not the name it is about to replace.
+    expect(brand).toMatch(/pending \?[\s\S]{0,200}animate-pulse/);
+  });
+
+  it("leaves the product's own pages saying the product's name", () => {
+    // Passing no `name` takes the component's default, which is the product.
+    for (const vendorPage of [
+      "features/architecture/architecture-hub.tsx",
+      "features/design-system/design-system-page.tsx",
+    ]) {
+      const src = code(vendorPage);
+      expect(src, `${vendorPage} no longer renders the brand`).toContain("<AppBrand");
+      expect(src, `${vendorPage} overrides the product name`).not.toMatch(/<AppBrand[^>]*\bname=/);
+    }
+    // And the default is still the product, so those pages keep it.
+    expect(code(BRAND)).toMatch(/PRODUCT_NAME = "Bakery CMS"/);
+    expect(code(BRAND)).toMatch(/name = PRODUCT_NAME/);
+  });
+});

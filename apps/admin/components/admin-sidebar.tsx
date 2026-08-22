@@ -47,7 +47,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { BakeryCmsBrand } from "@/components/shared/bakery-cms-brand";
+import { AppBrand } from "@/components/shared/app-brand";
 import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
@@ -58,6 +58,7 @@ import {
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
+import { settingsHydration } from "@/features/settings/lib/settings-api";
 import {
   getGeneralSettings,
   getModuleSettings,
@@ -407,6 +408,22 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   // Wedding Builder is bakery-only: hidden for other business types or when the
   // module is off. Hidden from the sidebar only — the route/page still exist.
   const [hideWedding, setHideWedding] = useState(false);
+  /**
+   * Whose panel this is.
+   *
+   * The sidebar named the CMS product, hardcoded, so every shop's admin was
+   * headed with the vendor's brand — and nine of the ten business types this
+   * runs were headed with the word "Bakery". It reads the shop's own name now.
+   * The vendor's mark still belongs on the platform and design-system pages,
+   * which are about the product; this one is not.
+   */
+  const [shopName, setShopName] = useState("");
+  /**
+   * The settings store answers from the shipped seed until the server's copy
+   * lands, so rendering the name straight away would show the seed for a frame
+   * and then swap it. `AppBrand` draws a placeholder while this is true.
+   */
+  const [brandPending, setBrandPending] = useState(true);
   const [openMenu, setOpenMenu] = useState<string | null>(() => findOpenMenuHref(pathname));
 
   useEffect(() => {
@@ -422,15 +439,28 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       setHideWedding(!isBakery || !getModuleSettings().weddingBuilder);
     }
 
+    function refreshBrand() {
+      // Both read together: hydration is what makes the name trustworthy, and
+      // the same event announces it, so they can never disagree.
+      setShopName(getGeneralSettings().siteName?.trim() ?? "");
+      setBrandPending(!settingsHydration.hasSettled());
+    }
+
     refreshBadges();
     refreshModules();
+    refreshBrand();
+
+    function onSettingsUpdated() {
+      refreshModules();
+      refreshBrand();
+    }
 
     const unsubscribeBadges = subscribeToAdminData(refreshBadges);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, onSettingsUpdated);
 
     return () => {
       unsubscribeBadges();
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, onSettingsUpdated);
     };
   }, []);
 
@@ -469,8 +499,12 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
           inDrawer ? "pr-11" : ""
         )}
       >
-        <BakeryCmsBrand
+        <AppBrand
           href={routes.admin.dashboard}
+          // The shop's name, not the product's. A blank one falls back to the
+          // component's default rather than heading the panel with nothing.
+          name={shopName || undefined}
+          pending={brandPending}
           subtitle="Admin Panel"
           size="sm"
           collapsed={collapsed}
