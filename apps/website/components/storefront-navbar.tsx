@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/shared/brand-mark";
 import { MegaMenu, MobileShopLinks } from "@/components/storefront/mega-menu";
 import {
   CustomerAuthModal,
@@ -34,10 +35,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   // carries the admin's real store name / logo / nav, no defaults-then-swap flash.
   const [siteName] = useState(chrome.siteName);
   const [logo] = useState(chrome.logo);
-  // An admin can point this anywhere, and anywhere can 404 — a stale path, a
-  // deleted upload, a CDN that moved. A broken-image glyph in the header is
-  // worse than the letter mark it replaced, so fall back to it.
-  const [logoBroken, setLogoBroken] = useState(false);
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
   const [showSearch] = useState(chrome.showSearch);
@@ -177,55 +174,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href={routes.store.home} className="flex items-center gap-2.5">
-          {/*
-            A shop's logo is usually a WORDMARK — the cupcake AND the name, in
-            one wide image. This rendered it into a 36×36 square, so a 2:1 logo
-            shrank to 36×18 and its lettering became unreadable; then the shop's
-            name was printed again beside it, so the header read
-            "[logo saying Sweet Crumbs Bakery] Sweet Crumbs Bakery".
-
-            So a logo now replaces the name rather than sitting next to it:
-            full header height, natural width, capped so a very wide one cannot
-            push the nav off the row. The name is still the accessible name via
-            `alt`, so screen readers and a failed image both still get it.
-
-            Without a logo, nothing changes: the letter badge and the name, as
-            before — which is also where a broken logo URL lands.
-          */}
-          {logo && !logoBroken ? (
-            // An admin-typed URL on any host, so next/image is not usable here:
-            // it would need every such host allow-listed in next.config
-            // remotePatterns, and an un-listed one throws instead of rendering.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logo}
-              alt={siteName}
-              onError={() => setLogoBroken(true)}
-              // The logo is in the SERVER-rendered HTML, so a 404 can resolve
-              // before the bundle has even downloaded — and React does not
-              // replay load/error events that completed before hydration. The
-              // handler above would never fire and the header would keep a
-              // broken-image glyph forever. This asks the element directly.
-              ref={(node) => {
-                if (node?.complete && node.naturalWidth === 0) setLogoBroken(true);
-              }}
-              // 50px inside the 64px row. Taller than the letter badge it
-              // replaces on purpose: a wordmark carries lettering, and at 36px
-              // a logo's second line — a tagline, an "EST. 2026" — was a smear.
-              className="h-[50px] w-auto max-w-[200px] object-contain object-left"
-            />
-          ) : (
-            <>
-              <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
-                <span className="font-heading text-sm font-bold text-white">
-                  {logoLetter}
-                </span>
-              </div>
-              <span className="font-heading text-lg font-bold tracking-tight text-foreground">
-                {siteName}
-              </span>
-            </>
-          )}
+          <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">

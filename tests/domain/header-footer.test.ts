@@ -317,32 +317,26 @@ describe("what these screens say after a refusal", () => {
 
 /**
  * A shop's logo is usually its NAME, drawn — a wide wordmark, not a square icon.
+ *
+ * And it belongs at BOTH ends of the page. The header and the footer each drew
+ * the mark themselves, so when the header learned about logos the footer did
+ * not: a shop that uploaded its wordmark got it at the top and a letter badge
+ * at the bottom of the same page.
  */
-describe("the navbar logo", () => {
+describe("the brand mark", () => {
+  const MARK = "components/shared/brand-mark.tsx";
+
   /**
-   * The logo ternary cut into three, and the third piece is the point.
-   *
-   * A first version of this sliced only "logo branch" and "everything after the
-   * else", which put the code AFTER the closed ternary inside the fallback
-   * slice — exactly where the unconditional name used to sit. Both assertions
-   * then passed against the very layout they were written to reject. The
-   * `afterTernary` slice is what makes "rendered in both branches" detectable.
+   * The two returns, cut apart so neither can be satisfied by the other's code.
+   * The logo path is an early return; the badge path is the last one.
    */
-  function logoBranches() {
-    const navbar = code("apps/website/components/storefront-navbar.tsx");
-    const start = navbar.indexOf("{logo && !logoBroken ? (");
-    expect(start, "the logo branch moved — this test is scoped to it").toBeGreaterThan(-1);
-    const elseAt = navbar.indexOf(") : (", start);
-    expect(elseAt, "the logo ternary has no fallback branch").toBeGreaterThan(start);
-    const closeAt = navbar.indexOf(")}", elseAt);
-    expect(closeAt, "the logo ternary never closes").toBeGreaterThan(elseAt);
-    const end = navbar.indexOf("</Link>", closeAt);
-    expect(end, "the brand link never closes").toBeGreaterThan(closeAt);
-    return {
-      withLogo: navbar.slice(start, elseAt),
-      withoutLogo: navbar.slice(elseAt, closeAt),
-      afterTernary: navbar.slice(closeAt, end),
-    };
+  function branches() {
+    const src = code(MARK);
+    const guardAt = src.indexOf("if (logo && !logoBroken)");
+    expect(guardAt, "the logo guard moved — this test is scoped to it").toBeGreaterThan(-1);
+    const fallbackAt = src.lastIndexOf("return (");
+    expect(fallbackAt, "no fallback return after the logo guard").toBeGreaterThan(guardAt);
+    return { withLogo: src.slice(guardAt, fallbackAt), withoutLogo: src.slice(fallbackAt) };
   }
 
   it("gives a wordmark its own width instead of crushing it into a square", () => {
@@ -352,41 +346,65 @@ describe("the navbar logo", () => {
     // The SHAPE is pinned, not the number: bound the height, leave the width
     // free, cap it. Retuning the height is a design call and should not have to
     // come here; rendering a logo into a fixed square is the defect.
-    const { withLogo } = logoBranches();
+    const { withLogo } = branches();
     expect(withLogo).not.toContain("size-9");
     // No trailing \b: after the `]` of an arbitrary value there is no word
     // boundary, so `h-[50px]` failed to match while `h-9` passed — the
     // assertion would have rejected the very form it was widened to allow.
     expect(withLogo).toMatch(/\bh-(?:\d+|\[[^\]]+\])/);
     expect(withLogo).toContain("w-auto");
-    // Capped, or a very wide logo pushes the nav off the row.
     expect(withLogo).toMatch(/max-w-\[\d+px\]/);
   });
 
   it("does not print the shop's name beside a logo that already says it", () => {
-    // The name used to render unconditionally, after the ternary. A wordmark
-    // logo then produced "[logo reading Sweet Crumbs Bakery] Sweet Crumbs Bakery".
-    //
     // `>` first: the name as ELEMENT TEXT is what a customer reads. Matching a
     // bare `{siteName}` would also hit `alt={siteName}` on the image, which must
     // stay — so the assertion would have been unfailable in the direction that
     // matters, and green whether the visible name was there or not.
     const VISIBLE_NAME = />\s*\{siteName\}/;
-    const { withLogo, withoutLogo, afterTernary } = logoBranches();
-    // Inside the no-logo branch, and ONLY there.
+    const { withLogo, withoutLogo } = branches();
     expect(withoutLogo).toMatch(VISIBLE_NAME);
     expect(withLogo).not.toMatch(VISIBLE_NAME);
-    // The one that catches the original bug: rendered after the ternary closes,
-    // the name reached both branches and sat beside the wordmark.
-    expect(afterTernary).not.toMatch(VISIBLE_NAME);
   });
 
   it("keeps the name reachable when the image is the only thing carrying it", () => {
-    // Losing the visible name must not lose it for a screen reader, and a
-    // logo URL that 404s still falls back to the letter badge and the name.
-    const { withLogo, withoutLogo } = logoBranches();
+    // Losing the visible name must not lose it for a screen reader, and a logo
+    // URL that 404s still falls back to the letter badge and the name.
+    const { withLogo, withoutLogo } = branches();
     expect(withLogo).toContain("alt={siteName}");
     expect(withLogo).toContain("setLogoBroken(true)");
-    expect(withoutLogo).toContain("{logoLetter}");
+    expect(withoutLogo).toContain("{letter}");
+  });
+
+  it("is the same mark in the header and the footer", () => {
+    // Two hand-drawn copies is what let them drift. Pinning both call sites is
+    // the assertion that would have caught the footer being left behind.
+    for (const caller of [
+      "apps/website/components/storefront-navbar.tsx",
+      "apps/website/landing/components/landing-footer.tsx",
+    ]) {
+      const src = code(caller);
+      expect(src, `${caller} does not render the shared mark`).toContain("<BrandMark");
+      expect(src).toContain('from "@/components/shared/brand-mark"');
+      // Neither may keep its own copy of the badge markup.
+      expect(src, `${caller} still draws its own letter badge`).not.toContain(
+        "items-center justify-center rounded-xl bg-bakery-700",
+      );
+    }
+  });
+
+  it("takes the letter an admin typed, not one derived from the name", () => {
+    // The footer read `siteName.charAt(0)`, so the letter set in Appearance →
+    // Header reached the navbar and not the footer. Both pass `logoLetter` now,
+    // and the derivation is the mark's own fallback for when it is blank.
+    const footer = code("apps/website/landing/components/landing-footer.tsx");
+    expect(footer).toContain("logoLetter={chrome.logoLetter}");
+    expect(footer).not.toMatch(/brandInfo\.name\.charAt\(0\)/);
+
+    const navbar = code("apps/website/components/storefront-navbar.tsx");
+    expect(navbar).toContain("logoLetter={logoLetter}");
+
+    const mark = code(MARK);
+    expect(mark).toContain("logoLetter.trim() || siteName.trim().charAt(0).toUpperCase()");
   });
 });
