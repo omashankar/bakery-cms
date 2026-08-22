@@ -314,3 +314,71 @@ describe("what these screens say after a refusal", () => {
     }
   });
 });
+
+/**
+ * A shop's logo is usually its NAME, drawn — a wide wordmark, not a square icon.
+ */
+describe("the navbar logo", () => {
+  /**
+   * The logo ternary cut into three, and the third piece is the point.
+   *
+   * A first version of this sliced only "logo branch" and "everything after the
+   * else", which put the code AFTER the closed ternary inside the fallback
+   * slice — exactly where the unconditional name used to sit. Both assertions
+   * then passed against the very layout they were written to reject. The
+   * `afterTernary` slice is what makes "rendered in both branches" detectable.
+   */
+  function logoBranches() {
+    const navbar = code("apps/website/components/storefront-navbar.tsx");
+    const start = navbar.indexOf("{logo && !logoBroken ? (");
+    expect(start, "the logo branch moved — this test is scoped to it").toBeGreaterThan(-1);
+    const elseAt = navbar.indexOf(") : (", start);
+    expect(elseAt, "the logo ternary has no fallback branch").toBeGreaterThan(start);
+    const closeAt = navbar.indexOf(")}", elseAt);
+    expect(closeAt, "the logo ternary never closes").toBeGreaterThan(elseAt);
+    const end = navbar.indexOf("</Link>", closeAt);
+    expect(end, "the brand link never closes").toBeGreaterThan(closeAt);
+    return {
+      withLogo: navbar.slice(start, elseAt),
+      withoutLogo: navbar.slice(elseAt, closeAt),
+      afterTernary: navbar.slice(closeAt, end),
+    };
+  }
+
+  it("gives a wordmark its own width instead of crushing it into a square", () => {
+    // `size-9` is 36×36. A 2:1 wordmark rendered into it came out 36×18 and its
+    // lettering was unreadable — the one thing a wordmark is for.
+    const { withLogo } = logoBranches();
+    expect(withLogo).not.toContain("size-9");
+    expect(withLogo).toContain("h-9 w-auto");
+    // Capped, or a very wide logo pushes the nav off the row.
+    expect(withLogo).toMatch(/max-w-\[\d+px\]/);
+  });
+
+  it("does not print the shop's name beside a logo that already says it", () => {
+    // The name used to render unconditionally, after the ternary. A wordmark
+    // logo then produced "[logo reading Sweet Crumbs Bakery] Sweet Crumbs Bakery".
+    //
+    // `>` first: the name as ELEMENT TEXT is what a customer reads. Matching a
+    // bare `{siteName}` would also hit `alt={siteName}` on the image, which must
+    // stay — so the assertion would have been unfailable in the direction that
+    // matters, and green whether the visible name was there or not.
+    const VISIBLE_NAME = />\s*\{siteName\}/;
+    const { withLogo, withoutLogo, afterTernary } = logoBranches();
+    // Inside the no-logo branch, and ONLY there.
+    expect(withoutLogo).toMatch(VISIBLE_NAME);
+    expect(withLogo).not.toMatch(VISIBLE_NAME);
+    // The one that catches the original bug: rendered after the ternary closes,
+    // the name reached both branches and sat beside the wordmark.
+    expect(afterTernary).not.toMatch(VISIBLE_NAME);
+  });
+
+  it("keeps the name reachable when the image is the only thing carrying it", () => {
+    // Losing the visible name must not lose it for a screen reader, and a
+    // logo URL that 404s still falls back to the letter badge and the name.
+    const { withLogo, withoutLogo } = logoBranches();
+    expect(withLogo).toContain("alt={siteName}");
+    expect(withLogo).toContain("setLogoBroken(true)");
+    expect(withoutLogo).toContain("{logoLetter}");
+  });
+});

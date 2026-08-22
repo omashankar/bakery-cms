@@ -177,6 +177,21 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href={routes.store.home} className="flex items-center gap-2.5">
+          {/*
+            A shop's logo is usually a WORDMARK — the cupcake AND the name, in
+            one wide image. This rendered it into a 36×36 square, so a 2:1 logo
+            shrank to 36×18 and its lettering became unreadable; then the shop's
+            name was printed again beside it, so the header read
+            "[logo saying Sweet Crumbs Bakery] Sweet Crumbs Bakery".
+
+            So a logo now replaces the name rather than sitting next to it:
+            full header height, natural width, capped so a very wide one cannot
+            push the nav off the row. The name is still the accessible name via
+            `alt`, so screen readers and a failed image both still get it.
+
+            Without a logo, nothing changes: the letter badge and the name, as
+            before — which is also where a broken logo URL lands.
+          */}
           {logo && !logoBroken ? (
             // An admin-typed URL on any host, so next/image is not usable here:
             // it would need every such host allow-listed in next.config
@@ -194,18 +209,20 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               ref={(node) => {
                 if (node?.complete && node.naturalWidth === 0) setLogoBroken(true);
               }}
-              className="size-9 rounded-xl object-contain shadow-sm"
+              className="h-9 w-auto max-w-[200px] object-contain object-left"
             />
           ) : (
-            <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
-              <span className="font-heading text-sm font-bold text-white">
-                {logoLetter}
+            <>
+              <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
+                <span className="font-heading text-sm font-bold text-white">
+                  {logoLetter}
+                </span>
+              </div>
+              <span className="font-heading text-lg font-bold tracking-tight text-foreground">
+                {siteName}
               </span>
-            </div>
+            </>
           )}
-          <span className="font-heading text-lg font-bold tracking-tight text-foreground">
-            {siteName}
-          </span>
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
