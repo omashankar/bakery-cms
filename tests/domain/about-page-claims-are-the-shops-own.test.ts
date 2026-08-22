@@ -123,7 +123,18 @@ describe("the seeded About page", () => {
     const seedEnd = repository.indexOf("export function", seedStart + 10);
     const seed = repository.slice(seedStart, seedEnd > 0 ? seedEnd : undefined);
 
-    for (const claim of ["Since 1965", "1M+", "60+", "500+", "Six decades"]) {
+    for (const claim of [
+      "Since 1965",
+      "Since 1956",
+      "1M+",
+      "60+",
+      "500+",
+      "Six decades",
+      // The brand itself, not just its claims: the seed also carried the demo
+      // shop's NAME into every new install's About copy and meta title.
+      "Monginis",
+      "India's beloved",
+    ]) {
       expect(seed, `the seed ships "${claim}"`).not.toContain(claim);
     }
   });

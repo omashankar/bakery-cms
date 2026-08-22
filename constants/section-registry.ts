@@ -1,4 +1,4 @@
-import { brandInfo, contactInfo } from "@/constants/landing-data";
+import { brandInfo } from "@/constants/landing-data";
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import { routes } from "@/constants/routes";
 import type {
@@ -21,7 +21,10 @@ export interface HomepageSectionRegistryEntry {
 /** Seed slides for a fresh hero carousel — all editable in the builder. */
 export const DEFAULT_HERO_SLIDES: HeroSlideContent[] = [
   {
-    badge: "Since 1965 · India's Favourite Bakery",
+    // No founding year, no superlative: the badge renders only when truthy
+    // (hero-carousel.tsx), and a claim the shop cannot stand behind is worse
+    // than no badge. The shop types its own in the builder.
+    badge: "",
     headline: brandInfo.tagline,
     subtext: brandInfo.description,
     primaryLabel: "Shop Cakes",
@@ -644,7 +647,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       ctaLabel: "Contact Us",
       ctaHref: routes.store.contact,
       showPhone: true,
-      phone: contactInfo.phone,
+      // Blank, not `contactInfo.phone`: this section stores its OWN copy of the
+      // number, so seeding it from the shipped placeholder published a demo
+      // 1800 line as a live `tel:` link on the homepage.
+      phone: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },

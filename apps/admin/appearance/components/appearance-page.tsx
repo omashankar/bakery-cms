@@ -213,7 +213,7 @@ export function AppearancePage() {
       resetDisabled={!canSave}
       saveDisabled={!hasValidAppearanceColors(settings) || !canSave}
       resetTitle="Reset appearance?"
-      resetDescription="Restore the Monginis Classic preset and default radius. Custom colors will be lost."
+      resetDescription="Restore the Classic Bakery preset and default radius. Custom colors will be lost."
     >
       <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">

@@ -28,7 +28,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             <Link href={routes.store.home} className="flex items-center gap-2.5">
               <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700">
                 <span className="font-heading text-sm font-bold text-white">
-                  {brandInfo.name.charAt(0) || "M"}
+                  {brandInfo.name.charAt(0).toUpperCase()}
                 </span>
               </div>
               <span className="font-heading text-lg font-bold">{brandInfo.name}</span>

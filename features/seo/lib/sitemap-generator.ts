@@ -13,7 +13,7 @@ export interface SitemapGating {
  *
  * This read `getGlobalSeo()`/`getSeoRoutes()`, which on the server answer
  * from a module variable only client code writes — so every URL in the
- * sitemap carried the seeded `https://www.monginis.example` base, and each
+ * sitemap carried the seeded `https://www.your-bakery.example` base, and each
  * `lastModified` was the moment the module happened to load.
  */
 export function buildSitemapEntriesFrom(

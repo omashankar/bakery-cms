@@ -30,9 +30,9 @@ describe("what the SEO endpoint will store", () => {
   });
 
   it("refuses an address a crawler cannot use", () => {
-    // The ordinary thing to type, and it produces `Sitemap: monginis.com/sitemap.xml`
+    // The ordinary thing to type, and it produces `Sitemap: mybakery.com/sitemap.xml`
     // — broken in a way nobody sees.
-    expect(parse({ siteName: "Shop", canonicalBaseUrl: "monginis.com" }).success).toBe(false);
+    expect(parse({ siteName: "Shop", canonicalBaseUrl: "mybakery.com" }).success).toBe(false);
     expect(parse({ siteName: "Shop", canonicalBaseUrl: "javascript:alert(1)" }).success).toBe(
       false,
     );

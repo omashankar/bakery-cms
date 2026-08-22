@@ -264,7 +264,8 @@ describe("what this screen claims", () => {
 
   it("shows the shop its OWN name and currency", () => {
     const preview = code("apps/admin/appearance/components/appearance-preview.tsx");
-    // "M" / "Monginis" / "₹1,299" — another shop's identity, in the one panel
+    // A fixed letter / a fixed shop name / "₹1,299" — the demo brand's identity
+    // rather than this shop's, in the one panel
     // whose whole job is to show this shop its storefront.
     expect(preview).not.toContain("Monginis");
     expect(preview).not.toContain("₹1,299");

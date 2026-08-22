@@ -5,7 +5,7 @@
  * answered from a module variable that only client code ever writes — the demo
  * seed. So robots.txt, sitemap.xml and the canonical/title/OG metadata of every
  * storefront page served the seeded values forever, including a canonical base
- * of `https://www.monginis.example`, a domain RFC 2606 reserves so that it can
+ * of `https://www.your-bakery.example`, a domain RFC 2606 reserves so that it can
  * never resolve. The sitemap handed to Google pointed at a host that does not
  * exist.
  *

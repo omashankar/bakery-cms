@@ -79,7 +79,7 @@ export function buildRouteMetadataFrom(store: SeoStore, routeKey: string): Metad
   return {
     // `absolute`, so the root layout's "%s | <site name>" template does not
     // apply: `resolveRouteTitle` has already appended the SEO title suffix, and
-    // letting the template run again renders "Wedding Cakes | Monginis | Monginis".
+    // letting the template run again renders "Wedding Cakes | Acme | Acme".
     title: { absolute: title },
     description,
     keywords:

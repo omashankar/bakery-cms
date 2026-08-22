@@ -30,7 +30,7 @@ interface Identity {
 }
 
 const SEED: Identity = { name: "Demo Bakery" };
-const SERVER: Identity = { name: "Monginis Andheri" };
+const SERVER: Identity = { name: "Sweet Crumbs Kota" };
 const UPDATED_EVENT = "test-store-updated";
 
 /** A gate that has NOT settled — the cold-load case every one of these is about. */

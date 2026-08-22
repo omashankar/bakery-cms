@@ -81,9 +81,16 @@ function HeroSlideView({
             "space-y-4 slide-in-from-bottom-4 [animation-delay:180ms]"
           )}
         >
-          <h1 className="font-heading text-[2.25rem] font-bold leading-[1.1] tracking-tight text-bakery-950 sm:text-[2.75rem] lg:text-5xl">
-            {accentLastWord(slide.headline)}
-          </h1>
+          {/* Guarded like the badge above and the subtext below. A slide can
+              reach here with an empty headline — the section filter admits any
+              slide that has EITHER a headline or an image — and an unguarded
+              h1 then rendered as an empty heading block with full type styling
+              on it, which is worse than no heading. */}
+          {slide.headline ? (
+            <h1 className="font-heading text-[2.25rem] font-bold leading-[1.1] tracking-tight text-bakery-950 sm:text-[2.75rem] lg:text-5xl">
+              {accentLastWord(slide.headline)}
+            </h1>
+          ) : null}
           {slide.subtext ? (
             <p className="max-w-md text-base leading-relaxed text-muted-foreground sm:mx-auto sm:text-lg lg:mx-0">
               {slide.subtext}

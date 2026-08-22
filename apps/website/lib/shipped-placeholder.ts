@@ -19,9 +19,34 @@
  * contact page and the site footer beside it were still doing
  * `contact.phone || defaultContact.phone`.
  */
+/**
+ * Contact values this install used to ship, kept so they can still be REJECTED.
+ *
+ * These are not seeds and must never be rendered — `contactInfo` is blank now.
+ * They are here because blanking the seed also deleted the thing `chosen()`
+ * compared against: with the placeholder empty, the check below collapses to a
+ * truthiness test, and any shop whose settings still hold these un-edited
+ * values — the exact population the rule exists to protect — would start
+ * publishing them, the phone as a live `tel:` in every footer.
+ *
+ * The email that shipped alongside these is deliberately absent: it is a real,
+ * reachable address belonging to this install's owner, so suppressing it would
+ * be the bug rather than the fix.
+ *
+ * Delete an entry once no install can still be holding it.
+ */
+const LEGACY_SEEDED_CONTACT = [
+  "123 Baker Street, Mumbai, Maharashtra 400001",
+  "+91 1800-123-4567",
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3771.626326424726!2d72.8776559!3d19.0759837!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c6306644edc1%3A0x5da4ed8f8d648c69!2sMumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin",
+].map((entry) => entry.trim());
+
 export function chosen(value: string | undefined, placeholder: string): string {
   const trimmed = value?.trim() ?? "";
-  return trimmed && trimmed !== placeholder.trim() ? trimmed : "";
+  if (!trimmed) return "";
+  if (trimmed === placeholder.trim()) return "";
+  if (LEGACY_SEEDED_CONTACT.includes(trimmed)) return "";
+  return trimmed;
 }
 
 /**

@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { invoiceSettingsSchema } from "./payments.validators";
 
 const valid = {
-  companyName: "Monginis",
+  companyName: "Sweet Crumbs Bakery",
   tagline: "Sweet",
   logoUrl: "",
   address: "Mumbai",
-  email: "hi@monginis.com",
+  email: "hi@sweetcrumbs.example",
   phone: "999",
   website: "",
   gstNumber: "GST123",

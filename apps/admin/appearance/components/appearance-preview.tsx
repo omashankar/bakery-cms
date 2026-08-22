@@ -64,9 +64,9 @@ export function AppearancePreview({
   /**
    * The shop's OWN name, letter and currency.
    *
-   * These were hardcoded to "M", "Monginis" and "₹1,299" — another shop's
-   * identity, in the one panel whose entire job is to show this shop what its
-   * storefront looks like. The live navbar renders `chrome.logoLetter` and
+   * These were hardcoded to a fixed letter, a fixed shop name and "₹1,299" —
+   * the demo brand's identity rather than this shop's, in the one panel whose
+   * entire job is to show this shop what its storefront looks like. The live navbar renders `chrome.logoLetter` and
    * `chrome.siteName`, and prices use the configured currency, so the preview
    * was demonstrating a storefront nobody has.
    *

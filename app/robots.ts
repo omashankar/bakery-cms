@@ -7,7 +7,7 @@ import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
  *
  * This called `getGlobalSeo()`, which on the server answers from a module
  * variable that only client code ever writes. So robots.txt served the seeded
- * canonical base — `https://www.monginis.example`, a domain RFC 2606 reserves
+ * canonical base — `https://www.your-bakery.example`, a domain RFC 2606 reserves
  * so that it never resolves — and the seeded `allowIndexing`, whatever the
  * admin had saved. Confirmed live before the fix: the Sitemap line pointed at
  * a host that does not exist.
@@ -19,7 +19,7 @@ import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
  * `cookies()` or `connection()` either, so this really was prerendered at
  * build: an admin turning "Allow search engines to index this site" OFF saved
  * the field, and every crawler went on reading the copy baked at build time —
- * on a build without a database, the seeded `https://www.monginis.example` with
+ * on a build without a database, the seeded `https://www.your-bakery.example` with
  * indexing ALLOWED. The admin screen even links to /robots.txt as "already
  * generated and live".
  *

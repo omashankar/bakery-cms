@@ -124,10 +124,10 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         ...prev.seo,
         // Tracks the name until the admin edits the meta title themselves.
         //
-        // This was `prev.seo.metaTitle || `${name} | Monginis``, so the FIRST
+        // This was `prev.seo.metaTitle || `${name} | Acme``, so the FIRST
         // keystroke made it truthy and the `||` short-circuited for every one
         // after: typing "Rose Truffle Delight" left the SEO tab, the search
-        // preview card and the stored record all reading "R | Monginis". The
+        // preview card and the stored record all reading "R | Acme". The
         // brand was hard-coded too, in a CMS meant to run more than one shop.
         metaTitle: metaTitleTouched ? prev.seo.metaTitle : name,
       },

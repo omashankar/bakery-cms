@@ -48,8 +48,8 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
 
   // The root layout appends "| <shop>" to every title. An admin who writes the
   // shop's name into the meta title themselves — and every product here already
-  // carries one, because the form used to append a hard-coded "| Monginis" —
-  // would otherwise get it twice: "Black Forest Supreme | Monginis | Monginis".
+  // carries one, because the form used to append a hard-coded brand suffix —
+  // would otherwise get it twice: "Black Forest Supreme | Acme | Acme".
   // Taking the typed title as absolute respects what was written either way.
   const alreadyBranded =
     !!typed && !!siteName && typed.toLowerCase().endsWith(siteName.trim().toLowerCase());

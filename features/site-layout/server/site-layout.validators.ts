@@ -44,8 +44,8 @@ const seoRouteSchema = z
  * restore posts a hand-editable JSON file straight to this endpoint.
  *
  * `canonicalBaseUrl` is checked as a URL rather than merely a string, because
- * "monginis.com" without a scheme is an ordinary thing to type and produces a
- * `Sitemap: monginis.com/sitemap.xml` line no crawler can use — broken in a way
+ * "your-bakery.com" without a scheme is an ordinary thing to type and produces a
+ * `Sitemap: your-bakery.com/sitemap.xml` line no crawler can use — broken in a way
  * nobody sees.
  */
 const seoGlobalSchema = z

@@ -76,7 +76,7 @@ describe("the seeded transactional templates", () => {
     const reset = bySlug("password_reset");
     const rendered = renderTemplate(reset?.body ?? "", {
       customer_name: "Asha",
-      store_name: "Monginis",
+      store_name: "Sweet Crumbs Bakery",
       reset_code: "482913",
       expires_in: "10 minutes",
     });
@@ -120,7 +120,7 @@ describe("the seeded transactional templates", () => {
       order_number: "BK-1",
       delivery_date: "2026-08-01",
       delivery_address: "12 Bakery Lane",
-      store_name: "Monginis",
+      store_name: "Sweet Crumbs Bakery",
       store_phone: "+91 90000 00000",
       store_email: "hello@shop.in",
     });
@@ -133,7 +133,7 @@ describe("the seeded transactional templates", () => {
     const confirmation = bySlug("order_confirmation");
     const rendered = renderTemplate(confirmation?.body ?? "", {
       customer_name: "Asha",
-      store_name: "Monginis",
+      store_name: "Sweet Crumbs Bakery",
       order_number: "BK-20260730-1234",
       order_total: "₹1,250.00",
       payment_method: "Paid online",

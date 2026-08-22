@@ -146,7 +146,7 @@ export async function openRazorpayCheckout(options: OpenOptions): Promise<Razorp
       // The shop's configured site name, not a hardcoded demo brand.
       //
       // `brandName` was declared in these options and never supplied by the one
-      // caller, so every payment sheet was headed "Monginis" — a different
+      // caller, so every payment sheet was headed with the demo brand — a different
       // company from the storefront the customer is on, the invoice they get
       // and the confirmation they read. Nothing is misdirected (the merchant
       // account comes from the server's `keyId` and the signature is verified

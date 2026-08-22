@@ -32,16 +32,41 @@ describe("telling a chosen value from a shipped one", () => {
   });
 
   it("treats the shipped placeholder as never set", () => {
-    // The install ships these; a shop that never opened Settings has not
-    // chosen them, and publishing them is the same lie as publishing a blank.
-    expect(chosen(contactInfo.phone, contactInfo.phone)).toBe("");
-    expect(chosen(contactInfo.address, contactInfo.address)).toBe("");
-    expect(chosen(`  ${contactInfo.address}  `, contactInfo.address)).toBe("");
+    // Literals, NOT `contactInfo.*`. Those constants are blank now, so deriving
+    // the inputs from them made all three assertions `chosen("", "")` — true
+    // via the empty-string branch, and identical to the test above. The
+    // placeholder-equality clause could then be deleted outright and this suite
+    // would stay green. A test must not take its subject from the thing it is
+    // pinning.
+    expect(chosen("+91 98765 00000", "+91 98765 00000")).toBe("");
+    expect(chosen("7 Somewhere Road, Jaipur", "7 Somewhere Road, Jaipur")).toBe("");
+    expect(chosen("  7 Somewhere Road, Jaipur  ", "7 Somewhere Road, Jaipur")).toBe("");
+  });
+
+  it("still rejects the values this install used to ship, now that the seed is blank", () => {
+    // The seed was emptied so a fresh install publishes nothing. That also
+    // removed what `chosen()` compared against, so a shop still holding the old
+    // un-edited values would have started publishing them. `chosen` carries
+    // them as an explicit reject list; these pin that it does.
+    expect(chosen("123 Baker Street, Mumbai, Maharashtra 400001", "")).toBe("");
+    expect(chosen("+91 1800-123-4567", "")).toBe("");
+    expect(chosen("  +91 1800-123-4567  ", "")).toBe("");
+  });
+
+  it("the shipped contact seed is blank, so a fresh install publishes nothing", () => {
+    // Pinned separately from the rule above. Previously one property hid the
+    // other: the seed being blank was what made the placeholder rule untestable.
+    expect(contactInfo.address).toBe("");
+    expect(contactInfo.phone).toBe("");
+    expect(contactInfo.email).toBe("");
+    expect(contactInfo.mapEmbedUrl).toBe("");
   });
 
   it("keeps what the shop actually typed", () => {
-    expect(chosen("+91 98765 43210", contactInfo.phone)).toBe("+91 98765 43210");
-    expect(chosen("  9 Real Street, Delhi ", contactInfo.address)).toBe("9 Real Street, Delhi");
+    // Non-empty placeholders, so this exercises the "differs from shipped"
+    // branch rather than passing on the placeholder simply being blank.
+    expect(chosen("+91 98765 43210", "+91 98765 00000")).toBe("+91 98765 43210");
+    expect(chosen("  9 Real Street, Delhi ", "7 Somewhere Road, Jaipur")).toBe("9 Real Street, Delhi");
   });
 });
 

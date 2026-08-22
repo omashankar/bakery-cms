@@ -689,6 +689,19 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
   const items = props.testimonials
     ? selectStorefrontTestimonials(props.testimonials)
     : getStorefrontTestimonials();
+
+  /**
+   * Empty renders no section — the same rule every other section here follows,
+   * and this was the one that did not.
+   *
+   * Testimonials are the section a shop is most likely to empty deliberately:
+   * the ones it ships with are not its own, so drafting all of them is the
+   * correct first move. Doing that painted a full-height band with a heading
+   * and an empty grid under it — the shop looked like it had no customers
+   * rather than like it had not written this section yet.
+   */
+  if (items.length === 0) return null;
+
   return (
     <SectionShell {...props}>
       <SectionHeader
@@ -1003,17 +1016,25 @@ function InstagramSection(props: HomepageSectionRendererProps) {
   // placeholders count as "not set" — they were seeded, not chosen, and a shop
   // that has configured its own profile should not keep advertising the demo
   // account across seven links and a "Follow @…" button.
-  const SEED_HANDLE = "monginisofficial";
+  // The LEGACY value, kept verbatim on purpose. This is not a seed — the current
+  // seed sets no handle at all. Its only job is to RECOGNISE the handle stored
+  // on every homepage created before that change, so the shop's real profile
+  // outranks it. Renaming it to something neutral silently disabled the
+  // suppression and let the old handle win again, which is the opposite of what
+  // this constant is for. It goes when no install still carries the value.
+  const LEGACY_SEED_HANDLE = "monginisofficial";
   const SEED_URL = "https://instagram.com";
   const contentHandle = contentString(c, "instagramHandle");
   const contentUrl = contentString(c, "instagramUrl");
   const configured = props.instagram ?? null;
 
+  // No final fallback to a handle: with nothing stored and nothing configured
+  // this stays empty, and the section below renders no "Follow @…" button
+  // rather than advertising an account that does not exist.
   const handle =
-    (contentHandle && contentHandle !== SEED_HANDLE ? contentHandle : "") ||
+    (contentHandle && contentHandle !== LEGACY_SEED_HANDLE ? contentHandle : "") ||
     configured?.handle ||
-    contentHandle ||
-    SEED_HANDLE;
+    "";
 
   // Seven anchors below render this. It is builder-editable content, so it is
   // admin-typed text reaching an `href` exactly like `social[].href` was —
@@ -1029,14 +1050,15 @@ function InstagramSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          // The seeded copy reads "@monginisofficial — daily inspiration…", and
+          // The legacy copy reads "@<legacy handle> — daily inspiration…", and
           // that text is stored on every homepage created before this. Swapping
-          // the placeholder handle at RENDER time keeps the admin's own words
-          // and their stored content untouched, while a shop that has set its
-          // real Instagram stops advertising the demo account in prose.
-          description={contentString(c, "description", `@${handle}`).replaceAll(
-            `@${SEED_HANDLE}`,
-            `@${handle}`
+          // it at RENDER time keeps the admin's own words and their stored
+          // content untouched, while a shop that has set its real Instagram
+          // stops advertising the old account in prose. With no handle at all
+          // the mention is dropped rather than replaced with a bare "@".
+          description={contentString(c, "description", handle ? `@${handle}` : "").replaceAll(
+            `@${LEGACY_SEED_HANDLE}`,
+            handle ? `@${handle}` : ""
           )}
         />
       </ScrollReveal>
@@ -1048,7 +1070,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="group relative block aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
-            aria-label={`View @${handle} on Instagram`}
+            aria-label={handle ? `View @${handle} on Instagram` : "View our Instagram"}
           >
             <Image
               src={post.image}
@@ -1063,12 +1085,17 @@ function InstagramSection(props: HomepageSectionRendererProps) {
           </a>
         ))}
       </StaggerReveal>
-      <ScrollReveal className="mt-8 text-center">
-        <Button variant="outline" render={<a href={profileUrl} target="_blank" rel="noopener noreferrer" />}>
-          <Camera className="size-4" />
-          Follow @{handle}
-        </Button>
-      </ScrollReveal>
+      {/* No handle means no account to follow. The button used to fall back to
+          the seeded handle, so a shop with no Instagram invited its customers
+          to follow somebody else's. */}
+      {handle ? (
+        <ScrollReveal className="mt-8 text-center">
+          <Button variant="outline" render={<a href={profileUrl} target="_blank" rel="noopener noreferrer" />}>
+            <Camera className="size-4" />
+            Follow @{handle}
+          </Button>
+        </ScrollReveal>
+      ) : null}
     </SectionShell>
   );
 }

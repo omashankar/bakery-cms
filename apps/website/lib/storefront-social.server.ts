@@ -8,7 +8,7 @@ import {
  * The shop's Instagram profile, read on the SERVER from the Social settings.
  *
  * The homepage's Instagram Gallery section had its own hardcoded
- * `instagramHandle: "monginisofficial"` and `instagramUrl: "https://instagram.com"`,
+ * `instagramHandle: "yourbakery"` and `instagramUrl: "https://instagram.com"`,
  * so a shop that filled in its real Instagram under Settings → Social still
  * advertised the demo account across seven links and a "Follow @…" button.
  *
