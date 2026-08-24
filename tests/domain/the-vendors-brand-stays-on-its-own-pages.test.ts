@@ -174,26 +174,63 @@ describe("a failed settings read", () => {
 describe("the brand on the sign-in screens", () => {
   const SHELL = "layouts/auth-layout.tsx";
 
-  it("lets the shop's wordmark replace both the badge and the heading", () => {
-    // A wordmark IS the name drawn, so printing the name beside it says it
-    // twice — the same rule the storefront header and footer follow. Both the
-    // desktop plane and the mobile row get it.
+  it("lets the shop's wordmark take the badge's place", () => {
+    // A wordmark IS the name drawn — the same rule the storefront header and
+    // footer follow. Both the desktop plane and the mobile row get it, at
+    // bounded height and free width, not squeezed into the badge's square.
     const shell = code(SHELL);
     expect(shell).toMatch(/wordmark\s*\?/);
-    // The heading is suppressed under a wordmark.
-    expect(shell).toMatch(/wordmark\s*\?\s*null\s*:\s*\(/);
-    // Bounded height, free width, capped — not a square.
     const marks = shell.match(/h-\d+ w-auto max-w-\[\d+px\] object-contain/g) ?? [];
     expect(marks.length, "expected a wordmark class on both the plane and the row").toBe(2);
+  });
+
+  it("does not make the shop's name the heading", () => {
+    // The heading printed `{name}`, which the mark above already carries — so
+    // under a wordmark the plane said it twice. Suppressing the heading instead
+    // left a hole in the hierarchy, so it states the screen's PURPOSE now:
+    // content that never duplicates the mark and holds with or without a logo.
+    const shell = code(SHELL);
+    const h1 = shell.slice(shell.indexOf("<h1"), shell.indexOf("</h1>"));
+    expect(h1, "the <h1> moved").not.toBe("");
+    expect(h1, "the heading is the shop's name again").not.toContain("{name}");
+    expect(h1.trim().length, "the heading is empty").toBeGreaterThan(20);
+  });
+
+  it("promises features for whatever trade the shop is in", () => {
+    // "Manage cakes, catalog & inventory" — this CMS runs ten business types, so
+    // nine of them were shown a feature list for a trade they are not in.
+    const shell = code(SHELL);
+    const points = shell.slice(
+      shell.indexOf("const brandPoints"),
+      shell.indexOf("]", shell.indexOf("const brandPoints")),
+    );
+    expect(points, "brandPoints moved").not.toBe("");
+    expect(points.toLowerCase()).not.toMatch(/\bcakes?\b/);
   });
 
   it("uses the square favicon for the badge, never the wordmark", () => {
     // A 3:1 wordmark in a 48px box is 48x15px. The favicon is the one image a
     // shop is guaranteed to have made square.
+    //
+    // Scoped to this function, and scoped by the NEXT DECLARATION rather than
+    // by a length or a brace.
+    //
+    // A fixed 700-char slice reached past the function into whatever followed,
+    // so edits elsewhere in the file failed this test — reporting a defect it
+    // was not looking at. Slicing to the first `\n}` then went too far the other
+    // way: this function's destructured parameters close with a brace in column
+    // one, so the "body" ended before the body began, and the assertion failed
+    // on correct code. Both directions are the same mistake — a slice whose end
+    // is not the thing it means.
     const shell = code(SHELL);
-    const badge = shell.slice(shell.indexOf("function BrandBadge"));
-    expect(badge.slice(0, 700)).toMatch(/icon\s*\?/);
-    expect(badge.slice(0, 700)).not.toMatch(/wordmark/);
+    const at = shell.indexOf("function BrandBadge");
+    expect(at, "BrandBadge moved").toBeGreaterThan(-1);
+    const end = shell.indexOf("export function", at);
+    expect(end, "nothing follows BrandBadge to bound it").toBeGreaterThan(at);
+
+    const body = shell.slice(at, end);
+    expect(body).toMatch(/icon\s*\?/);
+    expect(body, "the badge draws the wordmark").not.toMatch(/wordmark/);
   });
 
   it("does not put the shipped stock icon in a fresh install's badge", () => {

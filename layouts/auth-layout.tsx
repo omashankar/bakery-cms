@@ -26,10 +26,17 @@ interface AuthLayoutShellProps {
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+/**
+ * Business-neutral on purpose.
+ *
+ * These read "Manage cakes, catalog & inventory" — and this CMS runs ten
+ * business types, so nine of them were promised a feature list for a trade they
+ * are not in. A florist's staff signed in past a line about cakes.
+ */
 const brandPoints = [
-  "Manage cakes, catalog & inventory",
-  "Track orders, customers & inquiries",
-  "Build pages, media & storefront content",
+  "Products, catalogue & inventory",
+  "Orders, customers & enquiries",
+  "Pages, media & storefront content",
 ];
 
 /**
@@ -125,15 +132,24 @@ export function AuthLayoutShell({
                 <p className="text-[11px] font-semibold tracking-[0.2em] text-gold-300 uppercase">
                   Staff console
                 </p>
-                {/* Not printed under a wordmark that already reads it. */}
-                {wordmark ? null : (
-                  <h1 className="font-heading text-4xl font-bold tracking-tight text-cream-50 xl:text-5xl">
-                    {name}
-                  </h1>
-                )}
+                {/*
+                  The heading says what this screen is FOR, not whose it is.
+
+                  It used to print the shop's name — which the mark above
+                  already carries, so under a wordmark the plane read the name
+                  twice. Suppressing it left a hole in the hierarchy instead: a
+                  logo, then nothing, then small print. A purpose line is the
+                  right content for the space, it never duplicates the mark, and
+                  it holds whether the shop has a logo or only a letter.
+                */}
+                <h1 className="font-heading text-4xl font-bold tracking-tight text-cream-50 xl:text-5xl">
+                  Run your shop from one place
+                </h1>
                 <div className="h-px w-12 bg-gold-300" />
                 <p className="text-[15px] leading-relaxed text-cream-200/75">
-                  Orders, pages, media and enquiries — one calm place for your team.
+                  {name
+                    ? `Sign in to manage ${name}.`
+                    : "Sign in to manage your shop."}
                 </p>
               </div>
 
