@@ -542,6 +542,18 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
     ...allTestimonials.filter((item) => !seen.has(item.id)),
   ];
 
+  /**
+   * Empty renders no section — the rule four of this file's sections already
+   * follow, and the two that did not are the two most likely to BE empty.
+   *
+   * Testimonials are what a shop drafts first: the ones it ships with are not
+   * its own. Doing that left "What Couples Say" over an empty two-column grid on
+   * the wedding page, so the shop looked like it had no couples rather than like
+   * it had not written this section yet. Same defect, same fix, as the homepage's
+   * `TestimonialsSection`.
+   */
+  if (items.length === 0) return null;
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -622,6 +634,11 @@ function WeddingFaqSection(props: WeddingSectionRendererProps) {
   const items = (
     weddingCategoryFaqs.length > 0 ? weddingCategoryFaqs : keywordFaqs.length > 0 ? keywordFaqs : allFaqs
   ).slice(0, maxItems);
+
+  // Same rule. Three fallbacks deep, this still lands on an empty list for a
+  // shop that has written no FAQs at all — and a heading with an accordion of
+  // nothing under it reads as broken rather than as unfinished.
+  if (items.length === 0) return null;
 
   return (
     <SectionShell {...props}>
