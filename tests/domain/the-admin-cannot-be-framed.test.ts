@@ -180,8 +180,9 @@ describe("the front door", () => {
    * Complete Bakery Business Management Platform", with a Pricing section. That
    * is the right page for whoever SELLS this software and the wrong one for
    * every shop running it: a customer arriving from Instagram, a printed card
-   * or a search result met an advert for a dashboard instead of the cakes, as
-   * did anyone following the shop's own "Powered by" footer link.
+   * or a search result met an advert for a dashboard instead of the cakes — as
+   * did anyone following the "Powered by" credit the storefront footer used to
+   * carry. That credit is gone; this redirect is what still has to hold.
    */
   it("sends the bare domain to the shop", async () => {
     const { default: loaded } = await import("../../next.config");

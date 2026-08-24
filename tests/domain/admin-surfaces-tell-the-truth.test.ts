@@ -151,3 +151,136 @@ describe("whose account the profile screen is showing", () => {
     expect(fn).toContain("text: body,");
   });
 });
+
+/** Comments quoting old code are not the code. */
+const code = (path: string) =>
+  source(path)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+/**
+ * Whose name heads the admin panel.
+ *
+ * The sidebar wrote the CMS PRODUCT's name into itself, so every shop's control
+ * panel was headed with the vendor's brand instead of the shop's — and because
+ * that name carries a trade in it, nine of the ten business types this software
+ * runs were headed with a word for a trade they are not in. A florist's admin
+ * said "Bakery CMS".
+ *
+ * The vendor's own pages keep it. They are about the product.
+ */
+describe("the admin panel's brand", () => {
+  const SIDEBAR = "apps/admin/components/admin-sidebar.tsx";
+  const BRAND = "components/shared/app-brand.tsx";
+
+  it("names the shop, not the software", () => {
+    const sidebar = code(SIDEBAR);
+    // Read from settings, and handed to the brand block.
+    expect(sidebar).toContain("getGeneralSettings()");
+    expect(sidebar).toMatch(/general\.siteName/);
+    expect(sidebar).toMatch(/name=\{shopName/);
+    // The product's name may not be written into a shop's panel.
+    expect(sidebar, "the sidebar hardcodes the product name").not.toContain("Bakery CMS");
+  });
+
+  it("does not show the seeded name for a frame before the real one lands", () => {
+    // The settings store answers from the shipped seed until the server's copy
+    // arrives, so rendering straight away showed the seed and then swapped.
+    const sidebar = code(SIDEBAR);
+    expect(sidebar).toContain("settingsHydration.hasSettled()");
+    expect(sidebar).toMatch(/pending=\{brandPending\}/);
+
+    const brand = code(BRAND);
+    // A placeholder, not the name it is about to replace.
+    expect(brand).toMatch(/pending \?[\s\S]{0,200}animate-pulse/);
+  });
+
+  it("leaves the product's own pages saying the product's name", () => {
+    // Passing no `name` takes the component's default, which is the product.
+    for (const vendorPage of [
+      "features/design-system/design-system-page.tsx",
+    ]) {
+      const src = code(vendorPage);
+      expect(src, `${vendorPage} no longer renders the brand`).toContain("<AppBrand");
+      expect(src, `${vendorPage} overrides the product name`).not.toMatch(/<AppBrand[^>]*\bname=/);
+    }
+    // And the default is still the product, so those pages keep it.
+    expect(code(BRAND)).toMatch(/PRODUCT_NAME = "Bakery CMS"/);
+    expect(code(BRAND)).toMatch(/name = PRODUCT_NAME/);
+  });
+});
+
+/**
+ * The badge beside the panel's name.
+ *
+ * A letter is a placeholder for a picture nobody supplied. The shop's FAVICON
+ * is the one image it is guaranteed to have made square, and this badge is
+ * 32px — the wordmark logo is typically 3:1, which in that box is ten pixels
+ * tall and unreadable.
+ */
+describe("the admin badge", () => {
+  const SIDEBAR = "apps/admin/components/admin-sidebar.tsx";
+  const BRAND = "components/shared/app-brand.tsx";
+  const IMAGE = "components/shared/app-brand-image.tsx";
+
+  it("uses the shop's own square icon, not the logo", () => {
+    const sidebar = code(SIDEBAR);
+    expect(sidebar).toContain("general.favicon");
+    expect(sidebar).toMatch(/image=\{shopIcon/);
+    // The wordmark belongs in the storefront header, where it has room.
+    expect(sidebar, "the sidebar puts the wide logo in a 32px box").not.toMatch(
+      /image=\{[^}]*\blogo\b/,
+    );
+  });
+
+  it("keeps the letter when no icon has been set", () => {
+    const brand = code(BRAND);
+    // Both arms present, and the picture only when there is one.
+    expect(brand).toMatch(/hasImage \?[\s\S]{0,400}<AppBrandImage/);
+    expect(brand).toMatch(/\) : \([\s\S]{0,300}\{letter\}/);
+    // The primary fill is the letter's backdrop; it would show through a
+    // transparent PNG, so a picture drops it.
+    expect(brand).toMatch(/hasImage \? "overflow-hidden" : "bg-primary"/);
+  });
+
+  it("falls back to the letter when the icon URL does not load", () => {
+    const image = code(IMAGE);
+    expect(image).toContain('"use client"');
+    expect(image).toContain("setBroken(true)");
+    // A 404 that resolves before hydration fires no React event, so the element
+    // is asked directly — the same rule the storefront mark follows.
+    expect(image).toContain("naturalWidth === 0");
+    expect(image).toMatch(/if \(broken\)[\s\S]{0,200}\{letter\}/);
+  });
+
+  it("shows no icon on the product's own pages", () => {
+    // They pass no image, so the badge stays the product's letter.
+    for (const vendorPage of [
+      "features/design-system/design-system-page.tsx",
+    ]) {
+      expect(code(vendorPage)).not.toMatch(/<AppBrand[^>]*\bimage=/);
+    }
+  });
+});
+
+/**
+ * A fresh install has chosen nothing, and must not be shown a stock asset as
+ * though it had.
+ */
+describe("the admin badge on a shop that has set nothing", () => {
+  it("does not treat the shipped favicon as the shop's own icon", () => {
+    // `defaultGeneralSettings.favicon` is "/favicon.ico" — non-empty, and the
+    // file behind it is the stock Create Next App icon. So an "is it set?" check
+    // can never fail, and a brand-new install put that icon at the top of its
+    // own admin instead of falling back to the shop's initial.
+    const sidebar = code("apps/admin/components/admin-sidebar.tsx");
+    expect(sidebar).toMatch(/setShopIcon\(chosenFavicon\(/);
+    expect(sidebar).toContain('from "@/features/settings/lib/settings-utils"');
+
+    // The rule lives beside the default it compares against, so the login
+    // screen's badge can apply it too. Pinned there, not here.
+    const utils = code("features/settings/lib/settings-utils.ts");
+    const fn = utils.slice(utils.indexOf("export function chosenFavicon"));
+    expect(fn.slice(0, 400)).toMatch(/trimmed\s*!==\s*defaultGeneralSettings\.favicon/);
+  });
+});

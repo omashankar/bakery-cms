@@ -91,7 +91,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCalendarDate, formatCurrency } from "@/utils/format";
-import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -155,9 +154,20 @@ function hasDeliverableAddress(address?: Partial<CheckoutAddress>): boolean {
 interface CheckoutPageProps {
   /** Live published catalogue, fetched on the server. */
   catalog: LandingProduct[];
+  /**
+   * The shop's name, read on the SERVER.
+   *
+   * This used to come from `getStorefrontBrandInfo()`, which reads the client
+   * settings cache — and that cache PERSISTS the shipped seed when the storage
+   * key is absent. A first-time visitor whose settings request was blocked saw
+   * an unfamiliar company name heading the payment sheet at the moment they
+   * entered card details, which is the failure `razorpay.ts` warns about a few
+   * lines above where it reads this.
+   */
+  siteName: string;
 }
 
-export function CheckoutPage({ catalog }: CheckoutPageProps) {
+export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
@@ -886,7 +896,7 @@ export function CheckoutPage({ catalog }: CheckoutPageProps) {
         const result = await openRazorpayCheckout({
           draftId: quote.draftId,
           // The sheet is headed with the shop's name, not a hardcoded one.
-          brandName: getStorefrontBrandInfo().name,
+          brandName: siteName,
           name: address.fullName,
           email: address.email,
           phone: address.phone,

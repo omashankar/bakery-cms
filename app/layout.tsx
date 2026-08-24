@@ -38,17 +38,33 @@ const geistMono = Geist_Mono({
  * the configured favicon could never win.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const [{ siteName, siteDescription, favicon }, seo] = await Promise.all([
+  const [{ siteName, siteDescription, favicon, resolved }, seo] = await Promise.all([
     getSiteIdentity(),
     getSeoStoreServer(),
   ]);
 
   const googleSiteVerification = seo.global.googleSiteVerification?.trim();
 
+  /**
+   * A failed settings read states nothing rather than stating the seed.
+   *
+   * `resolved` is false when the database could not be reached, and the
+   * fallback identity is the shipped placeholder — so every page on the site
+   * titled itself "Your Bakery" and served `/favicon.ico` during an outage.
+   * `resolved` was already honoured for currency and timezone, for the reason
+   * the identity module's own comment gives; a name is the same kind of claim.
+   * Omitting the override lets Next fall back to the URL, which is honest.
+   */
+  const identity: Metadata = resolved
+    ? {
+        title: { default: siteName, template: `%s | ${siteName}` },
+        description: siteDescription,
+        icons: { icon: favicon },
+      }
+    : {};
+
   return {
-    title: { default: siteName, template: `%s | ${siteName}` },
-    description: siteDescription,
-    icons: { icon: favicon },
+    ...identity,
     // The SEO screen has a plainly labelled "Google site verification" field,
     // saved with "Global SEO settings saved" and read by nothing — so a shop
     // pasting the token Search Console gave them stayed unverified.

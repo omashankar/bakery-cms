@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { adoptCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { getStorefrontBrandInfo } from "@/apps/website/lib/settings";
 import { routes } from "@/constants/routes";
 
 /**
@@ -184,9 +183,15 @@ export function CustomerAuthModal({
 
     onOpenChange(false);
     onAuthenticated?.();
-    toast.success("Signed in", {
-      description: `Welcome to ${getStorefrontBrandInfo().name}!`,
-    });
+    // No shop name in the greeting.
+    //
+    // It came from `getStorefrontBrandInfo()`, which reads the client settings
+    // cache — and that cache persists the shipped SEED when the storage key is
+    // absent, so a visitor whose settings request was blocked was welcomed to a
+    // shop that does not exist. This modal opens through a global imperative
+    // API with no server prop to thread, and a greeting does not need the name
+    // to do its job: the customer is looking at the shop.
+    toast.success("Signed in", { description: "Welcome back!" });
   }
 
   return (

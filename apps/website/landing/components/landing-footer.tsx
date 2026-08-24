@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { BrandMark } from "@/components/shared/brand-mark";
 import { SocialMark } from "@/components/shared/social-mark";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -25,13 +26,16 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
       <div className={cn(layoutSpacing.container, "py-14")}>
         <div className="grid gap-10 lg:grid-cols-12">
           <div className="space-y-4 lg:col-span-4">
+            {/* The same mark the header renders. This used to be its own copy
+                of the markup, which is how the footer missed logo support
+                entirely and derived its letter from the name instead of the
+                one an admin typed in Appearance. */}
             <Link href={routes.store.home} className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700">
-                <span className="font-heading text-sm font-bold text-white">
-                  {brandInfo.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <span className="font-heading text-lg font-bold">{brandInfo.name}</span>
+              <BrandMark
+                logo={chrome.logo}
+                logoLetter={chrome.logoLetter}
+                siteName={brandInfo.name}
+              />
             </Link>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               {brandInfo.description}
@@ -163,19 +167,19 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
 
         <Separator className="my-8" />
 
+        {/*
+          No "Powered by" credit and no "Admin Login" link.
+
+          This footer is on every customer page, checkout included, so the credit
+          told cake buyers who the shop's software supplier is — and the link
+          pointed at `routes.home`, which redirects straight back to /store, so
+          the one person it was for could never follow it anywhere. The vendor's
+          attribution lives on the marketing shell, which has its own copyright
+          line; the admin is a bookmark, not shop chrome.
+        */}
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} {brandInfo.name}. {footerSettings.copyrightSuffix}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Powered by{" "}
-            <Link href={routes.home} className="text-bakery-700 hover:underline">
-              Bakery CMS
-            </Link>
-            {" · "}
-            <Link href={routes.auth.login} className="text-bakery-700 hover:underline">
-              Admin Login
-            </Link>
           </p>
         </div>
       </div>

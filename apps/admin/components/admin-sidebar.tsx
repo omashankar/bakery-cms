@@ -47,7 +47,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { BakeryCmsBrand } from "@/components/shared/bakery-cms-brand";
+import { AppBrand } from "@/components/shared/app-brand";
 import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
@@ -58,6 +58,8 @@ import {
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
+import { settingsHydration } from "@/features/settings/lib/settings-api";
+import { chosenFavicon } from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
   getModuleSettings,
@@ -68,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { adminShell } from "./admin-shell";
 
 const navRow = adminShell.navRow;
+
 const navActive = adminShell.navActive;
 const navIdle = adminShell.navIdle;
 
@@ -407,6 +410,30 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   // Wedding Builder is bakery-only: hidden for other business types or when the
   // module is off. Hidden from the sidebar only — the route/page still exist.
   const [hideWedding, setHideWedding] = useState(false);
+  /**
+   * Whose panel this is.
+   *
+   * The sidebar named the CMS product, hardcoded, so every shop's admin was
+   * headed with the vendor's brand — and nine of the ten business types this
+   * runs were headed with the word "Bakery". It reads the shop's own name now.
+   * The vendor's mark still belongs on the platform and design-system pages,
+   * which are about the product; this one is not.
+   */
+  const [shopName, setShopName] = useState("");
+  /**
+   * The shop's favicon fills the badge in place of the letter.
+   *
+   * The favicon rather than the logo: it is the one image a shop is guaranteed
+   * to have made square, and this badge is 32px. The wordmark logo is typically
+   * 3:1, which in that box is ten pixels tall.
+   */
+  const [shopIcon, setShopIcon] = useState("");
+  /**
+   * The settings store answers from the shipped seed until the server's copy
+   * lands, so rendering the name straight away would show the seed for a frame
+   * and then swap it. `AppBrand` draws a placeholder while this is true.
+   */
+  const [brandPending, setBrandPending] = useState(true);
   const [openMenu, setOpenMenu] = useState<string | null>(() => findOpenMenuHref(pathname));
 
   useEffect(() => {
@@ -422,15 +449,30 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       setHideWedding(!isBakery || !getModuleSettings().weddingBuilder);
     }
 
+    function refreshBrand() {
+      // All read together: hydration is what makes these trustworthy, and the
+      // same event announces it, so they can never disagree.
+      const general = getGeneralSettings();
+      setShopName(general.siteName?.trim() ?? "");
+      setShopIcon(chosenFavicon(general.favicon));
+      setBrandPending(!settingsHydration.hasSettled());
+    }
+
     refreshBadges();
     refreshModules();
+    refreshBrand();
+
+    function onSettingsUpdated() {
+      refreshModules();
+      refreshBrand();
+    }
 
     const unsubscribeBadges = subscribeToAdminData(refreshBadges);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, onSettingsUpdated);
 
     return () => {
       unsubscribeBadges();
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshModules);
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, onSettingsUpdated);
     };
   }, []);
 
@@ -469,8 +511,13 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
           inDrawer ? "pr-11" : ""
         )}
       >
-        <BakeryCmsBrand
+        <AppBrand
           href={routes.admin.dashboard}
+          // The shop's name, not the product's. A blank one falls back to the
+          // component's default rather than heading the panel with nothing.
+          name={shopName || undefined}
+          image={shopIcon || undefined}
+          pending={brandPending}
           subtitle="Admin Panel"
           size="sm"
           collapsed={collapsed}

@@ -75,10 +75,18 @@ export function InvoiceDocument({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             {settings.showLogo && settings.logoUrl ? (
+              /*
+                Bounded height, free width — the storefront header's rule, for
+                the same reason. This was a 72px SQUARE with padding and a
+                border, and the logo it resolves to is a shop's wordmark: a 3:1
+                mark came out 56×18px on the customer's bill, beside a
+                text-2xl company name. `object-contain` keeps a square icon
+                working in the same slot.
+              */
               <SafeImage
                 src={settings.logoUrl}
                 alt={settings.companyName}
-                className="size-[72px] rounded-lg border border-border bg-cream-50 object-contain p-2"
+                className="h-[56px] w-auto max-w-[220px] object-contain object-left"
                 fill={false}
               />
             ) : null}

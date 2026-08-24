@@ -21,7 +21,7 @@ export function PermissionsSettingsPage() {
       note={
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p>
-            Bakery CMS runs in single-admin mode today. Session policies, login history, and
+            This panel runs in single-admin mode today. Session policies, login history, and
             device access already live in Security.
           </p>
           <Button

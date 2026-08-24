@@ -59,8 +59,12 @@ export function buildRouteMetadataFrom(store: SeoStore, routeKey: string): Metad
   const entry = store.routes.find((route) => route.routeKey === routeKey) ?? null;
   if (!entry) {
     return {
-      title: { absolute: global.siteName },
-      description: global.defaultDescription,
+      // Omitted when blank rather than emitted empty. The SEO store blanks every
+      // identity-bearing field when its read FAILS, so these are the values an
+      // outage produces — and `<title></title>` with a canonical pointing at a
+      // bare path is worse than letting the root layout's own title stand.
+      ...(global.siteName.trim() ? { title: { absolute: global.siteName } } : {}),
+      ...(global.defaultDescription.trim() ? { description: global.defaultDescription } : {}),
     };
   }
 
@@ -76,25 +80,30 @@ export function buildRouteMetadataFrom(store: SeoStore, routeKey: string): Metad
         ? { index: true, follow: false }
         : undefined;
 
+  // Blank means "we do not know", which happens when the SEO store's read
+  // failed and it blanked its identity fields. An empty <title>, an empty
+  // og:site_name, and a canonical resolving to a bare path are each a claim
+  // stated wrongly; omitting them lets the root layout's own title stand.
+  const hasCanonicalBase = Boolean(global.canonicalBaseUrl.trim());
+  const canonical = hasCanonicalBase ? buildCanonicalUrl(entry.path, global) : undefined;
+
   return {
     // `absolute`, so the root layout's "%s | <site name>" template does not
     // apply: `resolveRouteTitle` has already appended the SEO title suffix, and
     // letting the template run again renders "Wedding Cakes | Acme | Acme".
-    title: { absolute: title },
+    ...(title.trim() ? { title: { absolute: title } } : {}),
     description,
     keywords:
       entry.metaKeywords && entry.metaKeywords.length > 0
         ? entry.metaKeywords
         : global.defaultKeywords,
     robots,
-    alternates: {
-      canonical: buildCanonicalUrl(entry.path, global),
-    },
+    alternates: canonical ? { canonical } : undefined,
     openGraph: {
-      title,
+      title: title.trim() || undefined,
       description,
-      url: buildCanonicalUrl(entry.path, global),
-      siteName: global.siteName,
+      url: canonical,
+      siteName: global.siteName.trim() || undefined,
       images: ogImage ? [{ url: ogImage }] : undefined,
       type: "website",
     },
