@@ -101,6 +101,17 @@ function SectionShell({
   id?: string;
   noReveal?: boolean;
 }) {
+  /**
+   * The Background setting, and the ONLY place a section background is decided.
+   *
+   * This is applied before the caller's `className`, so any `bg-*` or
+   * `surface-*` a section passes there outranks it — and three sections did,
+   * which meant their Background dropdown was inert. The Wedding Collection
+   * section showed "White" in the builder while rendering cream, on the page and
+   * in the preview, and changing the dropdown did nothing.
+   *
+   * A section may override its PADDING here. It may not override its background.
+   */
   const bgClass = section.background === "cream" ? "surface-cream" : "bg-white";
   // Grid sections opt out (noReveal) and animate their own cards via StaggerReveal;
   // the hero has its own entrance. Everything else fades up as one block on scroll.
@@ -170,8 +181,9 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
   const title = contentString(c, "title", "Celebrate Your Love Story");
   // Same fade-up entrance the rest of the page uses, staggered text → image.
   const Reveal = props.interactive ? HeroStatic : ScrollReveal;
+  // Padding only — a `bg-*` here would outrank the Background setting.
   return (
-    <SectionShell {...props} className="bg-white py-12 lg:py-16">
+    <SectionShell {...props} className="py-12 lg:py-16">
       <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
         <Reveal className="space-y-6 text-left">
           {contentString(c, "overline") ? (

@@ -80,3 +80,47 @@ describe("a section with nothing in it", () => {
     }
   }
 });
+
+/**
+ * The Background dropdown has to be the thing that decides the background.
+ *
+ * `SectionShell` computes `bgClass` from `section.background` and then spreads
+ * the caller's `className` AFTER it, so any `bg-*` or `surface-*` a section
+ * passes there outranks the setting. Three sections did. The Wedding Collection
+ * section read "White" in the builder while rendering cream — on the live page
+ * AND in the preview beside the dropdown — and changing the dropdown did
+ * nothing at all, on any of the three.
+ *
+ * A section may still override its PADDING. It may not override its background.
+ */
+describe("a section's Background setting", () => {
+  for (const file of [
+    "features/cms-sections/homepage-section-renderer.tsx",
+    "features/cms-sections/wedding-section-renderer.tsx",
+  ]) {
+    it(`${file.split("/").pop()} lets the setting decide, not the section`, () => {
+      const src = code(file);
+
+      // Every <SectionShell …> opening tag, with its attributes.
+      const tags = src.match(/<SectionShell[^>]*>/g) ?? [];
+      expect(tags.length, "no SectionShell usages found — did it move?").toBeGreaterThan(3);
+
+      const offenders = tags.filter((tag) => /className="[^"]*(?:\bbg-|\bsurface-)/.test(tag));
+      expect(
+        offenders,
+        `these sections hardcode a background, so their dropdown does nothing:\n${offenders.join("\n")}`,
+      ).toEqual([]);
+    });
+  }
+
+  it("computes the background from the stored setting in both renderers", () => {
+    for (const file of [
+      "features/cms-sections/homepage-section-renderer.tsx",
+      "features/cms-sections/wedding-section-renderer.tsx",
+    ]) {
+      expect(code(file), file).toContain(
+        'const bgClass = section.background === "cream" ? "surface-cream" : "bg-white"',
+      );
+    }
+  });
+});

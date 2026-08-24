@@ -184,6 +184,17 @@ function SectionShell({
   className?: string;
   noReveal?: boolean;
 }) {
+  /**
+   * The Background setting, and the ONLY place a section background is decided.
+   *
+   * This is applied before the caller's `className`, so any `bg-*` or
+   * `surface-*` a section passes there outranks it — and three sections did,
+   * which meant their Background dropdown was inert. The Wedding Collection
+   * section showed "White" in the builder while rendering cream, on the page and
+   * in the preview, and changing the dropdown did nothing.
+   *
+   * A section may override its PADDING here. It may not override its background.
+   */
   const bgClass = section.background === "cream" ? "surface-cream" : "bg-white";
   // Hero runs its own entrance; the builder preview must stay fully visible while editing.
   // noReveal: the section reveals its own parts (e.g. staggered card grids).
@@ -258,7 +269,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
     .filter((slide) => slide.headline || slide.imageUrl);
 
   return (
-    <SectionShell {...props} className="bg-white py-10 sm:py-12 lg:py-16">
+    <SectionShell {...props} className="py-10 sm:py-12 lg:py-16">
       <HeroCarousel
         slides={slides}
         rating={props.trust?.rating ?? null}
@@ -554,9 +565,12 @@ function WeddingSection(props: HomepageSectionRendererProps) {
 
   if (!weddingEnabled) return null;
 
+  // No background class below. This section hardcoded `surface-cream` while its
+  // stored setting said "white", so the Background dropdown read White, the page
+  // and the preview rendered cream, and changing the dropdown did nothing.
   return (
     <div className="contents" data-gate-wedding>
-    <SectionShell {...props} noReveal className="surface-cream">
+    <SectionShell {...props} noReveal>
       <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
         <ScrollReveal className="space-y-6">
           <Badge variant="accent" className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]">
