@@ -5,6 +5,11 @@ import { cn } from "@/lib/utils";
 
 interface AuthLayoutShellProps {
   children: React.ReactNode;
+  /**
+   * The shop's name. Empty when the settings read failed — the shell then says
+   * nothing about whose panel this is rather than naming the wrong party.
+   */
+  siteName?: string;
   className?: string;
 }
 
@@ -20,7 +25,10 @@ const brandPoints = [
  * Staff auth — one brand plane + one form column.
  * Solid colors only. Left is bakery brand; right stays light.
  */
-export function AuthLayoutShell({ children, className }: AuthLayoutShellProps) {
+export function AuthLayoutShell({ children, siteName = "", className }: AuthLayoutShellProps) {
+  const name = siteName.trim();
+  const letter = name.charAt(0).toUpperCase();
+
   return (
     <div className={cn("min-h-dvh bg-cream-100 text-foreground", className)}>
       <div className="grid min-h-dvh lg:grid-cols-2">
@@ -35,7 +43,9 @@ export function AuthLayoutShell({ children, className }: AuthLayoutShellProps) {
               className="max-w-md space-y-8"
             >
               <div className="flex size-12 items-center justify-center rounded-2xl bg-gold-300">
-                <span className="font-heading text-xl font-bold text-bakery-900">B</span>
+                <span className="font-heading text-xl font-bold text-bakery-900">
+                  {letter}
+                </span>
               </div>
 
               <div className="space-y-4">
@@ -43,11 +53,11 @@ export function AuthLayoutShell({ children, className }: AuthLayoutShellProps) {
                   Staff console
                 </p>
                 <h1 className="font-heading text-4xl font-bold tracking-tight text-cream-50 xl:text-5xl">
-                  Bakery CMS
+                  {name}
                 </h1>
                 <div className="h-px w-12 bg-gold-300" />
                 <p className="text-[15px] leading-relaxed text-cream-200/75">
-                  Cakes, pages, media, and inquiries — one calm place for your bakery team.
+                  Orders, pages, media and enquiries — one calm place for your team.
                 </p>
               </div>
 
@@ -70,7 +80,8 @@ export function AuthLayoutShell({ children, className }: AuthLayoutShellProps) {
 
           <div className="absolute inset-x-0 bottom-0 px-10 py-8 xl:px-16">
             <p className="text-[12px] text-cream-200/45">
-              © 2026 Bakery CMS · Internal staff access only
+              {name ? `© ${new Date().getFullYear()} ${name} · ` : ""}Internal staff
+              access only
             </p>
           </div>
         </aside>
@@ -84,10 +95,10 @@ export function AuthLayoutShell({ children, className }: AuthLayoutShellProps) {
             className="mb-10 flex items-center gap-3 lg:hidden"
           >
             <div className="flex size-11 items-center justify-center rounded-2xl bg-bakery-900">
-              <span className="font-heading text-lg font-bold text-gold-300">B</span>
+              <span className="font-heading text-lg font-bold text-gold-300">{letter}</span>
             </div>
             <div>
-              <p className="font-heading text-lg font-bold text-foreground">Bakery CMS</p>
+              <p className="font-heading text-lg font-bold text-foreground">{name}</p>
               <p className="text-xs text-muted-foreground">Staff console</p>
             </div>
           </motion.div>

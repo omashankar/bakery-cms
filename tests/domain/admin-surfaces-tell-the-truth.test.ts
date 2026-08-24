@@ -198,7 +198,6 @@ describe("the admin panel's brand", () => {
   it("leaves the product's own pages saying the product's name", () => {
     // Passing no `name` takes the component's default, which is the product.
     for (const vendorPage of [
-      "features/architecture/architecture-hub.tsx",
       "features/design-system/design-system-page.tsx",
     ]) {
       const src = code(vendorPage);
@@ -257,7 +256,6 @@ describe("the admin badge", () => {
   it("shows no icon on the product's own pages", () => {
     // They pass no image, so the badge stays the product's letter.
     for (const vendorPage of [
-      "features/architecture/architecture-hub.tsx",
       "features/design-system/design-system-page.tsx",
     ]) {
       expect(code(vendorPage)).not.toMatch(/<AppBrand[^>]*\bimage=/);

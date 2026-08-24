@@ -4,7 +4,7 @@
  */
 
 export const routes = {
-  /** Dev / architecture hub */
+  /** Redirects to `/store` — see next.config.ts. */
   home: "/",
 
   /** Design system */

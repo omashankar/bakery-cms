@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LandingPage } from "@/features/marketing/landing-page";
+import { PRODUCT_METADATA } from "@/constants/product-brand";
 
 /**
  * The product's own marketing page — for whoever is deciding whether to RUN this
@@ -24,6 +25,9 @@ export const metadata: Metadata = {
    * so the copy still reachable at `/` cannot compete with it for the same text.
    */
   alternates: { canonical: "/platform" },
+  // The product's icon, not the shop's — see constants/product-brand.ts. Left
+  // to inherit, this sales page wore a client bakery's logo in the browser tab.
+  ...PRODUCT_METADATA,
 };
 
 export default function PlatformPage() {

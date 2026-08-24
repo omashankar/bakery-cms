@@ -167,19 +167,19 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
 
         <Separator className="my-8" />
 
+        {/*
+          No "Powered by" credit and no "Admin Login" link.
+
+          This footer is on every customer page, checkout included, so the credit
+          told cake buyers who the shop's software supplier is — and the link
+          pointed at `routes.home`, which redirects straight back to /store, so
+          the one person it was for could never follow it anywhere. The vendor's
+          attribution lives on the marketing shell, which has its own copyright
+          line; the admin is a bookmark, not shop chrome.
+        */}
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} {brandInfo.name}. {footerSettings.copyrightSuffix}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Powered by{" "}
-            <Link href={routes.home} className="text-bakery-700 hover:underline">
-              Bakery CMS
-            </Link>
-            {" · "}
-            <Link href={routes.auth.login} className="text-bakery-700 hover:underline">
-              Admin Login
-            </Link>
           </p>
         </div>
       </div>

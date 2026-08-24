@@ -1,4 +1,5 @@
 import { downloadCsv, toCsv } from "@/utils/csv";
+import { getGeneralSettings } from "@/features/settings/lib/settings-repository";
 /**
  * Admin-side entry point for report analytics.
  *
@@ -63,8 +64,15 @@ export function exportReportsCsv(
 ): void {
   if (typeof window === "undefined") return;
 
+  // The shop's name, not the software's. This export goes to the owner's
+  // accountant carrying revenue, top customers and their email addresses, and
+  // it was headed with the vendor — identifying every business except the one
+  // whose figures these are. It is the only export in the repo that stamps a
+  // brand at all.
+  const shopName = getGeneralSettings().siteName?.trim();
+
   const lines = [
-    ["Bakery CMS Reports Export"],
+    [shopName ? `${shopName} — Reports Export` : "Reports Export"],
     ["Range", range],
     ["Generated", new Date().toISOString()],
     [],
@@ -107,5 +115,7 @@ export function exportReportsCsv(
 
   const csv = toCsv(lines);
 
-  downloadCsv(`bakery-reports-${range}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  const slug =
+    shopName?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "reports";
+  downloadCsv(`${slug}-reports-${range}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }

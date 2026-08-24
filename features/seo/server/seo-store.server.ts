@@ -88,10 +88,36 @@ export const getSeoStoreServer = cache(async (): Promise<SeoStore> => {
       })),
     };
   } catch {
-    // A database blip must not take the storefront's metadata down with it.
-    return seedStore();
+    // A database blip must not take the storefront's metadata down with it —
+    // but it must not put someone else's brand up either.
+    //
+    // This returned the seed whole, so an outage retitled every page
+    // "Your Bakery — Cakes & Pastries | Your Bakery" and canonicalised it to
+    // `https://www.your-bakery.example/store`, a host RFC 2606 guarantees can
+    // never resolve. A canonical pointing at a dead domain is the one metadata
+    // error a crawler acts on.
+    //
+    // The seed's SHAPE is still what callers need; only the fields that assert
+    // an identity are blanked, and the render sites already omit a blank one.
+    return blankBrand(seedStore());
   }
 });
+
+/** The store with every identity-bearing field emptied. */
+function blankBrand(store: SeoStore): SeoStore {
+  return {
+    ...store,
+    global: {
+      ...store.global,
+      siteName: "",
+      titleSuffix: "",
+      canonicalBaseUrl: "",
+      defaultDescription: "",
+      organizationSchemaJson: "",
+    },
+    routes: store.routes.map((entry) => ({ ...entry, metaTitle: "", metaDescription: "" })),
+  };
+}
 
 /**
  * The metadata for one route, from the database.

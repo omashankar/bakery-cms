@@ -1,4 +1,4 @@
-import { brandInfo, businessHours, contactInfo } from "@/constants/landing-data";
+import { businessHours, contactInfo } from "@/constants/landing-data";
 import { chosenList, hoursIdentity } from "@/apps/website/lib/shipped-placeholder";
 import {
   getActiveSocialLinks,
@@ -15,14 +15,21 @@ import { chosen } from "./shipped-placeholder";
 import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
 import type { BusinessType } from "@/types/settings";
 
-export function getStorefrontBrandInfo() {
-  const general = getGeneralSettings();
-  return {
-    name: general.siteName || brandInfo.name,
-    tagline: general.siteTagline || brandInfo.tagline,
-    description: general.siteDescription || brandInfo.description,
-  };
-}
+/*
+ * `getStorefrontBrandInfo` was here, and it is gone rather than merely unused.
+ *
+ * It read the shop's name from the CLIENT settings cache — a cache that
+ * PERSISTS the shipped seed when its storage key is absent, and that a failed
+ * hydration leaves alone. Its two callers were the Razorpay payment sheet and
+ * the sign-in toast: a first-time visitor whose settings request was blocked
+ * was shown an unfamiliar company name at the moment they entered card
+ * details. `|| brandInfo.name` could not save it, because the seed it fell
+ * back to is exactly what the cache had already returned.
+ *
+ * The server knows. Checkout takes `siteName` as a prop from
+ * `getStorefrontChrome()`, and the toast no longer names the shop at all.
+ * Deleted so nothing reaches for it again.
+ */
 
 /**
  * The CLIENT twin of `getStorefrontContact`, and it had the same two defects.

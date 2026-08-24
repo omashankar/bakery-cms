@@ -28,6 +28,8 @@ interface AppBrandMarkProps {
   image?: string;
   /** Titles the picture. Ignored when there is no image. */
   name?: string;
+  /** Nothing is known yet — draw a neutral placeholder, not a letter. */
+  pending?: boolean;
   className?: string;
 }
 
@@ -37,9 +39,31 @@ export function AppBrandMark({
   letter = PRODUCT_LETTER,
   image,
   name = PRODUCT_NAME,
+  pending = false,
   className,
 }: AppBrandMarkProps) {
-  const hasImage = Boolean(image?.trim());
+  const hasImage = !pending && Boolean(image?.trim());
+
+  /**
+   * A blank pulse while pending, NOT the product's letter.
+   *
+   * Falling back to "B" put the vendor's initial in a shop's panel for as long
+   * as the settings took to arrive — and permanently if they never did, since
+   * the gate only opens on a successful read. Collapsed, the text skeleton is
+   * not rendered at all, so that "B" was the entire header and looked finished.
+   */
+  if (pending) {
+    return (
+      <div
+        className={cn(
+          "shrink-0 animate-pulse bg-muted",
+          size === "sm" ? "size-8 rounded-lg" : "size-9 rounded-xl",
+          className
+        )}
+        aria-hidden
+      />
+    );
+  }
 
   return (
     <div
@@ -110,14 +134,15 @@ export function AppBrand({
 
   const content = (
     <>
+      {/* Nothing is drawn until the shop's own settings have landed — neither
+          its icon nor a letter. Either one before then is a guess presented as
+          the answer. */}
       <AppBrandMark
         size={size}
-        letter={pending ? PRODUCT_LETTER : badgeLetter}
-        // Nothing until the shop's own settings have landed: the seed carries
-        // no favicon, so drawing one before then would be the product's mark
-        // pretending to be the shop's.
-        image={pending ? undefined : image}
+        letter={badgeLetter}
+        image={image}
         name={name}
+        pending={pending}
       />
       {!collapsed ? (
         <div className="min-w-0 flex-1">
