@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { optimizedImageUrl } from "@/lib/image-url";
 
 interface AppBrandImageProps {
   src: string;
@@ -39,7 +40,8 @@ export function AppBrandImage({ src, letter, name }: AppBrandImageProps) {
     // and an un-listed one throws instead of rendering.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      // A 32px badge. The shop's favicon is usually the largest square it has.
+      src={optimizedImageUrl(src, { width: 32 })}
       alt=""
       title={name}
       onError={() => setBroken(true)}

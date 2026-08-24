@@ -30,7 +30,15 @@ const productSchema = new mongoose.Schema(
     flavourId: { type: String },
     occasionIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
-    status: { type: String, default: "draft" },
+    /**
+     * Indexed: the storefront's every list starts `{ status: "published" }`.
+     *
+     * Without it that is a collection scan on the busiest read in the app — the
+     * homepage rails, every collection page, search, and the sitemap. It costs
+     * nothing on a demo catalogue of 25 and is the whole query on a real one of
+     * a few thousand, which is the size this software is sold to run.
+     */
+    status: { type: String, default: "draft", index: true },
     isFeatured: { type: Boolean, default: false },
     isBestSeller: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },

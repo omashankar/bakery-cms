@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { optimizedImageUrl } from "@/lib/image-url";
 
 interface AuthLayoutShellProps {
   children: React.ReactNode;
@@ -70,7 +71,12 @@ function BrandBadge({
       {icon ? (
         // An admin-typed URL on any host, so next/image is not usable here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={icon} alt="" title={name} className="size-full object-cover" />
+        <img
+          src={optimizedImageUrl(icon, { width: 48 })}
+          alt=""
+          title={name}
+          className="size-full object-cover"
+        />
       ) : (
         <span className={letterClass}>{letter}</span>
       )}
@@ -114,7 +120,7 @@ export function AuthLayoutShell({
               {wordmark ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={wordmark}
+                  src={optimizedImageUrl(wordmark, { height: 64 })}
                   alt={name}
                   className="h-16 w-auto max-w-[320px] object-contain object-left"
                 />
@@ -193,7 +199,7 @@ export function AuthLayoutShell({
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={wordmark}
+                  src={optimizedImageUrl(wordmark, { height: 40 })}
                   alt={name}
                   className="h-10 w-auto max-w-[200px] object-contain object-left"
                 />
