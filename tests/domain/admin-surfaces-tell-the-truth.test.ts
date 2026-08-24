@@ -262,3 +262,23 @@ describe("the admin badge", () => {
     }
   });
 });
+
+/**
+ * A fresh install has chosen nothing, and must not be shown a stock asset as
+ * though it had.
+ */
+describe("the admin badge on a shop that has set nothing", () => {
+  it("does not treat the shipped favicon as the shop's own icon", () => {
+    // `defaultGeneralSettings.favicon` is "/favicon.ico" — non-empty, and the
+    // file behind it is the stock Create Next App icon. So an "is it set?" check
+    // can never fail, and a brand-new install put that icon at the top of its
+    // own admin instead of falling back to the shop's initial.
+    const sidebar = code("apps/admin/components/admin-sidebar.tsx");
+    expect(sidebar).toContain("function chosenIcon");
+    expect(sidebar).toContain("defaultGeneralSettings.favicon");
+    expect(sidebar).toMatch(/setShopIcon\(chosenIcon\(/);
+    // The comparison itself, not merely a non-empty check.
+    const fn = sidebar.slice(sidebar.indexOf("function chosenIcon"));
+    expect(fn.slice(0, 400)).toMatch(/trimmed\s*!==\s*defaultGeneralSettings\.favicon/);
+  });
+});
