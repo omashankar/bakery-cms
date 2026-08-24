@@ -101,6 +101,17 @@ function SectionShell({
   id?: string;
   noReveal?: boolean;
 }) {
+  /**
+   * The Background setting, and the ONLY place a section background is decided.
+   *
+   * This is applied before the caller's `className`, so any `bg-*` or
+   * `surface-*` a section passes there outranks it — and three sections did,
+   * which meant their Background dropdown was inert. The Wedding Collection
+   * section showed "White" in the builder while rendering cream, on the page and
+   * in the preview, and changing the dropdown did nothing.
+   *
+   * A section may override its PADDING here. It may not override its background.
+   */
   const bgClass = section.background === "cream" ? "surface-cream" : "bg-white";
   // Grid sections opt out (noReveal) and animate their own cards via StaggerReveal;
   // the hero has its own entrance. Everything else fades up as one block on scroll.
@@ -170,8 +181,9 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
   const title = contentString(c, "title", "Celebrate Your Love Story");
   // Same fade-up entrance the rest of the page uses, staggered text → image.
   const Reveal = props.interactive ? HeroStatic : ScrollReveal;
+  // Padding only — a `bg-*` here would outrank the Background setting.
   return (
-    <SectionShell {...props} className="bg-white py-12 lg:py-16">
+    <SectionShell {...props} className="py-12 lg:py-16">
       <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
         <Reveal className="space-y-6 text-left">
           {contentString(c, "overline") ? (
@@ -542,6 +554,18 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
     ...allTestimonials.filter((item) => !seen.has(item.id)),
   ];
 
+  /**
+   * Empty renders no section — the rule four of this file's sections already
+   * follow, and the two that did not are the two most likely to BE empty.
+   *
+   * Testimonials are what a shop drafts first: the ones it ships with are not
+   * its own. Doing that left "What Couples Say" over an empty two-column grid on
+   * the wedding page, so the shop looked like it had no couples rather than like
+   * it had not written this section yet. Same defect, same fix, as the homepage's
+   * `TestimonialsSection`.
+   */
+  if (items.length === 0) return null;
+
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
@@ -622,6 +646,11 @@ function WeddingFaqSection(props: WeddingSectionRendererProps) {
   const items = (
     weddingCategoryFaqs.length > 0 ? weddingCategoryFaqs : keywordFaqs.length > 0 ? keywordFaqs : allFaqs
   ).slice(0, maxItems);
+
+  // Same rule. Three fallbacks deep, this still lands on an empty list for a
+  // shop that has written no FAQs at all — and a heading with an accordion of
+  // nothing under it reads as broken rather than as unfinished.
+  if (items.length === 0) return null;
 
   return (
     <SectionShell {...props}>
