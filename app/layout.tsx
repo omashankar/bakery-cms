@@ -7,6 +7,7 @@ import { BusinessBlockingScript } from "@/components/business-blocking-script";
 import { LocaleSync } from "@/components/shared/locale-sync";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
 import { setActiveLocale } from "@/features/settings/lib/active-locale";
+import { optimizedImageUrl } from "@/lib/image-url";
 import "./globals.css";
 
 const inter = Inter({
@@ -59,7 +60,9 @@ export async function generateMetadata(): Promise<Metadata> {
     ? {
         title: { default: siteName, template: `%s | ${siteName}` },
         description: siteDescription,
-        icons: { icon: favicon },
+        // A tab icon is drawn at 16-32px. Shops upload what their designer gave
+        // them — this one is 1254x1254 at 489 KB, on every page of the site.
+        icons: { icon: optimizedImageUrl(favicon, { width: 64 }) },
       }
     : {};
 

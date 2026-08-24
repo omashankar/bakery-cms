@@ -142,8 +142,11 @@ describe("a failed settings read", () => {
     expect(identity, "the identity block moved").not.toBe("");
     expect(identity).toMatch(/resolved\s*\?/);
     expect(identity, "an unresolved read still publishes a name").toContain(": {}");
-    // And it is the real fields that sit inside the resolved branch.
-    expect(identity).toContain("icons: { icon: favicon }");
+    // And it is the real fields that sit inside the resolved branch. The icon is
+    // matched by what it DERIVES FROM, not by an exact expression: it is passed
+    // through `optimizedImageUrl` now, and pinning the old literal made this
+    // fail on a change that was not about resolution at all.
+    expect(identity).toMatch(/icons:\s*\{\s*icon:[^}]*favicon/);
     expect(identity).toContain("template: `%s | ${siteName}`");
   });
 

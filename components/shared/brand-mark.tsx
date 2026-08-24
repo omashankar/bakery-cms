@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { optimizedImageUrl } from "@/lib/image-url";
 
 interface BrandMarkProps {
   /** An admin-typed URL, or "" for the letter badge. */
@@ -40,7 +41,9 @@ export function BrandMark({ logo, logoLetter, siteName }: BrandMarkProps) {
       // and an un-listed one throws instead of rendering.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={logo}
+        // Delivered at the height it is drawn at. Shops upload the file their
+        // designer exported — measured here at 293 KB for a 50px-tall mark.
+        src={optimizedImageUrl(logo, { height: 50 })}
         alt={siteName}
         onError={() => setLogoBroken(true)}
         // The logo is in the SERVER-rendered HTML, so a 404 can resolve before
