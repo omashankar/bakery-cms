@@ -167,3 +167,56 @@ describe("a failed settings read", () => {
     expect(meta).toContain("canonical ? { canonical } : undefined");
   });
 });
+
+/**
+ * The sign-in screens carry a mark too, and the shop has two different images.
+ */
+describe("the brand on the sign-in screens", () => {
+  const SHELL = "layouts/auth-layout.tsx";
+
+  it("lets the shop's wordmark replace both the badge and the heading", () => {
+    // A wordmark IS the name drawn, so printing the name beside it says it
+    // twice — the same rule the storefront header and footer follow. Both the
+    // desktop plane and the mobile row get it.
+    const shell = code(SHELL);
+    expect(shell).toMatch(/wordmark\s*\?/);
+    // The heading is suppressed under a wordmark.
+    expect(shell).toMatch(/wordmark\s*\?\s*null\s*:\s*\(/);
+    // Bounded height, free width, capped — not a square.
+    const marks = shell.match(/h-\d+ w-auto max-w-\[\d+px\] object-contain/g) ?? [];
+    expect(marks.length, "expected a wordmark class on both the plane and the row").toBe(2);
+  });
+
+  it("uses the square favicon for the badge, never the wordmark", () => {
+    // A 3:1 wordmark in a 48px box is 48x15px. The favicon is the one image a
+    // shop is guaranteed to have made square.
+    const shell = code(SHELL);
+    const badge = shell.slice(shell.indexOf("function BrandBadge"));
+    expect(badge.slice(0, 700)).toMatch(/icon\s*\?/);
+    expect(badge.slice(0, 700)).not.toMatch(/wordmark/);
+  });
+
+  it("does not put the shipped stock icon in a fresh install's badge", () => {
+    // `defaultGeneralSettings.favicon` is `/favicon.ico` and non-empty, so an
+    // "is it set?" check cannot fail. The browser tab is the one place that
+    // default is right; a badge drawing it as THE SHOP'S mark is not.
+    const route = code("app/(auth)/layout.tsx");
+    expect(route).toContain("chosenFavicon");
+    expect(route).toMatch(/favicon=\{[^}]*chosenFavicon/);
+
+    // And the rule itself compares against the shipped value.
+    const utils = code("features/settings/lib/settings-utils.ts");
+    const fn = utils.slice(utils.indexOf("export function chosenFavicon"));
+    expect(fn.slice(0, 400)).toMatch(/!==\s*defaultGeneralSettings\.favicon/);
+  });
+
+  it("says nothing at all when the settings read failed", () => {
+    // Half an identity — a logo with no name — is worse than none.
+    const route = code("app/(auth)/layout.tsx");
+    for (const prop of ["siteName", "logo", "favicon"]) {
+      expect(route, `${prop} is passed without checking resolved`).toMatch(
+        new RegExp(`${prop}=\{resolved \?`),
+      );
+    }
+  });
+});

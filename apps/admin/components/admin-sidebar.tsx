@@ -59,7 +59,7 @@ import {
 } from "@/apps/admin/commerce/lib/notifications-repository";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import { settingsHydration } from "@/features/settings/lib/settings-api";
-import { defaultGeneralSettings } from "@/features/settings/lib/settings-utils";
+import { chosenFavicon } from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
   getModuleSettings,
@@ -71,21 +71,6 @@ import { adminShell } from "./admin-shell";
 
 const navRow = adminShell.navRow;
 
-/**
- * The shop's icon if it CHOSE one, else nothing.
- *
- * `defaultGeneralSettings.favicon` is `/favicon.ico` — non-empty, and the file
- * behind it is the stock Create Next App icon, unchanged since the first commit.
- * So an "is it set?" check can never fail, and a fresh install put that stock
- * icon in the badge at the top of its own admin instead of falling back to the
- * shop's initial. Same rule, and the same reason, as `chosen()` on the
- * storefront's contact fields — reimplemented here because apps/admin may not
- * import from apps/website.
- */
-function chosenIcon(favicon: string | undefined): string {
-  const trimmed = favicon?.trim() ?? "";
-  return trimmed && trimmed !== defaultGeneralSettings.favicon.trim() ? trimmed : "";
-}
 const navActive = adminShell.navActive;
 const navIdle = adminShell.navIdle;
 
@@ -469,7 +454,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       // same event announces it, so they can never disagree.
       const general = getGeneralSettings();
       setShopName(general.siteName?.trim() ?? "");
-      setShopIcon(chosenIcon(general.favicon));
+      setShopIcon(chosenFavicon(general.favicon));
       setBrandPending(!settingsHydration.hasSettled());
     }
 

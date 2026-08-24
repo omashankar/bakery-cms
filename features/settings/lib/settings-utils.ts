@@ -215,6 +215,24 @@ export const currencyOptions = [
  * off-site fetch. Shared by the form and the Zod schema so the browser and the
  * server agree on what is valid.
  */
+/**
+ * The shop's OWN square icon, or "" if it is still the one this install shipped.
+ *
+ * `defaultGeneralSettings.favicon` is `/favicon.ico`, and the file behind it is
+ * the stock Create Next App icon. It is non-empty, so an "is an icon set?" check
+ * can never fail — and any surface that draws the favicon AS THE SHOP'S MARK
+ * then draws that stock icon on a fresh install, which is worse than the letter
+ * it replaced. The browser tab is the one place the shipped default is right, so
+ * this is a question each caller asks rather than something the read decides.
+ *
+ * Same rule as `chosen()` on the storefront's contact fields: a value still
+ * equal to the shipped one was seeded, not chosen.
+ */
+export function chosenFavicon(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  return trimmed && trimmed !== defaultGeneralSettings.favicon.trim() ? trimmed : "";
+}
+
 export function isSafeAssetUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return true;

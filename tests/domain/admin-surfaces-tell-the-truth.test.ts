@@ -274,11 +274,13 @@ describe("the admin badge on a shop that has set nothing", () => {
     // can never fail, and a brand-new install put that icon at the top of its
     // own admin instead of falling back to the shop's initial.
     const sidebar = code("apps/admin/components/admin-sidebar.tsx");
-    expect(sidebar).toContain("function chosenIcon");
-    expect(sidebar).toContain("defaultGeneralSettings.favicon");
-    expect(sidebar).toMatch(/setShopIcon\(chosenIcon\(/);
-    // The comparison itself, not merely a non-empty check.
-    const fn = sidebar.slice(sidebar.indexOf("function chosenIcon"));
+    expect(sidebar).toMatch(/setShopIcon\(chosenFavicon\(/);
+    expect(sidebar).toContain('from "@/features/settings/lib/settings-utils"');
+
+    // The rule lives beside the default it compares against, so the login
+    // screen's badge can apply it too. Pinned there, not here.
+    const utils = code("features/settings/lib/settings-utils.ts");
+    const fn = utils.slice(utils.indexOf("export function chosenFavicon"));
     expect(fn.slice(0, 400)).toMatch(/trimmed\s*!==\s*defaultGeneralSettings\.favicon/);
   });
 });

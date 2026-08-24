@@ -1,5 +1,6 @@
 import { AuthLayoutShell } from "@/layouts/auth-layout";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
+import { chosenFavicon } from "@/features/settings/lib/settings-utils";
 
 /**
  * The shop's own name on the shop owner's front door.
@@ -18,9 +19,20 @@ export default async function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { siteName, resolved } = await getSiteIdentity();
+  const { siteName, logo, favicon, resolved } = await getSiteIdentity();
 
+  // Nothing at all when the read failed. Half an identity — a logo with no name,
+  // or a name the database did not actually supply — is worse than none.
   return (
-    <AuthLayoutShell siteName={resolved ? siteName : ""}>{children}</AuthLayoutShell>
+    <AuthLayoutShell
+      siteName={resolved ? siteName : ""}
+      logo={resolved ? logo : ""}
+      // `chosenFavicon`, not the raw value: the shipped default is `/favicon.ico`,
+      // the stock Create Next App icon, so passing it straight through would put
+      // that in the badge of a fresh install's own login screen.
+      favicon={resolved ? chosenFavicon(favicon) : ""}
+    >
+      {children}
+    </AuthLayoutShell>
   );
 }

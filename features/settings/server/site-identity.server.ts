@@ -25,6 +25,8 @@ import { getPublicSettings } from "./settings.service";
 export interface SiteIdentity {
   siteName: string;
   siteDescription: string;
+  /** The shop's wordmark, or "" — it REPLACES the name wherever both would show. */
+  logo: string;
   favicon: string;
   currency: string;
   timezone: string;
@@ -42,6 +44,7 @@ export interface SiteIdentity {
 const FALLBACK: SiteIdentity = {
   siteName: defaultGeneralSettings.siteName,
   siteDescription: defaultGeneralSettings.siteDescription,
+  logo: defaultGeneralSettings.logo,
   favicon: defaultGeneralSettings.favicon,
   currency: defaultGeneralSettings.currency,
   timezone: defaultGeneralSettings.timezone,
@@ -77,6 +80,9 @@ export const getSiteIdentity = cache(async (): Promise<SiteIdentity> => {
     return {
       siteName: general.siteName?.trim() || FALLBACK.siteName,
       siteDescription: general.siteDescription?.trim() || FALLBACK.siteDescription,
+      // No `||` fallback: a shop with no logo must get "", not the seed, or the
+      // callers that let a logo REPLACE the name would render an empty image.
+      logo: general.logo?.trim() ?? "",
       favicon: general.favicon?.trim() || FALLBACK.favicon,
       // Checked against the supported set, not merely non-empty. The Zod enum
       // only constrains FUTURE writes, and both are handed to `Intl`, which
