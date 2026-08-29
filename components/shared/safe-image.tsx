@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ImageIcon } from "lucide-react";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { cn } from "@/lib/utils";
+import { ImagePlaceholder } from "./image-placeholder";
 
 interface SafeImageProps {
   /**
@@ -42,17 +42,7 @@ export function SafeImage({ src, alt, className, fill = true }: SafeImageProps) 
   }, [resolvedSrc]);
 
   if (!resolvedSrc || resolvedSrc.startsWith("blob:") || failed) {
-    return (
-      <div
-        className={cn(
-          "flex items-center justify-center bg-muted text-muted-foreground",
-          fill ? "absolute inset-0" : className
-        )}
-        title={alt}
-      >
-        <ImageIcon className="size-4 opacity-60" />
-      </div>
-    );
+    return <ImagePlaceholder alt={alt} className={className} fill={fill} />;
   }
 
   return (

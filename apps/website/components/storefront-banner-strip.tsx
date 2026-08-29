@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -69,7 +69,7 @@ export function StorefrontBannerStrip() {
   const content = (
     <div className="relative flex items-center gap-3 bg-bakery-700 px-4 py-2.5 text-sm text-white">
       <div className="relative size-8 shrink-0 overflow-hidden rounded-md border border-white/20">
-        <Image src={banner.image} alt="" fill className="object-cover" sizes="32px" />
+        <OptimizedImage src={banner.image} alt="" fill className="object-cover" sizes="32px" />
       </div>
       <p className="min-w-0 flex-1 truncate font-medium">{banner.title}</p>
       {banner.link ? <span className="hidden text-xs underline sm:inline">View offer</span> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Heart, ShoppingBag, Star } from "lucide-react";
@@ -89,7 +89,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
         )}
       >
         <Link href={routes.store.cake(cake.slug)} className="absolute inset-0">
-          <Image
+          <OptimizedImage
             src={cake.image}
             alt={cake.name}
             fill

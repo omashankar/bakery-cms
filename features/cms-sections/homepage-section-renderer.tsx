@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -321,7 +321,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
           >
             <div className="relative aspect-square w-20 overflow-hidden rounded-full border border-border bg-cream-100 transition-premium group-hover:border-bakery-300 group-hover:shadow-sm sm:w-full">
               {category.image ? (
-                <Image
+                <OptimizedImage
                   src={category.image}
                   alt={category.name}
                   fill
@@ -479,7 +479,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
-                <Image src={category.image} alt={category.name} fill className="object-cover" sizes="300px" />
+                <OptimizedImage src={category.image} alt={category.name} fill className="object-cover" sizes="300px" />
               ) : null}
             </div>
             <div className="p-4">
@@ -617,7 +617,7 @@ function WeddingSection(props: HomepageSectionRendererProps) {
                   does not throw, it just ships an empty grey panel to every
                   visitor. The wedding renderer's twin guards this the same way. */}
               {teaserImage ? (
-                <Image
+                <OptimizedImage
                   src={teaserImage}
                   alt="Wedding cake"
                   fill
@@ -736,7 +736,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
             </p>
             <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">
               <div className="relative size-10 shrink-0 overflow-hidden rounded-full">
-                <Image src={item.avatar} alt={item.name} fill className="object-cover" sizes="40px" />
+                <OptimizedImage src={item.avatar} alt={item.name} fill className="object-cover" sizes="40px" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{item.name}</p>
@@ -784,7 +784,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
               key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
-              <Image
+              <OptimizedImage
                 src={src}
                 alt={title || `Gallery ${index + 1}`}
                 fill
@@ -917,7 +917,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
             className="group relative overflow-hidden rounded-2xl border border-border"
           >
             <div className="relative aspect-[21/9] bg-muted">
-              <Image src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
+              <OptimizedImage src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
               <div className="absolute inset-0 bg-bakery-950/35 transition-colors group-hover:bg-bakery-950/45" />
               <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
                 <p className="text-sm font-medium">{banner.title}</p>
@@ -977,7 +977,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
             className="overflow-hidden rounded-xl border border-border bg-white"
           >
             <div className="relative aspect-[3/2] bg-muted">
-              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
+              <OptimizedImage src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
               <Badge variant="gold" className="absolute top-3 left-3">
                 {offer.discount}
               </Badge>
@@ -1086,7 +1086,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
             className="group relative block aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             aria-label={handle ? `View @${handle} on Instagram` : "View our Instagram"}
           >
-            <Image
+            <OptimizedImage
               src={post.image}
               alt=""
               fill

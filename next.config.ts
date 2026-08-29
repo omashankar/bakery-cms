@@ -1,22 +1,6 @@
 import type { NextConfig } from "next";
 
-/**
- * The Cloudinary account this shop uploads to, from either supported form of
- * the credentials — `CLOUDINARY_URL` (cloudinary://key:secret@cloud) or the
- * separate vars. Matches how lib/server/media/cloudinary.ts reads them.
- */
-function resolveCloudinaryCloudName(): string | undefined {
-  const direct = process.env.CLOUDINARY_CLOUD_NAME?.trim();
-  if (direct) return direct;
-
-  const url = process.env.CLOUDINARY_URL?.trim();
-  if (!url) return undefined;
-  try {
-    return new URL(url).hostname || undefined;
-  } catch {
-    return undefined;
-  }
-}
+import { remoteImagePatterns, resolveCloudinaryCloudName } from "./lib/images/image-hosts";
 
 const cloudinaryCloudName = resolveCloudinaryCloudName();
 
@@ -97,34 +81,36 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     /**
-     * Every host `next/image` is allowed to fetch from. Anything else answers
-     * 400 and renders as a blank box.
+     * Every host `next/image` is allowed to fetch from.
+     *
+     * This docblock used to say anything else "answers 400 and renders as a
+     * blank box", which is true only of a production build. In `next dev` the
+     * same URL THROWS E231 from image-loader.js and takes the whole route down
+     * — that sentence is precisely what made this look survivable, and a shop
+     * owner pasting a Pinterest link into the homepage builder found out
+     * otherwise.
      *
      * `images.unsplash.com` alone was the whole list, which is the host the
      * SHIPPED DEMO catalogue uses. So the shop's own photographs — everything
      * uploaded through Media, which Cloudinary serves from `res.cloudinary.com`
      * — were refused by the optimiser, on the storefront and in the admin
-     * previews alike. A bakery could replace every demo image with its own
-     * cakes and end up with a storefront of empty rectangles.
+     * previews alike.
      *
-     * Scoped to the configured cloud rather than all of Cloudinary: the path is
-     * `/<cloud-name>/image/upload/...`, and the docs warn that an unrestricted
-     * pattern lets anyone route arbitrary images through this shop's optimiser.
-     * Without a cloud name configured there is nothing to scope to and nothing
-     * being uploaded either.
+     * The list itself now lives in lib/images/image-hosts.ts, because the
+     * BROWSER needs the same answer: components/shared/optimized-image.tsx asks
+     * it whether a src is safe to optimise and passes `unoptimized` when it is
+     * not, which is what stops a foreign host from ever reaching the loader.
+     * Two copies of this list would drift; one cannot.
      */
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "res.cloudinary.com",
-        pathname: cloudinaryCloudName ? `/${cloudinaryCloudName}/**` : "/**",
-      },
-    ],
+    remotePatterns: remoteImagePatterns(cloudinaryCloudName),
   },
+  /**
+   * Inlined into the client bundle so the renderer can scope res.cloudinary.com
+   * to THIS shop the way the optimiser does. Derived from credentials already
+   * configured — no shop has to set a new variable. Empty string rather than
+   * undefined: an undefined value is dropped from the inlining entirely.
+   */
+  env: { NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: cloudinaryCloudName ?? "" },
   async headers() {
     return [
       {

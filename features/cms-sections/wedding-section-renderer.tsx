@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -238,7 +238,7 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
           <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
             <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[4/3] lg:aspect-square">
               {contentString(c, "imageUrl") ? (
-                <Image
+                <OptimizedImage
                   src={contentString(c, "imageUrl")}
                   alt={contentString(c, "title", "Wedding cake")}
                   fill
@@ -360,7 +360,7 @@ function WeddingOffersSection(props: WeddingSectionRendererProps) {
         {offers.map((offer) => (
           <article key={offer.id} className="h-full overflow-hidden rounded-xl border border-border bg-white">
             <div className="relative aspect-[16/10] bg-muted">
-              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="300px" />
+              <OptimizedImage src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="300px" />
               <Badge className="absolute top-3 left-3" variant="gold">
                 {offer.discount}
               </Badge>
@@ -436,7 +436,7 @@ function WeddingCollectionsSection(props: WeddingSectionRendererProps) {
             className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-white transition-all hover:border-bakery-300 hover:shadow-md"
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-cream-100">
-              <Image
+              <OptimizedImage
                 src={cake.image}
                 alt={cake.name}
                 fill
@@ -502,7 +502,7 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
               key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
-              <Image
+              <OptimizedImage
                 src={src}
                 alt={title || `Wedding gallery ${index + 1}`}
                 fill
@@ -588,7 +588,7 @@ function WeddingTestimonialsSection(props: WeddingSectionRendererProps) {
             <p className="mt-4 flex-1 leading-relaxed text-muted-foreground">{item.content}</p>
             <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">
               <div className="relative size-11 overflow-hidden rounded-full">
-                <Image src={item.avatar} alt={item.name} fill className="object-cover" sizes="44px" />
+                <OptimizedImage src={item.avatar} alt={item.name} fill className="object-cover" sizes="44px" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">{item.name}</p>
