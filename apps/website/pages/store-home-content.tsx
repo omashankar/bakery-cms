@@ -1,6 +1,7 @@
 "use client";
 
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
+import { planNewsletterCtaPair } from "@/features/cms-sections/lib/section-utils";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -79,22 +80,21 @@ function renderSections(
   sections: HomepageSectionInstance[],
   data: HomepageSectionData
 ) {
-  const idxNewsletter = sections.findIndex((s) => s.type === "newsletter");
-  const idxCta = sections.findIndex((s) => s.type === "cta");
-  const paired = idxNewsletter !== -1 && idxCta !== -1;
-  const anchor = paired ? Math.min(idxNewsletter, idxCta) : -1;
-  const other = paired ? Math.max(idxNewsletter, idxCta) : -1;
+  // The rule lives in section-utils so the BUILDER PREVIEW can apply the same
+  // one. It used to be inline here, which is why the preview drew these two
+  // full-width wherever they sat and the published page put them side by side.
+  const pair = planNewsletterCtaPair(sections);
 
-  return sections.map((section, index) => {
-    if (paired && index === other) return null;
+  return sections.map((section) => {
+    if (pair && section.instanceId === pair.otherId) return null;
 
-    if (paired && index === anchor) {
+    if (pair && section.instanceId === pair.anchorId) {
       return (
         <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
           <div className={layoutSpacing.container}>
             <StaggerReveal className="grid items-stretch gap-6 lg:grid-cols-2">
-              <HomepageSectionRenderer {...data} section={sections[idxNewsletter]} embedded />
-              <HomepageSectionRenderer {...data} section={sections[idxCta]} embedded />
+              <HomepageSectionRenderer {...data} section={pair.newsletter} embedded />
+              <HomepageSectionRenderer {...data} section={pair.cta} embedded />
             </StaggerReveal>
           </div>
         </section>

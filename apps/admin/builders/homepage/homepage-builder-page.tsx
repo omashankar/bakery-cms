@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { sortSections } from "@/features/cms-sections/lib/section-utils";
+import {
+  getVisibleSections,
+  planNewsletterCtaPair,
+  sortSections,
+} from "@/features/cms-sections/lib/section-utils";
 import {
   deriveHomepageMeta,
   fetchHomepageRevisions,
@@ -125,6 +129,12 @@ export function HomepageBuilderPage() {
    * had never seen. One route now returns exactly what the live page renders.
    */
   const [previewData, setPreviewData] = useState<HomepageRenderData | null>(null);
+
+  /**
+   * Computed over the VISIBLE list in the order the preview panel renders it,
+   * which is the same list the storefront pairs over.
+   */
+  const pair = planNewsletterCtaPair(getVisibleSections(sections));
 
   /**
    * What is on screen right now, readable after an await — see settleDirty.
@@ -703,16 +713,50 @@ export function HomepageBuilderPage() {
               setSelectedId(id);
               setMobilePanel("editor");
             }}
-            renderSection={(section, ctx) => (
-              <HomepageSectionRenderer
-                key={section.instanceId}
-                section={section}
-                {...previewData}
-                selected={ctx.selected}
-                interactive
-                onSelect={ctx.onSelect}
-              />
-            )}
+            renderSection={(section, ctx) => {
+              /**
+               * The storefront renders the newsletter and the CTA as ONE band,
+               * side by side, at whichever comes first. Drawing them full-width
+               * here meant an admin who moved the CTA to the bottom saw it at
+               * the bottom and published it halfway up the page.
+               *
+               * Both halves stay independently selectable — a preview you
+               * cannot click is no better than one that lies.
+               */
+              if (pair && section.instanceId === pair.otherId) return null;
+
+              if (pair && section.instanceId === pair.anchorId) {
+                return (
+                  <div key="newsletter-cta-row" className="grid items-stretch gap-6 p-6 lg:grid-cols-2">
+                    {[pair.newsletter, pair.cta].map((half) => (
+                      <HomepageSectionRenderer
+                        key={half.instanceId}
+                        section={half}
+                        {...previewData}
+                        embedded
+                        selected={selectedId === half.instanceId}
+                        interactive
+                        onSelect={() => {
+                          setSelectedId(half.instanceId);
+                          setMobilePanel("editor");
+                        }}
+                      />
+                    ))}
+                  </div>
+                );
+              }
+
+              return (
+                <HomepageSectionRenderer
+                  key={section.instanceId}
+                  section={section}
+                  {...previewData}
+                  selected={ctx.selected}
+                  interactive
+                  onSelect={ctx.onSelect}
+                />
+              );
+            }}
           />
         </main>
 

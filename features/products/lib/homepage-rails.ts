@@ -1,6 +1,9 @@
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product } from "@/types/product";
-import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
+import {
+  getPublishedStorefrontProducts,
+  type TaxonomyNames,
+} from "@/features/products/lib/product-mapper";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 
 /**
@@ -35,7 +38,20 @@ export function buildHomepageProducts(
   source: HomepageProductSource,
   maxCount: number,
   adminProducts: Product[],
-  all: LandingProduct[]
+  all: LandingProduct[],
+  /**
+   * Category and occasion names, for callers that have them.
+   *
+   * Without this the flagged cakes below — the ones the section is actually
+   * about — resolved their category through `getCategoryById`, which on the
+   * SERVER reads the shipped demo taxonomy because no client store has been
+   * hydrated there. So the live homepage labelled a shop's own cakes with
+   * category names out of the demo data, while the cakes topped up from `all`
+   * (already mapped with names by the caller) were labelled correctly — two
+   * different answers inside one row. The browser did not have the bug, which
+   * is why it went unnoticed: there the store is real.
+   */
+  names?: TaxonomyNames
 ): LandingProduct[] {
   const published = adminProducts.filter((cake) => cake.status === "published");
   const flags = {
@@ -47,7 +63,7 @@ export function buildHomepageProducts(
     seasonal: published.filter((cake) => cake.isSeasonal),
   };
 
-  const adminMapped = getPublishedStorefrontProducts(adminProducts);
+  const adminMapped = getPublishedStorefrontProducts(adminProducts, names);
   const adminBySlug = new Map(adminMapped.map((cake) => [cake.slug, cake]));
 
   const pickAdmin = (cakes: Product[]) =>

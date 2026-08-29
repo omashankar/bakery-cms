@@ -309,7 +309,9 @@ export async function getHomepageRails(
   return Object.fromEntries(
     sources.map((source) => [
       source,
-      buildHomepageProducts(source, maxCount, products, all).map((product) => toCard(product, modules)),
+      buildHomepageProducts(source, maxCount, products, all, names).map((product) =>
+        toCard(product, modules),
+      ),
     ])
   ) as Record<HomepageProductSource, LandingProduct[]>;
 }
