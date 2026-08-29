@@ -14,7 +14,8 @@ import {
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { slugify } from "@/features/products/lib/product-utils";
-import { BuilderMediaField } from "@/apps/admin/builders/shared/builder-media-field";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
+import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,8 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
   const [form, setForm] = useState<CmsPageFormData>(createEmptyPageForm);
   const [baseline, setBaseline] = useState(() => serializeForm(createEmptyPageForm()));
   const [isLoading, setIsLoading] = useState(mode === "edit");
+  /** The status the SERVER holds, which is the only one the storefront honours. */
+  const [savedStatus, setSavedStatus] = useState<CmsPageFormData["status"] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
@@ -134,6 +137,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
 
       const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
       setForm(data);
+      setSavedStatus(data.status);
       setBaseline(serializeForm(data));
       setIsSystem(existing.isSystem);
       setIsLoading(false);
@@ -246,15 +250,24 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
     toast.message("Discarded unsaved changes");
   }
 
-  async function handleSubmit(status?: CmsPageFormData["status"]) {
+  async function handleSubmit(intent: SaveIntent) {
     if (!form.title.trim()) {
       toast.error("Page title is required");
       return;
     }
 
+    /**
+     * From the button's INTENT and the server's current status, never from a
+     * literal the caller chose. `status ?? form.status` looked like it let the
+     * dropdown decide, but all four callers passed a status, so the fallback
+     * was dead — and "Save draft" over an ARCHIVED page silently put it back in
+     * the drafts, while Publish put it back on the storefront.
+     */
+    const status = resolveSaveStatus(intent, savedStatus);
+
     const payload: CmsPageFormData = {
       ...form,
-      status: status ?? form.status,
+      status,
       blocks: form.blocks.filter((block) => block.content.trim()),
       // A row with neither a figure nor a label says nothing, exactly as an
       // empty block does. A row with EITHER one is kept — half-filled is a
@@ -319,10 +332,21 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
     );
   }
 
+  const isArchived = savedStatus === "archived";
+  const saveLabel = isArchived ? "Save changes" : "Save draft";
+  const publishLabel = isArchived ? "Restore & publish" : "Publish";
+
+  /**
+   * The SERVER's status, not the form's.
+   *
+   * The storefront serves published pages only, so a form that had been
+   * switched to "Published" but not saved offered a "View live" link to a 404.
+   * The same fix already exists in product-form-page's `openPreview`; this
+   * screen never got it.
+   */
+  const previewIsLive = savedStatus === "published";
   const previewHref = form.slug
-    ? `${getStorefrontPageUrl(form.slug)}${
-        form.status === "published" ? "" : "?preview=1"
-      }`
+    ? `${getStorefrontPageUrl(form.slug)}${previewIsLive ? "" : "?preview=1"}`
     : null;
 
   return (
@@ -342,7 +366,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                 render={<a href={previewHref} target="_blank" rel="noreferrer" />}
               >
                 <ExternalLink className="size-4" />
-                {form.status === "published" ? "View live" : "Preview draft"}
+                {previewIsLive ? "View live" : "Preview draft"}
               </Button>
             ) : null}
             <Button variant="outline" render={<Link href={routes.admin.pages.list} />}>
@@ -428,7 +452,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                   </div>
                 </div>
                 {form.template === "about" ? (
-                  <BuilderMediaField
+                  <PhotoField
                     id="page-hero"
                     label="Hero image"
                     value={form.heroImage ?? ""}
@@ -827,7 +851,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                     placeholder="cakes, bakery, catering"
                   />
                 </div>
-                <BuilderMediaField
+                <PhotoField
                   id="meta-og-image"
                   label="Open Graph image"
                   value={form.seo?.ogImage ?? ""}
@@ -865,19 +889,36 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
               <CardDescription>Control visibility on the public website.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/*
+                Reported, not chosen — see the note in product-form-page. Every
+                save took its status from the button that was pressed, so this
+                dropdown decided nothing, and "Archived" was a status no save
+                path in the app could produce.
+              */}
               <div className="space-y-2">
-                <Label htmlFor="page-status">Status</Label>
-                <AdminSelect
-                  id="page-status"
-                  value={form.status}
-                  onChange={(e) =>
-                    patch({ status: e.target.value as CmsPageFormData["status"] })
-                  }
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </AdminSelect>
+                <span className="text-sm font-medium">Status</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={savedStatus === "published" ? "success" : "outline"}>
+                    {savedStatus ?? "draft"}
+                  </Badge>
+                  {mode === "edit" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-muted-foreground"
+                      disabled={isSaving}
+                      onClick={() => void handleSubmit(isArchived ? "unarchive" : "archive")}
+                    >
+                      {isArchived ? "Restore as draft" : "Archive"}
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isArchived
+                    ? "Hidden from the site. Restoring brings it back as a draft."
+                    : "Set by the Save and Publish buttons."}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="page-schedule">Schedule publish</Label>
@@ -937,17 +978,17 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                 <Button
                   variant="bakery"
                   disabled={isSaving}
-                  onClick={() => handleSubmit("published")}
+                  onClick={() => handleSubmit("publish")}
                 >
                   {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Publish
+                  {publishLabel}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={isSaving || (!isDirty && mode === "edit")}
-                  onClick={() => handleSubmit("draft")}
+                  onClick={() => handleSubmit("save")}
                 >
-                  Save draft
+                  {saveLabel}
                 </Button>
                 {mode === "edit" && !isSystem ? (
                   <Button
@@ -974,17 +1015,17 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
         <Button
           variant="outline"
           disabled={isSaving || (!isDirty && mode === "edit")}
-          onClick={() => handleSubmit("draft")}
+          onClick={() => handleSubmit("save")}
         >
-          Save draft
+          {saveLabel}
         </Button>
         <Button
           variant="bakery"
           disabled={isSaving}
-          onClick={() => handleSubmit("published")}
+          onClick={() => handleSubmit("publish")}
         >
           {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-          Publish
+          {publishLabel}
         </Button>
       </AdminMobileActionBar>
 

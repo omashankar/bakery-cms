@@ -56,6 +56,7 @@ import { MediaToolsDialog } from "./media-tools-dialog";
 import { MediaUploadDialog } from "./media-upload-dialog";
 import { useMediaUsageSync } from "../lib/use-media-usage-sync";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 
 const PAGE_SIZE = 12;
 
@@ -68,6 +69,20 @@ const EMPTY_STATS = {
 };
 
 export function MediaLibraryPage() {
+  /**
+   * This screen's own data, asked for NOW.
+   *
+   * The admin layout hydrates every admin cache — this one included — but only
+   * after `useIdle(1000)`, so that the screen the admin opened gets the
+   * connection first. For a screen whose content IS one of those caches that is
+   * backwards: it spent that second waiting on a delay meant to help it.
+   *
+   * Mounting the same hook here costs nothing — `hydrateOnce` makes the
+   * layout's later call join this read rather than repeat it — and the rest of
+   * the batch still waits its turn.
+   */
+  useMediaServerSync();
+
   /**
    * The "is this file in use?" index, loaded HERE rather than in the admin
    * layout.

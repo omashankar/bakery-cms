@@ -57,7 +57,10 @@ describe("draft content crossing to the browser", () => {
   it("is applied by every server page that hands content to a client component", () => {
     for (const path of [
       "app/(storefront)/store/faq/page.tsx",
-      "apps/website/pages/store-home-page.tsx",
+      // The homepage's own reads moved here when the builder started sharing
+      // them — it is still the one place that hands this content to a client
+      // component, so it is still the file that has to filter.
+      "apps/website/lib/homepage-render-data.server.ts",
       "apps/website/pages/wedding-page.tsx",
     ]) {
       const source = read(path);

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { ArrowRight, Award, Heart, Leaf, Palette, Truck } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -166,7 +166,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
               <ScrollReveal className="relative mx-auto w-full max-w-lg lg:max-w-none">
                 <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] bg-muted">
-                    <Image
+                    <OptimizedImage
                       src={page.heroImage}
                       alt={page.title}
                       fill

@@ -33,6 +33,7 @@ import {
   SERVER_SECTIONS,
   settingsHydration,
 } from "./settings-api";
+import { writeLocalJson } from "@/lib/browser-storage";
 
 const STORAGE_KEY = "bakery-cms-settings";
 const MAX_ACTIVITY = 100;
@@ -64,7 +65,11 @@ function scrubbedForCache(settings: AppSettings): AppSettings {
 
 function persist(settings: AppSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubbedForCache(settings)));
+  // Never throws. `loadSettings` seeds through here on first read, and
+  // `getCommerceSettings` is called from `generateOrderNumber` — so on a browser
+  // at its storage limit this was the SECOND way a checkout died before the
+  // order reached the server, after the order cache itself.
+  writeLocalJson(STORAGE_KEY, scrubbedForCache(settings));
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
@@ -126,8 +131,29 @@ function appendActivity(
  * omits keeps its existing value. `saveSettings` fires SETTINGS_UPDATED_EVENT,
  * which every live consumer already listens to.
  */
-export async function hydrateSettingsFromServer(): Promise<boolean> {
-  const full = await fetchFullSettings();
+export async function hydrateSettingsFromServer(
+  options: {
+    /**
+     * Whether to try the admin-only read first.
+     *
+     * False on the storefront. `/api/settings` requires a settings role, so for
+     * a visitor it can only ever answer 401 — two of them on every page view,
+     * two red lines in every customer's console, and a `noteAuthStatus(401)`
+     * that pushed the session tracker into "checking" on a page with no session
+     * to check. The public subset that follows is what the storefront actually
+     * uses, and it is unauthenticated by design.
+     *
+     * This is the same reasoning that already keeps `SiteLayoutServerSync` out
+     * of the root providers — see the note in components/providers/app-providers.
+     *
+     * It costs the storefront nothing else: only a FULL read opens the
+     * hydration gate, and the gate is opened on demand by
+     * `ensureSettingsHydrated` before any write, never by this mount.
+     */
+    privileged?: boolean;
+  } = {},
+): Promise<boolean> {
+  const full = options.privileged === false ? null : await fetchFullSettings();
   const server = full ?? (await fetchPublicSettings());
   if (!server) return false;
 

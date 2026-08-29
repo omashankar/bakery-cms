@@ -55,8 +55,30 @@ describe("settings validators", () => {
       false,
     );
 
+    /**
+     * A data URI that is not an image is the same stored-XSS shape as
+     * `javascript:` — accepting `data:` wholesale to make Upload work would have
+     * reopened exactly what this test exists to close.
+     */
+    expect(
+      generalSchema.safeParse({ ...base, logo: "data:text/html;base64,PHNjcmlwdD4=" }).success,
+    ).toBe(false);
+
     expect(generalSchema.safeParse({ ...base, logo: "" }).success).toBe(true);
     expect(generalSchema.safeParse({ ...base, logo: "/images/logo.svg" }).success).toBe(true);
+
+    /**
+     * An uploaded logo on a shop with NO image host is a base64 image, and both
+     * fields render it fine. Rejecting it disabled Save for the whole General
+     * card — site name and timezone included — the moment an owner used the
+     * Upload button these fields had just been given.
+     */
+    expect(
+      generalSchema.safeParse({ ...base, logo: "data:image/png;base64,iVBORw0KGgo=" }).success,
+    ).toBe(true);
+    expect(
+      generalSchema.safeParse({ ...base, favicon: "data:image/x-icon;base64,AAABAAEAEBA=" }).success,
+    ).toBe(true);
     expect(generalSchema.safeParse({ ...base, logo: "https://cdn.example/logo.svg" }).success).toBe(
       true,
     );

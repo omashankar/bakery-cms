@@ -44,6 +44,7 @@ import {
   toggleReviewFeatured,
   updateReview,
 } from "@/features/reviews/lib/reviews-repository";
+import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
 import {
   defaultReviewFilters,
   filterReviews,
@@ -96,6 +97,22 @@ export function ReviewsAdminPage() {
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
 
+  /**
+   * This page's own data, asked for NOW.
+   *
+   * The admin layout hydrates every admin cache — this one included — but only
+   * after `useIdle(1000)`, so that the screen the admin opened gets the
+   * connection first. For a screen whose content IS one of those caches that is
+   * backwards, and it was measured: in a production build the review list
+   * appeared at 2508ms with `/api/reviews` answering at 1565ms, most of the gap
+   * being a delay meant to help it.
+   *
+   * Mounting the same hook here costs nothing — `hydrateOnce` makes the
+   * layout's later call join this read rather than repeat it — and the rest of
+   * the batch still waits its turn.
+   */
+  useReviewsServerSync();
+
   function refresh() {
     setReviews(loadReviews());
   }
@@ -108,8 +125,8 @@ export function ReviewsAdminPage() {
      * It used to be set inside `refresh()`, which runs straight after a
      * synchronous localStorage read — so on a fresh browser the cards painted
      * "0 pending · All clear" and the list said "No reviews found" before the
-     * server had been asked. `useReviewsServerSync` in the admin layout is what
-     * actually fetches them, and it settles this gate when it lands.
+     * server had been asked. `useReviewsServerSync` is what actually fetches
+     * them, and it settles this gate when it lands.
      */
     void reviewsHydration.waitForSettled().then(() => setMounted(true));
     window.addEventListener(REVIEWS_UPDATED_EVENT, refresh);

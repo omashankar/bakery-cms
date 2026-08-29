@@ -2,12 +2,10 @@
 
 import { fromScheduleInputValue, toScheduleInputValue } from "@/lib/datetime-local";
 import { useEffect, useMemo, useState } from "react";
-import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
-import { MediaPicker } from "@/apps/admin/products/components/media-picker";
-import { SafeImage } from "@/components/shared/safe-image";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -90,14 +88,12 @@ export function BannerFormDialog({
   const isEdit = Boolean(bannerId);
   const [form, setForm] = useState<BannerFormState>(EMPTY_FORM);
   const [baseline, setBaseline] = useState(serializeForm(EMPTY_FORM));
-  const [mediaOpen, setMediaOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
   useEffect(() => {
     if (!open) {
-      setMediaOpen(false);
       setDiscardOpen(false);
       return;
     }
@@ -191,47 +187,13 @@ export function BannerFormDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="banner-image">Image</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMediaOpen(true)}
-                >
-                  <ImageIcon className="size-4" />
-                  Media
-                </Button>
-              </div>
-              <Input
-                id="banner-image"
-                value={form.image}
-                onChange={(e) => patchForm({ image: e.target.value })}
-                placeholder="https://… or pick from Media Library"
-              />
-            </div>
-
-            {form.image ? (
-              <div className="space-y-2">
-                <div className="relative aspect-[3/1] overflow-hidden rounded-xl border border-border bg-muted">
-                  <SafeImage
-                    src={form.image}
-                    alt={form.title || "Banner preview"}
-                    className="object-cover"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-muted-foreground"
-                  onClick={() => patchForm({ image: "" })}
-                >
-                  Clear image
-                </Button>
-              </div>
-            ) : null}
+            <PhotoField
+              id="banner-image"
+              label="Image"
+              aspect="wide"
+              value={form.image}
+              onChange={(url) => patchForm({ image: url })}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="banner-link">Link URL</Label>
@@ -343,15 +305,6 @@ export function BannerFormDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <MediaPicker
-        open={mediaOpen}
-        onOpenChange={setMediaOpen}
-        onSelect={(url) => {
-          patchForm({ image: url });
-          setMediaOpen(false);
-        }}
-      />
 
       <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <DialogContent className="sm:max-w-md">

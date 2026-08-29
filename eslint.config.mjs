@@ -172,6 +172,47 @@ const sharedUiStaysShared = {
 };
 
 /**
+ * `next/image` may only be imported by the one component that makes it safe.
+ *
+ * A raw `<Image>` THROWS during render for any src whose hostname is not in
+ * `images.remotePatterns` -- E231, from image-loader.js -- and every image on
+ * this site is a URL an admin typed into a form. One pasted Pinterest link took
+ * down the homepage builder AND the live storefront, because the cms-sections
+ * renderers are mounted by both. components/shared/optimized-image.tsx asks
+ * lib/images/image-hosts.ts and passes `unoptimized` for anything outside the
+ * list, which makes the throw structurally unreachable.
+ *
+ * Written as `no-restricted-syntax`, NOT `no-restricted-imports`, and that is
+ * not a style choice. Flat config resolves a rule by last-match-wins for the
+ * whole rule, so a repo-wide `no-restricted-imports` block placed after
+ * domainStaysPure and sharedUiStaysShared would REPLACE their options for every
+ * file they cover -- silently switching off two guards to add a third. Verified
+ * by running eslint against a deliberate violation of each, not assumed.
+ *
+ * Repo-wide `files` with a single `ignores`, rather than an enumerated list of
+ * directories, for the reason set out above domainStaysPure: an enumerated rule
+ * reads as complete while quietly excluding whatever nobody remembered.
+ *
+ * Same limit as the other guards: this sees static `import` declarations only.
+ */
+const nextImageStaysWrapped = {
+  files: ["**/*.{ts,tsx}"],
+  // The wrapper itself, and nothing else. An exemption has to be written here
+  // with its reason beside it.
+  ignores: ["components/shared/optimized-image.tsx"],
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector: "ImportDeclaration[source.value='next/image']",
+        message:
+          "Import { OptimizedImage } from @/components/shared/optimized-image instead. A raw next/image throws during render for any host outside next.config remotePatterns, and admins can type any URL they like.",
+      },
+    ],
+  },
+};
+
+/**
  * The codebase already marks deliberately-discarded bindings with a leading
  * underscore — `const { id: _id, ...data } = record` to strip a field. Honour
  * that convention so the real unused-variable warnings stay visible.
@@ -199,6 +240,7 @@ const eslintConfig = defineConfig([
   storefrontImportsAdmin,
   domainStaysPure,
   sharedUiStaysShared,
+  nextImageStaysWrapped,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -55,6 +55,7 @@ import { SettingsFormGate, SettingsHydrationNotice } from "@/apps/admin/settings
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 
 const PAGE_SIZE = 10;
 
@@ -69,6 +70,20 @@ const EMPTY_OVERVIEW: InventoryOverview = {
 };
 
 export function InventoryAdminPage() {
+  /**
+   * This screen's own data, asked for NOW.
+   *
+   * The admin layout hydrates every admin cache — this one included — but only
+   * after `useIdle(1000)`, so that the screen the admin opened gets the
+   * connection first. For a screen whose content IS one of those caches that is
+   * backwards: it spent that second waiting on a delay meant to help it.
+   *
+   * Mounting the same hook here costs nothing — `hydrateOnce` makes the
+   * layout's later call join this read rather than repeat it — and the rest of
+   * the batch still waits its turn.
+   */
+  useProductCacheSync();
+
   const [mounted, setMounted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<InventoryListFilters>(defaultInventoryFilters);

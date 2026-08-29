@@ -1,7 +1,7 @@
 import type { Banner } from "@/types/media";
 import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
-import { defaultBanners } from "./banners-utils";
+import { defaultBanners, selectActiveHeroBanners } from "./banners-utils";
 import {
   bannersLoaded,
   bannersWritable,
@@ -45,16 +45,6 @@ function normalizeBanners(banners: Banner[]): { banners: Banner[]; changed: bool
     return normalized;
   });
   return { banners: next, changed };
-}
-
-function isBannerWithinSchedule(banner: Banner, now = Date.now()): boolean {
-  if (banner.startDate && new Date(banner.startDate).getTime() > now) return false;
-  if (banner.endDate && new Date(banner.endDate).getTime() < now) return false;
-  return true;
-}
-
-function sortBanners(banners: Banner[]): Banner[] {
-  return [...banners].sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title));
 }
 
 export function loadBanners(): Banner[] {
@@ -165,22 +155,18 @@ export async function resetBanners(): Promise<WriteResult<Banner[]>> {
   return saveBanners(defaultBanners);
 }
 
+/**
+ * The browser cache, run through the storefront's OWN selector.
+ *
+ * This used to carry a second copy of the rule — its own schedule check and its
+ * own `sortBanners` — beside `selectActiveHeroBanners`. The copies agreed only
+ * because `loadBanners` normalises `priority` and `visibility` first; on a
+ * banner missing either, this one sorted on NaN and the server did not. Two
+ * implementations of "which banners are live" is the shape of the bug, so there
+ * is now one. `"all"` is still the WILDCARD here, not the visibility value.
+ */
 export function getActiveHeroBanners(visibility: Banner["visibility"] | "all" = "all"): Banner[] {
-  return sortBanners(
-    loadBanners().filter(
-      (banner) =>
-        banner.isActive &&
-        banner.position === "hero" &&
-        isBannerWithinSchedule(banner) &&
-        (visibility === "all" ||
-          banner.visibility === "all" ||
-          banner.visibility === visibility)
-    )
-  );
-}
-
-export function getActivePromoBanners(limit = 3, visibility: Banner["visibility"] | "all" = "all"): Banner[] {
-  return getActiveHeroBanners(visibility).slice(0, limit);
+  return selectActiveHeroBanners(loadBanners(), visibility);
 }
 
 export async function createBanner(

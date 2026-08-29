@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { useState } from "react";
 import { ZoomIn } from "lucide-react";
 import {
@@ -31,7 +31,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100"
           aria-label="Zoom product image"
         >
-          <Image
+          <OptimizedImage
             src={activeImage}
             alt={productName}
             fill
@@ -58,7 +58,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                     : "border-border hover:border-bakery-300"
                 )}
               >
-                <Image src={src} alt="" fill className="object-cover" sizes="100px" />
+                <OptimizedImage src={src} alt="" fill className="object-cover" sizes="100px" />
               </button>
             ))}
           </div>
@@ -69,7 +69,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
         <DialogContent className="border-border p-2 sm:max-w-3xl sm:p-3" showCloseButton>
           <DialogTitle className="sr-only">{productName}</DialogTitle>
           <div className="relative aspect-square overflow-hidden rounded-xl bg-cream-100">
-            <Image src={activeImage} alt={productName} fill className="object-contain" sizes="90vw" />
+            <OptimizedImage src={activeImage} alt={productName} fill className="object-contain" sizes="90vw" />
           </div>
         </DialogContent>
       </Dialog>

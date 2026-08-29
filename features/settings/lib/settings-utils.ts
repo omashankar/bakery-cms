@@ -233,11 +233,39 @@ export function chosenFavicon(value: string | undefined): string {
   return trimmed && trimmed !== defaultGeneralSettings.favicon.trim() ? trimmed : "";
 }
 
+/**
+ * A base64 image, which is what an upload becomes on a shop with no image host.
+ *
+ * `data:image/` specifically, never bare `data:`: `data:text/html` in the same
+ * slot would be a stored-XSS sink the moment one of these values reached
+ * anything other than an `<img>` or a `<link rel="icon">`.
+ */
+const INLINE_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,/i;
+
+/**
+ * What may be stored as the shop's logo or favicon.
+ *
+ * The `data:image/` case is not a loosening for its own sake. Both fields now
+ * offer an Upload button, and on an install with no Cloudinary credentials that
+ * upload legitimately produces a base64 data URI — which this function rejected,
+ * so the field went red, `hasErrors` went true, and Save was disabled for the
+ * WHOLE General card: the owner could no longer save their site name, timezone
+ * or currency either, having done nothing but add their logo.
+ *
+ * Safe for these two sinks. The logo renders through an `<img>` and the favicon
+ * through `<link rel="icon">`, and neither executes script from a data URI — an
+ * image is a scripting-disabled context, SVG included. The SIZE is bounded
+ * elsewhere, by MAX_INLINE_BYTES in the upload path.
+ *
+ * `javascript:` and protocol-relative `//host` stay refused, which is what this
+ * guard was written for.
+ */
 export function isSafeAssetUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return true;
   if (trimmed.startsWith("//")) return false;
   if (trimmed.startsWith("/")) return true;
+  if (INLINE_IMAGE.test(trimmed)) return true;
   return /^https?:\/\/\S+$/i.test(trimmed);
 }
 

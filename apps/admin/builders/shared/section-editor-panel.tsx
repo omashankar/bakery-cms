@@ -14,7 +14,7 @@ import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/compo
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { BuilderMediaField } from "./builder-media-field";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 
 export interface BuilderEditableSection {
   instanceId: string;
@@ -144,7 +144,7 @@ function ListField({
             </div>
             {columns.map((column) =>
               column.isImage ? (
-                <BuilderMediaField
+                <PhotoField
                   key={column.key}
                   id={`${field.key}-${id}-${column.key}`}
                   label={column.label}
@@ -328,7 +328,7 @@ function SlidesField({
               />
             </div>
           </div>
-          <BuilderMediaField
+          <PhotoField
             id={`slide-${index}-image`}
             label="Slide image"
             value={slide.imageUrl ?? ""}
@@ -407,7 +407,7 @@ function renderField<T extends BuilderEditableSection>(
 
   if (field.type === "url" && field.isImage) {
     return (
-      <BuilderMediaField
+      <PhotoField
         key={field.key}
         id={field.key}
         label={field.label}

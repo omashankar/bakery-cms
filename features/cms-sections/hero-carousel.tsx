@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -162,7 +162,7 @@ function HeroSlideView({
         <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
           <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[3/2] lg:aspect-[4/3]">
             {slide.imageUrl ? (
-              <Image
+              <OptimizedImage
                 src={slide.imageUrl}
                 alt={slide.headline}
                 fill

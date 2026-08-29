@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { hydrateOnce } from "@/lib/hydrate-once";
 
 import { fetchProducts } from "@/features/products/data/products-client";
 import { persistProducts } from "@/features/products/lib/products-repository";
@@ -22,20 +23,13 @@ import { persistProducts } from "@/features/products/lib/products-repository";
  */
 export function useProductCacheSync(): void {
   useEffect(() => {
-    let cancelled = false;
-
-    async function sync() {
+    void hydrateOnce("products", async () => {
       try {
         const products = await fetchProducts();
-        if (!cancelled) persistProducts(products);
+        persistProducts(products);
       } catch {
         // Offline or API down — the existing cache is better than nothing.
       }
-    }
-
-    void sync();
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 }

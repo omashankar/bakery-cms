@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SafeImage } from "@/components/shared/safe-image";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
@@ -35,6 +35,8 @@ import {
   resolveStockFields,
 } from "@/features/inventory/lib/inventory-utils";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
+import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
+import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
@@ -44,7 +46,6 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
-import { MediaPicker } from "./media-picker";
 import { ProductDetailsFields } from "./product-details-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import {
@@ -60,6 +61,13 @@ interface ProductFormPageProps {
   cakeId?: string;
 }
 
+/** What the admin is told, per status actually written. */
+const SAVED_MESSAGE: Record<EntityStatus, string> = {
+  published: "Cake published — it is live on the shop",
+  draft: "Saved as a draft — not on the shop yet",
+  archived: "Cake archived — hidden from the shop",
+};
+
 export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
@@ -71,11 +79,20 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   // Once the admin types a meta title of their own, the name stops driving it.
   // In edit mode the stored value is already theirs.
   const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
+
+  /**
+   * An archived cake is off the shop, and the two buttons say something
+   * different about it. "Save Draft" over a retired cake is a lie twice: it
+   * used to un-archive it, and even fixed it would be describing a state the
+   * record is not in.
+   */
+  const isArchived = savedStatus === "archived";
+  const saveLabel = isArchived ? "Save changes" : "Save Draft";
+  const publishLabel = isArchived ? "Restore & publish" : "Publish";
 
   useEffect(() => {
     const sync = () => setModules(getModuleSettings());
@@ -173,7 +190,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
-  async function saveProduct(status: EntityStatus, redirectToList = true) {
+  async function saveProduct(intent: SaveIntent, redirectToList = true) {
     if (!form.name.trim()) {
       toast.error("Cake name is required");
       return;
@@ -184,6 +201,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }
 
     setIsSaving(true);
+
+    /**
+     * Derived from the button's INTENT and from what the server holds — never
+     * hardcoded by the caller. `status` used to be the caller's argument,
+     * spread over `...form` below, which is why the Status dropdown beside
+     * these buttons could not decide anything and why saving an archived cake
+     * put it back on the shop.
+     */
+    const status = resolveSaveStatus(intent, savedStatus);
 
     const payload: ProductFormData = {
       ...form,
@@ -204,11 +230,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     try {
       if (mode === "add") {
         await createProductRequest(payload);
-        toast.success(status === "published" ? "Cake published" : "Cake saved as draft");
+        toast.success(SAVED_MESSAGE[status]);
       } else if (cakeId) {
         await updateProductRequest(cakeId, payload);
         setSavedStatus(payload.status);
-        toast.success(status === "published" ? "Cake updated & published" : "Draft saved");
+        // The form's own copy too, so the badge and the button labels cannot
+        // disagree with what the server was just told.
+        setForm(payload);
+        toast.success(SAVED_MESSAGE[status]);
       }
     } catch (error) {
       // Keep the user on the form with their input intact so they can retry.
@@ -285,12 +314,12 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               <ExternalLink className="size-4" />
               Preview
             </Button>
-            <Button variant="outline" disabled={isSaving} onClick={() => saveProduct("draft")}>
-              Save Draft
+            <Button variant="outline" disabled={isSaving} onClick={() => saveProduct("save")}>
+              {saveLabel}
             </Button>
-            <Button variant="bakery" disabled={isSaving} onClick={() => saveProduct("published")}>
+            <Button variant="bakery" disabled={isSaving} onClick={() => saveProduct("publish")}>
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-              Publish
+              {publishLabel}
             </Button>
           </div>
         }
@@ -727,38 +756,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </TabsContent>
 
               <TabsContent value="media" className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="imageUrl">Primary image URL</Label>
-                  <Input
-                    id="imageUrl"
-                    value={form.images[0] ?? ""}
-                    onChange={(e) => patchForm({ images: [e.target.value] })}
-                    placeholder="https://images.unsplash.com/..."
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setMediaPickerOpen(true)}
-                  >
-                    Browse Media Library
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Pick from uploaded media or paste an image URL.
-                  </p>
-                </div>
-                {form.images[0] ? (
-                  <div className="relative aspect-square w-full max-w-xs overflow-hidden rounded-xl border border-border bg-muted">
-                    <SafeImage
-                      src={form.images[0]}
-                      alt={form.name || "Cake preview"}
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex aspect-square w-full max-w-xs items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 text-sm text-muted-foreground">
-                    Image preview
-                  </div>
-                )}
+                <PhotoField
+                  id="imageUrl"
+                  label="Photo"
+                  aspect="square"
+                  value={form.images[0] ?? ""}
+                  onChange={(url) => patchForm({ images: [url] })}
+                  placeholder="https://images.unsplash.com/..."
+                />
               </TabsContent>
 
               <TabsContent value="seo" className="space-y-4">
@@ -796,19 +801,45 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               <CardDescription>Status and merchandising flags</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/*
+                Status is REPORTED here, not chosen.
+
+                This was a dropdown, and it could not set anything: every save
+                took its status from the button that was pressed, spread over
+                the form's own copy, so whichever of Save/Publish the admin
+                pressed overrode whatever they had picked. "Archived" was the
+                clearest proof — no save path in the app could produce it, so
+                the option existed only to be ignored.
+
+                Two labelled buttons already say what a save does. A third
+                control claiming the same job could only ever be the one that
+                loses, so it is gone, and Archive — the thing the dropdown was
+                really being asked for — is a real action below.
+              */}
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <AdminSelect
-                  id="status"
-                  value={form.status}
-                  onChange={(e) =>
-                    patchForm({ status: e.target.value as EntityStatus })
-                  }
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </AdminSelect>
+                <span className="text-sm font-medium">Status</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={savedStatus === "published" ? "success" : "outline"}>
+                    {formatStatusLabel(savedStatus ?? "draft")}
+                  </Badge>
+                  {mode === "edit" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-muted-foreground"
+                      disabled={isSaving}
+                      onClick={() => saveProduct(isArchived ? "unarchive" : "archive", false)}
+                    >
+                      {isArchived ? "Restore as draft" : "Archive"}
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isArchived
+                    ? "Hidden from the shop. Restoring brings it back as a draft."
+                    : "Set by the Save and Publish buttons above."}
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm">
@@ -895,24 +926,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         </div>
       </div>
 
-      <MediaPicker
-        open={mediaPickerOpen}
-        onOpenChange={setMediaPickerOpen}
-        onSelect={(url) => patchForm({ images: [url] })}
-        description="Select an image for this cake. Upload new files from the Media Library page."
-      />
-
       <AdminMobileActionBar className="xl:hidden">
         <Button variant="outline" onClick={openPreview} disabled={!form.slug}>
           <ExternalLink className="size-4" />
           Preview
         </Button>
-        <Button variant="outline" disabled={isSaving} onClick={() => saveProduct("draft")}>
-          Save Draft
+        <Button variant="outline" disabled={isSaving} onClick={() => saveProduct("save")}>
+          {saveLabel}
         </Button>
-        <Button variant="bakery" disabled={isSaving} onClick={() => saveProduct("published")}>
+        <Button variant="bakery" disabled={isSaving} onClick={() => saveProduct("publish")}>
           {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-          Publish
+          {publishLabel}
         </Button>
       </AdminMobileActionBar>
     </AdminPage>

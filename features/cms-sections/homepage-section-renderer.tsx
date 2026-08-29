@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -40,7 +40,7 @@ import {
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
+import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import type { Banner } from "@/types/media";
 import {
   limitRows,
@@ -76,7 +76,7 @@ import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 import { formatCurrency } from "@/utils/format";
 
-interface HomepageSectionRendererProps {
+export interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
   /**
    * Product rails built on the server. When absent (admin builder preview) the
@@ -321,7 +321,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
           >
             <div className="relative aspect-square w-20 overflow-hidden rounded-full border border-border bg-cream-100 transition-premium group-hover:border-bakery-300 group-hover:shadow-sm sm:w-full">
               {category.image ? (
-                <Image
+                <OptimizedImage
                   src={category.image}
                   alt={category.name}
                   fill
@@ -479,7 +479,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
-                <Image src={category.image} alt={category.name} fill className="object-cover" sizes="300px" />
+                <OptimizedImage src={category.image} alt={category.name} fill className="object-cover" sizes="300px" />
               ) : null}
             </div>
             <div className="p-4">
@@ -503,6 +503,33 @@ function ProductGridSection(
   const maxCount = contentNumber(c, "maxCount", 4);
   const ctaHref = contentString(c, "ctaHref");
   const ctaLabel = contentString(c, "ctaLabel");
+  const cakes = props.cakes.slice(0, maxCount);
+
+  /**
+   * Nothing to show means nothing to show — the same answer this file already
+   * gives for categories, why-us and the store locator. A shop with no cake
+   * flagged for this row was publishing "Our Best Sellers" over an empty strip.
+   *
+   * The builder says WHY instead of vanishing, because a section that renders
+   * nothing cannot be selected, and an admin cannot fix what they cannot click.
+   */
+  if (cakes.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+        <div className="mt-8 rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+          No cake is set for this row yet, so it stays hidden on the live
+          homepage. Flag some cakes under Products, or lower &ldquo;Max cakes
+          shown&rdquo;.
+        </div>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props} noReveal>
@@ -514,7 +541,7 @@ function ProductGridSection(
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {props.cakes.slice(0, maxCount).map((cake) => (
+        {cakes.map((cake) => (
           <ProductCard key={cake.id} cake={cake} className="h-full" />
         ))}
       </StaggerReveal>
@@ -617,7 +644,7 @@ function WeddingSection(props: HomepageSectionRendererProps) {
                   does not throw, it just ships an empty grey panel to every
                   visitor. The wedding renderer's twin guards this the same way. */}
               {teaserImage ? (
-                <Image
+                <OptimizedImage
                   src={teaserImage}
                   alt="Wedding cake"
                   fill
@@ -736,7 +763,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
             </p>
             <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">
               <div className="relative size-10 shrink-0 overflow-hidden rounded-full">
-                <Image src={item.avatar} alt={item.name} fill className="object-cover" sizes="40px" />
+                <OptimizedImage src={item.avatar} alt={item.name} fill className="object-cover" sizes="40px" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{item.name}</p>
@@ -784,7 +811,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
               key={`${src}-${index}`}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             >
-              <Image
+              <OptimizedImage
                 src={src}
                 alt={title || `Gallery ${index + 1}`}
                 fill
@@ -897,10 +924,25 @@ function CtaSection(props: HomepageSectionRendererProps) {
 function PromoBannerSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 2);
-  // Prefer the server-provided banners (an SSR snapshot → identical on hydration).
-  // Fall back to the client store only in the builder preview, which has no
-  // server data and never server-renders.
-  const banners = (props.banners ?? getActivePromoBanners(maxCount)).slice(0, maxCount);
+  /**
+   * The list is SELECTED here, not trusted from the caller.
+   *
+   * Both mounts pass `banners`, and they were passing different things. The
+   * storefront pre-selects on the server (`selectActiveHeroBanners(raw,
+   * "homepage")`, store-home-page.tsx) so the RSC payload carries only what a
+   * visitor may see. The builder fetches GET /api/content/banners, which hands
+   * staff the RAW stored array, and passed it straight in — so the preview that
+   * calls itself "the same light sections as live store" rendered banners that
+   * were switched off, expired, scheduled, scoped to Collections, or positioned
+   * sidebar/popup, in stored order (newest first) rather than by priority. With
+   * maxCount 2 that decided WHICH two tiles appeared, and the admin published a
+   * homepage they had never seen.
+   *
+   * The server pass stays: it is the TRANSPORT filter, so unpublished content
+   * does not cross the wire. This is the RENDER filter, and running it twice is
+   * a no-op — the same rule testimonials and FAQs already follow above.
+   */
+  const banners = selectActiveHeroBanners(props.banners ?? [], "homepage").slice(0, maxCount);
 
   return (
     <SectionShell {...props}>
@@ -917,7 +959,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
             className="group relative overflow-hidden rounded-2xl border border-border"
           >
             <div className="relative aspect-[21/9] bg-muted">
-              <Image src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
+              <OptimizedImage src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
               <div className="absolute inset-0 bg-bakery-950/35 transition-colors group-hover:bg-bakery-950/45" />
               <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
                 <p className="text-sm font-medium">{banner.title}</p>
@@ -977,7 +1019,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
             className="overflow-hidden rounded-xl border border-border bg-white"
           >
             <div className="relative aspect-[3/2] bg-muted">
-              <Image src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
+              <OptimizedImage src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
               <Badge variant="gold" className="absolute top-3 left-3">
                 {offer.discount}
               </Badge>
@@ -1086,7 +1128,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
             className="group relative block aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
             aria-label={handle ? `View @${handle} on Instagram` : "View our Instagram"}
           >
-            <Image
+            <OptimizedImage
               src={post.image}
               alt=""
               fill

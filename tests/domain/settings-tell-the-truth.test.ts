@@ -118,16 +118,32 @@ describe("the mail password never reaches localStorage", () => {
   });
 
   it("keeps it out of a backup, which sweeps every bakery-cms key", async () => {
+    /**
+     * REWRITTEN from a `toContain` on the repository's source text. That
+     * asserted a SPELLING: when `persist` was changed to route its write
+     * through a helper that cannot throw, the scrub was still there and doing
+     * its job, and the test failed anyway. It would equally have passed for a
+     * `scrubbedForCache` that had been gutted to return its argument.
+     *
+     * The backup sweeps every `bakery-cms` key, so this puts a real secret
+     * through the real writer and then looks in the real backup.
+     */
     const repo = await freshModules();
-    localStorage.setItem(
-      "bakery-cms-settings",
-      JSON.stringify({ ...defaultAppSettings, smtp: { ...defaultAppSettings.smtp, password: "x" } }),
-    );
-    // The cache is only ever written through `persist`, so a value that got in
-    // some other way is out of scope — what matters is that the writer scrubs.
-    const repoSource = source("features/settings/lib/settings-repository.ts");
-    expect(repoSource).toContain("JSON.stringify(scrubbedForCache(settings))");
-    expect(typeof repo.exportLocalStorageBackup).toBe("function");
+
+    /**
+     * `saveSettings` is the path where the scrub is load-bearing: it takes a
+     * whole AppSettings from its caller and caches it, password and all, unless
+     * `scrubbedForCache` intervenes. Driving this through `saveSmtpSettings`
+     * instead proves nothing — that route never puts the password in front of
+     * `persist`, so the assertion passes with the scrub deleted.
+     */
+    repo.saveSettings({
+      ...defaultAppSettings,
+      smtp: { ...defaultAppSettings.smtp, host: "smtp.example.com", password: "a-real-live-secret" },
+    });
+
+    expect(localStorage.getItem("bakery-cms-settings")).not.toContain("a-real-live-secret");
+    expect(JSON.stringify(repo.exportLocalStorageBackup())).not.toContain("a-real-live-secret");
   });
 });
 

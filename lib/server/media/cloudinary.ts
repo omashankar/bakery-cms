@@ -47,7 +47,23 @@ export async function uploadToCloudinary(
   if (!configured) throw new Error("Cloudinary is not configured");
   const result = await cloudinary.uploader.upload(source, {
     folder,
-    resource_type: "auto",
+    /**
+     * "image", not "auto".
+     *
+     * Both callers send an image and nothing else — the media library rejects a
+     * file whose type is not image/*, and the photo-cake route sniffs the magic
+     * number before it builds its data URI. "auto" let Cloudinary decide from
+     * the bytes, which turned a source that was never an image into a stored
+     * raw file rather than a refusal.
+     */
+    resource_type: "image",
+    /**
+     * The SDK's own default is a 60s socket timeout (uploader.js:635), and a
+     * remote source means Cloudinary fetches a host WE do not control. A
+     * pasted link to something slow otherwise holds this admin request open for
+     * a minute.
+     */
+    timeout: 20000,
   });
   return {
     url: result.secure_url,

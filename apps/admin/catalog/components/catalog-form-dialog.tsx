@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
@@ -247,11 +248,20 @@ export function CatalogFormDialog({
                   rows={3}
                 />
               </div>
+              {/*
+                * This field was a bare text box, and it is where the reported
+                * crash came from: OurMenuSection renders `category.image`, and
+                * with no Media button beside it, typing a URL from somewhere
+                * else was the ONLY way to set a category picture. Every other
+                * image field in the admin already had a picker.
+                */}
+              <PhotoField
+                id="catalog-image"
+                label="Image"
+                value={image}
+                onChange={setImage}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="catalog-image">Image URL</Label>
-                  <Input id="catalog-image" value={image} onChange={(e) => setImage(e.target.value)} />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="catalog-count">Cake count</Label>
                   <Input

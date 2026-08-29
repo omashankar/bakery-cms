@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
-import { MediaPicker } from "@/apps/admin/products/components/media-picker";
-import { SafeImage } from "@/components/shared/safe-image";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -46,14 +44,12 @@ export function TestimonialFormDialog({
 }: TestimonialFormDialogProps) {
   const [form, setForm] = useState<TestimonialFormData>(createEmptyTestimonialForm);
   const [baseline, setBaseline] = useState(() => serializeForm(createEmptyTestimonialForm()));
-  const [mediaOpen, setMediaOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const isEdit = Boolean(testimonialId);
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
   useEffect(() => {
     if (!open) {
-      setMediaOpen(false);
       setDiscardOpen(false);
       return;
     }
@@ -162,46 +158,13 @@ export function TestimonialFormDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="testimonial-avatar">Avatar</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMediaOpen(true)}
-                >
-                  <ImageIcon className="size-4" />
-                  Media
-                </Button>
-              </div>
-              <Input
-                id="testimonial-avatar"
-                value={form.avatar}
-                onChange={(e) => patch({ avatar: e.target.value })}
-                placeholder="https://… or pick from Media Library"
-              />
-              {form.avatar ? (
-                <div className="flex items-center gap-3">
-                  <div className="relative size-14 overflow-hidden rounded-full border border-border bg-muted">
-                    <SafeImage
-                      src={form.avatar}
-                      alt={form.name || "Avatar preview"}
-                      className="object-cover"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs text-muted-foreground"
-                    onClick={() => patch({ avatar: "" })}
-                  >
-                    Clear avatar
-                  </Button>
-                </div>
-              ) : null}
-            </div>
+            <PhotoField
+              id="testimonial-avatar"
+              label="Avatar"
+              aspect="square"
+              value={form.avatar}
+              onChange={(url) => patch({ avatar: url })}
+            />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
@@ -273,15 +236,6 @@ export function TestimonialFormDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <MediaPicker
-        open={mediaOpen}
-        onOpenChange={setMediaOpen}
-        onSelect={(url) => {
-          patch({ avatar: url });
-          setMediaOpen(false);
-        }}
-      />
 
       <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <DialogContent className="sm:max-w-md">

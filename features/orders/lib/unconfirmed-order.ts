@@ -1,4 +1,4 @@
-import type { PlacedOrder } from "./orders";
+import { ORDERS_STORAGE_KEY, type PlacedOrder } from "./orders";
 
 /**
  * A payment the bakery never acknowledged, kept where a reload cannot erase it.
@@ -78,10 +78,28 @@ export function saveUnconfirmedOrder(held: Omit<UnconfirmedOrder, "heldAt">): vo
   // Cash costs nothing to re-place. See the note at the top of this file.
   if (held.paymentStatus !== "paid" && !held.paymentReference) return;
 
-  localStorage.setItem(
-    UNCONFIRMED_ORDER_KEY,
-    JSON.stringify({ ...held, heldAt: new Date().toISOString() }),
-  );
+  const payload = JSON.stringify({ ...held, heldAt: new Date().toISOString() });
+
+  try {
+    localStorage.setItem(UNCONFIRMED_ORDER_KEY, payload);
+  } catch {
+    /**
+     * This is a record of money that has ALREADY left the customer's account,
+     * and the reference in it is the only thing tying them to an order the shop
+     * is holding under a number they have never seen. It is worth more than
+     * anything else this origin stores.
+     *
+     * So make room and try again. The order cache is a convenience the next
+     * hydration rebuilds from the server; this is not.
+     */
+    try {
+      localStorage.removeItem(ORDERS_STORAGE_KEY);
+      localStorage.setItem(UNCONFIRMED_ORDER_KEY, payload);
+    } catch {
+      // Storage is refusing everything. The overlay still holds it in React
+      // state for this pageview, which is all that is left to offer.
+    }
+  }
 }
 
 export function clearUnconfirmedOrder(): void {

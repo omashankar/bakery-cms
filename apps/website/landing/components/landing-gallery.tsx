@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AnimateOnScroll } from "@/components/shared/animate-on-scroll";
@@ -77,7 +77,7 @@ export function LandingGallery({
                     aspects[index % aspects.length]
                   )}
                 >
-                  <Image
+                  <OptimizedImage
                     src={src}
                     alt={title || `Gallery image ${index + 1}`}
                     fill
