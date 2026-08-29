@@ -20,7 +20,7 @@ import {
   type PlaceOrderResponse,
 } from "./orders-api";
 
-const ORDERS_STORAGE_KEY = "bakery-cms-orders";
+export const ORDERS_STORAGE_KEY = "bakery-cms-orders";
 
 export const ORDERS_UPDATED_EVENT = "bakery-orders-updated";
 
@@ -138,9 +138,56 @@ function readOrders(): PlacedOrder[] {
   }
 }
 
+/**
+ * How many orders to keep when the browser refuses to store the whole list.
+ *
+ * Not a blanket cap: the admin's payments screen reads this cache, so trimming
+ * every write would hide orders a shop can currently see. This only applies
+ * once the browser has ALREADY refused, when the choice is between the newest
+ * few and nothing at all.
+ */
+const ORDERS_KEPT_UNDER_PRESSURE = 50;
+
+/**
+ * Best effort, and it must stay that way: this cache can never be allowed to
+ * fail a checkout.
+ *
+ * It threw. `placeOrder` calls it BEFORE the server write, so a browser at its
+ * localStorage limit turned a captured Razorpay payment into an exception that
+ * checkout-page reported as "Payment failed" — showing the customer the raw
+ * text "Setting the value of 'bakery-cms-orders' exceeded the quota". The order
+ * never reached `placeOrderRequest`, so the shop had a payment and no order
+ * (until the webhook minted one under a number the customer had not seen), and
+ * pressing Retry hit the same wall and could charge them again.
+ *
+ * The server is where an order lives. This is the copy that lets the
+ * confirmation page render immediately, and losing it costs a customer nothing
+ * — the next hydration brings it back.
+ *
+ * Filling up is easy: the admin layout hydrates the WHOLE shop's order history
+ * into this same key, so an owner who is signed in to the admin and then opens
+ * their own storefront in the same browser is the exact case in the report.
+ */
 function writeOrders(orders: PlacedOrder[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+
+  try {
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+  } catch {
+    // Out of room. Orders are newest-first, so keep the ones a customer is
+    // most likely to look at and try once more.
+    try {
+      localStorage.setItem(
+        ORDERS_STORAGE_KEY,
+        JSON.stringify(orders.slice(0, ORDERS_KEPT_UNDER_PRESSURE)),
+      );
+    } catch {
+      // Still refused — a browser with storage disabled entirely, or full of
+      // something else. Nothing more to do, and nothing that should stop the
+      // order reaching the server.
+    }
+  }
+
   window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
 }
 

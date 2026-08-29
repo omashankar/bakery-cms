@@ -33,6 +33,7 @@ import {
   SERVER_SECTIONS,
   settingsHydration,
 } from "./settings-api";
+import { writeLocalJson } from "@/lib/browser-storage";
 
 const STORAGE_KEY = "bakery-cms-settings";
 const MAX_ACTIVITY = 100;
@@ -64,7 +65,11 @@ function scrubbedForCache(settings: AppSettings): AppSettings {
 
 function persist(settings: AppSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(scrubbedForCache(settings)));
+  // Never throws. `loadSettings` seeds through here on first read, and
+  // `getCommerceSettings` is called from `generateOrderNumber` — so on a browser
+  // at its storage limit this was the SECOND way a checkout died before the
+  // order reached the server, after the order cache itself.
+  writeLocalJson(STORAGE_KEY, scrubbedForCache(settings));
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
 }
 
