@@ -39,10 +39,25 @@ import {
   type NewsletterFilters,
 } from "@/features/inquiries/lib/newsletter-repository";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
 
 const PAGE_SIZE = 12;
 
 export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boolean } = {}) {
+  /**
+   * This screen's own data, asked for NOW.
+   *
+   * The admin layout hydrates every admin cache — this one included — but only
+   * after `useIdle(1000)`, so that the screen the admin opened gets the
+   * connection first. For a screen whose content IS one of those caches that is
+   * backwards: it spent that second waiting on a delay meant to help it.
+   *
+   * Mounting the same hook here costs nothing — `hydrateOnce` makes the
+   * layout's later call join this read rather than repeat it — and the rest of
+   * the batch still waits its turn.
+   */
+  useNewsletterServerSync();
+
   /**
    * "Have I heard from the SERVER", not "have I read the cache" — the exact
    * twin of the inquiries list next door. This localStorage key is a cache the

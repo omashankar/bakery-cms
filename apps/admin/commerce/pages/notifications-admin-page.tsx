@@ -55,6 +55,7 @@ import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
 
 const PAGE_SIZE = 12;
 
@@ -104,6 +105,20 @@ const preferenceItems = [
 ];
 
 export function NotificationsAdminPage() {
+  /**
+   * This screen's own data, asked for NOW.
+   *
+   * The admin layout hydrates every admin cache — this one included — but only
+   * after `useIdle(1000)`, so that the screen the admin opened gets the
+   * connection first. For a screen whose content IS one of those caches that is
+   * backwards: it spent that second waiting on a delay meant to help it.
+   *
+   * Mounting the same hook here costs nothing — `hydrateOnce` makes the
+   * layout's later call join this read rather than repeat it — and the rest of
+   * the batch still waits its turn.
+   */
+  useOrdersServerSync();
+
   const [weddingEnabled, setWeddingEnabled] = useState(true);
 
   useEffect(() => {
