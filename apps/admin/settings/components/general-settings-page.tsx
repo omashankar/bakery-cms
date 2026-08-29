@@ -8,6 +8,7 @@ import {
 } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -187,35 +188,35 @@ export function GeneralSettingsPage() {
                 Controls public labels and which optional modules appear. Bakery keeps every feature on.
               </p>
             </div>
+            {/*
+              * These two were bare URL boxes with no picker of any kind, which
+              * made the shop's own logo and favicon the HARDEST images in the
+              * admin to set — you had to host the file somewhere yourself and
+              * type its address. They are square because a mark is.
+              */}
             <div className="space-y-2">
-              <Label htmlFor="logo">Logo URL</Label>
-              <Input
+              <PhotoField
                 id="logo"
+                label="Logo"
+                aspect="square"
                 value={settings.logo}
-                aria-invalid={Boolean(errors.logo)}
-                aria-describedby={errors.logo ? "logo-error" : undefined}
-                className={cn(errors.logo && "border-destructive")}
-                onChange={(e) => edit((prev) => ({ ...prev, logo: e.target.value }))}
+                onChange={(url) => edit((prev) => ({ ...prev, logo: url }))}
                 placeholder="/images/logo.svg"
+                error={errors.logo}
               />
-              <FieldError id="logo-error" message={errors.logo} />
               <p className="text-xs text-muted-foreground">
                 Shown as the storefront mark. Leave empty to use the header&apos;s letter mark.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="favicon">Favicon URL</Label>
-              <Input
-                id="favicon"
-                value={settings.favicon}
-                aria-invalid={Boolean(errors.favicon)}
-                aria-describedby={errors.favicon ? "favicon-error" : undefined}
-                className={cn(errors.favicon && "border-destructive")}
-                onChange={(e) => edit((prev) => ({ ...prev, favicon: e.target.value }))}
-                placeholder="/favicon.ico"
-              />
-              <FieldError id="favicon-error" message={errors.favicon} />
-            </div>
+            <PhotoField
+              id="favicon"
+              label="Favicon"
+              aspect="square"
+              value={settings.favicon}
+              onChange={(url) => edit((prev) => ({ ...prev, favicon: url }))}
+              placeholder="/favicon.ico"
+              error={errors.favicon}
+            />
             <div className="space-y-2">
               <Label htmlFor="timezone">Timezone</Label>
               <AdminSelect

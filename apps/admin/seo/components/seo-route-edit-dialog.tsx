@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
-import { MediaPicker } from "@/apps/admin/products/components/media-picker";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -68,7 +67,6 @@ export function SeoRouteEditDialog({
     twitterCard: "summary_large_image",
   });
   const [baseline, setBaseline] = useState("");
-  const [mediaOpen, setMediaOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const isDirty = useMemo(
@@ -78,7 +76,6 @@ export function SeoRouteEditDialog({
 
   useEffect(() => {
     if (!open) {
-      setMediaOpen(false);
       setDiscardOpen(false);
       return;
     }
@@ -212,28 +209,13 @@ export function SeoRouteEditDialog({
                 />
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="seo-og-image">Open Graph image</Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setMediaOpen(true)}
-                  >
-                    <ImageIcon className="size-4" />
-                    Media
-                  </Button>
-                </div>
-                <Input
-                  id="seo-og-image"
-                  value={form.ogImage}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, ogImage: e.target.value }))
-                  }
-                  placeholder="https://… or pick from Media Library"
-                />
-              </div>
+              <PhotoField
+                id="seo-og-image"
+                label="Open Graph image"
+                aspect="wide"
+                value={form.ogImage}
+                onChange={(url) => setForm((prev) => ({ ...prev, ogImage: url }))}
+              />
 
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
@@ -300,15 +282,6 @@ export function SeoRouteEditDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <MediaPicker
-        open={mediaOpen}
-        onOpenChange={setMediaOpen}
-        onSelect={(url) => {
-          setForm((prev) => ({ ...prev, ogImage: url }));
-          setMediaOpen(false);
-        }}
-      />
 
       <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <DialogContent className="sm:max-w-md">

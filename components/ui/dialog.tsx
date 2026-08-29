@@ -43,13 +43,24 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  forceBackdrop = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /**
+   * Draw the dim even when this dialog is NESTED inside another.
+   *
+   * base-ui switches a nested backdrop off — `enabled: forceRender || !nested`
+   * in DialogBackdrop — on the reasonable assumption that the parent's dim is
+   * still there. But the parent's dim sits BEHIND the parent's own content, so
+   * a dialog opened from inside a form leaves that form at full brightness with
+   * the new dialog floating over it, and nothing marks which one is live.
+   */
+  forceBackdrop?: boolean
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay forceRender={forceBackdrop} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(

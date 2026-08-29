@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
-import { MediaPicker } from "@/apps/admin/products/components/media-picker";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -161,7 +161,6 @@ export function SeoAdminPage() {
   const [seoRoutes, setSeoRoutes] = useState<SeoRouteEntry[]>([]);
   const [filters, setFilters] = useState<SeoRouteListFilters>(defaultSeoRouteFilters);
   const [editingEntry, setEditingEntry] = useState<SeoRouteEntry | null>(null);
-  const [mediaOpen, setMediaOpen] = useState(false);
 
   /** Edits the settings half of the form, leaving the keyword box alone. */
   function editGlobal(update: (prev: GlobalSeoSettings) => GlobalSeoSettings) {
@@ -395,26 +394,13 @@ export function SeoAdminPage() {
                 }
               />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="default-og">Default OG image</Label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMediaOpen(true)}
-                >
-                  Media
-                </Button>
-              </div>
-              <Input
-                id="default-og"
-                value={global.defaultOgImage}
-                onChange={(e) =>
-                  editGlobal((prev) => ({ ...prev, defaultOgImage: e.target.value }))
-                }
-              />
-            </div>
+            <PhotoField
+              id="default-og"
+              label="Default OG image"
+              aspect="wide"
+              value={global.defaultOgImage}
+              onChange={(url) => editGlobal((prev) => ({ ...prev, defaultOgImage: url }))}
+            />
           </div>
 
           <div className="space-y-2">
@@ -758,14 +744,6 @@ export function SeoAdminPage() {
         onSaved={refreshRoutes}
       />
 
-      <MediaPicker
-        open={mediaOpen}
-        onOpenChange={setMediaOpen}
-        onSelect={(url) => {
-          editGlobal((prev) => ({ ...prev, defaultOgImage: url }));
-          setMediaOpen(false);
-        }}
-      />
     </SettingsSectionShell>
   );
 }

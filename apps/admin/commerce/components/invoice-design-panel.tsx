@@ -28,6 +28,7 @@ import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -299,15 +300,14 @@ export function InvoiceDesignPanel() {
                   onChange={(event) => patch({ tagline: event.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="invoice-logo">Logo URL</Label>
-                <Input
-                  id="invoice-logo"
-                  value={settings.logoUrl}
-                  onChange={(event) => patch({ logoUrl: event.target.value })}
-                  placeholder="/images/logo.svg"
-                />
-              </div>
+              <PhotoField
+                id="invoice-logo"
+                label="Logo"
+                aspect="square"
+                value={settings.logoUrl}
+                onChange={(url) => patch({ logoUrl: url })}
+                placeholder="/images/logo.svg"
+              />
               <div className="space-y-2">
                 <Label htmlFor="invoice-title">Invoice title</Label>
                 <Input

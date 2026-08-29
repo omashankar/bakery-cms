@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SafeImage } from "@/components/shared/safe-image";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
@@ -44,7 +44,6 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
-import { MediaPicker } from "./media-picker";
 import { ProductDetailsFields } from "./product-details-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import {
@@ -71,7 +70,6 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   // Once the admin types a meta title of their own, the name stops driving it.
   // In edit mode the stored value is already theirs.
   const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
@@ -727,38 +725,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </TabsContent>
 
               <TabsContent value="media" className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="imageUrl">Primary image URL</Label>
-                  <Input
-                    id="imageUrl"
-                    value={form.images[0] ?? ""}
-                    onChange={(e) => patchForm({ images: [e.target.value] })}
-                    placeholder="https://images.unsplash.com/..."
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setMediaPickerOpen(true)}
-                  >
-                    Browse Media Library
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Pick from uploaded media or paste an image URL.
-                  </p>
-                </div>
-                {form.images[0] ? (
-                  <div className="relative aspect-square w-full max-w-xs overflow-hidden rounded-xl border border-border bg-muted">
-                    <SafeImage
-                      src={form.images[0]}
-                      alt={form.name || "Cake preview"}
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex aspect-square w-full max-w-xs items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 text-sm text-muted-foreground">
-                    Image preview
-                  </div>
-                )}
+                <PhotoField
+                  id="imageUrl"
+                  label="Photo"
+                  aspect="square"
+                  value={form.images[0] ?? ""}
+                  onChange={(url) => patchForm({ images: [url] })}
+                  placeholder="https://images.unsplash.com/..."
+                />
               </TabsContent>
 
               <TabsContent value="seo" className="space-y-4">
@@ -894,13 +868,6 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           </Button>
         </div>
       </div>
-
-      <MediaPicker
-        open={mediaPickerOpen}
-        onOpenChange={setMediaPickerOpen}
-        onSelect={(url) => patchForm({ images: [url] })}
-        description="Select an image for this cake. Upload new files from the Media Library page."
-      />
 
       <AdminMobileActionBar className="xl:hidden">
         <Button variant="outline" onClick={openPreview} disabled={!form.slug}>

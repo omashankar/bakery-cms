@@ -114,36 +114,49 @@ export function AddSectionDialog<T extends string>({
           />
         </div>
 
-        <div className="panel-scroll grid max-h-[50vh] gap-2 overflow-y-auto sm:grid-cols-2">
-          {filtered.length === 0 ? (
-            <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
-              No sections match “{search.trim()}”.
-            </p>
-          ) : (
-            filtered.map((entry) => {
-              const Icon = iconMap[entry.icon] ?? Sparkles;
-              return (
-                <button
-                  key={entry.type}
-                  type="button"
-                  onClick={() => {
-                    onAdd(entry.type as T);
-                    setSearch("");
-                    onOpenChange(false);
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-left transition-colors",
-                    "hover:border-primary/40 hover:bg-muted"
-                  )}
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
-                    <Icon className="size-4" />
-                  </div>
-                  <p className="min-w-0 truncate text-sm font-medium">{entry.label}</p>
-                </button>
-              );
-            })
-          )}
+        {/*
+          The cap sits on a plain box, never on the grid — see the note in
+          apps/admin/products/components/media-picker.tsx. A grid that is also
+          its own height-capped scroll box shares its free space equally across
+          rows instead of letting them reach their content height, and any item
+          with a zero automatic minimum size (anything `overflow-hidden`, or an
+          aspect box with only absolutely-positioned children) then collapses.
+          Nothing here collapses today, because these rows are icon-plus-text
+          with a real content minimum — but that is luck, and the first image
+          tile added to this list would hit it.
+        */}
+        <div className="panel-scroll max-h-[50vh] overflow-y-auto">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {filtered.length === 0 ? (
+              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+                No sections match “{search.trim()}”.
+              </p>
+            ) : (
+              filtered.map((entry) => {
+                const Icon = iconMap[entry.icon] ?? Sparkles;
+                return (
+                  <button
+                    key={entry.type}
+                    type="button"
+                    onClick={() => {
+                      onAdd(entry.type as T);
+                      setSearch("");
+                      onOpenChange(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-left transition-colors",
+                      "hover:border-primary/40 hover:bg-muted"
+                    )}
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
+                      <Icon className="size-4" />
+                    </div>
+                    <p className="min-w-0 truncate text-sm font-medium">{entry.label}</p>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
 
         <DialogFooter>

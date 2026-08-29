@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { slugify } from "@/features/products/lib/product-utils";
-import { BuilderMediaField } from "@/apps/admin/builders/shared/builder-media-field";
+import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -428,7 +428,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                   </div>
                 </div>
                 {form.template === "about" ? (
-                  <BuilderMediaField
+                  <PhotoField
                     id="page-hero"
                     label="Hero image"
                     value={form.heroImage ?? ""}
@@ -827,7 +827,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                     placeholder="cakes, bakery, catering"
                   />
                 </div>
-                <BuilderMediaField
+                <PhotoField
                   id="meta-og-image"
                   label="Open Graph image"
                   value={form.seo?.ogImage ?? ""}

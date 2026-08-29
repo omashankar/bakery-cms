@@ -88,14 +88,29 @@ export interface UploadedAsset {
 }
 
 /**
- * Upload an image (data URI) to Cloudinary via the server. Returns the uploaded
- * asset, or null when Cloudinary is not configured / the upload fails — callers
- * then fall back to storing the raw source (the pre-Cloudinary behaviour).
+ * "This shop has no image host" and "the upload was rejected" are DIFFERENT
+ * answers, and this used to return `null` for both.
+ *
+ * The caller's fallback for an unconfigured shop is to store the image inline as
+ * base64. Giving it the same answer for a rotated API key, an exhausted free
+ * tier, a timeout or a 500 meant a configured shop silently began writing
+ * megabytes of base64 into localStorage, into the whole-library Mongo document
+ * and into its own product records — under a green success toast — while being
+ * told to "add Cloudinary credentials" it already had.
+ *
+ * The server distinguishes them on the wire: it answers 200 with
+ * `configured: false` when there is no host, and anything else is a failure.
  */
+export type UploadOutcome =
+  | { status: "uploaded"; asset: UploadedAsset }
+  | { status: "unconfigured" }
+  | { status: "failed" };
+
+/** Upload an image (data URI, or an https URL for Cloudinary to fetch). */
 export async function uploadMediaRequest(
   source: string,
   folder?: string,
-): Promise<UploadedAsset | null> {
+): Promise<UploadOutcome> {
   try {
     const res = await fetch("/api/media/upload", {
       method: "POST",
@@ -104,12 +119,13 @@ export async function uploadMediaRequest(
     });
     if (!res.ok) {
       noteAuthStatus(res.status);
-      return null;
+      return { status: "failed" };
     }
     const json = (await res.json()) as Envelope<UploadedAsset & { configured: boolean }>;
-    if (!json.success || !json.data?.configured) return null;
-    return json.data;
+    if (!json.success) return { status: "failed" };
+    if (!json.data?.configured) return { status: "unconfigured" };
+    return { status: "uploaded", asset: json.data };
   } catch {
-    return null;
+    return { status: "failed" };
   }
 }

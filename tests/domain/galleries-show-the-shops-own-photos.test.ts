@@ -129,11 +129,11 @@ describe("the builder", () => {
   });
 
   it("picks images through the media library, not a bare text box", () => {
-    // `isImage` is what turns a row's column into the Media picker; without the
+    // `isImage` is what turns a row's column into the photo field; without the
     // editor honouring it, an admin would have to paste URLs by hand.
     const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
     expect(editor).toContain("column.isImage ? (");
-    expect(editor).toMatch(/column\.isImage \? \(\s*<BuilderMediaField/);
+    expect(editor).toMatch(/column\.isImage \? \(\s*<PhotoField/);
   });
 });
 
