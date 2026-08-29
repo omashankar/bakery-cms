@@ -26,9 +26,23 @@ import {
   getRegistryEntry,
   HOMEPAGE_SECTION_REGISTRY,
 } from "@/constants/section-registry";
-import { fetchFaqs, fetchTestimonials, fetchBanners } from "@/features/content/lib/content-api";
-import type { FaqItem, Testimonial } from "@/types/content";
-import type { Banner } from "@/types/media";
+import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
+import type { HomepageSectionRendererProps } from "@/features/cms-sections/homepage-section-renderer";
+
+/**
+ * The renderer props that come from the SERVER, as opposed to the ones this
+ * page supplies itself.
+ *
+ * Derived from the renderer rather than imported from
+ * apps/website/lib/homepage-render-data.server, because `adminImportsStorefront`
+ * in eslint.config.mjs forbids the admin reaching into the storefront — and it
+ * is right to: what the admin depends on is the RENDERER'S contract, and the
+ * route happens to satisfy it.
+ */
+type HomepageRenderData = Omit<
+  HomepageSectionRendererProps,
+  "section" | "selected" | "interactive" | "onSelect" | "embedded"
+>;
 import { routes } from "@/constants/routes";
 import type {
   HomepageSectionInstance,
@@ -100,9 +114,17 @@ export function HomepageBuilderPage() {
    * fallback reads localStorage while the live page reads MongoDB. The admin
    * was reviewing a layout that did not match what would ship.
    */
-  const [previewTestimonials, setPreviewTestimonials] = useState<Testimonial[]>([]);
-  const [previewFaqs, setPreviewFaqs] = useState<FaqItem[]>([]);
-  const [previewBanners, setPreviewBanners] = useState<Banner[]>([]);
+  /**
+   * The storefront's OWN answer, not a browser-side imitation of it.
+   *
+   * This was three separate fetches — testimonials, faqs, banners — and the six
+   * product grids, the categories, the offers, Instagram, the locator and the
+   * trust figures were left to the renderer's fallbacks. Those fallbacks read
+   * `getAllProducts()`, which starts from the 37 hardcoded demo cakes, so a shop
+   * previewed grids full of cakes it does not sell and published a homepage it
+   * had never seen. One route now returns exactly what the live page renders.
+   */
+  const [previewData, setPreviewData] = useState<HomepageRenderData | null>(null);
 
   /**
    * What is on screen right now, readable after an await — see settleDirty.
@@ -213,14 +235,24 @@ export function HomepageBuilderPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchTestimonials(), fetchFaqs(), fetchBanners()]).then(
-      ([testimonials, faqs, banners]) => {
-        if (cancelled) return;
-        if (testimonials) setPreviewTestimonials(testimonials.items);
-        if (faqs) setPreviewFaqs(faqs.items);
-        if (banners) setPreviewBanners(banners.items);
-      },
-    );
+    void (async () => {
+      try {
+        const res = await fetch("/api/builders/homepage/preview-data", {
+          headers: { Accept: "application/json" },
+        });
+        // Every response gets examined once: a 401 here is an expired admin
+        // session, and without this the preview would just stay empty while the
+        // rest of the screen went on pretending it was signed in.
+        noteAuthStatus(res.status);
+        if (!res.ok) return;
+        const data = (await res.json()) as HomepageRenderData;
+        if (!cancelled) setPreviewData(data);
+      } catch {
+        // Left null, which the renderer already handles: sections that need
+        // server data say so rather than inventing content. A preview that is
+        // briefly incomplete is better than one that is confidently wrong.
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -675,9 +707,7 @@ export function HomepageBuilderPage() {
               <HomepageSectionRenderer
                 key={section.instanceId}
                 section={section}
-                testimonials={previewTestimonials}
-                faqs={previewFaqs}
-                banners={previewBanners}
+                {...previewData}
                 selected={ctx.selected}
                 interactive
                 onSelect={ctx.onSelect}

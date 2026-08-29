@@ -3,7 +3,7 @@ import { loadProducts } from "@/features/products/lib/products-repository";
 import { getCategories } from "@/features/catalog/lib/catalog-repository";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
-import { getAllProducts } from "@/features/products/lib/product-catalog";
+import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
 import {
   buildHomepageProducts,
   type HomepageProductSource,
@@ -17,11 +17,30 @@ export type { HomepageProductSource };
  * The selection logic itself lives in the products domain so the server can run
  * it too; these just supply the client catalogue.
  */
+/**
+ * The shop's OWN cakes, never the shipped demo ones.
+ *
+ * The pool used to be `getAllProducts()`, which is
+ * `mergeStorefrontProducts()`: it starts from the 37 hardcoded cakes in
+ * constants/landing-data.ts and only overwrites the entries whose slug a real
+ * product happens to share, leaving the rest in place AHEAD of the shop's own.
+ * That was fine for the demo site and wrong everywhere else — the admin's
+ * builder preview drew its six product grids from it, so a shop with four cakes
+ * previewed four grids containing none of them, and published a homepage it had
+ * never seen.
+ *
+ * The storefront builds the same rails from published products alone
+ * (products-service.getHomepageRails), so this now uses the same pool. It is
+ * only a stand-in: the builder fetches the server's rails from
+ * /api/builders/homepage/preview-data, and this runs for the moment before that
+ * lands, or if it fails.
+ */
 export function getHomepageProducts(
   source: HomepageProductSource,
   maxCount = 8
 ): LandingProduct[] {
-  return buildHomepageProducts(source, maxCount, loadProducts(), getAllProducts());
+  const cached = loadProducts();
+  return buildHomepageProducts(source, maxCount, cached, getPublishedStorefrontProducts(cached));
 }
 
 /**

@@ -40,7 +40,7 @@ import {
   type LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { getActivePromoBanners } from "@/features/content/lib/banners-repository";
+import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import type { Banner } from "@/types/media";
 import {
   limitRows,
@@ -76,7 +76,7 @@ import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 import { formatCurrency } from "@/utils/format";
 
-interface HomepageSectionRendererProps {
+export interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
   /**
    * Product rails built on the server. When absent (admin builder preview) the
@@ -503,6 +503,33 @@ function ProductGridSection(
   const maxCount = contentNumber(c, "maxCount", 4);
   const ctaHref = contentString(c, "ctaHref");
   const ctaLabel = contentString(c, "ctaLabel");
+  const cakes = props.cakes.slice(0, maxCount);
+
+  /**
+   * Nothing to show means nothing to show — the same answer this file already
+   * gives for categories, why-us and the store locator. A shop with no cake
+   * flagged for this row was publishing "Our Best Sellers" over an empty strip.
+   *
+   * The builder says WHY instead of vanishing, because a section that renders
+   * nothing cannot be selected, and an admin cannot fix what they cannot click.
+   */
+  if (cakes.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+        />
+        <div className="mt-8 rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+          No cake is set for this row yet, so it stays hidden on the live
+          homepage. Flag some cakes under Products, or lower &ldquo;Max cakes
+          shown&rdquo;.
+        </div>
+      </SectionShell>
+    );
+  }
 
   return (
     <SectionShell {...props} noReveal>
@@ -514,7 +541,7 @@ function ProductGridSection(
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {props.cakes.slice(0, maxCount).map((cake) => (
+        {cakes.map((cake) => (
           <ProductCard key={cake.id} cake={cake} className="h-full" />
         ))}
       </StaggerReveal>
@@ -897,10 +924,25 @@ function CtaSection(props: HomepageSectionRendererProps) {
 function PromoBannerSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const maxCount = contentNumber(c, "maxCount", 2);
-  // Prefer the server-provided banners (an SSR snapshot → identical on hydration).
-  // Fall back to the client store only in the builder preview, which has no
-  // server data and never server-renders.
-  const banners = (props.banners ?? getActivePromoBanners(maxCount)).slice(0, maxCount);
+  /**
+   * The list is SELECTED here, not trusted from the caller.
+   *
+   * Both mounts pass `banners`, and they were passing different things. The
+   * storefront pre-selects on the server (`selectActiveHeroBanners(raw,
+   * "homepage")`, store-home-page.tsx) so the RSC payload carries only what a
+   * visitor may see. The builder fetches GET /api/content/banners, which hands
+   * staff the RAW stored array, and passed it straight in — so the preview that
+   * calls itself "the same light sections as live store" rendered banners that
+   * were switched off, expired, scheduled, scoped to Collections, or positioned
+   * sidebar/popup, in stored order (newest first) rather than by priority. With
+   * maxCount 2 that decided WHICH two tiles appeared, and the admin published a
+   * homepage they had never seen.
+   *
+   * The server pass stays: it is the TRANSPORT filter, so unpublished content
+   * does not cross the wire. This is the RENDER filter, and running it twice is
+   * a no-op — the same rule testimonials and FAQs already follow above.
+   */
+  const banners = selectActiveHeroBanners(props.banners ?? [], "homepage").slice(0, maxCount);
 
   return (
     <SectionShell {...props}>
