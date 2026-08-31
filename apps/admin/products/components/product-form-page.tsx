@@ -21,6 +21,7 @@ import {
   adminCategories,
   adminFlavours,
   adminOccasions,
+  getDefaultWeights,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
 import { slugify } from "@/features/products/lib/product-utils";
@@ -451,9 +452,49 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                           </div>
                         </div>
                       ))}
-                      <p className="text-xs text-muted-foreground">
-                        Weight presets come from Catalog. Edit prices per variant for this product.
-                      </p>
+                      {/*
+                        The way BACK to the presets.
+
+                        A new product no longer arrives carrying three weight
+                        tiers — that was the whole point, since a phone charger
+                        is not sold by the kilo. But a bakery creating a cake
+                        still needs them, and without this button the section
+                        rendered an empty list and a sentence about Catalog with
+                        nothing to press: the tiers could be lost and never got
+                        back.
+                      */}
+                      {form.weights.length === 0 ? (
+                        <div className="space-y-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              patchForm({ weights: getDefaultWeights(form.price) })
+                            }
+                          >
+                            Sell this by size
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Adds your Catalog weight presets, priced from this product&apos;s
+                            base price. Leave it off for anything sold in one size.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            Presets come from Catalog. Edit prices per size for this product.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => patchForm({ weights: [] })}
+                          >
+                            Sold in one size
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : null}

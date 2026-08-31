@@ -71,6 +71,7 @@ import {
   normalizeVariantGroups,
 } from "@/features/products/lib/variant-utils";
 import { normalizeCommerceFields } from "@/features/products/lib/products-repository";
+import { getDefaultWeights, rederiveWeights } from "@/features/products/lib/catalog-options";
 import type { Product } from "@/types/product";
 
 /** The shape the repository hands the pricing path: a Product, not a LandingProduct. */
@@ -127,6 +128,36 @@ describe("nothing invents cake data for a product that never had any", () => {
 
     expect(normalized.shapes).toEqual([]);
     expect(normalized.variantGroups).toEqual([]);
+  });
+});
+
+describe("sizes are opt-in, and the choice survives editing the price", () => {
+  it("keeps a one-size product at one size when its price changes", () => {
+    /**
+     * `rederiveWeights` always returned `getDefaultWeights(next).map(...)` — the
+     * shop's catalog presets — so a product with no tiers grew three of them on
+     * the first keystroke in the Price field. Clearing the tiers on a charger
+     * never stuck, because the next price edit put them back.
+     */
+    expect(rederiveWeights([], 1499, 999)).toEqual([]);
+  });
+
+  it("still re-prices the tiers of a product that has them", () => {
+    // The behaviour this function exists for must not have been traded away.
+    const tiers = getDefaultWeights(1000);
+    const rederived = rederiveWeights(tiers, 1200, 1000);
+
+    expect(rederived).toHaveLength(tiers.length);
+    expect(rederived[0].price).toBe(tiers[0].price + 200);
+  });
+
+  it("gives the admin's opt-in button real tiers, priced from this product", () => {
+    // What "Sell this by size" puts into the form.
+    const tiers = getDefaultWeights(1499);
+
+    expect(tiers.length).toBeGreaterThan(0);
+    expect(tiers[0].price).toBe(1499);
+    expect(tiers.every((tier) => tier.label.trim().length > 0)).toBe(true);
   });
 });
 
