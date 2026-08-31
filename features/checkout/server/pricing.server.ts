@@ -4,7 +4,10 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import { getCoupons, getZones } from "@/features/commerce/server/commerce.service";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
-import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
+import {
+  calculateProductUnitPrice,
+  formatVariantSummary,
+} from "@/features/products/lib/product-pricing";
 import {
   getProductVariantGroups,
   variantGroupsEnabledBy,
@@ -111,13 +114,27 @@ export class UnknownWeightError extends Error {
   }
 }
 
-/** The unit price of one line, given the options the customer picked. */
+/**
+ * What one line costs, AND what the customer chose to make it cost that.
+ *
+ * The two are returned together because they must be derived from the same
+ * groups. `QuotedLine.variantSummary` existed and was never assigned —
+ * `formatVariantSummary` was not imported here at all — so the field was empty
+ * on every order this shop has taken, and the kitchen email read "2 x Black
+ * Forest" with no size, flavour or message. The customer was charged for those
+ * choices the whole time: `calculateVariantAdjustment` applies every enabled
+ * group, falling back to its default option when no selection arrives.
+ *
+ * Computing the summary anywhere else would let the order narrate one set of
+ * options and bill another — a group added, gated, or defaulted differently on
+ * the two paths. One list, used twice.
+ */
 function priceLine(
   product: LandingProduct,
   line: QuoteLineInput,
   /** The modules this shop has switched on. A group it does not sell is not priced. */
   modules: ModuleSettings,
-): number {
+): { price: number; variantSummary: string[] } {
   const weightOptions = getProductWeightOptions(product);
 
   // An unrecognised weight label is REFUSED, not repriced.
@@ -140,16 +157,25 @@ function priceLine(
   const chosen = weightOptions[index] ?? weightOptions[0];
   const weightPrice = product.weights?.[index]?.price ?? product.price + (chosen?.modifier ?? 0);
 
-  return calculateProductUnitPrice({
-    basePrice: product.price,
-    weightPrice,
-    // Only the groups this shop sells. A module that is off used to hide the
-    // picker and keep charging its default option's surcharge — and since the
-    // adjustment falls back to that default whenever no selection is sent,
-    // omitting the selection would not have stopped it either.
-    variantGroups: variantGroupsEnabledBy(getProductVariantGroups(product), modules),
-    variantSelections: line.variantSelections ?? {},
-  });
+  // Only the groups this shop sells. A module that is off used to hide the
+  // picker and keep charging its default option's surcharge — and since the
+  // adjustment falls back to that default whenever no selection is sent,
+  // omitting the selection would not have stopped it either.
+  const variantGroups = variantGroupsEnabledBy(getProductVariantGroups(product), modules);
+  const variantSelections = line.variantSelections ?? {};
+
+  return {
+    price: calculateProductUnitPrice({
+      basePrice: product.price,
+      weightPrice,
+      variantGroups,
+      variantSelections,
+    }),
+    // The same list the price came from, resolved the same way — including the
+    // fallback to a group's default, so a line never states a price it does not
+    // explain, and never mentions a group the shop has switched off.
+    variantSummary: formatVariantSummary(variantGroups, variantSelections),
+  };
 }
 
 export async function priceCart(input: QuoteInput): Promise<CartQuote> {
@@ -201,7 +227,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       // The two shapes DO agree on everything the pricing reads — price,
       // weights, variant groups — so this cast is narrow and deliberate, unlike
       // the one above it replaced.
-      price: priceLine(product as unknown as LandingProduct, line, modules),
+      ...priceLine(product as unknown as LandingProduct, line, modules),
     });
   }
 

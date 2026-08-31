@@ -308,9 +308,30 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {item.quantity} × {formatCurrency(item.price)}
-                      {item.weight ? ` · ${item.weight}` : ""}
-                      {item.shape ? ` · ${item.shape}` : ""}
                     </p>
+                    {/*
+                      Everything the customer chose, on one line.
+
+                      This showed the weight and the shape and stopped there —
+                      the flavour was omitted, and `variantSummary` (the shop's
+                      own option groups, and what the customer was actually
+                      charged for) was never rendered anywhere in the admin at
+                      all. Whoever has to make this order was reading a shorter
+                      list than the one the customer paid for.
+                    */}
+                    {(() => {
+                      const chosen = [
+                        item.weight,
+                        item.flavour,
+                        item.shape,
+                        ...(item.variantSummary ?? []),
+                      ].filter(Boolean);
+                      return chosen.length > 0 ? (
+                        <p className="mt-0.5 text-sm text-foreground">
+                          {chosen.join(" · ")}
+                        </p>
+                      ) : null;
+                    })()}
                     {item.message ? (
                       <p className="mt-1 text-sm text-muted-foreground">
                         Message: {item.message}

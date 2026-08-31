@@ -743,8 +743,35 @@ async function notifyShopOfOrder(
   const shopEmail = ((settings.contact ?? {}) as { email?: string }).email?.trim();
   if (!shopEmail) return;
 
+  /**
+   * What to BAKE, not just what was bought.
+   *
+   * This was `${quantity} x ${name}` and nothing else, so the one message that
+   * reaches a human who can act on an order told them "2 x Black Forest" — no
+   * size, no flavour, no shape, no message to pipe on it, and no link to the
+   * photo a photo-cake is printed with. Every one of those was already on the
+   * line; none of them was written down.
+   *
+   * `variantSummary` carries the shop's own option groups ("Egg preference:
+   * Eggless", "Cable length: 2 m") and is what the customer was charged for, so
+   * it belongs here beside the three named fields rather than instead of them.
+   */
   const items = order.items
-    .map((item) => `  ${item.quantity} x ${item.name}`)
+    .map((item) => {
+      const chosen = [
+        item.weight,
+        item.flavour,
+        item.shape,
+        ...(item.variantSummary ?? []),
+      ].filter(Boolean);
+
+      const lines = [`  ${item.quantity} x ${item.name}`];
+      if (chosen.length > 0) lines.push(`      ${chosen.join(" · ")}`);
+      if (item.message) lines.push(`      Message on it: ${item.message}`);
+      // The baker cannot print a photo they cannot open.
+      if (item.photoUrl) lines.push(`      Photo to print: ${item.photoUrl}`);
+      return lines.join("\n");
+    })
     .join("\n");
 
   // "Payment Received" on the Payment Notifications screen.
