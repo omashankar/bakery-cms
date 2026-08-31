@@ -11,7 +11,6 @@ import {
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { slugify } from "@/utils/slug";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
-import { getWeightOptions } from "@/features/catalog/lib/catalog-repository";
 import { defaultWeightOptions } from "@/features/catalog/lib/catalog-utils";
 
 function getLandingCatalog(): LandingProduct[] {
@@ -153,20 +152,28 @@ export function filterProductsByCategory(
   );
 }
 
-/** Weight options from catalog admin (falls back to defaults on server) */
+/**
+ * The sizes THIS product is sold in. Empty when it is sold in one.
+ *
+ * It used to fall back to the shop's catalog weight presets, which was wrong in
+ * two ways at once. A phone charger was offered "0.5 kg / 1 kg / 1.5 kg", and
+ * picking 1 kg added the preset's +200 modifier to a real customer's real bill.
+ * And the fallback read a different source on each side — the browser's
+ * localStorage catalog (the shop's real tiers) versus the shipped seed on the
+ * server — so the moment an owner edited Catalog > Weights, the label the
+ * customer sent was absent from the server's list and `priceLine` threw
+ * `UnknownWeightError`, turning every such product into a 409 at checkout.
+ *
+ * Reading only the product removes both: it is pure, identical on server and
+ * client, and says nothing about a product that never claimed a size.
+ */
 export function getProductWeightOptions(cake?: LandingProduct) {
-  if (cake?.weights?.length) {
-    return cake.weights.map((weight) => ({
-      label: weight.label,
-      modifier: Math.max(0, weight.price - cake.price),
-      serves: weight.serves,
-    }));
-  }
+  if (!cake?.weights?.length) return [];
 
-  return getWeightOptions().map((option) => ({
-    label: option.label,
-    modifier: option.modifier,
-    serves: option.serves,
+  return cake.weights.map((weight) => ({
+    label: weight.label,
+    modifier: Math.max(0, weight.price - cake.price),
+    serves: weight.serves,
   }));
 }
 

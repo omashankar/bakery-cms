@@ -21,7 +21,6 @@ import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { addToCart } from "@/features/cart/lib/cart";
 import {
   getProductWeightOptions,
-  getDefaultProductWeightOptions,
   getAllProducts,
 } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
@@ -90,20 +89,21 @@ export function ProductDetailPage({
 }: ProductDetailPageProps) {
   const router = useRouter();
   // Related/recommended lists merge localStorage-backed admin cakes (absent during
-  // SSR) — gate them behind mount to avoid a hydration mismatch. weightOptions
-  // shares the gate: its catalog fallback (for products without their own weights)
-  // reads localStorage too, so it renders the seed defaults until mounted.
+  // SSR) — gate them behind mount to avoid a hydration mismatch.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
-  const weightOptions = useMemo(
-    () =>
-      cake.weights?.length || mounted
-        ? getProductWeightOptions(cake)
-        : getDefaultProductWeightOptions(),
-    [cake, mounted]
-  );
+  /**
+   * No mount gate any more, because there is nothing left to gate.
+   *
+   * `getProductWeightOptions` used to fall back to the localStorage catalog for a
+   * product with no tiers of its own, which is why this rendered the shipped seed
+   * until mounted. It now reads only the product, so server and client agree by
+   * construction — and keeping the gate would have flashed three cake tiers onto
+   * a charger for one paint before removing them.
+   */
+  const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
   const flavourOptions = useMemo(() => getProductFlavourOptions(cake), [cake]);
   const shapeOptions = useMemo(() => getProductShapeOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
@@ -117,7 +117,10 @@ export function ProductDetailPage({
 
   const [selectedWeight, setSelectedWeight] = useState(0);
   const [selectedFlavour, setSelectedFlavour] = useState(flavourOptions[0] ?? "");
-  const [selectedShape, setSelectedShape] = useState(shapeOptions[0] ?? "Round");
+  // No "Round" fallback. A product that offers no shapes has no selected shape —
+  // the same empty-string convention `selectedFlavour` above already uses, and
+  // what stops `addToCart` stamping a choice onto a line that never had one.
+  const [selectedShape, setSelectedShape] = useState(shapeOptions[0] ?? "");
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>(() =>
     getDefaultVariantSelections(variantGroups)
   );
@@ -216,7 +219,7 @@ export function ProductDetailPage({
     setWishlisted(isInWishlist(cake.slug));
     setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
     setSelectedFlavour(getProductFlavourOptions(cake)[0] ?? "");
-    setSelectedShape(getProductShapeOptions(cake)[0] ?? "Round");
+    setSelectedShape(getProductShapeOptions(cake)[0] ?? "");
     setSelectedWeight(0);
   }, [cake.slug]);
 
@@ -339,7 +342,13 @@ export function ProductDetailPage({
       // the module, so without this a shop that switched Flavour off still had
       // "Chocolate" on every order line, invoice and confirmation email.
       flavour: (modules.flavour && selectedFlavour) || undefined,
-      shape: modules.shape ? selectedShape : undefined,
+      // Shape reads the same way as flavour now. It was `modules.shape ?
+      // selectedShape : undefined`, and `selectedShape` fell back to the literal
+      // "Round" — so a shop with the Shape module on (any shop selling cakes)
+      // stamped "Round" onto every phone charger and gift hamper it sold, on the
+      // order line, the invoice and the baker's email, for a picker that renders
+      // nothing because the product offers no shapes.
+      shape: (modules.shape && selectedShape) || undefined,
       message: message.trim() || undefined,
       photoUrl: photoUrl || undefined,
       deliveryDate,

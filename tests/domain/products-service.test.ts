@@ -248,6 +248,20 @@ describe("storefront projections", () => {
         name: "Card Me",
         status: "published",
         price: 800,
+        /**
+         * The tiers are stated by the FIXTURE now, not inherited from the form.
+         *
+         * `createEmptyProductForm()` used to arrive carrying three weight tiers
+         * priced from a hardcoded 999, so this test got its base/tier mismatch
+         * by accident. A new product is now born with no tiers at all, which
+         * would have made base and tier the same number and quietly retired the
+         * very thing this test exists to prove. Setting them here keeps the
+         * mismatch deliberate: base 800, tier 999, and the card must say 999.
+         */
+        weights: [
+          { label: "0.5 kg", price: 999, serves: "4–6" },
+          { label: "1 kg", price: 1199, serves: "8–10" },
+        ],
         description: "A very long description that no card ever displays",
       })
     );

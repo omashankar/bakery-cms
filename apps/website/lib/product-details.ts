@@ -41,9 +41,16 @@ export function getProductFlavourOptions(cake: LandingProduct): string[] {
   return cake.flavours ?? [];
 }
 
+/**
+ * The shapes this product is offered in — empty when the merchant named none.
+ *
+ * The Round/Square/Heart fallback meant a customer buying a charger was shown a
+ * shape picker, and `addToCart` stamped the chosen one onto the order line. The
+ * same reasoning as `getProductFlavourOptions` above: a shipped list is not a
+ * statement about this product.
+ */
 export function getProductShapeOptions(cake?: LandingProduct): string[] {
-  if (cake?.shapes?.length) return cake.shapes;
-  return ["Round", "Square", "Heart"];
+  return cake?.shapes ?? [];
 }
 
 export function getProductDetailBadges(cake: LandingProduct): string[] {

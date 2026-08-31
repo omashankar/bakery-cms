@@ -16,6 +16,8 @@ import {
   syncLegacyFlagsFromVariants,
 } from "@/features/products/lib/variant-utils";
 import { createEmptyProductForm, loadProducts } from "@/features/products/lib/products-repository";
+import { DEFAULT_PRODUCT_SHAPES } from "@/features/products/lib/product-mapper";
+import { getProductShapeOptions } from "@/apps/website/lib/product-details";
 import type { ProductFormData } from "@/types/product";
 
 beforeEach(() => {
@@ -29,7 +31,21 @@ beforeEach(() => {
 function composeSavePayload(form: ProductFormData): ProductFormData {
   return {
     ...form,
-    ...syncLegacyFlagsFromVariants(form.variantGroups, getDefaultVariantSelections(form.variantGroups)),
+    ...syncLegacyFlagsFromVariants(
+      form.variantGroups,
+      getDefaultVariantSelections(form.variantGroups),
+      /**
+       * THE THIRD ARGUMENT, which this mirror was missing.
+       *
+       * The real form passes the tick the merchant made, and
+       * `syncLegacyFlagsFromVariants` falls back to it whenever the variant data
+       * cannot answer — a product with no egg group, which is now every new
+       * product. Without it the flag is derived as `false` unconditionally,
+       * which is the very bug the function's own header describes. A mirror that
+       * has drifted from what it mirrors tests nothing.
+       */
+      { isEggless: form.isEggless, isPhotoCake: form.isPhotoCake },
+    ),
   };
 }
 
@@ -66,10 +82,28 @@ describe("the admin Eggless checkbox survives a save", () => {
   });
 
   it("moves the variant default onto the eggless option, so the data agrees with the flag", () => {
-    const form = tickEggless(createEmptyProductForm(), true);
+    // A new product no longer arrives carrying an egg group — a shop selling
+    // chargers was never going to want one. This is the bakery's own path: the
+    // Variants tab's "Reset to defaults", and then the tick.
+    const withEggGroup: ProductFormData = {
+      ...createEmptyProductForm(),
+      variantGroups: createDefaultVariantGroups(),
+    };
+    const form = tickEggless(withEggGroup, true);
     const eggGroup = form.variantGroups.find((g) => g.type === "egg");
 
     expect(eggGroup?.options.find((o) => o.isDefault)?.semantic).toBe("eggless");
+    // And the flag still survives the save, which is what this file is about.
+    expect(composeSavePayload(form).isEggless).toBe(true);
+  });
+
+  it("keeps the tick on a product that has no egg group at all", () => {
+    // The common case now. The variants cannot answer, so the merchant's own
+    // statement is the only one there is.
+    const form = tickEggless(createEmptyProductForm(), true);
+
+    expect(form.variantGroups).toEqual([]);
+    expect(composeSavePayload(form).isEggless).toBe(true);
   });
 });
 
@@ -258,21 +292,34 @@ describe("editing a seeded product does not silently drop its flags", () => {
   });
 });
 
-describe("SMELL: the shape list is triplicated and divergent", () => {
-  // Not a runtime bug — normalizeCommerceFields only runs on the seed path, so
-  // a merchant's empty shape list is preserved. The defect is that three
-  // separate literals define "the shapes" and they disagree.
-  it("documents that the admin form offers a shape no default list knows about", () => {
-    // features/admin/cakes/components/cake-form-page.tsx (UI stays in admin)
+describe("SMELL: the shape list is duplicated and divergent", () => {
+  /**
+   * Two of the four copies are gone. It was TRIPLICATED, and worse than
+   * duplicated — the two copies that mattered were not lists of what a product
+   * offers but defaults imposed on every product that named none, so a phone
+   * charger was sold in Round, Square and Heart.
+   *
+   * Removed: `createEmptyProductForm().shapes` (a new product now names none)
+   * and `getProductShapeOptions`' storefront fallback (a product with no shapes
+   * now shows no shape picker, instead of three cake shapes and an order line
+   * stamped "Round").
+   *
+   * What remains is a genuine, narrower smell: the admin form hardcodes the
+   * four shapes it offers as checkboxes, while `DEFAULT_PRODUCT_SHAPES` — now
+   * reached only by the demo bakery seed — knows three. Tick "Rectangle" and no
+   * shared list agrees it exists.
+   */
+  it("documents that the admin form offers a shape no shared list knows about", () => {
+    // apps/admin/products/components/product-form-page.tsx — hardcoded checkboxes
     const formOffers = ["Round", "Square", "Heart", "Rectangle"];
-    // features/products/lib/cake-mapper.ts:5
-    const mapperDefaults = ["Round", "Square", "Heart"];
-    // features/storefront/lib/product-details.ts:58-59
-    const storefrontFallback = ["Round", "Square", "Heart"];
+    // features/products/lib/product-mapper.ts:5 — now the demo seed's list only
+    const seedDefaults = [...DEFAULT_PRODUCT_SHAPES];
 
-    expect(createEmptyProductForm().shapes).toEqual(mapperDefaults);
-    expect(mapperDefaults).toEqual(storefrontFallback);
+    // The two removals, pinned so they cannot quietly come back.
+    expect(createEmptyProductForm().shapes).toEqual([]);
+    expect(getProductShapeOptions({ shapes: [] } as never)).toEqual([]);
+
     expect(formOffers).toContain("Rectangle");
-    expect(mapperDefaults).not.toContain("Rectangle");
+    expect(seedDefaults).not.toContain("Rectangle");
   });
 });

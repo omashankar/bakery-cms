@@ -18,11 +18,11 @@ import {
   updateProduct,
 } from "@/features/products/lib/products-repository";
 import {
-  DEFAULT_PRODUCT_SHAPES,
   getPublishedStorefrontProducts,
   mapAdminProductToStorefront,
 } from "@/features/products/lib/product-mapper";
-import type { ProductFormData } from "@/types/product";
+import { createDefaultVariantGroups } from "@/features/products/lib/variant-utils";
+import type { ProductFormData, ProductVariantOption } from "@/types/product";
 
 function form(overrides: Partial<ProductFormData> = {}): ProductFormData {
   return { ...createEmptyProductForm(), name: "Test Cake", slug: "test-cake", ...overrides };
@@ -155,14 +155,41 @@ describe("cakes repository", () => {
     expect(loadProducts()).toHaveLength(before - 2);
   });
 
-  it("gives a new form sensible bakery defaults", () => {
+  it("gives a new form no product type at all — it is the merchant's to declare", () => {
+    /**
+     * This asserted the opposite: Round/Square/Heart, three weight tiers priced
+     * from a hardcoded 999, and an "Egg preference" group charging +80 for
+     * Eggless. A shop adding a phone charger had to find and delete every one of
+     * them, on every product, and the CMS read as though it were telling the
+     * owner what kind of shop to run.
+     *
+     * The commerce defaults below are NOT product-type opinions and stay: a
+     * draft, in stock, and personalisable.
+     */
     const empty = createEmptyProductForm();
 
+    expect(empty.shapes).toEqual([]);
+    expect(empty.weights).toEqual([]);
+    expect(empty.variantGroups).toEqual([]);
+    expect(empty.flavourOptions).toEqual([]);
+    expect(empty.preparationTimeMinutes).toBeUndefined();
+    expect(empty.shelfLifeDays).toBeUndefined();
+
     expect(empty.status).toBe("draft");
-    expect(empty.shapes).toEqual([...DEFAULT_PRODUCT_SHAPES]);
-    expect(empty.variantGroups).toHaveLength(1);
-    expect(empty.variantGroups[0].type).toBe("egg");
     expect(empty.allowsMessage).toBe(true);
+    expect(empty.stockStatus).toBe("in_stock");
+  });
+
+  it("still offers the bakery its defaults, when a human asks for them", () => {
+    // The Variants tab's "Reset to defaults" button. Removing the automatic
+    // injection must not remove the merchant's ability to opt in.
+    const groups = createDefaultVariantGroups({ isEggless: true });
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].type).toBe("egg");
+    expect(
+      groups[0].options.find((o: ProductVariantOption) => o.isDefault)?.label,
+    ).toBe("Eggless");
   });
 });
 

@@ -118,16 +118,77 @@ describe("normalizeVariantGroups", () => {
     expect(result[0].options[1].isDefault).toBe(false);
   });
 
-  it("falls back to generated defaults when a product has no groups", () => {
+  it("invents nothing for a product that declared no groups", () => {
+    /**
+     * This used to assert the opposite — that an egg group was generated here.
+     * That fallback ran on every repository read, so a shop selling a phone
+     * charger got "Egg preference: Regular / Eggless +80" on the picker, in the
+     * price, and on the order line, for a group nobody configured.
+     *
+     * `isEggless: true` is the strongest case: the old fallback made Eggless the
+     * DEFAULT option, so the product silently cost 80 more than its own record
+     * said. Absent is the honest answer; `createDefaultVariantGroups` still
+     * exists for the admin's "reset to defaults", where a human asked for it.
+     */
     const result = normalizeVariantGroups({
       variantGroups: [],
       isEggless: true,
       isPhotoCake: false,
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0].type).toBe("egg");
-    expect(result[0].options.find((o) => o.isDefault)?.label).toBe("Eggless");
+    expect(result).toEqual([]);
+  });
+
+  it("respects a default the merchant named, even when an earlier option omits the key", () => {
+    /**
+     * `isDefault: option.isDefault ?? index === 0` was evaluated per option, so
+     * a group whose second option was explicitly the default, and whose first
+     * simply omitted the key, came back with TWO defaults — and every consumer
+     * resolves with `.find(o => o.isDefault)`, which takes the first. The
+     * merchant's choice was replaced by the option above it, in the picker and
+     * in what the customer was charged.
+     */
+    const result = normalizeVariantGroups({
+      variantGroups: [
+        {
+          id: "g-size",
+          name: "Storage",
+          type: "custom",
+          required: true,
+          options: [
+            { id: "o-128", label: "128 GB", priceAdjustment: 0 },
+            { id: "o-256", label: "256 GB", priceAdjustment: 5000, isDefault: true },
+          ],
+        },
+      ],
+      isEggless: false,
+      isPhotoCake: false,
+    });
+
+    expect(result[0].options.filter((o) => o.isDefault)).toHaveLength(1);
+    expect(result[0].options.find((o) => o.isDefault)?.label).toBe("256 GB");
+  });
+
+  it("still falls back to the first option when the group names no default at all", () => {
+    const result = normalizeVariantGroups({
+      variantGroups: [
+        {
+          id: "g-colour",
+          name: "Colour",
+          type: "custom",
+          required: true,
+          options: [
+            { id: "o-black", label: "Black", priceAdjustment: 0 },
+            { id: "o-white", label: "White", priceAdjustment: 0 },
+          ],
+        },
+      ],
+      isEggless: false,
+      isPhotoCake: false,
+    });
+
+    expect(result[0].options[0].isDefault).toBe(true);
+    expect(result[0].options[1].isDefault).toBe(false);
   });
 });
 

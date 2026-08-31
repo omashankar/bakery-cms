@@ -164,7 +164,11 @@ export function normalizeCommerceFields(cake: Product): Product {
     isEggless: cake.isEggless ?? false,
     isPhotoCake: cake.isPhotoCake ?? false,
     isSeasonal: cake.isSeasonal ?? false,
-    shapes: cake.shapes?.length ? cake.shapes : [...DEFAULT_PRODUCT_SHAPES],
+    // Never Round/Square/Heart by default. This runs on every repository read,
+    // so a phone charger came back from the database with three cake shapes on
+    // it — offered to the customer, and stamped onto the order line they chose
+    // from. A product with no shapes is sold in one shape, which is most of them.
+    shapes: cake.shapes ?? [],
     flavourOptions: cake.flavourOptions ?? [],
     stockStatus: cake.stockStatus ?? "in_stock",
     stockQuantity: cake.stockQuantity ?? 50,
@@ -348,7 +352,21 @@ export function createEmptyProductForm(): ProductFormData {
     categoryId: adminCategories()[0]?.id ?? "1",
     flavourId: undefined,
     occasionIds: [],
-    weights: getDefaultWeights(999),
+    /**
+     * A NEW PRODUCT IS BORN EMPTY.
+     *
+     * These four fields used to arrive pre-filled with cake: three weight tiers
+     * from the Catalog presets, Round/Square/Heart, an "Egg preference" group
+     * charging +80 for Eggless, and a 120-minute prep time. A shop adding a
+     * phone charger had to find and delete every one of them, on every product,
+     * and the CMS read as though it were telling them what kind of shop to run.
+     *
+     * Nothing is lost for the bakery: the Pricing tab offers the Catalog weight
+     * presets on a button, and the Variants tab has always had "Reset to
+     * defaults" and "Add option group". A merchant asking for cake options gets
+     * them; a merchant who never asked no longer has to undo them.
+     */
+    weights: [],
     status: "draft",
     isFeatured: false,
     isBestSeller: false,
@@ -356,7 +374,7 @@ export function createEmptyProductForm(): ProductFormData {
     isEggless: false,
     isPhotoCake: false,
     isSeasonal: false,
-    shapes: [...DEFAULT_PRODUCT_SHAPES],
+    shapes: [],
     flavourOptions: [],
     stockStatus: "in_stock",
     stockQuantity: 50,
@@ -366,12 +384,12 @@ export function createEmptyProductForm(): ProductFormData {
     allowsPhotoUpload: false,
     ingredients: "",
     barcode: "",
-    preparationTimeMinutes: 120,
-    shelfLifeDays: 3,
+    preparationTimeMinutes: undefined,
+    shelfLifeDays: undefined,
     calories: undefined,
     allergens: "",
     careInstructions: "",
-    variantGroups: createDefaultVariantGroups(),
+    variantGroups: [],
     // A cake with no reviews has no rating. This started at 4.5.
     rating: 0,
     reviewCount: 0,

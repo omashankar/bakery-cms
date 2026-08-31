@@ -117,35 +117,66 @@ export function createDefaultVariantGroups(input?: {
  * layer, and no other storefront could reuse the pricing at all.
  *
  * Not the same function as normalizeVariantGroups below, despite the shape.
- * That one runs backfillLegacyGroups and forces isDefault, and takes photo-ness
- * straight off Product.isPhotoCake; this one does neither and DERIVES photo-ness
- * from allowsPhotoUpload or the category name. They disagree on the pricing
- * path, so folding them together would change what customers are charged.
+ * That one runs backfillLegacyGroups and forces isDefault; this one does not.
+ * Keep them separate — they sit on different paths and have disagreed before.
+ *
+ * IT NO LONGER INVENTS GROUPS FOR A PRODUCT THAT HAS NONE, for two reasons.
+ *
+ * The first is the point of the change: a shop selling a phone charger was
+ * handed an "Egg preference" group (Regular / Eggless +80) it never configured,
+ * on the picker, in the price, and on the order line. A product's options are
+ * the merchant's to declare; absent is a valid answer.
+ *
+ * The second is a latent crash this fallback was hiding. It read
+ * `cake.category`, but the pricing path calls this with a repository `Product`,
+ * which declares `categoryId` and has no `category` at all — so the branch was
+ * a TypeError waiting for the first product to arrive without stored groups,
+ * and `/api/checkout/quote` would have answered 500 rather than a clean 409.
+ * Every pricing fixture in the suite set `category` by hand, so nothing caught
+ * it. `tests/domain/a-product-that-is-not-a-cake.test.ts` now reproduces it.
+ *
+ * Verified against this shop's own data before changing: all 29 products carry
+ * stored `variantGroups`, so no live product's price moves.
  */
 export function getProductVariantGroups(cake: LandingProduct): ProductVariantGroup[] {
-  if (cake.variantGroups?.length) return cake.variantGroups;
-
-  return createDefaultVariantGroups({
-    isEggless: cake.isEggless,
-    isPhotoCake:
-      cake.allowsPhotoUpload === true || cake.category.toLowerCase().includes("photo"),
-  });
+  return cake.variantGroups ?? [];
 }
 
+/**
+ * Stored groups, made safe to read — never invented ones.
+ *
+ * This runs on EVERY repository read (`normalizeCommerceFields`), so its old
+ * fallback is what put an "Egg preference" group on every product in the shop
+ * that had not configured its own, whatever that product was. The merchant
+ * declares a product's options; no options is a valid answer, and
+ * `createDefaultVariantGroups` is still exported for the admin's own
+ * "reset to defaults" button, where a human is asking for it.
+ */
 export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isEggless" | "isPhotoCake">): ProductVariantGroup[] {
-  if (cake.variantGroups?.length) {
-    return backfillLegacyGroups(cake.variantGroups).map((group) => ({
+  if (!cake.variantGroups?.length) return [];
+
+  return backfillLegacyGroups(cake.variantGroups).map((group) => {
+    /**
+     * "First option wins" is a fallback for a group that names no default —
+     * not a vote each option casts on its own.
+     *
+     * This was `option.isDefault ?? index === 0` evaluated per option, so a
+     * group whose SECOND option was explicitly the default, and whose first
+     * simply omitted the key, came back with TWO options marked default. Every
+     * consumer resolves with `.find(o => o.isDefault)`, which returns the
+     * first — so the merchant's chosen default was silently replaced by the
+     * one above it, in the picker and in `calculateVariantAdjustment`, which
+     * is what a line is charged when the customer sends no selection.
+     */
+    const named = group.options.some((option) => option.isDefault);
+
+    return {
       ...group,
       options: group.options.map((option, index) => ({
         ...option,
-        isDefault: option.isDefault ?? index === 0,
+        isDefault: option.isDefault ?? (!named && index === 0),
       })),
-    }));
-  }
-
-  return createDefaultVariantGroups({
-    isEggless: cake.isEggless,
-    isPhotoCake: cake.isPhotoCake,
+    };
   });
 }
 

@@ -38,6 +38,16 @@ export function rederiveWeights(
   nextBasePrice: number,
   previousBasePrice: number
 ): ProductWeight[] {
+  /**
+   * A product sold in ONE size stays sold in one size.
+   *
+   * This always returned `getDefaultWeights(next).map(...)` — the shop's catalog
+   * presets — so a product with no tiers grew three of them on the first
+   * keystroke in the Price field, silently undoing the merchant's choice. It is
+   * the reason clearing the tiers on a phone charger never stuck.
+   */
+  if (current.length === 0) return [];
+
   const previousDerived = new Map(
     getDefaultWeights(previousBasePrice).map((tier) => [tier.label, tier.price])
   );
