@@ -6,6 +6,9 @@
  * correct behaviour: variant options carry an explicit `semantic`, and logic
  * branches on that instead of pattern-matching English words in a label.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -310,16 +313,30 @@ describe("SMELL: the shape list is duplicated and divergent", () => {
    * shared list agrees it exists.
    */
   it("documents that the admin form offers a shape no shared list knows about", () => {
-    // apps/admin/products/components/product-form-page.tsx — hardcoded checkboxes
-    const formOffers = ["Round", "Square", "Heart", "Rectangle"];
-    // features/products/lib/product-mapper.ts:5 — now the demo seed's list only
-    const seedDefaults = [...DEFAULT_PRODUCT_SHAPES];
-
     // The two removals, pinned so they cannot quietly come back.
     expect(createEmptyProductForm().shapes).toEqual([]);
     expect(getProductShapeOptions({ shapes: [] } as never)).toEqual([]);
 
+    /**
+     * Read from the FORM, not retyped here.
+     *
+     * The first version of this declared `const formOffers = ["Round","Square",
+     * "Heart","Rectangle"]` three lines above `expect(formOffers).toContain
+     * ("Rectangle")` — a literal checked against itself, which is true for as
+     * long as someone keeps typing it and says nothing about the form. Delete
+     * Rectangle from the checkboxes and it would still have passed.
+     */
+    const form = readFileSync(
+      join(process.cwd(), "apps/admin/products/components/product-form-page.tsx"),
+      "utf8",
+    );
+    const shapeBlock = form.slice(form.indexOf("Available shapes"));
+    const formOffers = [...shapeBlock.matchAll(/"(Round|Square|Heart|Rectangle)"/g)].map(
+      (match) => match[1],
+    );
+
     expect(formOffers).toContain("Rectangle");
-    expect(seedDefaults).not.toContain("Rectangle");
+    // features/products/lib/product-mapper.ts:5 — now the demo seed's list only.
+    expect([...DEFAULT_PRODUCT_SHAPES]).not.toContain("Rectangle");
   });
 });

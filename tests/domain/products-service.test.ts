@@ -294,4 +294,42 @@ describe("storefront projections", () => {
     // Only the labels travel; the per-tier prices do not.
     expect(card?.weights?.every((tier) => tier.price === 0)).toBe(true);
   });
+
+  it("tells the grid whether the product asks the customer anything", async () => {
+    /**
+     * `hasOptions` is what stops a card adding blind: the grid cannot present a
+     * picker, and the server falls back to each group's default option when no
+     * selection arrives, so a one-tap add was priced AND recorded as a choice
+     * nobody was shown.
+     *
+     * The flag travels rather than the groups — `variantGroups` is dropped just
+     * above, and `toCard`'s own header budgets that payload for 5,000 products.
+     * Asserted here because this is the only test that builds a real card:
+     * without it the field could be deleted from the projection and every card
+     * in the shop would silently go back to adding blind.
+     */
+    await createProduct(
+      form({
+        slug: "with-options",
+        status: "published",
+        variantGroups: [
+          {
+            id: "g-storage",
+            name: "Storage",
+            type: "custom",
+            options: [
+              { id: "o-128", label: "128 GB", priceAdjustment: 0, isDefault: true },
+              { id: "o-256", label: "256 GB", priceAdjustment: 5000 },
+            ],
+          },
+        ],
+      })
+    );
+    await createProduct(form({ slug: "no-options", status: "published", variantGroups: [] }));
+
+    const cards = await getStorefrontProductCards();
+
+    expect(cards.find((p) => p.slug === "with-options")?.hasOptions).toBe(true);
+    expect(cards.find((p) => p.slug === "no-options")?.hasOptions).toBe(false);
+  });
 });
