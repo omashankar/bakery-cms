@@ -54,10 +54,11 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       category: "transactional",
       subject: "Order {{order_number}} confirmed",
       previewText: "We've received your order and started preparing it.",
-      body: `Hi {{customer_name}},\n\nThank you for your order {{order_number}}.\n\nOrder total: {{order_total}}\nPayment: {{payment_method}}\nDelivery date: {{delivery_date}}\n\nTrack your order: {{invoice_url}}\n\n— {{store_name}}`,
+      body: `Hi {{customer_name}},\n\nThank you for your order {{order_number}}.\n\nItems:\n{{order_items}}\n\nOrder total: {{order_total}}\nPayment: {{payment_method}}\nDelivery date: {{delivery_date}}\n\nTrack your order: {{invoice_url}}\n\n— {{store_name}}`,
       variables: [
         "customer_name",
         "order_number",
+        "order_items",
         "order_total",
         "payment_method",
         "delivery_date",

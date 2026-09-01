@@ -178,6 +178,42 @@ async function repriceForPlacement(input: PlaceOrderInput) {
   }
 }
 
+/**
+ * An order's lines as plain text, for an email body.
+ *
+ * ONE formatter, because the two emails an order sends were telling different
+ * people different things about it. The shop's copy printed
+ * `${quantity} x ${name}` and nothing else — no size, no flavour, no option the
+ * customer paid for, and no link to the photo a photo cake is printed from —
+ * and the CUSTOMER'S copy named no product at all: `order_confirmation` supplied
+ * a total, a date and a link, and left them to follow it back into the site to
+ * find out what they had bought.
+ *
+ * `includePhotoLink` is the one difference between the two, and it is a real
+ * one: the baker cannot print a photo they cannot open, and the customer
+ * uploaded it and does not need the storage URL read back to them.
+ *
+ * Exported so a test can assert what an inbox receives without sending mail.
+ */
+export function formatOrderItemsForEmail(
+  items: PlacedOrder["items"],
+  options: { includePhotoLink?: boolean } = {},
+): string {
+  return items
+    .map((item) => {
+      const chosen = cartLineChoices(item);
+
+      const lines = [`  ${item.quantity} x ${item.name}`];
+      if (chosen.length > 0) lines.push(`      ${chosen.join(" · ")}`);
+      if (item.message) lines.push(`      Message on it: ${item.message}`);
+      if (options.includePhotoLink && item.photoUrl) {
+        lines.push(`      Photo to print: ${item.photoUrl}`);
+      }
+      return lines.join("\n");
+    })
+    .join("\n");
+}
+
 /** Fresh order numbers to try when the client's collided with another customer's. */
 const ORDER_NUMBER_ATTEMPTS = 5;
 
@@ -677,6 +713,10 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
         invoice_url: base
           ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
           : "Reply to this email and we will send your invoice.",
+        // What they actually bought. The confirmation named a total, a date and
+        // a link, and no product — so the only record a customer receives
+        // without logging in could not tell them what was in their order.
+        order_items: formatOrderItemsForEmail(placed.items),
       })
     : null;
 
@@ -744,31 +784,7 @@ async function notifyShopOfOrder(
   const shopEmail = ((settings.contact ?? {}) as { email?: string }).email?.trim();
   if (!shopEmail) return;
 
-  /**
-   * What to BAKE, not just what was bought.
-   *
-   * This was `${quantity} x ${name}` and nothing else, so the one message that
-   * reaches a human who can act on an order told them "2 x Black Forest" — no
-   * size, no flavour, no shape, no message to pipe on it, and no link to the
-   * photo a photo-cake is printed with. Every one of those was already on the
-   * line; none of them was written down.
-   *
-   * `variantSummary` carries the shop's own option groups ("Egg preference:
-   * Eggless", "Cable length: 2 m") and is what the customer was charged for, so
-   * it belongs here beside the three named fields rather than instead of them.
-   */
-  const items = order.items
-    .map((item) => {
-      const chosen = cartLineChoices(item);
-
-      const lines = [`  ${item.quantity} x ${item.name}`];
-      if (chosen.length > 0) lines.push(`      ${chosen.join(" · ")}`);
-      if (item.message) lines.push(`      Message on it: ${item.message}`);
-      // The baker cannot print a photo they cannot open.
-      if (item.photoUrl) lines.push(`      Photo to print: ${item.photoUrl}`);
-      return lines.join("\n");
-    })
-    .join("\n");
+  const items = formatOrderItemsForEmail(order.items, { includePhotoLink: true });
 
   // "Payment Received" on the Payment Notifications screen.
   if (!(await isNotificationEnabled("admin_payment_received", "email"))) return;
