@@ -39,6 +39,8 @@ import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-
 import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
+import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
+import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -64,9 +66,9 @@ interface ProductFormPageProps {
 
 /** What the admin is told, per status actually written. */
 const SAVED_MESSAGE: Record<EntityStatus, string> = {
-  published: "Cake published — it is live on the shop",
+  published: "Published — it is live on the shop",
   draft: "Saved as a draft — not on the shop yet",
-  archived: "Cake archived — hidden from the shop",
+  archived: "Archived — hidden from the shop",
 };
 
 export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
@@ -102,6 +104,29 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
+  /**
+   * The shop's own domain for the search-result preview.
+   *
+   * The card printed "bakery.com/store/cakes/<slug>" — a domain this shop does
+   * not own, shown to every owner as the address their product would live at,
+   * and the only occurrence of that literal in the app. SEO settings have held
+   * `canonicalBaseUrl` all along.
+   *
+   * Read after mount rather than during render: `loadSeoStore` reads
+   * localStorage, which the server cannot, and an empty first paint shows the
+   * path alone rather than a wrong host.
+   */
+  const [previewOrigin, setPreviewOrigin] = useState("");
+  useEffect(() => {
+    const sync = () =>
+      setPreviewOrigin((loadSeoStore().global.canonicalBaseUrl ?? "").replace(/\/+$/, ""));
+    sync();
+    // The base URL is edited on the SEO screen, which broadcasts its own event.
+    // Subscribing means a form left open does not keep showing the old domain.
+    window.addEventListener(SEO_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SEO_UPDATED_EVENT, sync);
+  }, []);
+
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
 
@@ -117,7 +142,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         setIsLoading(false);
       } catch {
         if (cancelled) return;
-        toast.error("Cake not found");
+        toast.error("Product not found");
         router.replace(routes.admin.cakes.list);
       }
     }
@@ -193,7 +218,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
   async function saveProduct(intent: SaveIntent, redirectToList = true) {
     if (!form.name.trim()) {
-      toast.error("Cake name is required");
+      toast.error("A name is required");
       return;
     }
     if (!form.slug.trim()) {
@@ -242,7 +267,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       }
     } catch (error) {
       // Keep the user on the form with their input intact so they can retry.
-      toast.error(error instanceof Error ? error.message : "Could not save this cake");
+      toast.error(error instanceof Error ? error.message : "Could not save this product");
       return;
     } finally {
       setIsSaving(false);
@@ -267,7 +292,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }
 
     if (mode === "add" || !cakeId) {
-      toast.error("Save the cake first", {
+      toast.error("Save the product first", {
         description: "There is nothing to preview until it exists.",
       });
       return;
@@ -299,6 +324,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   }
 
   const title = mode === "add" ? `Add ${labels.productWord}` : `Edit ${labels.productWord}`;
+  const previewUrl = `${previewOrigin}${routes.store.cake(form.slug || "product-slug")}`;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5 pb-20 xl:pb-0">
@@ -333,8 +359,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               <TabsList className="mb-6 w-full justify-start overflow-x-auto">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="pricing">Pricing</TabsTrigger>
+                {/*
+                  "Options" third, not "Variants" fourth.
+                  This is the tab that answers what most shops actually need —
+                  a size, a colour, a capacity — and it sat behind "Details",
+                  which is seven food fields. "Variant" is a word a developer
+                  chose; "Options" is what the customer is being asked for.
+                */}
+                <TabsTrigger value="variants">Options</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="variants">Variants</TabsTrigger>
                 <TabsTrigger value="classification">Classification</TabsTrigger>
                 <TabsTrigger value="commerce">Commerce</TabsTrigger>
                 <TabsTrigger value="media">Media</TabsTrigger>
@@ -348,7 +381,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     id="name"
                     value={form.name}
                     onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="Chocolate Truffle Delight"
+                    placeholder="e.g. Chocolate Truffle Cake, 65W Type-C Charger"
                   />
                 </div>
                 <div className="space-y-2">
@@ -360,7 +393,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       setSlugTouched(true);
                       patchForm({ slug: slugify(e.target.value) });
                     }}
-                    placeholder="chocolate-truffle-delight"
+                    placeholder="chocolate-truffle-cake"
                   />
                 </div>
                 <div className="space-y-2">
@@ -388,7 +421,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     className={adminTextareaClassName}
                     value={form.description}
                     onChange={(e) => patchForm({ description: e.target.value })}
-                    placeholder="Describe flavours, layers, and serving notes..."
+                    placeholder="What it is, what makes it good, anything a buyer should know..."
                   />
                 </div>
               </TabsContent>
@@ -396,7 +429,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               <TabsContent value="pricing" className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="price">Base price (INR)</Label>
+                    <Label htmlFor="price">Base price ({getActiveLocale().currency})</Label>
                     <Input
                       id="price"
                       type="number"
@@ -439,7 +472,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                             ) : null}
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor={`weight-${index}`}>Price (INR)</Label>
+                            <Label htmlFor={`weight-${index}`}>Price ({getActiveLocale().currency})</Label>
                             <Input
                               id={`weight-${index}`}
                               type="number"
@@ -917,7 +950,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Product summary</CardTitle>
-              <CardDescription>Bakery metadata & variants</CardDescription>
+              <CardDescription>Stock, options and classification</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {form.barcode ? (
@@ -947,10 +980,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           <Card>
             <CardContent className="space-y-2">
               <p className="line-clamp-1 text-sm font-medium text-primary">
-                {form.seo.metaTitle || form.name || "Cake title"}
+                {form.seo.metaTitle || form.name || "Product title"}
               </p>
+              {/*
+                The shop's own domain, not "bakery.com" — the one place in the
+                app that literal appeared, shown to every owner as the address
+                their product would live at.
+              */}
               <p className="text-xs text-green-700 dark:text-green-400">
-                bakery.com/store/cakes/{form.slug || "cake-slug"}
+                {previewUrl}
               </p>
               <p className="line-clamp-3 text-xs text-muted-foreground">
                 {form.seo.metaDescription ||

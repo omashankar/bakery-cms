@@ -25,13 +25,13 @@ export function DeleteProductDialog({
   onOpenChange,
   onConfirm,
 }: DeleteProductDialogProps) {
-  const label = count > 1 ? `${count} cakes` : `"${cakeName ?? "this cake"}"`;
+  const label = count > 1 ? `${count} products` : `"${cakeName ?? "this product"}"`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete {count > 1 ? "cakes" : "cake"}?</DialogTitle>
+          <DialogTitle>Delete {count > 1 ? "products" : "product"}?</DialogTitle>
           <DialogDescription>
             Delete {label}? This cannot be undone in the demo store.
           </DialogDescription>

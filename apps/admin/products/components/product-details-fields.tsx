@@ -20,7 +20,7 @@ export function ProductDetailsFields({ value, onChange }: ProductDetailsFieldsPr
             id="barcode"
             value={value.barcode ?? ""}
             onChange={(event) => onChange({ barcode: event.target.value })}
-            placeholder="CAKE-CHOC-1KG"
+            placeholder="SKU-001"
           />
         </div>
         <div className="space-y-2">
@@ -99,7 +99,7 @@ export function ProductDetailsFields({ value, onChange }: ProductDetailsFieldsPr
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="careInstructions">Cake care instructions</Label>
+        <Label htmlFor="careInstructions">Care instructions</Label>
         <textarea
           id="careInstructions"
           className={adminTextareaClassName}

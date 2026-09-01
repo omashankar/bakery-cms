@@ -86,8 +86,8 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   return (
     <AdminPage>
       <AdminPageHeader
-        title="Preview Cake"
-        description="Review how this cake will appear before publishing to the storefront."
+        title="Preview"
+        description="Review how this product will appear before publishing to the storefront."
         actions={
           <>
             <Button variant="outline" render={<Link href={routes.admin.cakes.edit(cake.id)} />}>

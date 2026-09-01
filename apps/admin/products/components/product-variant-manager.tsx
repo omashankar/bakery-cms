@@ -15,6 +15,8 @@ import {
   createVariantOption,
 } from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
+import { getActiveLocale } from "@/features/settings/lib/active-locale";
+import { cn } from "@/lib/utils";
 import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
@@ -66,8 +68,33 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
     ]);
   }
 
-  function resetDefaults() {
-    onChange(createDefaultVariantGroups());
+  /** True when this product already carries the bakery's egg group. */
+  const hasEggGroup = groups.some((group) => group.type === "egg");
+
+  /**
+   * Whether to offer the bakery-only Type control for a group of this type.
+   *
+   * A group already using egg or photo always keeps it, so switching a module
+   * off never strands data an admin can no longer edit.
+   */
+  const showTypeControl = (type: ProductVariantGroupType): boolean =>
+    modules.eggEggless || modules.photoCake || type === "egg" || type === "photo";
+
+  /**
+   * Give a bakery its egg/eggless group — without taking anything away.
+   *
+   * The button this replaces called `createDefaultVariantGroups()` and passed
+   * the result straight to `onChange`, which REPLACES. So "Reset defaults" on a
+   * phone charger deleted Storage and Colour and left an egg question in their
+   * place, and on a photo cake it discarded the photo group the Commerce tab
+   * had just added. Appending is the only thing this was ever wanted for.
+   */
+  function addEggOptions() {
+    if (hasEggGroup) return;
+    onChange([
+      ...groups,
+      ...createDefaultVariantGroups().filter((group) => group.type === "egg"),
+    ]);
   }
 
   function updateOption(
@@ -138,64 +165,102 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Variant groups</p>
+          <p className="text-sm font-medium">Options</p>
           <p className="text-xs text-muted-foreground">
-            Add option groups with price adjustments on top of the base price.
+            What the customer chooses before buying — a size, a colour, a storage
+            capacity. Each choice can add to or subtract from the base price.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={resetDefaults}>
-            Reset defaults
-          </Button>
+          {/*
+            "Reset defaults" was here, and it was a trap rather than a shortcut.
+            It called `createDefaultVariantGroups()` with no arguments and
+            REPLACED the array, so one click on a phone charger deleted Storage
+            and Colour and installed "Egg preference / Regular / Eggless +80" —
+            no confirm, and not even gated on the egg module being on.
+
+            It is now additive, gated on the module, and disabled once the group
+            exists, so it can only ever give a bakery something it is missing.
+          */}
+          {modules.eggEggless && !hasEggGroup ? (
+            <Button type="button" variant="outline" size="sm" onClick={addEggOptions}>
+              <Plus className="size-4" />
+              Add egg / eggless
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={() => addGroup("custom")}>
             <Plus className="size-4" />
-            Add group
+            Add option
           </Button>
         </div>
       </div>
 
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted px-4 py-8 text-center text-sm text-muted-foreground">
-          No variant groups yet. Add a group or reset to bakery defaults.
+          No options yet. Add one if this product comes in more than one version —
+          a size, a colour, a capacity. Products sold one way need none.
         </div>
       ) : (
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group.id} className="rounded-xl border border-border bg-card p-4">
-              <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_160px_auto]">
+              <div
+                className={cn(
+                  "mb-4 grid gap-3",
+                  showTypeControl(group.type)
+                    ? "sm:grid-cols-[1fr_160px_auto]"
+                    : "sm:grid-cols-[1fr_auto]",
+                )}
+              >
                 <div className="space-y-2">
-                  <Label>Group name</Label>
+                  <Label>Option name</Label>
                   <Input
                     value={group.name}
                     onChange={(event) => updateGroup(group.id, { name: event.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <AdminSelect
-                    value={group.type}
-                    onChange={(event) =>
-                      updateGroup(group.id, {
-                        type: event.target.value as ProductVariantGroupType,
-                      })
-                    }
-                  >
-                    {modules.eggEggless || group.type === "egg" ? (
-                      <option value="egg">Egg preference</option>
-                    ) : null}
-                    {modules.photoCake || group.type === "photo" ? (
-                      <option value="photo">Photo cake</option>
-                    ) : null}
-                    <option value="custom">Custom</option>
-                  </AdminSelect>
-                </div>
+                {/*
+                  The Type control is a BAKERY control, and only a bakery sees it.
+                  `type` drives two things and neither is generic: which module
+                  hides the group, and which legacy flag `syncLegacyFlagsFromVariants`
+                  derives. A shop selling chargers was made to answer
+                  "Egg preference / Photo cake / Custom" on every option group it
+                  created, which is the single loudest reason the options tab read
+                  as a cake feature.
+
+                  Shown when either module is on, and always for a group that
+                  already uses one of those types — the same data-preservation
+                  carve-out the options below it use, so existing bakery data stays
+                  fully editable after a module is switched off.
+                */}
+                {showTypeControl(group.type) ? (
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <AdminSelect
+                      value={group.type}
+                      onChange={(event) =>
+                        updateGroup(group.id, {
+                          type: event.target.value as ProductVariantGroupType,
+                        })
+                      }
+                    >
+                      {modules.eggEggless || group.type === "egg" ? (
+                        <option value="egg">Egg preference</option>
+                      ) : null}
+                      {modules.photoCake || group.type === "photo" ? (
+                        <option value="photo">Photo cake</option>
+                      ) : null}
+                      <option value="custom">Custom</option>
+                    </AdminSelect>
+                  </div>
+                ) : null}
                 <div className="flex items-end">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     onClick={() => removeGroup(group.id)}
-                    aria-label="Remove variant group"
+                    aria-label="Remove option"
                   >
                     <Trash2 className="size-4 text-destructive" />
                   </Button>
@@ -229,7 +294,8 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Price +/- (INR)</Label>
+                      {/* The shop's own currency, not a hardcoded rupee. */}
+                      <Label>Price +/- ({getActiveLocale().currency})</Label>
                       <Input
                         type="number"
                         value={option.priceAdjustment}

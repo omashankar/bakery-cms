@@ -223,7 +223,7 @@ export function ProductsListPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not ${verb === "published" ? "publish" : "archive"} the selected cakes`
+          : `Could not ${verb === "published" ? "publish" : "archive"} the selected products`
       );
     }
   }
@@ -353,7 +353,7 @@ export function ProductsListPage() {
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search cakes…"
+            placeholder={`Search ${productsLower}…`}
           />
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             <AdminSelect

@@ -21,6 +21,9 @@ import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components"
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+// The shop's own currency. The weight modifier printed a hardcoded ₹ while
+// every other price on the screen already resolved `general.currency`.
+import { formatCurrency } from "@/utils/format";
 import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
@@ -241,12 +244,12 @@ export function CatalogAdminPage() {
     // Three of this shop's products are already in that state.
     const orphans = orphanCount();
     if (orphans > 0) {
-      const noun = orphans === 1 ? "cake is" : "cakes are";
+      const noun = orphans === 1 ? "product is" : "products are";
       const which = selectedIds.length === 1 ? "category" : "categories";
       const ok = window.confirm(
         `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
           "They will keep pointing at a category that no longer exists: the shop " +
-          "will show them as plain “Cakes”, and the category filter here will " +
+          "will show them as uncategorised, and the category filter here will " +
           "never find them again.\n\nDelete anyway?"
       );
       if (!ok) return;
@@ -274,7 +277,7 @@ export function CatalogAdminPage() {
       `This replaces all four lists — ${counts.categories} categories, ` +
         `${counts.occasions} occasions, ${counts.flavours} flavours and ` +
         `${counts.weights} weights — with the ones this software ships with.\n\n` +
-        "Anything you have named here is lost, and cakes using those values will " +
+        "Anything you have named here is lost, and products using those values will " +
         "point at entries that no longer exist.\n\nReset the whole catalog?"
     );
     if (!ok) return;
@@ -293,7 +296,7 @@ export function CatalogAdminPage() {
         title="Catalog"
         description={
           showThemes
-            ? "Cake design themes — coming soon"
+            ? "Design themes — coming soon"
             : totalItems > 0
               ? `${counts[activeTab]} ${activeTabMeta.label.toLowerCase()} · ${totalItems} total`
               : "Categories, flavours, occasions, and weights"
@@ -390,7 +393,7 @@ export function CatalogAdminPage() {
           <EmptyState
             icon={Palette}
             title="Themes coming soon"
-            description="Cake design themes (e.g. Cartoon, Floral, Minimal, Elegant) will be manageable here."
+            description="Design themes (e.g. Cartoon, Floral, Minimal, Elegant) will be manageable here."
             className="py-16"
           />
         </section>
@@ -460,9 +463,9 @@ export function CatalogAdminPage() {
                     const slug = "slug" in item ? item.slug : undefined;
                     const detail =
                       activeTab === "weights" && "modifier" in item
-                        ? `+₹${item.modifier} · serves ${item.serves}`
+                        ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
                         : activeTab === "categories"
-                          ? `${productsByCategory.get(item.id) ?? 0} cakes`
+                          ? `${productsByCategory.get(item.id) ?? 0} products`
                           : slug
                             ? `/${slug}`
                             : "—";
@@ -514,9 +517,9 @@ export function CatalogAdminPage() {
                 const slug = "slug" in item ? item.slug : undefined;
                 const detail =
                   activeTab === "weights" && "modifier" in item
-                    ? `+₹${item.modifier} · serves ${item.serves}`
+                    ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
                     : activeTab === "categories"
-                      ? `${productsByCategory.get(item.id) ?? 0} cakes`
+                      ? `${productsByCategory.get(item.id) ?? 0} products`
                       : slug
                         ? `/${slug}`
                         : null;
