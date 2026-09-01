@@ -6,6 +6,7 @@ import type {
   ContactSettings,
   GeneralSettings,
   MaintenanceSettings,
+  LabelOverrides,
   ModuleSettings,
   SecuritySettings,
   SmtpSettings,
@@ -19,6 +20,7 @@ import {
   defaultContactSettings,
   defaultGeneralSettings,
   defaultMaintenanceSettings,
+  defaultLabelOverrides,
   defaultModuleSettings,
   defaultSecuritySettings,
   defaultSmtpSettings,
@@ -176,6 +178,10 @@ export async function hydrateSettingsFromServer(
       },
     },
     modules: { ...current.modules, ...(server.modules ?? {}) },
+    // The shop's own words. This list is rebuilt BY HAND, so a section missing
+    // from it is discarded on every hydrate — which is precisely how
+    // `labelOverrides` stayed inert while the server resolved it correctly.
+    labelOverrides: { ...current.labelOverrides, ...(server.labelOverrides ?? {}) },
     // Activity is a client-only convenience log; the server uses audit_logs.
     activity: current.activity,
   });
@@ -394,6 +400,17 @@ export function getModuleSettings(): ModuleSettings {
 }
 
 /**
+ * The shop's own words for what it sells, as stored.
+ *
+ * Raw overrides, not resolved labels — the caller layers these over the preset
+ * through `resolveLabels`, so a blank field still means "use the preset" at
+ * exactly one place.
+ */
+export function getLabelSettings(): LabelOverrides {
+  return loadSettings().labelOverrides ?? {};
+}
+
+/**
  * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
  * bakery-only and gated by the wedding module. Shared by admin + storefront so
  * every surface hides wedding consistently.
@@ -506,6 +523,17 @@ export async function saveModuleSettings(
     details: "Module settings saved",
   });
   return { value: value.modules, persisted };
+}
+
+export async function saveLabelSettings(
+  labelOverrides: LabelOverrides
+): Promise<SettingsWriteResult<LabelOverrides>> {
+  const { value, persisted } = await updateStore({ labelOverrides }, {
+    action: "updated",
+    entity: "settings",
+    details: "Product wording saved",
+  });
+  return { value: value.labelOverrides, persisted };
 }
 
 export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLog[]>> {
@@ -626,6 +654,15 @@ export function resetCommerceSettings(): Promise<SettingsWriteResult<CommerceSet
 
 export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSettings>> {
   return resetToDefaults("modules", { ...defaultModuleSettings }, getModuleSettings, "Module settings reset");
+}
+
+export function resetLabelSettings(): Promise<SettingsWriteResult<LabelOverrides>> {
+  return resetToDefaults(
+    "labelOverrides",
+    { ...defaultLabelOverrides },
+    getLabelSettings,
+    "Product wording reset",
+  );
 }
 
 export function exportLocalStorageBackup(): Record<string, string | null> {

@@ -14,6 +14,7 @@ import type {
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
+  LabelOverrides,
   MaintenanceSettings,
   ModuleSettings,
   SecuritySettings,
@@ -161,6 +162,9 @@ export const defaultCommerceSettings: CommerceSettings = {
 export const seedActivityLog: ActivityLog[] = [];
 
 
+/** No overrides. Every label comes from the preset until a shop says otherwise. */
+export const defaultLabelOverrides: LabelOverrides = {};
+
 export const defaultAppSettings: AppSettings = {
   general: defaultGeneralSettings,
   contact: defaultContactSettings,
@@ -171,6 +175,7 @@ export const defaultAppSettings: AppSettings = {
   maintenance: defaultMaintenanceSettings,
   commerce: defaultCommerceSettings,
   modules: defaultModuleSettings,
+  labelOverrides: defaultLabelOverrides,
   activity: seedActivityLog,
   updatedAt: nowIso(),
 };
@@ -527,6 +532,7 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
         partial.commerce?.deliveryTimeSlots ?? defaultCommerceSettings.deliveryTimeSlots,
     },
     modules: { ...defaultModuleSettings, ...partial.modules },
+    labelOverrides: { ...defaultLabelOverrides, ...partial.labelOverrides },
     activity: partial.activity ?? seedActivityLog,
     updatedAt: partial.updatedAt ?? nowIso(),
   };

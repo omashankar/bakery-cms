@@ -4,6 +4,7 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
+  getLabelSettings,
   isWeddingEnabled,
 } from "@/features/settings/lib/settings-repository";
 import {
@@ -12,7 +13,11 @@ import {
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
 import { chosen } from "./shipped-placeholder";
-import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
+import {
+  getBusinessLabels,
+  resolveLabels,
+  type BusinessLabels,
+} from "@/config/business-labels";
 import type { BusinessType } from "@/types/settings";
 
 /*
@@ -78,7 +83,11 @@ export function getStorefrontBusinessType(): BusinessType {
 }
 
 export function getStorefrontBusinessLabels(): BusinessLabels {
-  return getBusinessLabels(getStorefrontBusinessType());
+  // The shop's own words over the preset — the same resolution the server does
+  // and the admin hook does. This read the preset alone, so the collections
+  // heading a shop had renamed still said "Our Collections".
+  const type = getStorefrontBusinessType();
+  return { ...getBusinessLabels(type), ...resolveLabels(type, getLabelSettings()) };
 }
 
 /** Wedding cakes are bakery-only and gated by the wedding module. */

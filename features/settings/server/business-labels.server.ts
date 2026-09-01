@@ -1,36 +1,18 @@
-import { getBusinessLabels } from "@/config/business-labels";
-import type { BusinessType } from "@/types/settings";
+import { resolveLabels, type ResolvedLabels } from "@/config/business-labels";
+import type { LabelOverrides } from "@/types/settings";
 
 /**
  * Server-side white-label resolution: the per-business-type default wording
  * (config/business-labels.ts) with any admin overrides layered on top.
  *
- * Only the STRING labels are resolved here — the `productIcon` (a React
- * component) stays on the client, since it cannot cross an API boundary.
+ * The resolution itself now LIVES in config/business-labels.ts, because it is
+ * pure and both sides need it. While it was only here, `useBusinessLabels`
+ * could not call it — so the browser resolved from `businessType` alone and
+ * threw the overrides away, and `labelOverrides` reached no screen despite the
+ * server computing it correctly on every request.
+ *
+ * This module stays as the server's entry point so existing imports keep
+ * working and the boundary is still stated in one place.
  */
-export interface ResolvedLabels {
-  collectionsTitle: string;
-  collectionsSubtitle: string;
-  productWord: string;
-  productWordPlural: string;
-}
-
-export interface LabelOverrides {
-  collectionsTitle?: string;
-  collectionsSubtitle?: string;
-  productWord?: string;
-  productWordPlural?: string;
-}
-
-export function resolveLabels(
-  businessType: BusinessType,
-  overrides: LabelOverrides = {},
-): ResolvedLabels {
-  const base = getBusinessLabels(businessType);
-  return {
-    collectionsTitle: overrides.collectionsTitle?.trim() || base.collectionsTitle,
-    collectionsSubtitle: overrides.collectionsSubtitle?.trim() || base.collectionsSubtitle,
-    productWord: overrides.productWord?.trim() || base.productWord,
-    productWordPlural: overrides.productWordPlural?.trim() || base.productWordPlural,
-  };
-}
+export { resolveLabels };
+export type { ResolvedLabels, LabelOverrides };

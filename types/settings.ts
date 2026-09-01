@@ -177,6 +177,24 @@ export interface ModuleSettings {
   photoCake: boolean;
 }
 
+/**
+ * The shop's own words for what it sells, overriding the business-type preset.
+ *
+ * Every field optional and every blank meaning "no opinion" — clearing a box
+ * gives the preset back rather than an empty label. `resolveLabels` layers this
+ * over `config/business-labels.ts` and the result ships as `settings.labels`.
+ *
+ * This existed on the server before it existed anywhere else: it was in no
+ * client type, no default, no merge and no backup section, so nothing read it
+ * and a shop had no way to say "Bouquet" instead of "Cake".
+ */
+export interface LabelOverrides {
+  collectionsTitle?: string;
+  collectionsSubtitle?: string;
+  productWord?: string;
+  productWordPlural?: string;
+}
+
 export interface AppSettings {
   general: GeneralSettings;
   contact: ContactSettings;
@@ -187,6 +205,7 @@ export interface AppSettings {
   maintenance: MaintenanceSettings;
   commerce: CommerceSettings;
   modules: ModuleSettings;
+  labelOverrides: LabelOverrides;
   activity: ActivityLog[];
   updatedAt: string;
 }

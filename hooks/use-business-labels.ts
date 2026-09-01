@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
+import {
+  getBusinessLabels,
+  resolveLabels,
+  type BusinessLabels,
+} from "@/config/business-labels";
 import {
   getGeneralSettings,
+  getLabelSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 
@@ -19,7 +24,24 @@ export function useBusinessLabels(): BusinessLabels {
   const [labels, setLabels] = useState<BusinessLabels>(() => getBusinessLabels("bakery"));
 
   useEffect(() => {
-    const sync = () => setLabels(getBusinessLabels(getGeneralSettings().businessType));
+    /**
+     * The shop's OWN words first, then the business-type preset.
+     *
+     * This resolved from `businessType` alone and threw away the overrides the
+     * server had already layered on — so `labelOverrides` was inert, and a shop
+     * that wanted "Bouquet" got "Cake" whatever it typed. It also made the
+     * wording depend entirely on a closed ten-value enum, which is why deleting
+     * that enum could not be done before this: `getBusinessLabels` falls back
+     * to the bakery labels, so the sidebar and the products list would have
+     * quietly gone back to "Cakes" with nothing able to override them.
+     *
+     * `resolveLabels` is the single place a blank means "use the preset".
+     */
+    const sync = () => {
+      const preset = getBusinessLabels(getGeneralSettings().businessType);
+      const resolved = resolveLabels(getGeneralSettings().businessType, getLabelSettings());
+      setLabels({ ...preset, ...resolved });
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);

@@ -11,7 +11,7 @@ import {
   UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
-import type { BusinessType } from "@/types/settings";
+import type { BusinessType, LabelOverrides } from "@/types/settings";
 
 /**
  * Central config for product-noun labels that read differently per business type.
@@ -115,4 +115,38 @@ export const BUSINESS_LABELS: Record<BusinessType, BusinessLabels> = {
 /** Resolve labels for a business type, falling back to the bakery defaults. */
 export function getBusinessLabels(type: BusinessType): BusinessLabels {
   return BUSINESS_LABELS[type] ?? BAKERY_LABELS;
+}
+
+/** The STRING labels only — no `productIcon`, which cannot cross an API boundary. */
+export interface ResolvedLabels {
+  collectionsTitle: string;
+  collectionsSubtitle: string;
+  productWord: string;
+  productWordPlural: string;
+}
+
+/**
+ * The shop's own words layered over the business-type preset.
+ *
+ * The ONE place a blank override means "use the preset" rather than "use an
+ * empty label" — an admin clearing the box gets the default back, not a
+ * nameless button.
+ *
+ * Lives here rather than in `business-labels.server.ts` because it is pure and
+ * both sides need it: the server ships the result as `settings.labels`, and
+ * `useBusinessLabels` resolves the same way in the browser. When only the
+ * server could call it, the client hook resolved from `businessType` alone and
+ * threw the overrides away, which is why they reached no screen at all.
+ */
+export function resolveLabels(
+  businessType: BusinessType,
+  overrides: LabelOverrides = {},
+): ResolvedLabels {
+  const base = getBusinessLabels(businessType);
+  return {
+    collectionsTitle: overrides.collectionsTitle?.trim() || base.collectionsTitle,
+    collectionsSubtitle: overrides.collectionsSubtitle?.trim() || base.collectionsSubtitle,
+    productWord: overrides.productWord?.trim() || base.productWord,
+    productWordPlural: overrides.productWordPlural?.trim() || base.productWordPlural,
+  };
 }

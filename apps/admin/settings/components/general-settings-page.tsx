@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   reportSettingsReset,
@@ -12,7 +13,7 @@ import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { GeneralSettings } from "@/types/settings";
+import type { GeneralSettings, LabelOverrides } from "@/types/settings";
 import {
   businessTypeOptions,
   currencyOptions,
@@ -22,10 +23,14 @@ import {
 } from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
+  getLabelSettings,
   resetGeneralSettings,
   saveGeneralSettings,
+  saveLabelSettings,
+  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { SettingsSectionShell } from "./settings-section-shell";
 import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 
@@ -54,6 +59,8 @@ export function GeneralSettingsPage() {
 
   const errors = validate(settings);
   const hasErrors = Object.values(errors).some(Boolean);
+  /** The wording in force right now — used as the placeholder for each box. */
+  const labels = useBusinessLabels();
 
   /**
    * The site name in the tab, the favicon, and the currency and timezone every
@@ -63,6 +70,29 @@ export function GeneralSettingsPage() {
    */
   function refreshServerRender() {
     router.refresh();
+  }
+
+  /**
+   * The shop's own word for what it sells.
+   *
+   * Held beside the section rather than inside it because it is a different
+   * settings section on the server (`labelOverrides`), and saved in the same
+   * click because an owner does not think of "what do you call your products"
+   * as a separate screen. Seeded after mount: `getLabelSettings` reads
+   * localStorage, which the server cannot.
+   */
+  const [wording, setWording] = useState<LabelOverrides>({});
+  const [wordingDirty, setWordingDirty] = useState(false);
+  useEffect(() => {
+    const sync = () => setWording(getLabelSettings());
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  function editWording(patch: Partial<LabelOverrides>) {
+    setWording((prev) => ({ ...prev, ...patch }));
+    setWordingDirty(true);
   }
 
   async function handleSave() {
@@ -75,6 +105,14 @@ export function GeneralSettingsPage() {
       if (accepted) refreshServerRender();
       return { value, accepted };
     });
+
+    if (wordingDirty) {
+      const { persisted } = await saveLabelSettings(wording);
+      if (reportSettingsWrite(persisted, "Product wording")) {
+        setWordingDirty(false);
+        refreshServerRender();
+      }
+    }
   }
 
   function handleDiscard() {
@@ -103,7 +141,7 @@ export function GeneralSettingsPage() {
             } · ${settings.currency}`
           : "Site identity, business type, branding, timezone, and currency."
       }
-      isDirty={isDirty}
+      isDirty={isDirty || wordingDirty}
       // Behind the skeleton until the SERVER's copy has landed: editing the seed
       // makes the form dirty, the resync then skips it to protect the edit, and
       // Save pushes the seeded name/INR/Asia-Kolkata over the shop's own identity.
@@ -185,7 +223,41 @@ export function GeneralSettingsPage() {
                 ))}
               </AdminSelect>
               <p className="text-xs text-muted-foreground">
-                Controls public labels and which optional modules appear. Bakery keeps every feature on.
+                Sets the starting wording and unlocks the Wedding Builder for bakeries.
+                It does not restrict what you can sell.
+              </p>
+            </div>
+
+            {/*
+              The shop's OWN word, which beats the business type above.
+              `labelOverrides` has existed on the server for as long as business
+              types have — `resolveLabels` layers it over the preset — and
+              nothing read it, so a flower shop that wanted "Bouquet" was told
+              "Cake" whatever it typed, because there was nowhere to type it.
+            */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="productWord">What do you call one product?</Label>
+                <Input
+                  id="productWord"
+                  value={wording.productWord ?? ""}
+                  onChange={(e) => editWording({ productWord: e.target.value })}
+                  placeholder={labels.productWord}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="productWordPlural">And more than one?</Label>
+                <Input
+                  id="productWordPlural"
+                  value={wording.productWordPlural ?? ""}
+                  onChange={(e) => editWording({ productWordPlural: e.target.value })}
+                  placeholder={labels.productWordPlural}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Used across the admin and your storefront — &ldquo;Add {labels.productWord}
+                &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;. Leave
+                blank to use the business type&rsquo;s wording.
               </p>
             </div>
             {/*
