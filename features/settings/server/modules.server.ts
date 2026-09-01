@@ -25,9 +25,10 @@ export interface ServerModules {
    *
    * This was `businessType === "bakery" && modules.weddingBuilder`. The
    * business type is gone, so the switch is the whole gate — which is what it
-   * always described itself as. The DEFAULT now carries what the enum used to
-   * (see `defaultModuleSettings`), so a fresh install of any trade does not
-   * ship a live Wedding Builder.
+   * always described itself as. What the enum used to guarantee — that a shop
+   * does not open with a live Wedding Builder — is carried by
+   * `newShopModuleSettings` at the one place a shop is created, NOT by
+   * `defaultModuleSettings`, which fails open and is what this file reads.
    */
   weddingEnabled: boolean;
 }

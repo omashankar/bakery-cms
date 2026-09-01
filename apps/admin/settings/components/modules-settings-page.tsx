@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
-  getGeneralSettings,
   getModuleSettings,
   resetModuleSettings,
   saveModuleSettings,

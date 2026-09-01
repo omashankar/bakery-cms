@@ -412,14 +412,15 @@ export function getLabelSettings(): LabelOverrides {
 
 /**
  * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
- * bakery-only and gated by the wedding module. Shared by admin + storefront so
- * every surface hides wedding consistently.
+ * gated by the wedding module alone. Shared by admin + storefront so every
+ * surface hides wedding consistently.
  */
 export function isWeddingEnabled(): boolean {
   // The switch is the whole gate. This also required
-  // `businessType === "bakery"`, which is gone; `defaultModuleSettings` now
-  // carries what that enum used to, so a shop that never asked for the Wedding
-  // Builder still does not get one.
+  // `businessType === "bakery"`, which is gone. A shop that never asked for a
+  // Wedding Builder is not given one by `newShopModuleSettings` when it is
+  // created; the copy READ here fails open, because an unknown value in a cold
+  // browser must not hide a page a running shop is selling from.
   return loadSettings().modules.weddingBuilder;
 }
 

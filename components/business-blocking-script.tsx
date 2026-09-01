@@ -3,7 +3,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { BUSINESS_BLOCKING_SCRIPT } from "@/lib/business-blocking";
 import {
-  getGeneralSettings,
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
@@ -15,15 +14,26 @@ function useIsServerRender() {
   return useSyncExternalStore(emptySubscribe, () => false, () => true);
 }
 
-/** Live-sync the root data-* flags after settings change (admin toggles, resets). */
-function applyBusinessAttributes() {
+/**
+ * Live-sync the root data-* flags after settings change (admin toggles, resets).
+ *
+ * Exported so a test can prove it agrees with the pre-paint string it takes
+ * over from. `lib/business-blocking.ts` asks for the two to be kept in sync and
+ * nothing checked that they were — they already disagreed for any stored value
+ * that is neither `true` nor `false`, because that script asks `!== false` and
+ * this asked for truthiness.
+ */
+export function applyBusinessAttributes() {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const m = getModuleSettings();
   // `data-biz` was stamped here and read by nothing — not one CSS selector, not
   // one line of JS. It went with the business type it named.
-  const toggle = (attr: string, on: boolean) =>
-    on ? root.removeAttribute(attr) : root.setAttribute(attr, "0");
+  // `!== false`, exactly as the pre-paint script asks it. Only an explicit
+  // `false` hides anything: every other value means the shop has not said, and
+  // a gate that does not know must not take down a page a shop is selling from.
+  const toggle = (attr: string, on: unknown) =>
+    on !== false ? root.removeAttribute(attr) : root.setAttribute(attr, "0");
   toggle("data-wed", m.weddingBuilder);
   toggle("data-mod-flavour", m.flavour);
   toggle("data-mod-egg", m.eggEggless);

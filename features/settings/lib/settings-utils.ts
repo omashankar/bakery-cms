@@ -417,27 +417,11 @@ export function instagramHandleFromUrl(url: string): string {
 /** One correction to a stored settings document, as a path and the value to set. */
 export interface SettingsRepair {
   path: string;
+  /** `undefined` means UNSET the path — see how `migrate` applies it. */
   value: unknown;
   reason: string;
 }
 
-/**
- * Decides what to repair in a settings document written before the current
- * contracts existed. Pure, so the rules can be tested without a database — this
- * is the only logic in the app that REWRITES data at rest, which makes it the
- * last place to leave untested.
- *
- * Tightening a Zod schema only constrains future writes, and the Mongoose model
- * stores these fields as bare `String`. So:
- *
- * - `contact.mapEmbedUrl` may hold Google's whole `<iframe …>` snippet (the
- *   paste that field invites) or a `javascript:` URL. Unwrap what can be
- *   unwrapped, drop what cannot.
- * - `social[].href` may hold a `javascript:` URL, and an active row is rendered
- *   into an `<a href>` in the footer of every storefront page. DEACTIVATE rather
- *   than delete or blank: the row keeps its label and platform, so the admin can
- *   see what needs a real URL instead of finding a link silently gone.
- */
 /**
  * The wording each business type used to produce, kept ONLY to preserve it.
  *
@@ -448,10 +432,12 @@ export interface SettingsRepair {
  * flavour, and occasion." to a generic line on the storefront — with no
  * announcement and, for two of the four fields, no admin input to type it back.
  *
- * A one-way migration, not a feature: it fires once per shop, only where the
- * document still carries the legacy `general.businessType`, and only when the
- * shop has stated no wording of its own. Delete this table once no stored
- * document carries a business type.
+ * A one-way migration, not a feature. It fires only where the document still
+ * carries the legacy `general.businessType`, only writes wording where the shop
+ * has stated none of its own — and clears that field as it goes, so it fires
+ * ONCE and the claim in this sentence is something the code enforces rather
+ * than something it hopes for. Delete this table once no stored document
+ * carries a business type; the clearing above is what lets you find that out.
  */
 const LEGACY_BUSINESS_TYPE_LABELS: Record<string, LabelOverrides> = {
   bakery: {
@@ -516,6 +502,28 @@ const LEGACY_BUSINESS_TYPE_LABELS: Record<string, LabelOverrides> = {
   },
 };
 
+/**
+ * Decides what to repair in a settings document written before the current
+ * contracts existed. Pure, so the rules can be tested without a database — this
+ * is the only logic in the app that REWRITES data at rest, which makes it the
+ * last place to leave untested.
+ *
+ * Tightening a Zod schema only constrains future writes, and the Mongoose model
+ * stores these fields as bare `String`. So:
+ *
+ * - `contact.mapEmbedUrl` may hold Google's whole `<iframe …>` snippet (the
+ *   paste that field invites) or a `javascript:` URL. Unwrap what can be
+ *   unwrapped, drop what cannot.
+ * - `social[].href` may hold a `javascript:` URL, and an active row is rendered
+ *   into an `<a href>` in the footer of every storefront page. DEACTIVATE rather
+ *   than delete or blank: the row keeps its label and platform, so the admin can
+ *   see what needs a real URL instead of finding a link silently gone.
+ * - `general.businessType` is a field the schema no longer declares, holding
+ *   the wording preset a shop was showing before the enum was deleted. Copy
+ *   that wording into `labelOverrides` where the shop has stated none, and
+ *   DROP the field either way — that drop is what makes this rule fire once
+ *   rather than every time a shop happens to blank its wording.
+ */
 export function planSettingsRepairs(settings: {
   contact?: { mapEmbedUrl?: string };
   social?: { href?: string; isActive?: boolean }[];
@@ -534,16 +542,50 @@ export function planSettingsRepairs(settings: {
    * repair that could fire twice would churn the document on every read.
    */
   const legacyType = settings.general?.businessType;
-  const stated = Object.values(settings.labelOverrides ?? {}).some((value) => value?.trim());
-  if (legacyType && !stated) {
-    const preserved = LEGACY_BUSINESS_TYPE_LABELS[legacyType];
-    if (preserved) {
+  if (legacyType) {
+    /**
+     * `.trim()` on whatever is at rest, and a bracket lookup keyed by database
+     * text. Both are guarded because this runs on the SINGLETON READ that every
+     * server render funnels through, OUTSIDE the try/catch below, which wraps
+     * only the save: one non-string in `labelOverrides` would throw a TypeError
+     * out of every page. `labelOverrides` is a Mixed path, so the Zod schema
+     * that has always constrained it governs writes through the API and not
+     * what a direct database edit can leave there. Without `Object.hasOwn`,
+     * `businessType: "constructor"` resolves to a truthy inherited member and
+     * gets written as the shop's wording.
+     */
+    const stated = Object.values(settings.labelOverrides ?? {}).some(
+      (value) => typeof value === "string" && value.trim(),
+    );
+    const preserved = Object.hasOwn(LEGACY_BUSINESS_TYPE_LABELS, legacyType)
+      ? LEGACY_BUSINESS_TYPE_LABELS[legacyType]
+      : undefined;
+
+    if (preserved && !stated) {
       repairs.push({
         path: "labelOverrides",
         value: preserved,
         reason: `kept the ${legacyType} wording`,
       });
     }
+
+    /**
+     * And drop the legacy field, in the SAME save, whether or not there was
+     * wording to keep.
+     *
+     * Without this the condition above is a recurring state rather than a
+     * one-shot marker: nothing else clears `businessType` deliberately, so any
+     * path that empties `labelOverrides` — `POST /api/settings/labelOverrides/
+     * reset` is live and audit-logged — would have the preset re-imposed on the
+     * very next read, an endpoint reporting a reset that is undone before the
+     * page repaints. Dropping the field is also the only thing that can ever
+     * make this table's delete condition observable.
+     */
+    repairs.push({
+      path: "general.businessType",
+      value: undefined,
+      reason: `dropped the legacy ${legacyType} business type`,
+    });
   }
 
   const storedMap = settings.contact?.mapEmbedUrl ?? "";

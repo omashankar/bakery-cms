@@ -9,8 +9,9 @@ import type { LabelOverrides } from "@/types/settings";
 
 /**
  * Settings repository — data access for the singleton settings document.
- * Seeds from the same `defaultAppSettings` the frontend uses, so a fresh
- * install matches the bakery template exactly.
+ * Seeds from the same `defaultAppSettings` the frontend uses — except
+ * `modules`, where a brand-new shop takes `newShopModuleSettings` so it does
+ * not open with a live Wedding Builder it never asked for.
  */
 
 const SINGLETON = "singleton";
@@ -46,7 +47,23 @@ async function migrate(doc: SettingsDoc): Promise<SettingsDoc> {
 
   if (repairs.length === 0) return doc;
 
-  for (const repair of repairs) doc.set(repair.path, repair.value);
+  for (const repair of repairs) {
+    if (repair.value === undefined) {
+      /**
+       * Dropping a path the schema no longer DECLARES.
+       *
+       * `doc.set(path, undefined)` is a silent no-op under the default strict
+       * mode — save() still resolves, and the field is still there on the next
+       * read, so the repair would report itself done forever without ever
+       * doing it. Probed against the installed mongoose 9.8.0: only
+       * `{ strict: false }` emits the `$unset`, and it rides in the same delta
+       * as the sets above — still one write, not two.
+       */
+      doc.set(repair.path, undefined, { strict: false });
+    } else {
+      doc.set(repair.path, repair.value);
+    }
+  }
 
   try {
     await doc.save();

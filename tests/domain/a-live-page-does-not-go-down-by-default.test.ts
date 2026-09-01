@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  defaultAppSettings,
   defaultModuleSettings,
   newShopModuleSettings,
   planSettingsRepairs,
 } from "@/features/settings/lib/settings-utils";
+import { applyBusinessAttributes } from "@/components/business-blocking-script";
 import { BUSINESS_BLOCKING_SCRIPT } from "@/lib/business-blocking";
 
 /**
@@ -58,17 +60,71 @@ describe("the fallback direction", () => {
 });
 
 describe("the pre-paint script", () => {
-  it("shows wedding unless the shop has switched it off", () => {
-    /**
-     * The bias, in one character. `!== false` means an absent value SHOWS;
-     * `=== true` means an absent value HIDES — and absent is exactly what a
-     * first-time visitor's localStorage holds.
-     *
-     * Asserted on the emitted script because that string is what runs before
-     * paint; there is no other guard on it anywhere in the suite.
-     */
-    expect(BUSINESS_BLOCKING_SCRIPT).toContain("m.weddingBuilder!==false");
-    expect(BUSINESS_BLOCKING_SCRIPT).not.toContain("m.weddingBuilder===true");
+  /**
+   * RUN the script, do not read it.
+   *
+   * This asserted `toContain("m.weddingBuilder!==false")` and
+   * `not.toContain("m.weddingBuilder===true")`, which is a check on the
+   * comparison operator and not on which branch stamps the attribute. Swapping
+   * the arms — `m.weddingBuilder!==false?set("data-wed"):off("data-wed")` —
+   * hides the wedding nav, footer link, FAQ entry and search result from every
+   * cold browser, which is the regression this describes, and BOTH assertions
+   * still passed. It could not fail for the bug it names.
+   *
+   * There is no other guard on this string in the suite, so it evaluates it in
+   * the DOM and asserts the attribute the CSS actually reads.
+   */
+  function seed(modules?: Record<string, unknown>) {
+    for (const attribute of document.documentElement.getAttributeNames()) {
+      document.documentElement.removeAttribute(attribute);
+    }
+    localStorage.clear();
+    // A REAL persisted blob. `parseSettings` drops one with no
+    // `general.siteName` and hands back the all-on defaults, so seeding bare
+    // modules would compare the script against a fallback, not against the twin.
+    if (modules) {
+      localStorage.setItem(
+        "bakery-cms-settings",
+        JSON.stringify({ ...defaultAppSettings, modules }),
+      );
+    }
+  }
+
+  function stamp(modules?: Record<string, unknown>) {
+    seed(modules);
+    new Function(BUSINESS_BLOCKING_SCRIPT)();
+    return document.documentElement;
+  }
+
+  it("shows wedding to a browser that has never been here", () => {
+    // `data-wed="0"` is what globals.css hides `[data-gate-wedding]` on. An
+    // empty localStorage is the ordinary case — first visit, private window,
+    // cleared site data — not the edge one.
+    expect(stamp().hasAttribute("data-wed")).toBe(false);
+  });
+
+  it("hides wedding only once the shop has actually switched it off", () => {
+    expect(stamp({ weddingBuilder: false }).getAttribute("data-wed")).toBe("0");
+    expect(stamp({ weddingBuilder: true }).hasAttribute("data-wed")).toBe(false);
+  });
+
+  it("agrees with the hydrated twin that owns the same attribute", () => {
+    // lib/business-blocking.ts says "keep the two in sync" and nothing checked
+    // that they were. The twin re-stamps every one of these after hydration, so
+    // a disagreement is a flash on every load of an affected shop.
+    for (const modules of [
+      undefined,
+      { weddingBuilder: false },
+      { weddingBuilder: true },
+      // Neither one. The two disagreed here: `0 !== false` shows, truthiness hides.
+      { weddingBuilder: 0 },
+    ]) {
+      const fromScript = stamp(modules).getAttribute("data-wed");
+      applyBusinessAttributes();
+      expect(document.documentElement.getAttribute("data-wed"), JSON.stringify(modules)).toBe(
+        fromScript,
+      );
+    }
   });
 
   it("still hides the five module pickers only when explicitly switched off", () => {
