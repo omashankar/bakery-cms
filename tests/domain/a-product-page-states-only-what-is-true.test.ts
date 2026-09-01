@@ -262,6 +262,54 @@ describe("the food tabs belong to food", () => {
   });
 });
 
+describe("the page does not call every product a cake", () => {
+  it("offers a neutral message box, not a cake message", () => {
+    const { html, unmount } = render({ ...CHARGER, allowsMessage: true });
+    try {
+      expect(html).not.toContain("Cake message");
+      expect(html).not.toContain("Happy Birthday Rahul");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("claims nothing about how the product was made", () => {
+    const { html, unmount } = render(CHARGER);
+    try {
+      // An unconditional bullet under every product in the shop.
+      expect(html).not.toContain("Freshly baked");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not promise a message card on a product that takes no message", () => {
+    const { openTab, unmount } = render({ ...CHARGER, allowsMessage: false });
+    try {
+      expect(openTab("Delivery")).not.toContain("message card");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("survives a product whose category could not be resolved", () => {
+    /**
+     * `mapAdminProductToStorefront` fell back to the literal "Cakes" for a
+     * product whose category id resolves to nothing, so an orphaned charger was
+     * badged "Cakes" to customers. Removing that fallback alone is not safe:
+     * this page reads `cake.category.toLowerCase()` twice, so an absent category
+     * is the same TypeError class that sat dead in `getProductVariantGroups`
+     * until a change made it live.
+     */
+    const { html, unmount } = render({ ...CHARGER, category: undefined });
+    try {
+      expect(html).not.toContain("Cakes");
+    } finally {
+      unmount();
+    }
+  });
+});
+
 describe("a cake still says everything it used to", () => {
   it("prints its own tier under the price, not a fallback", () => {
     const { html, unmount } = render(CAKE);

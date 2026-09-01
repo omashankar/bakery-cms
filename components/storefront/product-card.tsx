@@ -62,7 +62,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
     event.preventDefault();
     event.stopPropagation();
     if (outOfStock) {
-      toast.error("This cake is currently out of stock");
+      toast.error("This product is currently out of stock");
       return;
     }
     /**

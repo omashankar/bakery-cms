@@ -207,13 +207,25 @@ describe("mapAdminProductToStorefront", () => {
     expect(mapped.image).toBe("/a.jpg"); // first image only
   });
 
-  it("falls back to an empty image and the 'Cakes' category when unresolved", () => {
+  it("names no category rather than calling an unresolved product a cake", () => {
+    /**
+     * This asserted `"Cakes"`. A product whose category id resolves to neither
+     * the passed taxonomy nor the local store was badged that to CUSTOMERS, so
+     * an orphaned phone charger advertised itself as a cake — while the Catalog
+     * screen's own delete warning promised the opposite ("they will show them
+     * as uncategorised").
+     *
+     * Empty rather than undefined on purpose: `LandingProduct.category` is typed
+     * `string` and the product page calls `.toLowerCase()` on it twice, so
+     * making it optional would trade a wrong badge for a TypeError. The page
+     * renders no badge when the name is empty.
+     */
     const cake = createProduct(form({ slug: "no-image", images: [], categoryId: "missing" }));
 
     const mapped = mapAdminProductToStorefront(cake);
 
     expect(mapped.image).toBe("");
-    expect(mapped.category).toBe("Cakes");
+    expect(mapped.category).toBe("");
   });
 
   it("derives the badge with Featured winning over Bestseller and Trending", () => {

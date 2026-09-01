@@ -208,10 +208,10 @@ export function ProductDetailPage({
   const isEggless =
     selectedEggOption?.semantic === "eggless" ||
     cake.isEggless ||
-    cake.category.toLowerCase().includes("eggless");
+    (cake.category ?? "").toLowerCase().includes("eggless");
   const showPhotoUpload =
     (cake.allowsPhotoUpload === true ||
-      cake.category.toLowerCase().includes("photo") ||
+      (cake.category ?? "").toLowerCase().includes("photo") ||
       selectedPhotoOption?.semantic === "photo-print") &&
     modules.photoCake;
   const isOutOfStock = cake.inStock === false;
@@ -314,7 +314,7 @@ export function ProductDetailPage({
       toast.success("Photo attached");
     } catch {
       setPhotoUrl("");
-      toast.error("Could not reach the bakery", {
+      toast.error("Could not reach the shop", {
         description: "Please check your connection and try again.",
       });
     } finally {
@@ -324,7 +324,7 @@ export function ProductDetailPage({
 
   const handleAddToCart = (redirectToCart = false) => {
     if (isOutOfStock) {
-      toast.error("This cake is currently out of stock");
+      toast.error("This product is currently out of stock");
       return;
     }
 
@@ -414,7 +414,7 @@ export function ProductDetailPage({
             <div className="space-y-6">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="accent">{cake.category}</Badge>
+                  {cake.category ? <Badge variant="accent">{cake.category}</Badge> : null}
                   {modules.eggEggless && isEggless ? (
                     <span className="contents" data-gate-egg>
                       <Badge variant="outline" className="gap-1">
@@ -556,10 +556,10 @@ export function ProductDetailPage({
 
               {cake.allowsMessage !== false ? (
                 <div className="space-y-2">
-                  <Label htmlFor="cake-message">Cake message</Label>
+                  <Label htmlFor="product-message">Message on this order</Label>
                   <Textarea
-                    id="cake-message"
-                    placeholder='e.g. "Happy Birthday Rahul!"'
+                    id="product-message"
+                    placeholder='e.g. "Happy Birthday!"'
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     rows={3}
@@ -602,7 +602,7 @@ export function ProductDetailPage({
                   ) : photoUrl ? (
                     <p className="flex items-center gap-1.5 text-xs text-green-700">
                       <Check className="size-3.5" />
-                      Photo attached — it will reach the bakery with your order.
+                      Photo attached — it will reach the shop with your order.
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
@@ -682,10 +682,14 @@ export function ProductDetailPage({
               </div>
 
               <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                <li className="flex items-center gap-2">
-                  <Check className="size-4 text-bakery-700" />
-                  Freshly baked
-                </li>
+                {/*
+                  "Freshly baked" was here, unconditionally, under every product
+                  in the shop — a claim about how the thing was made, printed on
+                  chargers and gift hampers alike. There is no field behind it
+                  and no module gating it, so it was not a fact the shop had
+                  stated; it was one the template assumed. The delivery promise
+                  below IS derived from settings, which is the difference.
+                */}
                 <li className="flex items-center gap-2">
                   <Truck className="size-4 text-bakery-700" />
                   {deliveryPromise}
@@ -838,8 +842,15 @@ export function ProductDetailPage({
                 <TabsContent value="delivery" className="text-sm text-muted-foreground">
                   {deliveryPromise} on orders placed within city limits.
                   Scheduled delivery on {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
-                  {deliveryTime ? ` between ${deliveryTime}` : ""}. Custom message card included at
-                  no extra charge.
+                  {deliveryTime ? ` between ${deliveryTime}` : ""}.
+                  {/*
+                    Only promised where the product actually takes a message.
+                    This was unconditional, so a shop selling chargers offered
+                    every customer a free message card it had no way to send.
+                  */}
+                  {cake.allowsMessage !== false
+                    ? " Custom message card included at no extra charge."
+                    : ""}
                 </TabsContent>
               </Tabs>
             </div>

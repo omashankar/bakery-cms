@@ -26,8 +26,22 @@ export function mapAdminProductToStorefront(
   cake: Product,
   names?: TaxonomyNames
 ): LandingProduct {
+  /**
+   * The category's own name, or nothing — never the literal "Cakes".
+   *
+   * A product whose category id resolves to neither list was badged "Cakes" to
+   * customers, so an orphaned phone charger advertised itself as a cake. The
+   * Catalog screen's own delete warning promised this ("they will show them as
+   * uncategorised"), and the code did the opposite.
+   *
+   * Empty rather than undefined, deliberately: `LandingProduct.category` is
+   * typed `string` and the product page reads `.toLowerCase()` on it twice.
+   * Making it optional would trade a wrong badge for the same TypeError class
+   * `getProductVariantGroups` carried — so those two reads are guarded in the
+   * same commit, and the badge simply does not render when there is no name.
+   */
   const category =
-    names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "Cakes";
+    names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "";
 
   // The occasions this cake is actually tagged with. The storefront filter used
   // to search the name, category and description for the word "Wedding" instead,
