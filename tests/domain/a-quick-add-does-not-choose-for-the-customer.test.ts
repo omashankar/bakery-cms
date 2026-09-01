@@ -146,6 +146,7 @@ function renderCard(cake: LandingProduct): { button: HTMLButtonElement; unmount:
   };
 }
 
+/** A configurable product, with the shop's own resolution of its defaults. */
 const CHARGER: LandingProduct = {
   id: "p-charger",
   name: "65W Charger",
@@ -155,7 +156,11 @@ const CHARGER: LandingProduct = {
   image: "/charger.jpg",
   category: "Chargers",
   inStock: true,
-  hasOptions: true,
+  quickAdd: {
+    weight: "1 kg",
+    variantSelections: { "g-storage": "o-128" },
+    variantSummary: ["Storage: 128 GB"],
+  },
 };
 
 const BUN: LandingProduct = {
@@ -167,46 +172,79 @@ const BUN: LandingProduct = {
   image: "/bun.jpg",
   category: "Bakes",
   inStock: true,
-  hasOptions: false,
+  quickAdd: {},
 };
 
-describe("a card add never records a choice the customer was not shown", () => {
-  it("sends a product with options to its page instead of adding it", () => {
+describe("a card add says which answer it gave", () => {
+  it("writes the shop's resolved choices onto the line", () => {
     const { button, unmount } = renderCard(CHARGER);
     try {
-      expect(button.textContent).toContain("Choose options");
-
-      act(() => {
-        button.click();
-      });
-
-      // The card cannot present a picker, and the server falls back to each
-      // group's default — so a silent add is priced AND recorded as a choice.
-      expect(getCartItems()).toHaveLength(0);
-      expect(state.pushed).toEqual([routes.store.cake("type-c-charger")]);
-    } finally {
-      unmount();
-    }
-  });
-
-  it("keeps the one-tap add for a product with nothing to choose", () => {
-    const { button, unmount } = renderCard(BUN);
-    try {
+      // One tap is kept. What changed is that the line now states what the
+      // server was always going to charge for.
       expect(button.textContent).toContain("Add to Cart");
 
       act(() => {
         button.click();
       });
 
+      const [line] = getCartItems();
+      expect(line).toBeDefined();
+      expect(line.variantSelections).toEqual({ "g-storage": "o-128" });
+      expect(line.variantSummary).toEqual(["Storage: 128 GB"]);
+      expect(line.weight).toBe("1 kg");
       expect(state.pushed).toEqual([]);
-      expect(getCartItems()).toHaveLength(1);
-      expect(getCartItems()[0].productSlug).toBe("plain-bun");
     } finally {
       unmount();
     }
   });
 
-  it("still refuses an out-of-stock product before either path", () => {
+  it("lands on the same cart line a product-page add with the same choices would", () => {
+    /**
+     * The identity matters: if the grid wrote a different line from the product
+     * page for the same choices, a customer adding one from each would get two
+     * rows of the same thing. `cartLineId` folds the selections in, so passing
+     * them is what makes the two agree.
+     */
+    const { button, unmount } = renderCard(CHARGER);
+    try {
+      act(() => {
+        button.click();
+      });
+      addToCart({
+        productSlug: "type-c-charger",
+        name: "65W Charger",
+        image: "/charger.jpg",
+        price: 1499,
+        quantity: 1,
+        weight: "1 kg",
+        variantSelections: { "g-storage": "o-128" },
+        variantSummary: ["Storage: 128 GB"],
+      });
+
+      expect(getCartItems()).toHaveLength(1);
+      expect(getCartItems()[0].quantity).toBe(2);
+    } finally {
+      unmount();
+    }
+  });
+
+  it("states nothing about a product that asks nothing", () => {
+    const { button, unmount } = renderCard(BUN);
+    try {
+      act(() => {
+        button.click();
+      });
+
+      const [line] = getCartItems();
+      expect(line.productSlug).toBe("plain-bun");
+      expect(line.variantSummary).toBeUndefined();
+      expect(line.weight).toBeUndefined();
+    } finally {
+      unmount();
+    }
+  });
+
+  it("still refuses an out-of-stock product", () => {
     const { button, unmount } = renderCard({ ...CHARGER, inStock: false });
     try {
       expect(button.disabled).toBe(true);
@@ -217,7 +255,6 @@ describe("a card add never records a choice the customer was not shown", () => {
       });
 
       expect(getCartItems()).toHaveLength(0);
-      expect(state.pushed).toEqual([]);
     } finally {
       unmount();
     }

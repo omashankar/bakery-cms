@@ -12,9 +12,12 @@ import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import {
   defaultProductUnitPrice,
-  productHasOptions,
+  formatVariantSummary,
 } from "@/features/products/lib/product-pricing";
-import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
+import {
+  getDefaultVariantSelections,
+  variantGroupsEnabledBy,
+} from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { ModuleSettings } from "@/types/settings";
@@ -111,6 +114,33 @@ export async function getStorefrontProducts(): Promise<LandingProduct[]> {
  * their labels, since the filter compares labels and the card shows no prices
  * per tier.
  */
+/**
+ * The choices a grid add would commit to, resolved exactly as the server prices
+ * them.
+ *
+ * Deliberately built from the SAME two helpers the pricing path uses —
+ * `variantGroupsEnabledBy` then `getDefaultVariantSelections` — so the line a
+ * card writes cannot describe one thing while `priceLine` bills another. The
+ * weight is tier 0 for the same reason: that is the tier `priceLine` charges
+ * when the line carries no label.
+ */
+function buildQuickAdd(
+  product: LandingProduct,
+  modules: ModuleSettings,
+): LandingProduct["quickAdd"] {
+  const groups = variantGroupsEnabledBy(product.variantGroups ?? [], modules);
+  const variantSelections = getDefaultVariantSelections(groups);
+
+  return {
+    // Gated like the picker on the product page: a shop with Weight switched off
+    // must not stamp a size on a line no customer was shown one for.
+    weight: (modules.weight && product.weights?.[0]?.label) || undefined,
+    variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+    variantSummary:
+      groups.length > 0 ? formatVariantSummary(groups, variantSelections) : undefined,
+  };
+}
+
 function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduct {
   return {
     id: product.id,
@@ -147,18 +177,22 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     inStock: product.inStock,
     description: "", // required by the type; never rendered on a card
     /**
-     * The QUESTION, not the data.
+     * THE ANSWER, not the groups it came from.
      *
-     * `variantGroups` is dropped below and should stay dropped — one boolean is
-     * smaller than the groups it was computed from, and the card only needs to
-     * know whether to send the customer to the product page instead of adding
-     * blind. Computed from the module-filtered groups, so a group the shop has
-     * switched off does not make a card refuse a one-tap add for a choice that
-     * is neither shown nor charged.
+     * A one-tap add from a grid is not a choiceless purchase — the server
+     * resolves each group to its default option and the weight to tier 0, and
+     * charges for both. What was missing was the cart ever SAYING so, which is
+     * how a customer met "Egg preference: Regular" for the first time on the
+     * invoice. So the shop resolves the same defaults here and hands them to
+     * the card, which passes them straight into the line.
+     *
+     * `variantGroups` stays dropped — this is an id map and a few short strings,
+     * not the groups behind them, and `toCard`'s payload is budgeted for 5,000
+     * products. Module-gated, so a group the shop neither shows nor charges for
+     * is not recorded either. `weights` here is already the product's own tiers,
+     * so tier 0 is exactly what `priceLine` will bill.
      */
-    hasOptions: productHasOptions({
-      variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
-    }),
+    quickAdd: buildQuickAdd(product, modules),
     // Filter inputs.
     occasions: product.occasions,
     isEggless: product.isEggless,

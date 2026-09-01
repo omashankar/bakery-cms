@@ -2,7 +2,6 @@
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +22,6 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ cake, variant = "default", className }: ProductCardProps) {
-  const router = useRouter();
   const [wishlisted, setWishlisted] = useState(false);
   /**
    * The price the SHOP will charge, not the base price on the record.
@@ -68,30 +66,34 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
       return;
     }
     /**
-     * A card cannot ask a question, so it must not answer one.
+     * A card cannot ask a question — so it says which answer it gave.
      *
-     * This added straight to the cart with no `variantSelections`, and
-     * `calculateVariantAdjustment` falls back to each group's DEFAULT option
-     * whenever a selection is absent — so the shop priced and RECORDED choices
-     * the customer was never shown. The cart line displayed no options while
-     * the stored order read "Storage: 128 GB", and a phone offered in two sizes
-     * could be bought from a grid without ever picking one.
+     * This added with no `variantSelections` and no size, and the server does
+     * not read that as "no choice": `calculateVariantAdjustment` falls back to
+     * each group's default option and `priceLine` to weight tier 0, and charges
+     * for both. So a grid add was always priced AS a set of choices; the cart
+     * line simply never said which, and the customer met "Egg preference:
+     * Regular" for the first time on their invoice.
      *
-     * Products with nothing to choose keep their one-tap add.
+     * `quickAdd` is the shop's own resolution of those same defaults, built in
+     * `toCard` from the same helpers the pricing path uses. Passing it keeps the
+     * one-tap add and makes the line honest: the cart, the order, the invoice
+     * and the baker's email all now state what was committed to, and the
+     * customer can open the product page to change it.
      */
-    if (cake.hasOptions) {
-      router.push(routes.store.cake(cake.slug));
-      return;
-    }
-
     addToCart({
       productSlug: cake.slug,
       name: cake.name,
       image: cake.image,
       price,
       quantity: 1,
+      ...cake.quickAdd,
     });
-    toast.success("Added to cart", { description: cake.name });
+    toast.success("Added to cart", {
+      description: cake.quickAdd?.variantSummary?.length
+        ? `${cake.name} — ${cake.quickAdd.variantSummary.join(" · ")}`
+        : cake.name,
+    });
   };
 
   return (
@@ -166,11 +168,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
             onClick={handleAddToCart}
           >
             <ShoppingBag className="size-4" />
-            {outOfStock
-              ? "Out of stock"
-              : cake.hasOptions
-                ? "Choose options"
-                : "Add to Cart"}
+            {outOfStock ? "Out of stock" : "Add to Cart"}
           </Button>
         </div>
       </div>

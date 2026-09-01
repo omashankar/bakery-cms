@@ -295,23 +295,26 @@ describe("storefront projections", () => {
     expect(card?.weights?.every((tier) => tier.price === 0)).toBe(true);
   });
 
-  it("tells the grid whether the product asks the customer anything", async () => {
+  it("tells the grid what a one-tap add would commit to", async () => {
     /**
-     * `hasOptions` is what stops a card adding blind: the grid cannot present a
-     * picker, and the server falls back to each group's default option when no
-     * selection arrives, so a one-tap add was priced AND recorded as a choice
-     * nobody was shown.
+     * A card cannot present a picker, but the server does not read that as "no
+     * choice" — it resolves each group to its default option and the weight to
+     * tier 0, and charges for both. So the grid's add was always a set of
+     * choices; the line just never said which, and the customer met
+     * "Storage: 128 GB" for the first time on their invoice.
      *
-     * The flag travels rather than the groups — `variantGroups` is dropped just
-     * above, and `toCard`'s own header budgets that payload for 5,000 products.
-     * Asserted here because this is the only test that builds a real card:
-     * without it the field could be deleted from the projection and every card
-     * in the shop would silently go back to adding blind.
+     * `quickAdd` is the shop's own resolution of those defaults. Asserted here
+     * because this is the only test that builds a real card: delete the field
+     * from the projection and every grid in the shop goes back to adding blind.
+     * The groups themselves stay dropped — this is an id map and two short
+     * strings, and the payload is budgeted for 5,000 products.
      */
     await createProduct(
       form({
         slug: "with-options",
         status: "published",
+        price: 1499,
+        weights: [{ label: "1 kg", price: 1499 }],
         variantGroups: [
           {
             id: "g-storage",
@@ -325,11 +328,24 @@ describe("storefront projections", () => {
         ],
       })
     );
-    await createProduct(form({ slug: "no-options", status: "published", variantGroups: [] }));
+    await createProduct(
+      form({ slug: "no-options", status: "published", variantGroups: [], weights: [] })
+    );
 
     const cards = await getStorefrontProductCards();
+    const withOptions = cards.find((p) => p.slug === "with-options");
+    const plain = cards.find((p) => p.slug === "no-options");
 
-    expect(cards.find((p) => p.slug === "with-options")?.hasOptions).toBe(true);
-    expect(cards.find((p) => p.slug === "no-options")?.hasOptions).toBe(false);
+    // The default the server would charge for, named.
+    expect(withOptions?.quickAdd?.variantSelections).toEqual({ "g-storage": "o-128" });
+    expect(withOptions?.quickAdd?.variantSummary).toEqual(["Storage: 128 GB"]);
+    expect(withOptions?.quickAdd?.weight).toBe("1 kg");
+    // And the groups it was derived from do NOT travel.
+    expect(withOptions?.variantGroups).toBeUndefined();
+
+    // A product that asks nothing states nothing.
+    expect(plain?.quickAdd?.variantSelections).toBeUndefined();
+    expect(plain?.quickAdd?.variantSummary).toBeUndefined();
+    expect(plain?.quickAdd?.weight).toBeUndefined();
   });
 });

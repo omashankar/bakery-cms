@@ -35,14 +35,26 @@ export interface LandingProduct {
   careInstructions?: string;
   variantGroups?: ProductVariantGroup[];
   /**
-   * Whether this product asks the customer anything before it can be bought.
+   * What a one-tap add from a grid commits to, resolved by the SHOP.
    *
-   * Carried on the CARD projection, which deliberately drops `variantGroups` to
-   * keep the RSC payload small. A grid cannot show a picker, and the server
-   * falls back to each group's default option when no selection arrives, so
-   * without this a one-tap add priced and recorded choices nobody was shown.
+   * A card cannot present a picker, but the server does not treat that as "no
+   * choice": `calculateVariantAdjustment` falls back to each group's default
+   * option, and `priceLine` to weight tier 0. So a grid add was always priced
+   * and recorded as a set of choices — the cart line simply did not say which,
+   * and the customer met "Storage: 128 GB" for the first time on their invoice.
+   *
+   * Resolved here rather than on the client because the card projection
+   * deliberately drops `variantGroups` to keep the RSC payload small; this is a
+   * short id map and a few short strings, not the groups they came from. Gated
+   * by the shop's modules, so a group that is neither shown nor charged is not
+   * recorded either.
    */
-  hasOptions?: boolean;
+  quickAdd?: {
+    /** The tier the shop will charge for when no size is chosen. */
+    weight?: string;
+    variantSelections?: Record<string, string>;
+    variantSummary?: string[];
+  };
 }
 
 export interface LandingCategory {
