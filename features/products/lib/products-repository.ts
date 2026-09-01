@@ -184,8 +184,22 @@ export function normalizeCommerceFields(cake: Product): Product {
     allergens: cake.allergens,
     careInstructions: cake.careInstructions,
     variantGroups,
-    rating: cake.rating ?? 4.5,
-    reviewCount: cake.reviewCount ?? 12,
+    /**
+     * A product nobody has reviewed has no stars.
+     *
+     * `createEmptyProductForm` was fixed to write 0 — "a cake with no reviews
+     * has no rating. This started at 4.5" — and this, three lines below the
+     * shape injection removed in the same pass, kept inventing 4.5 stars from
+     * 12 reviews for any document that simply omits the fields. It runs on
+     * EVERY repository read, so an imported product, a legacy row or a restored
+     * backup came back advertising social proof that no review anywhere
+     * supports, rendered as stars on every grid card and at the top of the
+     * product page. `rating` and `reviewCount` are owned by the reviews
+     * aggregate, which writes them directly; absent means nobody has said
+     * anything yet, and that is what it should read as.
+     */
+    rating: cake.rating ?? 0,
+    reviewCount: cake.reviewCount ?? 0,
   };
 }
 
@@ -361,10 +375,13 @@ export function createEmptyProductForm(): ProductFormData {
      * phone charger had to find and delete every one of them, on every product,
      * and the CMS read as though it were telling them what kind of shop to run.
      *
-     * Nothing is lost for the bakery: the Pricing tab offers the Catalog weight
-     * presets on a button, and the Variants tab has always had "Reset to
-     * defaults" and "Add option group". A merchant asking for cake options gets
-     * them; a merchant who never asked no longer has to undo them.
+     * Nothing is lost for the bakery, but say where it actually is: the Pricing
+     * tab has "Sell this by size", which fills the Catalog weight presets, and
+     * the Options tab has "Add egg / eggless" and "Add option". An earlier
+     * version of this note named "Reset to defaults", which has since been
+     * deleted — it replaced the whole array rather than adding to it, so one
+     * click on a charger wiped Storage and Colour. A merchant asking for cake
+     * options gets them; a merchant who never asked no longer has to undo them.
      */
     weights: [],
     status: "draft",

@@ -14,7 +14,11 @@ import type { PlacedOrder } from "@/features/orders/lib/orders";
  * `priceLine` charges every enabled variant group and now stamps
  * `variantSummary` on the line from the same list it priced from — so an order
  * for a 256 GB charger genuinely costs ₹5,000 more and genuinely records
- * "Storage: 256 GB". But not one customer-facing surface rendered that field.
+ * "Storage: 256 GB". The cart line and the product page rendered it; every
+ * surface AFTER checkout did not. (An earlier version of this note said no
+ * surface did, which was wrong — the narrower truth is the worse one: the
+ * customer saw it while choosing and then never again.)
+ *
  * Six screens each built their own "what was chosen" string and each picked a
  * different subset of weight / shape / flavour; the account order list printed
  * nothing but "2 × name". The invoice — the only paper the shop prints, and the

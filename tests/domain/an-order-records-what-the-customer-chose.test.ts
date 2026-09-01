@@ -27,11 +27,13 @@ import { describe, expect, it, vi } from "vitest";
 /**
  * Shaped like a real catalogue document.
  *
- * `category` is set by hand on every fixture deliberately. `getProductVariantGroups`
- * reads `cake.category.toLowerCase()` on its fallback branch, but the repository
- * returns a `Product`, which has `categoryId` and no `category` at all. The
- * fallback is unreachable while these fixtures carry stored `variantGroups` —
- * remove them and this file would report a TypeError rather than a price.
+ * `category` is set by hand on every fixture, which is now HISTORY rather than a
+ * requirement. `getProductVariantGroups` used to read `cake.category.toLowerCase()`
+ * on a fallback branch while the repository returns a `Product`, which has
+ * `categoryId` and no `category` at all — so removing the stored `variantGroups`
+ * from a fixture made this file report a TypeError rather than a price. That
+ * fallback is deleted (see `a-product-that-is-not-a-cake.test.ts`, which pins
+ * the empty case directly), so a new fixture here does not need the field.
  */
 const CATALOGUE: Record<string, Record<string, unknown>> = {
   // A product with nothing bakery about it: no flavour, no weights, no egg.

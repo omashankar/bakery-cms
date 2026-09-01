@@ -19,10 +19,7 @@ import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { addToCart } from "@/features/cart/lib/cart";
-import {
-  getProductWeightOptions,
-  getAllProducts,
-} from "@/features/products/lib/product-catalog";
+import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
 import {
@@ -77,9 +74,18 @@ interface ProductDetailPageProps {
    * product rails identical between the server pass and the client, which the
    * old localStorage reads could not do — the server had no localStorage, so it
    * always rendered seed data and then swapped on hydration.
+   *
+   * REQUIRED, and the client fallbacks that stood behind them are deleted.
+   * Both fell through to `getAllProducts()`, which does not go through
+   * `toCard` — so a rail built from it carries no `quickAdd`, and every card in
+   * it goes back to adding to the cart without recording the size or the
+   * options the shop then charges for. The single render site has always passed
+   * both, which made the fallbacks unreachable and therefore untested; the same
+   * shape as the `cake.category` read that sat dead in `getProductVariantGroups`
+   * until a change made it live. A required prop cannot rot that way.
    */
-  related?: LandingProduct[];
-  catalog?: LandingProduct[];
+  related: LandingProduct[];
+  catalog: LandingProduct[];
 }
 
 export function ProductDetailPage({
@@ -225,14 +231,7 @@ export function ProductDetailPage({
 
   // Same-category first, then top up from the wider catalogue so this row always
   // shows a full set of 4 — never a lone card floating in an empty grid.
-  const related = useMemo(() => {
-    if (relatedFromServer) return relatedFromServer;
-    const all = getAllProducts().filter((item) => item.slug !== cake.slug);
-    const sameCategory = all.filter((item) => item.category === cake.category);
-    const seen = new Set(sameCategory.map((item) => item.slug));
-    const others = all.filter((item) => !seen.has(item.slug));
-    return [...sameCategory, ...others].slice(0, 4);
-  }, [relatedFromServer, cake.slug, cake.category]);
+  const related = relatedFromServer;
   // Recommendations rank by recently-viewed and past orders, which live in this
   // browser — so this stays client-side even though the catalogue comes from
   // the server.

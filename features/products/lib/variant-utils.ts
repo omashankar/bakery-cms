@@ -106,7 +106,9 @@ export function createDefaultVariantGroups(input?: {
 
 /**
  * The variant groups a storefront product is actually sold in: the ones the
- * merchant configured, or the shipped defaults.
+ * merchant configured, and only those. It no longer falls back to shipped
+ * defaults — see the note below on why that fallback was both wrong and a
+ * TypeError waiting to happen.
  *
  * This used to live at apps/website/lib/product-details.ts, next to the gallery
  * and badge formatters, because the product page was the first thing that had
@@ -149,8 +151,10 @@ export function getProductVariantGroups(cake: LandingProduct): ProductVariantGro
  * fallback is what put an "Egg preference" group on every product in the shop
  * that had not configured its own, whatever that product was. The merchant
  * declares a product's options; no options is a valid answer, and
- * `createDefaultVariantGroups` is still exported for the admin's own
- * "reset to defaults" button, where a human is asking for it.
+ * `createDefaultVariantGroups` is still exported for the Options tab's
+ * "Add egg / eggless" button, where a human is asking for it. (That button
+ * used to be "Reset to defaults" and REPLACED the array, which is why it is
+ * now additive and gated on the module.)
  */
 export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isEggless" | "isPhotoCake">): ProductVariantGroup[] {
   if (!cake.variantGroups?.length) return [];
