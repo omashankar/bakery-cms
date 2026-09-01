@@ -2,8 +2,10 @@ import { connectDB } from "@/lib/server/db/mongoose";
 import { SettingsModel } from "@/lib/server/db/models/settings.model";
 import {
   defaultAppSettings,
+  newShopModuleSettings,
   planSettingsRepairs,
 } from "@/features/settings/lib/settings-utils";
+import type { LabelOverrides } from "@/types/settings";
 
 /**
  * Settings repository — data access for the singleton settings document.
@@ -35,6 +37,11 @@ async function migrate(doc: SettingsDoc): Promise<SettingsDoc> {
   const repairs = planSettingsRepairs({
     contact: { mapEmbedUrl: doc.get("contact.mapEmbedUrl") as string | undefined },
     social: doc.get("social") as { href?: string; isActive?: boolean }[] | undefined,
+    // Legacy, and read straight off the document rather than through the type:
+    // `businessType` is gone from `GeneralSettings`, but a shop written before
+    // it was deleted still stores one, and its wording is what this preserves.
+    general: { businessType: doc.get("general.businessType") as string | undefined },
+    labelOverrides: doc.get("labelOverrides") as LabelOverrides | undefined,
   });
 
   if (repairs.length === 0) return doc;
@@ -72,7 +79,11 @@ export async function getOrCreateSettings() {
     analytics: defaultAppSettings.analytics,
     maintenance: defaultAppSettings.maintenance,
     commerce: defaultAppSettings.commerce,
-    modules: defaultAppSettings.modules,
+    // The one path that is a decision rather than a guess: a shop that has
+    // never existed has not asked for a Wedding Builder. Every OTHER reader of
+    // module defaults — the reset payload, the cold browser, the DB-failure
+    // catch — takes `defaultModuleSettings`, which fails open.
+    modules: newShopModuleSettings,
     labelOverrides: {},
   });
 }

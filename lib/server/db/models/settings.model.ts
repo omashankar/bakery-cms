@@ -131,6 +131,10 @@ const commerceSchema = new mongoose.Schema(
 
 const modulesSchema = new mongoose.Schema(
   {
+    // Fails open, in step with `defaultModuleSettings`. A shop that has never
+    // existed starts wedding OFF, but that is decided once by
+    // `getOrCreateSettings` with `newShopModuleSettings` — not by this schema
+    // default, which fills in for a document that simply does not say.
     weddingBuilder: { type: Boolean, default: true },
     flavour: { type: Boolean, default: true },
     eggEggless: { type: Boolean, default: true },

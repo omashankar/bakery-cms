@@ -40,27 +40,50 @@ export const defaultGeneralSettings: GeneralSettings = {
 };
 
 /**
- * Optional product modules, all ON except the Wedding Builder.
+ * What to ASSUME when the stored module state is unknown. Every field ON.
  *
- * Wedding used to be gated on `businessType === "bakery"` AND this switch. With
- * the business type gone the switch is the whole gate, so the DEFAULT has to
- * carry what the enum used to: a brand-new install would otherwise ship a live
- * Wedding Builder and a public /store/wedding-cakes page whatever the shop
- * sells. A bakery turns it on; nobody else has to turn it off.
+ * This is a fallback, not a policy, and it is read on four paths that are all
+ * some form of "we do not know yet": the client's default on a cold browser,
+ * `mergeAppSettings`, the reset-to-defaults payload, and `getServerModules`'
+ * catch when the database cannot be reached.
  *
- * A shop with a stored value — this one has `weddingBuilder: true` — is
- * unaffected; defaults only fill what a settings document does not say.
+ * IT FAILS OPEN, DELIBERATELY. It was briefly flipped so `weddingBuilder` was
+ * false — correct for a brand-new shop, and wrong for all four of these. One
+ * click of "Reset defaults" took a live bakery's /store/wedding-cakes offline
+ * for everyone and persisted it; a first-time visitor had the wedding nav,
+ * footer link and homepage section hidden before paint; and a Mongo outage
+ * 404'd a revenue page that had served through the same outage the day before.
  *
- * The five below stay ON so an existing bakery is unchanged. They hide UI only:
- * data and routes are never deleted.
+ * A guess may not switch off something a running shop already has. The one path
+ * that is NOT a guess — creating a shop that has never existed — uses
+ * `newShopModuleSettings` below.
+ *
+ * These hide UI only: data and routes are never deleted.
  */
 export const defaultModuleSettings: ModuleSettings = {
-  weddingBuilder: false,
+  weddingBuilder: true,
   flavour: true,
   eggEggless: true,
   weight: true,
   shape: true,
   photoCake: true,
+};
+
+/**
+ * What a shop that has NEVER EXISTED is created with.
+ *
+ * The only module path that is a decision rather than a guess, and the only one
+ * that may start something off. Wedding is off here because the business type
+ * that used to gate it is gone: without this, a fresh install of any trade would
+ * ship a live Wedding Builder and a public /store/wedding-cakes page. A bakery
+ * turns it on once; nobody else has to notice it.
+ *
+ * Read by `getOrCreateSettings` and nowhere else — see `defaultModuleSettings`
+ * for why every other path fails open instead.
+ */
+export const newShopModuleSettings: ModuleSettings = {
+  ...defaultModuleSettings,
+  weddingBuilder: false,
 };
 
 export const defaultContactSettings: ContactSettings = {
@@ -415,11 +438,113 @@ export interface SettingsRepair {
  *   than delete or blank: the row keeps its label and platform, so the admin can
  *   see what needs a real URL instead of finding a link silently gone.
  */
+/**
+ * The wording each business type used to produce, kept ONLY to preserve it.
+ *
+ * `BUSINESS_LABELS` held these as live presets keyed off a closed enum in
+ * Settings. Deleting the enum without writing its answer down would have changed
+ * what a running shop calls its own products on the day the change deployed —
+ * "Cakes" to "Products" in the admin, and "Browse premium cakes by category,
+ * flavour, and occasion." to a generic line on the storefront — with no
+ * announcement and, for two of the four fields, no admin input to type it back.
+ *
+ * A one-way migration, not a feature: it fires once per shop, only where the
+ * document still carries the legacy `general.businessType`, and only when the
+ * shop has stated no wording of its own. Delete this table once no stored
+ * document carries a business type.
+ */
+const LEGACY_BUSINESS_TYPE_LABELS: Record<string, LabelOverrides> = {
+  bakery: {
+    collectionsTitle: "Our Collections",
+    collectionsSubtitle: "Browse premium cakes by category, flavour, and occasion.",
+    productWord: "Cake",
+    productWordPlural: "Cakes",
+  },
+  "sweet-shop": {
+    collectionsTitle: "Our Sweets",
+    collectionsSubtitle: "Browse our sweets and confections by category and occasion.",
+    productWord: "Sweet",
+    productWordPlural: "Sweets",
+  },
+  "flower-shop": {
+    collectionsTitle: "Our Flowers",
+    collectionsSubtitle: "Browse fresh flowers and arrangements by category and occasion.",
+    productWord: "Bouquet",
+    productWordPlural: "Flowers",
+  },
+  restaurant: {
+    collectionsTitle: "Our Menu",
+    collectionsSubtitle: "Browse our menu by category.",
+    productWord: "Dish",
+    productWordPlural: "Dishes",
+  },
+  "gift-shop": {
+    collectionsTitle: "Our Gifts",
+    collectionsSubtitle: "Browse gifts by category and occasion.",
+    productWord: "Gift",
+    productWordPlural: "Gifts",
+  },
+  grocery: {
+    collectionsTitle: "Our Products",
+    collectionsSubtitle: "Browse groceries and essentials by category.",
+    productWord: "Product",
+    productWordPlural: "Products",
+  },
+  fashion: {
+    collectionsTitle: "Our Collection",
+    collectionsSubtitle: "Browse the latest styles by category.",
+    productWord: "Product",
+    productWordPlural: "Products",
+  },
+  electronics: {
+    collectionsTitle: "Our Products",
+    collectionsSubtitle: "Browse electronics and gadgets by category.",
+    productWord: "Product",
+    productWordPlural: "Products",
+  },
+  pharmacy: {
+    collectionsTitle: "Our Products",
+    collectionsSubtitle: "Browse health and wellness products by category.",
+    productWord: "Product",
+    productWordPlural: "Products",
+  },
+  other: {
+    collectionsTitle: "Our Products",
+    collectionsSubtitle: "Browse our products by category.",
+    productWord: "Product",
+    productWordPlural: "Products",
+  },
+};
+
 export function planSettingsRepairs(settings: {
   contact?: { mapEmbedUrl?: string };
   social?: { href?: string; isActive?: boolean }[];
+  /** Legacy. Present only on documents written before the enum was deleted. */
+  general?: { businessType?: string };
+  labelOverrides?: LabelOverrides;
 }): SettingsRepair[] {
   const repairs: SettingsRepair[] = [];
+
+  /**
+   * Keep the wording a shop was already showing.
+   *
+   * Only where the document still names a business type AND the shop has said
+   * nothing of its own — so it fires once, never overwrites a merchant's choice,
+   * and does nothing at all for a shop created after the enum was removed. A
+   * repair that could fire twice would churn the document on every read.
+   */
+  const legacyType = settings.general?.businessType;
+  const stated = Object.values(settings.labelOverrides ?? {}).some((value) => value?.trim());
+  if (legacyType && !stated) {
+    const preserved = LEGACY_BUSINESS_TYPE_LABELS[legacyType];
+    if (preserved) {
+      repairs.push({
+        path: "labelOverrides",
+        value: preserved,
+        reason: `kept the ${legacyType} wording`,
+      });
+    }
+  }
 
   const storedMap = settings.contact?.mapEmbedUrl ?? "";
   if (storedMap) {

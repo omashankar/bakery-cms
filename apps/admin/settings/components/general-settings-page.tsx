@@ -240,6 +240,33 @@ export function GeneralSettingsPage() {
                 &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;. Leave
                 blank to use the default wording.
               </p>
+
+              {/*
+                These two were the half that had no input.
+                `labelOverrides` has always carried four fields — the type, the
+                Zod schema, the merge and the hydrate all handle them — and only
+                the product nouns were editable. So the shop-all page's heading
+                and subtitle could be CHANGED by removing the business-type
+                presets and not changed back from anywhere in the product.
+              */}
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="collectionsTitle">Heading on your shop-all page</Label>
+                <Input
+                  id="collectionsTitle"
+                  value={wording.collectionsTitle ?? ""}
+                  onChange={(e) => editWording({ collectionsTitle: e.target.value })}
+                  placeholder={labels.collectionsTitle}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="collectionsSubtitle">The line under it</Label>
+                <Input
+                  id="collectionsSubtitle"
+                  value={wording.collectionsSubtitle ?? ""}
+                  onChange={(e) => editWording({ collectionsSubtitle: e.target.value })}
+                  placeholder={labels.collectionsSubtitle}
+                />
+              </div>
             </div>
             {/*
               * These two were bare URL boxes with no picker of any kind, which

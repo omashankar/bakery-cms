@@ -50,8 +50,17 @@ export const getServerModules = cache(async (): Promise<ServerModules> => {
 
     return resolve({ ...defaultModuleSettings, ...(settings.modules ?? {}) });
   } catch {
-    // A database that cannot be reached must not take a page down. The
-    // defaults hide nothing that was not already hidden.
+    /**
+     * A database that cannot be reached must not take a page down.
+     *
+     * `defaultModuleSettings` fails open for exactly this reason. It was briefly
+     * flipped so wedding defaulted false, which made an outage 404
+     * /store/wedding-cakes, redirect the owner out of their own builder and drop
+     * the URL from a sitemap that still resolved — harm outlasting the outage
+     * that caused it. The comment on this line was edited in the same commit to
+     * claim the defaults hid nothing new, which was not true; it says what the
+     * code does now.
+     */
     return resolve(defaultModuleSettings);
   }
 });

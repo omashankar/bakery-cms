@@ -46,12 +46,17 @@ const SERVER = {
   analytics: { ...defaultAppSettings.analytics, googleAnalyticsId: "G-REAL" },
   maintenance: { ...defaultAppSettings.maintenance, message: "Back at nine" },
   commerce: { ...defaultAppSettings.commerce, deliveryFee: 199, taxRate: 0.05, minOrderValue: 750 },
-  // `true`, because the DEFAULT is now false: wedding used to be gated on
-  // `businessType === "bakery"` as well as this switch, and with the business
-  // type gone the default carries what the enum used to. The case below asserts
-  // the shop's stored value survives a refused reset, so it has to differ from
-  // the default — the test guards that itself, and it caught this.
-  modules: { ...defaultAppSettings.modules, weddingBuilder: true },
+  /**
+   * `flavour`, not `weddingBuilder`.
+   *
+   * The case below asserts a stored value survives a refused reset, so it has to
+   * DIFFER from the default — and the test guards that itself, which is how it
+   * caught two changes to the wedding default in a row. Wedding is the one
+   * module whose default has moved, so pinning this case to it made an unrelated
+   * policy decision able to break a test about reset refusal. `flavour` has
+   * defaulted true throughout and has no reason to move.
+   */
+  modules: { ...defaultAppSettings.modules, flavour: false },
 };
 
 /** Hydration always succeeds; every section PUT is refused. */
@@ -144,9 +149,9 @@ describe("a reset the server refused", () => {
     {
       name: "Modules",
       reset: (r) => r.resetModuleSettings(),
-      kept: (v) => (v as ModuleSettings).weddingBuilder,
-      serverValue: SERVER.modules.weddingBuilder,
-      defaultValue: defaultAppSettings.modules.weddingBuilder,
+      kept: (v) => (v as ModuleSettings).flavour,
+      serverValue: SERVER.modules.flavour,
+      defaultValue: defaultAppSettings.modules.flavour,
     },
   ];
 
