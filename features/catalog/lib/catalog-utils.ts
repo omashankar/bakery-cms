@@ -72,13 +72,17 @@ export const defaultCategories: ProductCategory[] = [
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   },
-  {
-    id: "cat-seasonal",
-    name: "Seasonal",
-    slug: "seasonal",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-  },
+  /*
+    "cat-seasonal" was here, with slug "seasonal" — the SAME slug as the
+    Seasonal row spread in from landing-data above it. `getStorefrontCategories`
+    de-dupes by slug and keeps the FIRST, so this one was unreachable: its
+    products could not be browsed to, with no 404 and no error anywhere. Every
+    fresh install shipped the collision, and so did every "Reset defaults" on
+    the Catalog screen.
+
+    Removing the duplicate rather than renaming it, because the row it collided
+    with is the one that was always winning.
+  */
 ];
 
 export const defaultFlavours: ProductFlavour[] = [
@@ -104,6 +108,29 @@ export const defaultCatalogStore: CatalogStore = {
   weights: defaultWeightOptions,
   updatedAt: nowIso(),
 };
+
+/**
+ * The row already using this slug, if any — excluding the one being edited.
+ *
+ * Nothing enforced slug uniqueness anywhere: the server schema asks only for
+ * `min(1)`. And a collision does not fail loudly, it fails silently —
+ * `getStorefrontCategories` de-dupes by slug and keeps the FIRST row, so the
+ * second is simply unreachable, its products unbrowsable, with no 404 and no
+ * error. The shipped taxonomy carried exactly that (two Seasonal categories),
+ * and every fresh install and every "Reset defaults" reproduced it.
+ *
+ * A pure function rather than a check inside the dialog, so the rule can be
+ * tested without rendering a modal.
+ */
+export function findSlugClash<T extends { id: string; name: string; slug: string }>(
+  rows: readonly T[],
+  slug: string,
+  editingId?: string | null,
+): T | undefined {
+  const wanted = slug.trim().toLowerCase();
+  if (!wanted) return undefined;
+  return rows.find((row) => row.id !== editingId && row.slug.trim().toLowerCase() === wanted);
+}
 
 export function weightsToProductWeights(
   basePrice: number,

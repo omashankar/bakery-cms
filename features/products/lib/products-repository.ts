@@ -18,7 +18,6 @@ import {
   getDefaultWeights,
   getFlavourByName,
 } from "./catalog-options";
-import { DEFAULT_PRODUCT_SHAPES } from "./product-mapper";
 import { slugify } from "./product-utils";
 import { createDefaultVariantGroups, normalizeVariantGroups } from "./variant-utils";
 
@@ -99,7 +98,10 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
     isPhotoCake: cake.category.toLowerCase().includes("photo"),
     isSeasonal: cake.category.toLowerCase().includes("seasonal"),
-    shapes: [...DEFAULT_PRODUCT_SHAPES],
+    // Nothing in the landing data says a product comes in Round, Square and
+    // Heart — the seed said it on their behalf, and the storefront then offered
+    // the picker. The last copy of the injection 46b04b2 removed.
+    shapes: [],
     flavourOptions: cake.flavours ?? [],
     stockStatus: cake.inStock === false ? "out_of_stock" : index % 5 === 0 ? "low_stock" : "in_stock",
     stockQuantity: cake.inStock === false ? 0 : index % 5 === 0 ? 6 : 50,
@@ -109,13 +111,27 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     allowsPhotoUpload: cake.category.toLowerCase().includes("photo"),
     ingredients: undefined,
     barcode: undefined,
+    /**
+     * Only what the demo data actually says.
+     *
+     * This stamped `shelfLifeDays: 3`, `calories: 320` and "Refrigerate within
+     * 2 hours" onto EVERY seeded product — the same invention 46b04b2 removed
+     * from `normalizeCommerceFields`, left in the one place that writes it
+     * straight into a fresh shop's database. 320 kcal on all 25 products is not
+     * data; it is a placeholder rendered to a customer as a fact, and the
+     * product page's Nutrition and Care tabs now correctly hide when the field
+     * is empty rather than printing prose nobody wrote.
+     *
+     * `preparationTimeMinutes` and `allergens` stay: both are derived from what
+     * the landing data declares about the product, not asserted over it.
+     */
     preparationTimeMinutes: cake.category.toLowerCase().includes("photo") ? 180 : 120,
-    shelfLifeDays: 3,
-    calories: 320,
+    shelfLifeDays: undefined,
+    calories: undefined,
     allergens: cake.isEggless
       ? "Contains milk, wheat. Prepared without eggs."
       : "Contains milk, wheat, eggs.",
-    careInstructions: "Refrigerate within 2 hours. Serve at room temperature for best taste.",
+    careInstructions: undefined,
     variantGroups: createDefaultVariantGroups({
       isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
       isPhotoCake: cake.category.toLowerCase().includes("photo"),

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
 import type { CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
+import { findSlugClash } from "@/features/catalog/lib/catalog-utils";
 import {
   createCategory,
   createFlavour,
@@ -33,6 +34,14 @@ import {
   updateOccasion,
   updateWeightOption,
 } from "@/features/catalog/lib/catalog-repository";
+
+/** The rows a new slug has to be unique against, for the section being edited. */
+function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
+  if (tab === "categories") return getCategories();
+  if (tab === "flavours") return getFlavours();
+  if (tab === "occasions") return getOccasions();
+  return [];
+}
 
 interface CatalogFormDialogProps {
   open: boolean;
@@ -54,7 +63,6 @@ export function CatalogFormDialog({
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
-  const [cakeCount, setCakeCount] = useState(0);
   const [modifier, setModifier] = useState(0);
   const [serves, setServes] = useState("8–10");
   const [sortOrder, setSortOrder] = useState(1);
@@ -66,7 +74,6 @@ export function CatalogFormDialog({
       setSlug("");
       setDescription("");
       setImage("");
-      setCakeCount(0);
       setModifier(0);
       setServes("8–10");
       setSortOrder(getWeightOptions().length + 1);
@@ -80,7 +87,6 @@ export function CatalogFormDialog({
         setSlug(item.slug);
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
-        setCakeCount(item.cakeCount ?? 0);
       }
     } else if (tab === "flavours") {
       const item = getFlavours().find((entry) => entry.id === itemId);
@@ -152,13 +158,35 @@ export function CatalogFormDialog({
       return;
     }
 
+    /**
+     * Two rows may not claim the same slug.
+     *
+     * Nothing enforced this anywhere — the server schema asks only for
+     * `min(1)`. And the failure is silent rather than loud:
+     * `getStorefrontCategories` de-dupes by slug and keeps the FIRST row, so a
+     * second one with the same slug is simply unreachable. Its products cannot
+     * be browsed to, and there is no 404 and no error to notice. The shipped
+     * taxonomy carried exactly that collision — two Seasonal categories — and
+     * every fresh install and every "Reset defaults" reproduced it.
+     *
+     * The row being edited is excluded, or saving it without touching the slug
+     * would refuse itself.
+     */
+    const clash = findSlugClash(existingSlugs(tab), finalSlug, itemId);
+    if (clash) {
+      toast.error(`"${finalSlug}" is already used by ${clash.name}`, {
+        description:
+          "Two entries with the same web address cannot both be reached — give this one a different slug.",
+      });
+      return;
+    }
+
     if (tab === "categories") {
       const payload: Omit<ProductCategory, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
-        cakeCount,
       };
       if (isEdit && itemId) {
         const { persisted } = await updateCategory(itemId, payload);
@@ -261,18 +289,17 @@ export function CatalogFormDialog({
                 value={image}
                 onChange={setImage}
               />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="catalog-count">Cake count</Label>
-                  <Input
-                    id="catalog-count"
-                    type="number"
-                    min={0}
-                    value={cakeCount}
-                    onChange={(e) => setCakeCount(Number(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
+              {/*
+                A "Cake count" number box was here. It wrote to the database and
+                was read by nobody: the one place that used to consume it now
+                says "Counted, never declared" and counts the shop's actual
+                published products instead — because a typed number OVERRODE the
+                real catalogue, and the homepage advertised "48 cakes" under
+                Birthday in a shop that held 25 products in total.
+
+                Same treatment as the other controls that decided nothing:
+                the input goes, the stored field stays.
+              */}
             </>
           ) : null}
 
