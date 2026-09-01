@@ -7,40 +7,37 @@ import {
   type BusinessLabels,
 } from "@/config/business-labels";
 import {
-  getGeneralSettings,
   getLabelSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 
 /**
- * Business-type product labels for client UI. Defaults to the bakery labels so
- * SSR / the bakery template render exactly as before, then resolves the real
- * business type on the client and re-reads whenever settings change.
+ * The shop's own product wording for client UI.
  *
- * Used to make visible wording (e.g. "Cakes" → "Flowers") business-aware WITHOUT
- * renaming any route, folder, component, or database collection.
+ * Starts at the neutral defaults so SSR and the first client paint agree, then
+ * layers the shop's own overrides after mount and re-reads whenever settings
+ * change.
+ *
+ * Changes visible wording only (e.g. "Products" → "Flowers"). Routes, folders,
+ * components and database collections are never renamed from here.
  */
 export function useBusinessLabels(): BusinessLabels {
-  const [labels, setLabels] = useState<BusinessLabels>(() => getBusinessLabels("bakery"));
+  const [labels, setLabels] = useState<BusinessLabels>(getBusinessLabels);
 
   useEffect(() => {
     /**
-     * The shop's OWN words first, then the business-type preset.
+     * The shop's OWN words, over the neutral defaults.
      *
      * This resolved from `businessType` alone and threw away the overrides the
      * server had already layered on — so `labelOverrides` was inert, and a shop
-     * that wanted "Bouquet" got "Cake" whatever it typed. It also made the
-     * wording depend entirely on a closed ten-value enum, which is why deleting
-     * that enum could not be done before this: `getBusinessLabels` falls back
-     * to the bakery labels, so the sidebar and the products list would have
-     * quietly gone back to "Cakes" with nothing able to override them.
+     * that wanted "Bouquet" got "Cake" whatever it typed. Wiring it had to come
+     * BEFORE the enum was deleted, or the sidebar and products list would have
+     * quietly reverted to "Cakes" with nothing able to override them.
      *
-     * `resolveLabels` is the single place a blank means "use the preset".
+     * `resolveLabels` is the single place a blank means "use the default".
      */
     const sync = () => {
-      const preset = getBusinessLabels(getGeneralSettings().businessType);
-      const resolved = resolveLabels(getGeneralSettings().businessType, getLabelSettings());
-      setLabels({ ...preset, ...resolved });
+      setLabels({ ...getBusinessLabels(), ...resolveLabels(getLabelSettings()) });
     };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);

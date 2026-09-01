@@ -19,12 +19,12 @@ function useIsServerRender() {
 function applyBusinessAttributes() {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const biz = getGeneralSettings().businessType;
   const m = getModuleSettings();
-  root.setAttribute("data-biz", biz);
+  // `data-biz` was stamped here and read by nothing — not one CSS selector, not
+  // one line of JS. It went with the business type it named.
   const toggle = (attr: string, on: boolean) =>
     on ? root.removeAttribute(attr) : root.setAttribute(attr, "0");
-  toggle("data-wed", biz === "bakery" && m.weddingBuilder);
+  toggle("data-wed", m.weddingBuilder);
   toggle("data-mod-flavour", m.flavour);
   toggle("data-mod-egg", m.eggEggless);
   toggle("data-mod-weight", m.weight);

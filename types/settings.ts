@@ -10,27 +10,6 @@ export interface ThemeSettings {
   customCss?: string;
 }
 
-/**
- * Business type only changes public branding + which optional modules are shown.
- * "bakery" is the default template — the CMS behaves exactly as before for it.
- */
-export type BusinessType =
-  | "bakery"
-  | "sweet-shop"
-  | "flower-shop"
-  | "restaurant"
-  | "gift-shop"
-  | "grocery"
-  | "fashion"
-  | "electronics"
-  | "pharmacy"
-  | "other";
-
-export interface BusinessTypeOption {
-  value: BusinessType;
-  label: string;
-}
-
 export interface GeneralSettings {
   siteName: string;
   siteTagline: string;
@@ -39,7 +18,6 @@ export interface GeneralSettings {
   favicon: string;
   timezone: string;
   currency: string;
-  businessType: BusinessType;
 }
 
 export interface BusinessHoursEntry {

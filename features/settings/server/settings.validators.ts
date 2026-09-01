@@ -17,20 +17,7 @@ import { isValidIp } from "@/features/settings/lib/maintenance-access";
  * boundary that rejects bad input before it reaches the DB.
  */
 
-export const businessTypeEnum = z.enum([
-  "bakery",
-  "sweet-shop",
-  "flower-shop",
-  "restaurant",
-  "gift-shop",
-  "grocery",
-  "fashion",
-  "electronics",
-  "pharmacy",
-  "other",
-]);
-
-const nonNegative = z.number().min(0, "Must be zero or more");
+export const nonNegative = z.number().min(0, "Must be zero or more");
 
 /**
  * Timezone and currency are closed sets, not free text: both are fed straight to
@@ -62,7 +49,6 @@ export const generalSchema = z.object({
   favicon: assetUrl,
   timezone: z.enum(timezoneValues, "Unknown timezone"),
   currency: z.enum(currencyValues, "Unknown currency"),
-  businessType: businessTypeEnum,
 });
 
 export const contactSchema = z.object({

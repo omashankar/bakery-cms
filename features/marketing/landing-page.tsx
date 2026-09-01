@@ -149,7 +149,7 @@ export function LandingPage() {
               <SectionHeading
                 eyebrow="Any Business"
                 title="One CMS, built for every business"
-                description="Bakery is the default template — but switch your Business Type in Settings and the entire storefront, labels, icons, and optional modules adapt instantly. One codebase, any business — no redesign."
+                description="There is no business type to choose. Name your products in your own words, build the options they come in — size, colour, flavour, capacity — and sell whatever mix you like from one catalogue. One codebase, any business, no redesign."
               />
             </ScrollReveal>
             <StaggerReveal className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-3">

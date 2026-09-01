@@ -360,7 +360,7 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "Can I use it for a business other than a bakery?",
     answer:
-      "Yes. Bakery is the default, but you can switch the Business Type in Settings to a Flower Shop, Restaurant, Gift Shop, Grocery, Pharmacy and more — the storefront labels, icons, and optional modules adapt automatically, all from the same platform and one codebase.",
+      "Yes, and there is no business type to switch. You choose what to call your products, define the options they come in — size, colour, flavour, storage — and add your own product details like Brand or Warranty. One shop can sell cakes, cold drinks, gift hampers and chargers side by side, all from the same catalogue.",
   },
   {
     question: "Do I need any coding or technical skills?",

@@ -416,8 +416,11 @@ export function getLabelSettings(): LabelOverrides {
  * every surface hides wedding consistently.
  */
 export function isWeddingEnabled(): boolean {
-  const settings = loadSettings();
-  return settings.general.businessType === "bakery" && settings.modules.weddingBuilder;
+  // The switch is the whole gate. This also required
+  // `businessType === "bakery"`, which is gone; `defaultModuleSettings` now
+  // carries what that enum used to, so a shop that never asked for the Wedding
+  // Builder still does not get one.
+  return loadSettings().modules.weddingBuilder;
 }
 
 export function getActivityLog(): ActivityLog[] {

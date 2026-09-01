@@ -76,7 +76,7 @@ const groups: SettingsGroup[] = [
     items: [
       {
         title: "General",
-        description: "Store name, logo, timezone, currency, and business type.",
+        description: "Store name, what you call your products, logo, timezone, and currency.",
         href: routes.admin.settings.general,
         icon: Settings,
       },

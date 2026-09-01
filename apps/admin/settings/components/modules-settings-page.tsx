@@ -64,9 +64,6 @@ export function ModulesSettingsPage() {
   const router = useRouter();
   const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
     useSettingsSection<ModuleSettings>(getModuleSettings, defaultModuleSettings);
-  // Business type gates the wedding module. Read alongside the section, so it
-  // is only trusted once the same hydration has landed.
-  const isBakery = hydration !== "ready" || getGeneralSettings().businessType === "bakery";
 
   const enabledCount = MODULE_KEYS.filter((key) => settings[key]).length;
 
@@ -162,13 +159,12 @@ export function ModulesSettingsPage() {
               checked={settings.weddingBuilder}
               onCheckedChange={(checked) => toggle("weddingBuilder", checked)}
             />
-            {hydration === "ready" && !isBakery ? (
-              <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                Business type is not <span className="font-medium">Bakery</span>, so the Wedding
-                Builder and Wedding Cakes link are already hidden from the storefront and sidebar
-                regardless of this toggle.
-              </p>
-            ) : null}
+            {/*
+              A note used to sit here explaining that the business type had
+              already hidden the Wedding Builder "regardless of this toggle" —
+              i.e. telling the admin that the switch in front of them decided
+              nothing. It is now the only thing that decides it.
+            */}
           </CardContent>
         </Card>
       </div>

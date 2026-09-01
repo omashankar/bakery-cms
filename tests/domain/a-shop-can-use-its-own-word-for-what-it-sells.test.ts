@@ -35,9 +35,9 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe("an override beats the business-type preset", () => {
+describe("an override beats the default wording", () => {
   it("uses the shop's word where it gave one", () => {
-    const labels = resolveLabels("bakery", {
+    const labels = resolveLabels({
       productWord: "Bouquet",
       productWordPlural: "Flowers",
     });
@@ -47,17 +47,17 @@ describe("an override beats the business-type preset", () => {
   });
 
   it("falls back to the preset for the fields it left alone", () => {
-    const labels = resolveLabels("bakery", { productWord: "Bouquet" });
+    const labels = resolveLabels({ productWord: "Bouquet" });
 
-    expect(labels.productWordPlural).toBe("Cakes");
+    expect(labels.productWordPlural).toBe("Products");
     expect(labels.collectionsTitle).toBe("Our Collections");
   });
 
   it("treats blank and whitespace as 'no opinion', not as an empty label", () => {
     // An admin clearing the box must get the preset back, not a nameless button.
-    const labels = resolveLabels("bakery", { productWord: "   ", collectionsTitle: "" });
+    const labels = resolveLabels({ productWord: "   ", collectionsTitle: "" });
 
-    expect(labels.productWord).toBe("Cake");
+    expect(labels.productWord).toBe("Product");
     expect(labels.collectionsTitle).toBe("Our Collections");
   });
 });

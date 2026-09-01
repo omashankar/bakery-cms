@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { GeneralSettings, LabelOverrides } from "@/types/settings";
 import {
-  businessTypeOptions,
   currencyOptions,
   defaultGeneralSettings,
   isSafeAssetUrl,
@@ -135,11 +134,8 @@ export function GeneralSettingsPage() {
       title="General"
       description={
         hydration === "ready"
-          ? `${settings.siteName} · ${
-              businessTypeOptions.find((o) => o.value === settings.businessType)?.label ??
-              settings.businessType
-            } · ${settings.currency}`
-          : "Site identity, business type, branding, timezone, and currency."
+          ? `${settings.siteName} · ${labels.productWordPlural} · ${settings.currency}`
+          : "Site identity, product wording, branding, timezone, and currency."
       }
       isDirty={isDirty || wordingDirty}
       // Behind the skeleton until the SERVER's copy has landed: editing the seed
@@ -201,37 +197,22 @@ export function GeneralSettingsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Branding &amp; locale</CardTitle>
-            <CardDescription>Business type, logo paths, and regional defaults.</CardDescription>
+            <CardDescription>What you call your products, logo paths, and regional defaults.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="businessType">Business type</Label>
-              <AdminSelect
-                id="businessType"
-                value={settings.businessType}
-                onChange={(e) =>
-                  edit((prev) => ({
-                    ...prev,
-                    businessType: e.target.value as GeneralSettings["businessType"],
-                  }))
-                }
-              >
-                {businessTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </AdminSelect>
-              <p className="text-xs text-muted-foreground">
-                Sets the starting wording and unlocks the Wedding Builder for bakeries.
-                It does not restrict what you can sell.
-              </p>
-            </div>
-
             {/*
-              The shop's OWN word, which beats the business type above.
+              A "Business type" select sat here — ten trades, one of which every
+              shop had to be. It restricted nothing (audited: the only thing it
+              gated was the Wedding Builder), it had to grow a row every time a
+              shop was a trade nobody had listed, and a shop selling cakes AND
+              chargers AND flowers had no honest answer to give it.
+
+              What it really did is now said directly: the two boxes below name
+              what this shop sells, and Settings → Modules turns the Wedding
+              Builder on.
+
               `labelOverrides` has existed on the server for as long as business
-              types have — `resolveLabels` layers it over the preset — and
+              types have — `resolveLabels` layers it over the default — and
               nothing read it, so a flower shop that wanted "Bouquet" was told
               "Cake" whatever it typed, because there was nowhere to type it.
             */}
@@ -257,7 +238,7 @@ export function GeneralSettingsPage() {
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Used across the admin and your storefront — &ldquo;Add {labels.productWord}
                 &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;. Leave
-                blank to use the business type&rsquo;s wording.
+                blank to use the default wording.
               </p>
             </div>
             {/*

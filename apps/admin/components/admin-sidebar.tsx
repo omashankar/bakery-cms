@@ -445,8 +445,9 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     }
 
     function refreshModules() {
-      const isBakery = getGeneralSettings().businessType === "bakery";
-      setHideWedding(!isBakery || !getModuleSettings().weddingBuilder);
+      // The switch is the whole gate now — it also required the business type
+      // to be "bakery", which no longer exists.
+      setHideWedding(!getModuleSettings().weddingBuilder);
     }
 
     function refreshBrand() {

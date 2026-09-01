@@ -2,7 +2,7 @@ import { cache } from "react";
 import { connection } from "next/server";
 
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
-import type { BusinessType, ModuleSettings } from "@/types/settings";
+import type { ModuleSettings } from "@/types/settings";
 
 import { getPublicSettings } from "./settings.service";
 
@@ -13,25 +13,27 @@ import { getPublicSettings } from "./settings.service";
  * hides links and pickers, which is right for a chooser inside a page. It is not
  * enough for a page: hiding every link to `/store/wedding-cakes` still leaves it
  * serving 200 to a bookmark, a search result, or anyone who has the URL — so a
- * shop that switched the Wedding module off, or that is not a bakery at all,
- * kept a fully working wedding-cakes page and kept taking wedding enquiries
- * through it.
+ * shop that switched the Wedding module off kept a fully working wedding-cakes
+ * page and kept taking wedding enquiries through it.
  *
  * `cache` dedupes the read between `generateMetadata` and the page body.
  */
 export interface ServerModules {
   modules: ModuleSettings;
-  businessType: BusinessType;
-  /** Bakery-only, and gated by its own switch — mirrors `isWeddingEnabled()`. */
+  /**
+   * Gated by its own switch, and nothing else.
+   *
+   * This was `businessType === "bakery" && modules.weddingBuilder`. The
+   * business type is gone, so the switch is the whole gate — which is what it
+   * always described itself as. The DEFAULT now carries what the enum used to
+   * (see `defaultModuleSettings`), so a fresh install of any trade does not
+   * ship a live Wedding Builder.
+   */
   weddingEnabled: boolean;
 }
 
-function resolve(modules: ModuleSettings, businessType: BusinessType): ServerModules {
-  return {
-    modules,
-    businessType,
-    weddingEnabled: businessType === "bakery" && modules.weddingBuilder,
-  };
+function resolve(modules: ModuleSettings): ServerModules {
+  return { modules, weddingEnabled: modules.weddingBuilder };
 }
 
 export const getServerModules = cache(async (): Promise<ServerModules> => {
@@ -44,17 +46,13 @@ export const getServerModules = cache(async (): Promise<ServerModules> => {
   try {
     const settings = (await getPublicSettings()) as {
       modules?: Partial<ModuleSettings>;
-      general?: { businessType?: BusinessType };
     };
 
-    return resolve(
-      { ...defaultModuleSettings, ...(settings.modules ?? {}) },
-      settings.general?.businessType ?? "bakery",
-    );
+    return resolve({ ...defaultModuleSettings, ...(settings.modules ?? {}) });
   } catch {
-    // A database that cannot be reached must not take a page down. Defaults are
-    // the bakery template with every module on — i.e. nothing newly hidden.
-    return resolve(defaultModuleSettings, "bakery");
+    // A database that cannot be reached must not take a page down. The
+    // defaults hide nothing that was not already hidden.
+    return resolve(defaultModuleSettings);
   }
 });
 

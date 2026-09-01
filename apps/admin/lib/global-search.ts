@@ -103,9 +103,9 @@ const SETTINGS_ENTRIES: GlobalSearchResult[] = [
     id: "settings-general",
     group: "settings",
     title: "General Settings",
-    subtitle: "Site name, branding, business type",
+    subtitle: "Site name, product wording, branding",
     href: routes.admin.settings.general,
-    keywords: ["business type", "brand", "logo", "currency"],
+    keywords: ["product wording", "brand", "logo", "currency"],
   },
   {
     id: "settings-modules",

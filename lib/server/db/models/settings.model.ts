@@ -24,7 +24,6 @@ const generalSchema = new mongoose.Schema(
     favicon: String,
     timezone: String,
     currency: String,
-    businessType: { type: String, default: "bakery" },
   },
   sub,
 );

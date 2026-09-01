@@ -10,7 +10,6 @@ import type {
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
-  BusinessTypeOption,
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
@@ -38,12 +37,25 @@ export const defaultGeneralSettings: GeneralSettings = {
   favicon: "/favicon.ico",
   timezone: "Asia/Kolkata",
   currency: "INR",
-  businessType: "bakery",
 };
 
-/** Bakery is the default template — every optional module ships ON. */
+/**
+ * Optional product modules, all ON except the Wedding Builder.
+ *
+ * Wedding used to be gated on `businessType === "bakery"` AND this switch. With
+ * the business type gone the switch is the whole gate, so the DEFAULT has to
+ * carry what the enum used to: a brand-new install would otherwise ship a live
+ * Wedding Builder and a public /store/wedding-cakes page whatever the shop
+ * sells. A bakery turns it on; nobody else has to turn it off.
+ *
+ * A shop with a stored value — this one has `weddingBuilder: true` — is
+ * unaffected; defaults only fill what a settings document does not say.
+ *
+ * The five below stay ON so an existing bakery is unchanged. They hide UI only:
+ * data and routes are never deleted.
+ */
 export const defaultModuleSettings: ModuleSettings = {
-  weddingBuilder: true,
+  weddingBuilder: false,
   flavour: true,
   eggEggless: true,
   weight: true,
@@ -179,19 +191,6 @@ export const defaultAppSettings: AppSettings = {
   activity: seedActivityLog,
   updatedAt: nowIso(),
 };
-
-export const businessTypeOptions: BusinessTypeOption[] = [
-  { value: "bakery", label: "Bakery (Default)" },
-  { value: "sweet-shop", label: "Sweet Shop" },
-  { value: "flower-shop", label: "Flower Shop" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "gift-shop", label: "Gift Shop" },
-  { value: "grocery", label: "Grocery" },
-  { value: "fashion", label: "Fashion" },
-  { value: "electronics", label: "Electronics" },
-  { value: "pharmacy", label: "Pharmacy" },
-  { value: "other", label: "Other" },
-];
 
 export const timezoneOptions = [
   { value: "Asia/Kolkata", label: "Asia/Kolkata (IST)" },

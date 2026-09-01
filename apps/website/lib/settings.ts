@@ -18,7 +18,6 @@ import {
   resolveLabels,
   type BusinessLabels,
 } from "@/config/business-labels";
-import type { BusinessType } from "@/types/settings";
 
 /*
  * `getStorefrontBrandInfo` was here, and it is gone rather than merely unused.
@@ -78,16 +77,11 @@ export function getStorefrontBusinessHours() {
   return chosenList(contact.businessHours, businessHours, hoursIdentity);
 }
 
-export function getStorefrontBusinessType(): BusinessType {
-  return getGeneralSettings().businessType;
-}
-
 export function getStorefrontBusinessLabels(): BusinessLabels {
   // The shop's own words over the preset — the same resolution the server does
   // and the admin hook does. This read the preset alone, so the collections
   // heading a shop had renamed still said "Our Collections".
-  const type = getStorefrontBusinessType();
-  return { ...getBusinessLabels(type), ...resolveLabels(type, getLabelSettings()) };
+  return { ...getBusinessLabels(), ...resolveLabels(getLabelSettings()) };
 }
 
 /** Wedding cakes are bakery-only and gated by the wedding module. */
