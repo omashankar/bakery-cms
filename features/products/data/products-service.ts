@@ -10,7 +10,10 @@ import * as productRepo from "@/features/products/server/product.repository";
 import { purgeProductTraces } from "@/features/products/server/product-cascade.server";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
-import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
+import {
+  defaultProductUnitPrice,
+  productHasOptions,
+} from "@/features/products/lib/product-pricing";
 import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { getSettings } from "@/features/settings/server/settings.service";
@@ -143,6 +146,19 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     reviewCount: product.reviewCount,
     inStock: product.inStock,
     description: "", // required by the type; never rendered on a card
+    /**
+     * The QUESTION, not the data.
+     *
+     * `variantGroups` is dropped below and should stay dropped — one boolean is
+     * smaller than the groups it was computed from, and the card only needs to
+     * know whether to send the customer to the product page instead of adding
+     * blind. Computed from the module-filtered groups, so a group the shop has
+     * switched off does not make a card refuse a one-tap add for a choice that
+     * is neither shown nor charged.
+     */
+    hasOptions: productHasOptions({
+      variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+    }),
     // Filter inputs.
     occasions: product.occasions,
     isEggless: product.isEggless,

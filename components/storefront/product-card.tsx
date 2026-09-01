@@ -2,6 +2,7 @@
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ cake, variant = "default", className }: ProductCardProps) {
+  const router = useRouter();
   const [wishlisted, setWishlisted] = useState(false);
   /**
    * The price the SHOP will charge, not the base price on the record.
@@ -65,6 +67,23 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
       toast.error("This cake is currently out of stock");
       return;
     }
+    /**
+     * A card cannot ask a question, so it must not answer one.
+     *
+     * This added straight to the cart with no `variantSelections`, and
+     * `calculateVariantAdjustment` falls back to each group's DEFAULT option
+     * whenever a selection is absent — so the shop priced and RECORDED choices
+     * the customer was never shown. The cart line displayed no options while
+     * the stored order read "Storage: 128 GB", and a phone offered in two sizes
+     * could be bought from a grid without ever picking one.
+     *
+     * Products with nothing to choose keep their one-tap add.
+     */
+    if (cake.hasOptions) {
+      router.push(routes.store.cake(cake.slug));
+      return;
+    }
+
     addToCart({
       productSlug: cake.slug,
       name: cake.name,
@@ -147,7 +166,11 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
             onClick={handleAddToCart}
           >
             <ShoppingBag className="size-4" />
-            {outOfStock ? "Out of stock" : "Add to Cart"}
+            {outOfStock
+              ? "Out of stock"
+              : cake.hasOptions
+                ? "Choose options"
+                : "Add to Cart"}
           </Button>
         </div>
       </div>

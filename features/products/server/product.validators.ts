@@ -31,7 +31,9 @@ const variantGroupSchema = z
     id: z.string(),
     name: z.string(),
     type: z.string(),
-    required: z.boolean(),
+    // Inert — see the note on ProductVariantGroup.required. Optional so a group
+    // that arrives without it is not a 400 on a field nothing reads.
+    required: z.boolean().optional(),
     options: z.array(z.any()),
   })
   .passthrough();

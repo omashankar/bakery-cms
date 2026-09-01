@@ -29,7 +29,22 @@ export interface ProductVariantGroup {
   id: string;
   name: string;
   type: ProductVariantGroupType;
-  required: boolean;
+  /**
+   * LEGACY, and inert. Nothing reads it.
+   *
+   * Its only reader was the admin checkbox that wrote it. No picker blocks on
+   * it, and `calculateVariantAdjustment` substitutes the group's default option
+   * whenever a selection is absent — so a group marked required was priced and
+   * recorded exactly like one that was not, and the merchant was told a
+   * purchase would be stopped without a choice that it never stopped.
+   *
+   * Optional rather than deleted, and for the same reason
+   * `PaymentMethodSettings.upi/card` were kept: every stored product, and every
+   * backup an owner has taken, already carries it. Optional so a caller that
+   * has no opinion — an import, an API client — is not forced to invent one.
+   * Do not gate anything on it without making it mean something first.
+   */
+  required?: boolean;
   options: ProductVariantOption[];
 }
 

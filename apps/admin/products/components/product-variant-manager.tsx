@@ -202,16 +202,17 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                 </div>
               </div>
 
-              <label className="mb-4 flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={group.required}
-                  onCheckedChange={(checked) =>
-                    updateGroup(group.id, { required: checked === true })
-                  }
-                />
-                Required on storefront
-              </label>
+              {/*
+                "Required on storefront" was here, and it decided nothing.
 
+                Its only reader in the whole repository was the checkbox that
+                wrote it: no picker blocks on it, and the server substitutes the
+                group's default option whenever a selection is absent — so a
+                merchant who ticked it was told a purchase would be stopped
+                without one, and it never was. The same defect, in the same
+                shape, as `PaymentMethodSettings.upi/card`, and removed the same
+                way: the control goes, the stored field stays.
+              */}
               <div className="space-y-3">
                 {group.options.map((option) => (
                   <div

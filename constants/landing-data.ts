@@ -34,6 +34,15 @@ export interface LandingProduct {
   allergens?: string;
   careInstructions?: string;
   variantGroups?: ProductVariantGroup[];
+  /**
+   * Whether this product asks the customer anything before it can be bought.
+   *
+   * Carried on the CARD projection, which deliberately drops `variantGroups` to
+   * keep the RSC payload small. A grid cannot show a picker, and the server
+   * falls back to each group's default option when no selection arrives, so
+   * without this a one-tap add priced and recorded choices nobody was shown.
+   */
+  hasOptions?: boolean;
 }
 
 export interface LandingCategory {

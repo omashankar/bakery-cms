@@ -58,6 +58,18 @@ export function reorderFromOrder(
       flavour: item.flavour,
       shape: item.shape,
       message: item.message,
+      /**
+       * The photo, which this dropped.
+       *
+       * `cartLineId` folds the photo, the message and the shape into the line's
+       * identity precisely so two photo cakes carrying two different children's
+       * photos stay two lines. Reordering passed the message and the shape and
+       * not this, so it did both halves of the damage at once: the shop was
+       * charged-for-but-not-given the photo it has to print, and two lines
+       * differing only by photo collapsed into one of quantity 2 — the exact
+       * bug `cartLineId`'s own comment records, reintroduced on the way back in.
+       */
+      photoUrl: item.photoUrl,
       deliveryDate: item.deliveryDate,
       deliveryTime: item.deliveryTime,
       variantSelections: item.variantSelections,

@@ -62,6 +62,23 @@ export function defaultProductUnitPrice(cake: {
   });
 }
 
+/**
+ * Does this product ask the customer anything before it can be added?
+ *
+ * A grid card cannot present a picker, and `calculateVariantAdjustment` falls
+ * back to each group's DEFAULT option whenever a selection is absent — so a
+ * one-tap add from a grid was priced as, and recorded as, a set of choices the
+ * customer was never shown. The cart line displayed no options while the stored
+ * order said "Storage: 128 GB".
+ *
+ * A boolean rather than the groups themselves, because `toCard` deliberately
+ * drops `variantGroups` to keep the RSC payload small — its own header budgets
+ * that for 5,000 products. The card needs the question, not the data.
+ */
+export function productHasOptions(product: { variantGroups?: ProductVariantGroup[] }): boolean {
+  return (product.variantGroups?.length ?? 0) > 0;
+}
+
 export function formatVariantSummary(
   groups: ProductVariantGroup[],
   selections: Record<string, string>
