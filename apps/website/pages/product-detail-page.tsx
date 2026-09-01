@@ -441,9 +441,23 @@ export function ProductDetailPage({
 
               <div className="rounded-xl border border-border bg-cream-50 p-4">
                 <PriceDisplay price={displayPrice} compareAtPrice={cake.compareAtPrice} />
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Serves {weight?.serves ?? "8–10"} people · {weight?.label ?? "1 kg"}
-                </p>
+                {/*
+                  Only when this product IS sold by size.
+                  `weight?.serves ?? "8–10"` and `weight?.label ?? "1 kg"` were
+                  unreachable while `getProductWeightOptions` could not return an
+                  empty list. It can now, deliberately — so a phone charger stated,
+                  under its price and gated by nothing, that it serves 8–10 people
+                  and weighs 1 kg. A fallback is not a fact.
+
+                  `serves` stays optional within that: a tier can be priced without
+                  claiming a headcount.
+                */}
+                {weight ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {weight.serves ? `Serves ${weight.serves} people · ` : ""}
+                    {weight.label}
+                  </p>
+                ) : null}
                 {variantSummary.length > 0 ? (
                   <p className="mt-1 text-xs text-muted-foreground">{variantSummary.join(" · ")}</p>
                 ) : null}
@@ -452,7 +466,7 @@ export function ProductDetailPage({
               {/* Only offered when this cake actually comes in several flavours. */}
               {modules.flavour && flavourOptions.length > 0 ? (
                 <div className="contents" data-gate-flavour>
-                  <OptionGroup label="Flavour">
+                  <OptionGroup label="Flavour" count={flavourOptions.length}>
                     <div className="flex flex-wrap gap-2">
                       {flavourOptions.map((flavour) => (
                         <OptionButton
@@ -470,7 +484,7 @@ export function ProductDetailPage({
 
               {modules.weight ? (
                 <div className="contents" data-gate-weight>
-                  <OptionGroup label="Weight">
+                  <OptionGroup label="Weight" count={weightOptions.length}>
                     <div className="flex flex-wrap gap-2">
                       {weightOptions.map((option, index) => (
                         <OptionButton
@@ -493,7 +507,7 @@ export function ProductDetailPage({
                   data-gate-egg={group.type === "egg" ? "" : undefined}
                   data-gate-photo={group.type === "photo" ? "" : undefined}
                 >
-                  <OptionGroup label={group.name}>
+                  <OptionGroup label={group.name} count={group.options.length}>
                     <div className="flex flex-wrap gap-2">
                       {group.options.map((option) => (
                         <OptionButton
@@ -519,7 +533,7 @@ export function ProductDetailPage({
 
               {modules.shape ? (
                 <div className="contents" data-gate-shape>
-                  <OptionGroup label="Shape">
+                  <OptionGroup label="Shape" count={shapeOptions.length}>
                     <div className="flex flex-wrap gap-2">
                       {shapeOptions.map((shape) => (
                         <OptionButton
@@ -846,7 +860,32 @@ export function ProductDetailPage({
   );
 }
 
-function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A choice the customer makes. Renders nothing when there is nothing to choose.
+ *
+ * The label used to paint unconditionally, which was harmless only because no
+ * list could be empty: `getProductWeightOptions` fell back to the shop's catalog
+ * tiers and `getProductShapeOptions` to Round/Square/Heart, so the empty case
+ * was dead code. Both now return `[]` for a product that declares none — which
+ * is the point — and that turned the dead case into the default one: a phone
+ * charger rendered a "Weight" heading over nothing and a "Shape" heading over
+ * nothing, on the page a customer buys from.
+ *
+ * `count` is REQUIRED rather than derived from `children`, so a new group cannot
+ * be added without stating how many options it has. A convention would have been
+ * forgotten the same way the three above were; a required prop is a type error.
+ */
+function OptionGroup({
+  label,
+  count,
+  children,
+}: {
+  label: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  if (count <= 0) return null;
+
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">{label}</p>
