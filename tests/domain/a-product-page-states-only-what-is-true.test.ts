@@ -88,7 +88,18 @@ const CAKE: Product = {
   variantGroups: [],
 };
 
-function render(cake: Product): { html: string; unmount: () => void } {
+function render(cake: Product): {
+  html: string;
+  /**
+   * Open a tab by its label and hand back the markup that follows.
+   *
+   * Radix mounts only the ACTIVE tab's content, so asserting on a tab's text
+   * without opening it passes for a product that has no such tab at all. A
+   * first version of these tests did exactly that.
+   */
+  openTab: (label: string) => string;
+  unmount: () => void;
+} {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -99,6 +110,16 @@ function render(cake: Product): { html: string; unmount: () => void } {
 
   return {
     html: container.innerHTML,
+    openTab: (label: string) => {
+      const trigger = [...container.querySelectorAll("button")].find(
+        (element) => element.textContent?.trim() === label,
+      );
+      if (!trigger) throw new Error(`no "${label}" tab to open`);
+      act(() => {
+        trigger.click();
+      });
+      return container.innerHTML;
+    },
     unmount: () => {
       act(() => {
         root.unmount();
@@ -149,6 +170,92 @@ describe("a product that is sold one way says so by saying nothing", () => {
     try {
       expect(html).toContain("Cable length");
       expect(html).toContain("2 m");
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe("the shop's own facts reach the page", () => {
+  it("prints the attributes a charger declares", () => {
+    const { openTab, unmount } = render({
+      ...CHARGER,
+      attributes: [
+        { id: "a1", label: "Brand", value: "Anker" },
+        { id: "a2", label: "Warranty", value: "1 year" },
+      ],
+    });
+    try {
+      const opened = openTab("Details");
+      expect(opened).toContain("Brand");
+      expect(opened).toContain("Anker");
+      expect(opened).toContain("Warranty");
+      expect(opened).toContain("1 year");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("offers no Details tab to a product that states nothing", () => {
+    const { html, unmount } = render(CHARGER);
+    try {
+      expect(html).not.toContain(">Details<");
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe("the food tabs belong to food", () => {
+  it("shows a charger no Ingredients, Nutrition, Allergens or Care tab", () => {
+    /**
+     * Each of these used to render unconditionally with bakery prose to print
+     * when the field was empty — so a phone charger's page carried an
+     * Ingredients tab reading "Flour, sugar, butter, fresh cream, premium
+     * chocolate, and natural flavours", a Care tab saying "Refrigerate within
+     * 2 hours of delivery", and a Nutrition tab promising calorie information.
+     */
+    const { html, unmount } = render(CHARGER);
+    try {
+      expect(html).not.toContain(">Ingredients<");
+      expect(html).not.toContain(">Nutrition<");
+      expect(html).not.toContain(">Allergens<");
+      expect(html).not.toContain(">Care<");
+      expect(html).not.toContain("Flour, sugar, butter");
+      expect(html).not.toContain("Refrigerate within 2 hours");
+      expect(html).not.toContain("Calorie information will be updated soon");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not append a bakery sentence to every description", () => {
+    const { html, unmount } = render(CHARGER);
+    try {
+      expect(html).toContain("Fast charging for phones and laptops.");
+      expect(html).not.toContain("finished by");
+      expect(html).not.toContain("expert bakers");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("still shows a cake the tabs it actually fills", () => {
+    const { html, openTab, unmount } = render({
+      ...CAKE,
+      ingredients: "Flour, cocoa, cream.",
+      allergens: "Contains milk and wheat.",
+      careInstructions: "Refrigerate on arrival.",
+      calories: 320,
+    });
+    try {
+      expect(html).toContain(">Ingredients<");
+      expect(html).toContain(">Nutrition<");
+      expect(html).toContain(">Allergens<");
+      expect(html).toContain(">Care<");
+      // Opened, not merely listed — Radix mounts only the active tab's content.
+      expect(openTab("Ingredients")).toContain("Flour, cocoa, cream.");
+      expect(openTab("Care")).toContain("Refrigerate on arrival.");
     } finally {
       unmount();
     }

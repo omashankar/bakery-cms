@@ -184,6 +184,9 @@ export function normalizeCommerceFields(cake: Product): Product {
     allergens: cake.allergens,
     careInstructions: cake.careInstructions,
     variantGroups,
+    // Owner-defined facts. Absent means the shop has stated none, not that it
+    // needs some invented for it — the mistake this function made with shapes.
+    attributes: cake.attributes ?? [],
     /**
      * A product nobody has reviewed has no stars.
      *
@@ -407,6 +410,7 @@ export function createEmptyProductForm(): ProductFormData {
     allergens: "",
     careInstructions: "",
     variantGroups: [],
+    attributes: [],
     // A cake with no reviews has no rating. This started at 4.5.
     rating: 0,
     reviewCount: 0,

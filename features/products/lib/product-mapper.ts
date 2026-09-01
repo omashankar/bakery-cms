@@ -73,6 +73,13 @@ export function mapAdminProductToStorefront(
     allergens: cake.allergens,
     careInstructions: cake.careInstructions,
     variantGroups: cake.variantGroups,
+    /**
+     * This list is a WHITELIST, not a spread — a field missing from it persists
+     * perfectly and is never seen by a customer, which is the second of the two
+     * silent failures a new product field has to survive. The first is the
+     * Mongoose path.
+     */
+    attributes: cake.attributes,
   };
 }
 

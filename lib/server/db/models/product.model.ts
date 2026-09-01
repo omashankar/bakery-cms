@@ -55,6 +55,17 @@ const productSchema = new mongoose.Schema(
     allowsPhotoUpload: { type: Boolean, default: false },
     ingredients: { type: String },
     variantGroups: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    /**
+     * Owner-defined facts (Brand, Material, Warranty, RAM). Load-bearing line.
+     *
+     * This schema is constructed with only `{ minimize: false }`, so Mongoose
+     * `strict` is ON: without a declared path, every write of this field is
+     * dropped SILENTLY while the API still answers 201 and the admin form
+     * re-renders its own state as though it had saved. `productFormSchema` ends
+     * in `.passthrough()`, which looks like the escape hatch and is not — it
+     * governs validation, not persistence.
+     */
+    attributes: { type: [mongoose.Schema.Types.Mixed], default: [] },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     seo: { type: mongoose.Schema.Types.Mixed, default: {} },

@@ -49,6 +49,7 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
+import { ProductAttributesFields } from "./product-attributes-fields";
 import { ProductDetailsFields } from "./product-details-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import {
@@ -533,7 +534,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 ) : null}
               </TabsContent>
 
-              <TabsContent value="details" className="space-y-4">
+              <TabsContent value="details" className="space-y-6">
+                {/*
+                  The shop's OWN facts come first. What follows them is six fixed
+                  food fields — prep time, shelf life, calories, allergens, care
+                  instructions — which are right for a bakery and dead space for a
+                  charger. Putting the generic editor above them is what makes the
+                  tab usable by a shop that sells neither cake nor anything edible.
+                */}
+                <ProductAttributesFields
+                  value={form.attributes ?? []}
+                  onChange={(attributes) => patchForm({ attributes })}
+                />
+                <Separator />
                 <ProductDetailsFields
                   value={form}
                   onChange={(patch) => patchForm(patch)}

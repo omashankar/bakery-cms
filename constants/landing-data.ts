@@ -3,7 +3,7 @@
  */
 
 import { demoPhotoIds, unsplash } from "./demo-images";
-import type { ProductVariantGroup } from "@/types/product";
+import type { ProductAttribute, ProductVariantGroup } from "@/types/product";
 
 export interface LandingProduct {
   id: string;
@@ -34,6 +34,8 @@ export interface LandingProduct {
   allergens?: string;
   careInstructions?: string;
   variantGroups?: ProductVariantGroup[];
+  /** Owner-defined facts, printed as a spec list. Never a choice, never priced. */
+  attributes?: ProductAttribute[];
   /**
    * What a one-tap add from a grid commits to, resolved by the SHOP.
    *

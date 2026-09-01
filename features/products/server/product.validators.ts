@@ -38,6 +38,21 @@ const variantGroupSchema = z
   })
   .passthrough();
 
+/**
+ * A shop's own fact about a product. A real schema, not the top-level
+ * `.passthrough()` — which would accept `attributes: "hello"` and an entry with
+ * no value, both of which reach Mongo as Mixed and then render as nothing or as
+ * "[object Object]" on the product page.
+ *
+ * Bounded because it is free text an admin types and the storefront prints: the
+ * caps stop a paste turning one product document into a page nobody can read.
+ */
+const attributeSchema = z.object({
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1, "An attribute needs a name").max(60),
+  value: z.string().trim().min(1, "An attribute needs a value").max(300),
+});
+
 export const productFormSchema = z
   .object({
     name: z.string().trim().min(1, "Name is required"),
@@ -72,6 +87,7 @@ export const productFormSchema = z
     allowsPhotoUpload: z.boolean(),
     ingredients: z.string().optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
+    attributes: z.array(attributeSchema).max(40).default([]),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().min(0),
     seo: seoSchema.default({}),

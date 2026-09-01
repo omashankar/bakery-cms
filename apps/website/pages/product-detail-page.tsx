@@ -114,6 +114,12 @@ export function ProductDetailPage({
   const shapeOptions = useMemo(() => getProductShapeOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
   const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
+  /** The shop's own facts about this product. Empty when it states none. */
+  const attributes = useMemo(() => cake.attributes ?? [], [cake]);
+  /** The nutrition tab has something to say only if one of its three fields does. */
+  const hasNutrition = Boolean(
+    cake.calories || cake.preparationTimeMinutes || cake.shelfLifeDays,
+  );
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
@@ -696,10 +702,28 @@ export function ProductDetailPage({
                 <div className="overflow-x-auto">
                   <TabsList className="w-max min-w-full">
                     <TabsTrigger value="description">Description</TabsTrigger>
-                    <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
-                    <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
-                    <TabsTrigger value="allergens">Allergens</TabsTrigger>
-                    <TabsTrigger value="care">Care</TabsTrigger>
+                    {/*
+                      Every tab below is now gated on the product CARRYING the
+                      field. They were unconditional, each with bakery prose to
+                      print when empty — so a phone charger's page offered an
+                      Ingredients tab reading "Flour, sugar, butter, fresh cream,
+                      premium chocolate, and natural flavours", a Care tab saying
+                      "Refrigerate within 2 hours of delivery", and a Nutrition
+                      tab promising "Calorie information will be updated soon".
+                      A fallback is not a fact, and an empty tab is better absent
+                      than filled with someone else's product.
+                    */}
+                    {attributes.length > 0 ? (
+                      <TabsTrigger value="details">Details</TabsTrigger>
+                    ) : null}
+                    {cake.ingredients ? (
+                      <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
+                    ) : null}
+                    {hasNutrition ? <TabsTrigger value="nutrition">Nutrition</TabsTrigger> : null}
+                    {cake.allergens ? (
+                      <TabsTrigger value="allergens">Allergens</TabsTrigger>
+                    ) : null}
+                    {cake.careInstructions ? <TabsTrigger value="care">Care</TabsTrigger> : null}
                     <TabsTrigger value="reviews">
                       Reviews
                       {reviews.length ? ` (${reviews.length})` : ""}
@@ -708,15 +732,33 @@ export function ProductDetailPage({
                   </TabsList>
                 </div>
                 <TabsContent value="description" className="text-sm text-muted-foreground">
-                  {cake.description} Crafted fresh with premium ingredients and finished by
-                  our expert bakers for celebrations of every size.
+                  {/*
+                    The shop's own words, and only those. This appended "Crafted
+                    fresh with premium ingredients and finished by our expert
+                    bakers for celebrations of every size." to EVERY description
+                    in the shop, whatever the product was.
+                  */}
+                  {cake.description}
                 </TabsContent>
+                {attributes.length > 0 ? (
+                  <TabsContent value="details">
+                    {/* The shop's own facts, as a spec list. */}
+                    <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                      {attributes.map((attribute) => (
+                        <div
+                          key={attribute.id}
+                          className="flex flex-wrap justify-between gap-2 border-b border-border/60 pb-2"
+                        >
+                          <dt className="text-muted-foreground">{attribute.label}</dt>
+                          <dd className="font-medium text-foreground">{attribute.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </TabsContent>
+                ) : null}
                 <TabsContent value="ingredients" className="text-sm text-muted-foreground">
-                  {cake.ingredients ||
-                    "Flour, sugar, butter, fresh cream, premium chocolate, and natural flavours."}
-                  {isEggless
-                    ? " This cake is prepared without eggs."
-                    : " Eggless version available on request."}
+                  {cake.ingredients}
+                  {modules.eggEggless && isEggless ? " This cake is prepared without eggs." : ""}
                 </TabsContent>
                 <TabsContent value="nutrition" className="space-y-2 text-sm text-muted-foreground">
                   {cake.calories ? (
@@ -724,9 +766,7 @@ export function ProductDetailPage({
                       <span className="font-medium text-foreground">Calories:</span>{" "}
                       {cake.calories} kcal per serving
                     </p>
-                  ) : (
-                    <p>Calorie information will be updated soon.</p>
-                  )}
+                  ) : null}
                   {cake.preparationTimeMinutes ? (
                     <p>
                       <span className="font-medium text-foreground">Preparation:</span>{" "}
@@ -741,12 +781,10 @@ export function ProductDetailPage({
                   ) : null}
                 </TabsContent>
                 <TabsContent value="allergens" className="text-sm text-muted-foreground">
-                  {cake.allergens ||
-                    "May contain milk, wheat, eggs, and nuts. Please contact us for allergen-specific requests."}
+                  {cake.allergens}
                 </TabsContent>
                 <TabsContent value="care" className="text-sm text-muted-foreground">
-                  {cake.careInstructions ||
-                    "Refrigerate within 2 hours of delivery. Bring to room temperature before serving for the best texture and flavour."}
+                  {cake.careInstructions}
                 </TabsContent>
                 <TabsContent value="reviews" className="space-y-4">
                   <ProductReviewForm
