@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CartLineItem } from "@/features/cart/lib/cart";
+import { cartLineChoices, type CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
 import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
@@ -97,9 +97,17 @@ export function OrderSummaryPanel({
               <p className="truncate font-medium">
                 {item.quantity} × {item.name}
               </p>
-              {item.weight || item.flavour ? (
+              {/*
+                One component, three places: the checkout review step, the cart
+                sidebar, and the customer's own placed-order and tracking page,
+                which has no other item markup at all. It showed weight and
+                flavour only — no shape, and none of the shop's own option
+                groups — so the last screen before paying, and the only one after,
+                both omitted what the customer had chosen.
+              */}
+              {cartLineChoices(item).length > 0 ? (
                 <p className="truncate text-xs text-muted-foreground">
-                  {[item.weight, item.flavour].filter(Boolean).join(" · ")}
+                  {cartLineChoices(item).join(" · ")}
                 </p>
               ) : null}
             </div>

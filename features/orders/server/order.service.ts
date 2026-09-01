@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { GatewayRefund, RefundRecord } from "@/types/refund";
@@ -758,12 +759,7 @@ async function notifyShopOfOrder(
    */
   const items = order.items
     .map((item) => {
-      const chosen = [
-        item.weight,
-        item.flavour,
-        item.shape,
-        ...(item.variantSummary ?? []),
-      ].filter(Boolean);
+      const chosen = cartLineChoices(item);
 
       const lines = [`  ${item.quantity} x ${item.name}`];
       if (chosen.length > 0) lines.push(`      ${chosen.join(" · ")}`);

@@ -25,6 +25,7 @@ import {
   CART_PREFERENCES_UPDATED_EVENT,
   getCartPreferences,
   getCartItems,
+  cartLineChoices,
   moveCartItemToSavedForLater,
   removeCartItem,
   restoreSavedItemToCart,
@@ -257,12 +258,10 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                           >
                             {item.name}
                           </Link>
-                          <p className="text-sm text-muted-foreground">
-                            {[item.weight, item.flavour, item.shape].filter(Boolean).join(" · ")}
-                          </p>
-                          {item.variantSummary?.length ? (
+                          {/* One list, so this cannot drift from the invoice again. */}
+                          {cartLineChoices(item).length > 0 ? (
                             <p className="text-sm text-muted-foreground">
-                              {item.variantSummary.join(" · ")}
+                              {cartLineChoices(item).join(" · ")}
                             </p>
                           ) : null}
                           {item.message ? (
@@ -428,9 +427,12 @@ function SavedForLaterSection({
           >
             <div className="min-w-0">
               <p className="font-medium">{item.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {[item.weight, item.flavour, item.shape].filter(Boolean).join(" · ")}
-              </p>
+              {/* Saved for later, and it must say the same thing the cart said. */}
+              {cartLineChoices(item).length > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {cartLineChoices(item).join(" · ")}
+                </p>
+              ) : null}
               <p className="text-sm font-medium">{formatCurrency(item.price * item.quantity)}</p>
             </div>
             <div className="flex flex-wrap gap-2">

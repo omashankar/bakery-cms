@@ -9,6 +9,7 @@ import { AccountOrderStatusBadge } from "@/apps/website/account/components/accou
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { reorderFromOrder } from "@/apps/website/lib/reorder";
 import { fetchProducts } from "@/features/products/data/products-client";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -199,6 +200,18 @@ export function AccountOrdersPage() {
                     <li key={item.id}>
                       <span className="font-medium text-foreground">{item.quantity} ×</span>{" "}
                       {item.name}
+                      {/*
+                        The customer's own record of what they ordered. It read
+                        "2 × Chocolate Truffle Cake" and stopped — no size, no
+                        flavour, and none of the options they were charged for —
+                        so the one page they can check their own order on could
+                        not tell two different orders of the same product apart.
+                      */}
+                      {cartLineChoices(item).length > 0 ? (
+                        <span className="block text-xs">
+                          {cartLineChoices(item).join(" · ")}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                   {order.items.length > 3 ? (

@@ -7,6 +7,7 @@ import { ArrowLeft, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } 
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Input } from "@/components/ui/input";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { CancelOrderDialog } from "@/apps/admin/commerce/components/cancel-order-dialog";
@@ -319,19 +320,11 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       all. Whoever has to make this order was reading a shorter
                       list than the one the customer paid for.
                     */}
-                    {(() => {
-                      const chosen = [
-                        item.weight,
-                        item.flavour,
-                        item.shape,
-                        ...(item.variantSummary ?? []),
-                      ].filter(Boolean);
-                      return chosen.length > 0 ? (
-                        <p className="mt-0.5 text-sm text-foreground">
-                          {chosen.join(" · ")}
-                        </p>
-                      ) : null;
-                    })()}
+                    {cartLineChoices(item).length > 0 ? (
+                      <p className="mt-0.5 text-sm text-foreground">
+                        {cartLineChoices(item).join(" · ")}
+                      </p>
+                    ) : null}
                     {item.message ? (
                       <p className="mt-1 text-sm text-muted-foreground">
                         Message: {item.message}
