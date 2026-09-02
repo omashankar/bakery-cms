@@ -38,6 +38,7 @@ import {
 import {
   calculateProductUnitPrice,
   formatVariantSummary,
+  displayCompareAtPrice,
 } from "@/features/products/lib/product-pricing";
 import {
   getDefaultVariantSelections,
@@ -207,6 +208,18 @@ export function ProductDetailPage({
         variantSelections: visibleSelections,
       }),
     [cake.price, weightPrice, visibleVariantGroups, visibleSelections]
+  );
+  /**
+   * Struck through, and moved by whatever moved the price beside it.
+   *
+   * `cake.compareAtPrice` is one product-level number while `displayPrice`
+   * changes with the size and every option, so the badge used to disappear at
+   * the larger sizes — silently, at exactly the sizes a shop most wants to
+   * sell.
+   */
+  const displayCompareAt = useMemo(
+    () => displayCompareAtPrice(cake.price, cake.compareAtPrice, displayPrice),
+    [cake.price, cake.compareAtPrice, displayPrice],
   );
   const variantSummary = useMemo(
     () => formatVariantSummary(visibleVariantGroups, visibleSelections),
@@ -485,7 +498,7 @@ export function ProductDetailPage({
               </div>
 
               <div className="rounded-xl border border-border bg-cream-50 p-4">
-                <PriceDisplay price={displayPrice} compareAtPrice={cake.compareAtPrice} />
+                <PriceDisplay price={displayPrice} compareAtPrice={displayCompareAt} />
                 {/*
                   Only when this product IS sold by size.
                   `weight?.serves ?? "8–10"` and `weight?.label ?? "1 kg"` were

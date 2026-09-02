@@ -11,7 +11,10 @@ import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { addToCart } from "@/features/cart/lib/cart";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
-import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
+import {
+  defaultProductUnitPrice,
+  displayCompareAtPrice,
+} from "@/features/products/lib/product-pricing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -35,6 +38,11 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
    * changed", for a choice the customer never made.
    */
   const price = defaultProductUnitPrice(cake);
+  // The card price already includes each group’s DEFAULT option — this shop’s
+  // eggless cakes default to an option that adds money — so the compare-at has
+  // to move with it or the card advertises a discount computed against the
+  // wrong basis.
+  const compareAt = displayCompareAtPrice(cake.price, cake.compareAtPrice, price);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
@@ -161,7 +169,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
         </div>
 
         <div className="mt-auto space-y-3">
-          <PriceDisplay price={price} compareAtPrice={cake.compareAtPrice} size="sm" />
+          <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
           <Button
             type="button"
             variant="bakery"
