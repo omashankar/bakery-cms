@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { applyCouponCode, revalidateCoupon } from "@/features/orders/lib/coupons";
+import { loadCoupons, persistServerCoupons } from "@/features/commerce/lib/coupons-repository";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import { getOrders, placeOrder } from "@/features/orders/lib/orders";
 import {
@@ -53,8 +54,28 @@ const address = {
   pincode: "400001",
 };
 
+/**
+ * The coupons these cases need, switched on BY THE TEST.
+ *
+ * They used to lean on the demo seed shipping WED2026 and BDAY20 as ACTIVE.
+ * That seed is now inactive-by-default — a demo code that resolves is money,
+ * not decoration — and these three went red for a reason that has nothing to do
+ * with whether a coupon outlives its cart. A test about revalidation should own
+ * its fixture.
+ */
+function activateFixtureCoupons() {
+  persistServerCoupons(
+    loadCoupons().map((coupon) =>
+      coupon.code === "WED2026" || coupon.code === "BDAY20"
+        ? { ...coupon, isActive: true }
+        : coupon,
+    ),
+  );
+}
+
 beforeEach(() => {
   localStorage.clear();
+  activateFixtureCoupons();
   // `placeOrder` now confirms with the server and RETRIES on failure. Left
   // unstubbed these tests would each spend the backoff before returning.
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 201 } as Response));

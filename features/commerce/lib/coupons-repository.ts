@@ -37,8 +37,14 @@ export function buildDefaultCoupons(): StoredCoupon[] {
           label: offer.discount,
           description: offer.description,
           percentOff: 20,
-          isActive: true,
-          usageCount: 12,
+          // INACTIVE, and never used. These seed into Mongo as real,
+          // resolvable codes — `getCoupons` is what `priceCart` checks a typed
+          // code against — with no expiry, so on a shop the owner had only
+          // just set up, anyone who guessed BDAY20 took 20% off a live
+          // checkout. They are examples now: visible in the admin, switched
+          // on by the owner when the owner means them.
+          isActive: false,
+          usageCount: 0,
           createdAt: now,
         } satisfies StoredCoupon;
       }
@@ -50,8 +56,8 @@ export function buildDefaultCoupons(): StoredCoupon[] {
           description: offer.description,
           minSubtotal: 10000,
           flatOff: 2000,
-          isActive: true,
-          usageCount: 4,
+          isActive: false,
+          usageCount: 0,
           createdAt: now,
         } satisfies StoredCoupon;
       }
@@ -61,7 +67,9 @@ export function buildDefaultCoupons(): StoredCoupon[] {
         label: offer.discount,
         description: offer.description,
         percentOff: 10,
-        isActive: true,
+        // Inactive for the same reason as the two above: a demo code that
+        // resolves is money, not decoration.
+        isActive: false,
         usageCount: 0,
         createdAt: now,
       } satisfies StoredCoupon;
@@ -75,8 +83,10 @@ export function buildDefaultCoupons(): StoredCoupon[] {
       label: "10% OFF",
       description: "Welcome offer for new customers",
       percentOff: 10,
-      isActive: true,
-      usageCount: 28,
+      // Off, like the rest. This one shipped claiming 28 redemptions on a
+      // shop that had taken no orders.
+      isActive: false,
+      usageCount: 0,
       createdAt: now,
     },
   ];

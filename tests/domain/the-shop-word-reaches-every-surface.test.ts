@@ -327,11 +327,25 @@ describe("modules with no way to reach a setting", () => {
   };
 
   it("counts stock in the shop's own two words", async () => {
+    /**
+     * ONE module load, two answers.
+     *
+     * This mocked, imported, reset and imported AGAIN to change the stock
+     * count — pulling the whole dashboard-analytics graph twice. It timed out
+     * at five seconds in a full parallel run and passed on its own, twice over,
+     * which is flaky rather than slow. The stub holds a mutable number instead.
+     */
+    const stock = { outOfStock: 1 };
     vi.doUnmock("@/apps/admin/commerce/lib/inventory-repository");
     vi.resetModules();
     vi.doMock("@/apps/admin/commerce/lib/inventory-repository", () => ({
       ...INVENTORY_STUB,
-      getInventoryOverview: () => ({ outOfStock: 1, lowStock: 0, totalValue: 0, tracked: 0 }),
+      getInventoryOverview: () => ({
+        outOfStock: stock.outOfStock,
+        lowStock: 0,
+        totalValue: 0,
+        tracked: 0,
+      }),
     }));
 
     /**
@@ -343,19 +357,13 @@ describe("modules with no way to reach a setting", () => {
     const BOXES = { productWord: "Box", productWordPlural: "Boxes" };
 
     const { getDashboardAlerts } = await import("@/apps/admin/dashboard/lib/dashboard-analytics");
-    const one = getDashboardAlerts(BOXES).find((a) => a.id === "inventory-out");
-    expect(one?.value).toBe("1 box");
+    expect(getDashboardAlerts(BOXES).find((a) => a.id === "inventory-out")?.value).toBe("1 box");
 
-    vi.resetModules();
-    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", () => ({
-      ...INVENTORY_STUB,
-      getInventoryOverview: () => ({ outOfStock: 3, lowStock: 0, totalValue: 0, tracked: 0 }),
-    }));
-    const { getDashboardAlerts: again } = await import(
-      "@/apps/admin/dashboard/lib/dashboard-analytics"
-    );
+    stock.outOfStock = 3;
     // "3 boxes", from the configured plural. Appending a letter gives "3 boxs".
-    expect(again(BOXES).find((a) => a.id === "inventory-out")?.value).toBe("3 boxes");
+    expect(getDashboardAlerts(BOXES).find((a) => a.id === "inventory-out")?.value).toBe(
+      "3 boxes",
+    );
 
     vi.doUnmock("@/apps/admin/commerce/lib/inventory-repository");
     vi.resetModules();

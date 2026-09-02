@@ -4,7 +4,6 @@ import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import * as productRepo from "@/features/products/server/product.repository";
-import type { Product } from "@/types/product";
 import type { ProductReview } from "@/types/review";
 
 import * as repo from "./review.repository";
@@ -17,59 +16,14 @@ interface RequestCtx {
   actorEmail?: string;
 }
 
-// ---- Demo seed (ported from the client repo; server products source) --------
-
-const SAMPLE_BODIES = [
-  "Absolutely delicious! Fresh, moist, and beautifully decorated. Will order again.",
-  "Delivered on time and tasted amazing. The whole family loved it.",
-  "Great flavour and presentation. Slightly sweeter than expected but still excellent.",
-  "Perfect for our celebration. Looked exactly like the photos online.",
-  "Soft sponge and rich frosting. One of the best cakes we have ordered.",
-];
-
-const SAMPLE_AUTHORS = [
-  "Priya Sharma",
-  "Rahul Mehta",
-  "Ananya Patel",
-  "Vikram Singh",
-  "Neha Kapoor",
-  "Arjun Desai",
-];
-
-function seedReviewsFromProducts(cakes: Product[]): ProductReview[] {
-  const published = cakes.filter((cake) => cake.status === "published");
-  const reviews: ProductReview[] = [];
-  let index = 0;
-
-  for (const cake of published.slice(0, 12)) {
-    const reviewCount = Math.min(Math.max(cake.reviewCount || 2, 1), 3);
-
-    for (let i = 0; i < reviewCount; i += 1) {
-      const timestamp = new Date(Date.now() - (index + 2) * 86400000 * 5).toISOString();
-      const rating = i === 0 ? Math.round(cake.rating) : 4 + (index % 2);
-      const author = SAMPLE_AUTHORS[index % SAMPLE_AUTHORS.length]!;
-      reviews.push({
-        id: `review-seed-${cake.slug}-${i}`,
-        cakeId: cake.id,
-        productSlug: cake.slug,
-        cakeName: cake.name,
-        authorName: author,
-        authorEmail: `${author.split(" ")[0]?.toLowerCase()}@demo.com`,
-        rating: Math.min(5, Math.max(1, rating)),
-        title: i === 0 ? "Loved it!" : undefined,
-        body: SAMPLE_BODIES[index % SAMPLE_BODIES.length]!,
-        status: index % 7 === 0 ? "pending" : index % 11 === 0 ? "reported" : "approved",
-        isFeatured: index % 9 === 0,
-        reportReason: index % 11 === 0 ? "Customer flagged inappropriate language (demo)" : undefined,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
-      index += 1;
-    }
-  }
-
-  return reviews;
-}
+/**
+ * The demo seed that used to live here is GONE, names and all.
+ *
+ * It wrote invented reviews — “Priya Sharma”, “Rahul Mehta”, at @demo.com
+ * addresses — into the shop’s real database, and the aggregate averaged them
+ * onto its products as if customers had left them. A shop cannot tell which of
+ * its reviews are real once they are in the same collection.
+ */
 
 const seededFlag = createMongoStore<{ done: boolean }>({
   key: "reviews-seeded",
@@ -79,8 +33,21 @@ const seededFlag = createMongoStore<{ done: boolean }>({
 async function ensureSeeded(): Promise<void> {
   const flag = await seededFlag.read();
   if (flag.done) return;
-  const products = await productRepo.listAll();
-  await repo.seedIfEmpty(seedReviewsFromProducts(products));
+  /**
+   * NOTHING IS SEEDED. This wrote invented reviews under invented names, at
+   * `@demo.com` addresses, into the shop’s real database the first time anyone
+   * opened Reviews — and the aggregate then averaged them onto the shop’s own
+   * products as if customers had left them.
+   *
+   * Worse for a shop’s OWN product: the first seeded review took
+   * `Math.round(cake.rating)`, which is 0 for anything nobody has reviewed,
+   * clamped up to 1 — so adding a product earned it a ONE-STAR review from a
+   * customer who does not exist.
+   *
+   * The flag is still written, so a shop that already has the seeded rows
+   * (ids `review-seed-*`) does not get them again; removing those is a data
+   * job, not a code one.
+   */
   await seededFlag.write({ done: true });
 }
 

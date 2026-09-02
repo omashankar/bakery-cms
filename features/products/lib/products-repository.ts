@@ -85,7 +85,11 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     description: cake.description,
     shortDescription: cake.description.slice(0, 100),
     price: cake.price,
-    compareAtPrice: cake.price > 1000 ? Math.round(cake.price * 1.1) : undefined,
+    // NO INVENTED MRP. This was `price > 1000 ? price * 1.1 : undefined`, so
+    // every demo product over Rs 1000 wore a permanent “9% OFF” against a
+    // price nobody had ever charged. A struck-through number is a claim about
+    // the past, and the shop is the only one who can make it.
+    compareAtPrice: cake.compareAtPrice,
     images: [cake.image],
     categoryId: category.id,
     flavourId: flavour?.id,
@@ -136,8 +140,15 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
       isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
       isPhotoCake: cake.category.toLowerCase().includes("photo"),
     }),
-    rating: cake.rating ?? 4.5,
-    reviewCount: cake.reviewCount ?? 12,
+    // Zero, not 4.5. A shop opened advertising “4.5 ★ · 12 reviews” on every
+    // product with no review behind any of it — and the honest aggregate then
+    // averaged its first real review against a number that was never earned.
+    // ZERO, not what the demo data says. The landing fixtures carry their own
+    // 4.9s and 4.7s — fine as marketing copy on the vendor’s own page, and a
+    // lie the moment they are seeded into a real shop’s catalogue as that
+    // shop’s ratings. `?? 0` was not enough: the fixtures do set them.
+    rating: 0,
+    reviewCount: 0,
     seo: {
       // Name only. The shop's brand comes from SEO → Title Suffix, which is
       // applied once at render; baking it in here printed it twice.
