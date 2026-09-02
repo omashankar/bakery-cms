@@ -1,5 +1,9 @@
 import { AppError, ValidationError } from "@/lib/server/http/errors";
+import { connectDB } from "@/lib/server/db/mongoose";
+import { OrderModel } from "@/lib/server/db/models/order.model";
+import { PhotoUploadModel } from "@/lib/server/db/models/photo-upload.model";
 import {
+  deleteFromCloudinary,
   isCloudinaryConfigured,
   uploadToCloudinary,
 } from "@/lib/server/media/cloudinary";
@@ -110,5 +114,110 @@ export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
     "bakery-cms/photo-cakes",
   );
 
+  await trackUpload(asset);
+  /**
+   * AWAITED, not fire-and-forget.
+   *
+   * `void sweepUnclaimedPhotos()` reads as the considerate choice and is the
+   * wrong one here: on a serverless host the function can be frozen the moment
+   * the response is sent, so the sweep would run sometimes, on some requests,
+   * and nobody would ever notice it had stopped. A cleanup that might not happen
+   * is worse than none, because the endpoint is anonymous ON THE STRENGTH of it.
+   *
+   * The cost is one indexed query on the overwhelming majority of uploads, since
+   * there is normally nothing a day old left to sweep.
+   */
+  await sweepUnclaimedPhotos();
+
   return { url: asset.url, bytes: asset.bytes ?? buffer.byteLength };
+}
+
+/**
+ * Remember the asset, so it can be deleted if nothing ever orders it.
+ *
+ * Called for every upload. The row is what makes the anonymous endpoint safe:
+ * without it, a photo somebody chose and then changed their mind about would sit
+ * in the shop's Cloudinary account forever, and abandoning an upload is the
+ * ordinary case rather than the abusive one.
+ */
+async function trackUpload(asset: { url: string; publicId: string }): Promise<void> {
+  try {
+    await connectDB();
+    await PhotoUploadModel.create({ publicId: asset.publicId, url: asset.url });
+  } catch (error) {
+    /**
+     * The asset is already on Cloudinary at this point, so failing here has to
+     * choose between two bad outcomes: a photo stored that nothing will ever
+     * sweep, or an error for a customer whose photo actually uploaded fine.
+     *
+     * It takes the asset back. The row is the ONLY link from a URL to the
+     * Cloudinary id, so a photo stored without one can never be deleted by
+     * anything but a human going into the media console — and the endpoint is
+     * open to the public on the strength of that sweep. A shop whose database
+     * is unreachable cannot take the order either, so nothing is lost by
+     * refusing the upload that was not lost already.
+     */
+    await deleteFromCloudinary(asset.publicId).catch(() => {
+      console.error("[photo-upload] stored but untracked, and could not be removed", asset.publicId);
+    });
+    console.error("[photo-upload] could not track the upload", error);
+    throw new AppError(
+      "We could not attach your photo just now. Please try again in a moment.",
+      503,
+    );
+  }
+}
+
+/** A day. Long enough that somebody can leave the tab open over lunch. */
+const CLAIM_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Bounded, because this runs inside a customer's upload request. */
+const SWEEP_BATCH = 10;
+
+/**
+ * Delete the photos a day old that no order carries.
+ *
+ * Runs ON UPLOAD rather than on a schedule, because this app has no scheduler —
+ * and the property that makes that acceptable is that traffic is the only thing
+ * that creates work here. A shop quiet enough never to sweep is a shop quiet
+ * enough not to be accumulating anything.
+ *
+ * The claim is checked against the ORDERS themselves rather than a flag on the
+ * row. A flag needs an order hook to set it, and a hook that is ever missed —
+ * a COD path, a retry, an import — deletes a photograph out of a real order.
+ * Asking the orders directly cannot drift.
+ *
+ * Failure is swallowed on purpose: the customer is waiting for their upload, and
+ * a housekeeping error is not their problem. It is retried on the next one.
+ */
+async function sweepUnclaimedPhotos(): Promise<void> {
+  try {
+    await connectDB();
+    const stale = await PhotoUploadModel.find({
+      createdAt: { $lt: new Date(Date.now() - CLAIM_WINDOW_MS) },
+    })
+      .limit(SWEEP_BATCH)
+      .lean();
+    if (!stale.length) return;
+
+    const urls = stale.map((row) => row.url);
+    const claimed = new Set<string>();
+    const orders = await OrderModel.find({ "items.photoUrl": { $in: urls } })
+      .select("items")
+      .lean();
+    for (const order of orders) {
+      for (const item of (order.items ?? []) as { photoUrl?: string }[]) {
+        if (item?.photoUrl) claimed.add(item.photoUrl);
+      }
+    }
+
+    for (const row of stale) {
+      // A claimed photo keeps its asset and loses only the row: it belongs to an
+      // order now, and nothing here should ever look at it again.
+      if (!claimed.has(row.url)) await deleteFromCloudinary(row.publicId);
+      await PhotoUploadModel.deleteOne({ _id: row._id });
+    }
+  } catch {
+    /* housekeeping — the next upload tries again */
+  }
 }

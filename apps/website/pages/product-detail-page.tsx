@@ -48,8 +48,6 @@ import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
-import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
@@ -285,14 +283,12 @@ export function ProductDetailPage({
    * else. Nothing is claimed here until the server answers with a URL.
    */
   async function handlePhotoUpload(file: File) {
-    if (!getCustomerSession()) {
-      toast.info("Please sign in to attach a photo", {
-        description: "It travels with your order, so it needs to belong to an account.",
-      });
-      openCustomerAuthModal("phone");
-      return;
-    }
-
+    /**
+     * No sign-in gate. This asked for a phone number and an OTP the moment
+     * somebody pressed Upload — before they had bought anything, on the one
+     * control that makes a photo cake a photo cake. Checkout still requires an
+     * account; deciding does not. The endpoint carries its own limits.
+     */
     setPhotoUploading(true);
     try {
       const body = new FormData();
