@@ -410,21 +410,112 @@ describe("a cake still says everything it used to", () => {
     }
   });
 
-  it("renders the Weight, Shape and Flavour choices it actually offers", () => {
+  it("renders the Weight and Flavour choices it actually offers", () => {
     const { html, unmount } = render(CAKE);
     try {
       expect(html).toContain(">Weight<");
-      expect(html).toContain(">Shape<");
       expect(html).toContain(">Flavour<");
       expect(html).toContain("2 kg");
-      expect(html).toContain("Heart");
       expect(html).toContain("Vanilla");
-      /**
-       * The point of making shapes a variant group: a shape can cost money.
-       * The old `shapes: string[]` held names and nothing else, so a shop
-       * could offer a Heart and had no way to charge for it.
-       */
+    } finally {
+      unmount();
+    }
+  });
+
+  /**
+   * An ADD-ON reads as a tick, a CHOICE reads as buttons — and the rule is read
+   * off the DATA, not the group’s name, so naming it “Shape” or “Egg preference”
+   * changes nothing.
+   */
+  it("shows a two-option upgrade as one tick, with its price", () => {
+    // CAKE’s Shape group is Round (free, default) and Heart (+150) — a
+    // yes-or-no, which used to arrive as a heading over two buttons.
+    const { html, unmount } = render(CAKE);
+    try {
+      expect(html).toContain("Heart");
+      // The surcharge is the whole point: `shapes: string[]` could never say it.
       expect(html).toContain("150");
+      // No heading, and no button for the free side to be “off”.
+      expect(html).not.toContain(">Shape<");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not tick-ify a two-way choice where neither side costs more", () => {
+    /**
+     * Round or Square, both free. A tick has to make one of them the “off”
+     * state, and there is no reason to pick either — the customer would see a
+     * box labelled Square whose unticked meaning is Round, stated nowhere.
+     */
+    const { html, unmount } = render({
+      ...CAKE,
+      variantGroups: [
+        {
+          id: "g-shape",
+          name: "Shape",
+          type: "shape",
+          options: [
+            { id: "round", label: "Round", priceAdjustment: 0, isDefault: true },
+            { id: "square", label: "Square", priceAdjustment: 0 },
+          ],
+        },
+      ],
+    } as never);
+    try {
+      expect(html).toContain(">Shape<");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not tick-ify a group whose DEFAULT is the paid side", () => {
+    /**
+     * A tick starts unticked, and this group starts on the Rs 150 option. The
+     * customer would see an empty box while already being charged for it — and
+     * the grid card, which prices each group’s default, would disagree with the
+     * page by exactly that amount.
+     */
+    const { html, unmount } = render({
+      ...CAKE,
+      variantGroups: [
+        {
+          id: "g-shape",
+          name: "Shape",
+          type: "shape",
+          options: [
+            { id: "heart", label: "Heart", priceAdjustment: 150, isDefault: true },
+            { id: "round", label: "Round", priceAdjustment: 0 },
+          ],
+        },
+      ],
+    } as never);
+    try {
+      expect(html).toContain(">Shape<");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("shows a real three-way choice as buttons", () => {
+    const { html, unmount } = render({
+      ...CAKE,
+      variantGroups: [
+        {
+          id: "g-shape",
+          name: "Shape",
+          type: "shape",
+          options: [
+            { id: "round", label: "Round", priceAdjustment: 0, isDefault: true },
+            { id: "square", label: "Square", priceAdjustment: 0 },
+            { id: "heart", label: "Heart", priceAdjustment: 150 },
+          ],
+        },
+      ],
+    } as never);
+    try {
+      expect(html).toContain(">Shape<");
+      expect(html).toContain("Square");
     } finally {
       unmount();
     }

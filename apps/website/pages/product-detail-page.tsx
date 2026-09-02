@@ -69,6 +69,8 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
 import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
@@ -548,37 +550,84 @@ export function ProductDetailPage({
                 </div>
               ) : null}
 
-              {visibleVariantGroups.map((group) => (
-                <div
-                  key={group.id}
-                  className="contents"
-                  data-gate-egg={group.type === "egg" ? "" : undefined}
-                  data-gate-photo={group.type === "photo" ? "" : undefined}
-                  data-gate-shape={group.type === "shape" ? "" : undefined}
-                >
-                  <OptionGroup label={group.name} count={group.options.length}>
-                    <div className="flex flex-wrap gap-2">
-                      {group.options.map((option) => (
-                        <OptionButton
-                          key={option.id}
-                          active={variantSelections[group.id] === option.id}
-                          onClick={() =>
-                            setVariantSelections((current) => ({
-                              ...current,
-                              [group.id]: option.id,
-                            }))
-                          }
-                        >
-                          {option.label}
-                          {option.priceAdjustment !== 0
-                            ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
-                            : ""}
-                        </OptionButton>
-                      ))}
-                    </div>
-                  </OptionGroup>
-                </div>
-              ))}
+              {/*
+                An ADD-ON reads as a tick, a CHOICE reads as buttons.
+
+                Every group rendered as a labelled row of buttons, so “Eggless”
+                arrived as a heading over [With egg] [Eggless (+₹80)] — two
+                buttons and a title to say one yes-or-no thing. A group with two
+                options whose default costs nothing IS a yes-or-no thing, and
+                the reference storefront shows exactly that: a small tick
+                reading “Eggless”, another reading “Heart Shape”, side by side.
+
+                The rule follows the DATA rather than the group’s name, so a
+                shop gets the compact form by describing an add-on and the
+                buttons by describing a real choice. Round / Square / Heart is
+                three-way and stays buttons; Round / Heart at +₹150 becomes a
+                tick.
+              */}
+              {visibleVariantGroups.map((group) => {
+                const gates = {
+                  "data-gate-egg": group.type === "egg" ? "" : undefined,
+                  "data-gate-photo": group.type === "photo" ? "" : undefined,
+                  "data-gate-shape": group.type === "shape" ? "" : undefined,
+                };
+                const addOn = asAddOn(group);
+
+                if (addOn) {
+                  const on = variantSelections[group.id] === addOn.paid.id;
+                  return (
+                    <label
+                      key={group.id}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
+                      {...gates}
+                    >
+                      <Checkbox
+                        checked={on}
+                        onCheckedChange={(checked) =>
+                          setVariantSelections((current) => ({
+                            ...current,
+                            [group.id]: checked === true ? addOn.paid.id : addOn.free.id,
+                          }))
+                        }
+                      />
+                      <span>{addOn.paid.label}</span>
+                      {addOn.paid.priceAdjustment !== 0 ? (
+                        <span className="text-muted-foreground">
+                          {addOn.paid.priceAdjustment > 0 ? "+" : ""}
+                          {formatCurrency(addOn.paid.priceAdjustment)}
+                        </span>
+                      ) : null}
+                    </label>
+                  );
+                }
+
+                return (
+                  <div key={group.id} className="contents" {...gates}>
+                    <OptionGroup label={group.name} count={group.options.length}>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map((option) => (
+                          <OptionButton
+                            key={option.id}
+                            active={variantSelections[group.id] === option.id}
+                            onClick={() =>
+                              setVariantSelections((current) => ({
+                                ...current,
+                                [group.id]: option.id,
+                              }))
+                            }
+                          >
+                            {option.label}
+                            {option.priceAdjustment !== 0
+                              ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
+                              : ""}
+                          </OptionButton>
+                        ))}
+                      </div>
+                    </OptionGroup>
+                  </div>
+                );
+              })}
 
               {/*
                 The shape picker that stood here is gone. Shapes are a typed
@@ -1041,6 +1090,35 @@ function OptionGroup({
  * shop has filled the field, so an empty one disappears rather than printing
  * somebody else’s product back at the customer.
  */
+/**
+ * A group that is really a yes-or-no, or null.
+ *
+ * Two options, exactly one of which costs nothing and is the default. That is
+ * an ADD-ON — “make it eggless”, “make it a heart” — and a tick says it in one
+ * line where a titled row of two buttons needed three.
+ *
+ * Read off the data, not the group’s name: naming it “Eggless” is the shop’s
+ * business, and a rule keyed on that would break the moment somebody wrote
+ * “Egg preference”. A three-way choice stays buttons, because it is one.
+ */
+function asAddOn(
+  group: ProductVariantGroup,
+): { free: ProductVariantOption; paid: ProductVariantOption } | null {
+  if (group.options.length !== 2) return null;
+
+  const free = group.options.find((option) => option.priceAdjustment === 0);
+  const paid = group.options.find((option) => option !== free);
+  if (!free || !paid) return null;
+  // Both free is a choice with no upgrade in it — Round or Square, neither
+  // costing more — and a tick would have to pick one of them to be “off”.
+  if (paid.priceAdjustment === 0) return null;
+  // The free one has to be what the customer gets by NOT ticking, or the box
+  // starts checked and the price starts higher than the one on the card.
+  const defaulted = group.options.find((option) => option.isDefault) ?? group.options[0];
+  if (defaulted !== free) return null;
+
+  return { free, paid };
+}
 function DetailSection({
   title,
   id,
