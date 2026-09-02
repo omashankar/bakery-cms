@@ -123,6 +123,16 @@ export function ProductsListPage() {
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
   const productsLower = labels.productWordPlural.toLowerCase();
+  /**
+   * `${n} ${noun}` using the shop’s OWN two words.
+   *
+   * These toasts said `${n} cake${n === 1 ? "" : "s"}` — the noun welded in, and
+   * the plural built by appending a letter. Both fail the moment a shop renames
+   * anything: a florist deleting two things was told "2 cakes deleted", and a
+   * shop selling Boxes would have been told "2 Boxs". The plural is a separate
+   * field precisely because it is not always the singular plus s.
+   */
+  const countOf = (n: number) => `${n} ${n === 1 ? productLower : productsLower}`;
   const [filters, setFilters] = useState<ProductListFilters>(defaultProductListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -137,7 +147,9 @@ export function ProductsListPage() {
       setLoadError(null);
     } catch (error) {
       // Leave the previous list on screen rather than blanking the table.
-      setLoadError(error instanceof Error ? error.message : "Failed to load products");
+      setLoadError(
+        error instanceof Error ? error.message : `Failed to load ${productsLower}`,
+      );
     } finally {
       setMounted(true);
     }
@@ -211,19 +223,19 @@ export function ProductsListPage() {
       await refresh();
       setSelectedIds([]);
 
-      if (updated > 0) toast.success(`${updated} cake${updated === 1 ? "" : "s"} ${verb}`);
+      if (updated > 0) toast.success(`${countOf(updated)} ${verb}`);
       // Fewer rows changed than were selected: something was deleted or already
       // in that state. Say so rather than reporting the number asked for.
       const missed = ids.length - updated;
       if (missed > 0) {
-        toast.error(`${missed} cake${missed === 1 ? " was" : "s were"} not updated`);
+        toast.error(`${countOf(missed)} ${missed === 1 ? "was" : "were"} not updated`);
       }
     } catch (error) {
       await refresh();
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not ${verb === "published" ? "publish" : "archive"} the selected products`
+          : `Could not ${verb === "published" ? "publish" : "archive"} the selected ${productsLower}`
       );
     }
   }
@@ -248,8 +260,8 @@ export function ProductsListPage() {
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
     setDeleteTarget(null);
 
-    if (ok > 0) toast.success(`${ok} cake${ok === 1 ? "" : "s"} deleted`);
-    if (failed > 0) toast.error(`${failed} cake${failed === 1 ? "" : "s"} could not be deleted`);
+    if (ok > 0) toast.success(`${countOf(ok)} deleted`);
+    if (failed > 0) toast.error(`${countOf(failed)} could not be deleted`);
   }
 
   function categoryName(categoryId: string) {
@@ -417,7 +429,7 @@ export function ProductsListPage() {
                 })
               }
               className="w-full"
-              aria-label="Product type"
+              aria-label={`${labels.productWord} type`}
             >
               <option value="all">All types</option>
               {modules.eggEggless ? <option value="eggless">Eggless</option> : null}

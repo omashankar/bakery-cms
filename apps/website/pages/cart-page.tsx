@@ -204,7 +204,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 className="border-border bg-cream-50"
                 icon={ShoppingBag}
                 title="Your cart is empty"
-                description={`Browse our delicious ${labels.productWordPlural.toLowerCase()} and add your favourites.`}
+                description={`Browse our ${labels.productWordPlural.toLowerCase()} and add your favourites.`}
                 action={
                   <Button variant="bakery" render={<Link href={routes.store.collections} />}>
                     {`Browse ${labels.productWordPlural}`}

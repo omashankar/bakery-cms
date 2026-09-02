@@ -87,6 +87,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   // form data is never dropped, so a hidden field keeps whatever it had.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
+  const productLower = labels.productWord.toLowerCase();
+  const productsLower = labels.productWordPlural.toLowerCase();
 
   /**
    * An archived cake is off the shop, and the two buttons say something
@@ -143,7 +145,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         setIsLoading(false);
       } catch {
         if (cancelled) return;
-        toast.error("Product not found");
+        toast.error(`${labels.productWord} not found`);
         router.replace(routes.admin.cakes.list);
       }
     }
@@ -268,7 +270,9 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       }
     } catch (error) {
       // Keep the user on the form with their input intact so they can retry.
-      toast.error(error instanceof Error ? error.message : "Could not save this product");
+      toast.error(
+        error instanceof Error ? error.message : `Could not save this ${productLower}`,
+      );
       return;
     } finally {
       setIsSaving(false);
@@ -293,7 +297,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }
 
     if (mode === "add" || !cakeId) {
-      toast.error("Save the product first", {
+      toast.error(`Save the ${productLower} first`, {
         description: "There is nothing to preview until it exists.",
       });
       return;
@@ -333,8 +337,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         title={title}
         description={
           mode === "add"
-            ? "Create a product with pricing, commerce options, classification, and SEO."
-            : "Update product details, stock, customization options, and publishing status."
+            ? `Create a ${productLower} with pricing, commerce options, classification, and SEO.`
+            : `Update ${productLower} details, stock, customization options, and publishing status.`
         }
         actions={
           <div className="hidden flex-wrap items-center gap-2 xl:flex">
@@ -802,7 +806,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                         patchForm({ allowsMessage: checked === true })
                       }
                     />
-                    Allow cake message on PDP
+                    Allow {productLower} message on PDP
                   </label>
                   {modules.photoCake ? (
                     <label className="flex items-center gap-2 text-sm">
@@ -962,7 +966,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Product summary</CardTitle>
+              <CardTitle className="text-base">{labels.productWord} summary</CardTitle>
               <CardDescription>Stock, options and classification</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -993,7 +997,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           <Card>
             <CardContent className="space-y-2">
               <p className="line-clamp-1 text-sm font-medium text-primary">
-                {form.seo.metaTitle || form.name || "Product title"}
+                {form.seo.metaTitle || form.name || `${labels.productWord} title`}
               </p>
               {/*
                 The shop's own domain, not "bakery.com" — the one place in the
@@ -1013,7 +1017,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           </Card>
 
           <Button variant="ghost" className="w-full" render={<Link href={routes.admin.cakes.list} />}>
-            Back to cakes list
+            Back to {productsLower} list
           </Button>
         </div>
       </div>

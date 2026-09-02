@@ -12,6 +12,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { getAdminBreadcrumbs } from "@/lib/admin-breadcrumbs";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,10 @@ interface AdminBreadcrumbsProps {
 export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
-  const crumbs = useMemo(() => getAdminBreadcrumbs(pathname), [pathname]);
+  const labels = useBusinessLabels();
+  // `labels` in the deps, or the trail keeps the wording from first paint and
+  // never picks up the shop’s own after the settings fetch lands.
+  const crumbs = useMemo(() => getAdminBreadcrumbs(pathname, labels), [pathname, labels]);
   const visibleCrumbs = useMemo(
     () => getVisibleCrumbs(crumbs, isMobile),
     [crumbs, isMobile]

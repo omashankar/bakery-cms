@@ -103,7 +103,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
                 <Search className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-12 rounded-xl pl-11 text-base"
-                  placeholder="Search for chocolate, wedding, red velvet..."
+                  placeholder={`Search ${labels.productWordPlural.toLowerCase()}...`}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   autoFocus
