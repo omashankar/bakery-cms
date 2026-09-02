@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
+import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductPreviewPage } from "@/apps/admin/products";
-
-export const metadata: Metadata = {
-  title: "Preview Cake",
-  description: "Preview cake before publishing.",
-};
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { productWord } = await getServerLabels();
+  return {
+    title: `Preview ${productWord}`,
+    description: `Preview ${productWord.toLowerCase()} before publishing.`,
+  };
 }
 
 export default async function Page({ params }: PageProps) {

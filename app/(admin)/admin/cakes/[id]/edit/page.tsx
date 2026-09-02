@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
+import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductFormPage } from "@/apps/admin/products";
-
-export const metadata: Metadata = {
-  title: "Edit Cake",
-  description: "Edit existing cake details.",
-};
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { productWord } = await getServerLabels();
+  return {
+    title: `Edit ${productWord}`,
+    description: `Edit existing ${productWord.toLowerCase()} details.`,
+  };
 }
 
 export default async function Page({ params }: PageProps) {

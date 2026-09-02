@@ -7,6 +7,7 @@ import {
   getStorefrontProductBySlug,
   getStorefrontProductCards,
 } from "@/features/products/data/products-service";
+import { getServerLabels } from "@/features/settings/server/labels.server";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
 import { buildCanonicalUrl } from "@/features/seo/lib/seo-metadata";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
@@ -33,7 +34,10 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   // `shortDescription` are admin-side fields the projection does not carry.
   const cake = await getProductBySlug(slug);
 
-  if (!cake || cake.status !== "published") return { title: "Cake not found" };
+  if (!cake || cake.status !== "published") {
+    const { productWord } = await getServerLabels();
+    return { title: `${productWord} not found` };
+  }
 
   // Falling back to the product's own name and description keeps a shop that has
   // never opened the SEO tab from publishing one shared title anyway.

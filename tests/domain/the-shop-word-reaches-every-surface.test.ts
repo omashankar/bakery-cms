@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_LABELS } from "@/config/business-labels";
 import { getAdminBreadcrumbs } from "@/lib/admin-breadcrumbs";
 
 /**
@@ -72,5 +73,63 @@ describe("the admin breadcrumb", () => {
     expect(trail("/admin/pages/abc123/edit")).toBe("Dashboard > Pages > Edit Page");
     expect(trail("/admin/orders/abc123")).toBe("Dashboard > Orders > Order Details");
     expect(trail("/admin/customers/abc123")).toBe("Dashboard > Customers > Customer Details");
+  });
+});
+
+/**
+ * Nine pages had their wording frozen at module load, in a `<title>` the shop
+ * could never change. Replacing that with a database read puts a query on the
+ * metadata path of pages that have nothing to do with settings — so the read
+ * has to be the kind that cannot take one down.
+ */
+describe("reading the shop word on the server", () => {
+  const REPLACED = ["@/features/settings/server/settings.service"];
+
+  beforeEach(() => {
+    // `resetModules` clears the registry, not the doMock registrations.
+    for (const path of REPLACED) vi.doUnmock(path);
+    vi.resetModules();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("hands back what the shop stored", async () => {
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getLabels: vi.fn(async () => ({
+        collectionsTitle: "Our Blooms",
+        collectionsSubtitle: "Everything we grow.",
+        productWord: "Bouquet",
+        productWordPlural: "Bouquets",
+      })),
+    }));
+
+    const { getServerLabels } = await import("@/features/settings/server/labels.server");
+
+    expect(await getServerLabels()).toMatchObject({
+      productWord: "Bouquet",
+      productWordPlural: "Bouquets",
+    });
+  });
+
+  it("falls back to neutral wording when the database is unreachable", async () => {
+    /**
+     * A `generateMetadata` that throws does not degrade to a plain title — it
+     * fails the render. Without this catch a database blip turns the catalog,
+     * the product form and the wishlist into error pages over their BROWSER TAB
+     * TEXT. Neutral wording in a tab is cosmetic; a 500 on the catalog is not.
+     */
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getLabels: vi.fn(async () => {
+        throw new Error("mongo unreachable");
+      }),
+    }));
+
+    const { getServerLabels } = await import("@/features/settings/server/labels.server");
+
+    await expect(getServerLabels()).resolves.toEqual({
+      collectionsTitle: DEFAULT_LABELS.collectionsTitle,
+      collectionsSubtitle: DEFAULT_LABELS.collectionsSubtitle,
+      productWord: DEFAULT_LABELS.productWord,
+      productWordPlural: DEFAULT_LABELS.productWordPlural,
+    });
   });
 });

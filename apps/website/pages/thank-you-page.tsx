@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { getServerLabels } from "@/features/settings/server/labels.server";
 import { CheckCircle2 } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 
-export function ThankYouPage() {
+export async function ThankYouPage() {
+  // A server component, so the shop’s word is simply awaited — no hook, and no
+  // flash of the neutral default the way a client component would give.
+  const { productWordPlural } = await getServerLabels();
   return (
     <section className={layoutSpacing.sectionY}>
       <div className={layoutSpacing.containerNarrow}>
@@ -26,7 +30,7 @@ export function ThankYouPage() {
               variant="outline"
               render={<Link href={routes.store.collections} />}
             >
-              Browse Cakes
+              Browse {productWordPlural}
             </Button>
           </div>
         </ScrollReveal>
