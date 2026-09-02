@@ -56,6 +56,7 @@ import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
 import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
 
@@ -70,6 +71,7 @@ const EMPTY_OVERVIEW: ProductReviewOverview = {
 };
 
 export function ReviewsAdminPage() {
+  const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [filters, setFilters] = useState<ReviewListFilters>(defaultReviewFilters);
@@ -229,7 +231,7 @@ export function ReviewsAdminPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Reviews"
-        description="Moderate product reviews."
+        description={`Moderate ${labels.productWord.toLowerCase()} reviews.`}
         className="gap-3"
         actions={
           <div className="flex w-full gap-2">
@@ -314,7 +316,7 @@ export function ReviewsAdminPage() {
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search reviews, customers, products…"
+            placeholder={`Search reviews, customers, ${labels.productWordPlural.toLowerCase()}…`}
           />
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <AdminSelect
@@ -352,7 +354,7 @@ export function ReviewsAdminPage() {
             <AdminSelect
               value={filters.productSlug}
               onChange={(event) => updateFilters({ productSlug: event.target.value })}
-              aria-label="Product"
+              aria-label={labels.productWord}
             >
               <option value="">All products</option>
               {cakes.map((cake) => (

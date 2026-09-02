@@ -37,6 +37,7 @@ import {
 } from "@/features/site-layout/lib/appearance-utils";
 import { APPEARANCE_UPDATED_EVENT } from "@/features/site-layout/lib/appearance-utils";
 import { AppearancePreview } from "./appearance-preview";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_OVERVIEW: AppearanceOverview = {
   presetLabel: "—",
@@ -53,6 +54,7 @@ const COLOR_FIELDS = [
 ];
 
 export function AppearancePage() {
+  const labels = useBusinessLabels();
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same
   // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout
@@ -350,7 +352,9 @@ export function AppearancePage() {
                   <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                     Heading
                   </p>
-                  <p className="mt-2 font-heading text-2xl font-bold">Celebration Cakes</p>
+                  {/* The shop’s own headings, so the specimen shows the type at
+                      the words it will actually render. */}
+                  <p className="mt-2 font-heading text-2xl font-bold">{labels.collectionsTitle}</p>
                   <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-4">
@@ -358,8 +362,7 @@ export function AppearancePage() {
                     Body
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Freshly baked cakes, pastries, and confections made with premium
-                    ingredients.
+                    {labels.collectionsSubtitle}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">Inter</p>
                 </div>

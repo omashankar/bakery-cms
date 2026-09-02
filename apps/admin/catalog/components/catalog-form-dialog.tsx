@@ -34,6 +34,7 @@ import {
   updateOccasion,
   updateWeightOption,
 } from "@/features/catalog/lib/catalog-repository";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 /** The rows a new slug has to be unique against, for the section being edited. */
 function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
@@ -58,6 +59,7 @@ export function CatalogFormDialog({
   onOpenChange,
   onSaved,
 }: CatalogFormDialogProps) {
+  const labels = useBusinessLabels();
   const isEdit = Boolean(itemId);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -240,7 +242,7 @@ export function CatalogFormDialog({
             {isEdit ? "Edit" : "Add"} {titles[tab]}
           </DialogTitle>
           <DialogDescription>
-            Catalog data is used in cake forms, collections, and product weight pricing.
+            Catalog data is used in {labels.productWord.toLowerCase()} forms, collections, and weight pricing.
           </DialogDescription>
         </DialogHeader>
 

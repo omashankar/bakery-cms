@@ -16,6 +16,7 @@ import {
   isValidHexColor,
   normalizeHexColor,
 } from "@/features/site-layout/lib/appearance-utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface AppearancePreviewProps {
   settings: AppearanceSettings;
@@ -53,6 +54,7 @@ export function AppearancePreview({
   hydration = "ready",
   saved,
 }: AppearancePreviewProps) {
+  const labels = useBusinessLabels();
   // The saved palette first, the demo default only if there is no saved one —
   // matching what `appearance-page.tsx` does when it live-applies.
   const base = saved ?? defaultAppearanceSettings;
@@ -145,7 +147,7 @@ export function AppearancePreview({
               style={{ backgroundColor: "var(--preview-surface)" }}
             >
               <p className="text-xs font-semibold tracking-widest text-[var(--preview-primary)] uppercase">
-                Featured Cake
+                Featured {labels.productWord}
               </p>
               <h3 className="mt-2 font-heading text-xl font-bold">Chocolate Truffle</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -179,7 +181,7 @@ export function AppearancePreview({
                     borderRadius: "var(--preview-radius)",
                   }}
                 >
-                  Add Cake
+                  Add {labels.productWord}
                 </Button>
               </div>
               <div className="rounded-[var(--preview-radius)] border border-border bg-background p-3">

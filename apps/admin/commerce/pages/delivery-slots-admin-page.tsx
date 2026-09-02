@@ -12,8 +12,10 @@ import {
   SettingsFormGate,
   SettingsHydrationNotice,
 } from "@/apps/admin/settings/components/settings-field-error";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 export function DeliverySlotsAdminPage() {
+  const labels = useBusinessLabels();
   // `hydration` holds the fields closed until the server's copy lands. This
   // screen edits time slots but SAVES the whole commerce section — the tax
   // rate, the delivery fees, the minimum order value — so an unhydrated save
@@ -110,7 +112,7 @@ export function DeliverySlotsAdminPage() {
         <CardHeader>
           <CardTitle className="text-base">Lead time</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sets the earliest selectable delivery date on cake pages.
+            Sets the earliest selectable delivery date on {labels.productWord.toLowerCase()} pages.
           </p>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -152,7 +154,7 @@ export function DeliverySlotsAdminPage() {
           <div>
             <CardTitle className="text-base">Delivery time slots</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Shown on cake detail pages when customers schedule delivery.
+              Shown on {labels.productWord.toLowerCase()} detail pages when customers schedule delivery.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={addSlot}>

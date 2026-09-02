@@ -33,6 +33,7 @@ import {
   type OrderAnalyticsResponse,
 } from "@/features/orders/lib/orders-api";
 import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const rangeOptions: Array<{ value: ReportDateRange; label: string }> = [
   { value: "7d", label: "Last 7 days" },
@@ -109,6 +110,7 @@ const MAX_REFRESH_RETRIES = 4;
 const REFRESH_RETRY_BASE_MS = 5_000;
 
 export function ReportsPage() {
+  const labels = useBusinessLabels();
   const [range, setRange] = useState<ReportDateRange>("30d");
   const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(null);
   const [failed, setFailed] = useState(false);
@@ -543,9 +545,9 @@ export function ReportsPage() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0">
             {awaitingAnalytics ? (
-              <ListLoading rows={4} label="Loading top products" />
+              <ListLoading rows={4} label={`Loading top ${labels.productWordPlural.toLowerCase()}`} />
             ) : topProducts.length === 0 ? (
-              <EmptyState message="No product sales" />
+              <EmptyState message={`No ${labels.productWord.toLowerCase()} sales`} />
             ) : (
               <ul className="divide-y divide-border">
                 {topProducts.map((product, index) => (

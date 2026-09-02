@@ -22,12 +22,14 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductPreviewPageProps {
   cakeId: string;
 }
 
 export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const [cake, setCake] = useState<Product | null>(null);
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
@@ -87,7 +89,7 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
     <AdminPage>
       <AdminPageHeader
         title="Preview"
-        description="Review how this product will appear before publishing to the storefront."
+        description={`Review how this ${labels.productWord.toLowerCase()} will appear before publishing to the storefront.`}
         actions={
           <>
             <Button variant="outline" render={<Link href={routes.admin.cakes.edit(cake.id)} />}>

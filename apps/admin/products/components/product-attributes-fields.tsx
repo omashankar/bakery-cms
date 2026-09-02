@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProductAttribute } from "@/types/product";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductAttributesFieldsProps {
   value: ProductAttribute[];
@@ -26,6 +27,7 @@ interface ProductAttributesFieldsProps {
  * does not remount the row the cursor is in.
  */
 export function ProductAttributesFields({ value, onChange }: ProductAttributesFieldsProps) {
+  const labels = useBusinessLabels();
   function patch(id: string, change: Partial<ProductAttribute>) {
     onChange(value.map((attribute) => (attribute.id === id ? { ...attribute, ...change } : attribute)));
   }
@@ -47,8 +49,8 @@ export function ProductAttributesFields({ value, onChange }: ProductAttributesFi
         <div>
           <p className="text-sm font-medium">Product details</p>
           <p className="text-xs text-muted-foreground">
-            Facts you want shown on the product page — Brand, Material, Warranty,
-            anything this product should state. Not a choice, and never priced.
+            Facts you want shown on the {labels.productWord.toLowerCase()} page — Brand, Material, Warranty,
+            anything this {labels.productWord.toLowerCase()} should state. Not a choice, and never priced.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={add}>
@@ -59,7 +61,7 @@ export function ProductAttributesFields({ value, onChange }: ProductAttributesFi
 
       {value.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted px-4 py-8 text-center text-sm text-muted-foreground">
-          No details yet. Add one to show a fact on the product page, like
+          No details yet. Add one to show a fact on the {labels.productWord.toLowerCase()} page, like
           &ldquo;Brand: Samsung&rdquo; or &ldquo;Material: Ceramic&rdquo;.
         </div>
       ) : (

@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface StockAdjustmentDialogProps {
   item: InventoryItem | null;
@@ -37,6 +38,7 @@ export function StockAdjustmentDialog({
   onOpenChange,
   onAdjusted,
 }: StockAdjustmentDialogProps) {
+  const labels = useBusinessLabels();
   const [type, setType] = useState<AdjustStockInput["type"]>("add");
   const [quantity, setQuantity] = useState("1");
   const [reason, setReason] = useState<AdjustStockInput["reason"]>("manual_adjustment");
@@ -142,7 +144,7 @@ export function StockAdjustmentDialog({
         <DialogHeader>
           <DialogTitle>Adjust stock</DialogTitle>
           <DialogDescription>
-            {item ? `Update inventory for ${item.name}.` : "Select a product to adjust stock."}
+            {item ? `Update inventory for ${item.name}.` : `Select a ${labels.productWord.toLowerCase()} to adjust stock.`}
           </DialogDescription>
         </DialogHeader>
 

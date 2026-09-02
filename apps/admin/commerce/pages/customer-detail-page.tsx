@@ -30,12 +30,14 @@ import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface CustomerDetailPageProps {
   customerId: string;
 }
 
 export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
+  const labels = useBusinessLabels();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [notes, setNotes] = useState("");
@@ -511,7 +513,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                     notesRef.current = event.target.value;
                     setNotes(event.target.value);
                   }}
-                  placeholder="VIP wedding client, prefers eggless cakes, always requests morning delivery…"
+                  placeholder="Repeat client, prefers morning delivery, always asks for a note…"
                 />
               </div>
               <Button variant="bakery" className="w-full" onClick={handleSaveNotes}>

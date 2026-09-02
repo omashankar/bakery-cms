@@ -56,6 +56,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 12;
 
@@ -81,30 +82,38 @@ const typeOptions = [
   "system",
 ] as const;
 
-const preferenceItems = [
-  {
-    key: "orderAlerts" as const,
-    label: "New orders",
-    description: "Orders from the last 30 days",
-  },
-  {
-    key: "paymentAlerts" as const,
-    label: "Payments",
-    description: "Online payments received or failed",
-  },
-  {
-    key: "stockAlerts" as const,
-    label: "Stock alerts",
-    description: "Low stock and out-of-stock products",
-  },
-  {
-    key: "inquiryAlerts" as const,
-    label: "Inquiries",
-    description: "Contact, wedding, and newsletter",
-  },
-];
+/**
+ * Built from the labels rather than fixed at module load: one of these rows
+ * names what the shop sells, and a module constant cannot read a setting.
+ */
+function buildPreferenceItems(labels: { productWordPlural: string }) {
+  return [
+    {
+      key: "orderAlerts" as const,
+      label: "New orders",
+      description: "Orders from the last 30 days",
+    },
+    {
+      key: "paymentAlerts" as const,
+      label: "Payments",
+      description: "Online payments received or failed",
+    },
+    {
+      key: "stockAlerts" as const,
+      label: "Stock alerts",
+      description: `Low stock and out-of-stock ${labels.productWordPlural.toLowerCase()}`,
+    },
+    {
+      key: "inquiryAlerts" as const,
+      label: "Inquiries",
+      description: "Contact, wedding, and newsletter",
+    },
+  ];
+}
 
 export function NotificationsAdminPage() {
+  const labels = useBusinessLabels();
+  const preferenceItems = buildPreferenceItems(labels);
   /**
    * This screen's own data, asked for NOW.
    *

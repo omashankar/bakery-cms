@@ -22,6 +22,7 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { AdminSelect } from "./admin-field";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductVariantManagerProps {
   groups: ProductVariantGroup[];
@@ -36,6 +37,7 @@ const groupTypeLabels: Record<ProductVariantGroupType, string> = {
 };
 
 export function ProductVariantManager({ groups, basePrice, onChange }: ProductVariantManagerProps) {
+  const labels = useBusinessLabels();
   // Egg / photo variant presets are bakery modules — hide those type options when
   // the module is off, but never for a group that already uses the type (so a
   // product's existing variant data stays fully editable).
@@ -197,8 +199,8 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
 
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted px-4 py-8 text-center text-sm text-muted-foreground">
-          No options yet. Add one if this product comes in more than one version —
-          a size, a colour, a capacity. Products sold one way need none.
+          No options yet. Add one if this {labels.productWord.toLowerCase()} comes in more than one version —
+          a size, a colour, a capacity. {labels.productWordPlural} sold one way need none.
         </div>
       ) : (
         <div className="space-y-4">

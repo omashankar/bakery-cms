@@ -45,6 +45,7 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_STORE: CatalogStore = {
   categories: [],
@@ -75,6 +76,7 @@ const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }
 ];
 
 export function CatalogAdminPage() {
+  const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
@@ -244,7 +246,7 @@ export function CatalogAdminPage() {
     // Three of this shop's products are already in that state.
     const orphans = orphanCount();
     if (orphans > 0) {
-      const noun = orphans === 1 ? "product is" : "products are";
+      const noun = orphans === 1 ? `${labels.productWord.toLowerCase()} is` : `${labels.productWordPlural.toLowerCase()} are`;
       const which = selectedIds.length === 1 ? "category" : "categories";
       const ok = window.confirm(
         `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
@@ -465,7 +467,7 @@ export function CatalogAdminPage() {
                       activeTab === "weights" && "modifier" in item
                         ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
                         : activeTab === "categories"
-                          ? `${productsByCategory.get(item.id) ?? 0} products`
+                          ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
                           : slug
                             ? `/${slug}`
                             : "—";
@@ -519,7 +521,7 @@ export function CatalogAdminPage() {
                   activeTab === "weights" && "modifier" in item
                     ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
                     : activeTab === "categories"
-                      ? `${productsByCategory.get(item.id) ?? 0} products`
+                      ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
                       : slug
                         ? `/${slug}`
                         : null;

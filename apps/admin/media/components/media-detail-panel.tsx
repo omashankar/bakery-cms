@@ -179,7 +179,7 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
                 reading localStorage keys that no longer exist, so it said this
                 about images that were live on the homepage. */}
             {isUsageIndexReady()
-              ? "Not used in cakes, banners, pages, testimonials, the site layout or either page builder."
+              ? `Not used in ${labels.productWordPlural.toLowerCase()}, banners, pages, testimonials, the site layout or either page builder.`
               : "Checking where this is used…"}
           </p>
         )}

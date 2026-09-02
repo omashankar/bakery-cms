@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface DeleteProductDialogProps {
   open: boolean;
@@ -25,7 +26,8 @@ export function DeleteProductDialog({
   onOpenChange,
   onConfirm,
 }: DeleteProductDialogProps) {
-  const label = count > 1 ? `${count} products` : `"${cakeName ?? "this product"}"`;
+  const labels = useBusinessLabels();
+  const label = count > 1 ? `${count} ${labels.productWordPlural.toLowerCase()}` : `"${cakeName ?? `this ${labels.productWord.toLowerCase()}`}"`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

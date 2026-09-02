@@ -47,6 +47,7 @@ import {
 import { getStorefrontPageUrl } from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
 import { fromScheduleInputValue, toScheduleInputValue } from "@/lib/datetime-local";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface PageFormPageProps {
   mode: "add" | "edit";
@@ -85,6 +86,7 @@ function serializeForm(form: CmsPageFormData): string {
 }
 
 export function PageFormPage({ mode, pageId }: PageFormPageProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const [form, setForm] = useState<CmsPageFormData>(createEmptyPageForm);
   const [baseline, setBaseline] = useState(() => serializeForm(createEmptyPageForm()));
@@ -686,7 +688,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                       className={adminTextareaClassName}
                       rows={2}
                       value={about.ctaDescription ?? ""}
-                      placeholder="Explore our cakes, or reach out for something custom."
+                      placeholder={`Explore our ${labels.productWordPlural.toLowerCase()}, or reach out for something custom.`}
                       onChange={(event) => patchAbout({ ctaDescription: event.target.value })}
                     />
                   </div>
@@ -696,7 +698,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                       <Input
                         id="about-cta-primary"
                         value={about.ctaPrimaryLabel ?? ""}
-                        placeholder="Browse Cakes"
+                        placeholder={`Browse ${labels.productWordPlural}`}
                         onChange={(event) => patchAbout({ ctaPrimaryLabel: event.target.value })}
                       />
                     </div>
@@ -848,7 +850,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                         },
                       })
                     }
-                    placeholder="cakes, bakery, catering"
+                    placeholder={`${labels.productWordPlural.toLowerCase()}, delivery, custom orders`}
                   />
                 </div>
                 <PhotoField

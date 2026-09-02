@@ -57,6 +57,7 @@ import { MediaUploadDialog } from "./media-upload-dialog";
 import { useMediaUsageSync } from "../lib/use-media-usage-sync";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 12;
 
@@ -69,6 +70,7 @@ const EMPTY_STATS = {
 };
 
 export function MediaLibraryPage() {
+  const labels = useBusinessLabels();
   /**
    * This screen's own data, asked for NOW.
    *
@@ -211,7 +213,7 @@ export function MediaLibraryPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Media Library"
-        description="Upload and organize images for cakes, banners, and builders."
+        description={`Upload and organize images for ${labels.productWordPlural.toLowerCase()}, banners, and builders.`}
         className="gap-3"
         actions={
           <div className="flex w-full gap-2">
