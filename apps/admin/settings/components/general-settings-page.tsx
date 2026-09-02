@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { GeneralSettings, LabelOverrides } from "@/types/settings";
+import { describeWordingProblems, guessPlural } from "@/config/business-labels";
 import {
   currencyOptions,
   defaultGeneralSettings,
@@ -82,8 +83,21 @@ export function GeneralSettingsPage() {
    */
   const [wording, setWording] = useState<LabelOverrides>({});
   const [wordingDirty, setWordingDirty] = useState(false);
+  /**
+   * Whether the plural box is the shop’s OWN answer rather than a guess.
+   *
+   * The same rule the product form uses for slug-follows-name: derive until
+   * somebody types in the box themselves, then never touch it again. Seeded
+   * true whenever a plural is already stored, so an existing answer — a shop
+   * that wrote “Mithai” for both — is never overwritten by an English rule.
+   */
+  const [pluralTouched, setPluralTouched] = useState(false);
   useEffect(() => {
-    const sync = () => setWording(getLabelSettings());
+    const sync = () => {
+      const stored = getLabelSettings();
+      setWording(stored);
+      if (stored.productWordPlural?.trim()) setPluralTouched(true);
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
@@ -93,6 +107,24 @@ export function GeneralSettingsPage() {
     setWording((prev) => ({ ...prev, ...patch }));
     setWordingDirty(true);
   }
+
+  /**
+   * One word typed, two boxes filled.
+   *
+   * Both were blank and independent, so an owner had to fill each and could
+   * fill them the same — this shop put “products” in both, and every plural
+   * surface then read “Add products”. The guess is only ever a starting value;
+   * the box below stays editable because these are English rules and a shop
+   * selling Mithai is right and they are not.
+   */
+  function editProductWord(value: string) {
+    editWording({
+      productWord: value,
+      ...(pluralTouched ? {} : { productWordPlural: guessPlural(value) }),
+    });
+  }
+
+  const wordingProblems = describeWordingProblems(wording);
 
   async function handleSave() {
     if (hasErrors || !canSave) return;
@@ -222,23 +254,50 @@ export function GeneralSettingsPage() {
                 <Input
                   id="productWord"
                   value={wording.productWord ?? ""}
-                  onChange={(e) => editWording({ productWord: e.target.value })}
+                  aria-describedby={wordingProblems.productWord ? "productWord-hint" : undefined}
+                  onChange={(e) => editProductWord(e.target.value)}
                   placeholder={labels.productWord}
                 />
+                {wordingProblems.productWord ? (
+                  <p id="productWord-hint" className="text-xs text-amber-700">
+                    {wordingProblems.productWord}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="productWordPlural">And more than one?</Label>
+                <Label htmlFor="productWordPlural">
+                  And more than one?{" "}
+                  {pluralTouched ? null : (
+                    <span className="font-normal text-muted-foreground">— filled in for you</span>
+                  )}
+                </Label>
                 <Input
                   id="productWordPlural"
                   value={wording.productWordPlural ?? ""}
-                  onChange={(e) => editWording({ productWordPlural: e.target.value })}
+                  aria-describedby={
+                    wordingProblems.productWordPlural ? "productWordPlural-hint" : undefined
+                  }
+                  onChange={(e) => {
+                    // From here on this box is the shop’s own answer, and the
+                    // English guess must never overwrite it again.
+                    setPluralTouched(true);
+                    editWording({ productWordPlural: e.target.value });
+                  }}
                   placeholder={labels.productWordPlural}
                 />
+                {wordingProblems.productWordPlural ? (
+                  <p id="productWordPlural-hint" className="text-xs text-amber-700">
+                    {wordingProblems.productWordPlural}
+                  </p>
+                ) : null}
               </div>
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Used across the admin and your storefront — &ldquo;Add {labels.productWord}
-                &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;. Leave
-                blank to use the default wording.
+                &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;.
+                {" "}
+                <strong className="font-medium">Leave both blank</strong> if you sell more
+                than one kind of thing — the default wording is the honest one for a
+                mixed catalogue.
               </p>
 
               {/*
