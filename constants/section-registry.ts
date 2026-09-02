@@ -1,3 +1,4 @@
+import type { ResolvedLabels } from "@/config/business-labels";
 import { brandInfo } from "@/constants/landing-data";
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import { routes } from "@/constants/routes";
@@ -8,6 +9,51 @@ import type {
   SectionBackground,
   SectionFieldDef,
 } from "@/types/homepage-builder";
+
+/**
+ * Wording in this file that belongs to the SHOP, written as a token.
+ *
+ * This registry is plain data with no way to reach a setting, and six builder
+ * fields read "Max cakes shown" while two section types were called "Featured
+ * Cakes" and "Trending Cakes" — chrome the admin reads, in a builder a florist
+ * uses. A token rather than a lookup keyed by the English literal, so that
+ * editing the surrounding words cannot quietly disconnect the substitution, and
+ * so a new section opts in by writing one.
+ *
+ * `defaultContent` is deliberately NOT resolved. That is the page copy a shop
+ * then edits and stores; substituting into it would rewrite text an admin owns.
+ */
+const LABEL_TOKENS = {
+  "{Products}": (l: RegistryLabels) => l.productWordPlural,
+  "{products}": (l: RegistryLabels) => l.productWordPlural.toLowerCase(),
+  "{Product}": (l: RegistryLabels) => l.productWord,
+  "{product}": (l: RegistryLabels) => l.productWord.toLowerCase(),
+} as const;
+
+export type RegistryLabels = Pick<ResolvedLabels, "productWord" | "productWordPlural">;
+
+function fillTokens(text: string, labels: RegistryLabels): string {
+  let out = text;
+  for (const [token, read] of Object.entries(LABEL_TOKENS)) {
+    out = out.split(token).join(read(labels));
+  }
+  return out;
+}
+
+/** A registry entry with the shop’s own words in its CHROME. */
+export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
+  entry: T,
+  labels: RegistryLabels,
+): T {
+  return {
+    ...entry,
+    label: fillTokens(entry.label, labels),
+    fields: entry.fields.map((field) => ({
+      ...field,
+      label: fillTokens(field.label, labels),
+    })),
+  };
+}
 
 export interface HomepageSectionRegistryEntry {
   type: HomepageSectionType;
@@ -278,7 +324,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "featured-cakes",
-    label: "Featured Cakes",
+    label: "Featured {Products}",
     icon: "Star",
     defaultBackground: "white",
     defaultContent: {
@@ -292,12 +338,12 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
     ],
   },
   {
     type: "trending",
-    label: "Trending Cakes",
+    label: "Trending {Products}",
     icon: "TrendingUp",
     defaultBackground: "cream",
     defaultContent: {
@@ -310,7 +356,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
     ],
   },
   {
@@ -328,7 +374,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
     ],
   },
   {
@@ -390,7 +436,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
     ],
@@ -412,7 +458,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
     ],
@@ -434,7 +480,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max cakes shown", type: "number" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
     ],

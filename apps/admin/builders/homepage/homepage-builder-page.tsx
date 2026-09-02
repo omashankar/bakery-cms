@@ -25,9 +25,11 @@ import {
 } from "@/lib/datetime-local";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   createSectionInstance,
   getRegistryEntry,
+  resolveRegistryEntry,
   HOMEPAGE_SECTION_REGISTRY,
 } from "@/constants/section-registry";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
@@ -86,6 +88,27 @@ const EMPTY_META = {
 };
 
 export function HomepageBuilderPage() {
+  const labels = useBusinessLabels();
+  /**
+   * One choke point for the registry’s CHROME.
+   *
+   * Six builder fields read “Max cakes shown” and two section types were called
+   * “Featured Cakes” / “Trending Cakes”, in a builder every trade uses. The
+   * registry is plain data and cannot read a setting, so it carries tokens and
+   * they are filled HERE — in the one place this page resolves an entry, rather
+   * than in each of the three components that render one.
+   */
+  const resolveEntry = useCallback(
+    (type: HomepageSectionType) => {
+      const entry = getRegistryEntry(type);
+      return entry ? resolveRegistryEntry(entry, labels) : undefined;
+    },
+    [labels],
+  );
+  const registry = useMemo(
+    () => HOMEPAGE_SECTION_REGISTRY.map((entry) => resolveRegistryEntry(entry, labels)),
+    [labels],
+  );
   const [mounted, setMounted] = useState(false);
   /**
    * Whether the saved layout was actually READ.
@@ -343,7 +366,7 @@ export function HomepageBuilderPage() {
     setSelectedId(instance.instanceId);
     setListFilter("all");
     setMobilePanel("editor");
-    toast.success(`${getRegistryEntry(type)?.label ?? "Section"} added`);
+    toast.success(`${resolveEntry(type)?.label ?? "Section"} added`);
   }
 
   function handleDuplicateSection(id: string) {
@@ -662,7 +685,7 @@ export function HomepageBuilderPage() {
             onAdd={() => setAddDialogOpen(true)}
             onDuplicate={handleDuplicateSection}
             onRemove={(id) => setConfirm({ type: "remove", id })}
-            resolveEntry={(type) => getRegistryEntry(type)}
+            resolveEntry={resolveEntry}
             reorderEnabled={listFilter === "all"}
             totalCount={sections.length}
             emptyMessage={
@@ -769,8 +792,8 @@ export function HomepageBuilderPage() {
           <SectionEditorPanel
             section={selectedSection}
             onChange={handleSectionChange}
-            resolveEntry={(type) => getRegistryEntry(type)}
-            settingsNote="Cake grids use the catalog. Promo banners come from Banner Manager. Site footer is managed under Footer."
+            resolveEntry={resolveEntry}
+            settingsNote={`${labels.productWordPlural} grids use the catalog. Promo banners come from Banner Manager. Site footer is managed under Footer.`}
           />
         </aside>
       </div>
@@ -779,7 +802,7 @@ export function HomepageBuilderPage() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onAdd={handleAddSection}
-        registry={HOMEPAGE_SECTION_REGISTRY}
+        registry={registry}
         title="Add homepage section"
         description="Choose a section type to add to the layout."
       />

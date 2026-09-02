@@ -8,6 +8,7 @@ import { routes } from "@/constants/routes";
 import { SafeImage } from "@/components/shared/safe-image";
 import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,6 +16,24 @@ import { cn } from "@/lib/utils";
  * the bakery template, then drops wedding links after mount for other business
  * types (settings live in client localStorage).
  */
+/**
+ * The demo category list, with the one entry that names the SHOP’S GOODS
+ * rather than a category renamed to whatever the shop calls them.
+ *
+ * This fallback renders only while a shop has no categories of its own — which
+ * is exactly a brand-new non-bakery shop, the one that must not be shown a menu
+ * reading “All Cakes”. Matched by href, like the admin nav, rather than by
+ * position: the rest of the list is demo CATEGORY names and stays as written.
+ */
+function useFallbackCategories(): MegaMenuLink[] {
+  const labels = useBusinessLabels();
+  return shopMegaMenu.categories.map((category) =>
+    category.href === routes.store.collections
+      ? { ...category, label: `All ${labels.productWordPlural}` }
+      : category,
+  );
+}
+
 function useWeddingLinkFilter() {
   const [weddingEnabled, setWeddingEnabled] = useState(true);
   useEffect(() => {
@@ -50,13 +69,14 @@ interface MegaMenuProps {
 
 export function MegaMenu({ isActive, label = "Shop", categories: shopCategories }: MegaMenuProps) {
   const filterWedding = useWeddingLinkFilter();
+  const fallbackCategories = useFallbackCategories();
   const categories = filterWedding(
     shopCategories?.length
       ? shopCategories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         }))
-      : shopMegaMenu.categories,
+      : fallbackCategories,
   );
   const occasions = filterWedding(shopMegaMenu.occasions);
   // The first of the shop's own categories that has a picture. Nothing to show
@@ -172,13 +192,14 @@ export function MobileShopLinks({
   categories?: ShopCategory[];
 }) {
   const filterWedding = useWeddingLinkFilter();
+  const fallbackCategories = useFallbackCategories();
   const categories = filterWedding(
     shopCategories?.length
       ? shopCategories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         }))
-      : shopMegaMenu.categories,
+      : fallbackCategories,
   );
   return (
     <div className="space-y-1 border-t border-border pt-3">

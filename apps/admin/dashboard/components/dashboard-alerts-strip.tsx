@@ -6,6 +6,7 @@ import { AlertTriangle, Bell, ChevronRight, MessageSquare, Package } from "lucid
 import { syncNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { getDashboardAlerts, type DashboardAlert } from "../lib/dashboard-analytics";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 
@@ -24,16 +25,18 @@ const toneStyles = {
 
 export function DashboardAlertsStrip() {
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const labels = useBusinessLabels();
 
   useEffect(() => {
     function refresh() {
       syncNotifications();
-      setAlerts(getDashboardAlerts());
+      setAlerts(getDashboardAlerts(labels));
     }
 
     refresh();
     return subscribeToAdminData(refresh);
-  }, []);
+    // `labels` here too, or the strip keeps the wording from first paint.
+  }, [labels]);
 
   if (alerts.length === 0) return null;
 

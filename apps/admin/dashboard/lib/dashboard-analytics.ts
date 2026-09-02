@@ -1,3 +1,4 @@
+import type { ResolvedLabels } from "@/config/business-labels";
 import { getInventoryOverview } from "@/apps/admin/commerce/lib/inventory-repository";
 import { countUnreadNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
 import { countNewInquiries } from "@/apps/admin/inquiries";
@@ -151,7 +152,13 @@ export function toDashboardCommerceAnalytics(
   };
 }
 
-export function getDashboardAlerts(): DashboardAlert[] {
+/**
+ * `labels` is required: the out-of-stock line names what the shop sells, and
+ * this runs on the first screen after login.
+ */
+export function getDashboardAlerts(
+  labels: Pick<ResolvedLabels, "productWord" | "productWordPlural">,
+): DashboardAlert[] {
   const inventory = getInventoryOverview();
   const newInquiries = countNewInquiries();
   const unreadNotifications = countUnreadNotifications();
@@ -161,7 +168,13 @@ export function getDashboardAlerts(): DashboardAlert[] {
     alerts.push({
       id: "inventory-out",
       label: "Out of stock",
-      value: `${inventory.outOfStock} product${inventory.outOfStock === 1 ? "" : "s"}`,
+      // The shop’s OWN two words — never the singular with a letter appended,
+      // which is why the plural is a separate field.
+      value: `${inventory.outOfStock} ${
+        inventory.outOfStock === 1
+          ? labels.productWord.toLowerCase()
+          : labels.productWordPlural.toLowerCase()
+      }`,
       href: routes.admin.commerce.inventory,
       tone: "destructive",
     });

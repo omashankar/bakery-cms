@@ -78,13 +78,17 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
 
   getAllProducts().forEach((cake) => {
     if (cake.image === normalized) {
-      refs.push({ label: cake.name, context: "Storefront cake" });
+      // A stable KEY, not display text. What a shop calls its goods is a
+      // setting, and this module has no way to read one — the panel that
+      // renders `context` does. `countMediaUsage` only ever takes `.length`,
+      // so keeping the wording out of here leaves it needing nothing.
+      refs.push({ label: cake.name, context: "storefront-product" });
     }
   });
 
   loadProducts().forEach((cake) => {
     if (cake.images.includes(normalized)) {
-      refs.push({ label: cake.name, context: "Admin cake" });
+      refs.push({ label: cake.name, context: "admin-product" });
     }
   });
 

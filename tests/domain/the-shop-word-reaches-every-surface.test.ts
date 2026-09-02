@@ -233,3 +233,128 @@ describe("the command palette", () => {
     );
   });
 });
+
+/**
+ * Plain-data modules and pure functions, which cannot read a setting at all.
+ *
+ * Each one built display text that named the goods and handed it to exactly one
+ * client component. The fix is either a labels parameter or, where the module
+ * has no business knowing the wording, a stable key resolved at the point of
+ * render.
+ */
+describe("modules with no way to reach a setting", () => {
+  const FLORIST = { productWord: "Bouquet", productWordPlural: "Bouquets" };
+
+  it("fills the builder's chrome tokens with the shop's word", async () => {
+    const { HOMEPAGE_SECTION_REGISTRY, resolveRegistryEntry } = await import(
+      "@/constants/section-registry"
+    );
+
+    const featured = HOMEPAGE_SECTION_REGISTRY.find((e) => e.type === "featured-cakes");
+    expect(featured, "the featured section went missing").toBeDefined();
+    const resolved = resolveRegistryEntry(featured!, FLORIST);
+
+    expect(resolved.label).toBe("Featured Bouquets");
+    expect(resolved.fields.find((f) => f.key === "maxCount")?.label).toBe("Max bouquets shown");
+  });
+
+  it("leaves no token unfilled and no bakery noun in any builder field", async () => {
+    const { HOMEPAGE_SECTION_REGISTRY, resolveRegistryEntry } = await import(
+      "@/constants/section-registry"
+    );
+
+    /**
+     * Sections that ARE a bakery product type, each behind its own module
+     * switch, exactly like the Wedding Builder. “Photo Cakes” and “Eggless
+     * Cakes” name those FEATURES, not the generic word for what a shop sells —
+     * a florist switches them off rather than renaming them. Listed here so the
+     * decision is recorded, and so a NEW cake-named section has to be argued
+     * for rather than slipping past.
+     */
+    const GATED_BAKERY_FEATURES = new Set(["photo-cakes", "eggless", "wedding-preview"]);
+
+    for (const entry of HOMEPAGE_SECTION_REGISTRY) {
+      const resolved = resolveRegistryEntry(entry, FLORIST);
+      const gated = GATED_BAKERY_FEATURES.has(entry.type);
+      // A token that survives is a typo rendered to the admin as "{Products}".
+      expect(resolved.label, entry.type).not.toMatch(/[{}]/);
+      if (!gated) expect(resolved.label, entry.type).not.toMatch(/cake/i);
+      for (const field of resolved.fields) {
+        expect(field.label, `${entry.type}.${field.key}`).not.toMatch(/[{}]/);
+        // Field labels stay generic even inside a gated section — “Max cakes
+        // shown” on the Eggless rail names the goods, not the feature.
+        expect(field.label, `${entry.type}.${field.key}`).not.toMatch(/cake/i);
+      }
+    }
+  });
+
+  it("does not rewrite the page copy a shop owns", async () => {
+    const { HOMEPAGE_SECTION_REGISTRY, resolveRegistryEntry } = await import(
+      "@/constants/section-registry"
+    );
+
+    /**
+     * `defaultContent` is seed copy the admin then edits and stores. Filling
+     * tokens into it would rewrite text that belongs to them, and would differ
+     * from what every existing shop already has saved.
+     *
+     * Asserted by REFERENCE, not by value. A deep-equal check passes for a
+     * function that rebuilds this object, because no `defaultContent` value
+     * happens to contain a token today — so it would go green for exactly the
+     * change it exists to forbid, right up until someone writes one.
+     */
+    for (const entry of HOMEPAGE_SECTION_REGISTRY) {
+      expect(resolveRegistryEntry(entry, FLORIST).defaultContent, entry.type).toBe(
+        entry.defaultContent,
+      );
+    }
+  });
+
+  it("counts stock in the shop's own two words", async () => {
+    vi.doUnmock("@/apps/admin/commerce/lib/inventory-repository");
+    vi.resetModules();
+    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", async (importOriginal) => ({
+      ...(await importOriginal<Record<string, unknown>>()),
+      getInventoryOverview: () => ({ outOfStock: 1, lowStock: 0, totalValue: 0, tracked: 0 }),
+    }));
+
+    /**
+     * An IRREGULAR plural on purpose. With Bouquet/Bouquets — or any noun whose
+     * plural is the singular plus s — this case passes whether the code reads
+     * the configured plural or just appends a letter, so it could not fail for
+     * the bug it is named after.
+     */
+    const BOXES = { productWord: "Box", productWordPlural: "Boxes" };
+
+    const { getDashboardAlerts } = await import("@/apps/admin/dashboard/lib/dashboard-analytics");
+    const one = getDashboardAlerts(BOXES).find((a) => a.id === "inventory-out");
+    expect(one?.value).toBe("1 box");
+
+    vi.resetModules();
+    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", async (importOriginal) => ({
+      ...(await importOriginal<Record<string, unknown>>()),
+      getInventoryOverview: () => ({ outOfStock: 3, lowStock: 0, totalValue: 0, tracked: 0 }),
+    }));
+    const { getDashboardAlerts: again } = await import(
+      "@/apps/admin/dashboard/lib/dashboard-analytics"
+    );
+    // "3 boxes", from the configured plural. Appending a letter gives "3 boxs".
+    expect(again(BOXES).find((a) => a.id === "inventory-out")?.value).toBe("3 boxes");
+
+    vi.doUnmock("@/apps/admin/commerce/lib/inventory-repository");
+    vi.resetModules();
+  });
+
+  it("keeps display wording out of the media usage index", async () => {
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync("apps/admin/media/lib/media-usage.ts", "utf8"),
+    );
+
+    // This module is imported by `countMediaUsage`, which only ever reads
+    // `.length`. Threading labels in for text nobody counts would spread the
+    // wording further than it needs to go, so it emits keys instead.
+    expect(source).not.toMatch(/"Storefront cake"|"Admin cake"/);
+    expect(source).toContain('"storefront-product"');
+    expect(source).toContain('"admin-product"');
+  });
+});

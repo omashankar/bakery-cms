@@ -18,6 +18,7 @@ import { loadMediaFolders } from "../lib/media-folders";
 import { formatFileSize } from "../lib/media-utils";
 import type { MediaFile } from "@/types/media";
 import { MediaThumbnail } from "./media-thumbnail";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface MediaDetailPanelProps {
   file: MediaFile | null;
@@ -26,6 +27,20 @@ interface MediaDetailPanelProps {
 }
 
 export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelProps) {
+  // Before the early return — a hook cannot sit after one.
+  const labels = useBusinessLabels();
+  /**
+   * `getMediaUsageDetails` emits stable KEYS for the two product contexts, so
+   * the wording is chosen here, where a setting can be read. Anything else it
+   * reports (“Banner”, “Page”) already names a part of the admin and passes
+   * through untouched.
+   */
+  const contextLabel = (context: string) => {
+    if (context === "storefront-product") return `Storefront ${labels.productWord.toLowerCase()}`;
+    if (context === "admin-product") return `Admin ${labels.productWord.toLowerCase()}`;
+    return context;
+  };
+
   if (!file) {
     return (
       <div className="flex h-full min-h-64 flex-col">
@@ -153,7 +168,7 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
                   variant="outline"
                   className="text-xs"
                 >
-                  {ref.context}: {ref.label}
+                  {contextLabel(ref.context)}: {ref.label}
                 </Badge>
               ))}
             </div>
