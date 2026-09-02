@@ -295,48 +295,31 @@ describe("editing a seeded product does not silently drop its flags", () => {
   });
 });
 
-describe("SMELL: the shape list is duplicated and divergent", () => {
+describe("the shape list was duplicated and divergent, and is not any more", () => {
   /**
-   * Two of the four copies are gone. It was TRIPLICATED, and worse than
-   * duplicated — the two copies that mattered were not lists of what a product
-   * offers but defaults imposed on every product that named none, so a phone
-   * charger was sold in Round, Square and Heart.
+   * CLOSED. It was FOUR copies, and the two that mattered were not lists of
+   * what a product offers but defaults imposed on every product that named
+   * none — so a phone charger was sold in Round, Square and Heart.
    *
-   * Removed: `createEmptyProductForm().shapes` (a new product now names none)
-   * and `getProductShapeOptions`' storefront fallback (a product with no shapes
-   * now shows no shape picker, instead of three cake shapes and an order line
-   * stamped "Round").
-   *
-   * What remains is a genuine, narrower smell: the admin form hardcodes the
-   * four shapes it offers as checkboxes, while `DEFAULT_PRODUCT_SHAPES` — now
-   * reached only by the demo bakery seed — knows three. Tick "Rectangle" and no
-   * shared list agrees it exists.
+   * The last of it was the admin form hardcoding four shapes as checkboxes
+   * while `DEFAULT_PRODUCT_SHAPES` knew three: tick “Rectangle” and no shared
+   * list agreed it existed. That list is gone. A shape is a typed VARIANT
+   * GROUP now, so a shop names its own and prices each one, and there is no
+   * second list left to diverge from.
    */
-  it("documents that the admin form offers a shape no shared list knows about", () => {
-    // The two removals, pinned so they cannot quietly come back.
+  it("names no shapes of its own anywhere", () => {
     expect(createEmptyProductForm().shapes).toEqual([]);
     expect(getProductShapeOptions({ shapes: [] } as never)).toEqual([]);
 
-    /**
-     * Read from the FORM, not retyped here.
-     *
-     * The first version of this declared `const formOffers = ["Round","Square",
-     * "Heart","Rectangle"]` three lines above `expect(formOffers).toContain
-     * ("Rectangle")` — a literal checked against itself, which is true for as
-     * long as someone keeps typing it and says nothing about the form. Delete
-     * Rectangle from the checkboxes and it would still have passed.
-     */
     const form = readFileSync(
       join(process.cwd(), "apps/admin/products/components/product-form-page.tsx"),
       "utf8",
     );
-    const shapeBlock = form.slice(form.indexOf("Available shapes"));
-    const formOffers = [...shapeBlock.matchAll(/"(Round|Square|Heart|Rectangle)"/g)].map(
-      (match) => match[1],
-    );
 
-    expect(formOffers).toContain("Rectangle");
-    // features/products/lib/product-mapper.ts:5 — now the demo seed's list only.
-    expect([...DEFAULT_PRODUCT_SHAPES]).not.toContain("Rectangle");
+    // Read from the FORM, not retyped here — the first version of this declared
+    // the four names three lines above asserting on them, which is a literal
+    // checked against itself.
+    expect(form).not.toContain("Available shapes");
+    expect(form).not.toContain("toggleShape");
   });
 });

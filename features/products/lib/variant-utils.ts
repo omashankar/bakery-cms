@@ -228,12 +228,19 @@ export function getVariantOption(
  */
 export function variantGroupsEnabledBy(
   groups: ProductVariantGroup[],
-  modules: { eggEggless: boolean; photoCake: boolean },
+  /**
+   * `shape` joined these when the flat `shapes: string[]` became a typed
+   * group. It is REQUIRED rather than optional: this function is the one gate
+   * the storefront, the card projection and the server’s pricing all share, so
+   * a caller that forgot to pass it would price a group the page had hidden.
+   */
+  modules: { eggEggless: boolean; photoCake: boolean; shape: boolean },
 ): ProductVariantGroup[] {
   return groups.filter(
     (group) =>
       (group.type !== "egg" || modules.eggEggless) &&
-      (group.type !== "photo" || modules.photoCake),
+      (group.type !== "photo" || modules.photoCake) &&
+      (group.type !== "shape" || modules.shape),
   );
 }
 

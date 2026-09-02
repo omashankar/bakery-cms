@@ -2,7 +2,17 @@ import type { BaseEntity, EntityStatus, SeoFields } from "./common";
 
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
-export type ProductVariantGroupType = "egg" | "photo" | "custom";
+/**
+ * `shape` joined these when the flat `shapes: string[]` was retired.
+ *
+ * That list held NAMES with nowhere to put a price, so a shop could say a cake
+ * came in Round and Heart and could not charge more for the Heart — and the
+ * four names it offered were hardcoded, so a shop wanting “Number” or a bouquet
+ * size had no way to say so. A typed group is what egg preference and photo
+ * cakes already were, so shapes stop being a second system, and the type is
+ * what lets `modules.shape` keep gating them.
+ */
+export type ProductVariantGroupType = "egg" | "photo" | "shape" | "custom";
 
 /**
  * Machine-readable meaning of a variant option.

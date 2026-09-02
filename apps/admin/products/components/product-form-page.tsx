@@ -210,15 +210,6 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
-  function toggleShape(shape: string, checked: boolean) {
-    setForm((prev) => ({
-      ...prev,
-      shapes: checked
-        ? [...prev.shapes, shape]
-        : prev.shapes.filter((item) => item !== shape),
-    }));
-  }
-
   async function saveProduct(intent: SaveIntent, redirectToList = true) {
     if (!form.name.trim()) {
       toast.error("A name is required");
@@ -757,27 +748,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   />
                 </div>
 
-                {modules.shape ? (
-                  <div className="space-y-2">
-                    <Label>Available shapes</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["Round", "Square", "Heart", "Rectangle"].map((shape) => (
-                        <label
-                          key={shape}
-                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={form.shapes.includes(shape)}
-                            onCheckedChange={(checked) =>
-                              toggleShape(shape, checked === true)
-                            }
-                          />
-                          {shape}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                {/*
+                  The four hardcoded shape checkboxes — Round, Square, Heart,
+                  Rectangle — are gone. They wrote a list of NAMES with nowhere
+                  to put a price, so a shop could offer a Heart and could not
+                  charge for it, and a shop wanting any other shape had no way
+                  to say so. Shapes are a variant group in the Options tab now,
+                  with a price on each.
+                */}
 
                 {modules.flavour ? (
                   <div className="space-y-2">

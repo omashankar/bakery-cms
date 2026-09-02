@@ -28,7 +28,6 @@ import {
   getProductFlavourOptions,
   getProductGalleryImages,
   getProductReviews,
-  getProductShapeOptions,
   getDeliveryTimeSlots,
   getDeliveryPromise,
   getMinDeliveryDate,
@@ -116,7 +115,6 @@ export function ProductDetailPage({
    */
   const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
   const flavourOptions = useMemo(() => getProductFlavourOptions(cake), [cake]);
-  const shapeOptions = useMemo(() => getProductShapeOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
   const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
   /** The shop's own facts about this product. Empty when it states none. */
@@ -147,10 +145,6 @@ export function ProductDetailPage({
 
   const [selectedWeight, setSelectedWeight] = useState(0);
   const [selectedFlavour, setSelectedFlavour] = useState(flavourOptions[0] ?? "");
-  // No "Round" fallback. A product that offers no shapes has no selected shape —
-  // the same empty-string convention `selectedFlavour` above already uses, and
-  // what stops `addToCart` stamping a choice onto a line that never had one.
-  const [selectedShape, setSelectedShape] = useState(shapeOptions[0] ?? "");
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>(() =>
     getDefaultVariantSelections(variantGroups)
   );
@@ -277,7 +271,6 @@ export function ProductDetailPage({
     setWishlisted(isInWishlist(cake.slug));
     setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
     setSelectedFlavour(getProductFlavourOptions(cake)[0] ?? "");
-    setSelectedShape(getProductShapeOptions(cake)[0] ?? "");
     setSelectedWeight(0);
   }, [cake.slug]);
 
@@ -391,13 +384,10 @@ export function ProductDetailPage({
       // the module, so without this a shop that switched Flavour off still had
       // "Chocolate" on every order line, invoice and confirmation email.
       flavour: (modules.flavour && selectedFlavour) || undefined,
-      // Shape reads the same way as flavour now. It was `modules.shape ?
-      // selectedShape : undefined`, and `selectedShape` fell back to the literal
-      // "Round" — so a shop with the Shape module on (any shop selling cakes)
-      // stamped "Round" onto every phone charger and gift hamper it sold, on the
-      // order line, the invoice and the baker's email, for a picker that renders
-      // nothing because the product offers no shapes.
-      shape: (modules.shape && selectedShape) || undefined,
+      // No `shape` on the line any more. A shape is a variant group, so the
+      // choice travels in `variantSummary` as “Shape: Heart” with every other
+      // option — one place, which is what `cartLineChoices` was written for.
+      // The field stays on the type because ORDERS ALREADY PLACED carry it.
       message: message.trim() || undefined,
       photoUrl: photoUrl || undefined,
       deliveryDate,
@@ -564,6 +554,7 @@ export function ProductDetailPage({
                   className="contents"
                   data-gate-egg={group.type === "egg" ? "" : undefined}
                   data-gate-photo={group.type === "photo" ? "" : undefined}
+                  data-gate-shape={group.type === "shape" ? "" : undefined}
                 >
                   <OptionGroup label={group.name} count={group.options.length}>
                     <div className="flex flex-wrap gap-2">
@@ -589,23 +580,13 @@ export function ProductDetailPage({
                 </div>
               ))}
 
-              {modules.shape ? (
-                <div className="contents" data-gate-shape>
-                  <OptionGroup label="Shape" count={shapeOptions.length}>
-                    <div className="flex flex-wrap gap-2">
-                      {shapeOptions.map((shape) => (
-                        <OptionButton
-                          key={shape}
-                          active={selectedShape === shape}
-                          onClick={() => setSelectedShape(shape)}
-                        >
-                          {shape}
-                        </OptionButton>
-                      ))}
-                    </div>
-                  </OptionGroup>
-                </div>
-              ) : null}
+              {/*
+                The shape picker that stood here is gone. Shapes are a typed
+                VARIANT GROUP now, rendered by the loop above like egg
+                preference and photo cake — so each one can carry a price, a
+                shop can name its own rather than choosing from four hardcoded
+                ones, and there is one option system instead of two.
+              */}
 
               {cake.allowsMessage !== false ? (
                 <div className="space-y-2">

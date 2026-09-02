@@ -52,6 +52,17 @@ const photo = {
   ],
 } as unknown as ProductVariantGroup;
 
+const shape = {
+  id: "shape",
+  name: "Shape",
+  type: "shape",
+  required: false,
+  options: [
+    { id: "round", label: "Round", priceAdjustment: 0, isDefault: true },
+    { id: "heart", label: "Heart", priceAdjustment: 150 },
+  ],
+} as unknown as ProductVariantGroup;
+
 const size = {
   id: "tier",
   name: "Tiers",
@@ -72,6 +83,32 @@ describe("the groups a shop with these modules sells", () => {
     });
 
     expect(kept.map((group) => group.id)).toEqual(["photo", "tier"]);
+  });
+
+  /**
+   * Shapes became a typed group when the flat `shapes: string[]` was retired.
+   * The Shape MODULE has to keep gating them, or a switch a shop can still see
+   * in Settings quietly stops meaning anything — and worse, the storefront and
+   * the server’s pricing share this one filter, so a group the page hid would
+   * still be charged for.
+   */
+  it("drops the shape group when Shape is off", () => {
+    const kept = variantGroupsEnabledBy([egg, photo, shape, size], {
+      ...defaultModuleSettings,
+      shape: false,
+    });
+
+    expect(kept.map((group) => group.id)).toEqual(["egg", "photo", "tier"]);
+  });
+
+  it("does not charge for a shape the page did not show", () => {
+    const priced = (groups: ProductVariantGroup[]) =>
+      calculateVariantAdjustment(groups, { shape: "heart" });
+
+    expect(priced([shape])).toBe(150);
+    expect(
+      priced(variantGroupsEnabledBy([shape], { ...defaultModuleSettings, shape: false })),
+    ).toBe(0);
   });
 
   it("drops the photo group when Photo Cake is off", () => {

@@ -33,6 +33,7 @@ interface ProductVariantManagerProps {
 const groupTypeLabels: Record<ProductVariantGroupType, string> = {
   egg: "Egg preference",
   photo: "Photo cake",
+  shape: "Shape",
   custom: "Custom",
 };
 
@@ -80,7 +81,12 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
    * off never strands data an admin can no longer edit.
    */
   const showTypeControl = (type: ProductVariantGroupType): boolean =>
-    modules.eggEggless || modules.photoCake || type === "egg" || type === "photo";
+    modules.eggEggless ||
+    modules.photoCake ||
+    modules.shape ||
+    type === "egg" ||
+    type === "photo" ||
+    type === "shape";
 
   /**
    * Give a bakery its egg/eggless group — without taking anything away.
@@ -251,6 +257,15 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                       ) : null}
                       {modules.photoCake || group.type === "photo" ? (
                         <option value="photo">Photo cake</option>
+                      ) : null}
+                      {/*
+                        Typed, so `modules.shape` can still hide these the way
+                        it hid the old checkbox list — and so a shop that
+                        switches the module off does not lose the ability to
+                        EDIT a shape group it already has.
+                      */}
+                      {modules.shape || group.type === "shape" ? (
+                        <option value="shape">Shape</option>
                       ) : null}
                       <option value="custom">Custom</option>
                     </AdminSelect>

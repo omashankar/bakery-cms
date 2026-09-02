@@ -83,9 +83,21 @@ const CAKE: Product = {
     { label: "1 kg", price: 999, serves: "8–10" },
     { label: "2 kg", price: 1799, serves: "16–20" },
   ],
-  shapes: ["Round", "Heart"],
+  // Retired. `shapes` was a list of NAMES with nowhere to put a price; it is a
+  // typed variant group below, so a Heart can cost more than a Round.
+  shapes: [],
   flavours: ["Chocolate", "Vanilla"],
-  variantGroups: [],
+  variantGroups: [
+    {
+      id: "g-shape",
+      name: "Shape",
+      type: "shape",
+      options: [
+        { id: "round", label: "Round", priceAdjustment: 0, isDefault: true },
+        { id: "heart", label: "Heart", priceAdjustment: 150 },
+      ],
+    },
+  ],
 };
 
 function render(cake: Product): {
@@ -407,6 +419,12 @@ describe("a cake still says everything it used to", () => {
       expect(html).toContain("2 kg");
       expect(html).toContain("Heart");
       expect(html).toContain("Vanilla");
+      /**
+       * The point of making shapes a variant group: a shape can cost money.
+       * The old `shapes: string[]` held names and nothing else, so a shop
+       * could offer a Heart and had no way to charge for it.
+       */
+      expect(html).toContain("150");
     } finally {
       unmount();
     }
