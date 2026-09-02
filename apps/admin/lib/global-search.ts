@@ -1,4 +1,5 @@
-import { adminNavSections } from "@/constants/navigation";
+import type { ResolvedLabels } from "@/config/business-labels";
+import { adminNavSections, navItemLabel } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isWeddingEnabled } from "@/features/settings/lib/settings-repository";
 import { loadProducts } from "@/features/products/lib/products-repository";
@@ -46,8 +47,12 @@ export interface GlobalSearchOptions {
   groupFilter?: GlobalSearchGroup | "all";
 }
 
-const GROUP_LABELS: Record<GlobalSearchGroup, string> = {
-  products: "Products",
+/**
+ * The FIXED group headings. `products` is deliberately absent: it names what
+ * the shop sells, so it comes from the labels at render time. Everything else
+ * here names a part of the admin and is nobody’s to rename.
+ */
+const GROUP_LABELS: Record<Exclude<GlobalSearchGroup, "products">, string> = {
   orders: "Orders",
   customers: "Customers",
   coupons: "Coupons",
@@ -253,85 +258,106 @@ const SETTINGS_ENTRIES: GlobalSearchResult[] = [
   },
 ];
 
-const ACTION_ENTRIES: GlobalSearchResult[] = [
-  {
-    id: "action-add-cake",
-    group: "actions",
-    title: "Add new cake",
-    subtitle: "Create a product",
-    href: routes.admin.cakes.add,
-    keywords: ["create", "product", "new"],
-  },
-  {
-    id: "action-add-page",
-    group: "actions",
-    title: "Add new page",
-    subtitle: "CMS content page",
-    href: routes.admin.pages.add,
-    keywords: ["create", "content"],
-  },
-  {
-    id: "action-upload-media",
-    group: "actions",
-    title: "Open media library",
-    subtitle: "Upload images",
-    href: routes.admin.media,
-    keywords: ["upload", "image", "asset"],
-  },
-  {
-    id: "action-coupons",
-    group: "actions",
-    title: "Manage coupons",
-    subtitle: "Discount codes",
-    href: routes.admin.commerce.coupons,
-    keywords: ["discount", "promo"],
-  },
-  {
-    id: "action-inventory",
-    group: "actions",
-    title: "Adjust inventory",
-    subtitle: "Stock levels",
-    href: routes.admin.commerce.inventory,
-    keywords: ["stock", "quantity"],
-  },
-  {
-    id: "action-delivery-zones",
-    group: "actions",
-    title: "Manage delivery zones",
-    subtitle: "Pincode and city pricing",
-    href: routes.admin.commerce.deliveryZones,
-    keywords: ["shipping", "zone"],
-  },
-  {
-    id: "action-reports",
-    group: "actions",
-    title: "View reports",
-    subtitle: "Sales and performance",
-    href: routes.admin.reports,
-    keywords: ["analytics", "revenue"],
-  },
-  {
-    id: "action-storefront",
-    group: "actions",
-    title: "View storefront",
-    subtitle: "Customer website",
-    href: routes.store.home,
-    keywords: ["website", "preview"],
-  },
-];
+/**
+ * Quick actions, built PER CALL.
+ *
+ * This was a module-level constant, so its wording was fixed when the file was
+ * first imported and no setting could ever move it. The first row of an empty
+ * palette read "Add new cake" in every shop of every trade.
+ */
+function buildActionEntries(labels: PaletteLabels): GlobalSearchResult[] {
+  return [
+    {
+      id: "action-add-cake",
+      group: "actions",
+      title: `Add new ${labels.productWord.toLowerCase()}`,
+      subtitle: `Create a ${labels.productWord.toLowerCase()}`,
+      href: routes.admin.cakes.add,
+      // "cake" and "product" stay MATCHABLE whatever the shop calls things.
+      // These are what an admin types, not what they read — dropping them would
+      // make a working search stop working to fix a label.
+      keywords: ["create", "new", "product", "cake", labels.productWord.toLowerCase()],
+    },
+    {
+      id: "action-add-page",
+      group: "actions",
+      title: "Add new page",
+      subtitle: "CMS content page",
+      href: routes.admin.pages.add,
+      keywords: ["create", "content"],
+    },
+    {
+      id: "action-upload-media",
+      group: "actions",
+      title: "Open media library",
+      subtitle: "Upload images",
+      href: routes.admin.media,
+      keywords: ["upload", "image", "asset"],
+    },
+    {
+      id: "action-coupons",
+      group: "actions",
+      title: "Manage coupons",
+      subtitle: "Discount codes",
+      href: routes.admin.commerce.coupons,
+      keywords: ["discount", "promo"],
+    },
+    {
+      id: "action-inventory",
+      group: "actions",
+      title: "Adjust inventory",
+      subtitle: "Stock levels",
+      href: routes.admin.commerce.inventory,
+      keywords: ["stock", "quantity"],
+    },
+    {
+      id: "action-delivery-zones",
+      group: "actions",
+      title: "Manage delivery zones",
+      subtitle: "Pincode and city pricing",
+      href: routes.admin.commerce.deliveryZones,
+      keywords: ["shipping", "zone"],
+    },
+    {
+      id: "action-reports",
+      group: "actions",
+      title: "View reports",
+      subtitle: "Sales and performance",
+      href: routes.admin.reports,
+      keywords: ["analytics", "revenue"],
+    },
+    {
+      id: "action-storefront",
+      group: "actions",
+      title: "View storefront",
+      subtitle: "Customer website",
+      href: routes.store.home,
+      keywords: ["website", "preview"],
+    },
+  ];
+}
 
-function buildNavigationEntries(): GlobalSearchResult[] {
+function buildNavigationEntries(labels: PaletteLabels): GlobalSearchResult[] {
   const entries: GlobalSearchResult[] = [];
 
   for (const section of adminNavSections) {
     for (const item of section.items) {
+      // The one item that names goods rather than a screen. Shared with the
+      // sidebar so the two cannot drift apart again.
+      const label = navItemLabel(item, labels);
       entries.push({
         id: `nav-${item.href}`,
         group: "navigation",
-        title: item.label,
+        title: label,
         subtitle: section.title,
         href: item.href,
-        keywords: [section.title.toLowerCase(), item.label.toLowerCase()],
+        // `item.label` as well as the shown one, so the words an admin has
+        // always typed keep finding the row after it is renamed.
+        keywords: [
+          section.title.toLowerCase(),
+          label.toLowerCase(),
+          item.label.toLowerCase(),
+        ],
       });
 
       for (const child of item.children ?? []) {
@@ -350,16 +376,34 @@ function buildNavigationEntries(): GlobalSearchResult[] {
   return entries;
 }
 
-const NAVIGATION_ENTRIES = buildNavigationEntries();
+/** Everything the palette needs from the shop’s wording. */
+export type PaletteLabels = Pick<ResolvedLabels, "productWord" | "productWordPlural">;
 
-export function getGlobalSearchGroupLabel(group: GlobalSearchGroup): string {
-  return GROUP_LABELS[group];
+/**
+ * The palette rows that are CHROME rather than data — actions and navigation.
+ *
+ * Exported so recent searches can be re-titled from the live wording instead of
+ * replaying the text that was on screen when they were clicked.
+ */
+export function getGlobalSearchChromeEntries(labels: PaletteLabels): GlobalSearchResult[] {
+  return [...buildActionEntries(labels), ...buildNavigationEntries(labels)];
 }
 
-export function getGlobalSearchGroupHints(): Array<{ prefix: string; label: string }> {
+export function getGlobalSearchGroupLabel(
+  group: GlobalSearchGroup,
+  labels: PaletteLabels,
+): string {
+  return group === "products" ? labels.productWordPlural : GROUP_LABELS[group];
+}
+
+export function getGlobalSearchGroupHints(
+  labels: PaletteLabels,
+): Array<{ prefix: string; label: string }> {
   return [
     { prefix: "order:", label: "Orders" },
-    { prefix: "product:", label: "Products" },
+    // The PREFIX stays `product:`. It is query syntax an admin types and
+    // `parseGlobalSearchQuery` matches literally; only the hint text moves.
+    { prefix: "product:", label: labels.productWordPlural },
     { prefix: "customer:", label: "Customers" },
     { prefix: "inquiry:", label: "Inquiries" },
     { prefix: "stock:", label: "Inventory" },
@@ -569,23 +613,36 @@ function searchSettings(text: string, limit: number): GlobalSearchResult[] {
   return SETTINGS_ENTRIES.filter((entry) => matchesQuery(entry, text)).slice(0, limit);
 }
 
-function searchNavigation(text: string, limit: number): GlobalSearchResult[] {
+function searchNavigation(
+  text: string,
+  limit: number,
+  labels: PaletteLabels,
+): GlobalSearchResult[] {
   // Don't surface the Wedding Builder in search when it's hidden from the sidebar.
   const weddingOn = isWeddingEnabled();
-  return NAVIGATION_ENTRIES.filter(
+  return buildNavigationEntries(labels).filter(
     (entry) =>
       (weddingOn || entry.href !== routes.admin.builders.wedding) && matchesQuery(entry, text)
   ).slice(0, limit);
 }
 
-function searchActions(text: string, limit: number): GlobalSearchResult[] {
-  return ACTION_ENTRIES.filter((entry) => matchesQuery(entry, text)).slice(0, limit);
+function searchActions(
+  text: string,
+  limit: number,
+  labels: PaletteLabels,
+): GlobalSearchResult[] {
+  return buildActionEntries(labels)
+    .filter((entry) => matchesQuery(entry, text))
+    .slice(0, limit);
 }
 
 /** Client-side admin global search across catalog, commerce, CMS, and settings */
 export function searchAdminGlobal(
   query: string,
-  options: GlobalSearchOptions = {}
+  // Ahead of `options` because it is required and that one is not — the shop’s
+  // wording is not an option.
+  labels: PaletteLabels,
+  options: GlobalSearchOptions = {},
 ): GlobalSearchResult[] {
   const limitPerGroup = options.limitPerGroup ?? 5;
   const parsed = parseGlobalSearchQuery(query);
@@ -627,16 +684,16 @@ export function searchAdminGlobal(
     results.push(...searchSettings(text, limitPerGroup));
   }
   if (shouldSearchGroup("navigation", groupFilter)) {
-    results.push(...searchNavigation(text, limitPerGroup));
+    results.push(...searchNavigation(text, limitPerGroup, labels));
   }
   if (shouldSearchGroup("actions", groupFilter)) {
-    results.push(...searchActions(text, limitPerGroup));
+    results.push(...searchActions(text, limitPerGroup, labels));
   }
 
   return results;
 }
 
-export function getGlobalSearchShortcuts(): GlobalSearchResult[] {
+export function getGlobalSearchShortcuts(labels: PaletteLabels): GlobalSearchResult[] {
   const popularHrefs = new Set<string>([
     routes.admin.dashboard,
     routes.admin.orders.list,
@@ -647,13 +704,14 @@ export function getGlobalSearchShortcuts(): GlobalSearchResult[] {
   ]);
 
   return [
-    ...ACTION_ENTRIES.slice(0, 4),
-    ...NAVIGATION_ENTRIES.filter((entry) => popularHrefs.has(entry.href)),
+    ...buildActionEntries(labels).slice(0, 4),
+    ...buildNavigationEntries(labels).filter((entry) => popularHrefs.has(entry.href)),
   ];
 }
 
 export function groupGlobalSearchResults(
-  results: GlobalSearchResult[]
+  results: GlobalSearchResult[],
+  labels: PaletteLabels,
 ): Array<{ group: GlobalSearchGroup; label: string; items: GlobalSearchResult[] }> {
   const order: GlobalSearchGroup[] = [
     "actions",
@@ -673,7 +731,7 @@ export function groupGlobalSearchResults(
   return order
     .map((group) => ({
       group,
-      label: GROUP_LABELS[group],
+      label: getGlobalSearchGroupLabel(group, labels),
       items: results.filter((item) => item.group === group),
     }))
     .filter((section) => section.items.length > 0);

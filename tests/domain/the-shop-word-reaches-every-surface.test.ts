@@ -133,3 +133,103 @@ describe("reading the shop word on the server", () => {
     });
   });
 });
+
+/**
+ * Ctrl+K, the surface where the wording and the SEARCH SYNTAX are the same
+ * strings.
+ *
+ * Its rows were module-level constants, evaluated the first time the file was
+ * imported, so no setting could move them: the first row of an empty palette
+ * read "Add new cake" in every shop of every trade, and the navigation row said
+ * "Cakes" beside a sidebar that already said the shop's own word.
+ *
+ * Relabelling here can break something a label fix has no business breaking —
+ * an admin who has typed "cakes" for a year must keep finding the row.
+ */
+describe("the command palette", () => {
+  const FLORIST = { productWord: "Bouquet", productWordPlural: "Bouquets" };
+
+  it("builds its rows per call, not once at import", async () => {
+    const { getGlobalSearchChromeEntries } = await import("@/apps/admin/lib/global-search");
+
+    const florist = getGlobalSearchChromeEntries(FLORIST);
+    const baker = getGlobalSearchChromeEntries({
+      productWord: "Cake",
+      productWordPlural: "Cakes",
+    });
+
+    // Same module, same call, two answers. A frozen constant cannot do this.
+    expect(florist.find((e) => e.id === "action-add-cake")?.title).toBe("Add new bouquet");
+    expect(baker.find((e) => e.id === "action-add-cake")?.title).toBe("Add new cake");
+  });
+
+  it("names the catalog row and the group heading with the shop's word", async () => {
+    const { getGlobalSearchChromeEntries, getGlobalSearchGroupLabel, getGlobalSearchGroupHints } =
+      await import("@/apps/admin/lib/global-search");
+
+    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/cakes"));
+    expect(nav?.title).toBe("Bouquets");
+
+    expect(getGlobalSearchGroupLabel("products", FLORIST)).toBe("Bouquets");
+    // …and nothing else moves. These name parts of the admin, not the goods.
+    expect(getGlobalSearchGroupLabel("orders", FLORIST)).toBe("Orders");
+    expect(getGlobalSearchGroupLabel("settings", FLORIST)).toBe("Settings");
+
+    const hint = getGlobalSearchGroupHints(FLORIST).find((h) => h.prefix === "product:");
+    expect(hint?.label).toBe("Bouquets");
+  });
+
+  it("leaves no bakery noun in any row a florist reads", async () => {
+    const { getGlobalSearchChromeEntries } = await import("@/apps/admin/lib/global-search");
+
+    for (const entry of getGlobalSearchChromeEntries(FLORIST)) {
+      expect(`${entry.title} ${entry.subtitle ?? ""}`, entry.id).not.toMatch(/cake/i);
+    }
+  });
+
+  /**
+   * The half a relabel can silently break. Display text and search text are the
+   * same strings here: `keywords` is built from the label, and PREFIX_GROUPS
+   * matches typed tokens literally.
+   */
+  it("still answers to the words an admin has always typed", async () => {
+    const { getGlobalSearchChromeEntries, parseGlobalSearchQuery } = await import(
+      "@/apps/admin/lib/global-search"
+    );
+
+    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/cakes"));
+    // Renamed to Bouquets, and "products" still finds it — that is the built-in
+    // label, kept as a keyword precisely so a rename does not orphan the row.
+    expect(nav?.keywords).toContain("products");
+    expect(nav?.keywords).toContain("bouquets");
+
+    // The prefixes are query SYNTAX, not wording. Changing them would stop
+    // parseGlobalSearchQuery parsing what people already type.
+    for (const typed of ["product:", "products:", "cake:", "cakes:"]) {
+      expect(parseGlobalSearchQuery(`${typed}red`), typed).toEqual({
+        text: "red",
+        groupFilter: "products",
+      });
+    }
+  });
+
+  it("re-titles a recent click from the live wording, and leaves data alone", async () => {
+    const { recentSearchToResult } = await import("@/apps/admin/lib/global-search-history");
+    const stored = {
+      id: "action-add-cake",
+      title: "Add new cake",
+      href: "/admin/cakes/add",
+      group: "actions" as const,
+      visitedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    // Chrome: the stored text is stale the moment the shop renames.
+    expect(recentSearchToResult(stored, "Add new bouquet").title).toBe("Add new bouquet");
+
+    // A product or an order has no live chrome title, and its stored one is
+    // DATA — the name of a real record. It must survive untouched.
+    expect(recentSearchToResult({ ...stored, id: "product-1", group: "products" }).title).toBe(
+      "Add new cake",
+    );
+  });
+});

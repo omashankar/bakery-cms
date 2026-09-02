@@ -36,7 +36,9 @@ import {
   recentSearchToResult,
   recordRecentSearch,
 } from "@/apps/admin/lib/global-search-history";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
+  getGlobalSearchChromeEntries,
   getGlobalSearchGroupHints,
   getGlobalSearchGroupLabel,
   getGlobalSearchShortcuts,
@@ -48,8 +50,11 @@ import {
 } from "@/apps/admin/lib/global-search";
 import { cn } from "@/lib/utils";
 
-const GROUP_ICONS: Record<GlobalSearchGroup, typeof Search> = {
-  products: Cake,
+/**
+ * `products` is absent on purpose — it is the shop’s icon, and comes from the
+ * labels at render. It was a Cake in every trade.
+ */
+const GROUP_ICONS: Record<Exclude<GlobalSearchGroup, "products">, typeof Search> = {
   orders: ShoppingBag,
   customers: Users,
   coupons: Tag,
@@ -88,12 +93,15 @@ function ResultButton({
   result,
   active,
   onSelect,
+  productIcon,
 }: {
   result: GlobalSearchResult;
   active: boolean;
   onSelect: (result: GlobalSearchResult) => void;
+  /** The shop’s catalog icon, passed in because it is a setting, not a map. */
+  productIcon: typeof Search;
 }) {
-  const Icon = GROUP_ICONS[result.group];
+  const Icon = result.group === "products" ? productIcon : GROUP_ICONS[result.group];
 
   return (
     <button
@@ -149,20 +157,39 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
   const [activeIndex, setActiveIndex] = useState(0);
   const [groupFilter, setGroupFilter] = useState<GlobalSearchGroup | "all">("all");
   const [recentVersion, setRecentVersion] = useState(0);
+  const labels = useBusinessLabels();
 
   const parsedQuery = useMemo(() => parseGlobalSearchQuery(query), [query]);
   const effectiveGroupFilter =
     parsedQuery.groupFilter !== "all" ? parsedQuery.groupFilter : groupFilter;
 
+  /**
+   * `labels` belongs in every one of these dep arrays.
+   *
+   * The hook seeds the neutral defaults and swaps to the shop’s own words after
+   * the settings fetch lands. Leave it out of a dep array — `shortcuts` had
+   * `[]` — and the palette compiles, renders, and shows the wording from first
+   * paint for the rest of the session.
+   */
   const results = useMemo(
-    () => searchAdminGlobal(query, { groupFilter: effectiveGroupFilter }),
-    [query, effectiveGroupFilter]
+    () => searchAdminGlobal(query, labels, { groupFilter: effectiveGroupFilter }),
+    [query, effectiveGroupFilter, labels]
   );
 
-  const shortcuts = useMemo(() => getGlobalSearchShortcuts(), []);
+  const shortcuts = useMemo(() => getGlobalSearchShortcuts(labels), [labels]);
+
+  // The palette’s own rows, by id, so a recent click shows what that row says
+  // NOW rather than what it said the day it was clicked. Products and orders
+  // are not in here: their stored titles are data and stay as recorded.
+  const liveTitles = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const entry of getGlobalSearchChromeEntries(labels)) byId.set(entry.id, entry.title);
+    return byId;
+  }, [labels]);
+
   const recentResults = useMemo(
-    () => loadRecentSearches().map(recentSearchToResult),
-    [recentVersion, open]
+    () => loadRecentSearches().map((entry) => recentSearchToResult(entry, liveTitles.get(entry.id))),
+    [recentVersion, open, liveTitles]
   );
 
   const emptyStateResults = useMemo(() => {
@@ -170,7 +197,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
     return shortcuts;
   }, [recentResults, shortcuts]);
 
-  const grouped = useMemo(() => groupGlobalSearchResults(results), [results]);
+  const grouped = useMemo(() => groupGlobalSearchResults(results, labels), [results, labels]);
   const flatResults = useMemo(
     () => (query.trim() ? grouped.flatMap((section) => section.items) : emptyStateResults),
     [grouped, emptyStateResults, query]
@@ -262,7 +289,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     : "border-border bg-card text-muted-foreground hover:border-border hover:text-foreground"
                 )}
               >
-                {filter === "all" ? "All" : getGlobalSearchGroupLabel(filter)}
+                {filter === "all" ? "All" : getGlobalSearchGroupLabel(filter, labels)}
               </button>
             ))}
           </div>
@@ -276,7 +303,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                 No results for &ldquo;{query}&rdquo;
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {getGlobalSearchGroupHints().map((hint) => (
+                {getGlobalSearchGroupHints(labels).map((hint) => (
                   <button
                     key={hint.prefix}
                     type="button"
@@ -293,7 +320,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               <p className="px-3 py-1 text-xs text-muted-foreground">
                 {flatResults.length} result{flatResults.length === 1 ? "" : "s"}
                 {parsedQuery.groupFilter !== "all"
-                  ? ` in ${getGlobalSearchGroupLabel(parsedQuery.groupFilter)}`
+                  ? ` in ${getGlobalSearchGroupLabel(parsedQuery.groupFilter, labels)}`
                   : ""}
               </p>
               {grouped.map((section) => (
@@ -306,6 +333,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                       const index = flatResults.findIndex((item) => item.id === result.id);
                       return (
                         <ResultButton
+                          productIcon={labels.productIcon}
                           key={result.id}
                           result={result}
                           active={index === activeIndex}
@@ -342,6 +370,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                   <div className="space-y-0.5">
                     {recentResults.map((result, index) => (
                       <ResultButton
+                        productIcon={labels.productIcon}
                         key={result.id}
                         result={result}
                         active={index === activeIndex}
@@ -362,6 +391,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     const offset = recentResults.length > 0 ? recentResults.length : 0;
                     return (
                       <ResultButton
+                        productIcon={labels.productIcon}
                         key={result.id}
                         result={result}
                         active={index + offset === activeIndex}
@@ -375,7 +405,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">Search tips</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {getGlobalSearchGroupHints().map((hint) => (
+                  {getGlobalSearchGroupHints(labels).map((hint) => (
                     <button
                       key={hint.prefix}
                       type="button"

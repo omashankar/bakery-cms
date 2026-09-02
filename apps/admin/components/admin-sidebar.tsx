@@ -48,7 +48,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AppBrand } from "@/components/shared/app-brand";
-import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/navigation";
+import {
+  adminNavSections,
+  navItemLabel,
+  type AdminNavItem,
+  type NavItem,
+} from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
 import { countNewInquiries } from "@/apps/admin/inquiries";
@@ -483,13 +488,9 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       ...section,
       items: section.items
         .filter((item) => !hideWedding || item.href !== routes.admin.builders.wedding)
-        // Relabel the "Cakes" catalog item for the current business type — the
-        // route/component stay named "cakes"; only the visible label changes.
-        .map((item) =>
-          item.href === routes.admin.cakes.list
-            ? { ...item, label: labels.productWordPlural }
-            : item
-        ),
+        // The route and component stay named "cakes"; only the visible label
+        // changes. Shared with the command palette, which used to disagree.
+        .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
     }));
   }, [hideWedding, labels]);
 

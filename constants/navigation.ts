@@ -1,3 +1,5 @@
+import type { ResolvedLabels } from "@/config/business-labels";
+
 import { routes } from "./routes";
 
 export interface NavItem {
@@ -6,6 +8,21 @@ export interface NavItem {
   icon?: string;
   badge?: string;
   children?: NavItem[];
+}
+
+/**
+ * The label to SHOW for an admin nav item.
+ *
+ * One item in this list names what the shop sells rather than a part of the
+ * admin, so it is the shop’s to name. The sidebar patched it inline and the
+ * command palette did not, which is why Ctrl+K went on offering "Cakes" to a
+ * florist whose sidebar already said "Flowers". Both call this now.
+ */
+export function navItemLabel(
+  item: NavItem,
+  labels: Pick<ResolvedLabels, "productWordPlural">,
+): string {
+  return item.href === routes.admin.cakes.list ? labels.productWordPlural : item.label;
 }
 
 /** Public storefront navigation */
@@ -57,7 +74,11 @@ export const adminNavSections: AdminNavSection[] = [
   {
     title: "Catalog",
     items: [
-      { label: "Cakes", href: routes.admin.cakes.list, icon: "Cake" },
+      // Never rendered as written — `navItemLabel` below replaces it with the
+      // shop’s own plural, and both consumers go through that. Kept as the
+      // neutral default rather than "Cakes" so the data is not a claim the app
+      // does not honour.
+      { label: "Products", href: routes.admin.cakes.list, icon: "Cake" },
       // Catalog uses in-page tabs (Categories / Occasions / Themes / Flavours / Weights).
       { label: "Catalog", href: routes.admin.catalog, icon: "Tags" },
       { label: "Inventory", href: routes.admin.commerce.inventory, icon: "Package" },
