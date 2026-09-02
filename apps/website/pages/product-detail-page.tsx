@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
+  Gift,
   Heart,
   Leaf,
   Share2,
@@ -57,7 +58,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -406,8 +406,17 @@ export function ProductDetailPage({
 
       <section className={cn(layoutSpacing.sectionY, "pb-24 lg:pb-16")}>
         <div className={layoutSpacing.container}>
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
-            <ProductGallery images={galleryImages} productName={cake.name} />
+          <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+            {/*
+              The photo stays put while the right column scrolls.
+              With everything below the fold now stacked rather than tabbed,
+              this column is long — and the image used to leave the screen a
+              third of the way down, so a customer reading the ingredients could
+              no longer see what they were reading about.
+            */}
+            <div className="lg:sticky lg:top-24">
+              <ProductGallery images={galleryImages} productName={cake.name} />
+            </div>
 
             <div className="space-y-6">
               <div className="space-y-3">
@@ -679,71 +688,61 @@ export function ProductDetailPage({
                 </Button>
               </div>
 
-              <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                {/*
-                  "Freshly baked" was here, unconditionally, under every product
-                  in the shop — a claim about how the thing was made, printed on
-                  chargers and gift hampers alike. There is no field behind it
-                  and no module gating it, so it was not a fact the shop had
-                  stated; it was one the template assumed. The delivery promise
-                  below IS derived from settings, which is the difference.
-                */}
-                <li className="flex items-center gap-2">
-                  <Truck className="size-4 text-bakery-700" />
-                  {deliveryPromise}
-                </li>
-                {modules.eggEggless ? (
-                  <li className="flex items-center gap-2" data-gate-egg>
-                    <Leaf className="size-4 text-bakery-700" />
-                    Eggless available
+              {/*
+                WHAT THE SHOP CAN ACTUALLY SAY, and only that.
+
+                Two rows sat here and both were broken. The delivery promise is
+                filled by a client effect from `""`, so the server HTML shipped
+                an icon with nothing beside it. And “Eggless available” was
+                gated on the egg MODULE rather than on whether this product is
+                eggless — so it printed under every product in the shop, a
+                fallback presented as a fact, in the exact lines that are
+                supposed to be the reason to trust the page.
+
+                “Freshly baked” was removed from here earlier for the same
+                reason. Each row now waits for something true to say.
+              */}
+              <ul className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+                {deliveryPromise ? (
+                  <li className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3">
+                    <Truck className="mt-0.5 size-4 shrink-0 text-bakery-700" />
+                    <span>{deliveryPromise}</span>
+                  </li>
+                ) : null}
+                {modules.eggEggless && isEggless ? (
+                  <li
+                    className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3"
+                    data-gate-egg
+                  >
+                    <Leaf className="mt-0.5 size-4 shrink-0 text-bakery-700" />
+                    <span>Made without eggs</span>
+                  </li>
+                ) : null}
+                {cake.allowsMessage !== false ? (
+                  <li className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3">
+                    <Gift className="mt-0.5 size-4 shrink-0 text-bakery-700" />
+                    <span>Free message card</span>
                   </li>
                 ) : null}
               </ul>
 
-              <Tabs defaultValue="description">
-                <div className="overflow-x-auto">
-                  <TabsList className="w-max min-w-full">
-                    <TabsTrigger value="description">Description</TabsTrigger>
-                    {/*
-                      Every tab below is now gated on the product CARRYING the
-                      field. They were unconditional, each with bakery prose to
-                      print when empty — so a phone charger's page offered an
-                      Ingredients tab reading "Flour, sugar, butter, fresh cream,
-                      premium chocolate, and natural flavours", a Care tab saying
-                      "Refrigerate within 2 hours of delivery", and a Nutrition
-                      tab promising "Calorie information will be updated soon".
-                      A fallback is not a fact, and an empty tab is better absent
-                      than filled with someone else's product.
-                    */}
-                    {attributes.length > 0 ? (
-                      <TabsTrigger value="details">Details</TabsTrigger>
-                    ) : null}
-                    {cake.ingredients ? (
-                      <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
-                    ) : null}
-                    {hasNutrition ? <TabsTrigger value="nutrition">Nutrition</TabsTrigger> : null}
-                    {cake.allergens ? (
-                      <TabsTrigger value="allergens">Allergens</TabsTrigger>
-                    ) : null}
-                    {cake.careInstructions ? <TabsTrigger value="care">Care</TabsTrigger> : null}
-                    <TabsTrigger value="reviews">
-                      Reviews
-                      {reviews.length ? ` (${reviews.length})` : ""}
-                    </TabsTrigger>
-                    <TabsTrigger value="delivery">Delivery</TabsTrigger>
-                  </TabsList>
-                </div>
-                <TabsContent value="description" className="text-sm text-muted-foreground">
-                  {/*
-                    The shop's own words, and only those. This appended "Crafted
-                    fresh with premium ingredients and finished by our expert
-                    bakers for celebrations of every size." to EVERY description
-                    in the shop, whatever the product was.
-                  */}
-                  {cake.description}
-                </TabsContent>
+              {/*
+                STACKED, NOT TABBED.
+
+                These were six tabs, and Base UI unmounts the panel that is not
+                showing — so five sixths of everything the shop had written about
+                its product was absent from the HTML the browser received, absent
+                from what Google indexed, and on a phone sat behind a tab strip
+                that scrolls sideways. The shop typed ingredients, allergens and
+                care instructions into the admin and almost nobody ever saw them.
+
+                Every section still gates itself on the product carrying the
+                field, which is what tabs were really buying: a phone charger
+                shows no Ingredients heading at all rather than an empty one.
+              */}
+              <div className="space-y-6">
                 {attributes.length > 0 ? (
-                  <TabsContent value="details">
+                  <DetailSection title={`${labels.productWord} details`}>
                     {/* The shop's own facts, as a spec list. */}
                     <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                       {attributes.map((attribute) => (
@@ -756,101 +755,152 @@ export function ProductDetailPage({
                         </div>
                       ))}
                     </dl>
-                  </TabsContent>
+                  </DetailSection>
                 ) : null}
-                <TabsContent value="ingredients" className="text-sm text-muted-foreground">
-                  {cake.ingredients}
-                  {modules.eggEggless && isEggless ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.` : ""}
-                </TabsContent>
-                <TabsContent value="nutrition" className="space-y-2 text-sm text-muted-foreground">
-                  {cake.calories ? (
-                    <p>
-                      <span className="font-medium text-foreground">Calories:</span>{" "}
-                      {cake.calories} kcal per serving
+
+                {cake.ingredients ? (
+                  <DetailSection title="Ingredients">
+                    <p className="whitespace-pre-line text-sm text-muted-foreground">
+                      {cake.ingredients}
+                      {modules.eggEggless && isEggless
+                        ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.`
+                        : ""}
                     </p>
-                  ) : null}
-                  {cake.preparationTimeMinutes ? (
-                    <p>
-                      <span className="font-medium text-foreground">Preparation:</span>{" "}
-                      {detailBadges.find((badge) => badge.includes("prep")) ?? `${cake.preparationTimeMinutes} minutes`}
+                  </DetailSection>
+                ) : null}
+
+                {hasNutrition ? (
+                  <DetailSection title="Nutrition">
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      {cake.calories ? (
+                        <p>
+                          <span className="font-medium text-foreground">Calories:</span>{" "}
+                          {cake.calories} kcal per serving
+                        </p>
+                      ) : null}
+                      {cake.preparationTimeMinutes ? (
+                        <p>
+                          <span className="font-medium text-foreground">Preparation:</span>{" "}
+                          {detailBadges.find((badge) => badge.includes("prep")) ??
+                            `${cake.preparationTimeMinutes} minutes`}
+                        </p>
+                      ) : null}
+                      {cake.shelfLifeDays ? (
+                        <p>
+                          <span className="font-medium text-foreground">Shelf life:</span>{" "}
+                          {cake.shelfLifeDays} day{cake.shelfLifeDays === 1 ? "" : "s"} when stored
+                          properly
+                        </p>
+                      ) : null}
+                    </div>
+                  </DetailSection>
+                ) : null}
+
+                {cake.allergens ? (
+                  <DetailSection title="Allergens">
+                    <p className="whitespace-pre-line text-sm text-muted-foreground">
+                      {cake.allergens}
                     </p>
-                  ) : null}
-                  {cake.shelfLifeDays ? (
-                    <p>
-                      <span className="font-medium text-foreground">Shelf life:</span>{" "}
-                      {cake.shelfLifeDays} day{cake.shelfLifeDays === 1 ? "" : "s"} when stored properly
+                  </DetailSection>
+                ) : null}
+
+                {cake.careInstructions ? (
+                  <DetailSection title="Care instructions">
+                    {/*
+                      `whitespace-pre-line`, because a shop writes care notes as
+                      a list. Without it every line break collapsed and four
+                      instructions arrived as one run-on sentence.
+                    */}
+                    <p className="whitespace-pre-line text-sm text-muted-foreground">
+                      {cake.careInstructions}
                     </p>
-                  ) : null}
-                </TabsContent>
-                <TabsContent value="allergens" className="text-sm text-muted-foreground">
-                  {cake.allergens}
-                </TabsContent>
-                <TabsContent value="care" className="text-sm text-muted-foreground">
-                  {cake.careInstructions}
-                </TabsContent>
-                <TabsContent value="reviews" className="space-y-4">
-                  <ProductReviewForm
-                    productSlug={cake.slug}
-                    cakeName={cake.name}
-                    onSubmitted={() => {
-                      // A new review is pending, so this re-read normally comes
-                      // back unchanged — which is the honest outcome. It runs so
-                      // that anything approved since the page loaded appears.
-                      void getProductReviews(cake).then((next) => {
-                        if (next) setReviews(next);
-                      });
-                    }}
-                  />
-                  {reviews.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No published reviews yet. Be the first to share your experience.
-                    </p>
-                  ) : (
-                    reviews.map((review) => (
-                      <article
-                        key={review.id}
-                        className="rounded-xl border border-border bg-white p-4"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium">{review.author}</p>
-                            {review.isFeatured ? (
-                              <Badge variant="gold">Featured</Badge>
-                            ) : null}
+                  </DetailSection>
+                ) : null}
+
+                <DetailSection title="Delivery">
+                  <p className="text-sm text-muted-foreground">
+                    {/*
+                      "within city limits" went with the rest of the invented
+                      delivery-area copy: there is no field behind it, and a shop
+                      that delivers to four localities was making a claim about a
+                      whole city.
+                    */}
+                    {deliveryPromise}. Scheduled delivery on{" "}
+                    {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
+                    {deliveryTime ? ` between ${deliveryTime}` : ""}.
+                    {/*
+                      Only promised where the product actually takes a message.
+                      This was unconditional, so a shop selling chargers offered
+                      every customer a free message card it had no way to send.
+                    */}
+                    {cake.allowsMessage !== false
+                      ? " Custom message card included at no extra charge."
+                      : ""}
+                  </p>
+                </DetailSection>
+
+                {/*
+                  `id`, so the star rating beside the title has somewhere to jump
+                  to — and so the review-request email can link straight here.
+                */}
+                <DetailSection
+                  id="reviews"
+                  title={`Reviews${reviews.length ? ` (${reviews.length})` : ""}`}
+                >
+                  <div className="space-y-4">
+                    <ProductReviewForm
+                      productSlug={cake.slug}
+                      cakeName={cake.name}
+                      onSubmitted={() => {
+                        // A new review is pending, so this re-read normally comes
+                        // back unchanged — which is the honest outcome. It runs so
+                        // that anything approved since the page loaded appears.
+                        void getProductReviews(cake).then((next) => {
+                          if (next) setReviews(next);
+                        });
+                      }}
+                    />
+                    {reviews.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No published reviews yet. Be the first to share your experience.
+                      </p>
+                    ) : (
+                      reviews.map((review) => (
+                        <article
+                          key={review.id}
+                          className="rounded-xl border border-border bg-white p-4"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{review.author}</p>
+                              {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatRelativeTime(review.date)}
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {formatRelativeTime(review.date)}
-                          </span>
-                        </div>
-                        {review.title ? (
-                          <p className="mt-1 text-sm font-medium">{review.title}</p>
-                        ) : null}
-                        <StarRating rating={review.rating} className="mt-2" />
-                        <p className="mt-2 text-sm text-muted-foreground">{review.text}</p>
-                        {review.adminReply ? (
-                          <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
-                            <p className="font-medium text-bakery-700">Response from the bakery</p>
-                            <p className="mt-1 text-muted-foreground">{review.adminReply}</p>
-                          </div>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
-                </TabsContent>
-                <TabsContent value="delivery" className="text-sm text-muted-foreground">
-                  {deliveryPromise} on orders placed within city limits.
-                  Scheduled delivery on {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
-                  {deliveryTime ? ` between ${deliveryTime}` : ""}.
-                  {/*
-                    Only promised where the product actually takes a message.
-                    This was unconditional, so a shop selling chargers offered
-                    every customer a free message card it had no way to send.
-                  */}
-                  {cake.allowsMessage !== false
-                    ? " Custom message card included at no extra charge."
-                    : ""}
-                </TabsContent>
-              </Tabs>
+                          {review.title ? (
+                            <p className="mt-1 text-sm font-medium">{review.title}</p>
+                          ) : null}
+                          <StarRating rating={review.rating} className="mt-2" />
+                          <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                            {review.text}
+                          </p>
+                          {review.adminReply ? (
+                            <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
+                              <p className="font-medium text-bakery-700">Response from the shop</p>
+                              <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                                {review.adminReply}
+                              </p>
+                            </div>
+                          ) : null}
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </DetailSection>
+              </div>
+
             </div>
           </div>
 
@@ -937,6 +987,30 @@ function OptionGroup({
       <p className="text-sm font-medium">{label}</p>
       {children}
     </div>
+  );
+}
+
+/**
+ * One block of product information, always visible.
+ *
+ * The heading is what a tab label used to be. A section renders only where the
+ * shop has filled the field, so an empty one disappears rather than printing
+ * somebody else’s product back at the customer.
+ */
+function DetailSection({
+  title,
+  id,
+  children,
+}: {
+  title: string;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="border-t border-border pt-6">
+      <h2 className="font-heading text-lg font-bold">{title}</h2>
+      <div className="mt-3">{children}</div>
+    </section>
   );
 }
 

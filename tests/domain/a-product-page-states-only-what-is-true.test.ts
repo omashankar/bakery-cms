@@ -93,11 +93,16 @@ function render(cake: Product): {
   /**
    * Open a tab by its label and hand back the markup that follows.
    *
-   * Radix mounts only the ACTIVE tab's content, so asserting on a tab's text
-   * without opening it passes for a product that has no such tab at all. A
-   * first version of these tests did exactly that.
+   * These WERE tabs, and Radix mounted only the active one — so asserting on a
+   * tab’s text without opening it passed for a product that had no such tab at
+   * all, which a first version of these tests did. They are stacked sections
+   * now, all of them in the HTML, so nothing has to be clicked.
+   *
+   * This still THROWS when the section is absent, which is the half that
+   * mattered: a page that stopped rendering ingredients entirely must not pass
+   * a test about what its ingredients say.
    */
-  openTab: (label: string) => string;
+  section: (heading: string) => string;
   unmount: () => void;
 } {
   const container = document.createElement("div");
@@ -110,15 +115,12 @@ function render(cake: Product): {
 
   return {
     html: container.innerHTML,
-    openTab: (label: string) => {
-      const trigger = [...container.querySelectorAll("button")].find(
-        (element) => element.textContent?.trim() === label,
+    section: (heading: string) => {
+      const found = [...container.querySelectorAll("section")].find((element) =>
+        element.querySelector("h2")?.textContent?.trim().startsWith(heading),
       );
-      if (!trigger) throw new Error(`no "${label}" tab to open`);
-      act(() => {
-        trigger.click();
-      });
-      return container.innerHTML;
+      if (!found) throw new Error(`no "${heading}" section on the page`);
+      return found.textContent ?? "";
     },
     unmount: () => {
       act(() => {
@@ -178,7 +180,7 @@ describe("a product that is sold one way says so by saying nothing", () => {
 
 describe("the shop's own facts reach the page", () => {
   it("prints the attributes a charger declares", () => {
-    const { openTab, unmount } = render({
+    const { section, unmount } = render({
       ...CHARGER,
       attributes: [
         { id: "a1", label: "Brand", value: "Anker" },
@@ -186,7 +188,7 @@ describe("the shop's own facts reach the page", () => {
       ],
     });
     try {
-      const opened = openTab("Details");
+      const opened = section("Product details");
       expect(opened).toContain("Brand");
       expect(opened).toContain("Anker");
       expect(opened).toContain("Warranty");
@@ -241,7 +243,7 @@ describe("the food tabs belong to food", () => {
   });
 
   it("still shows a cake the tabs it actually fills", () => {
-    const { html, openTab, unmount } = render({
+    const { html, section, unmount } = render({
       ...CAKE,
       ingredients: "Flour, cocoa, cream.",
       allergens: "Contains milk and wheat.",
@@ -252,10 +254,10 @@ describe("the food tabs belong to food", () => {
       expect(html).toContain(">Ingredients<");
       expect(html).toContain(">Nutrition<");
       expect(html).toContain(">Allergens<");
-      expect(html).toContain(">Care<");
-      // Opened, not merely listed — Radix mounts only the active tab's content.
-      expect(openTab("Ingredients")).toContain("Flour, cocoa, cream.");
-      expect(openTab("Care")).toContain("Refrigerate on arrival.");
+      expect(html).toContain(">Care instructions<");
+      // In the HTML, not behind a click — which is also what a crawler gets.
+      expect(section("Ingredients")).toContain("Flour, cocoa, cream.");
+      expect(section("Care instructions")).toContain("Refrigerate on arrival.");
     } finally {
       unmount();
     }
@@ -283,10 +285,30 @@ describe("the page does not call every product a cake", () => {
     }
   });
 
-  it("does not promise a message card on a product that takes no message", () => {
-    const { openTab, unmount } = render({ ...CHARGER, allowsMessage: false });
+  it("does not say a charger is made without eggs", () => {
+    /**
+     * The trust strip under Add to Cart said “Eggless available” gated on the
+     * egg MODULE alone — not on whether this product is eggless — so it printed
+     * under every product in any shop that had the module on. A fallback
+     * presented as a fact, in the three lines whose whole job is to be the
+     * reason to trust the page.
+     *
+     * The module IS on here: `getModuleSettings` reads an empty localStorage
+     * and answers with the all-on defaults. So this fails unless the product
+     * itself is consulted.
+     */
+    const { html, unmount } = render({ ...CHARGER, isEggless: false });
     try {
-      expect(openTab("Delivery")).not.toContain("message card");
+      expect(html).not.toContain("without eggs");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not promise a message card on a product that takes no message", () => {
+    const { section, unmount } = render({ ...CHARGER, allowsMessage: false });
+    try {
+      expect(section("Delivery")).not.toContain("message card");
     } finally {
       unmount();
     }
