@@ -91,7 +91,7 @@ export function AccountOrdersPage() {
       catalogue = await fetchProducts();
     } catch {
       // Distinct from "unavailable": nothing has been checked yet.
-      toast.error("Could not reach the bakery", {
+      toast.error("Could not reach the store", {
         description: "Please check your connection and try again.",
       });
       return;
@@ -131,7 +131,7 @@ export function AccountOrdersPage() {
   return (
     <AccountShell
       title="My Orders"
-      description="View and track all your bakery orders."
+      description="View and track all your orders."
       breadcrumbs={[{ label: "Orders" }]}
     >
       {orders === null ? (
@@ -152,7 +152,7 @@ export function AccountOrdersPage() {
         <EmptyState
           icon={Package}
           title="We could not load your orders"
-          description="Something went wrong reaching the bakery. Your orders are safe — please try again."
+          description="Something went wrong reaching the store. Your orders are safe — please try again."
           action={
             <Button variant="bakery" onClick={() => router.refresh()}>
               Try again

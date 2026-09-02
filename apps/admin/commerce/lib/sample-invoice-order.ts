@@ -34,7 +34,7 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
     {
       id: "preview-item-1",
       productSlug: "chocolate-truffle",
-      name: "Chocolate Truffle Cake",
+      name: "Sample product",
       image: "/images/cakes/chocolate-truffle.jpg",
       price: 850,
       quantity: 1,

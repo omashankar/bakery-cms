@@ -64,12 +64,26 @@ export function SearchPage({ catalog }: SearchPageProps) {
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
-  const popularSearches = POPULAR_SEARCHES.filter((item) => {
-    if (item.requires === "wedding") return weddingEnabled;
-    if (item.requires === "eggEggless") return modules.eggEggless;
-    if (item.requires === "photoCake") return modules.photoCake;
-    return true;
-  });
+  /**
+   * A suggestion that finds nothing is worse than no suggestion.
+   *
+   * Three of these terms — Chocolate, Red Velvet, Butterscotch — are bakery
+   * flavours behind no module gate at all, so a shop selling chargers offered
+   * its customers three chips that each ran a search and returned an empty
+   * page. Renaming them would only move the guess; asking the catalogue is the
+   * answer, and it makes the row right for a bakery too the day it stops
+   * stocking one.
+   */
+  const popularSearches = useMemo(
+    () =>
+      POPULAR_SEARCHES.filter((item) => {
+        if (item.requires === "wedding" && !weddingEnabled) return false;
+        if (item.requires === "eggEggless" && !modules.eggEggless) return false;
+        if (item.requires === "photoCake" && !modules.photoCake) return false;
+        return searchProducts(item.term, catalog).length > 0;
+      }),
+    [catalog, modules.eggEggless, modules.photoCake, weddingEnabled],
+  );
 
   // Searching stays on the client (it is interactive); the catalogue it searches
   // now arrives from the server, so the first paint already shows results.

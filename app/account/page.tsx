@@ -3,7 +3,7 @@ import { AccountDashboardPage } from "@/apps/website/account/pages/account-dashb
 
 export const metadata: Metadata = {
   title: "My Account",
-  description: "Manage your bakery account, orders, and preferences.",
+  description: "Manage your account, orders, and preferences.",
 };
 
 export default function Page() {

@@ -33,7 +33,11 @@ function nowIso(): string {
 export const defaultMediaFolders: MediaFolder[] = [
   {
     id: CAKES_FOLDER_ID,
-    name: "Cakes",
+    // The id stays `folder-cakes` — it is referenced by stored media rows and
+    // by `media-repository`, and renaming it would orphan them. Only the shown
+    // name changes, and only for a shop that does not have this folder yet:
+    // an existing one is already a row in Mongo with its old name.
+    name: "Products",
     createdAt: nowIso(),
     updatedAt: nowIso(),
   },

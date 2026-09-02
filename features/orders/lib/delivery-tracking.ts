@@ -109,7 +109,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       showPartner: Boolean(partner),
       partner,
       mapLabel,
-      statusMessage: "Hope your celebration was as sweet as our cakes.",
+      statusMessage: "We hope everything arrived just right.",
     };
   }
 
@@ -151,7 +151,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       // on the way with your cakes" for every order, about a person the shop
       // has never employed.
       etaDetail: partner
-        ? `${partner.name} is on the way with your cakes.`
+        ? `${partner.name} is on the way with your order.`
         : "Your order is on its way.",
       etaWindow,
       showLiveMap: true,
@@ -172,7 +172,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       showPartner: Boolean(partner),
       partner,
       mapLabel,
-      statusMessage: "Your cake is packed and will be handed to our delivery partner soon.",
+      statusMessage: "Your order is packed and will be handed to our delivery partner soon.",
     };
   }
 
@@ -187,7 +187,7 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
     mapLabel,
     statusMessage:
       order.status === "preparing"
-        ? "Our bakers are preparing your order fresh."
+        ? "We are preparing your order now."
         : "We will notify you when your order is out for delivery.",
   };
 }

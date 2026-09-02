@@ -92,6 +92,6 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
     }
     return { quote: body.data };
   } catch {
-    return { quote: null, error: "Could not reach the bakery. Check your connection." };
+    return { quote: null, error: "Could not reach the store. Check your connection." };
   }
 }

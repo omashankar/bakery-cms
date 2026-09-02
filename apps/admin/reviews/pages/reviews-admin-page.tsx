@@ -489,7 +489,7 @@ export function ReviewsAdminPage() {
                       {review.adminReply ? (
                         <div className="rounded-lg border border-border bg-muted/80 px-3 py-2 text-sm">
                           <p className="text-xs font-medium text-muted-foreground">
-                            Bakery reply
+                            Store reply
                           </p>
                           <p className="mt-0.5 text-muted-foreground">{review.adminReply}</p>
                         </div>

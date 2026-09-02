@@ -168,7 +168,7 @@ export const defaultCommerceSettings: CommerceSettings = {
   ],
   orderNumberPrefix: "BK",
   checkoutTerms:
-    "By placing this order you agree to our delivery terms. Cakes are prepared fresh — cancellations within 2 hours of placement may be accepted.",
+    "By placing this order you agree to our delivery terms. Orders are prepared to order — cancellations within 2 hours of placement may be accepted.",
   giftWrapEnabled: true,
   giftWrapFee: 49,
   giftWrapLabel: "Gift wrap",

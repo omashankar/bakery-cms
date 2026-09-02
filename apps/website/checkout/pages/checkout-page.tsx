@@ -799,14 +799,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       // the customer round a loop that cannot end. Their own words, and the
       // reference, so support can act on it.
       if (refusal) {
-        toast.error("The bakery could not accept this order", {
+        toast.error("The store could not accept this order", {
           description: `${refusal} Please contact support with the reference shown — your payment is safe.`,
           duration: 15000,
         });
         return;
       }
 
-      toast.error("Still couldn't reach the bakery", {
+      toast.error("Still couldn't reach the store", {
         description:
           "Your order is safe here. Try again, or contact support with the reference shown.",
       });
@@ -870,7 +870,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       persistDraft({ coupon: undefined });
       setPlacing(false);
       toast.error(`${quote.rejectedCoupon} could not be applied`, {
-        description: `The bakery did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
+        description: `The store did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
         duration: 10000,
       });
       return;
@@ -945,7 +945,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   return (
     <>
       {/*
-        The order reached this browser but not the bakery. Shown INSTEAD of the
+        The order reached this browser but not the store. Shown INSTEAD of the
         success page, and it blocks: the customer needs to know their order is
         not in yet, and if they paid, they need the reference in front of them
         before they navigate away. Retry re-sends the order — never the payment.
@@ -959,8 +959,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               unconfirmed.closed
                 ? `The shop closed while your payment was going through, so we could not confirm the order here. Your payment is safe and the bakery has it — quote the reference below when you get in touch. ${unconfirmed.closed}`
                 : unconfirmed.paymentStatus === "paid"
-                  ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
-                  : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+                  ? "Your payment went through, but we couldn't reach the store to confirm the order. Nothing has been lost — please retry."
+                  : "We couldn't reach the store to confirm your order. Your cart is still here — please retry."
             }
             reason={
               unconfirmed.paymentReference
@@ -1250,7 +1250,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div>
                         <p className="text-sm font-medium">When should we deliver?</p>
                         <p className="text-xs text-muted-foreground">
-                          We bake fresh, so the earliest date depends on preparation time.
+                          The earliest date depends on preparation time.
                         </p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">

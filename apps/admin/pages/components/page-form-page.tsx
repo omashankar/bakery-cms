@@ -502,7 +502,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                       <Input
                         id="about-badge-subtitle"
                         value={about.badgeSubtitle ?? ""}
-                        placeholder="Baking joy for generations"
+                        placeholder="Serving our neighbourhood since 2010"
                         onChange={(event) => patchAbout({ badgeSubtitle: event.target.value })}
                       />
                     </div>
@@ -555,7 +555,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                           />
                           <Input
                             value={stat.label ?? ""}
-                            placeholder="Years of baking"
+                            placeholder="Years in business"
                             aria-label="Stat label"
                             onChange={(event) => updateStat(stat.id, { label: event.target.value })}
                           />
@@ -591,7 +591,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                       <Input
                         id="about-highlights-description"
                         value={about.highlightsDescription ?? ""}
-                        placeholder="What makes your bakery different"
+                        placeholder="What makes your shop different"
                         onChange={(event) =>
                           patchAbout({ highlightsDescription: event.target.value })
                         }

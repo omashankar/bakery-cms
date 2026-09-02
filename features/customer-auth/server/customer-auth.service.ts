@@ -88,7 +88,7 @@ export async function requestSignInCode(
   if (existing?.blocked) {
     // Same shape as a wrong code, deliberately: a blocked address must not be
     // able to tell it is blocked rather than simply wrong.
-    throw new AuthError("We could not sign you in. Please contact the bakery.");
+    throw new AuthError("We could not sign you in. Please contact the store.");
   }
 
   const code = generateOtp();
@@ -126,7 +126,7 @@ export async function requestSignInCode(
     // never coming. The operator detail goes to the log.
     console.error(`[customer-auth] Could not email a sign-in code: ${mail.error}`);
     throw new AppError(
-      "We could not send your code right now. Please try again shortly, or contact the bakery.",
+      "We could not send your code right now. Please try again shortly, or contact the store.",
       502,
     );
   }
@@ -183,7 +183,7 @@ export async function verifySignInCode(
   await repo.consumeLoginCode(input.email);
 
   const existing = await repo.findAccountByEmail(input.email);
-  if (existing?.blocked) throw new AuthError("We could not sign you in. Please contact the bakery.");
+  if (existing?.blocked) throw new AuthError("We could not sign you in. Please contact the store.");
 
   let identity: CustomerIdentity;
   if (existing) {

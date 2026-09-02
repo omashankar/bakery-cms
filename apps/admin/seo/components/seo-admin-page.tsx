@@ -356,7 +356,7 @@ export function SeoAdminPage() {
                 onChange={(e) =>
                   editGlobal((prev) => ({ ...prev, titleSuffix: e.target.value }))
                 }
-                placeholder="| Your Bakery"
+                placeholder="| Your Store"
               />
             </div>
           </div>

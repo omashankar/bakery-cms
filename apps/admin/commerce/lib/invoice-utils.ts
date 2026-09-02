@@ -39,7 +39,7 @@ export function exportInvoicesToCsv(orders: PlacedOrder[]): void {
     ];
   });
   const csv = toCsv([headers, ...rows]);
-  downloadCsv(`bakery-invoices-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  downloadCsv(`invoices-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }
 
 // Filters + counters live in the domain layer so the SERVER can run them over

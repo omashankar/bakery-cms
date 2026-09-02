@@ -310,11 +310,27 @@ describe("modules with no way to reach a setting", () => {
     }
   });
 
+  /**
+   * A hand-written stub, not `importOriginal`.
+   *
+   * Spreading the real module pulled its whole import graph in on every one of
+   * these `resetModules` cycles, and the case timed out at five seconds under a
+   * full parallel run while passing on its own — flaky, which is worse than
+   * slow. These are the only exports the chain touches.
+   */
+  const INVENTORY_STUB = {
+    INVENTORY_UPDATED_EVENT: "bakery-inventory-updated",
+    getInventorySettings: () => ({}),
+    getInventoryItems: () => [],
+    countInventoryAlerts: () => 0,
+    loadStockHistory: () => [],
+  };
+
   it("counts stock in the shop's own two words", async () => {
     vi.doUnmock("@/apps/admin/commerce/lib/inventory-repository");
     vi.resetModules();
-    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", async (importOriginal) => ({
-      ...(await importOriginal<Record<string, unknown>>()),
+    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", () => ({
+      ...INVENTORY_STUB,
       getInventoryOverview: () => ({ outOfStock: 1, lowStock: 0, totalValue: 0, tracked: 0 }),
     }));
 
@@ -331,8 +347,8 @@ describe("modules with no way to reach a setting", () => {
     expect(one?.value).toBe("1 box");
 
     vi.resetModules();
-    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", async (importOriginal) => ({
-      ...(await importOriginal<Record<string, unknown>>()),
+    vi.doMock("@/apps/admin/commerce/lib/inventory-repository", () => ({
+      ...INVENTORY_STUB,
       getInventoryOverview: () => ({ outOfStock: 3, lowStock: 0, totalValue: 0, tracked: 0 }),
     }));
     const { getDashboardAlerts: again } = await import(

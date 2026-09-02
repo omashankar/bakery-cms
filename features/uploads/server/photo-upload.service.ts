@@ -100,7 +100,7 @@ export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
      * open is the exact failure this endpoint exists to end.
      */
     throw new AppError(
-      "Photo uploads are not set up on this shop yet. Please place the order and the bakery will contact you for the photo.",
+      "Photo uploads are not set up on this shop yet. Please place the order and the store will contact you for the photo.",
       503,
     );
   }

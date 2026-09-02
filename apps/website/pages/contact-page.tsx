@@ -168,7 +168,7 @@ export function ContactPage({
           {showMap && contactInfo.mapEmbedUrl ? (
             <ScrollReveal className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
               <iframe
-                title="Bakery location"
+                title="Shop location"
                 src={contactInfo.mapEmbedUrl}
                 className="h-full w-full border-0"
                 loading="lazy"

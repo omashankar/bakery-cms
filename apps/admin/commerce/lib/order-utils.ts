@@ -152,5 +152,5 @@ export function exportOrdersToCsv(orders: PlacedOrder[]): void {
 
   const csv = toCsv([headers, ...rows]);
 
-  downloadCsv(`bakery-orders-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }

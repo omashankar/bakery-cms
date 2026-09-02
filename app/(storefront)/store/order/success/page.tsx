@@ -4,7 +4,7 @@ import { OrderSuccessPage } from "@/apps/website/checkout/pages/order-success-pa
 
 export const metadata: Metadata = {
   title: "Order Confirmed",
-  description: "Your bakery order has been placed successfully.",
+  description: "Your order has been placed successfully.",
 };
 
 export default function Page() {

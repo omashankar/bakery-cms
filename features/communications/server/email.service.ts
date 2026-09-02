@@ -66,7 +66,7 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
   order_shipped: {
     subject: "Your order {{order_number}} is on the way",
     body:
-      "Hi {{customer_name}},\n\nOrder {{order_number}} has left the bakery and is " +
+      "Hi {{customer_name}},\n\nOrder {{order_number}} has left our store and is " +
       "out for delivery.\n\nExpected: {{delivery_date}}\nAddress: {{delivery_address}}\n\n" +
       "Need help? Call {{store_phone}}\n\n— {{store_name}}",
   },
@@ -214,7 +214,7 @@ export function toEmailHtml(text: string, preheader?: string): string {
  * so customers received "Need help? Call {{store_phone}}".
  */
 async function storeIdentity(): Promise<Record<string, string>> {
-  const fallback = { store_name: "Our bakery", store_phone: "", store_email: "" };
+  const fallback = { store_name: "Our store", store_phone: "", store_email: "" };
   try {
     const settings = (await getSettings()) as {
       general?: GeneralSettings;

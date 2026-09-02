@@ -335,7 +335,7 @@ export function SettingsOverviewPage() {
           // The shop's NAME is a claim, so it waits for the server's copy.
           hydrated && siteName
             ? `The control center for ${siteName} — store, commerce, communication, website, and security.`
-            : "The control center for this bakery."
+            : "The control center for this store."
         }
         actions={
           <Button

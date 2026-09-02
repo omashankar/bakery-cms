@@ -28,7 +28,7 @@ import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 const SAMPLE_ITEM = {
   id: "preview",
   productSlug: "preview",
-  name: "Sample cake",
+  name: "Sample product",
   image: "",
   price: 850,
   quantity: 1,

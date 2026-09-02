@@ -54,7 +54,7 @@ export const PAYMENT_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     audience: "customer",
     event: "Payment Success",
     title: "Payment successful 🎉",
-    message: "Your payment of {amount} for order {order} is confirmed. We're preparing your cakes!",
+    message: "Your payment of {amount} for order {order} is confirmed. We are preparing your order!",
     /**
      * WhatsApp belongs here because the order confirmation has always gone out
      * on it.

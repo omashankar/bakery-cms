@@ -3,7 +3,7 @@ import { TrackOrderPage } from "@/apps/website/checkout/pages/track-order-page";
 
 export const metadata: Metadata = {
   title: "Track Order",
-  description: "Track your bakery order delivery status.",
+  description: "Track your order delivery status.",
 };
 
 export default function Page() {

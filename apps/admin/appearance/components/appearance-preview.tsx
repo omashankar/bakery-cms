@@ -78,7 +78,7 @@ export function AppearancePreview({
    */
   const general = getGeneralSettings();
   const header = loadHeaderSettings();
-  const siteName = general.siteName?.trim() || "Your bakery";
+  const siteName = general.siteName?.trim() || "Your store";
   const logoLetter = header.logoLetter?.trim() || siteName.charAt(0).toUpperCase();
   const samplePrice = formatCurrency(1299, general.currency);
 

@@ -12,7 +12,10 @@ export const defaultInvoiceSettings: InvoiceSettings = {
   address: contactInfo.address,
   email: contactInfo.email,
   phone: contactInfo.phone,
-  website: "https://bakery.demo/store",
+  // Blank, for the same reason the GST fields below are: a plausible-looking
+  // value that is not this shop’s is worse than an empty one on a document a
+  // customer keeps. This was `https://bakery.demo/store`.
+  website: "",
   // Blank on purpose, and this is not a placeholder waiting to be filled in.
   //
   // These were `"27AABCM1234F1Z5"` and `"AABCM1234F"` — well-formed, plausible,
@@ -28,7 +31,7 @@ export const defaultInvoiceSettings: InvoiceSettings = {
   // make, once it has entered a registration number — and it can, in the
   // designer. The unconfigured default matches the Mongo model's own.
   invoiceTitle: "Invoice",
-  footerNote: "Thank you for choosing us. We hope your celebration is as sweet as our cakes.",
+  footerNote: "Thank you for choosing us. We hope you enjoy your order.",
   // The pricing pipeline ADDS tax on top of the subtotal — `computeTaxAmount`
   // returns a separate `tax` and the total is `subtotal + … + tax`. The old
   // wording, "GST is included where applicable", told the customer the opposite
