@@ -21,6 +21,7 @@ import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-reposit
 import type { FaqCategory, FaqItem } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const faqCategories: Array<{ label: string; value: "all" | FaqCategory }> = [
   { label: "All", value: "all" },
@@ -39,6 +40,7 @@ interface FaqPageProps {
 }
 
 export function FaqPage({ faqs, contact }: FaqPageProps) {
+  const labels = useBusinessLabels();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
   const contactInfo = contact ?? getStorefrontContactInfo();
@@ -76,7 +78,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
     <>
       <StorePageHeader
         title="Frequently Asked Questions"
-        description="Everything you need to know about ordering, delivery, and our cakes."
+        description={`Everything you need to know about ordering, delivery, and our ${labels.productWordPlural.toLowerCase()}.`}
         breadcrumbs={[{ label: "FAQ" }]}
       />
 

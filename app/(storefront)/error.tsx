@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 /**
  * The storefront's last line of defence.
@@ -22,6 +23,7 @@ export default function StorefrontError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const labels = useBusinessLabels();
   const router = useRouter();
 
   /**
@@ -46,7 +48,7 @@ export default function StorefrontError({
         </h1>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
           Sorry about that — the rest of the shop is fine. Try again, or head back
-          to browse our cakes.
+          to browse our {labels.productWordPlural.toLowerCase()}.
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">

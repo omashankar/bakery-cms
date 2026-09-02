@@ -75,6 +75,7 @@ import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 import { formatCurrency } from "@/utils/format";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 export interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
@@ -253,6 +254,7 @@ function heroTrustBarFor(trust: HomepageSectionRendererProps["trust"]) {
 const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
 
 function HeroSection(props: HomepageSectionRendererProps) {
+  const labels = useBusinessLabels();
   const { section } = props;
 
   const slides: HeroSlide[] = parseHeroSlides(section.content)
@@ -260,7 +262,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
       badge: slide.badge?.trim() || undefined,
       headline: slide.headline ?? "",
       subtext: slide.subtext?.trim() || undefined,
-      primaryLabel: slide.primaryLabel?.trim() || "Shop Cakes",
+      primaryLabel: slide.primaryLabel?.trim() || `Shop ${labels.productWordPlural}`,
       primaryHref: slide.primaryHref?.trim() || routes.store.collections,
       secondaryLabel: slide.secondaryLabel?.trim() || undefined,
       secondaryHref: slide.secondaryHref?.trim() || undefined,

@@ -14,6 +14,7 @@ import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductCardProps {
   cake: LandingProduct;
@@ -22,6 +23,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ cake, variant = "default", className }: ProductCardProps) {
+  const labels = useBusinessLabels();
   const [wishlisted, setWishlisted] = useState(false);
   /**
    * The price the SHOP will charge, not the base price on the record.
@@ -62,7 +64,7 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
     event.preventDefault();
     event.stopPropagation();
     if (outOfStock) {
-      toast.error("This product is currently out of stock");
+      toast.error(`This ${labels.productWord.toLowerCase()} is currently out of stock`);
       return;
     }
     /**

@@ -17,10 +17,12 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
 
 export function AccountOrdersPage() {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const { session, ready } = useCustomerAuth();
   const [page, setPage] = useState(1);
@@ -164,7 +166,7 @@ export function AccountOrdersPage() {
           description="When you place an order, it will appear here."
           action={
             <Button variant="bakery" render={<Link href={routes.store.collections} />}>
-              Browse cakes
+              Browse {labels.productWordPlural.toLowerCase()}
             </Button>
           }
         />

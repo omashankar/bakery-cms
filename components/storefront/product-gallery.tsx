@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductGalleryProps {
   images: string[];
@@ -16,6 +17,7 @@ interface ProductGalleryProps {
 }
 
 export function ProductGallery({ images, productName }: ProductGalleryProps) {
+  const labels = useBusinessLabels();
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
   const activeImage = images[activeIndex] ?? images[0];
@@ -29,7 +31,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           type="button"
           onClick={() => setZoomOpen(true)}
           className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100"
-          aria-label="Zoom product image"
+          aria-label={`Zoom ${labels.productWord.toLowerCase()} image`}
         >
           <OptimizedImage
             src={activeImage}

@@ -66,6 +66,7 @@ import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
@@ -93,6 +94,7 @@ export function ProductDetailPage({
   related: relatedFromServer,
   catalog,
 }: ProductDetailPageProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
   // Related/recommended lists merge localStorage-backed admin cakes (absent during
   // SSR) — gate them behind mount to avoid a hydration mismatch.
@@ -324,7 +326,7 @@ export function ProductDetailPage({
 
   const handleAddToCart = (redirectToCart = false) => {
     if (isOutOfStock) {
-      toast.error("This product is currently out of stock");
+      toast.error(`This ${labels.productWord.toLowerCase()} is currently out of stock`);
       return;
     }
 
@@ -762,7 +764,7 @@ export function ProductDetailPage({
                 ) : null}
                 <TabsContent value="ingredients" className="text-sm text-muted-foreground">
                   {cake.ingredients}
-                  {modules.eggEggless && isEggless ? " This cake is prepared without eggs." : ""}
+                  {modules.eggEggless && isEggless ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.` : ""}
                 </TabsContent>
                 <TabsContent value="nutrition" className="space-y-2 text-sm text-muted-foreground">
                   {cake.calories ? (

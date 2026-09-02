@@ -17,6 +17,7 @@ import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
 import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -33,12 +34,13 @@ const paymentLabels = {
  * answering, or there really is no such order. So the very first paint of a
  * successful checkout — and every frame until the fetch landed — read "We could
  * not find that order" beneath a green tick, an "Order Confirmed" page title and
- * "Thank you for your order. We're preparing your cakes with care." A customer
+ * `Thank you for your order. We're preparing your ${labels.productWordPlural.toLowerCase()} with care.` A customer
  * whose money had just left their account read that the shop had lost it.
  */
 type Lookup = "looking" | "found" | "missing";
 
 export function OrderSuccessPage() {
+  const labels = useBusinessLabels();
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get("order");
   const [order, setOrder] = useState<PlacedOrder | null>(null);
@@ -112,7 +114,7 @@ export function OrderSuccessPage() {
           looking
             ? "One moment while we fetch your order details."
             : order
-              ? "Thank you for your order. We're preparing your cakes with care."
+              ? `Thank you for your order. We're preparing your ${labels.productWordPlural.toLowerCase()} with care.`
               : "Look it up with your order number, or contact us and we will help."
         }
         breadcrumbs={[{ label: looking ? "Your Order" : order ? "Order Confirmed" : "Order" }]}

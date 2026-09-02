@@ -91,6 +91,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCalendarDate, formatCurrency } from "@/utils/format";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -168,6 +169,8 @@ interface CheckoutPageProps {
 }
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
+  const labels = useBusinessLabels();
+  const productLower = labels.productWord.toLowerCase();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
@@ -350,7 +353,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     const cartItems = getCartItems();
     if (cartItems.length === 0) {
-      toast.info("Your cart is empty — add a cake to check out");
+      toast.info(`Your cart is empty — add a ${productLower} to check out`);
       router.replace(routes.store.cart);
       return;
     }
@@ -463,13 +466,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
          *
          * `commitPlacedOrder` clears the cart on a successful order, which
          * fires this subscriber. So at the exact moment the order went through,
-         * the customer got "Your cart is now empty — add a cake to check out"
+         * the customer got `Your cart is now empty — add a ${productLower} to check out`
          * and a `router.replace` to the cart, racing the push to the success
          * page — a contradiction and a coin toss over where they landed.
          */
         if (orderCommitted.current) return;
 
-        toast.info("Your cart is now empty — add a cake to check out");
+        toast.info(`Your cart is now empty — add a ${productLower} to check out`);
         router.replace(routes.store.cart);
         return;
       }

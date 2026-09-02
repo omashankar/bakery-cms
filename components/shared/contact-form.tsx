@@ -10,6 +10,7 @@ import { routes } from "@/constants/routes";
 import { createInquiryFromForm } from "@/features/inquiries/lib/inquiries-repository";
 import type { InquiryType } from "@/types/inquiry";
 import { cn } from "@/lib/utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ContactFormProps {
   className?: string;
@@ -24,6 +25,7 @@ export function ContactForm({
   submitLabel = "Submit Inquiry",
   inquiryType = "contact",
 }: ContactFormProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -102,7 +104,7 @@ export function ContactForm({
         <Input
           id="subject"
           name="subject"
-          placeholder="Order inquiry, custom cake, etc."
+          placeholder={`Order inquiry, custom ${labels.productWord.toLowerCase()}, etc.`}
           defaultValue={defaultSubject}
         />
       </div>
