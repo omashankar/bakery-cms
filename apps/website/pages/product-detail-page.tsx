@@ -9,6 +9,7 @@ import {
   Heart,
   Leaf,
   Share2,
+  Tag,
   ShoppingBag,
   Truck,
 } from "lucide-react";
@@ -65,6 +66,9 @@ import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
+import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
@@ -126,6 +130,19 @@ export function ProductDetailPage({
   const [deliveryPromise, setDeliveryPromise] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
   const [deliveryReady, setDeliveryReady] = useState(false);
+  /**
+   * What this shop is offering, said where the decision is made.
+   *
+   * Every one of these already existed and none of them reached the product
+   * page. “Free delivery over Rs 999” is a setting the shop has filled in, and
+   * the only place a customer was ever told is the CART SUMMARY — after they
+   * had chosen. The coupons are live rows a checkout will honour; the homepage
+   * advertises them and the page selling the thing did not.
+   *
+   * Read on the client because both come from local settings, and empty until
+   * they do: a shop running no offers gets no block, not an empty heading.
+   */
+  const [offers, setOffers] = useState<string[]>([]);
 
   const [selectedWeight, setSelectedWeight] = useState(0);
   const [selectedFlavour, setSelectedFlavour] = useState(flavourOptions[0] ?? "");
@@ -225,6 +242,22 @@ export function ProductDetailPage({
     setDeliveryDate(minDate);
     setDeliveryTime(slots[3] ?? slots[0] ?? "");
     setDeliveryReady(true);
+
+    const threshold = getFreeDeliveryThreshold();
+    const lines = [
+      threshold > 0
+        ? `Free delivery on orders over ${formatCurrency(threshold)}`
+        : null,
+      // `getActiveCoupons` already drops the inactive and the expired, and
+      // `isLiveCoupon` is applied on top because it is the predicate the
+      // HOMEPAGE row uses — so the two surfaces cannot come to disagree about
+      // what is on offer. Advertising a code checkout then refuses is the
+      // exact failure `coupon-offers` was written to end.
+      ...getActiveCoupons()
+        .filter((coupon) => isLiveCoupon(coupon))
+        .map((coupon) => `Use code ${coupon.code} — ${couponDiscountLabel(coupon)}`),
+    ].filter((line): line is string => Boolean(line));
+    setOffers(lines);
   }, []);
 
   useEffect(() => {
@@ -687,6 +720,23 @@ export function ProductDetailPage({
                   Buy Now
                 </Button>
               </div>
+
+              {offers.length > 0 ? (
+                <div className="rounded-xl border border-dashed border-bakery-300 bg-white p-4">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
+                    <Tag className="size-4" />
+                    Available offers
+                  </p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                    {offers.map((offer) => (
+                      <li key={offer} className="flex gap-2">
+                        <span aria-hidden className="text-bakery-700">•</span>
+                        <span>{offer}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {/*
                 WHAT THE SHOP CAN ACTUALLY SAY, and only that.

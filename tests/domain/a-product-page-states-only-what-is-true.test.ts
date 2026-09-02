@@ -285,6 +285,61 @@ describe("the page does not call every product a cake", () => {
     }
   });
 
+  it("advertises only the codes a checkout will honour", () => {
+    /**
+     * The offers block is a PROMISE, and this repo has broken it before: the
+     * homepage row advertised “20% OFF · code BDAY20” off a hardcoded array,
+     * so deactivating the coupon left the offer up and checkout refused the
+     * code. Putting the same row on every product page multiplies that by the
+     * whole catalogue.
+     */
+    localStorage.setItem(
+      "bakery-cms-coupons",
+      JSON.stringify([
+        {
+          id: "c1",
+          code: "LIVE10",
+          label: "10% OFF",
+          description: "",
+          percentOff: 10,
+          isActive: true,
+          usageCount: 0,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "c2",
+          code: "SWITCHEDOFF",
+          label: "50% OFF",
+          description: "",
+          percentOff: 50,
+          isActive: false,
+          usageCount: 0,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "c3",
+          code: "LASTYEAR",
+          label: "Rs 500 off",
+          description: "",
+          flatOff: 500,
+          isActive: true,
+          usageCount: 0,
+          createdAt: "2020-01-01T00:00:00.000Z",
+          expiresAt: "2020-12-31T00:00:00.000Z",
+        },
+      ]),
+    );
+
+    const { html, unmount } = render(CHARGER);
+    try {
+      expect(html).toContain("LIVE10");
+      expect(html).not.toContain("SWITCHEDOFF");
+      expect(html).not.toContain("LASTYEAR");
+    } finally {
+      unmount();
+    }
+  });
+
   it("does not say a charger is made without eggs", () => {
     /**
      * The trust strip under Add to Cart said “Eggless available” gated on the
