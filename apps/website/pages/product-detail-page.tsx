@@ -67,7 +67,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
-import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
+import {
+  COUPONS_UPDATED_EVENT,
+  getActiveCoupons,
+} from "@/features/commerce/lib/coupons-repository";
 import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
@@ -127,6 +130,9 @@ export function ProductDetailPage({
   );
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  // The count the SERVER knows, so the heading and the empty state do not
+  // contradict the star rating beside them before the fetch lands.
+  const reviewCount = reviews.length || cake.reviewCount || 0;
   const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
   const [deliveryPromise, setDeliveryPromise] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
@@ -251,22 +257,57 @@ export function ProductDetailPage({
     setDeliveryDate(minDate);
     setDeliveryTime(slots[3] ?? slots[0] ?? "");
     setDeliveryReady(true);
+  }, []);
 
-    const threshold = getFreeDeliveryThreshold();
-    const lines = [
-      threshold > 0
-        ? `Free delivery on orders over ${formatCurrency(threshold)}`
-        : null,
-      // `getActiveCoupons` already drops the inactive and the expired, and
-      // `isLiveCoupon` is applied on top because it is the predicate the
-      // HOMEPAGE row uses — so the two surfaces cannot come to disagree about
-      // what is on offer. Advertising a code checkout then refuses is the
-      // exact failure `coupon-offers` was written to end.
-      ...getActiveCoupons()
-        .filter((coupon) => isLiveCoupon(coupon))
-        .map((coupon) => `Use code ${coupon.code} — ${couponDiscountLabel(coupon)}`),
-    ].filter((line): line is string => Boolean(line));
-    setOffers(lines);
+  /**
+   * The offers, RE-READ when the caches they come from land.
+   *
+   * Both the free-delivery threshold and the coupon list are read from
+   * localStorage, which the root providers hydrate asynchronously — so an
+   * effect with `[]` deps that runs once on mount states whatever the SHIPPED
+   * DEFAULT is on the first page view of a session and never corrects itself.
+   * A first-time visitor was told “over ₹999” whatever the shop had set.
+   */
+  useEffect(() => {
+    const sync = () => {
+      const threshold = getFreeDeliveryThreshold();
+      setOffers(
+        [
+          threshold > 0
+            ? `Free delivery on orders over ${formatCurrency(threshold)}`
+            : null,
+          // `getActiveCoupons` already drops the inactive and the expired, and
+          // `isLiveCoupon` is applied on top because it is the predicate the
+          // HOMEPAGE row uses — so the two surfaces cannot come to disagree
+          // about what is on offer.
+          ...getActiveCoupons()
+            .filter((coupon) => isLiveCoupon(coupon))
+            .map((coupon) => {
+              const label = `Use code ${coupon.code} — ${couponDiscountLabel(coupon)}`;
+              /**
+               * The minimum, SAID OUT LOUD.
+               *
+               * `isLiveCoupon` deliberately excludes `minSubtotal` — an offer
+               * with a minimum is a real offer and the customer can qualify by
+               * adding to the basket — and `coupon-offers` says in as many
+               * words that it must therefore be SHOWN, or a card sends someone
+               * to a checkout that refuses the code. This block dropped it.
+               */
+              return coupon.minSubtotal
+                ? `${label} on orders over ${formatCurrency(coupon.minSubtotal)}`
+                : label;
+            }),
+        ].filter((line): line is string => Boolean(line)),
+      );
+    };
+
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    window.addEventListener(COUPONS_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+      window.removeEventListener(COUPONS_UPDATED_EVENT, sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -924,7 +965,15 @@ export function ProductDetailPage({
                       that delivers to four localities was making a claim about a
                       whole city.
                     */}
-                    {deliveryPromise}. Scheduled delivery on{" "}
+                    {/*
+                      Guarded, like the trust-strip row above. `deliveryPromise`
+                      starts “” and is filled by a client effect, so the crawled
+                      HTML read “. Scheduled delivery on your selected date.” —
+                      a sentence beginning with a full stop. Under tabs this
+                      panel was unmounted and never shipped at all.
+                    */}
+                    {deliveryPromise ? `${deliveryPromise}. ` : ""}
+                    Scheduled delivery on{" "}
                     {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
                     {deliveryTime ? ` between ${deliveryTime}` : ""}.
                     {/*
@@ -944,7 +993,7 @@ export function ProductDetailPage({
                 */}
                 <DetailSection
                   id="reviews"
-                  title={`Reviews${reviews.length ? ` (${reviews.length})` : ""}`}
+                  title={`Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
                 >
                   <div className="space-y-4">
                     <ProductReviewForm
@@ -961,7 +1010,18 @@ export function ProductDetailPage({
                     />
                     {reviews.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        No published reviews yet. Be the first to share your experience.
+                        {/*
+                          `reviews` is fetched on the CLIENT and starts empty, so
+                          this said “no published reviews” in the server HTML of
+                          products carrying a 4.8-star rating rendered from the
+                          same payload two hundred lines above — a page
+                          contradicting itself, to a crawler, on the commit whose
+                          whole motive was that tabbed content never reached one.
+                          `reviewCount` is on the payload and is server-rendered.
+                        */}
+                        {reviewCount
+                          ? "Loading reviews…"
+                          : "No published reviews yet. Be the first to share your experience."}
                       </p>
                     ) : (
                       reviews.map((review) => (

@@ -1,4 +1,4 @@
-import { getCustomerSession } from "@/lib/server/auth/customer-dal";
+import { getCustomerAccount } from "@/lib/server/auth/customer-dal";
 import { clientIpFrom } from "@/lib/server/http/client-ip";
 import { AppError, ValidationError, withErrorHandler } from "@/lib/server/http/errors";
 import { rateLimit } from "@/lib/server/http/rate-limit";
@@ -94,11 +94,25 @@ export const photoUploadController = withErrorHandler(async (request: Request) =
     );
   }
 
-  const customer = await getCustomerSession();
+  /**
+   * The ACCOUNT, not the session claim.
+   *
+   * `getCustomerSession` reads the JWT and answers for anyone holding an
+   * unexpired one — including an account since blocked or deleted, which the
+   * `requireCustomer` this replaced would have refused, because it re-reads the
+   * row. Blocking is meant to mean something, and a blocked account was not
+   * only getting back in, it was getting its own private budget to do it with.
+   *
+   * A blocked customer falls to the anonymous path rather than being refused
+   * outright: the endpoint IS public, so they could clear a cookie and be a
+   * visitor anyway. What must not happen is the shop handing them a larger,
+   * separately-keyed allowance in their own name.
+   */
+  const customer = (await getCustomerAccount()) as { id?: string } | null;
   const ip = clientIpFrom(request.headers);
 
-  if (customer) {
-    rateLimit(`photo-upload:customer:${customer.sub}`, { limit: 20, windowMs: HOUR });
+  if (customer?.id) {
+    rateLimit(`photo-upload:customer:${customer.id}`, { limit: 20, windowMs: HOUR });
   } else if (ip) {
     rateLimit(`photo-upload:ip:${ip}`, { limit: 10, windowMs: HOUR });
   } else {

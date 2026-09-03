@@ -27,6 +27,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * being unreachable.
  */
 
+/**
+ * The delivery promise, made settable.
+ *
+ * It is filled by a client effect from “”, and in a test the effect always runs
+ * — so the empty state the SERVER ships could not be reproduced at all, and an
+ * assertion about it passed no matter what the component did.
+ */
+const promise = vi.hoisted(() => ({ value: "Next-day delivery" }));
+vi.mock("@/apps/website/lib/product-details", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getDeliveryPromise: () => promise.value,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
   usePathname: () => "/store/cakes/x",
@@ -347,6 +359,88 @@ describe("the page does not call every product a cake", () => {
       expect(html).toContain("LIVE10");
       expect(html).not.toContain("SWITCHEDOFF");
       expect(html).not.toContain("LASTYEAR");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not say a reviewed product has no reviews", () => {
+    /**
+     * `reviews` is fetched on the CLIENT and starts empty, so the server HTML
+     * of a product carrying 4.8 stars also carried “No published reviews yet” —
+     * a page contradicting itself, to a crawler, on the very commit whose motive
+     * was that tabbed content never reached one. `reviewCount` is on the payload
+     * and renders server-side, exactly like the stars.
+     */
+    const { html, unmount } = render({ ...CHARGER, rating: 4.8, reviewCount: 29 });
+    try {
+      expect(html).not.toContain("No published reviews yet");
+      expect(html).toContain("(29)");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("still offers to be the first review on a product that has none", () => {
+    const { html, unmount } = render({ ...CHARGER, rating: 0, reviewCount: 0 });
+    try {
+      expect(html).toContain("No published reviews yet");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("does not start the delivery line with a full stop", () => {
+    /**
+     * `deliveryPromise` starts “” and is filled by a client effect, so the
+     * server HTML read “. Scheduled delivery on your selected date.” Asserted on
+     * the section’s TEXT rather than the markup: React splits an interpolation
+     * into its own text node, so a markup-level regex looking for “>.” never
+     * matched and the case passed for the bug it names.
+     */
+    promise.value = "";
+    const { section, unmount } = render(CHARGER);
+    try {
+      const text = section("Delivery").replace(/^Delivery/, "").trim();
+      expect(text).not.toMatch(/^\./);
+      expect(text).toMatch(/^Scheduled delivery/);
+    } finally {
+      unmount();
+      promise.value = "Next-day delivery";
+    }
+  });
+
+  it("says the minimum a coupon needs, where it has one", () => {
+    /**
+     * `isLiveCoupon` deliberately excludes `minSubtotal` — an offer with a
+     * minimum is a real offer and the customer can qualify by adding to the
+     * basket. `coupon-offers` says in as many words that it must therefore be
+     * SHOWN, or a card sends somebody with a small basket to a checkout that
+     * refuses the code, which is the failure that module exists to end. This
+     * block dropped it and advertised the discount alone.
+     */
+    localStorage.setItem(
+      "bakery-cms-coupons",
+      JSON.stringify([
+        {
+          id: "c1",
+          code: "SAVE500",
+          label: "Rs 500 off",
+          description: "",
+          flatOff: 500,
+          minSubtotal: 2000,
+          isActive: true,
+          usageCount: 0,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ]),
+    );
+
+    const { html, unmount } = render(CHARGER);
+    try {
+      expect(html).toContain("SAVE500");
+      expect(html).toMatch(/on orders over/i);
+      expect(html).toContain("2,000");
     } finally {
       unmount();
     }

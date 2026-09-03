@@ -44,8 +44,11 @@ vi.mock("@/features/uploads/server/photo-upload.service", () => ({
   }),
 }));
 
+const account = vi.hoisted(() => ({ value: null as { id: string } | null }));
 vi.mock("@/lib/server/auth/customer-dal", () => ({
-  getCustomerSession: vi.fn(async () => null),
+  // The ACCOUNT reader, which returns null for a blocked or deleted row — not
+  // the session claim, which answers for anyone holding an unexpired token.
+  getCustomerAccount: vi.fn(async () => account.value),
 }));
 
 import { photoUploadController } from "@/features/uploads/server/photo-upload.controller";
@@ -65,6 +68,33 @@ function post(options: { file?: boolean; headers?: Record<string, string> } = {}
 beforeEach(() => {
   seen.budgets = [];
   seen.uploads = 0;
+  account.value = null;
+});
+
+describe("who the budget is charged to", () => {
+  it("gives a signed-in customer their own allowance", async () => {
+    account.value = { id: "cust-1" };
+
+    await post();
+
+    expect(seen.budgets).toEqual(["photo-upload:customer:cust-1"]);
+  });
+
+  it("does not give a blocked account one", async () => {
+    /**
+     * `getCustomerAccount` answers null for a blocked or deleted row. The code
+     * this replaced read the session CLAIM, so an account the shop had blocked
+     * kept uploading — and kept a private, separately-keyed allowance to do it
+     * with. It falls to the anonymous bucket now: the endpoint is public, so a
+     * blocked customer could clear a cookie and be a visitor anyway, but the
+     * shop does not hand them a larger budget in their own name.
+     */
+    account.value = null;
+
+    await post();
+
+    expect(seen.budgets).toEqual(["photo-upload:anonymous"]);
+  });
 });
 afterEach(() => vi.clearAllMocks());
 

@@ -162,9 +162,43 @@ function priceLine(
   // adjustment falls back to that default whenever no selection is sent,
   // omitting the selection would not have stopped it either.
   const variantGroups = variantGroupsEnabledBy(getProductVariantGroups(product), modules);
-  const variantSelections = line.variantSelections ?? {};
+  const shapeGroup = variantGroups.find((group) => group.type === "shape");
+  /**
+   * A line that still carries the OLD flat `shape` string.
+   *
+   * Shapes used to be `shapes: string[]` and a `shape` field on the line; they
+   * are a variant group now. Two kinds of line still hold the old field: one
+   * built by Reorder from an order placed before the change, and one sitting in
+   * a customer’s localStorage cart from before the deploy — carts have no
+   * expiry, so those arrive for as long as the browser keeps them.
+   *
+   * Without this the line said the shape TWICE and could say two different
+   * things: `...line` kept “Heart” while `formatVariantSummary` fell back to the
+   * group’s default and added “Shape: Round”. `cartLineChoices` concatenates
+   * both, so the customer’s confirmation, the invoice and the kitchen email all
+   * read “Heart · Shape: Round” — and the kitchen copy is the one acted on.
+   *
+   * The old choice is MAPPED rather than dropped. Dropping it would silently
+   * turn a reordered Heart into whatever the group defaults to, which is the
+   * same damage in the other direction.
+   */
+  const legacyShape = typeof line.shape === "string" ? line.shape.trim() : "";
+  const carried = line.variantSelections ?? {};
+  const matched =
+    shapeGroup && legacyShape && !carried[shapeGroup.id]
+      ? shapeGroup.options.find(
+          (option) => option.label.trim().toLowerCase() === legacyShape.toLowerCase(),
+        )
+      : undefined;
+  const variantSelections = matched
+    ? { ...carried, [shapeGroup!.id]: matched.id }
+    : carried;
 
   return {
+    // Cleared where a shape group exists, so the choice is stated ONCE, by the
+    // group. A product with no shape group keeps its legacy value: that is the
+    // only record an order placed before the change has.
+    ...(shapeGroup ? { shape: undefined } : {}),
     price: calculateProductUnitPrice({
       basePrice: product.price,
       weightPrice,
