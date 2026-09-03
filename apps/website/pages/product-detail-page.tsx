@@ -130,6 +130,16 @@ export function ProductDetailPage({
   );
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  /**
+   * Whether the fetch has answered, however it answered.
+   *
+   * Without it “Loading reviews…” has no terminal state: a failed fetch, or a
+   * stored `reviewCount` that no longer matches its approved reviews, leaves a
+   * spinner under a heading claiming a number nothing beneath it supports —
+   * permanently. `review.service` records that stale aggregates were measured
+   * on this shop, so this is not hypothetical.
+   */
+  const [reviewsSettled, setReviewsSettled] = useState(false);
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
@@ -345,8 +355,12 @@ export function ProductDetailPage({
 
     async function refreshReviews() {
       const fetched = await getProductReviews(cake);
+      if (cancelled) return;
       // Null is a failed read, not an empty list — leave what is on screen.
-      if (!cancelled && fetched) setReviews(fetched);
+      if (fetched) setReviews(fetched);
+      // Settled either way. A FAILED read still ends the loading state, or the
+      // spinner outlives the request that started it.
+      setReviewsSettled(true);
     }
 
     void refreshReviews();
@@ -1019,7 +1033,7 @@ export function ProductDetailPage({
                           whole motive was that tabbed content never reached one.
                           `reviewCount` is on the payload and is server-rendered.
                         */}
-                        {reviewCount
+                        {reviewCount && !reviewsSettled
                           ? "Loading reviews…"
                           : "No published reviews yet. Be the first to share your experience."}
                       </p>

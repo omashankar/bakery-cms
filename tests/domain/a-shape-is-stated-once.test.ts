@@ -101,13 +101,39 @@ describe("a cart line from before shapes were a group", () => {
     expect(line.price).toBe(800);
   });
 
-  it("falls back to the group default for a shape it cannot match", async () => {
-    // A shape the shop has since removed. There is nothing honest to select, so
-    // the group answers for itself rather than the line asserting a shape that
-    // is no longer on offer.
+  it("keeps a legacy shape the group cannot match", async () => {
+    /**
+     * A shape the shop has since renamed or removed. There is nothing honest
+     * to SELECT — so the group answers for itself — but the customer’s own word
+     * is kept rather than deleted.
+     *
+     * Clearing it here was my first attempt and it is worse than the doubling
+     * it was meant to end: “Rectangle · Shape: Round” is contradictory and a
+     * baker can SEE the contradiction, while dropping “Rectangle” bakes a round
+     * cake with no record anywhere that somebody asked for something else.
+     */
     const line = await quote({ shape: "Rectangle" });
 
-    expect(line.shape).toBeUndefined();
+    expect(line.shape).toBe("Rectangle");
     expect(line.variantSummary).toContain("Shape: Round");
+  });
+
+  it("records the mapped choice, not only the words on screen", async () => {
+    /**
+     * The mapping went into a local that `priceLine` never returned, so the
+     * stored line kept neither the flat `shape` nor a selection — the choice
+     * survived as display text alone. A reorder then showed “Shape: Heart” from
+     * the copied summary while the re-quote recorded and cooked “Shape: Round”,
+     * and with every migrated option priced at 0 nothing moved to warn anyone.
+     *
+     * It also let two lines collapse: with no selection and no shape,
+     * `cartLineId` keys both a Heart and a Round of the same cake as
+     * “default”, and `addToCart` merges them.
+     */
+    const line = (await quote({ shape: "Heart" })) as unknown as {
+      variantSelections?: Record<string, string>;
+    };
+
+    expect(line.variantSelections?.["g-shape"]).toBe("heart");
   });
 });

@@ -74,13 +74,86 @@ export interface UploadedPhoto {
  * customer's private photograph attached to one order, not stock the admin
  * browses and reuses.
  */
-export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
+/**
+ * The two refusals that cost nothing to make.
+ *
+ * Exported so the CONTROLLER can make them before it charges the upload
+ * budget. They lived only here, one call downstream of the charge, so a
+ * one-byte `photo` part still spent the shop-wide allowance — which made the
+ * denial the budget exists to prevent cheaper, not dearer.
+ */
+export function rejectUnusableFile(file: File): void {
   if (file.size === 0) throw photoError("That file is empty");
   if (file.size > MAX_BYTES) {
     throw photoError(
       `That photo is too large. Please use an image under ${Math.round(MAX_BYTES / (1024 * 1024))} MB.`,
     );
   }
+}
+
+/**
+ * How many stored photos nothing has claimed yet.
+ *
+ * A HARD CEILING on what the endpoint can cost, which no rate limit can give:
+ * `rateLimit` is a per-process Map that resets on every cold start, so on a
+ * serverless host its hourly number bounds nothing over a month. Thirty-day
+ * retention at the old ceiling reached about 130 GB of standing storage against
+ * a 25 GB free tier — the retention was raised to stop deleting real
+ * customers’ photographs, and this is what pays for that.
+ */
+const MAX_UNCLAIMED = 2_000;
+
+/**
+ * Make sure the TTL index really exists, once per process.
+ *
+ * Declaring it on the schema is not enough for a collection that already
+ * carries a plain `createdAt_1` — and this one does: the first version of this
+ * model shipped `index: true` on the path, so the deployed shop built that
+ * index before the TTL was ever declared. Mongoose sees a matching key and
+ * leaves it alone; a direct createIndex answers IndexOptionsConflict. The
+ * backstop this model spends a paragraph on would have been inert on exactly
+ * the database it was written for.
+ *
+ * The same remedy `ensureUniqueSlugIndex` uses for the same class of problem:
+ * drop the mismatched one and rebuild it. Best-effort, and the memo is cleared
+ * on failure so a transient error does not leave the process without it for
+ * its whole lifetime.
+ */
+const TTL_SECONDS = 180 * 24 * 60 * 60;
+let ttlIndex: Promise<void> | null = null;
+
+function ensureExpiryIndex(): Promise<void> {
+  ttlIndex ??= (async () => {
+    try {
+      const existing = await PhotoUploadModel.collection.indexes();
+      const found = existing.find((index) => index.name === "createdAt_1");
+      if (found && found.expireAfterSeconds !== TTL_SECONDS) {
+        await PhotoUploadModel.collection.dropIndex("createdAt_1");
+      }
+      if (!found || found.expireAfterSeconds !== TTL_SECONDS) {
+        await PhotoUploadModel.collection.createIndex(
+          { createdAt: 1 },
+          { name: "createdAt_1", expireAfterSeconds: TTL_SECONDS },
+        );
+      }
+    } catch (error) {
+      ttlIndex = null;
+      console.error("[photo-upload] could not create the expiry index", error);
+    }
+  })();
+  return ttlIndex;
+}
+export async function refuseIfStorageIsFull(): Promise<void> {
+  await connectDB();
+  if ((await PhotoUploadModel.estimatedDocumentCount()) < MAX_UNCLAIMED) return;
+  throw new AppError(
+    "We cannot take a photo just now. Please place your order and the store will contact you.",
+    503,
+  );
+}
+
+export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
+  rejectUnusableFile(file);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   // Re-checked against the bytes we actually received, because `file.size` is
@@ -144,6 +217,7 @@ export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
 async function trackUpload(asset: { url: string; publicId: string }): Promise<void> {
   try {
     await connectDB();
+    await ensureExpiryIndex();
     await PhotoUploadModel.create({ publicId: asset.publicId, url: asset.url });
   } catch (error) {
     /**
@@ -223,17 +297,45 @@ async function sweepUnclaimedPhotos(): Promise<void> {
       OrderModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
       CheckoutDraftModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
     ]);
-    for (const source of [...orders, ...drafts]) {
-      for (const item of (source.items ?? []) as { photoUrl?: string }[]) {
+    // Kept apart, because a draft is a weaker claim than an order: it keeps the
+    // asset but must not take the row (see the loop below).
+    const orderedUrls = new Set<string>();
+    for (const order of orders) {
+      for (const item of (order.items ?? []) as { photoUrl?: string }[]) {
+        if (item?.photoUrl) {
+          claimed.add(item.photoUrl);
+          orderedUrls.add(item.photoUrl);
+        }
+      }
+    }
+    for (const draft of drafts) {
+      for (const item of (draft.items ?? []) as { photoUrl?: string }[]) {
         if (item?.photoUrl) claimed.add(item.photoUrl);
       }
     }
 
     for (const row of stale) {
-      // A claimed photo keeps its asset and loses only the row: it belongs to an
-      // order now, and nothing here should ever look at it again.
-      if (!claimed.has(row.url)) await deleteFromCloudinary(row.publicId);
-      await PhotoUploadModel.deleteOne({ _id: row._id });
+      if (!claimed.has(row.url)) {
+        await deleteFromCloudinary(row.publicId);
+        await PhotoUploadModel.deleteOne({ _id: row._id });
+        continue;
+      }
+
+      /**
+       * An ORDER takes the row with it — the photo belongs to that order now,
+       * and nothing here should ever look at it again.
+       *
+       * A DRAFT does not. A draft is provisional and expires, so dropping the
+       * row on its word leaves an asset whose Cloudinary id exists nowhere and
+       * which nothing can ever delete. The row is pushed forward and asked
+       * again in another thirty days, by which time the draft has either become
+       * an order or gone.
+       */
+      if (orderedUrls.has(row.url)) {
+        await PhotoUploadModel.deleteOne({ _id: row._id });
+      } else {
+        await PhotoUploadModel.updateOne({ _id: row._id }, { $set: { createdAt: new Date() } });
+      }
     }
   } catch {
     /* housekeeping — the next upload tries again */

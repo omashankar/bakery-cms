@@ -21,6 +21,8 @@ const store = vi.hoisted(() => ({
   drafted: [] as string[],
   deletedFromCloudinary: [] as string[],
   deletedRows: [] as string[],
+  /** Rows a DRAFT claimed — kept and asked again later, not dropped. */
+  pushedForward: [] as string[],
   /** What the sweep asked for, so the window can be asserted rather than read. */
   findQuery: null as { createdAt?: { $lt?: Date } } | null,
 }));
@@ -50,20 +52,43 @@ vi.mock("@/lib/server/db/models/photo-upload.model", () => ({
       store.deletedRows.push(filter._id);
       return {};
     }),
+    updateOne: vi.fn(async (filter: { _id: string }) => {
+      store.pushedForward.push(filter._id);
+      return {};
+    }),
   },
 }));
 
-const itemsFor = (urls: string[]) => [{ items: urls.map((photoUrl) => ({ photoUrl })) }];
+/**
+ * The claim queries, ANSWERED PROPERLY.
+ *
+ * These mocks took no argument, so `find({ “items.photoUrl”: { $in: urls } })`
+ * and `.select(“items”)` were never checked — point the path at a field that
+ * does not exist and every ordered photo is destroyed on day thirty with the
+ * suite green. They filter on what they were actually asked for.
+ */
+function claimSource(urls: () => string[]) {
+  return {
+    find: (query: Record<string, { $in?: string[] }>) => {
+      const wanted = query["items.photoUrl"]?.$in ?? [];
+      const matching = urls().filter((url) => wanted.includes(url));
+      return {
+        select: (fields: string) => ({
+          lean: async () =>
+            fields.includes("items")
+              ? [{ items: matching.map((photoUrl) => ({ photoUrl })) }]
+              : [{}],
+        }),
+      };
+    },
+  };
+}
 
 vi.mock("@/lib/server/db/models/order.model", () => ({
-  OrderModel: {
-    find: () => ({ select: () => ({ lean: async () => itemsFor(store.ordered) }) }),
-  },
+  OrderModel: claimSource(() => store.ordered),
 }));
 vi.mock("@/lib/server/db/models/checkout-draft.model", () => ({
-  CheckoutDraftModel: {
-    find: () => ({ select: () => ({ lean: async () => itemsFor(store.drafted) }) }),
-  },
+  CheckoutDraftModel: claimSource(() => store.drafted),
 }));
 
 /** A one-pixel PNG, because the upload sniffs magic bytes rather than trusting a name. */
@@ -83,6 +108,7 @@ beforeEach(() => {
   store.drafted = [];
   store.deletedFromCloudinary = [];
   store.deletedRows = [];
+  store.pushedForward = [];
   store.findQuery = null;
 });
 afterEach(() => vi.clearAllMocks());
@@ -103,6 +129,50 @@ describe("sweeping the photos nothing claimed", () => {
     // Both rows go — the ordered photo belongs to an order now and nothing here
     // should look at it again.
     expect(store.deletedRows.sort()).toEqual(["r1", "r2"]);
+  });
+
+  it("keeps the row a draft claimed, and asks again later", async () => {
+    /**
+     * A claimed photo used to lose its row unconditionally, justified as “it
+     * belongs to an order now” — which is not true of a DRAFT. A draft is
+     * provisional and expires, so dropping the row on its word leaves an asset
+     * whose Cloudinary id exists nowhere and which nothing can ever delete.
+     */
+    store.stale = [DRAFTED];
+    store.drafted = [DRAFTED.url];
+
+    await upload();
+
+    expect(store.deletedFromCloudinary).toEqual([]);
+    expect(store.deletedRows).toEqual([]);
+    expect(store.pushedForward).toEqual(["r3"]);
+  });
+
+  it("lets an ORDER take the row with it", async () => {
+    store.stale = [ORDERED];
+    store.ordered = [ORDERED.url];
+
+    await upload();
+
+    expect(store.deletedFromCloudinary).toEqual([]);
+    expect(store.deletedRows).toEqual(["r2"]);
+    expect(store.pushedForward).toEqual([]);
+  });
+
+  it("asks the right question of the orders", async () => {
+    /**
+     * The two queries decide what “claimed” MEANS, and the mocks used to ignore
+     * both the filter and the projection — so pointing the path at a field that
+     * does not exist destroyed every ordered photo with the suite green.
+     */
+    store.stale = [ABANDONED, ORDERED];
+    store.ordered = [ORDERED.url];
+
+    await upload();
+
+    // The ordered one survived, which is only possible if the filter matched
+    // on the URL and the projection returned `items`.
+    expect(store.deletedFromCloudinary).toEqual(["abandoned"]);
   });
 
   it("treats a checkout draft as a claim", async () => {

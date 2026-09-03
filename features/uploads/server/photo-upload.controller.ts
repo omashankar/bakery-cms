@@ -4,7 +4,11 @@ import { AppError, ValidationError, withErrorHandler } from "@/lib/server/http/e
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { ok } from "@/lib/server/http/response";
 
-import { uploadPhotoCakeImage } from "./photo-upload.service";
+import {
+  refuseIfStorageIsFull,
+  rejectUnusableFile,
+  uploadPhotoCakeImage,
+} from "./photo-upload.service";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -28,7 +32,16 @@ function isCrossSite(request: Request): boolean {
   if (fetchSite) return fetchSite === "cross-site";
 
   const origin = request.headers.get("origin");
-  if (!origin) return false; // no browser context claimed at all
+  /**
+   * NEITHER header is refused, and that is the point of this check.
+   *
+   * It used to answer “not cross-site” here, which is exactly what a script
+   * sends — so the guard stopped a form on another site and waved through the
+   * curl loop it was written for. Every browser sends `Sec-Fetch-Site`, and
+   * every browser sends `Origin` on a POST, so a real customer always carries
+   * one of the two.
+   */
+  if (!origin) return true;
   const host = request.headers.get("host");
   try {
     return Boolean(host) && new URL(origin).host !== host;
@@ -93,6 +106,15 @@ export const photoUploadController = withErrorHandler(async (request: Request) =
       "No photo was received",
     );
   }
+  /**
+   * Empty and oversized, refused BEFORE the budget.
+   *
+   * These checks lived one call downstream, so anything that was merely a File
+   * — a single byte — spent the shop-wide allowance. Cutting the ceiling to 30
+   * then made the denial four times CHEAPER than the one this endpoint was
+   * hardened against.
+   */
+  rejectUnusableFile(file);
 
   /**
    * The ACCOUNT, not the session claim.
@@ -122,6 +144,11 @@ export const photoUploadController = withErrorHandler(async (request: Request) =
     // being small enough that spending it does not fill the media plan.
     rateLimit("photo-upload:anonymous", { limit: 30, windowMs: HOUR });
   }
+
+  // A ceiling the rate limit cannot give: `rateLimit` is a per-process Map that
+  // resets on every cold start, so an hourly number bounds nothing across a
+  // thirty-day retention. This is what actually stops the media plan filling.
+  await refuseIfStorageIsFull();
 
   const uploaded = await uploadPhotoCakeImage(file);
 

@@ -134,7 +134,14 @@ function priceLine(
   line: QuoteLineInput,
   /** The modules this shop has switched on. A group it does not sell is not priced. */
   modules: ModuleSettings,
-): { price: number; variantSummary: string[] } {
+): {
+  price: number;
+  variantSummary: string[];
+  /** Present so the ORDER records the choice, not only the display text. */
+  variantSelections: Record<string, string>;
+  /** Cleared, and only where a legacy value was mapped onto a real option. */
+  shape?: undefined;
+} {
   const weightOptions = getProductWeightOptions(product);
 
   // An unrecognised weight label is REFUSED, not repriced.
@@ -195,16 +202,38 @@ function priceLine(
     : carried;
 
   return {
-    // Cleared where a shape group exists, so the choice is stated ONCE, by the
-    // group. A product with no shape group keeps its legacy value: that is the
-    // only record an order placed before the change has.
-    ...(shapeGroup ? { shape: undefined } : {}),
+    /**
+     * Cleared only where the old value was actually MAPPED onto an option.
+     *
+     * Gated on `shapeGroup` alone, this destroyed a legacy shape the group
+     * cannot match — one the shop has since renamed or removed — leaving the
+     * line asserting the group's default with no record of what the customer
+     * actually asked for. Before the fix the invoice at least still read
+     * "Rectangle · Shape: Round", which is contradictory but not silent.
+     */
+    ...(matched ? { shape: undefined } : {}),
     price: calculateProductUnitPrice({
       basePrice: product.price,
       weightPrice,
       variantGroups,
       variantSelections,
     }),
+    /**
+     * RETURNED, not merely used to price.
+     *
+     * The mapping above wrote into a local and this returned only `price` and
+     * `variantSummary`, so the stored line kept neither the flat `shape` nor a
+     * selection for the group — the customer's choice survived as display text
+     * and nothing else. A reorder then showed "Shape: Heart" from the copied
+     * summary while the re-quote recorded and cooked "Shape: Round", and with
+     * every migrated option priced at 0 nothing moved to warn anybody.
+     *
+     * It also let two lines collapse: with no selection and no shape,
+     * `cartLineId`'s variant key is the literal "default" for both a Heart and
+     * a Round of the same cake, so `addToCart` merged them and added the
+     * quantities — the exact bug `cartLineId`'s own comment records.
+     */
+    variantSelections,
     // The same list the price came from, resolved the same way — including the
     // fallback to a group's default, so a line never states a price it does not
     // explain, and never mentions a group the shop has switched off.

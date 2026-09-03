@@ -29,6 +29,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const seen = vi.hoisted(() => ({
   budgets: [] as string[],
   uploads: 0,
+  /** Sizes the cheap validator saw, so its ORDER can be asserted. */
+  checked: [] as number[],
 }));
 
 vi.mock("@/lib/server/http/rate-limit", () => ({
@@ -38,6 +40,10 @@ vi.mock("@/lib/server/http/rate-limit", () => ({
 }));
 
 vi.mock("@/features/uploads/server/photo-upload.service", () => ({
+  rejectUnusableFile: vi.fn((file: File) => {
+    seen.checked.push(file.size);
+  }),
+  refuseIfStorageIsFull: vi.fn(async () => undefined),
   uploadPhotoCakeImage: vi.fn(async () => {
     seen.uploads += 1;
     return { url: "https://cdn.example/p.png", bytes: 10 };
@@ -51,15 +57,30 @@ vi.mock("@/lib/server/auth/customer-dal", () => ({
   getCustomerAccount: vi.fn(async () => account.value),
 }));
 
+import { rateLimit } from "@/lib/server/http/rate-limit";
+import {
+  refuseIfStorageIsFull,
+  rejectUnusableFile,
+  uploadPhotoCakeImage,
+} from "@/features/uploads/server/photo-upload.service";
 import { photoUploadController } from "@/features/uploads/server/photo-upload.controller";
 
-function post(options: { file?: boolean; headers?: Record<string, string> } = {}) {
+function post(
+  options: { file?: boolean; headers?: Record<string, string>; noFetchSite?: boolean } = {},
+) {
   const body = new FormData();
   if (options.file !== false) body.append("photo", new File(["x"], "p.png", { type: "image/png" }));
   return photoUploadController(
     new Request("https://shop.example/api/uploads/photo-cake", {
       method: "POST",
-      headers: { host: "shop.example", ...(options.headers ?? {}) },
+      headers: {
+        host: "shop.example",
+        // What every browser sends on a POST. A request carrying NEITHER
+        // signal is refused now, so the default here has to look like a real
+        // one; `noFetchSite` drops it to exercise the Origin fallback.
+        ...(options.noFetchSite ? {} : { "sec-fetch-site": "same-origin" }),
+        ...(options.headers ?? {}),
+      },
       body,
     }),
   );
@@ -68,7 +89,28 @@ function post(options: { file?: boolean; headers?: Record<string, string> } = {}
 beforeEach(() => {
   seen.budgets = [];
   seen.uploads = 0;
+  seen.checked = [];
   account.value = null;
+  /**
+   * Implementations RE-ESTABLISHED, not merely cleared.
+   *
+   * Several cases below replace one of these to make it throw, and
+   * `clearAllMocks` resets calls only — so the next test inherited the
+   * replacement and its budget assertions went quiet rather than red.
+   * `restoreAllMocks` is not the answer either: it strips the factory
+   * implementations too, and every mock becomes a bare `vi.fn()`.
+   */
+  vi.mocked(rateLimit).mockImplementation((key: string) => {
+    seen.budgets.push(key);
+  });
+  vi.mocked(rejectUnusableFile).mockImplementation((file: File) => {
+    seen.checked.push(file.size);
+  });
+  vi.mocked(refuseIfStorageIsFull).mockImplementation(async () => undefined);
+  vi.mocked(uploadPhotoCakeImage).mockImplementation(async () => {
+    seen.uploads += 1;
+    return { url: "https://cdn.example/p.png", bytes: 10 };
+  });
 });
 
 describe("who the budget is charged to", () => {
@@ -109,7 +151,22 @@ describe("posting a photo from somewhere that is not this shop", () => {
   });
 
   it("is refused when the Origin belongs to another host", async () => {
-    const response = await post({ headers: { origin: "https://evil.example" } });
+    const response = await post({
+      noFetchSite: true,
+      headers: { origin: "https://evil.example" },
+    });
+
+    expect(response.status).toBe(403);
+    expect(seen.budgets).toEqual([]);
+  });
+
+  it("is refused when it claims no browser context at all", async () => {
+    /**
+     * Neither Sec-Fetch-Site nor Origin — which is exactly what a script sends.
+     * This used to answer “not cross-site”, so the check stopped a form on
+     * another site and waved through the curl loop it was written for.
+     */
+    const response = await post({ noFetchSite: true });
 
     expect(response.status).toBe(403);
     expect(seen.budgets).toEqual([]);
@@ -150,16 +207,41 @@ describe("a real upload", () => {
     expect(seen.budgets).toEqual(["photo-upload:anonymous"]);
   });
 
+  it("refuses the empty and the oversized without spending anything", async () => {
+    /**
+     * The cheap refusals used to live one call downstream of the charge, so a
+     * ONE-BYTE file spent the shop-wide allowance — which made cutting the
+     * ceiling to 30 a four-times-cheaper denial than the 121 empty posts the
+     * endpoint was hardened against.
+     */
+    vi.mocked(rejectUnusableFile).mockImplementation(() => {
+      throw new Error("unusable");
+    });
+
+    await post().catch(() => undefined);
+
+    expect(seen.budgets).toEqual([]);
+    expect(seen.uploads).toBe(0);
+  });
+
+  it("refuses once the store is full, before storing anything more", async () => {
+    // A per-process rate limit resets on every cold start, so it bounds nothing
+    // across thirty-day retention. This ceiling is what does.
+    vi.mocked(refuseIfStorageIsFull).mockImplementation(async () => {
+      throw new Error("full");
+    });
+
+    await post().catch(() => undefined);
+
+    expect(seen.uploads).toBe(0);
+  });
+
   it("is charged before the file is stored, not after", async () => {
     /**
      * Order matters: a budget checked after the upload has already happened
      * bounds nothing, because the storage is spent by the time it refuses.
      */
     const order: string[] = [];
-    const { rateLimit } = await import("@/lib/server/http/rate-limit");
-    const { uploadPhotoCakeImage } = await import(
-      "@/features/uploads/server/photo-upload.service"
-    );
     vi.mocked(rateLimit).mockImplementation(() => {
       order.push("budget");
     });
