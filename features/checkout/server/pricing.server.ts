@@ -12,6 +12,7 @@ import {
   getProductVariantGroups,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
+import type { ProductVariantGroup } from "@/types/product";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
@@ -115,6 +116,35 @@ export class UnknownWeightError extends Error {
 }
 
 /**
+ * A flat legacy value, matched onto the option that replaced it.
+ *
+ * `shape` and `flavour` were both string fields on a cart line with their own
+ * hard-coded pickers, and both are variant groups now. Two kinds of line still
+ * carry the old fields: one built by Reorder from an order placed before the
+ * change, and one sitting in a browser’s localStorage cart from before the
+ * deploy — carts have no expiry, so those keep arriving.
+ *
+ * Returns null where there is nothing to map, which is the signal to LEAVE the
+ * old value alone: a shape or flavour the group cannot answer for is the
+ * customer’s own word, and deleting it bakes the default with no record that
+ * somebody asked for something else.
+ */
+function mapLegacyChoice(
+  group: ProductVariantGroup | undefined,
+  value: string | undefined,
+  carried: Record<string, string>,
+): { groupId: string; optionId: string } | null {
+  const wanted = typeof value === "string" ? value.trim() : "";
+  // A real selection always wins: a line from AFTER the change carries one, and
+  // the legacy field must not override it.
+  if (!group || !wanted || carried[group.id]) return null;
+
+  const option = group.options.find(
+    (candidate) => candidate.label.trim().toLowerCase() === wanted.toLowerCase(),
+  );
+  return option ? { groupId: group.id, optionId: option.id } : null;
+}
+/**
  * What one line costs, AND what the customer chose to make it cost that.
  *
  * The two are returned together because they must be derived from the same
@@ -139,8 +169,11 @@ function priceLine(
   variantSummary: string[];
   /** Present so the ORDER records the choice, not only the display text. */
   variantSelections: Record<string, string>;
+  /** The shop's word for the size axis, so every later surface can head it. */
+  weightLabel?: string;
   /** Cleared, and only where a legacy value was mapped onto a real option. */
   shape?: undefined;
+  flavour?: undefined;
 } {
   const weightOptions = getProductWeightOptions(product);
 
@@ -171,6 +204,22 @@ function priceLine(
   const variantGroups = variantGroupsEnabledBy(getProductVariantGroups(product), modules);
   const shapeGroup = variantGroups.find((group) => group.type === "shape");
   /**
+   * The same treatment for the legacy flat `flavour`.
+   *
+   * `flavourOptions` was a second, unpriced option system with its own
+   * hard-coded picker; it is a variant group now. A line built by Reorder from
+   * an older order, or sitting in a browser from before the change, still
+   * carries the flat field — and without this it would be printed beside a
+   * recomputed “Flavour: <default>”, which is the doubling shape already had.
+   *
+   * Matched by NAME rather than by a type, because flavour has no dedicated
+   * variant type: a shop names the group itself, and calling it anything else
+   * simply means the old value is preserved rather than mapped.
+   */
+  const flavourGroup = variantGroups.find(
+    (group) => group.name.trim().toLowerCase() === "flavour",
+  );
+  /**
    * A line that still carries the OLD flat `shape` string.
    *
    * Shapes used to be `shapes: string[]` and a `shape` field on the line; they
@@ -189,17 +238,14 @@ function priceLine(
    * turn a reordered Heart into whatever the group defaults to, which is the
    * same damage in the other direction.
    */
-  const legacyShape = typeof line.shape === "string" ? line.shape.trim() : "";
   const carried = line.variantSelections ?? {};
-  const matched =
-    shapeGroup && legacyShape && !carried[shapeGroup.id]
-      ? shapeGroup.options.find(
-          (option) => option.label.trim().toLowerCase() === legacyShape.toLowerCase(),
-        )
-      : undefined;
-  const variantSelections = matched
-    ? { ...carried, [shapeGroup!.id]: matched.id }
-    : carried;
+  const mappedShape = mapLegacyChoice(shapeGroup, line.shape, carried);
+  const mappedFlavour = mapLegacyChoice(flavourGroup, line.flavour, carried);
+  const variantSelections = {
+    ...carried,
+    ...(mappedShape ? { [mappedShape.groupId]: mappedShape.optionId } : {}),
+    ...(mappedFlavour ? { [mappedFlavour.groupId]: mappedFlavour.optionId } : {}),
+  };
 
   return {
     /**
@@ -211,7 +257,17 @@ function priceLine(
      * actually asked for. Before the fix the invoice at least still read
      * "Rectangle · Shape: Round", which is contradictory but not silent.
      */
-    ...(matched ? { shape: undefined } : {}),
+    ...(mappedShape ? { shape: undefined } : {}),
+    ...(mappedFlavour ? { flavour: undefined } : {}),
+    /**
+     * Taken from the PRODUCT, never from the line.
+     *
+     * The client sends what it chose; what that choice is CALLED is the
+     * shop's to say, and a line that sat in a browser since before the shop
+     * renamed the axis would otherwise keep printing the old word on a new
+     * invoice.
+     */
+    ...(product.weightLabel?.trim() ? { weightLabel: product.weightLabel.trim() } : {}),
     price: calculateProductUnitPrice({
       basePrice: product.price,
       weightPrice,

@@ -137,8 +137,10 @@ function matchesOccasion(cake: LandingProduct, occasions: string[]): boolean {
 
 function matchesFlavour(cake: LandingProduct, flavours: string[]): boolean {
   if (flavours.length === 0) return true;
-  const productFlavours = cake.flavours ?? [];
-  const haystack = `${cake.name} ${cake.description} ${productFlavours.join(" ")}`.toLowerCase();
+  // `optionLabels` first: flavours are a variant group now, and the legacy
+  // array is kept only for products stored before that.
+  const chosen = [...(cake.optionLabels ?? []), ...(cake.flavours ?? [])];
+  const haystack = `${cake.name} ${cake.description} ${chosen.join(" ")}`.toLowerCase();
   return flavours.some((flavour) => haystack.includes(flavour.toLowerCase()));
 }
 
@@ -180,6 +182,7 @@ export function applyCollectionFilters(
         cake.name,
         cake.category,
         cake.description,
+        ...(cake.optionLabels ?? []),
         ...(cake.flavours ?? []),
         ...(cake.occasions ?? []),
       ]

@@ -104,6 +104,8 @@ export interface Product extends BaseEntity, ProductDetails {
   flavourId?: string;
   occasionIds: string[];
   weights: ProductWeight[];
+  /** What this product's size tiers are CALLED. Blank means the generic word. */
+  weightLabel?: string;
   status: EntityStatus;
   isFeatured: boolean;
   isBestSeller: boolean;

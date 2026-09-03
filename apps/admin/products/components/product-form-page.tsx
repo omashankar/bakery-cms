@@ -14,6 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DEFAULT_SIZE_AXIS_LABEL,
+  weightAxisLabel,
+} from "@/features/products/lib/product-pricing";
 import { routes } from "@/constants/routes";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import type { ProductFormData, EntityStatus } from "@/types";
@@ -455,7 +459,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   <>
                     <Separator />
                     <div className="space-y-3">
-                      <p className="text-sm font-medium">Weight variants</p>
+                      {/*
+                        The heading was the literal “Weight variants” here and
+                        the literal “Weight” over the customer's buttons, while
+                        every OTHER option group on both screens has been named
+                        by the shop since variant groups existed. A shop selling
+                        t-shirts had no way to say “Size”.
+                      */}
+                      <p className="text-sm font-medium">
+                        {weightAxisLabel(form.weightLabel)} options
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="weightLabel">What customers see this called</Label>
+                        <Input
+                          id="weightLabel"
+                          value={form.weightLabel ?? ""}
+                          placeholder={DEFAULT_SIZE_AXIS_LABEL}
+                          onChange={(e) => patchForm({ weightLabel: e.target.value })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The heading above these buttons on the product page — Weight,
+                          Size, Length, Capacity. Leave it blank for
+                          “{DEFAULT_SIZE_AXIS_LABEL}”.
+                        </p>
+                      </div>
                       {form.weights.map((weight, index) => (
                         <div
                           key={weight.label}

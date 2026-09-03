@@ -30,6 +30,7 @@ const productSchema = new mongoose.Schema(
     flavourId: { type: String },
     occasionIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    weightLabel: { type: String },
     /**
      * Indexed: the storefront's every list starts `{ status: "published" }`.
      *

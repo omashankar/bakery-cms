@@ -70,6 +70,7 @@ export const productFormSchema = z
     flavourId: z.string().optional(),
     occasionIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),
+    weightLabel: z.string().optional(),
     status: z.enum(["draft", "published", "archived"]),
     isFeatured: z.boolean(),
     isBestSeller: z.boolean(),

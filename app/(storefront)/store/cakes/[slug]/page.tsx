@@ -8,6 +8,7 @@ import {
   getStorefrontProductCards,
 } from "@/features/products/data/products-service";
 import { getServerLabels } from "@/features/settings/server/labels.server";
+import { getServerModules } from "@/features/settings/server/modules.server";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
 import { buildCanonicalUrl } from "@/features/seo/lib/seo-metadata";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
@@ -122,9 +123,19 @@ export default async function Page(props: PageProps) {
   // Fetched on the server, so the first paint already carries real catalogue
   // data — previously this ran against localStorage, which the server does not
   // have, so SSR rendered seed data and the client swapped it on hydration.
-  const [cake, catalog] = await Promise.all([
+  const [cake, catalog, { modules }] = await Promise.all([
     getStorefrontProductBySlug(slug),
     getStorefrontProductCards(),
+    /**
+     * The shop’s modules, READ ON THE SERVER.
+     *
+     * The page seeded them from `defaultModuleSettings` — every module ON —
+     * and corrected itself in a client effect from localStorage. So a shop
+     * that had switched Flavour or Weight OFF still shipped those pickers in
+     * the HTML the browser and the crawler received, and they vanished a beat
+     * later. A gate that fails open on the server is not a gate.
+     */
+    getServerModules(),
   ]);
 
   if (!cake) {
@@ -134,6 +145,7 @@ export default async function Page(props: PageProps) {
   return (
     <ProductDetailPage
       cake={cake}
+      modules={modules}
       related={pickRelated(catalog, cake.slug, cake.category)}
       catalog={catalog}
     />

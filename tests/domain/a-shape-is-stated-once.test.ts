@@ -25,6 +25,17 @@ const SHAPE_GROUP = {
   ],
 };
 
+/** Named by the shop, not typed — a Flavour group is just a custom group. */
+const FLAVOUR_GROUP = {
+  id: "g-flavour",
+  name: "Flavour",
+  type: "custom",
+  options: [
+    { id: "choc", label: "Chocolate", priceAdjustment: 0, isDefault: true },
+    { id: "vanilla", label: "Vanilla", priceAdjustment: 60 },
+  ],
+};
+
 const PRODUCT = {
   id: "p1",
   name: "Black Forest",
@@ -33,8 +44,11 @@ const PRODUCT = {
   images: ["/bf.jpg"],
   status: "published",
   inStock: true,
-  weights: [],
-  variantGroups: [SHAPE_GROUP],
+  // Tier 0 is the base price, so every price assertion below is unchanged by
+  // this — it is here so the quote has a size to put a name to.
+  weights: [{ label: "1 kg", price: 800 }],
+  weightLabel: "Tin size",
+  variantGroups: [SHAPE_GROUP, FLAVOUR_GROUP],
 };
 
 vi.mock("@/features/products/server/product.repository", () => ({
@@ -58,6 +72,38 @@ async function quote(line: Record<string, unknown>) {
   } as never);
   return result.items[0] as { shape?: string; variantSummary?: string[]; price: number };
 }
+
+describe("a cart line from before flavour was a group", () => {
+  it("states the flavour once, through the group, and keeps the choice", async () => {
+    /**
+     * `flavourOptions` was a SECOND option system — an unpriced list of names
+     * with its own hard-coded “Flavour” picker, two lines above a loop that
+     * already rendered every group by its own name. Retiring it leaves the same
+     * legacy field on old lines that `shape` left, and the same doubling if it
+     * is not mapped.
+     */
+    const line = (await quote({ flavour: "Vanilla" })) as unknown as {
+      flavour?: string;
+      variantSelections?: Record<string, string>;
+      variantSummary?: string[];
+      price: number;
+    };
+
+    expect(line.variantSummary).toContain("Flavour: Vanilla");
+    expect(line.flavour).toBeUndefined();
+    expect(line.variantSelections?.["g-flavour"]).toBe("vanilla");
+    // Vanilla costs 60 more, and the price has to follow the mapped choice.
+    expect(line.price).toBe(860);
+  });
+
+  it("keeps a legacy flavour the group cannot match", async () => {
+    const line = await quote({ flavour: "Butterscotch" });
+
+    expect(line.shape).toBeUndefined();
+    expect((line as unknown as { flavour?: string }).flavour).toBe("Butterscotch");
+    expect(line.variantSummary).toContain("Flavour: Chocolate");
+  });
+});
 
 describe("a cart line from before shapes were a group", () => {
   it("states the shape once, through the group", async () => {
@@ -135,5 +181,20 @@ describe("a cart line from before shapes were a group", () => {
     };
 
     expect(line.variantSelections?.["g-shape"]).toBe("heart");
+  });
+});
+
+describe("the size the customer chose, called what the shop calls it", () => {
+  it("stamps the shop's word onto the priced line", async () => {
+    /**
+     * The ORDER is built from `quote.items`, so this is what the invoice, the
+     * account order list and the email to the kitchen read. Taken from the
+     * PRODUCT and never from the line: what a choice is CALLED is the shop's to
+     * say, and a line that sat in a browser since before a rename would
+     * otherwise print the old word on a new invoice.
+     */
+    const line = (await quote({ weight: "1 kg" })) as unknown as { weightLabel?: string };
+
+    expect(line.weightLabel).toBe("Tin size");
   });
 });

@@ -1,4 +1,5 @@
 import { act, createElement } from "react";
+import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -95,10 +96,16 @@ const CAKE: Product = {
     { label: "1 kg", price: 999, serves: "8–10" },
     { label: "2 kg", price: 1799, serves: "16–20" },
   ],
+  // A bakery DOES call this Weight — and now it says so, in a box, rather
+  // than the page saying it on every shop's behalf. A shirt shop types Size.
+  weightLabel: "Weight",
   // Retired. `shapes` was a list of NAMES with nowhere to put a price; it is a
   // typed variant group below, so a Heart can cost more than a Round.
   shapes: [],
-  flavours: ["Chocolate", "Vanilla"],
+  // Retired with `shapes`, and for the same reason: an unpriced list of names
+  // with a hard-coded picker. A flavour is a variant group now, so it can cost
+  // money and a shop can name the group whatever it sells.
+  flavours: [],
   variantGroups: [
     {
       id: "g-shape",
@@ -109,10 +116,19 @@ const CAKE: Product = {
         { id: "heart", label: "Heart", priceAdjustment: 150 },
       ],
     },
+    {
+      id: "g-flavour",
+      name: "Flavour",
+      type: "custom",
+      options: [
+        { id: "choc", label: "Chocolate", priceAdjustment: 0, isDefault: true },
+        { id: "vanilla", label: "Vanilla", priceAdjustment: 0 },
+      ],
+    },
   ],
 };
 
-function render(cake: Product): {
+function render(cake: Product, modules = defaultModuleSettings): {
   html: string;
   /**
    * Open a tab by its label and hand back the markup that follows.
@@ -134,7 +150,16 @@ function render(cake: Product): {
   const root = createRoot(container);
 
   act(() => {
-    root.render(createElement(ProductDetailPage, { cake, related: [], catalog: [] } as never));
+    root.render(
+      createElement(ProductDetailPage, {
+        cake,
+        related: [],
+        catalog: [],
+        // Every module ON, which is what these cases assume — and now stated
+        // rather than inherited from a default the page no longer has.
+        modules,
+      } as never),
+    );
   });
 
   return {
@@ -196,6 +221,38 @@ describe("a product that is sold one way says so by saying nothing", () => {
     try {
       expect(html).toContain("Cable length");
       expect(html).toContain("2 m");
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe("a module the shop switched off", () => {
+  it("is off in the FIRST render, not corrected a beat later", () => {
+    /**
+     * `modules` seeded from `defaultModuleSettings` — every module ON — and was
+     * corrected in a client effect reading localStorage, which the server does
+     * not have. So a shop that had switched Flavour off still shipped the
+     * Flavour picker in the HTML the browser and the crawler received, and it
+     * vanished on hydration. A gate that fails open on the server is not a
+     * gate. It is a required prop now, read on the server.
+     *
+     * This renders with the effect suppressed as far as the assertion goes: it
+     * asserts the markup captured at mount, before any correction could land.
+     */
+    /**
+     * `shape`, not `flavour`. A Flavour group is a plain custom group a shop
+     * NAMES — no module gates it, which is the point of retiring the hard-coded
+     * picker. `variantGroupsEnabledBy` still gates the typed ones, and that
+     * shared filter is what the server value has to reach.
+     */
+    const { html, unmount } = render(CAKE, { ...defaultModuleSettings, shape: false });
+    try {
+      expect(html).not.toContain("Heart");
+      // …and the ones still on are still there, so this is not passing by
+      // rendering nothing at all.
+      expect(html).toContain(">Weight<");
+      expect(html).toContain(">Flavour<");
     } finally {
       unmount();
     }
@@ -446,6 +503,43 @@ describe("the page does not call every product a cake", () => {
     }
   });
 
+  it("does not read a claim out of the category NAME", () => {
+    /**
+     * `category.toLowerCase().includes("eggless")` and `.includes("photo")`
+     * decided what the page claimed and which controls it offered — so a
+     * category a shop had named “Photo Frames” got a photo-cake uploader, and
+     * every product filed under “Eggless Sponges” was described as made without
+     * eggs whatever the product itself said. Business-type control by another
+     * name, decided by a word typed for filing.
+     */
+    const { html, unmount } = render({
+      ...CHARGER,
+      category: "Eggless Photo Frames",
+      isEggless: false,
+      allowsPhotoUpload: false,
+    });
+    try {
+      expect(html).not.toContain("without eggs");
+      expect(html).not.toContain("Upload your photo");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("still offers the photo upload where the PRODUCT says so", () => {
+    // …so the case above is not passing by rendering nothing at all.
+    const { html, unmount } = render({
+      ...CHARGER,
+      category: "Frames",
+      allowsPhotoUpload: true,
+    });
+    try {
+      expect(html).toContain("Upload your photo");
+    } finally {
+      unmount();
+    }
+  });
+
   it("does not say a charger is made without eggs", () => {
     /**
      * The trust strip under Add to Cart said “Eggless available” gated on the
@@ -508,6 +602,9 @@ describe("a cake still says everything it used to", () => {
     const { html, unmount } = render(CAKE);
     try {
       expect(html).toContain(">Weight<");
+      // From `group.name`, not from a hard-coded label. The picker that used to
+      // print this word is gone; the same loop that renders Colour or Storage
+      // renders it now.
       expect(html).toContain(">Flavour<");
       expect(html).toContain("2 kg");
       expect(html).toContain("Vanilla");

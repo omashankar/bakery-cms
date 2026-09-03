@@ -62,6 +62,24 @@ export function defaultProductUnitPrice(cake: {
   });
 }
 
+/**
+ * What the shop calls the axis its `weights` are tiers of.
+ *
+ * The picker was headed with the literal “Weight”, so a shop selling
+ * t-shirts got “Weight: S / M / L” and one selling storage got “Weight:
+ * 128 GB”. A variant group has carried a shop-typed `name` all along; this
+ * gives the first axis the same, and every surface reads it from here.
+ *
+ * The fallback is deliberately generic, for the same reason `DEFAULT_LABELS`
+ * says “Product” and not “Cake”: a default naming one trade is the same bug
+ * as a hard-coded one, just written in a nicer place. Nothing prefills it.
+ */
+export const DEFAULT_SIZE_AXIS_LABEL = "Size";
+
+export function weightAxisLabel(label?: string): string {
+  return label?.trim() || DEFAULT_SIZE_AXIS_LABEL;
+}
+
 export function formatVariantSummary(
   groups: ProductVariantGroup[],
   selections: Record<string, string>

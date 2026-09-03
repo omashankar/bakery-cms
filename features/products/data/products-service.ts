@@ -135,6 +135,9 @@ function buildQuickAdd(
     // Gated like the picker on the product page: a shop with Weight switched off
     // must not stamp a size on a line no customer was shown one for.
     weight: (modules.weight && product.weights?.[0]?.label) || undefined,
+    weightLabel:
+      (modules.weight && product.weights?.[0]?.label && product.weightLabel?.trim()) ||
+      undefined,
     variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
     variantSummary:
       groups.length > 0 ? formatVariantSummary(groups, variantSelections) : undefined,
@@ -194,6 +197,18 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
      */
     quickAdd: buildQuickAdd(product, modules),
     // Filter inputs.
+    /**
+     * Every visible option’s LABEL, flattened.
+     *
+     * The card carried `flavours` and nothing else, so a customer typing
+     * “Eggless”, “Heart”, “Black” or “256GB” matched nothing — the search
+     * haystack could only see one bakery-shaped field. `variantGroups` itself
+     * stays dropped for the payload-size reason above; these are a handful of
+     * short strings and they make the filter work for any trade.
+     */
+    optionLabels: variantGroupsEnabledBy(product.variantGroups ?? [], modules).flatMap(
+      (group) => group.options.map((option) => option.label),
+    ),
     occasions: product.occasions,
     isEggless: product.isEggless,
     flavours: product.flavours,

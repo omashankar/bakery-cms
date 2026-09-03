@@ -41,7 +41,15 @@ describe("one list of what the customer chose", () => {
     ).toEqual(["Storage: 256 GB", "Colour: White"]);
   });
 
-  it("keeps the bakery fields, in a stable order, alongside the options", () => {
+  it("labels every legacy field, in a stable order, alongside the options", () => {
+    /**
+     * These three carried BARE values while `variantSummary` carried labelled
+     * ones — so a line read “1 kg · Chocolate · Heart · Egg preference:
+     * Eggless”, and on a t-shirt it would read “M · Black” with nothing saying
+     * which was the size. They are legacy and READ-ONLY now: nothing writes
+     * shape or flavour any more, and this is what renders orders already
+     * placed.
+     */
     expect(
       cartLineChoices({
         weight: "1 kg",
@@ -49,7 +57,15 @@ describe("one list of what the customer chose", () => {
         shape: "Heart",
         variantSummary: ["Egg preference: Eggless"],
       }),
-    ).toEqual(["1 kg", "Chocolate", "Heart", "Egg preference: Eggless"]);
+    ).toEqual([
+      // The generic word: this line carries no `weightLabel`, which is every
+      // line stored before a shop could name the axis. See
+      // a-size-is-called-what-the-shop-calls-it for the named case.
+      "Size: 1 kg",
+      "Flavour: Chocolate",
+      "Shape: Heart",
+      "Egg preference: Eggless",
+    ]);
   });
 
   it("says nothing about a product that was sold with no choices at all", () => {
@@ -59,7 +75,9 @@ describe("one list of what the customer chose", () => {
 
   it("drops blanks rather than printing a stray separator", () => {
     // `weight: ""` reaches these lines from a module-gated add-to-cart path.
-    expect(cartLineChoices({ weight: "", flavour: "   ", shape: "Round" })).toEqual(["Round"]);
+    expect(cartLineChoices({ weight: "", flavour: "   ", shape: "Round" })).toEqual([
+      "Shape: Round",
+    ]);
   });
 });
 

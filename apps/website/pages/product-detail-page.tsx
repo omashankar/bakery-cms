@@ -25,7 +25,6 @@ import { getProductWeightOptions } from "@/features/products/lib/product-catalog
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
 import {
-  getProductFlavourOptions,
   getProductGalleryImages,
   getProductReviews,
   getDeliveryTimeSlots,
@@ -38,14 +37,15 @@ import {
   calculateProductUnitPrice,
   formatVariantSummary,
   displayCompareAtPrice,
+  weightAxisLabel,
 } from "@/features/products/lib/product-pricing";
 import {
+  asAddOn,
   getDefaultVariantSelections,
   getProductVariantGroups,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
@@ -73,10 +73,23 @@ import {
 } from "@/features/commerce/lib/coupons-repository";
 import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
+import { DetailSection } from "@/components/storefront/detail-section";
+import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
+  /**
+   * The shop’s modules, read on the SERVER.
+   *
+   * REQUIRED, for the same reason the catalogue props are. This seeded from
+   * `defaultModuleSettings` — every module ON — and corrected itself in a
+   * client effect from localStorage, so a shop that had switched Flavour or
+   * Weight OFF still shipped those pickers in the HTML the browser and the
+   * crawler received, and they vanished a beat later. A gate that fails open
+   * on the server is not a gate; and an optional prop would let the next
+   * caller reintroduce that silently.
+   */
+  modules: ModuleSettings;
   /**
    * Catalogue data fetched on the server. Passing it in keeps the rendered
    * product rails identical between the server pass and the client, which the
@@ -98,6 +111,7 @@ interface ProductDetailPageProps {
 
 export function ProductDetailPage({
   cake,
+  modules: modulesFromServer,
   related: relatedFromServer,
   catalog,
 }: ProductDetailPageProps) {
@@ -119,7 +133,6 @@ export function ProductDetailPage({
    * a charger for one paint before removing them.
    */
   const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
-  const flavourOptions = useMemo(() => getProductFlavourOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
   const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
   /** The shop's own facts about this product. Empty when it states none. */
@@ -162,7 +175,6 @@ export function ProductDetailPage({
   const [offers, setOffers] = useState<string[]>([]);
 
   const [selectedWeight, setSelectedWeight] = useState(0);
-  const [selectedFlavour, setSelectedFlavour] = useState(flavourOptions[0] ?? "");
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>(() =>
     getDefaultVariantSelections(variantGroups)
   );
@@ -175,12 +187,32 @@ export function ProductDetailPage({
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
 
-  // Optional bakery modules gate the bakery-specific choosers below. Default ON so
-  // SSR / the bakery template render exactly as before; re-read on the client.
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  /**
+   * Seeded from the SERVER, then kept live.
+   *
+   * The effect stays so an admin toggling a module in another tab sees this
+   * page follow — `SETTINGS_UPDATED_EVENT` is dispatched on every settings
+   * write and on hydration. What changed is the starting value: it was
+   * `defaultModuleSettings`, so the server HTML always claimed every module
+   * was on.
+   */
+  const [modules, setModules] = useState<ModuleSettings>(modulesFromServer);
   useEffect(() => {
+    /**
+     * NO SYNC AT MOUNT, and that is the whole point of seeding from the server.
+     *
+     * `getModuleSettings` reads localStorage, and on a cold browser
+     * `loadSettings` PERSISTS the shipped defaults — every module ON — and
+     * returns them. Calling it on mount therefore threw away the correct
+     * server answer on the first visit of every session and put the pickers
+     * straight back.
+     *
+     * The listener alone is right: `SETTINGS_UPDATED_EVENT` fires when the
+     * root providers finish hydrating the real settings, and again on every
+     * admin write — so the page catches up exactly when there is something
+     * truer than the server value to catch up to.
+     */
     const sync = () => setModules(getModuleSettings());
-    sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
@@ -209,6 +241,14 @@ export function ProductDetailPage({
   }, [visibleVariantGroups, variantSelections]);
 
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
+  /**
+   * The shop's own word for the axis, not the literal “Weight”.
+   *
+   * Every OTHER picker on this page is headed by a name the shop typed —
+   * `group.name` — while the first and oldest one was headed by a bakery noun
+   * in the markup. A shop selling t-shirts got “Weight: S / M / L”.
+   */
+  const sizeAxisLabel = weightAxisLabel(cake.weightLabel);
   const weightPrice =
     cake.weights?.[selectedWeight]?.price ?? cake.price + (weight?.modifier ?? 0);
   const displayPrice = useMemo(
@@ -247,14 +287,24 @@ export function ProductDetailPage({
   );
   // Branch on the option's semantic, never its label — labels are merchant-editable
   // display text and may be reworded or translated.
-  const isEggless =
-    selectedEggOption?.semantic === "eggless" ||
-    cake.isEggless ||
-    (cake.category ?? "").toLowerCase().includes("eggless");
+  /**
+   * NO CATEGORY STRING-MATCHING.
+   *
+   * These read `category.toLowerCase().includes("eggless")` and
+   * `.includes("photo")` — so what a shop had NAMED a category decided what
+   * the page claimed about the product and which controls it offered. A
+   * category called “Photo Frames” got a photo-cake uploader; one called
+   * “Eggless Sponges” had every product in it described as made without eggs,
+   * whatever the product said. That is business-type control by another name,
+   * decided by a word the shop typed for its own filing.
+   *
+   * What is left is what the PRODUCT states: the option the customer picked
+   * (by `semantic`, never by label — labels are merchant-editable display
+   * text), or the product’s own flag.
+   */
+  const isEggless = selectedEggOption?.semantic === "eggless" || cake.isEggless === true;
   const showPhotoUpload =
-    (cake.allowsPhotoUpload === true ||
-      (cake.category ?? "").toLowerCase().includes("photo") ||
-      selectedPhotoOption?.semantic === "photo-print") &&
+    (cake.allowsPhotoUpload === true || selectedPhotoOption?.semantic === "photo-print") &&
     modules.photoCake;
   const isOutOfStock = cake.inStock === false;
 
@@ -323,7 +373,6 @@ export function ProductDetailPage({
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
     setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
-    setSelectedFlavour(getProductFlavourOptions(cake)[0] ?? "");
     setSelectedWeight(0);
   }, [cake.slug]);
 
@@ -434,13 +483,14 @@ export function ProductDetailPage({
       // order, invoice and confirmation email, for a size no customer was ever
       // shown and no baker agreed to.
       weight: (modules.weight && weight?.label) || undefined,
-      // Omitted entirely when this cake has no flavour choice, or when the
-      // module is off — the picker is hidden in both cases, and an order line
-      // must not record a choice the customer was never shown. `selectedFlavour`
-      // and `selectedShape` default to the product's first option regardless of
-      // the module, so without this a shop that switched Flavour off still had
-      // "Chocolate" on every order line, invoice and confirmation email.
-      flavour: (modules.flavour && selectedFlavour) || undefined,
+      // Carried onto the line so the cart, the invoice and the kitchen email
+      // head the value with the same word this page did. Absent when the shop
+      // has not named the axis — those surfaces fall back the same way.
+      weightLabel: (modules.weight && weight?.label && cake.weightLabel?.trim()) || undefined,
+      // No `flavour` on the line any more, for the same reason `shape` went:
+      // it is a variant group, so the choice travels in `variantSummary` with
+      // every other option. The field stays on the type because ORDERS ALREADY
+      // PLACED carry it.
       // No `shape` on the line any more. A shape is a variant group, so the
       // choice travels in `variantSummary` as “Shape: Heart” with every other
       // option — one place, which is what `cartLineChoices` was written for.
@@ -569,27 +619,20 @@ export function ProductDetailPage({
               </div>
 
               {/* Only offered when this cake actually comes in several flavours. */}
-              {modules.flavour && flavourOptions.length > 0 ? (
-                <div className="contents" data-gate-flavour>
-                  <OptionGroup label="Flavour" count={flavourOptions.length}>
-                    <div className="flex flex-wrap gap-2">
-                      {flavourOptions.map((flavour) => (
-                        <OptionButton
-                          key={flavour}
-                          active={selectedFlavour === flavour}
-                          onClick={() => setSelectedFlavour(flavour)}
-                        >
-                          {flavour}
-                        </OptionButton>
-                      ))}
-                    </div>
-                  </OptionGroup>
-                </div>
-              ) : null}
+              {/*
+                The hard-coded Flavour picker stood here, two lines above a loop
+                that already renders every group by its OWN name. Two option
+                systems on one screen, and only one of them could carry a price
+                or be named by the shop — so a flavour could never cost more, and
+                a shop selling colours or storage sizes had nowhere to put them.
+
+                `flavourOptions` is migrated into a variant group, exactly as
+                `shapes` was. Nothing is lost: it was an unpriced list of names.
+              */}
 
               {modules.weight ? (
                 <div className="contents" data-gate-weight>
-                  <OptionGroup label="Weight" count={weightOptions.length}>
+                  <OptionGroup label={sizeAxisLabel} count={weightOptions.length}>
                     <div className="flex flex-wrap gap-2">
                       {weightOptions.map((option, index) => (
                         <OptionButton
@@ -1126,117 +1169,5 @@ export function ProductDetailPage({
         </div>
       </div>
     </>
-  );
-}
-
-/**
- * A choice the customer makes. Renders nothing when there is nothing to choose.
- *
- * The label used to paint unconditionally, which was harmless only because no
- * list could be empty: `getProductWeightOptions` fell back to the shop's catalog
- * tiers and `getProductShapeOptions` to Round/Square/Heart, so the empty case
- * was dead code. Both now return `[]` for a product that declares none — which
- * is the point — and that turned the dead case into the default one: a phone
- * charger rendered a "Weight" heading over nothing and a "Shape" heading over
- * nothing, on the page a customer buys from.
- *
- * `count` is REQUIRED rather than derived from `children`, so a new group cannot
- * be added without stating how many options it has. A convention would have been
- * forgotten the same way the three above were; a required prop is a type error.
- */
-function OptionGroup({
-  label,
-  count,
-  children,
-}: {
-  label: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  if (count <= 0) return null;
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-/**
- * One block of product information, always visible.
- *
- * The heading is what a tab label used to be. A section renders only where the
- * shop has filled the field, so an empty one disappears rather than printing
- * somebody else’s product back at the customer.
- */
-/**
- * A group that is really a yes-or-no, or null.
- *
- * Two options, exactly one of which costs nothing and is the default. That is
- * an ADD-ON — “make it eggless”, “make it a heart” — and a tick says it in one
- * line where a titled row of two buttons needed three.
- *
- * Read off the data, not the group’s name: naming it “Eggless” is the shop’s
- * business, and a rule keyed on that would break the moment somebody wrote
- * “Egg preference”. A three-way choice stays buttons, because it is one.
- */
-function asAddOn(
-  group: ProductVariantGroup,
-): { free: ProductVariantOption; paid: ProductVariantOption } | null {
-  if (group.options.length !== 2) return null;
-
-  const free = group.options.find((option) => option.priceAdjustment === 0);
-  const paid = group.options.find((option) => option !== free);
-  if (!free || !paid) return null;
-  // Both free is a choice with no upgrade in it — Round or Square, neither
-  // costing more — and a tick would have to pick one of them to be “off”.
-  if (paid.priceAdjustment === 0) return null;
-  // The free one has to be what the customer gets by NOT ticking, or the box
-  // starts checked and the price starts higher than the one on the card.
-  const defaulted = group.options.find((option) => option.isDefault) ?? group.options[0];
-  if (defaulted !== free) return null;
-
-  return { free, paid };
-}
-function DetailSection({
-  title,
-  id,
-  children,
-}: {
-  title: string;
-  id?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section id={id} className="border-t border-border pt-6">
-      <h2 className="font-heading text-lg font-bold">{title}</h2>
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
-
-function OptionButton({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg border px-4 py-2 text-sm font-medium transition-premium",
-        active
-          ? "border-bakery-700 bg-bakery-700 text-white"
-          : "border-border bg-white hover:border-bakery-300"
-      )}
-    >
-      {children}
-    </button>
   );
 }

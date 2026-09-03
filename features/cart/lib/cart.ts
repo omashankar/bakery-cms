@@ -1,3 +1,4 @@
+import { weightAxisLabel } from "@/features/products/lib/product-pricing";
 import {
   addSavedForLaterItem,
   getSavedForLaterItems,
@@ -27,6 +28,8 @@ export interface CartLineItem {
   price: number;
   quantity: number;
   weight?: string;
+  /** What the shop calls the size axis, stamped when the line was made. */
+  weightLabel?: string;
   flavour?: string;
   shape?: string;
   message?: string;
@@ -45,6 +48,7 @@ export interface AddToCartInput {
   price: number;
   quantity: number;
   weight?: string;
+  weightLabel?: string;
   flavour?: string;
   shape?: string;
   message?: string;
@@ -78,11 +82,37 @@ export interface AddToCartInput {
  * field reaches every screen at once.
  */
 export function cartLineChoices(
-  item: Pick<CartLineItem, "weight" | "flavour" | "shape" | "variantSummary">,
+  item: Pick<CartLineItem, "weight" | "weightLabel" | "flavour" | "shape" | "variantSummary">,
 ): string[] {
-  return [item.weight, item.flavour, item.shape, ...(item.variantSummary ?? [])].filter(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  );
+  /**
+   * EVERY value labelled, because a bare one is unreadable next to another.
+   *
+   * `variantSummary` has always carried “Shape: Heart”, and the three legacy
+   * fields carried bare values — so a line read “1 kg · Chocolate · Round ·
+   * Egg preference: Eggless”, and on a t-shirt it would read “M · Black” with
+   * nothing saying which was the size. Naming them costs nothing and makes the
+   * invoice and the kitchen email legible for any trade.
+   *
+   * These three are LEGACY and read-only: nothing writes them any more — shape
+   * and flavour became variant groups, and their labels come from the group a
+   * shop named. They stay because orders already placed carry them, and this
+   * is what renders those.
+   */
+  const labelled = [
+    // The shop's own word, so the invoice and the kitchen email head the
+    // value exactly as the product page did. Lines made before the shop
+    // named the axis, and orders already placed, fall back to the generic.
+    [weightAxisLabel(item.weightLabel), item.weight],
+    ["Flavour", item.flavour],
+    ["Shape", item.shape],
+  ] as const;
+
+  return [
+    ...labelled
+      .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+      .map(([label, value]) => `${label}: ${value}`),
+    ...(item.variantSummary ?? []),
+  ].filter((value) => typeof value === "string" && value.trim().length > 0);
 }
 
 export const CART_UPDATED_EVENT = "bakery-cart-updated";
@@ -284,6 +314,9 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     existing.photoUrl = input.photoUrl;
     existing.deliveryDate = input.deliveryDate;
     existing.deliveryTime = input.deliveryTime;
+    // Refreshed like the price: the shop may have renamed the axis since
+    // this line was made, and the two must not disagree within one cart.
+    existing.weightLabel = input.weightLabel;
     existing.variantSelections = input.variantSelections;
     existing.variantSummary = input.variantSummary;
     writeCart(items);
@@ -299,6 +332,7 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     price: input.price,
     quantity: input.quantity,
     weight: input.weight,
+    weightLabel: input.weightLabel,
     flavour: input.flavour,
     shape: input.shape,
     message: input.message,

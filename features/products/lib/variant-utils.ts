@@ -226,6 +226,40 @@ export function getVariantOption(
  * this reason: "an order line must not record a choice the customer was never
  * shown". These two were the ones left.
  */
+/**
+ * A group that is really a yes-or-no, or null.
+ *
+ * Two options, exactly one of which costs nothing and is the default. That is
+ * an ADD-ON — “make it eggless”, “make it a heart” — and a tick says it in one
+ * line where a titled row of two buttons needed three.
+ *
+ * Read off the data, not the group’s name: naming it “Eggless” is the shop’s
+ * business, and a rule keyed on that would break the moment somebody wrote
+ * “Egg preference”. A three-way choice stays buttons, because it is one.
+ *
+ * Here rather than inside the product page because it is a rule about VARIANT
+ * DATA, like every other function in this file, and the cart has to reach the
+ * same verdict about the same group.
+ */
+export function asAddOn(
+  group: ProductVariantGroup,
+): { free: ProductVariantOption; paid: ProductVariantOption } | null {
+  if (group.options.length !== 2) return null;
+
+  const free = group.options.find((option) => option.priceAdjustment === 0);
+  const paid = group.options.find((option) => option !== free);
+  if (!free || !paid) return null;
+  // Both free is a choice with no upgrade in it — Round or Square, neither
+  // costing more — and a tick would have to pick one of them to be “off”.
+  if (paid.priceAdjustment === 0) return null;
+  // The free one has to be what the customer gets by NOT ticking, or the box
+  // starts checked and the price starts higher than the one on the card.
+  const defaulted = group.options.find((option) => option.isDefault) ?? group.options[0];
+  if (defaulted !== free) return null;
+
+  return { free, paid };
+}
+
 export function variantGroupsEnabledBy(
   groups: ProductVariantGroup[],
   /**

@@ -19,6 +19,8 @@ export interface LandingProduct {
   reviewCount?: number;
   isEggless?: boolean;
   flavours?: string[];
+  /** Every visible variant option’s label — what the search haystack matches. */
+  optionLabels?: string[];
   /** Occasion names this cake is tagged with, for the storefront filter. */
   occasions?: string[];
   inStock?: boolean;
@@ -27,6 +29,8 @@ export interface LandingProduct {
   allowsPhotoUpload?: boolean;
   ingredients?: string;
   weights?: Array<{ label: string; price: number; serves?: string }>;
+  /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */
+  weightLabel?: string;
   barcode?: string;
   preparationTimeMinutes?: number;
   shelfLifeDays?: number;
@@ -54,6 +58,8 @@ export interface LandingProduct {
   quickAdd?: {
     /** The tier the shop will charge for when no size is chosen. */
     weight?: string;
+    /** And what the shop calls that tier, so the cart heads it the same way. */
+    weightLabel?: string;
     variantSelections?: Record<string, string>;
     variantSummary?: string[];
   };

@@ -16,6 +16,7 @@ import {
   getFilterWeightOptions,
 } from "@/apps/website/lib/collection-filters";
 import { formatCurrency } from "@/utils/format";
+import { DEFAULT_SIZE_AXIS_LABEL } from "@/features/products/lib/product-pricing";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -126,8 +127,15 @@ export function CollectionFiltersPanel({
         </FilterGroup>
       ) : null}
 
+      {/*
+        The generic word. This filter spans the WHOLE catalogue, so it cannot
+        take any one product’s ‘weightLabel’ — and over a mixed catalogue of
+        cakes and shirts “Weight: S, M, L” is simply wrong. A shop-level name
+        for this axis is a later step; the generic one is never wrong in the
+        meantime.
+      */}
       {modules.weight ? (
-        <FilterGroup title="Weight" noDivider data-gate-weight="">
+        <FilterGroup title={DEFAULT_SIZE_AXIS_LABEL} noDivider data-gate-weight="">
           {weights.map((weight) => (
             <FilterCheckbox
               key={weight}
