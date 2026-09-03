@@ -1,5 +1,6 @@
 import { AppError, ValidationError } from "@/lib/server/http/errors";
 import { connectDB } from "@/lib/server/db/mongoose";
+import { CheckoutDraftModel } from "@/lib/server/db/models/checkout-draft.model";
 import { OrderModel } from "@/lib/server/db/models/order.model";
 import { PhotoUploadModel } from "@/lib/server/db/models/photo-upload.model";
 import {
@@ -168,24 +169,40 @@ async function trackUpload(asset: { url: string; publicId: string }): Promise<vo
   }
 }
 
-/** A day. Long enough that somebody can leave the tab open over lunch. */
-const CLAIM_WINDOW_MS = 24 * 60 * 60 * 1000;
+/**
+ * THIRTY DAYS, and the number is the whole design.
+ *
+ * This was 24 hours, and 24 hours deletes real customers’ photographs. A CART
+ * IS NOT AN ORDER: it lives in the browser’s localStorage with no expiry and no
+ * timestamp, and saved-for-later lives longer still. Somebody who uploads on
+ * Monday, sleeps on it, and buys on Wednesday placed an order whose photo the
+ * shop had already deleted — the baker opens it and gets a 404, which is
+ * verbatim the failure this module was written to end.
+ *
+ * The server cannot see a browser’s cart, so there is no clever signal to wait
+ * for; the only honest lever is a window long enough that anything past it is
+ * genuinely abandoned. Thirty days is that, and the upload budget is what keeps
+ * the storage bounded rather than a short timer.
+ */
+const CLAIM_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Bounded, because this runs inside a customer's upload request. */
+/** Bounded, because this runs inside a customer’s upload request. */
 const SWEEP_BATCH = 10;
 
 /**
- * Delete the photos a day old that no order carries.
+ * Delete the photos nothing has claimed in thirty days.
  *
  * Runs ON UPLOAD rather than on a schedule, because this app has no scheduler —
  * and the property that makes that acceptable is that traffic is the only thing
  * that creates work here. A shop quiet enough never to sweep is a shop quiet
  * enough not to be accumulating anything.
  *
- * The claim is checked against the ORDERS themselves rather than a flag on the
- * row. A flag needs an order hook to set it, and a hook that is ever missed —
- * a COD path, a retry, an import — deletes a photograph out of a real order.
- * Asking the orders directly cannot drift.
+ * A photo is claimed by an ORDER or by a CHECKOUT DRAFT — the row the server
+ * writes when a customer reaches payment, which exists before the order does
+ * and would otherwise leave a photo unclaimed through the exact minutes it
+ * matters most. Both are asked directly rather than a flag being set on the
+ * row: a flag needs a hook, and a hook that is ever missed — a COD path, a
+ * retry, an import — deletes a photograph out of a real order.
  *
  * Failure is swallowed on purpose: the customer is waiting for their upload, and
  * a housekeeping error is not their problem. It is retried on the next one.
@@ -202,11 +219,12 @@ async function sweepUnclaimedPhotos(): Promise<void> {
 
     const urls = stale.map((row) => row.url);
     const claimed = new Set<string>();
-    const orders = await OrderModel.find({ "items.photoUrl": { $in: urls } })
-      .select("items")
-      .lean();
-    for (const order of orders) {
-      for (const item of (order.items ?? []) as { photoUrl?: string }[]) {
+    const [orders, drafts] = await Promise.all([
+      OrderModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
+      CheckoutDraftModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
+    ]);
+    for (const source of [...orders, ...drafts]) {
+      for (const item of (source.items ?? []) as { photoUrl?: string }[]) {
         if (item?.photoUrl) claimed.add(item.photoUrl);
       }
     }

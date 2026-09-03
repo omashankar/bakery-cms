@@ -659,10 +659,16 @@ export function ProductDetailPage({
                 had been chosen, after the customer had watched themselves
                 attach it and paid the photo surcharge.
 
-                It now uploads to `/api/uploads/photo-cake`, which requires a
-                signed-in customer (checkout does too), checks the magic bytes
-                rather than the browser's word for the type, caps the size, and
-                stores it where the bakery can open it.
+                It now uploads to `/api/uploads/photo-cake`, which takes NO
+                sign-in — asking for a phone number before somebody has bought
+                anything is where people leave, and checkout still asks. It
+                checks the magic bytes rather than the browser’s word for the
+                type, caps the size, refuses cross-site posts, budgets what it
+                accepts, and deletes any photo no order or draft claims.
+
+                This comment said “requires a signed-in customer” for a commit
+                after that stopped being true — directly above the control it
+                describes.
               */}
               {showPhotoUpload ? (
                 <div className="space-y-2" data-gate-photo>
