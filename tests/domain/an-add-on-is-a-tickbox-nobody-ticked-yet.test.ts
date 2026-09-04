@@ -243,3 +243,51 @@ describe("what the cart is told", () => {
     expect(line?.price).toBe(999);
   });
 });
+
+describe("where the tickboxes sit", () => {
+  it("puts them on one line together", () => {
+    /**
+     * Each was a block-level label, so three add-ons stacked into three lines of
+     * mostly empty space between the size picker and the message box. They are a
+     * handful of small yes-or-no extras; they belong on a row.
+     */
+    render();
+    const [first, second] = ticks();
+
+    const row = first?.closest("label")?.parentElement;
+    expect(row, "the ticks have no shared row").toBeTruthy();
+    expect(second?.closest("label")?.parentElement).toBe(row);
+    // …and it wraps, so a shop with six of them does not push the page sideways.
+    expect(row?.className).toContain("flex-wrap");
+  });
+
+  it("keeps a real choice as its own labelled row of buttons", () => {
+    /**
+     * Splitting the list is what puts the ticks together, and it must change
+     * nothing else: a group with a genuine choice in it still gets its name and
+     * its buttons.
+     */
+    const view = render({
+      ...CAKE,
+      variantGroups: [
+        {
+          id: "g-size",
+          name: "Tin size",
+          type: "custom",
+          options: [
+            { id: "small", label: "Small", priceAdjustment: 0, isDefault: true },
+            { id: "medium", label: "Medium", priceAdjustment: 100 },
+            { id: "large", label: "Large", priceAdjustment: 200 },
+          ],
+        },
+        EGGLESS_ADD_ON,
+      ],
+    });
+
+    expect(view.innerHTML).toContain(">Tin size<");
+    expect(ticks()).toHaveLength(1);
+    // The buttons keep their own price, because a button is a choice between
+    // priced alternatives rather than a yes-or-no.
+    expect(view.textContent).toContain("Medium (+₹100)");
+  });
+});

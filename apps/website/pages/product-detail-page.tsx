@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
+import type { ProductVariantGroup } from "@/types/product";
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PriceDisplay } from "@/components/storefront/price-display";
@@ -284,6 +285,39 @@ export function ProductDetailPage({
     () => variantGroupsEnabledBy(variantGroups, modules),
     [variantGroups, modules]
   );
+
+  /**
+   * The two kinds of group, told apart once.
+   *
+   * A real choice needs a heading and a row of buttons; an add-on is one small
+   * tick, and the ticks belong together on a line rather than stacked down the
+   * page with a name each. Split here rather than inside the render so the
+   * decision is made in one place and both lists are ordered exactly as the
+   * shop arranged them.
+   */
+  const addOnGroups = useMemo(
+    () =>
+      visibleVariantGroups
+        .map((group) => ({ group, addOn: asAddOn(group) }))
+        .filter(
+          (entry): entry is { group: ProductVariantGroup; addOn: NonNullable<ReturnType<typeof asAddOn>> } =>
+            entry.addOn !== null,
+        ),
+    [visibleVariantGroups],
+  );
+  const choiceGroups = useMemo(
+    () => visibleVariantGroups.filter((group) => asAddOn(group) === null),
+    [visibleVariantGroups],
+  );
+
+  /** The selectors the storefront tests hang the module gates off. */
+  function gatesFor(group: ProductVariantGroup) {
+    return {
+      "data-gate-egg": group.type === "egg" ? "" : undefined,
+      "data-gate-photo": group.type === "photo" ? "" : undefined,
+      "data-gate-shape": group.type === "shape" ? "" : undefined,
+    };
+  }
 
   /** Only what the customer could see, and only what the shop will charge for. */
   const visibleSelections = useMemo(() => {
@@ -866,24 +900,58 @@ export function ProductDetailPage({
                 three-way and stays buttons; Round / Heart at +₹150 becomes a
                 tick.
               */}
-              {visibleVariantGroups.map((group) => {
-                const gates = {
-                  "data-gate-egg": group.type === "egg" ? "" : undefined,
-                  "data-gate-photo": group.type === "photo" ? "" : undefined,
-                  "data-gate-shape": group.type === "shape" ? "" : undefined,
-                };
-                const addOn = asAddOn(group);
+              {/*
+                THE PICKERS FIRST, THEN ONE ROW OF TICKS.
 
-                if (addOn) {
-                  const on = variantSelections[group.id] === addOn.on.id;
-                  return (
+                Each add-on was a block-level label, so three of them stacked
+                into three lines of mostly empty space between the size picker
+                and the message box — and a shop with an add-on BETWEEN two
+                pickers got a tick marooned on its own line in the middle of
+                them. They are one row now, wrapping when it runs out of width,
+                which is what the reference storefront does and what these
+                actually are: a handful of small yes-or-no extras.
+
+                Splitting the list is what makes that possible, and it is the
+                only thing it changes — a group that is a real choice still
+                renders as its own labelled row of buttons, in the order the
+                shop arranged them.
+              */}
+              {choiceGroups.map((group) => (
+                <div key={group.id} className="contents" {...gatesFor(group)}>
+                  <OptionGroup label={group.name} count={group.options.length}>
+                    <div className="flex flex-wrap gap-2">
+                      {group.options.map((option) => (
+                        <OptionButton
+                          key={option.id}
+                          active={variantSelections[group.id] === option.id}
+                          onClick={() =>
+                            setVariantSelections((current) => ({
+                              ...current,
+                              [group.id]: option.id,
+                            }))
+                          }
+                        >
+                          {option.label}
+                          {option.priceAdjustment !== 0
+                            ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
+                            : ""}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </OptionGroup>
+                </div>
+              ))}
+
+              {addOnGroups.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  {addOnGroups.map(({ group, addOn }) => (
                     <label
                       key={group.id}
                       className="flex cursor-pointer items-center gap-2 text-sm"
-                      {...gates}
+                      {...gatesFor(group)}
                     >
                       <Checkbox
-                        checked={on}
+                        checked={variantSelections[group.id] === addOn.on.id}
                         onCheckedChange={(checked) =>
                           setVariantSelections((current) => {
                             if (checked === true) {
@@ -922,35 +990,9 @@ export function ProductDetailPage({
                       */}
                       <span>{addOn.on.label}</span>
                     </label>
-                  );
-                }
-
-                return (
-                  <div key={group.id} className="contents" {...gates}>
-                    <OptionGroup label={group.name} count={group.options.length}>
-                      <div className="flex flex-wrap gap-2">
-                        {group.options.map((option) => (
-                          <OptionButton
-                            key={option.id}
-                            active={variantSelections[group.id] === option.id}
-                            onClick={() =>
-                              setVariantSelections((current) => ({
-                                ...current,
-                                [group.id]: option.id,
-                              }))
-                            }
-                          >
-                            {option.label}
-                            {option.priceAdjustment !== 0
-                              ? ` (${option.priceAdjustment > 0 ? "+" : ""}${formatCurrency(option.priceAdjustment)})`
-                              : ""}
-                          </OptionButton>
-                        ))}
-                      </div>
-                    </OptionGroup>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              ) : null}
 
               {/*
                 The shape picker that stood here is gone. Shapes are a typed
