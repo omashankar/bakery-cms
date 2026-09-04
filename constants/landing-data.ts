@@ -13,6 +13,15 @@ export interface LandingProduct {
   price: number;
   compareAtPrice?: number;
   image: string;
+  /**
+   * Every photo the shop uploaded, in the order it arranged them.
+   *
+   * `image` stays, and stays FIRST: cards, search results and the link preview
+   * when a page is shared all read it, and none of them wants an array. This is
+   * the product page’s gallery and only the product page’s — `toCard` does not
+   * carry it.
+   */
+  images?: string[];
   category: string;
   badge?: string;
   rating?: number;
@@ -60,6 +69,8 @@ export interface LandingProduct {
     weight?: string;
     /** And what the shop calls that tier, so the cart heads it the same way. */
     weightLabel?: string;
+    /** The strike the card showed, so the cart repeats it rather than inventing one. */
+    compareAtPrice?: number;
     variantSelections?: Record<string, string>;
     variantSummary?: string[];
   };

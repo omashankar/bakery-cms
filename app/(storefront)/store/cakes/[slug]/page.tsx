@@ -15,6 +15,17 @@ import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  /**
+   * `?line=<cart line id>` — the customer pressed Edit on that line.
+   *
+   * Read on the SERVER and handed down as a prop, deliberately. The client
+   * alternative, `useSearchParams`, forces a Suspense boundary around
+   * whatever reads it, and everything inside one streams in after the initial
+   * HTML. This is the page the shop is found for and the only route with
+   * per-product metadata written for crawlers; it is the last page in the app
+   * that should start answering with a fallback.
+   */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -119,6 +130,8 @@ function pickRelated(
 
 export default async function Page(props: PageProps) {
   const { slug } = await props.params;
+  const query = props.searchParams ? await props.searchParams : {};
+  const editLineId = typeof query.line === "string" ? query.line : undefined;
 
   // Fetched on the server, so the first paint already carries real catalogue
   // data — previously this ran against localStorage, which the server does not
@@ -146,6 +159,7 @@ export default async function Page(props: PageProps) {
     <ProductDetailPage
       cake={cake}
       modules={modules}
+      editLineId={editLineId}
       related={pickRelated(catalog, cake.slug, cake.category)}
       catalog={catalog}
     />

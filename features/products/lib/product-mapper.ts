@@ -61,6 +61,11 @@ export function mapAdminProductToStorefront(
     price: cake.price,
     compareAtPrice: cake.compareAtPrice,
     image: cake.images[0] ?? "",
+    // The rest of them. Three gates already passed for this field — the type,
+    // the Mongoose path and the validator all declare `images` — and the admin
+    // already submits the whole array; it was this line, and one line in the
+    // form, that capped every shop at a single photo.
+    images: cake.images,
     category,
     occasions,
     badge: cake.isFeatured

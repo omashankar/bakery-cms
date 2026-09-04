@@ -20,10 +20,29 @@ export interface ProductReview {
   isFeatured?: boolean;
 }
 
+/**
+ * Every photo of THIS product, and no others.
+ *
+ * This returned `[cake.image]` — one element, always — which made the
+ * gallery's own thumbnail rail unreachable code: it renders on
+ * `images.length > 1`, and the length was one. The comment explaining why said
+ * products carry a single image, and that was true of the DATA rather than of
+ * the model: `images` is an array on the product, in the database and in the
+ * validator, and the admin form had one box.
+ *
+ * Still never padded. A gallery filled out with stock photos is a picture of
+ * something the customer is not buying.
+ */
 export function getProductGalleryImages(cake: LandingProduct): string[] {
-  // Products carry a single real image; show only that — never pad the gallery
-  // with unrelated stock photos that don't depict the actual cake.
-  return [cake.image];
+  const stored = (cake.images ?? [])
+    .map((url) => (typeof url === "string" ? url.trim() : ""))
+    .filter((url) => url.length > 0);
+  if (stored.length > 0) return stored;
+
+  // A product mapped before this field existed, or a card projection, which
+  // carries `image` alone by design.
+  const single = typeof cake.image === "string" ? cake.image.trim() : "";
+  return single ? [single] : [];
 }
 
 /**

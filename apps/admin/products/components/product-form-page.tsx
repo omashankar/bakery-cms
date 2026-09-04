@@ -69,6 +69,21 @@ interface ProductFormPageProps {
   cakeId?: string;
 }
 
+/**
+ * One photo replaced, the others left alone.
+ *
+ * Written out rather than done inline because the list is rendered from
+ * `photoSlots`, which can be one slot longer than `form.images` — an empty box
+ * for a photo not chosen yet. Indexing straight into `form.images` would drop
+ * that write on the floor.
+ */
+export function withPhotoAt(images: string[], index: number, url: string): string[] {
+  const next = [...images];
+  while (next.length <= index) next.push("");
+  next[index] = url;
+  return next;
+}
+
 /** What the admin is told, per status actually written. */
 const SAVED_MESSAGE: Record<EntityStatus, string> = {
   published: "Published — it is live on the shop",
@@ -79,6 +94,43 @@ const SAVED_MESSAGE: Record<EntityStatus, string> = {
 export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
+  /**
+   * Always at least one box, so a product with no photo yet has somewhere to
+   * put the first one. Blank slots are dropped on submit — `handleSubmit`
+   * already sends `images: form.images.filter(Boolean)`.
+   */
+  const photoSlots = form.images.length > 0 ? form.images : [""];
+  /**
+   * A write that reads the array it is changing, at the moment it changes it.
+   *
+   * `patchForm({ images: withPhotoAt(form.images, ...) })` captured `form.images`
+   * when the row rendered. An upload takes seconds — shrink, then a round trip —
+   * so its `onChange` fires long afterwards and put that stale copy back, wiping
+   * any photo added to another row while it was in flight.
+   */
+  function setPhotoSlot(index: number, url: string) {
+    setForm((prev) => ({ ...prev, images: withPhotoAt(prev.images, index, url) }));
+  }
+
+  /**
+   * Removing a row EMPTIES it rather than closing the gap.
+   *
+   * Splicing renumbers every row below, and a row's identity here is its index —
+   * for React's reconciliation and for an upload that has not landed yet. So
+   * removing one row while another was uploading moved the pending upload onto
+   * a different photo. Emptying keeps every other index exactly where it was.
+   *
+   * Trailing empties are dropped, so removing the last row still shrinks the
+   * list, and blanks never reach the database: `handleSubmit` already sends
+   * `images: form.images.filter(Boolean)`.
+   */
+  function removePhotoSlot(index: number) {
+    setForm((prev) => {
+      const next = withPhotoAt(prev.images, index, "");
+      while (next.length > 0 && next[next.length - 1] === "") next.pop();
+      return { ...prev, images: next };
+    });
+  }
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   /** The status the SERVER holds, which is the only one the storefront honours. */
@@ -852,14 +904,52 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </TabsContent>
 
               <TabsContent value="media" className="space-y-4">
-                <PhotoField
-                  id="imageUrl"
-                  label="Photo"
-                  aspect="square"
-                  value={form.images[0] ?? ""}
-                  onChange={(url) => patchForm({ images: [url] })}
-                  placeholder="https://images.unsplash.com/..."
-                />
+                {/*
+                  One box wrote `images: [url]`, so a shop could store exactly
+                  one photo — while the type, the database, the validator and this
+                  form's own submit (`images: form.images.filter(Boolean)`) had all
+                  handled an array from the start. The product page's thumbnail
+                  rail renders on `images.length > 1` and had therefore never
+                  appeared for anybody.
+                */}
+                {photoSlots.map((url, index) => (
+                  <div key={index} className="space-y-2">
+                    <PhotoField
+                      id={index === 0 ? "imageUrl" : `imageUrl-${index}`}
+                      label={index === 0 ? "Main photo" : `Photo ${index + 1}`}
+                      aspect="square"
+                      value={url}
+                      onChange={(next) => setPhotoSlot(index, next)}
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                    {photoSlots.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePhotoSlot(index)}
+                      >
+                        Remove this photo
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setForm((prev) => ({
+                    ...prev,
+                    images: [...(prev.images.length > 0 ? prev.images : [""]), ""],
+                  }))}
+                >
+                  Add another photo
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  The first photo is the one customers see on cards and in search,
+                  and the one that appears when somebody shares the link. The rest
+                  become thumbnails on the product page.
+                </p>
               </TabsContent>
 
               <TabsContent value="seo" className="space-y-4">

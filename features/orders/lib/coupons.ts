@@ -1,4 +1,5 @@
 import { hasExpired } from "@/lib/expiry-date";
+import { formatCurrency } from "@/utils/format";
 import {
   getActiveCoupons,
   getCouponByCode,
@@ -75,9 +76,18 @@ export function evaluateCoupon(
   }
 
   if (definition.minSubtotal && subtotal < definition.minSubtotal) {
+    /**
+     * In the shop’s own money, not India’s.
+     *
+     * This read `toLocaleString("en-IN")` — Indian digit grouping and no
+     * currency symbol at all — three lines below a `currency` argument this
+     * function already takes and was using correctly for the discount itself.
+     * So a shop priced in dollars refused a coupon with “Minimum order 1,500
+     * required”, and the customer had to guess which 1,500.
+     */
     return {
       ok: false,
-      message: `Minimum order ${definition.minSubtotal.toLocaleString("en-IN")} required`,
+      message: `Minimum order ${formatCurrency(definition.minSubtotal, currency)} required`,
     };
   }
 

@@ -1,4 +1,4 @@
-import { addToCart } from "@/features/cart/lib/cart";
+import { addToCart, cartLineToAddInput } from "@/features/cart/lib/cart";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { getOrderByNumber, getOrders } from "@/features/orders/lib/orders";
 
@@ -48,33 +48,20 @@ export function reorderFromOrder(
       continue;
     }
 
-    addToCart({
-      productSlug: item.productSlug,
-      name: item.name,
-      image: item.image || cake.image || "",
-      price: item.price,
-      quantity: item.quantity,
-      weight: item.weight,
-      flavour: item.flavour,
-      shape: item.shape,
-      message: item.message,
-      /**
-       * The photo, which this dropped.
-       *
-       * `cartLineId` folds the photo, the message and the shape into the line's
-       * identity precisely so two photo cakes carrying two different children's
-       * photos stay two lines. Reordering passed the message and the shape and
-       * not this, so it did both halves of the damage at once: the shop was
-       * charged-for-but-not-given the photo it has to print, and two lines
-       * differing only by photo collapsed into one of quantity 2 — the exact
-       * bug `cartLineId`'s own comment records, reintroduced on the way back in.
-       */
-      photoUrl: item.photoUrl,
-      deliveryDate: item.deliveryDate,
-      deliveryTime: item.deliveryTime,
-      variantSelections: item.variantSelections,
-      variantSummary: item.variantSummary,
-    });
+    /**
+     * Every field, from the one list that has them all.
+     *
+     * This wrote the list out by hand and `photoUrl` was missing, which did
+     * both halves of the damage at once: the shop was charged-for-but-not-given
+     * the photo it has to print, and two lines differing only by photo
+     * collapsed into one of quantity 2 — `cartLineId` folds the photo, the
+     * message and the shape into a line’s identity precisely so they do not.
+     *
+     * The image is the exception, and the reason for the override: a line from
+     * an old order may name a photo the shop has since replaced, so the
+     * catalogue’s current one is the better answer when the stored one is gone.
+     */
+    addToCart(cartLineToAddInput(item, { image: item.image || cake.image || "" }));
     added += 1;
   }
 

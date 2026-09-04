@@ -12,6 +12,7 @@ import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import {
   defaultProductUnitPrice,
+  displayCompareAtPrice,
   formatVariantSummary,
 } from "@/features/products/lib/product-pricing";
 import {
@@ -138,6 +139,17 @@ function buildQuickAdd(
     weightLabel:
       (modules.weight && product.weights?.[0]?.label && product.weightLabel?.trim()) ||
       undefined,
+    /**
+     * The strike the CARD showed, so the cart repeats it rather than inventing
+     * one. Computed from the record base price here, which is the last place
+     * that still has it — `toCard` replaces `price` with the default-option
+     * price a line below.
+     */
+    compareAtPrice: displayCompareAtPrice(
+      product.price,
+      product.compareAtPrice,
+      defaultProductUnitPrice({ price: product.price, weights: product.weights, variantGroups: groups }),
+    ),
     variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
     variantSummary:
       groups.length > 0 ? formatVariantSummary(groups, variantSelections) : undefined,
@@ -173,7 +185,29 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
       // show its surcharge either — the server would not charge it.
       variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
     }),
-    compareAtPrice: product.compareAtPrice,
+    /**
+     * Moved by whatever moved the price above it.
+     *
+     * `price` here is the default-option price, not the record base — and this
+     * shipped the record’s compare-at beside it, unshifted. So a Rs 1,000 cake
+     * with a Rs 1,200 compare-at and a default eggless option at +Rs 80 was
+     * advertised on the grid as Rs 1,080 struck against Rs 1,200, while its own
+     * product page said Rs 1,080 against Rs 1,280 — two different savings for
+     * the identical configuration, on two screens one click apart.
+     *
+     * `product-card.tsx` calls `displayCompareAtPrice` again over this value,
+     * and that call is a no-op there by construction: the card has no variant
+     * groups and its weight tiers are zeroed, so its shift is exactly 0.
+     */
+    compareAtPrice: displayCompareAtPrice(
+      product.price,
+      product.compareAtPrice,
+      defaultProductUnitPrice({
+        price: product.price,
+        weights: product.weights,
+        variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+      }),
+    ),
     badge: product.badge,
     rating: product.rating,
     reviewCount: product.reviewCount,

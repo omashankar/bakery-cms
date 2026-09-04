@@ -20,7 +20,13 @@ import { PriceDisplay } from "@/components/storefront/price-display";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { addToCart } from "@/features/cart/lib/cart";
+import {
+  addToCart,
+  getCartItems,
+  removeCartItem,
+  updateCartItemQuantity,
+  type CartLineItem,
+} from "@/features/cart/lib/cart";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
@@ -43,6 +49,7 @@ import {
   asAddOn,
   getDefaultVariantSelections,
   getProductVariantGroups,
+  mapLegacyChoice,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
@@ -91,6 +98,20 @@ interface ProductDetailPageProps {
    */
   modules: ModuleSettings;
   /**
+   * The cart line the customer pressed Edit on, if any.
+   *
+   * Read from `?line=` on the SERVER and passed down, rather than with
+   * `useSearchParams`: that hook forces a Suspense boundary, and everything
+   * inside one streams in after the initial HTML — on the one page this shop
+   * is found for.
+   *
+   * Editing is a REPLACE, not an update in place. `cartLineId` folds the size,
+   * the options, the message and the photo into a line’s identity precisely so
+   * two similar lines stay apart, so changing any of them necessarily makes a
+   * different line; adding without removing would leave the customer with two.
+   */
+  editLineId?: string;
+  /**
    * Catalogue data fetched on the server. Passing it in keeps the rendered
    * product rails identical between the server pass and the client, which the
    * old localStorage reads could not do — the server had no localStorage, so it
@@ -112,6 +133,7 @@ interface ProductDetailPageProps {
 export function ProductDetailPage({
   cake,
   modules: modulesFromServer,
+  editLineId,
   related: relatedFromServer,
   catalog,
 }: ProductDetailPageProps) {
@@ -370,11 +392,88 @@ export function ProductDetailPage({
     };
   }, []);
 
+  /**
+   * The line being edited, read from the cart in the browser.
+   *
+   * The cart lives in localStorage, so only the client can answer this. The
+   * id alone travels in the URL — putting the choices there instead would
+   * mean a link that can assert a size or an option the shop does not sell.
+   */
+  const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
+
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
-    setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
-    setSelectedWeight(0);
-  }, [cake.slug]);
+
+    const line = editLineId
+      ? getCartItems().find(
+          (item) => item.id === editLineId && item.productSlug === cake.slug,
+        )
+      : undefined;
+    setEditingLine(line ?? null);
+
+    if (!line) {
+      setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
+      setSelectedWeight(0);
+      return;
+    }
+
+    /**
+     * The stored choices OVER the defaults, never instead of them: a group the
+     * shop has added since this line was made has no answer on the line, and
+     * an unanswered group is priced at its default anyway — so leaving it out
+     * would show the customer one thing and charge them for another.
+     */
+    const groups = getProductVariantGroups(cake);
+    /**
+     * What the LINE actually says, before any default is laid under it.
+     *
+     * `mapLegacyChoice` refuses to map when the group already has an answer —
+     * a real selection must always beat a legacy field — so merging the
+     * defaults in first would make every group already-answered and the
+     * mapping below a no-op. This is the same order the server uses.
+     */
+    const carried: Record<string, string> = { ...(line.variantSelections ?? {}) };
+    /**
+     * A line from before shapes and flavours became variant groups carries the
+     * old flat field and no selection for it. `priceLine` maps those onto the
+     * matching option and charges accordingly; without the same mapping here,
+     * pressing Edit on such a line showed the group's DEFAULT — so a customer
+     * opening their Heart cake to change the message saw Round, and committing
+     * quietly swapped what the kitchen would bake.
+     *
+     * Unmatched values are left alone, exactly as the server leaves them: a
+     * shape the shop has since renamed is the customer's own word, and the line
+     * keeps carrying it.
+     */
+    for (const [group, legacy] of [
+      [groups.find((candidate) => candidate.type === "shape"), line.shape],
+      [
+        groups.find((candidate) => candidate.name.trim().toLowerCase() === "flavour"),
+        line.flavour,
+      ],
+    ] as const) {
+      const mapped = mapLegacyChoice(group, legacy, carried);
+      if (mapped) carried[mapped.groupId] = mapped.optionId;
+    }
+    // Defaults UNDER the line's own answers: a group the shop has added since
+    // this line was made has no answer on it, and an unanswered group is
+    // priced at its default anyway — so leaving it out would show the customer
+    // one thing and charge them for another.
+    setVariantSelections({ ...getDefaultVariantSelections(groups), ...carried });
+    const tier = getProductWeightOptions(cake).findIndex(
+      (option) => option.label === line.weight,
+    );
+    setSelectedWeight(tier >= 0 ? tier : 0);
+    setQuantity(line.quantity);
+    setMessage(line.message ?? "");
+    setPhotoUrl(line.photoUrl ?? "");
+    /*
+      NOT the delivery date. A line made last week may name a day that has
+      passed, and restoring it would let a customer place an order for it. The
+      picker is already defaulted to the earliest date the shop can actually
+      manage, which is the honest answer to a question being asked again.
+    */
+  }, [cake, editLineId]);
 
   // Same-category first, then top up from the wider catalogue so this row always
   // shows a full set of 4 — never a lone card floating in an empty grid.
@@ -471,7 +570,7 @@ export function ProductDetailPage({
       return;
     }
 
-    addToCart({
+    const line = addToCart({
       productSlug: cake.slug,
       name: cake.name,
       image: cake.image,
@@ -487,6 +586,11 @@ export function ProductDetailPage({
       // head the value with the same word this page did. Absent when the shop
       // has not named the axis — those surfaces fall back the same way.
       weightLabel: (modules.weight && weight?.label && cake.weightLabel?.trim()) || undefined,
+      // The struck-through price the customer was actually shown, for THIS
+      // configuration. The cart holds lines rather than products and cannot
+      // work it out again — and undefined here is the honest answer for a shop
+      // that has not claimed a higher price.
+      compareAtPrice: displayCompareAt,
       // No `flavour` on the line any more, for the same reason `shape` went:
       // it is a variant group, so the choice travels in `variantSummary` with
       // every other option. The field stays on the type because ORDERS ALREADY
@@ -507,11 +611,38 @@ export function ProductDetailPage({
       variantSummary,
     });
 
-    toast.success("Added to cart", {
+    /**
+     * The line this edit came from — removed only when the replacement is a
+     * DIFFERENT line.
+     *
+     * This removed it unconditionally, and that emptied the cart for the
+     * commonest edit there is. `cartLineId` keys on the size, the options, the
+     * message and the photo; it does NOT key on quantity or the delivery date.
+     * So a customer who pressed Edit and changed only the quantity — or
+     * changed nothing and pressed the button — produced the SAME id, `addToCart`
+     * merged into the very line being edited (doubling its quantity), and this
+     * line then deleted it. The item vanished under a “Cart updated” toast.
+     *
+     * `addToCart` returns the resulting line, which is the only thing that
+     * knows which of the two happened.
+     */
+    if (editingLine) {
+      if (line.id === editingLine.id) {
+        // Merged into itself: the merge branch ADDED to the quantity that was
+        // already there, so the edited value has to be set, not accumulated.
+        updateCartItemQuantity(line.id, quantity);
+      } else {
+        removeCartItem(editingLine.id);
+      }
+    }
+
+    toast.success(editingLine ? "Cart updated" : "Added to cart", {
       description: `${quantity} × ${cake.name}`,
     });
 
-    if (redirectToCart) {
+    // An edit came FROM the cart, so it goes back there — the customer asked
+    // to change a line, not to carry on shopping.
+    if (redirectToCart || editingLine) {
       router.push(routes.store.cart);
     }
   };
@@ -855,7 +986,7 @@ export function ProductDetailPage({
                   onClick={() => handleAddToCart(false)}
                 >
                   <ShoppingBag className="size-4" />
-                  {isOutOfStock ? "Out of stock" : "Add to Cart"}
+                  {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
                 </Button>
                 <Button
                   size="lg"
@@ -1156,7 +1287,7 @@ export function ProductDetailPage({
             disabled={isOutOfStock}
             onClick={() => handleAddToCart(false)}
           >
-            {isOutOfStock ? "Out of stock" : "Add to Cart"}
+            {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
           </Button>
           <Button
             variant="bakery"

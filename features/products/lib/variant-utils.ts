@@ -241,6 +241,39 @@ export function getVariantOption(
  * DATA, like every other function in this file, and the cart has to reach the
  * same verdict about the same group.
  */
+/**
+ * A legacy flat value — a `shape`, a `flavour` — matched onto a real option.
+ *
+ * `shapes: string[]` and `flavourOptions: string[]` were unpriced lists of
+ * names with their own hard-coded pickers; both are variant groups now. Two
+ * kinds of line still carry the old flat field: one built by Reorder from an
+ * order placed before the change, and one sitting in a browser’s localStorage
+ * cart from before the deploy — carts have no expiry, so those keep arriving.
+ *
+ * Returns null where there is nothing to map, which is the signal to LEAVE the
+ * old value alone: a shape or flavour the group cannot answer for is the
+ * customer’s own word, and deleting it bakes the default with no record that
+ * somebody asked for something else.
+ *
+ * Shared by the server pricing and the product page’s edit restore, because a
+ * line has to mean the same thing on both.
+ */
+export function mapLegacyChoice(
+  group: ProductVariantGroup | undefined,
+  value: string | undefined,
+  carried: Record<string, string>,
+): { groupId: string; optionId: string } | null {
+  const wanted = typeof value === "string" ? value.trim() : "";
+  // A real selection always wins: a line from AFTER the change carries one, and
+  // the legacy field must not override it.
+  if (!group || !wanted || carried[group.id]) return null;
+
+  const option = group.options.find(
+    (candidate) => candidate.label.trim().toLowerCase() === wanted.toLowerCase(),
+  );
+  return option ? { groupId: group.id, optionId: option.id } : null;
+}
+
 export function asAddOn(
   group: ProductVariantGroup,
 ): { free: ProductVariantOption; paid: ProductVariantOption } | null {

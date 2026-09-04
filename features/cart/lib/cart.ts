@@ -30,6 +30,20 @@ export interface CartLineItem {
   weight?: string;
   /** What the shop calls the size axis, stamped when the line was made. */
   weightLabel?: string;
+  /**
+   * The struck-through price for THIS configuration, or absent.
+   *
+   * Stamped when the line was made, because it cannot be worked out later:
+   * the cart holds lines, not products, and the card projection the cart page
+   * is handed carries a price that has already been shifted by every default
+   * option — so recomputing here would strike a different number from the one
+   * the customer was shown on the product page.
+   *
+   * Absent unless the SHOP typed a compare-at above its own base price.
+   * `displayCompareAtPrice` answers undefined otherwise, and a struck-through
+   * number is a claim about the past that only the shop can make.
+   */
+  compareAtPrice?: number;
   flavour?: string;
   shape?: string;
   message?: string;
@@ -49,6 +63,7 @@ export interface AddToCartInput {
   quantity: number;
   weight?: string;
   weightLabel?: string;
+  compareAtPrice?: number;
   flavour?: string;
   shape?: string;
   message?: string;
@@ -113,6 +128,48 @@ export function cartLineChoices(
       .map(([label, value]) => `${label}: ${value}`),
     ...(item.variantSummary ?? []),
   ].filter((value) => typeof value === "string" && value.trim().length > 0);
+}
+
+/**
+ * A line already in the cart, ready to be put back.
+ *
+ * THREE places rebuild a line from a stored one — Undo after a removal,
+ * Move-back from saved-for-later, and Reorder from a placed order — and each
+ * wrote out the field list by hand. Every time a field was added to the line,
+ * three lists had to be remembered, and the history says they were not:
+ * `photoUrl` was missing from two of them, so Undo restored a photo cake with
+ * nothing for the baker to print, and Reorder collapsed two children’s photos
+ * into one line of quantity 2.
+ *
+ * The newest field, `weightLabel`, was missing from all three, and that one is
+ * worse than a drop: `addToCart`’s merge branch assigns whatever it is handed,
+ * so restoring a line ERASED the label off the line already in the cart.
+ *
+ * One function, so a fourth rebuild cannot invent a fourth subset.
+ */
+export function cartLineToAddInput(
+  item: CartLineItem,
+  overrides: Partial<AddToCartInput> = {},
+): AddToCartInput {
+  return {
+    productSlug: item.productSlug,
+    name: item.name,
+    image: item.image,
+    price: item.price,
+    quantity: item.quantity,
+    weight: item.weight,
+    weightLabel: item.weightLabel,
+    compareAtPrice: item.compareAtPrice,
+    flavour: item.flavour,
+    shape: item.shape,
+    message: item.message,
+    photoUrl: item.photoUrl,
+    deliveryDate: item.deliveryDate,
+    deliveryTime: item.deliveryTime,
+    variantSelections: item.variantSelections,
+    variantSummary: item.variantSummary,
+    ...overrides,
+  };
 }
 
 export const CART_UPDATED_EVENT = "bakery-cart-updated";
@@ -317,6 +374,7 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     // Refreshed like the price: the shop may have renamed the axis since
     // this line was made, and the two must not disagree within one cart.
     existing.weightLabel = input.weightLabel;
+    existing.compareAtPrice = input.compareAtPrice;
     existing.variantSelections = input.variantSelections;
     existing.variantSummary = input.variantSummary;
     writeCart(items);
@@ -333,6 +391,7 @@ export function addToCart(input: AddToCartInput): CartLineItem {
     quantity: input.quantity,
     weight: input.weight,
     weightLabel: input.weightLabel,
+    compareAtPrice: input.compareAtPrice,
     flavour: input.flavour,
     shape: input.shape,
     message: input.message,
@@ -419,22 +478,20 @@ export function restoreSavedItemToCart(savedId: string): boolean {
    */
   const inCart = readCart().find((entry) => entry.id === cartLineId(savedItem));
 
-  addToCart({
-    productSlug: savedItem.productSlug,
-    name: savedItem.name,
-    image: savedItem.image,
-    price: inCart ? inCart.price : savedItem.price,
-    quantity: savedItem.quantity,
-    weight: savedItem.weight,
-    flavour: savedItem.flavour,
-    shape: savedItem.shape,
-    message: savedItem.message,
-    photoUrl: savedItem.photoUrl,
-    deliveryDate: savedItem.deliveryDate,
-    deliveryTime: savedItem.deliveryTime,
-    variantSelections: savedItem.variantSelections,
-    variantSummary: savedItem.variantSummary,
-  });
+  addToCart(
+    cartLineToAddInput(savedItem, {
+      price: inCart ? inCart.price : savedItem.price,
+      /**
+       * And the strike that belongs to THAT price.
+       *
+       * Overriding the price alone put the cart's current price beside the
+       * saved line's month-old compare-at — so a shop that had since dropped
+       * its price, or dropped the offer entirely, had a discount invented for
+       * it out of two numbers that were never quoted together.
+       */
+      compareAtPrice: inCart ? inCart.compareAtPrice : savedItem.compareAtPrice,
+    }),
+  );
   removeSavedForLaterItem(savedId);
   return true;
 }

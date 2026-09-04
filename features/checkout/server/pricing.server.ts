@@ -6,13 +6,14 @@ import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import {
   calculateProductUnitPrice,
+  displayCompareAtPrice,
   formatVariantSummary,
 } from "@/features/products/lib/product-pricing";
 import {
   getProductVariantGroups,
+  mapLegacyChoice,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
-import type { ProductVariantGroup } from "@/types/product";
 import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
@@ -116,35 +117,6 @@ export class UnknownWeightError extends Error {
 }
 
 /**
- * A flat legacy value, matched onto the option that replaced it.
- *
- * `shape` and `flavour` were both string fields on a cart line with their own
- * hard-coded pickers, and both are variant groups now. Two kinds of line still
- * carry the old fields: one built by Reorder from an order placed before the
- * change, and one sitting in a browser’s localStorage cart from before the
- * deploy — carts have no expiry, so those keep arriving.
- *
- * Returns null where there is nothing to map, which is the signal to LEAVE the
- * old value alone: a shape or flavour the group cannot answer for is the
- * customer’s own word, and deleting it bakes the default with no record that
- * somebody asked for something else.
- */
-function mapLegacyChoice(
-  group: ProductVariantGroup | undefined,
-  value: string | undefined,
-  carried: Record<string, string>,
-): { groupId: string; optionId: string } | null {
-  const wanted = typeof value === "string" ? value.trim() : "";
-  // A real selection always wins: a line from AFTER the change carries one, and
-  // the legacy field must not override it.
-  if (!group || !wanted || carried[group.id]) return null;
-
-  const option = group.options.find(
-    (candidate) => candidate.label.trim().toLowerCase() === wanted.toLowerCase(),
-  );
-  return option ? { groupId: group.id, optionId: option.id } : null;
-}
-/**
  * What one line costs, AND what the customer chose to make it cost that.
  *
  * The two are returned together because they must be derived from the same
@@ -171,6 +143,8 @@ function priceLine(
   variantSelections: Record<string, string>;
   /** The shop's word for the size axis, so every later surface can head it. */
   weightLabel?: string;
+  /** The struck-through price for this configuration, or undefined. */
+  compareAtPrice?: number;
   /** Cleared, and only where a legacy value was mapped onto a real option. */
   shape?: undefined;
   flavour?: undefined;
@@ -268,6 +242,24 @@ function priceLine(
      * invoice.
      */
     ...(product.weightLabel?.trim() ? { weightLabel: product.weightLabel.trim() } : {}),
+    /**
+     * Recomputed here too, from the product rather than the line.
+     *
+     * A browser can send any number it likes, and this one is a CLAIM — “this
+     * normally costs more” — that ends up on the invoice. It is priced the same
+     * way the product page prices it, so the two agree, and a stale line whose
+     * shop has since dropped the compare-at stops claiming a saving.
+     */
+    compareAtPrice: displayCompareAtPrice(
+      product.price,
+      product.compareAtPrice,
+      calculateProductUnitPrice({
+        basePrice: product.price,
+        weightPrice,
+        variantGroups,
+        variantSelections,
+      }),
+    ),
     price: calculateProductUnitPrice({
       basePrice: product.price,
       weightPrice,
