@@ -712,3 +712,88 @@ describe("a cake still says everything it used to", () => {
     }
   });
 });
+
+describe("an upgrade whose base option is not free", () => {
+  /** Regular +Rs 3, Eggless +Rs 80 — a real shop's egg group. */
+  const PAID_BASE = {
+    ...CAKE,
+    variantGroups: [
+      {
+        id: "g-egg",
+        name: "Egg preference",
+        type: "egg",
+        options: [
+          { id: "regular", label: "Regular", priceAdjustment: 3, isDefault: true },
+          { id: "eggless", label: "Eggless", priceAdjustment: 80 },
+        ],
+      },
+    ],
+  };
+
+  it("is still one tick, not a heading over two buttons", () => {
+    /**
+     * The rule looked for an option priced at exactly zero and refused
+     * everything else, so a shop whose base option carries a small charge of
+     * its own got two buttons and a title for what is plainly one yes-or-no
+     * question. Nothing about a tick needs the unticked side to be free — it
+     * needs to be what the customer gets by not ticking, which is the default.
+     */
+    const { html, unmount } = render(PAID_BASE as never);
+    try {
+      expect(html).toContain("Eggless");
+      expect(html).not.toContain(">Egg preference<");
+      // …and the option the customer gets for NOT ticking has no button of its
+      // own, because the unticked box is that button.
+      expect(html).not.toContain(">Regular<");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("says what ticking will actually add, not what the option costs", () => {
+    /**
+     * Rs 77, not Rs 80. The Rs 3 is already inside the price printed above the
+     * box, so "+Rs 80" would overstate the upgrade by exactly the amount the
+     * customer pays either way — and the total would then move by less than the
+     * label promised, which is the one thing a price label may not do.
+     */
+    const { html, unmount } = render(PAID_BASE as never);
+    try {
+      // The rendered label, not a bare number: "80" appears in this page’s
+      // markup for reasons that have nothing to do with the price.
+      expect(html).toContain("+₹77");
+      expect(html).not.toContain("+₹80");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("still refuses a group with a third option in it", () => {
+    /**
+     * Three options is three choices, and a single tick can only ever offer
+     * two. Collapsing it would silently remove one the shop had configured and
+     * can still sell — the answer to that is to delete the option in the admin,
+     * not to hide it from the customer.
+     */
+    const { html, unmount } = render({
+      ...CAKE,
+      variantGroups: [
+        {
+          id: "g-egg",
+          name: "Egg preference",
+          type: "egg",
+          options: [
+            { id: "cream", label: "Cream", priceAdjustment: 0, isDefault: true },
+            { id: "regular", label: "Regular", priceAdjustment: 3 },
+            { id: "eggless", label: "Eggless", priceAdjustment: 80 },
+          ],
+        },
+      ],
+    } as never);
+    try {
+      expect(html).toContain(">Egg preference<");
+    } finally {
+      unmount();
+    }
+  });
+});

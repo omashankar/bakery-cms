@@ -276,21 +276,45 @@ export function mapLegacyChoice(
 
 export function asAddOn(
   group: ProductVariantGroup,
-): { free: ProductVariantOption; paid: ProductVariantOption } | null {
+): { off: ProductVariantOption; on: ProductVariantOption; extra: number } | null {
   if (group.options.length !== 2) return null;
 
-  const free = group.options.find((option) => option.priceAdjustment === 0);
-  const paid = group.options.find((option) => option !== free);
-  if (!free || !paid) return null;
-  // Both free is a choice with no upgrade in it — Round or Square, neither
-  // costing more — and a tick would have to pick one of them to be “off”.
-  if (paid.priceAdjustment === 0) return null;
-  // The free one has to be what the customer gets by NOT ticking, or the box
-  // starts checked and the price starts higher than the one on the card.
-  const defaulted = group.options.find((option) => option.isDefault) ?? group.options[0];
-  if (defaulted !== free) return null;
+  /**
+   * The OFF state is the group’s default, whatever it costs.
+   *
+   * This looked for an option priced at exactly zero and refused everything
+   * else — so a shop whose base option carries a small charge of its own
+   * (“Regular +₹3”, “Eggless +₹80”) got two buttons and a heading for what is
+   * plainly one yes-or-no question. Nothing about a tick needs the unticked
+   * side to be free; it needs to be what the customer gets by not ticking,
+   * which is the default and only the default.
+   */
+  const off = group.options.find((option) => option.isDefault) ?? group.options[0];
+  const on = group.options.find((option) => option !== off);
+  if (!on) return null;
 
-  return { free, paid };
+  /**
+   * What ticking actually ADDS — the difference, not the raw adjustment.
+   *
+   * With a default of +₹3 and an upgrade of +₹80 the box must say +₹77: the
+   * ₹3 is already inside the price shown above it, so printing +₹80 would
+   * overstate the upgrade by exactly the amount the customer is paying either
+   * way — and the total would then move by less than the label promised.
+   */
+  const extra = on.priceAdjustment - off.priceAdjustment;
+
+  /**
+   * Nothing to upgrade to, or an upgrade that costs less than the default.
+   *
+   * Both sides equal is a choice with no upgrade in it — Round or Square,
+   * neither costing more — and a tick would have to pick one of them to be
+   * “off” with nothing to say why. Cheaper-than-default is worse: the box
+   * would start unticked at the HIGHER price, so the page and the grid card,
+   * which prices each group’s default, would disagree by exactly that much.
+   */
+  if (extra <= 0) return null;
+
+  return { off, on, extra };
 }
 
 export function variantGroupsEnabledBy(

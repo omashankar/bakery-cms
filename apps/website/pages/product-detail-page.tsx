@@ -875,7 +875,7 @@ export function ProductDetailPage({
                 const addOn = asAddOn(group);
 
                 if (addOn) {
-                  const on = variantSelections[group.id] === addOn.paid.id;
+                  const on = variantSelections[group.id] === addOn.on.id;
                   return (
                     <label
                       key={group.id}
@@ -887,17 +887,18 @@ export function ProductDetailPage({
                         onCheckedChange={(checked) =>
                           setVariantSelections((current) => ({
                             ...current,
-                            [group.id]: checked === true ? addOn.paid.id : addOn.free.id,
+                            [group.id]: checked === true ? addOn.on.id : addOn.off.id,
                           }))
                         }
                       />
-                      <span>{addOn.paid.label}</span>
-                      {addOn.paid.priceAdjustment !== 0 ? (
-                        <span className="text-muted-foreground">
-                          {addOn.paid.priceAdjustment > 0 ? "+" : ""}
-                          {formatCurrency(addOn.paid.priceAdjustment)}
-                        </span>
-                      ) : null}
+                      <span>{addOn.on.label}</span>
+                      {/*
+                        The DIFFERENCE from the default, which is what ticking
+                        this box will actually add to the price above it.
+                      */}
+                      <span className="text-muted-foreground">
+                        +{formatCurrency(addOn.extra)}
+                      </span>
                     </label>
                   );
                 }
