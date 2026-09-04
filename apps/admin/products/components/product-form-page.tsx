@@ -156,8 +156,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const saveLabel = isArchived ? "Save changes" : "Save Draft";
   const publishLabel = isArchived ? "Restore & publish" : "Publish";
 
+  /**
+   * The sizes the SHOP sells, as label + what each adds to a base price.
+   *
+   * Read here rather than in the render: `getDefaultWeights` goes through the
+   * catalog repository, which reads localStorage and seeds it when it is cold,
+   * and a render that writes is a render that can schedule its own next one.
+   * `getDefaultWeights(0)` gives the modifier directly, so the price can be
+   * re-derived from whatever the Price field says at the time.
+   */
+  const [catalogSizes, setCatalogSizes] = useState<
+    { label: string; modifier: number; serves?: string }[]
+  >([]);
+
   useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
+    const sync = () => {
+      setModules(getModuleSettings());
+      setCatalogSizes(
+        getDefaultWeights(0).map((tier) => ({
+          label: tier.label,
+          modifier: tier.price,
+          serves: tier.serves,
+        })),
+      );
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
@@ -257,14 +279,72 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
-  function updateWeightPrice(index: number, price: number) {
+  /**
+   * One row per size the shop sells, ticked where this product comes in it.
+   *
+   * A size the product carries whose Catalog preset has since been deleted
+   * still gets a row, ticked and marked — it is a size this product is
+   * genuinely sold in, and dropping it off the screen would delete it on the
+   * next save without anybody being told.
+   */
+  const sizeRows = (() => {
+    const chosen = new Map(form.weights.map((tier) => [tier.label, tier]));
+    const rows = catalogSizes.map((size) => {
+      const picked = chosen.get(size.label);
+      return {
+        label: size.label,
+        serves: size.serves,
+        selected: Boolean(picked),
+        price: picked ? picked.price : form.price + size.modifier,
+        retired: false,
+      };
+    });
+
+    const known = new Set(catalogSizes.map((size) => size.label));
+    for (const tier of form.weights) {
+      if (known.has(tier.label)) continue;
+      rows.push({
+        label: tier.label,
+        serves: tier.serves,
+        selected: true,
+        price: tier.price,
+        retired: true,
+      });
+    }
+
+    return rows;
+  })();
+
+  /**
+   * Ticked sizes, kept in the order the rows are shown.
+   *
+   * Rebuilt from the rows rather than appended to, so a size ticked, unticked
+   * and ticked again comes back where it belongs instead of at the end.
+   */
+  function toggleSize(label: string, selected: boolean) {
+    setForm((prev) => {
+      const kept = new Map(prev.weights.map((tier) => [tier.label, tier]));
+      const next = sizeRows
+        .filter((row) => (row.label === label ? selected : row.selected))
+        .map((row) => {
+          const existing = kept.get(row.label);
+          return existing ?? { label: row.label, price: row.price, serves: row.serves };
+        });
+      return { ...prev, weights: next };
+    });
+  }
+
+  function updateSizePrice(label: string, price: number) {
     setForm((prev) => ({
       ...prev,
-      weights: prev.weights.map((weight, i) =>
-        i === index ? { ...weight, price: Math.max(0, price) } : weight
+      weights: prev.weights.map((tier) =>
+        // Never below zero: the number input accepts a typed minus sign, and
+        // a negative tier price is money off for choosing a bigger cake.
+        tier.label === label ? { ...tier, price: Math.max(0, price) } : tier,
       ),
     }));
   }
+
 
   async function saveProduct(intent: SaveIntent, redirectToList = true) {
     if (!form.name.trim()) {
@@ -535,72 +615,78 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                           “{DEFAULT_SIZE_AXIS_LABEL}”.
                         </p>
                       </div>
-                      {form.weights.map((weight, index) => (
-                        <div
-                          key={weight.label}
-                          className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_120px]"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{weight.label}</p>
-                            {weight.serves ? (
-                              <p className="text-xs text-muted-foreground">Serves {weight.serves}</p>
-                            ) : null}
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor={`weight-${index}`}>Price ({getActiveLocale().currency})</Label>
-                            <Input
-                              id={`weight-${index}`}
-                              type="number"
-                              min={0}
-                              value={weight.price}
-                              onChange={(e) =>
-                                updateWeightPrice(index, Number(e.target.value) || 0)
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
                       {/*
-                        The way BACK to the presets.
+                        ONE ROW PER SIZE THE SHOP SELLS, ticked where this
+                        product comes in it.
 
-                        A new product no longer arrives carrying three weight
-                        tiers — that was the whole point, since a phone charger
-                        is not sold by the kilo. But a bakery creating a cake
-                        still needs them, and without this button the section
-                        rendered an empty list and a sentence about Catalog with
-                        nothing to press: the tiers could be lost and never got
-                        back.
+                        The choice used to be all of them or none: a button
+                        that dumped every Catalog preset in, and another that
+                        cleared the lot. A shop whose Ring Ceremony cake comes
+                        in 0.5 and 1 kg only had no way to say so — and even if
+                        it deleted the rest by hand, `rederiveWeights` put them
+                        straight back on the next keystroke in the Price field.
+
+                        Ticking is the whole interaction now. The price starts
+                        at what the Catalog preset derives from this product's
+                        base price, and the shop overrides it where it wants to.
                       */}
-                      {form.weights.length === 0 ? (
-                        <div className="space-y-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              patchForm({ weights: getDefaultWeights(form.price) })
-                            }
-                          >
-                            Sell this by size
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            Adds your Catalog weight presets, priced from this product&apos;s
-                            base price. Leave it off for anything sold in one size.
-                          </p>
-                        </div>
+                      {sizeRows.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          No sizes in Catalog yet. Add them under Catalog →{" "}
+                          {weightAxisLabel(form.weightLabel)} and they will appear here.
+                        </p>
                       ) : (
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="space-y-2">
+                          {sizeRows.map((row) => (
+                            <div
+                              key={row.label}
+                              className="grid items-center gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_140px]"
+                            >
+                              <label className="flex cursor-pointer items-start gap-2">
+                                <Checkbox
+                                  className="mt-0.5"
+                                  checked={row.selected}
+                                  onCheckedChange={(checked) =>
+                                    toggleSize(row.label, checked === true)
+                                  }
+                                />
+                                <span>
+                                  <span className="block text-sm font-medium">{row.label}</span>
+                                  {row.serves ? (
+                                    <span className="block text-xs text-muted-foreground">
+                                      Serves {row.serves}
+                                    </span>
+                                  ) : null}
+                                  {row.retired ? (
+                                    <span className="block text-xs text-muted-foreground">
+                                      Not in Catalog any more — untick to stop selling it.
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </label>
+                              {row.selected ? (
+                                <div className="space-y-1">
+                                  <Label htmlFor={`weight-${row.label}`}>
+                                    Price ({getActiveLocale().currency})
+                                  </Label>
+                                  <Input
+                                    id={`weight-${row.label}`}
+                                    type="number"
+                                    min={0}
+                                    value={row.price}
+                                    onChange={(e) =>
+                                      updateSizePrice(row.label, Number(e.target.value) || 0)
+                                    }
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
                           <p className="text-xs text-muted-foreground">
-                            Presets come from Catalog. Edit prices per size for this product.
+                            Tick every size this {productLower} is sold in. None ticked
+                            means it is sold in one size, and the customer is shown no
+                            picker at all.
                           </p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => patchForm({ weights: [] })}
-                          >
-                            Sold in one size
-                          </Button>
                         </div>
                       )}
                     </div>

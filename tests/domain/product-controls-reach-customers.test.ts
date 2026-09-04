@@ -131,14 +131,37 @@ describe("changing the base price", () => {
   });
 
   it("matches tiers by label, so a catalog change does not shift the comparison", () => {
+    // Re-priced by NAME, not by position: a preset added or removed in the
+    // catalog must not slide the comparison onto the wrong tier.
     const reordered = [derived[2], derived[0], derived[1]];
     const next = rederiveWeights(reordered, 1000, 1000);
-    expect(next).toEqual(derived);
+    expect(next).toEqual(reordered);
   });
 
-  it("adds a tier the catalog has but the product does not", () => {
+  it("does NOT add a size the product is not sold in", () => {
+    /**
+     * This used to map over every catalog preset, so a product sold in one
+     * size grew back to all of them on the first keystroke in the Price field.
+     * Removing a size could not stick — correcting a typo in the base price
+     * put it back, priced and orderable, with nothing to say it had.
+     *
+     * Which sizes a product comes in is the PRODUCT's answer. What each one
+     * costs, when the shop has not said otherwise, is the catalog's.
+     */
     const next = rederiveWeights([derived[0]], 1000, 1000);
-    expect(next.map((tier) => tier.label)).toEqual(["0.5 kg", "1 kg", "2 kg"]);
+
+    expect(next.map((tier) => tier.label)).toEqual(["0.5 kg"]);
+  });
+
+  it("keeps a size whose catalog preset has been deleted", () => {
+    // There is nothing left to re-derive it from, and dropping it would
+    // delete a size the product is genuinely sold in.
+    const retired = { label: "5 kg", price: 4000, serves: "30+" };
+
+    const next = rederiveWeights([derived[0], retired], 1200, 1000);
+
+    expect(next[0].price).toBe(1200);
+    expect(next[1]).toEqual(retired);
   });
 });
 
