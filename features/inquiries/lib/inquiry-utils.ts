@@ -27,6 +27,8 @@ export function formatInquiryType(type: InquiryType): string {
       return "Contact";
     case "newsletter":
       return "Newsletter";
+    case "product":
+      return "Product question";
   }
 }
 

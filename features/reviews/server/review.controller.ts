@@ -56,6 +56,27 @@ export const submitReviewController = withErrorHandler(async (request: Request) 
   return created(review, "Review submitted");
 });
 
+/**
+ * PUBLIC, and therefore rate-limited by IP.
+ *
+ * There is nothing to authenticate — a reader saying a review helped them is
+ * not signed in — so the only defence against a script inflating a count is
+ * how often one address may press it. The browser also remembers what it has
+ * already marked, but that is a convenience for an honest reader, not a
+ * control: localStorage is the caller’s own to edit.
+ */
+export const markReviewHelpfulController = withErrorHandler(
+  async (request: Request, ctx: IdContext) => {
+    const { id } = await ctx.params;
+    const requestCtx = requestContext(request);
+    if (requestCtx.ip) {
+      rateLimit(`review:helpful:${requestCtx.ip}`, { limit: 30, windowMs: 60_000 });
+    }
+    const result = await service.markReviewHelpful(id);
+    return ok(result, "Thanks for the feedback");
+  },
+);
+
 export const updateReviewController = withErrorHandler(async (request: Request, ctx: IdContext) => {
   const session = await requireRole(...REVIEW_ROLES);
   const { id } = await ctx.params;

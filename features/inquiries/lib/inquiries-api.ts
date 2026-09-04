@@ -65,6 +65,32 @@ export async function createInquiryRequest(inquiry: Inquiry): Promise<Inquiry | 
   }
 }
 
+/**
+ * Public: the answered questions on one product.
+ *
+ * Null on failure, so the caller can leave what it was showing alone rather
+ * than replacing a real list with “no questions yet” over a network blip.
+ */
+export async function fetchProductQuestions(productSlug: string): Promise<Inquiry[] | null> {
+  try {
+    const res = await fetch(
+      `/api/inquiries/questions?productSlug=${encodeURIComponent(productSlug)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) {
+      // Reported like every other read in this module. The endpoint is public,
+      // so a 401 should be impossible — which is exactly why a silent one here
+      // would be worth knowing about.
+      noteAuthStatus(res.status);
+      return null;
+    }
+    const json = (await res.json()) as { success: boolean; data: Inquiry[] | null };
+    return json.success ? (json.data ?? []) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function updateInquiryRequest(id: string, patch: Partial<Inquiry>): Promise<boolean> {
   return send(`/api/inquiries/${id}`, "PATCH", patch);
 }

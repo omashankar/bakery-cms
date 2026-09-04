@@ -11,7 +11,7 @@ import type { Inquiry } from "@/types/inquiry";
 const inquirySchema = new mongoose.Schema(
   {
     _id: { type: String },
-    type: { type: String, enum: ["wedding", "contact", "newsletter"], required: true, index: true },
+    type: { type: String, enum: ["wedding", "contact", "newsletter", "product"], required: true, index: true },
     name: { type: String, required: true },
     email: { type: String, required: true },
     phone: { type: String },
@@ -26,6 +26,11 @@ const inquirySchema = new mongoose.Schema(
     notes: { type: String },
     eventDate: { type: String },
     guestCount: { type: Number },
+    // Indexed: the product page asks for answered questions BY SLUG on every
+    // view, and it is the only query that filters on anything but type/status.
+    productSlug: { type: String, index: true },
+    answer: { type: String },
+    answeredAt: { type: String },
     createdAt: { type: String },
     updatedAt: { type: String },
   },

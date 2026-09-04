@@ -106,6 +106,29 @@ export async function fetchApprovedReviews(
   }
 }
 
+/**
+ * Public: say an approved review helped. Returns the new count, or null.
+ *
+ * The COUNT comes back rather than being assumed, because the caller is not
+ * the only reader: two people pressing it a second apart should both end up
+ * showing the same number, not each showing their own plus one.
+ */
+export async function markReviewHelpfulRequest(id: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/reviews/${encodeURIComponent(id)}/helpful`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
+    const json = (await res.json()) as Envelope<{ helpfulCount: number }>;
+    return json.success ? (json.data?.helpfulCount ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Admin: fetch all reviews (401 → null for non-admins). */
 export async function fetchReviews(): Promise<ProductReview[] | null> {
   try {

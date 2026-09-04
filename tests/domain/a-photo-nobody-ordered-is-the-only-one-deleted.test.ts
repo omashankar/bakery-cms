@@ -19,6 +19,8 @@ const store = vi.hoisted(() => ({
   stale: [] as { _id: string; publicId: string; url: string }[],
   ordered: [] as string[],
   drafted: [] as string[],
+  /** Photos a REVIEW carries — a claim of draft strength, not order strength. */
+  reviewed: [] as string[],
   deletedFromCloudinary: [] as string[],
   deletedRows: [] as string[],
   /** Rows a DRAFT claimed — kept and asked again later, not dropped. */
@@ -90,6 +92,26 @@ vi.mock("@/lib/server/db/models/order.model", () => ({
 vi.mock("@/lib/server/db/models/checkout-draft.model", () => ({
   CheckoutDraftModel: claimSource(() => store.drafted),
 }));
+/**
+ * Reviews name their photos on the review itself, not inside an items array,
+ * so this answers the query it is actually asked rather than reusing the one
+ * above — a mock that ignores its filter is how the destructive branch got to
+ * ship untested in the first place.
+ */
+vi.mock("@/lib/server/db/models/review.model", () => ({
+  ReviewModel: {
+    find: (query: Record<string, { $in?: string[] }>) => {
+      const wanted = query.photoUrls?.$in ?? [];
+      const matching = store.reviewed.filter((url) => wanted.includes(url));
+      return {
+        select: (fields: string) => ({
+          lean: async () =>
+            fields.includes("photoUrls") ? [{ photoUrls: matching }] : [{}],
+        }),
+      };
+    },
+  },
+}));
 
 /** A one-pixel PNG, because the upload sniffs magic bytes rather than trusting a name. */
 const PNG = new Uint8Array([
@@ -106,6 +128,7 @@ beforeEach(() => {
   store.stale = [];
   store.ordered = [];
   store.drafted = [];
+  store.reviewed = [];
   store.deletedFromCloudinary = [];
   store.deletedRows = [];
   store.pushedForward = [];
@@ -212,5 +235,50 @@ describe("sweeping the photos nothing claimed", () => {
 
     expect(store.deletedFromCloudinary).toEqual([]);
     expect(store.deletedRows).toEqual([]);
+  });
+});
+
+describe("a photo attached to a review", () => {
+  const REVIEWED = { _id: "r4", publicId: "reviewed", url: "https://cdn.example/d.png" };
+
+  it("is not deleted out from under the review that shows it", async () => {
+    /**
+     * A review photo is claimed by nothing an order or a draft knows about, so
+     * thirty days after it was uploaded the sweep destroyed it — and the review
+     * went on rendering a broken image on the product page for as long as it
+     * stood.
+     */
+    store.stale = [REVIEWED];
+    store.reviewed = [REVIEWED.url];
+
+    await upload();
+
+    expect(store.deletedFromCloudinary).not.toContain("reviewed");
+  });
+
+  it("keeps the row, so a deleted review does not strand the file forever", async () => {
+    /**
+     * Draft strength, not order strength. An order is final and takes the row
+     * with it — nothing will ever need to delete that photo again. A review can
+     * be rejected and deleted by a moderator, and dropping the row would leave
+     * an asset whose Cloudinary id exists nowhere and which nothing can clean
+     * up. Keeping it means the question is simply asked again in thirty days.
+     */
+    store.stale = [REVIEWED];
+    store.reviewed = [REVIEWED.url];
+
+    await upload();
+
+    expect(store.deletedRows).not.toContain("r4");
+    expect(store.pushedForward).toContain("r4");
+  });
+
+  it("still deletes one no review mentions", async () => {
+    store.stale = [REVIEWED];
+    store.reviewed = ["https://cdn.example/somebody-elses.png"];
+
+    await upload();
+
+    expect(store.deletedFromCloudinary).toContain("reviewed");
   });
 });

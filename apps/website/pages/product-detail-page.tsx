@@ -11,14 +11,17 @@ import {
   Share2,
   Tag,
   ShoppingBag,
+  ThumbsUp,
   Truck,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
+import { RatingSummary } from "@/components/storefront/rating-summary";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   addToCart,
@@ -29,7 +32,12 @@ import {
 } from "@/features/cart/lib/cart";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
+import { ProductQuestionForm } from "@/apps/website/components/product-question-form";
+import { fetchProductQuestions } from "@/features/inquiries/lib/inquiries-api";
+import type { Inquiry } from "@/types/inquiry";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
+import { markReviewHelpfulRequest } from "@/features/reviews/lib/reviews-api";
+import { getHelpfulMarks, rememberHelpfulMark } from "@/features/reviews/lib/helpful-marks";
 import {
   getProductGalleryImages,
   getProductReviews,
@@ -175,6 +183,18 @@ export function ProductDetailPage({
    * on this shop, so this is not hypothetical.
    */
   const [reviewsSettled, setReviewsSettled] = useState(false);
+  /**
+   * The reviews this browser has already marked, and the counts it has seen
+   * move since the page loaded.
+   *
+   * The count is held apart from `reviews` rather than written into it: the
+   * list is re-fetched whenever a review is submitted, and merging would mean
+   * deciding which of the two numbers is newer on every re-read.
+   */
+  const [helpfulMarks, setHelpfulMarks] = useState<string[]>([]);
+  /** Answered questions only — see `listAnsweredForProduct`. */
+  const [questions, setQuestions] = useState<Inquiry[]>([]);
+  const [helpfulCounts, setHelpfulCounts] = useState<Record<string, number>>({});
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
@@ -403,6 +423,15 @@ export function ProductDetailPage({
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
+    setHelpfulMarks(getHelpfulMarks());
+    /*
+      Fetched, not server-rendered: this is one more round trip on a page
+      whose first paint matters, and a question nobody has answered yet is
+      the common case — there is usually nothing here to render at all.
+    */
+    void fetchProductQuestions(cake.slug).then((answered) => {
+      if (answered) setQuestions(answered);
+    });
 
     const line = editLineId
       ? getCartItems().find(
@@ -644,6 +673,37 @@ export function ProductDetailPage({
     // to change a line, not to carry on shopping.
     if (redirectToCart || editingLine) {
       router.push(routes.store.cart);
+    }
+  };
+
+  /**
+   * Counted optimistically, then corrected by the server's own number.
+   *
+   * The mark is remembered whatever the request does. A reader who pressed it
+   * and got a network error has still said what they think, and offering the
+   * button again would invite them to say it twice.
+   */
+  const handleHelpful = async (review: ProductReview) => {
+    /**
+     * Read from the STORE, not from state.
+     *
+     * `helpfulMarks` is a render closure, so two clicks landing before React
+     * re-renders both see the empty array it was rendered with — and the
+     * disabled attribute, which is the other half of this, has not been
+     * applied yet either. `rememberHelpfulMark` writes synchronously, so the
+     * store is the only thing that already knows about the first press.
+     */
+    if (getHelpfulMarks().includes(review.id)) return;
+    rememberHelpfulMark(review.id);
+    setHelpfulMarks((current) => [...current, review.id]);
+    setHelpfulCounts((current) => ({
+      ...current,
+      [review.id]: (current[review.id] ?? review.helpfulCount ?? 0) + 1,
+    }));
+
+    const settled = await markReviewHelpfulRequest(review.id);
+    if (settled !== null) {
+      setHelpfulCounts((current) => ({ ...current, [review.id]: settled }));
     }
   };
 
@@ -1179,11 +1239,58 @@ export function ProductDetailPage({
                   `id`, so the star rating beside the title has somewhere to jump
                   to — and so the review-request email can link straight here.
                 */}
+                {/*
+                  Questions and answers, on the enquiry system this shop
+                  already runs. Only ANSWERED ones are here: an unanswered
+                  question is a stranger’s message in the shop’s inbox, and
+                  publishing it unread would put their words on the shop’s
+                  page under the shop’s name.
+
+                  The list hides itself when there is nothing in it; the form
+                  does not, because being able to ask is the point and a shop
+                  with no questions yet is the normal case.
+                */}
+                <DetailSection id="questions" title="Questions">
+                  <div className="space-y-4">
+                    {questions.length > 0 ? (
+                      <div className="space-y-3">
+                        {questions.map((question) => (
+                          <article
+                            key={question.id}
+                            className="rounded-xl border border-border bg-white p-4"
+                          >
+                            <p className="text-sm font-medium">Q: {question.message}</p>
+                            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                              A: {question.answer}
+                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Asked by {question.name}
+                              {question.answeredAt
+                                ? ` · answered ${formatRelativeTime(question.answeredAt)}`
+                                : ""}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                    <ProductQuestionForm
+                      productSlug={cake.slug}
+                      productName={cake.name}
+                    />
+                  </div>
+                </DetailSection>
+
                 <DetailSection
                   id="reviews"
                   title={`Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
                 >
                   <div className="space-y-4">
+                    {/*
+                      Counted from the rows rendered below it, so the summary
+                      and the list cannot disagree. Renders nothing when there
+                      is nothing to summarise.
+                    */}
+                    <RatingSummary reviews={reviews} />
                     <ProductReviewForm
                       productSlug={cake.slug}
                       cakeName={cake.name}
@@ -1221,6 +1328,20 @@ export function ProductDetailPage({
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium">{review.author}</p>
                               {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
+                              {/*
+                                Shown only where the SERVER could match this
+                                reviewer's signed-in account to an order of this
+                                product that actually reached Delivered. It is a
+                                statement that somebody in that city bought this
+                                and received it, so nothing a browser can type
+                                may reach it — and for most reviews it is simply
+                                absent, which is the honest answer.
+                              */}
+                              {review.deliveredCity ? (
+                                <span className="text-xs text-muted-foreground">
+                                  Delivered in {review.deliveredCity}
+                                </span>
+                              ) : null}
                             </div>
                             <span className="text-xs text-muted-foreground">
                               {formatRelativeTime(review.date)}
@@ -1233,6 +1354,36 @@ export function ProductDetailPage({
                           <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
                             {review.text}
                           </p>
+                          {/*
+                            The reviewer's own photos of what arrived.
+
+                            Only URLs this shop stored itself reach here: the
+                            submit endpoint is public, and an off-site image on
+                            a product page loads for every visitor and can be
+                            swapped for something else after a moderator has
+                            approved it.
+                          */}
+                          {review.photoUrls?.length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {review.photoUrls.map((url) => (
+                                <a
+                                  key={url}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="size-20 overflow-hidden rounded-lg border border-border bg-cream-100"
+                                >
+                                  <OptimizedImage
+                                    src={url}
+                                    alt=""
+                                    width={80}
+                                    height={80}
+                                    className="size-full object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
                           {review.adminReply ? (
                             <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
                               <p className="font-medium text-bakery-700">Response from the shop</p>
@@ -1241,6 +1392,37 @@ export function ProductDetailPage({
                               </p>
                             </div>
                           ) : null}
+                          {/*
+                            One direction only. There is no way to say a review
+                            was UNhelpful: a button that buries what somebody
+                            wrote is a moderation tool wearing a reader’s face,
+                            and this shop moderates on its own screen.
+
+                            The number is shown only once somebody has pressed
+                            it. “Helpful (0)” reads as a verdict on the review.
+                          */}
+                          <div className="mt-3 flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={helpfulMarks.includes(review.id)}
+                              onClick={() => void handleHelpful(review)}
+                            >
+                              <ThumbsUp className="size-4" />
+                              {helpfulMarks.includes(review.id) ? "Marked helpful" : "Helpful"}
+                            </Button>
+                            {(helpfulCounts[review.id] ?? review.helpfulCount ?? 0) > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {helpfulCounts[review.id] ?? review.helpfulCount}
+                                {" "}
+                                {(helpfulCounts[review.id] ?? review.helpfulCount) === 1
+                                  ? "person"
+                                  : "people"}{" "}
+                                found this helpful
+                              </span>
+                            ) : null}
+                          </div>
                         </article>
                       ))
                     )}

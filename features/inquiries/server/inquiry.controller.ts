@@ -17,6 +17,21 @@ type IdContext = { params: Promise<{ id: string }> };
 
 // ---- Public (contact form) ----
 
+/**
+ * The answered questions for one product. PUBLIC, and deliberately separate
+ * from the admin list controller beside it: that one requires a session and
+ * returns whole enquiries, contact details and private notes included.
+ *
+ * A missing or blank slug answers with an empty list rather than everything —
+ * a query parameter is whatever a stranger typed.
+ */
+export const listProductQuestionsController = withErrorHandler(async (request: Request) => {
+  const productSlug = new URL(request.url).searchParams.get("productSlug")?.trim();
+  if (!productSlug) return ok([], "No product");
+  const questions = await service.getAnsweredProductQuestions(productSlug);
+  return ok(questions, "Questions");
+});
+
 export const createInquiryController = withErrorHandler(async (request: Request) => {
   const ctx = requestContext(request);
 

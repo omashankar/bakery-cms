@@ -51,6 +51,7 @@ export async function createInquiry(input: CreateInquiryInput, ctx: RequestCtx):
     status: "new",
     eventDate: input.eventDate,
     guestCount: input.guestCount,
+    productSlug: input.productSlug,
     createdAt: now,
     updatedAt: now,
   };
@@ -65,6 +66,16 @@ export async function createInquiry(input: CreateInquiryInput, ctx: RequestCtx):
     userAgent: ctx.userAgent,
   });
   return inquiry;
+}
+
+/**
+ * The questions this product has public answers to.
+ *
+ * Public: no session, and the projection in the repository is what keeps the
+ * asker’s contact details out of the response.
+ */
+export function getAnsweredProductQuestions(productSlug: string): Promise<Inquiry[]> {
+  return repo.listAnsweredForProduct(productSlug);
 }
 
 // ---- Admin ----------------------------------------------------------------
@@ -82,7 +93,25 @@ export async function updateInquiry(
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError("Inquiry not found");
 
-  const updated = await repo.patch(id, patch);
+  /**
+   * Writing an answer stamps WHEN, and moves the enquiry on.
+   *
+   * The product page sorts answered questions by `answeredAt`, so an answer
+   * without one sorts as if it had never been given. And an admin who has just
+   * answered somebody has replied to them — leaving the status at "new" would
+   * keep the question in the queue they are working through.
+   *
+   * Clearing an answer — the admin thinking better of it — takes the stamp with
+   * it, so the row stops being public rather than becoming a blank answer.
+   */
+  const answered =
+    typeof patch.answer === "string"
+      ? patch.answer.trim()
+        ? { answeredAt: new Date().toISOString(), status: patch.status ?? ("replied" as const) }
+        : { answeredAt: undefined }
+      : {};
+
+  const updated = await repo.patch(id, { ...patch, ...answered });
   await writeAuditLog({
     action: "inquiry.update",
     actorId: ctx.actorId ?? null,

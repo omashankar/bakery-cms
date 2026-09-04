@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/server/db/mongoose";
 import { CheckoutDraftModel } from "@/lib/server/db/models/checkout-draft.model";
 import { OrderModel } from "@/lib/server/db/models/order.model";
 import { PhotoUploadModel } from "@/lib/server/db/models/photo-upload.model";
+import { ReviewModel } from "@/lib/server/db/models/review.model";
 import {
   deleteFromCloudinary,
   isCloudinaryConfigured,
@@ -60,6 +61,24 @@ function sniff(bytes: Uint8Array): string | null {
 /** Every refusal here is about the same field, so the shape is stated once. */
 function photoError(message: string): ValidationError {
   return new ValidationError([{ field: "photo", message }], message);
+}
+
+/**
+ * Which of these URLs this shop actually stored.
+ *
+ * The one honest answer to “did we issue this?”. A review names its photos by
+ * URL over a public, unauthenticated endpoint, and pattern-matching the host
+ * would accept anything else on the same CDN — including another tenant's
+ * folder. A row here means this shop's own uploader produced it, from a file
+ * it sniffed, inside the limits that endpoint enforces.
+ */
+export async function findStoredUrls(urls: string[]): Promise<Set<string>> {
+  if (urls.length === 0) return new Set();
+  await connectDB();
+  const rows = await PhotoUploadModel.find({ url: { $in: urls } })
+    .select({ url: 1 })
+    .lean();
+  return new Set(rows.map((row) => row.url as string));
 }
 
 export interface UploadedPhoto {
@@ -293,9 +312,18 @@ async function sweepUnclaimedPhotos(): Promise<void> {
 
     const urls = stale.map((row) => row.url);
     const claimed = new Set<string>();
-    const [orders, drafts] = await Promise.all([
+    const [orders, drafts, reviews] = await Promise.all([
       OrderModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
       CheckoutDraftModel.find({ "items.photoUrl": { $in: urls } }).select("items").lean(),
+      /**
+       * REVIEWS claim photos too, and this swept them.
+       *
+       * A photo attached to a review is claimed by nothing an order or a draft
+       * knows about, so thirty days after it was uploaded the sweep deleted it
+       * from Cloudinary — and the review it belonged to went on rendering a
+       * broken image on the product page, for as long as the review stood.
+       */
+      ReviewModel.find({ photoUrls: { $in: urls } }).select("photoUrls").lean(),
     ]);
     // Kept apart, because a draft is a weaker claim than an order: it keeps the
     // asset but must not take the row (see the loop below).
@@ -311,6 +339,21 @@ async function sweepUnclaimedPhotos(): Promise<void> {
     for (const draft of drafts) {
       for (const item of (draft.items ?? []) as { photoUrl?: string }[]) {
         if (item?.photoUrl) claimed.add(item.photoUrl);
+      }
+    }
+    /**
+     * A review is a claim of DRAFT strength, not order strength: it keeps the
+     * asset but leaves the row.
+     *
+     * An order is final, so dropping the row with it is right — nothing will
+     * ever need to delete that photo. A review can be rejected and deleted by a
+     * moderator, and dropping the row would leave an asset whose Cloudinary id
+     * exists nowhere and which nothing can ever clean up. Keeping the row means
+     * the question is simply asked again in another thirty days.
+     */
+    for (const review of reviews) {
+      for (const url of (review.photoUrls ?? []) as string[]) {
+        if (url) claimed.add(url);
       }
     }
 

@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SafeImage } from "@/components/shared/safe-image";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { loadProducts } from "@/features/products/lib/products-repository";
@@ -478,6 +479,35 @@ export function ReviewsAdminPage() {
                         <p className="max-w-2xl text-sm font-medium">{review.title}</p>
                       ) : null}
                       <p className="max-w-2xl text-sm text-muted-foreground">{review.body}</p>
+
+                      {/*
+                        THE PHOTOS, on the screen where a review is approved.
+
+                        A moderator pressing Approve publishes whatever is
+                        attached to it. Without these the one thing on a review
+                        that cannot be skim-read — a picture — would be published
+                        unseen, and the first person to look at it would be a
+                        customer on the product page.
+                      */}
+                      {review.photoUrls?.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {review.photoUrls.map((url) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="size-20 overflow-hidden rounded-lg border border-border bg-muted"
+                            >
+                              <SafeImage
+                                src={url}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
 
                       {review.reportReason ? (
                         <p className="flex items-start gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-xs text-red-950 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-100">

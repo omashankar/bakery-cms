@@ -4,6 +4,9 @@ import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import * as productRepo from "@/features/products/server/product.repository";
+import * as orderRepo from "@/features/orders/server/order.repository";
+import * as uploadRepo from "@/features/uploads/server/photo-upload.service";
+import { getCustomerAccount } from "@/lib/server/auth/customer-dal";
 import type { ProductReview } from "@/types/review";
 
 import * as repo from "./review.repository";
@@ -105,6 +108,71 @@ async function refreshProductRating(productSlug: string): Promise<void> {
   }
 }
 
+/**
+ * The order this reviewer actually had delivered, if there is one.
+ *
+ * `orderNumber` has been on the review type since the beginning and NOTHING
+ * ever wrote it — so "Delivered in <city>", which the reference storefront
+ * prints beside every review, had no honest source and was left off the page.
+ * This gives it one.
+ *
+ * Resolved from the SIGNED-IN account, never from `authorEmail` in the body.
+ * That field is whatever the browser typed: keyed on it, anyone could type a
+ * stranger's address, be told their order was delivered in Mumbai, and have
+ * that printed under their own review as a fact about a purchase they never
+ * made.
+ *
+ * Delivered, not merely placed. A review written the hour an order goes in is
+ * a review of the ordering, and the line would be saying a delivery happened
+ * that has not.
+ */
+async function deliveredOrderFor(
+  productSlug: string,
+): Promise<{ orderNumber: string; deliveredCity: string } | null> {
+  const account = (await getCustomerAccount()) as { email?: string } | null;
+  const email = account?.email?.trim();
+  if (!email) return null;
+
+  const orders = await orderRepo.findByCustomerEmail(email);
+  // Already newest-first out of the repository; the most recent delivery is
+  // the one the reviewer is most likely writing about.
+  const delivered = orders.find(
+    (order) =>
+      order.status === "delivered" &&
+      order.items.some((item) => item.productSlug === productSlug),
+  );
+
+  const city = delivered?.address?.city?.trim();
+  if (!delivered || !city) return null;
+  return { orderNumber: delivered.orderNumber, deliveredCity: city };
+}
+
+/**
+ * The submitted photos, less any this shop did not store itself.
+ *
+ * The review endpoint is public and unauthenticated, so this list is whatever
+ * a browser sent. Rendered as-is it is an arbitrary-image hole on the busiest
+ * page the shop has: an off-site URL that loads for every visitor, reports
+ * their IP to a stranger, and can be swapped for something else after a
+ * moderator has approved it.
+ *
+ * Checked against the upload ledger rather than by pattern-matching a host.
+ * A row there means this shop's own uploader produced that URL, from a file it
+ * sniffed, inside the limits that endpoint enforces.
+ *
+ * Silently dropping the rest is deliberate: the only way to get an unknown URL
+ * in here is to have bypassed the uploader, and an error message would just
+ * tell whoever did that which check they had hit.
+ */
+async function storedPhotosAmong(urls: string[] | undefined): Promise<string[] | undefined> {
+  const wanted = [...new Set((urls ?? []).map((url) => url.trim()).filter(Boolean))];
+  if (wanted.length === 0) return undefined;
+
+  const known = await uploadRepo.findStoredUrls(wanted);
+  const kept = wanted.filter((url) => known.has(url));
+  return kept.length > 0 ? kept : undefined;
+}
+
 // ---- Public (storefront review form) --------------------------------------
 
 export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): Promise<ProductReview> {
@@ -124,6 +192,14 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
   const cake = await productRepo.findBySlug(input.productSlug);
   if (!cake) throw new NotFoundError("Product not found");
 
+  /**
+   * Resolved before the row is built, so a review either carries a real
+   * delivery or carries nothing. There is no half state where the page shows
+   * a city it cannot account for.
+   */
+  const delivered = await deliveredOrderFor(cake.slug);
+  const photoUrls = await storedPhotosAmong(input.photoUrls);
+
   const now = new Date().toISOString();
   const review: ProductReview = {
     // Minted here, never taken from the body. See `submitReviewSchema`.
@@ -136,6 +212,12 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
     rating: Math.min(5, Math.max(1, input.rating)),
     title: input.title?.trim() || undefined,
     body: input.body.trim(),
+    // Server-resolved, both of them, and absent for a reviewer who is not
+    // signed in or has had nothing delivered.
+    orderNumber: delivered?.orderNumber,
+    deliveredCity: delivered?.deliveredCity,
+    // Only the ones this shop stored itself.
+    photoUrls,
     // Forced — a public submission is never pre-approved or featured.
     status: "pending",
     isFeatured: false,
@@ -153,6 +235,22 @@ export async function submitReview(input: SubmitReviewInput, ctx: RequestCtx): P
     userAgent: ctx.userAgent,
   });
   return review;
+}
+
+/**
+ * Count one reader who found an approved review helpful.
+ *
+ * No audit log entry: this is an anonymous, unauthenticated tap with no actor
+ * to record, and writing one per press would bury the log it shares with
+ * moderation decisions under noise.
+ *
+ * Throws NotFound for anything that is not an approved review, so a public id
+ * cannot be used to probe for reviews still in moderation.
+ */
+export async function markReviewHelpful(id: string): Promise<{ helpfulCount: number }> {
+  const count = await repo.incrementHelpful(id);
+  if (count === null) throw new NotFoundError("Review not found");
+  return { helpfulCount: count };
 }
 
 // ---- Admin ----------------------------------------------------------------

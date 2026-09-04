@@ -67,6 +67,17 @@ export function InquiryDetailPanel({
     void save({ notes }, "Notes");
   }
 
+  /**
+   * The answer the CUSTOMER will read.
+   *
+   * The server stamps `answeredAt` and moves the enquiry to Replied when this
+   * is set, and clears the stamp when it is emptied — so an admin who thinks
+   * better of an answer takes the question off the page by deleting it.
+   */
+  function saveAnswer(answer: string) {
+    void save({ answer }, "Answer");
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="shrink-0 border-b border-border px-4 py-3">
@@ -146,6 +157,33 @@ export function InquiryDetailPanel({
             ))}
           </AdminSelect>
         </div>
+
+        {/*
+          A PUBLIC answer, and only for a question asked from a product page.
+          It sits above the internal notes on purpose: the two boxes look
+          alike and one of them goes on the shop's website.
+
+          Writing it is what publishes the question — the storefront shows
+          only answered ones — so the placeholder says so rather than leaving
+          the admin to discover it.
+        */}
+        {current.type === "product" ? (
+          <div className="space-y-2">
+            <Label htmlFor="inquiry-answer">Public answer</Label>
+            <textarea
+              id="inquiry-answer"
+              className={adminTextareaClassName}
+              defaultValue={current.answer ?? ""}
+              placeholder="Answering this puts the question and your answer on the product page"
+              onBlur={(e) => saveAnswer(e.target.value)}
+            />
+            {current.productSlug ? (
+              <p className="text-xs text-muted-foreground">
+                Asked on <span className="font-medium">{current.productSlug}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <Label htmlFor="inquiry-notes">Internal notes</Label>

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const inquiryType = z.enum(["wedding", "contact", "newsletter"]);
+const inquiryType = z.enum(["wedding", "contact", "newsletter", "product"]);
 const inquiryStatus = z.enum(["new", "in_progress", "replied", "closed"]);
 
 /**
@@ -37,6 +37,7 @@ export const createInquirySchema = z.object({
   message: z.string().min(1),
   eventDate: z.string().optional(),
   guestCount: z.number().int().nonnegative().optional(),
+  productSlug: z.string().optional(),
 });
 
 /** Admin patch — status/notes and the editable metadata fields. */
@@ -44,6 +45,13 @@ export const updateInquirySchema = z
   .object({
     status: inquiryStatus.optional(),
     notes: z.string().optional(),
+    /**
+     * The public answer. `notes` beside it is PRIVATE — the admin screen has
+     * had it since before this existed — and the two must not be confused:
+     * one is what the shop tells the customer, the other is what it tells
+     * itself.
+     */
+    answer: z.string().optional(),
     subject: z.string().optional(),
     eventDate: z.string().optional(),
     guestCount: z.number().int().nonnegative().optional(),

@@ -18,6 +18,15 @@ export interface ProductReview {
   adminReply?: string;
   repliedAt?: string;
   isFeatured?: boolean;
+  /** How many readers said it helped them. Absent on one nobody has marked. */
+  helpfulCount?: number;
+  /**
+   * Where the reviewer's order was delivered, when the server could prove
+   * there was one. Absent otherwise — and absent is the common case.
+   */
+  deliveredCity?: string;
+  /** Photos the reviewer attached, as this shop stored them. */
+  photoUrls?: string[];
 }
 
 /**
@@ -121,6 +130,11 @@ export async function getProductReviews(
     adminReply: review.adminReply,
     repliedAt: review.repliedAt,
     isFeatured: review.isFeatured,
+    helpfulCount: review.helpfulCount,
+    // Server-resolved from the reviewer's own delivered order. The endpoint
+    // does not send the order number it came from, and this does not want it.
+    deliveredCity: review.deliveredCity,
+    photoUrls: review.photoUrls,
   }));
 }
 

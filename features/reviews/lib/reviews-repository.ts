@@ -329,6 +329,8 @@ export function submitStorefrontReview(input: {
   rating: number;
   title?: string;
   body: string;
+  /** URLs this shop's own uploader handed back. The server checks its ledger. */
+  photoUrls?: string[];
 }): Promise<ReviewWriteResult> {
   return createReview({
     productSlug: input.productSlug,
@@ -341,6 +343,7 @@ export function submitStorefrontReview(input: {
     rating: Math.min(5, Math.max(1, input.rating)),
     title: input.title?.trim() || undefined,
     body: input.body.trim(),
+    photoUrls: input.photoUrls?.length ? input.photoUrls : undefined,
     status: "pending",
     isFeatured: false,
   });
