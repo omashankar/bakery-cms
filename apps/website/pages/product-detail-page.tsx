@@ -904,14 +904,23 @@ export function ProductDetailPage({
                           })
                         }
                       />
-                      <span>{addOn.on.label}</span>
                       {/*
-                        The DIFFERENCE from the default, which is what ticking
-                        this box will actually add to the price above it.
+                        THE LABEL, and only the label.
+
+                        The surcharge used to be printed beside it. It reads as
+                        a price tag on the words — “Eggless +₹80” — next to a
+                        box whose own name is the thing being offered, and on an
+                        add-on that costs nothing it printed “+₹0”, which is an
+                        announcement about nothing.
+
+                        The number has not gone anywhere: the price block sits
+                        directly above these boxes and moves the moment one is
+                        ticked. That is where a total belongs, and it is the one
+                        that stays right when several are ticked at once — three
+                        labels each carrying their own “+₹” never add up to the
+                        figure the customer will actually pay.
                       */}
-                      <span className="text-muted-foreground">
-                        +{formatCurrency(addOn.extra)}
-                      </span>
+                      <span>{addOn.on.label}</span>
                     </label>
                   );
                 }

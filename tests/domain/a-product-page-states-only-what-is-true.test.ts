@@ -618,16 +618,23 @@ describe("a cake still says everything it used to", () => {
    * off the DATA, not the group’s name, so naming it “Shape” or “Egg preference”
    * changes nothing.
    */
-  it("shows a two-option upgrade as one tick, with its price", () => {
+  it("shows a two-option upgrade as one tick, labelled with the option", () => {
     // CAKE’s Shape group is Round (free, default) and Heart (+150) — a
     // yes-or-no, which used to arrive as a heading over two buttons.
     const { html, unmount } = render(CAKE);
     try {
       expect(html).toContain("Heart");
-      // The surcharge is the whole point: `shapes: string[]` could never say it.
-      expect(html).toContain("150");
       // No heading, and no button for the free side to be “off”.
       expect(html).not.toContain(">Shape<");
+      /**
+       * And no price tag on the words. The surcharge WAS printed beside the
+       * label; it reads as a price on the name of the thing, and on an add-on
+       * that costs nothing it said “+₹0”. The price block above these boxes
+       * moves the moment one is ticked, which is where a total belongs and the
+       * only place that stays right when several are ticked at once —
+       * an-add-on-is-a-tickbox-nobody-ticked-yet holds it to that.
+       */
+      expect(html).not.toContain("+₹150");
     } finally {
       unmount();
     }
@@ -750,18 +757,19 @@ describe("an upgrade whose base option is not free", () => {
     }
   });
 
-  it("says what ticking will actually add, not what the option costs", () => {
+  it("puts no price on the label, whatever the option costs", () => {
     /**
-     * Rs 77, not Rs 80. The Rs 3 is already inside the price printed above the
-     * box, so "+Rs 80" would overstate the upgrade by exactly the amount the
-     * customer pays either way — and the total would then move by less than the
-     * label promised, which is the one thing a price label may not do.
+     * The box is named for the thing being offered, and that is all it says.
+     * When the surcharge was printed here it had to be the DIFFERENCE from the
+     * default — Rs 77, not Rs 80, because the Rs 3 is already inside the price
+     * above it — which is exactly the sort of number a label should not be
+     * carrying. The price block does it instead, live, and correctly when
+     * several boxes are ticked at once.
      */
     const { html, unmount } = render(PAID_BASE as never);
     try {
-      // The rendered label, not a bare number: "80" appears in this page’s
-      // markup for reasons that have nothing to do with the price.
-      expect(html).toContain("+₹77");
+      expect(html).toContain("Eggless");
+      expect(html).not.toContain("+₹77");
       expect(html).not.toContain("+₹80");
     } finally {
       unmount();
