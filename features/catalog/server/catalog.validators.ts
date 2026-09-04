@@ -18,23 +18,11 @@ export const categoriesSchema = z.array(taxonomyItem);
 export const flavoursSchema = z.array(taxonomyItem);
 export const occasionsSchema = z.array(taxonomyItem);
 
-export const weightsSchema = z.array(
-  z
-    .object({
-      id: z.string().min(1),
-      label: z.string().trim().min(1, "Label is required"),
-      modifier: z.number(),
-      serves: z.string(),
-      sortOrder: z.number().int(),
-    })
-    .passthrough(),
-);
 
 export const catalogSectionSchemas = {
   categories: categoriesSchema,
   flavours: flavoursSchema,
   occasions: occasionsSchema,
-  weights: weightsSchema,
 } as const;
 
 export type CatalogSection = keyof typeof catalogSectionSchemas;

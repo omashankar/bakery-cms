@@ -13,7 +13,6 @@ import {
   type CollectionFilters,
   getFilterFlavourOptions,
   getFilterOccasionOptions,
-  getFilterWeightOptions,
 } from "@/apps/website/lib/collection-filters";
 import { formatCurrency } from "@/utils/format";
 import { DEFAULT_SIZE_AXIS_LABEL } from "@/features/products/lib/product-pricing";
@@ -33,6 +32,14 @@ interface CollectionFiltersPanelProps {
    * a fixed ceiling hid every product above itself with no way to get them back.
    */
   priceCeiling?: number;
+  /**
+   * The sizes to offer, read off the products being filtered.
+   *
+   * Passed in rather than looked up, because only the page knows what it is
+   * showing. The panel used to ask a shop-wide list, which could offer a size
+   * nothing on the page is sold in — a tick that hides everything.
+   */
+  sizeOptions?: string[];
   className?: string;
 }
 
@@ -40,9 +47,10 @@ export function CollectionFiltersPanel({
   filters,
   onChange,
   priceCeiling = COLLECTION_PRICE_FLOOR,
+  sizeOptions = [],
   className,
 }: CollectionFiltersPanelProps) {
-  const weights = getFilterWeightOptions();
+  const weights = sizeOptions;
   // Occasion / flavour options live in the catalog store (localStorage on the
   // client). Seed with the SAME defaults the server renders, then refresh after
   // mount — otherwise a customized catalog would mismatch the SSR HTML.

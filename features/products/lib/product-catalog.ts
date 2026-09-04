@@ -11,7 +11,6 @@ import {
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { slugify } from "@/utils/slug";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
-import { defaultWeightOptions } from "@/features/catalog/lib/catalog-utils";
 
 function getLandingCatalog(): LandingProduct[] {
   const combined = [
@@ -177,25 +176,9 @@ export function getProductWeightOptions(cake?: LandingProduct) {
   }));
 }
 
-/**
- * Default (localStorage-free) weight options — identical to what the server
- * renders from the seed catalog. Used for the product page's first paint so a
- * product without its own weights hydrates without a mismatch; the client swaps
- * in the live catalog values after mount.
- */
-export function getDefaultProductWeightOptions() {
-  return [...defaultWeightOptions]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((option) => ({
-      label: option.label,
-      modifier: option.modifier,
-      serves: option.serves,
-    }));
-}
-
-/** @deprecated Use getProductWeightOptions() */
-export const productWeightOptions = [
-  { label: "0.5 kg", modifier: 0, serves: "4–6" },
-  { label: "1 kg", modifier: 200, serves: "8–10" },
-  { label: "1.5 kg", modifier: 450, serves: "12–15" },
-] as const;
+/*
+  Two exports stood here and NOTHING imported either: a
+  `getDefaultProductWeightOptions` whose comment claimed the product page used
+  it for its first paint, and a `productWeightOptions` marked deprecated. Both
+  named the shipped bakery tiers, which is why they went with them.
+*/

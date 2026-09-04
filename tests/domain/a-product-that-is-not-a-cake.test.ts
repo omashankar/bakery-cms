@@ -71,7 +71,7 @@ import {
   normalizeVariantGroups,
 } from "@/features/products/lib/variant-utils";
 import { normalizeCommerceFields } from "@/features/products/lib/products-repository";
-import { getDefaultWeights, rederiveWeights } from "@/features/products/lib/catalog-options";
+import { rederiveWeights } from "@/features/products/lib/catalog-options";
 import type { Product } from "@/types/product";
 
 /** The shape the repository hands the pricing path: a Product, not a LandingProduct. */
@@ -142,22 +142,17 @@ describe("sizes are opt-in, and the choice survives editing the price", () => {
     expect(rederiveWeights([], 1499, 999)).toEqual([]);
   });
 
-  it("still re-prices the tiers of a product that has them", () => {
+  it("still re-prices the sizes of a product that has them", () => {
     // The behaviour this function exists for must not have been traded away.
-    const tiers = getDefaultWeights(1000);
+    const tiers = [
+      { label: "0.5 kg", price: 1000 },
+      { label: "1 kg", price: 1400 },
+    ];
+
     const rederived = rederiveWeights(tiers, 1200, 1000);
 
-    expect(rederived).toHaveLength(tiers.length);
-    expect(rederived[0].price).toBe(tiers[0].price + 200);
-  });
-
-  it("gives the admin's opt-in button real tiers, priced from this product", () => {
-    // What "Sell this by size" puts into the form.
-    const tiers = getDefaultWeights(1499);
-
-    expect(tiers.length).toBeGreaterThan(0);
-    expect(tiers[0].price).toBe(1499);
-    expect(tiers.every((tier) => tier.label.trim().length > 0)).toBe(true);
+    expect(rederived).toHaveLength(2);
+    expect(rederived.map((tier) => tier.price)).toEqual([1200, 1600]);
   });
 });
 

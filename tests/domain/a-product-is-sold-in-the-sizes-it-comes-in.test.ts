@@ -1,24 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-// The catalog helpers read localStorage; give them a fixed taxonomy so the
-// re-derivation can be exercised as arithmetic rather than as a mock.
-vi.mock("@/features/catalog/lib/catalog-repository", () => ({
-  getCategories: () => [],
-  getFlavours: () => [],
-  getOccasions: () => [],
-  getCategoryById: () => undefined,
-  getCategoryByName: () => undefined,
-  getFlavourByName: () => undefined,
-  getWeightOptions: () => [
-    { id: "w1", label: "0.5 kg", modifier: 0, serves: "2-4", sortOrder: 1 },
-    { id: "w2", label: "1 kg", modifier: 400, serves: "6-8", sortOrder: 2 },
-    { id: "w3", label: "2 kg", modifier: 900, serves: "12-16", sortOrder: 3 },
-  ],
-}));
-
-const { getDefaultWeights, rederiveWeights } = await import(
-  "@/features/products/lib/catalog-options"
-);
+/*
+  No catalog mock any more, and nothing to mock: `rederiveWeights` reads only
+  the product handed to it. The mocked taxonomy this file used to stand up was
+  the whole reason its arithmetic needed explaining.
+*/
+import { rederiveWeights } from "@/features/products/lib/catalog-options";
 
 /**
  * Which sizes a product comes in is the PRODUCT's answer.
@@ -50,47 +37,48 @@ describe("re-pricing a product after its base price changes", () => {
     expect(next.map((tier) => tier.price)).toEqual([1200, 1600]);
   });
 
-  it("keeps a price the shop typed for one of them", () => {
+  it("moves a price the shop typed by the same amount", () => {
+    /**
+     * The old rule pinned a hand-typed price for ever, because it could tell
+     * “typed” from “derived” by comparing against the Catalog presets. There
+     * are no presets now, and pinning would be the wrong default anyway: a
+     * shop that priced 1 kg at ₹200 over the small one meant ₹200 over, not
+     * ₹1,400 for ever. A size that should not move is one field away.
+     */
     const twoSizes = [derived[0], { ...derived[1], price: 1500 }];
 
     const next = rederiveWeights(twoSizes, 1200, 1000);
 
-    expect(next[0].price).toBe(1200);
-    expect(next[1].price).toBe(1500);
+    expect(next.map((tier) => tier.price)).toEqual([1200, 1700]);
   });
 
-  it("keeps a size whose preset the shop has since deleted from Catalog", () => {
+  it("knows nothing about Catalog, and moves every size alike", () => {
     /**
-     * There is nothing left to re-derive it from, and dropping it would delete
-     * a size the product is genuinely sold in — silently, on a keystroke in a
-     * different field.
+     * There is no taxonomy left to recognise a size by. A label this shop has
+     * never used anywhere else is re-priced exactly like one it uses on thirty
+     * products, because the only input is the product in front of it.
      */
-    const retired = { label: "5 kg", price: 4000, serves: "30+" };
+    const oddOne = { label: "5 kg", price: 4000, serves: "30+" };
 
-    const next = rederiveWeights([derived[0], retired], 1200, 1000);
+    const next = rederiveWeights([derived[0], oddOne], 1200, 1000);
 
-    expect(next).toEqual([{ label: "0.5 kg", price: 1200, serves: "2-4" }, retired]);
+    expect(next).toEqual([
+      { label: "0.5 kg", price: 1200, serves: "2-4" },
+      { label: "5 kg", price: 4200, serves: "30+" },
+    ]);
+  });
+
+  it("never prices a size below nothing", () => {
+    // A base price cut by more than a size costs would otherwise price it
+    // negative — money off for choosing the bigger one.
+    const next = rederiveWeights([{ label: "0.5 kg", price: 100 }], 200, 1000);
+
+    expect(next[0].price).toBe(0);
   });
 
   it("still says nothing about size for a product sold in one", () => {
     // A phone charger is not sold by the kilo, and this used to hand it three
     // tiers on the first keystroke.
     expect(rederiveWeights([], 1200, 1000)).toEqual([]);
-  });
-});
-
-describe("what the Catalog is for", () => {
-  it("prices every size it holds from a base", () => {
-    expect(getDefaultWeights(1000)).toEqual([
-      { label: "0.5 kg", price: 1000, serves: "2-4" },
-      { label: "1 kg", price: 1400, serves: "6-8" },
-      { label: "2 kg", price: 1900, serves: "12-16" },
-    ]);
-  });
-
-  it("gives the modifier on its own when asked from zero", () => {
-    // Which is how the form gets label + surcharge without reading the catalog
-    // again on every keystroke in the Price field.
-    expect(getDefaultWeights(0).map((tier) => tier.price)).toEqual([0, 400, 900]);
   });
 });

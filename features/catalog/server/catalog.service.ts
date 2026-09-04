@@ -6,7 +6,6 @@ import {
   defaultCategories,
   defaultFlavours,
   defaultOccasions,
-  defaultWeightOptions,
 } from "@/features/catalog/lib/catalog-utils";
 
 import * as repo from "./catalog.repository";
@@ -23,7 +22,6 @@ const SECTION_DEFAULTS: Record<string, unknown> = {
   categories: defaultCategories,
   flavours: defaultFlavours,
   occasions: defaultOccasions,
-  weights: defaultWeightOptions,
 };
 
 function toCatalog(json: Record<string, unknown>) {

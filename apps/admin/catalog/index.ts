@@ -5,7 +5,6 @@ export {
   getCategories,
   getFlavours,
   getOccasions,
-  getWeightOptions,
   getCategoryById,
   getCategoryByName,
   getFlavourByName,

@@ -15,7 +15,6 @@ import {
   adminFlavours,
   adminOccasions,
   getCategoryByName,
-  getDefaultWeights,
   getFlavourByName,
 } from "./catalog-options";
 import { slugify } from "./product-utils";
@@ -94,7 +93,20 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     categoryId: category.id,
     flavourId: flavour?.id,
     occasionIds,
-    weights: getDefaultWeights(cake.price),
+    /**
+     * The demo cakes' own sizes, named here rather than derived.
+     *
+     * This called `getDefaultWeights(cake.price)` — the shop-wide Catalog list
+     * — which is gone: sizes are typed on the product. The three tiers are the
+     * ones that list used to hold, so a fresh demo install looks exactly as it
+     * did, and an owner can now change them per cake without touching anything
+     * else in the shop.
+     */
+    weights: [
+      { label: "0.5 kg", price: cake.price, serves: "4–6" },
+      { label: "1 kg", price: cake.price + 200, serves: "8–10" },
+      { label: "1.5 kg", price: cake.price + 450, serves: "12–15" },
+    ],
     status: index === 1 ? "draft" : "published",
     isFeatured: cake.badge === "Featured",
     isBestSeller: cake.badge === "Bestseller",
@@ -261,6 +273,62 @@ function normalizeProductImages(cakes: Product[]): { cakes: Product[]; changed: 
   });
 
   return { cakes: next, changed };
+}
+
+/**
+ * Every size label this shop has already typed, commonest first.
+ *
+ * NOT a taxonomy. There is no list to maintain, nothing to keep in step with
+ * the products, and nothing that can go stale: this is a reading of what the
+ * shop has actually done, offered back as suggestions while it types the next
+ * one. Delete every product that uses a label and the label stops being
+ * offered, because it is no longer true that the shop sells it.
+ *
+ * A shop-wide list of sizes is what this replaces, and the reason it had to go
+ * is that it forced one product's sizes onto every other — a cake shop that
+ * also sells chargers had “0.5 kg” offered for a charger and nothing for the
+ * cable length. The reason this exists at all is the other half of that same
+ * problem: a shop with thirty products should not type “500 gm” thirty times,
+ * and two spellings of one size split the storefront filter in two.
+ */
+export function sizeLabelsInUse(): string[] {
+  const seen = new Map<string, number>();
+
+  for (const product of loadProducts()) {
+    for (const tier of product.weights ?? []) {
+      const label = tier.label?.trim();
+      if (!label) continue;
+      seen.set(label, (seen.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...seen.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
+}
+
+/**
+ * What one of those sizes usually costs on this shop's other products.
+ *
+ * Offered as the starting price when a size is added by name, so adding
+ * “1 kg” to the thirty-first product does not mean looking up what the other
+ * thirty charge. The MEDIAN rather than the mean: one mispriced product
+ * should not drag the suggestion, and a shop with two price points gets one
+ * of the two rather than a number nobody charges.
+ */
+export function usualPriceForSize(label: string): number | null {
+  const wanted = label.trim().toLowerCase();
+  if (!wanted) return null;
+
+  const prices = loadProducts()
+    .flatMap((product) => product.weights ?? [])
+    .filter((tier) => tier.label?.trim().toLowerCase() === wanted)
+    .map((tier) => tier.price)
+    .filter((price) => typeof price === "number" && price > 0)
+    .sort((a, b) => a - b);
+
+  if (prices.length === 0) return null;
+  return prices[Math.floor(prices.length / 2)];
 }
 
 export function loadProducts(): Product[] {

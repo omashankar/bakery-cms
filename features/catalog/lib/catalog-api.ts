@@ -13,7 +13,15 @@ interface Envelope<T> {
 }
 
 /** Sections the server accepts. */
-export const CATALOG_SECTIONS = ["categories", "flavours", "occasions", "weights"] as const;
+/**
+ * The sections the Catalog screen and a backup know about.
+ *
+ * "weights" was one of them. A backup taken before this change still carries
+ * it, and restore simply passes over what it does not recognise — the other
+ * three are pushed and the slice still reports success, because
+ * `pushCatalogSections` only fails when NOTHING recognised is present.
+ */
+export const CATALOG_SECTIONS = ["categories", "flavours", "occasions"] as const;
 
 /** Full catalog (public — no auth needed). */
 export async function fetchCatalog(): Promise<Partial<CatalogStore> | null> {

@@ -120,7 +120,8 @@ describe("the catalog gate guards the read, not just the write", () => {
       "createCategory", "updateCategory", "deleteCategories",
       "createFlavour", "updateFlavour", "deleteFlavours",
       "createOccasion", "updateOccasion", "deleteOccasions",
-      "createWeightOption", "updateWeightOption", "deleteWeightOptions",
+      // The three weight writers were here. Sizes are typed on the product now,
+      // so the shop-wide list and everything that wrote to it is gone.
     ];
 
     for (const name of mutations) {

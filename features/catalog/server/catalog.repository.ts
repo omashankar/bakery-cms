@@ -20,7 +20,6 @@ export async function getOrCreateCatalog() {
     categories: defaultCatalogStore.categories,
     flavours: defaultCatalogStore.flavours,
     occasions: defaultCatalogStore.occasions,
-    weights: defaultCatalogStore.weights,
   });
 }
 

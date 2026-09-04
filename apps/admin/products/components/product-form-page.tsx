@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,14 @@ import {
   adminCategories,
   adminFlavours,
   adminOccasions,
-  getDefaultWeights,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
 import { slugify } from "@/features/products/lib/product-utils";
-import { createEmptyProductForm } from "@/features/products/lib/products-repository";
+import {
+  createEmptyProductForm,
+  sizeLabelsInUse,
+  usualPriceForSize,
+} from "@/features/products/lib/products-repository";
 import {
   createProductRequest,
   fetchProduct,
@@ -157,28 +160,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const publishLabel = isArchived ? "Restore & publish" : "Publish";
 
   /**
-   * The sizes the SHOP sells, as label + what each adds to a base price.
+   * Sizes this shop has already typed on its other products.
    *
-   * Read here rather than in the render: `getDefaultWeights` goes through the
-   * catalog repository, which reads localStorage and seeds it when it is cold,
-   * and a render that writes is a render that can schedule its own next one.
-   * `getDefaultWeights(0)` gives the modifier directly, so the price can be
-   * re-derived from whatever the Price field says at the time.
+   * Filled in the effect below rather than read during the render: it goes
+   * through the product cache in localStorage, and a render that reads storage
+   * is a render that can be asked to seed it.
    */
-  const [catalogSizes, setCatalogSizes] = useState<
-    { label: string; modifier: number; serves?: string }[]
-  >([]);
+  const [sizeSuggestions, setSizeSuggestions] = useState<string[]>([]);
+
 
   useEffect(() => {
     const sync = () => {
       setModules(getModuleSettings());
-      setCatalogSizes(
-        getDefaultWeights(0).map((tier) => ({
-          label: tier.label,
-          modifier: tier.price,
-          serves: tier.serves,
-        })),
-      );
+      setSizeSuggestions(sizeLabelsInUse());
     };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
@@ -279,69 +273,53 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
-  /**
-   * One row per size the shop sells, ticked where this product comes in it.
-   *
-   * A size the product carries whose Catalog preset has since been deleted
-   * still gets a row, ticked and marked — it is a size this product is
-   * genuinely sold in, and dropping it off the screen would delete it on the
-   * next save without anybody being told.
-   */
-  const sizeRows = (() => {
-    const chosen = new Map(form.weights.map((tier) => [tier.label, tier]));
-    const rows = catalogSizes.map((size) => {
-      const picked = chosen.get(size.label);
-      return {
-        label: size.label,
-        serves: size.serves,
-        selected: Boolean(picked),
-        price: picked ? picked.price : form.price + size.modifier,
-        retired: false,
-      };
-    });
-
-    const known = new Set(catalogSizes.map((size) => size.label));
-    for (const tier of form.weights) {
-      if (known.has(tier.label)) continue;
-      rows.push({
-        label: tier.label,
-        serves: tier.serves,
-        selected: true,
-        price: tier.price,
-        retired: true,
-      });
-    }
-
-    return rows;
-  })();
 
   /**
-   * Ticked sizes, kept in the order the rows are shown.
+   * Renaming a size, with a price offered the first time it is named.
    *
-   * Rebuilt from the rows rather than appended to, so a size ticked, unticked
-   * and ticked again comes back where it belongs instead of at the end.
+   * A blank row priced at anything is the trap: `priceLine` skips a falsy label
+   * and charges tier ZERO instead, so a nameless third row does not fail — it
+   * quietly sells at the first row's price. The label is what the customer
+   * picks and what the order records, so it is what has to be filled in;
+   * `handleSubmit` drops any row still missing one.
    */
-  function toggleSize(label: string, selected: boolean) {
-    setForm((prev) => {
-      const kept = new Map(prev.weights.map((tier) => [tier.label, tier]));
-      const next = sizeRows
-        .filter((row) => (row.label === label ? selected : row.selected))
-        .map((row) => {
-          const existing = kept.get(row.label);
-          return existing ?? { label: row.label, price: row.price, serves: row.serves };
-        });
-      return { ...prev, weights: next };
-    });
-  }
-
-  function updateSizePrice(label: string, price: number) {
+  function renameSize(index: number, label: string) {
     setForm((prev) => ({
       ...prev,
-      weights: prev.weights.map((tier) =>
-        // Never below zero: the number input accepts a typed minus sign, and
-        // a negative tier price is money off for choosing a bigger cake.
-        tier.label === label ? { ...tier, price: Math.max(0, price) } : tier,
+      weights: prev.weights.map((tier, i) => {
+        if (i !== index) return tier;
+        // Only while the row is still priced at nothing: once the shop has
+        // typed a price, a rename must not overwrite it.
+        const suggested = tier.price > 0 ? null : usualPriceForSize(label);
+        return { ...tier, label, price: suggested ?? tier.price };
+      }),
+    }));
+  }
+
+  function updateSizePrice(index: number, price: number) {
+    setForm((prev) => ({
+      ...prev,
+      weights: prev.weights.map((tier, i) =>
+        // Never below zero: the number input accepts a typed minus sign, and a
+        // negative tier price is money off for choosing a bigger cake.
+        i === index ? { ...tier, price: Math.max(0, price) } : tier,
       ),
+    }));
+  }
+
+  function addSize() {
+    // Priced at the base to start with, which is the commonest smallest tier —
+    // and the number the shop is looking at while it adds the row.
+    setForm((prev) => ({
+      ...prev,
+      weights: [...prev.weights, { label: "", price: prev.price }],
+    }));
+  }
+
+  function removeSize(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      weights: prev.weights.filter((_, i) => i !== index),
     }));
   }
 
@@ -373,6 +351,16 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugify(form.slug),
       status,
       images: form.images.filter(Boolean),
+      /**
+       * A size with no name is dropped, and dropped SILENTLY on purpose.
+       *
+       * It is an empty row the shop added and did not fill in, and it cannot
+       * be sold: the customer would be shown a nameless button, and worse,
+       * `priceLine` skips a falsy label and charges tier ZERO — so a blank
+       * third row priced at ₹2,400 does not fail, it quietly sells at the
+       * first row's price.
+       */
+      weights: form.weights.filter((tier) => tier.label.trim().length > 0),
       ...resolveStockFields(form),
       ...syncLegacyFlagsFromVariants(
         form.variantGroups,
@@ -616,79 +604,81 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                         </p>
                       </div>
                       {/*
-                        ONE ROW PER SIZE THE SHOP SELLS, ticked where this
-                        product comes in it.
+                        THE SIZES THIS PRODUCT COMES IN, typed here.
 
-                        The choice used to be all of them or none: a button
-                        that dumped every Catalog preset in, and another that
-                        cleared the lot. A shop whose Ring Ceremony cake comes
-                        in 0.5 and 1 kg only had no way to say so — and even if
-                        it deleted the rest by hand, `rederiveWeights` put them
-                        straight back on the next keystroke in the Price field.
+                        They used to be a shop-wide Catalog taxonomy that every
+                        product drew from, and that is the wrong shape for a shop
+                        selling more than one kind of thing: a cake shop that also
+                        sells chargers had “0.5 kg” offered for a charger and
+                        nowhere to put a cable length. A product's options are the
+                        merchant's to declare, per product.
 
-                        Ticking is the whole interaction now. The price starts
-                        at what the Catalog preset derives from this product's
-                        base price, and the shop overrides it where it wants to.
+                        The other half of that problem is real too, and is why the
+                        label box suggests: a shop with thirty products should not
+                        type “500 gm” thirty times, and two spellings of one size
+                        split the storefront filter in two. The suggestions are a
+                        reading of what this shop has already typed elsewhere —
+                        not a list anybody maintains, and it goes away on its own
+                        when the last product using it does.
                       */}
-                      {sizeRows.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          No sizes in Catalog yet. Add them under Catalog →{" "}
-                          {weightAxisLabel(form.weightLabel)} and they will appear here.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {sizeRows.map((row) => (
-                            <div
-                              key={row.label}
-                              className="grid items-center gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_140px]"
-                            >
-                              <label className="flex cursor-pointer items-start gap-2">
-                                <Checkbox
-                                  className="mt-0.5"
-                                  checked={row.selected}
-                                  onCheckedChange={(checked) =>
-                                    toggleSize(row.label, checked === true)
-                                  }
-                                />
-                                <span>
-                                  <span className="block text-sm font-medium">{row.label}</span>
-                                  {row.serves ? (
-                                    <span className="block text-xs text-muted-foreground">
-                                      Serves {row.serves}
-                                    </span>
-                                  ) : null}
-                                  {row.retired ? (
-                                    <span className="block text-xs text-muted-foreground">
-                                      Not in Catalog any more — untick to stop selling it.
-                                    </span>
-                                  ) : null}
-                                </span>
-                              </label>
-                              {row.selected ? (
-                                <div className="space-y-1">
-                                  <Label htmlFor={`weight-${row.label}`}>
-                                    Price ({getActiveLocale().currency})
-                                  </Label>
-                                  <Input
-                                    id={`weight-${row.label}`}
-                                    type="number"
-                                    min={0}
-                                    value={row.price}
-                                    onChange={(e) =>
-                                      updateSizePrice(row.label, Number(e.target.value) || 0)
-                                    }
-                                  />
-                                </div>
-                              ) : null}
-                            </div>
+                      <div className="space-y-2">
+                        <datalist id="size-labels-in-use">
+                          {sizeSuggestions.map((label) => (
+                            <option key={label} value={label} />
                           ))}
-                          <p className="text-xs text-muted-foreground">
-                            Tick every size this {productLower} is sold in. None ticked
-                            means it is sold in one size, and the customer is shown no
-                            picker at all.
-                          </p>
-                        </div>
-                      )}
+                        </datalist>
+
+                        {form.weights.map((tier, index) => (
+                          <div
+                            key={index}
+                            className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_140px_auto]"
+                          >
+                            <div className="space-y-1">
+                              <Label htmlFor={`size-label-${index}`}>
+                                {weightAxisLabel(form.weightLabel)}
+                              </Label>
+                              <Input
+                                id={`size-label-${index}`}
+                                list="size-labels-in-use"
+                                value={tier.label}
+                                placeholder="500 gm"
+                                onChange={(e) => renameSize(index, e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`size-price-${index}`}>
+                                Price ({getActiveLocale().currency})
+                              </Label>
+                              <Input
+                                id={`size-price-${index}`}
+                                type="number"
+                                min={0}
+                                value={tier.price}
+                                onChange={(e) => updateSizePrice(index, Number(e.target.value) || 0)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="self-end"
+                              onClick={() => removeSize(index)}
+                              aria-label="Remove size"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Button type="button" variant="outline" size="sm" onClick={addSize}>
+                          Add a {weightAxisLabel(form.weightLabel).toLowerCase()}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Add a row for every size this {productLower} is sold in, and
+                          price each one. No rows means it is sold in one size, and the
+                          customer is shown no picker at all.
+                        </p>
+                      </div>
                     </div>
                   </>
                 ) : null}

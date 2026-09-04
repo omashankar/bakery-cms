@@ -5,41 +5,12 @@ import type {
   ProductOccasion,
   ProductWeight,
 } from "@/types/product";
-import type { CatalogStore, CatalogWeightOption } from "@/types/catalog";
+import type { CatalogStore } from "@/types/catalog";
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-export const defaultWeightOptions: CatalogWeightOption[] = [
-  {
-    id: "wt-05",
-    label: "0.5 kg",
-    modifier: 0,
-    serves: "4–6",
-    sortOrder: 1,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-  {
-    id: "wt-1",
-    label: "1 kg",
-    modifier: 200,
-    serves: "8–10",
-    sortOrder: 2,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-  {
-    id: "wt-15",
-    label: "1.5 kg",
-    modifier: 450,
-    serves: "12–15",
-    sortOrder: 3,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  },
-];
 
 export const defaultCategories: ProductCategory[] = [
   ...categories.map((category) => ({
@@ -105,7 +76,6 @@ export const defaultCatalogStore: CatalogStore = {
   categories: defaultCategories,
   flavours: defaultFlavours,
   occasions: defaultOccasions,
-  weights: defaultWeightOptions,
   updatedAt: nowIso(),
 };
 
@@ -132,15 +102,9 @@ export function findSlugClash<T extends { id: string; name: string; slug: string
   return rows.find((row) => row.id !== editingId && row.slug.trim().toLowerCase() === wanted);
 }
 
-export function weightsToProductWeights(
-  basePrice: number,
-  weights: CatalogWeightOption[]
-): ProductWeight[] {
-  return [...weights]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((option) => ({
-      label: option.label,
-      price: basePrice + option.modifier,
-      serves: option.serves,
-    }));
-}
+/*
+  `weightsToProductWeights` used to live here — base price plus each catalog
+  size's modifier, which is how a product got its tiers. Sizes are typed on
+  the product now, so there is nothing to derive them from and nothing to
+  derive them for.
+*/

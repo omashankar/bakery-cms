@@ -42,7 +42,6 @@ export function CatalogServerSync() {
         categories: server.categories ?? current.categories,
         flavours: server.flavours ?? current.flavours,
         occasions: server.occasions ?? current.occasions,
-        weights: server.weights ?? current.weights,
       });
 
       // Only NOW may a replace-all mutation send the local taxonomy — before

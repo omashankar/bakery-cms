@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
+import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,15 +24,12 @@ import {
   createCategory,
   createFlavour,
   createOccasion,
-  createWeightOption,
   getCategories,
   getFlavours,
   getOccasions,
-  getWeightOptions,
   updateCategory,
   updateFlavour,
   updateOccasion,
-  updateWeightOption,
 } from "@/features/catalog/lib/catalog-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
@@ -65,9 +62,6 @@ export function CatalogFormDialog({
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
-  const [modifier, setModifier] = useState(0);
-  const [serves, setServes] = useState("8–10");
-  const [sortOrder, setSortOrder] = useState(1);
 
   useEffect(() => {
     if (!open) return;
@@ -76,9 +70,6 @@ export function CatalogFormDialog({
       setSlug("");
       setDescription("");
       setImage("");
-      setModifier(0);
-      setServes("8–10");
-      setSortOrder(getWeightOptions().length + 1);
       return;
     }
 
@@ -102,44 +93,10 @@ export function CatalogFormDialog({
         setName(item.name);
         setSlug(item.slug);
       }
-    } else {
-      const item = getWeightOptions().find((entry) => entry.id === itemId);
-      if (item) {
-        setName(item.label);
-        setModifier(item.modifier);
-        setServes(item.serves);
-        setSortOrder(item.sortOrder);
-      }
     }
   }, [open, itemId, tab]);
 
   async function handleSubmit() {
-    if (tab === "weights") {
-      if (!name.trim()) {
-        toast.error("Label is required");
-        return;
-      }
-      if (isEdit && itemId) {
-        const { persisted } = await updateWeightOption(itemId, {
-          label: name.trim(),
-          modifier,
-          serves: serves.trim(),
-          sortOrder,
-        });
-        reportWrite(persisted, "Weight option updated");
-      } else {
-        const { persisted } = await createWeightOption({
-          label: name.trim(),
-          modifier,
-          serves: serves.trim(),
-          sortOrder,
-        });
-        reportWrite(persisted, "Weight option created");
-      }
-      onSaved();
-      onOpenChange(false);
-      return;
-    }
 
     if (!name.trim()) {
       toast.error("Name is required");
@@ -231,7 +188,6 @@ export function CatalogFormDialog({
     categories: "Category",
     flavours: "Flavour",
     occasions: "Occasion",
-    weights: "Weight Option",
   };
 
   return (
@@ -242,29 +198,27 @@ export function CatalogFormDialog({
             {isEdit ? "Edit" : "Add"} {titles[tab]}
           </DialogTitle>
           <DialogDescription>
-            Catalog data is used in {labels.productWord.toLowerCase()} forms, collections, and weight pricing.
+            Catalog data is used in {labels.productWord.toLowerCase()} forms and collections.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="catalog-name">{tab === "weights" ? "Label" : "Name"}</Label>
+            <Label htmlFor="catalog-name">Name</Label>
             <Input
               id="catalog-name"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                if (!isEdit && tab !== "weights") setSlug(slugify(e.target.value));
+                if (!isEdit) setSlug(slugify(e.target.value));
               }}
             />
           </div>
 
-          {tab !== "weights" ? (
-            <div className="space-y-2">
-              <Label htmlFor="catalog-slug">Slug</Label>
-              <Input id="catalog-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
-            </div>
-          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="catalog-slug">Slug</Label>
+            <Input id="catalog-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+          </div>
 
           {tab === "categories" ? (
             <>
@@ -305,37 +259,6 @@ export function CatalogFormDialog({
             </>
           ) : null}
 
-          {tab === "weights" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="catalog-modifier">Price modifier (₹)</Label>
-                <Input
-                  id="catalog-modifier"
-                  type="number"
-                  value={modifier}
-                  onChange={(e) => setModifier(Number(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="catalog-serves">Serves</Label>
-                <Input id="catalog-serves" value={serves} onChange={(e) => setServes(e.target.value)} />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="catalog-sort">Sort order</Label>
-                <AdminSelect
-                  id="catalog-sort"
-                  value={String(sortOrder)}
-                  onChange={(e) => setSortOrder(Number(e.target.value) || 1)}
-                >
-                  {Array.from({ length: 10 }, (_, index) => (
-                    <option key={index + 1} value={index + 1}>
-                      {index + 1}
-                    </option>
-                  ))}
-                </AdminSelect>
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <DialogFooter>

@@ -23,13 +23,11 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 // The shop's own currency. The weight modifier printed a hardcoded ₹ while
 // every other price on the screen already resolved `general.currency`.
-import { formatCurrency } from "@/utils/format";
 import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
   deleteFlavours,
   deleteOccasions,
-  deleteWeightOptions,
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
@@ -51,7 +49,6 @@ const EMPTY_STORE: CatalogStore = {
   categories: [],
   flavours: [],
   occasions: [],
-  weights: [],
   updatedAt: "",
 };
 
@@ -63,7 +60,6 @@ const tabs: Array<{
   { id: "categories", label: "Categories", singular: "Category" },
   { id: "occasions", label: "Occasions", singular: "Occasion" },
   { id: "flavours", label: "Flavours", singular: "Flavour" },
-  { id: "weights", label: "Weights", singular: "Weight" },
 ];
 
 // Tab bar order — includes a Themes placeholder (design-theme data model comes later).
@@ -72,7 +68,11 @@ const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }
   { id: "occasions", label: "Occasions" },
   { id: "themes", label: "Themes", soon: true },
   { id: "flavours", label: "Flavours" },
-  { id: "weights", label: "Weights" },
+  /*
+    A Weights tab stood here. Sizes are typed on the product now — a shop-wide
+    list forced one product's sizes onto every other, and editing it changed
+    nothing a customer could see once products stopped deriving from it.
+  */
 ];
 
 export function CatalogAdminPage() {
@@ -125,14 +125,13 @@ export function CatalogAdminPage() {
     };
   }, []);
 
-  // Flavours/Weights are optional bakery modules — hide those tabs when off.
+  // Flavours is an optional bakery module — hide that tab when it is off.
   useEffect(() => {
     const sync = () => {
       const next = getModuleSettings();
       setModules(next);
       setActiveTab((current) => {
         if (current === "flavours" && !next.flavour) return "categories";
-        if (current === "weights" && !next.weight) return "categories";
         return current;
       });
     };
@@ -143,7 +142,6 @@ export function CatalogAdminPage() {
 
   const moduleForTab: Partial<Record<CatalogTab | "themes", keyof ModuleSettings>> = {
     flavours: "flavour",
-    weights: "weight",
   };
   const visibleTabBar = tabBar.filter((tab) => {
     const mod = moduleForTab[tab.id];
@@ -157,16 +155,13 @@ export function CatalogAdminPage() {
         ? store.categories
         : activeTab === "flavours"
           ? store.flavours
-          : activeTab === "occasions"
-            ? store.occasions
-            : store.weights;
+          : store.occasions;
 
     if (!query) return list;
-    return list.filter((item) => {
-      const label = "label" in item ? item.label : item.name;
-      const slug = "slug" in item ? item.slug : "";
-      return label.toLowerCase().includes(query) || slug.toLowerCase().includes(query);
-    });
+    return list.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) || item.slug.toLowerCase().includes(query),
+    );
   }, [activeTab, search, store]);
 
   // How many published products are really in each category. `cakeCount` on the
@@ -186,11 +181,9 @@ export function CatalogAdminPage() {
     categories: store.categories.length,
     flavours: store.flavours.length,
     occasions: store.occasions.length,
-    weights: store.weights.length,
   };
 
-  const totalItems =
-    counts.categories + counts.flavours + counts.occasions + counts.weights;
+  const totalItems = counts.categories + counts.flavours + counts.occasions;
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const allSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(item.id));
@@ -261,9 +254,7 @@ export function CatalogAdminPage() {
         ? deleteCategories
         : activeTab === "flavours"
           ? deleteFlavours
-          : activeTab === "occasions"
-            ? deleteOccasions
-            : deleteWeightOptions;
+          : deleteOccasions;
 
     const { value: count, persisted } = await remove(selectedIds);
     refresh();
@@ -276,9 +267,9 @@ export function CatalogAdminPage() {
     // categories, occasions, flavours and weight tiers — gone, and every product
     // left pointing at ids that no longer existed.
     const ok = window.confirm(
-      `This replaces all four lists — ${counts.categories} categories, ` +
-        `${counts.occasions} occasions, ${counts.flavours} flavours and ` +
-        `${counts.weights} weights — with the ones this software ships with.\n\n` +
+      `This replaces all three lists — ${counts.categories} categories, ` +
+        `${counts.occasions} occasions and ${counts.flavours} flavours — ` +
+        `with the ones this software ships with.\n\n` +
         "Anything you have named here is lost, and products using those values will " +
         "point at entries that no longer exist.\n\nReset the whole catalog?"
     );
@@ -461,16 +452,14 @@ export function CatalogAdminPage() {
                 <tbody>
                   {items.map((item) => {
                     const id = item.id;
-                    const label = "label" in item ? item.label : item.name;
-                    const slug = "slug" in item ? item.slug : undefined;
+                    const label = item.name;
+                    const slug = item.slug;
                     const detail =
-                      activeTab === "weights" && "modifier" in item
-                        ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
-                        : activeTab === "categories"
-                          ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
-                          : slug
-                            ? `/${slug}`
-                            : "—";
+                      activeTab === "categories"
+                        ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
+                        : slug
+                          ? `/${slug}`
+                          : "—";
 
                     return (
                       <tr
@@ -515,16 +504,14 @@ export function CatalogAdminPage() {
             <ul className="divide-y divide-border md:hidden">
               {items.map((item) => {
                 const id = item.id;
-                const label = "label" in item ? item.label : item.name;
-                const slug = "slug" in item ? item.slug : undefined;
+                const label = item.name;
+                const slug = item.slug;
                 const detail =
-                  activeTab === "weights" && "modifier" in item
-                    ? `+${formatCurrency(item.modifier)} · serves ${item.serves}`
-                    : activeTab === "categories"
-                      ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
-                      : slug
-                        ? `/${slug}`
-                        : null;
+                  activeTab === "categories"
+                    ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
+                    : slug
+                      ? `/${slug}`
+                      : null;
 
                 return (
                   <li key={id} className="flex items-start gap-3 p-3 sm:p-4">

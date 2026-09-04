@@ -15,6 +15,7 @@ import {
   collectionPriceCeiling,
   countActiveFilters,
   defaultCollectionFilters,
+  getFilterWeightOptions,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
 import { categories as demoCategories } from "@/constants/landing-data";
@@ -96,6 +97,14 @@ export function CollectionsPage({
    * and so the ceiling is never below a price on screen.
    */
   const priceCeiling = useMemo(() => collectionPriceCeiling(catalog), [catalog]);
+  /**
+   * The sizes to offer as filters, read off the products on the page.
+   *
+   * Not a shop-wide list: a size is offered exactly when something here is sold
+   * in it, so a tick can never hide everything.  rather than the
+   * filtered result, or the options would vanish as the customer used them.
+   */
+  const sizeOptions = useMemo(() => getFilterWeightOptions(catalog), [catalog]);
   const [filters, setFilters] = useState<CollectionFilters>(() =>
     defaultCollectionFilters(collectionPriceCeiling(catalog)),
   );
@@ -168,6 +177,7 @@ export function CollectionsPage({
             <CollectionFiltersPanel
               filters={filters}
               priceCeiling={priceCeiling}
+              sizeOptions={sizeOptions}
               onChange={updateFilters}
               className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
             />
@@ -203,6 +213,7 @@ export function CollectionsPage({
                       <CollectionFiltersPanel
                         filters={filters}
                         priceCeiling={priceCeiling}
+                        sizeOptions={sizeOptions}
                         onChange={(next) => {
                           updateFilters(next);
                         }}

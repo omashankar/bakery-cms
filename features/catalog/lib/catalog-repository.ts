@@ -1,12 +1,11 @@
 import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
-import type { CatalogStore, CatalogWeightOption } from "@/types/catalog";
+import type { CatalogStore } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
   defaultCatalogStore,
   defaultCategories,
   defaultFlavours,
   defaultOccasions,
-  defaultWeightOptions,
 } from "./catalog-utils";
 import {
   pushCatalogSection,
@@ -61,7 +60,6 @@ function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
     categories: partial.categories ?? defaultCategories,
     flavours: partial.flavours ?? defaultFlavours,
     occasions: partial.occasions ?? defaultOccasions,
-    weights: partial.weights ?? defaultWeightOptions,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
 }
@@ -130,9 +128,12 @@ export function getOccasions(): ProductOccasion[] {
   return loadCatalogStore().occasions;
 }
 
-export function getWeightOptions(): CatalogWeightOption[] {
-  return [...loadCatalogStore().weights].sort((a, b) => a.sortOrder - b.sortOrder);
-}
+/*
+  `getWeightOptions` and its three writers stood here. Sizes are typed on the
+  product now — the shop-wide list forced one product's sizes onto every other,
+  and once products stopped deriving from it, editing it changed nothing a
+  customer could see.
+*/
 
 /**
  * The taxonomy, but only once the server's copy has actually arrived.
@@ -315,49 +316,6 @@ export async function deleteOccasions(ids: string[]): Promise<WriteResult<number
   const next = store.occasions.filter((item) => !ids.includes(item.id));
   const { persisted } = await updateStore(store, { occasions: next });
   return { value: persisted ? store.occasions.length - next.length : 0, persisted };
-}
-
-export async function createWeightOption(
-  data: Omit<CatalogWeightOption, "id" | "createdAt" | "updatedAt" | "sortOrder"> & {
-    sortOrder?: number;
-  }
-): Promise<WriteResult<CatalogWeightOption | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const item: CatalogWeightOption = {
-    ...data,
-    id: newId("wt"),
-    sortOrder: data.sortOrder ?? store.weights.length + 1,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  const { persisted } = await updateStore(store, { weights: [...store.weights, item] });
-  return { value: item, persisted };
-}
-
-export async function updateWeightOption(
-  id: string,
-  patch: Partial<CatalogWeightOption>
-): Promise<WriteResult<CatalogWeightOption | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const index = store.weights.findIndex((item) => item.id === id);
-  if (index < 0) return { value: null, persisted: false };
-  const next = [...store.weights];
-  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  const { persisted } = await updateStore(store, { weights: next });
-  return { value: next[index], persisted };
-}
-
-export async function deleteWeightOptions(ids: string[]): Promise<WriteResult<number>> {
-  const store = await hydratedStore();
-  if (!store) return { value: 0, persisted: false };
-
-  const next = store.weights.filter((item) => !ids.includes(item.id));
-  const { persisted } = await updateStore(store, { weights: next });
-  return { value: persisted ? store.weights.length - next.length : 0, persisted };
 }
 
 export function getCategoryById(id: string): ProductCategory | undefined {

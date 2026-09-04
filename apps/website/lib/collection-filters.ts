@@ -2,12 +2,10 @@ import type { LandingProduct } from "@/constants/landing-data";
 import {
   getFlavours,
   getOccasions,
-  getWeightOptions,
 } from "@/features/catalog/lib/catalog-repository";
 import {
   defaultFlavours,
   defaultOccasions,
-  defaultWeightOptions,
 } from "@/features/catalog/lib/catalog-utils";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
@@ -84,22 +82,38 @@ export function getFilterFlavourOptions(): string[] {
 }
 
 /**
- * The weight tiers this shop actually sells.
+ * The sizes this shop actually sells, read off the products it is selling.
  *
- * This was the hard-coded list `["0.5 kg", "1 kg", "1.5 kg"]`, so a shop that
- * added a 2 kg tier — or renamed its tiers, or removed one — had a filter panel
- * offering sizes it does not sell and hiding the ones it does. The Catalog
- * screen's whole Weights tab reached this list not at all.
+ * Three answers, in order. It was the hard-coded `["0.5 kg", "1 kg", "1.5 kg"]`,
+ * so a shop that renamed or added a tier had a panel offering sizes it does not
+ * sell. Then it was the shop-wide Catalog taxonomy, which was better but still
+ * a second list to keep in step — a size could sit in Catalog with no product
+ * using it, and a product could be sold in a size Catalog had never heard of.
+ *
+ * Now it is the products. A size is offered as a filter exactly when something
+ * in front of the customer is sold in it, which is the only definition that
+ * cannot go stale — and it is the same set `matchesWeight` compares against
+ * two functions below, so the panel can no longer offer a tick that matches
+ * nothing.
+ *
+ * Ordered by how many products use it, so the sizes a shop mostly sells come
+ * first rather than whichever product happened to be added first.
  */
-export function getFilterWeightOptions(): string[] {
-  const options = getWeightOptions().map((option) => option.label);
-  return options.length > 0 ? options : DEFAULT_FILTER_WEIGHT_OPTIONS;
-}
+export function getFilterWeightOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
 
-/** Stable for SSR and the first client paint, like the occasion/flavour ones. */
-export const DEFAULT_FILTER_WEIGHT_OPTIONS: string[] = defaultWeightOptions.map(
-  (option) => option.label
-);
+  for (const product of products) {
+    for (const tier of product.weights ?? []) {
+      const label = tier.label?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
+}
 
 /**
  * Stable occasion / flavour defaults for SSR and the client's first paint —

@@ -20,7 +20,11 @@ vi.mock("@/features/catalog/lib/catalog-repository", () => ({
 }));
 
 import { rederiveWeights } from "@/features/products/lib/catalog-options";
-import { applyCollectionFilters, DEFAULT_COLLECTION_FILTERS } from "@/apps/website/lib/collection-filters";
+import {
+  applyCollectionFilters,
+  getFilterWeightOptions,
+  DEFAULT_COLLECTION_FILTERS,
+} from "@/apps/website/lib/collection-filters";
 import type { LandingProduct } from "@/constants/landing-data";
 
 const root = process.cwd();
@@ -119,15 +123,16 @@ describe("changing the base price", () => {
     expect(next.map((tier) => tier.price)).toEqual([1200, 1600, 2100]);
   });
 
-  it("keeps a tier the admin priced by hand", () => {
-    // The whole point: editing the base by one rupee used to discard this.
+  it("moves a tier the admin priced by hand by the same amount", () => {
+    // The old rule pinned it, by comparing against the shop-wide Catalog
+    // presets. Sizes are typed on the product now and there is nothing to
+    // compare against — so every size keeps its distance from the base.
     const handEdited = [...derived];
     handEdited[2] = { ...handEdited[2], price: 2500 };
 
     const next = rederiveWeights(handEdited, 1200, 1000);
-    expect(next[0].price).toBe(1200);
-    expect(next[1].price).toBe(1600);
-    expect(next[2].price).toBe(2500);
+
+    expect(next.map((tier) => tier.price)).toEqual([1200, 1600, 2700]);
   });
 
   it("matches tiers by label, so a catalog change does not shift the comparison", () => {
@@ -153,15 +158,15 @@ describe("changing the base price", () => {
     expect(next.map((tier) => tier.label)).toEqual(["0.5 kg"]);
   });
 
-  it("keeps a size whose catalog preset has been deleted", () => {
-    // There is nothing left to re-derive it from, and dropping it would
-    // delete a size the product is genuinely sold in.
+  it("treats a size the shop has never used elsewhere like any other", () => {
+    // Nothing is looked up any more, so there is no such thing as a size the
+    // system does not recognise.
     const retired = { label: "5 kg", price: 4000, serves: "30+" };
 
     const next = rederiveWeights([derived[0], retired], 1200, 1000);
 
     expect(next[0].price).toBe(1200);
-    expect(next[1]).toEqual(retired);
+    expect(next[1].price).toBe(4200);
   });
 });
 
@@ -254,11 +259,41 @@ describe("collection filters use the product's real data", () => {
     expect(fn).toContain('description: ""');
   });
 
-  it("offers the shop's own weight labels, not three hard-coded ones", () => {
-    const source = stripComments(read("apps/website/lib/collection-filters.ts"));
-    expect(source).toContain("getWeightOptions().map((option) => option.label)");
-    expect(source).not.toContain('return ["0.5 kg", "1 kg", "1.5 kg"]');
-    // And the price bands are gone.
-    expect(source).not.toContain("cake.price >= 1400");
+  it("offers the sizes the products on the page are actually sold in", () => {
+    /**
+     * Three answers, in order. It was the hard-coded list, so a shop that
+     * renamed a tier had a panel offering sizes it does not sell. Then it was
+     * the shop-wide Catalog taxonomy — better, but still a second list to keep
+     * in step: a size could sit in Catalog with nothing using it, and a product
+     * could be sold in a size Catalog had never heard of.
+     *
+     * Now it is read off the products, which is the only definition that cannot
+     * go stale — and it is the same set `matchesWeight` compares against, so a
+     * tick can no longer match nothing.
+     */
+    const options = getFilterWeightOptions([
+      cake({ slug: "a", weights: [{ label: "1 kg", price: 900 }] }),
+      cake({
+        slug: "b",
+        weights: [{ label: "1 kg", price: 800 }, { label: "500 gm", price: 500 }],
+      }),
+    ]);
+
+    // Commonest first, so the sizes a shop mostly sells lead.
+    expect(options).toEqual(["1 kg", "500 gm"]);
+  });
+
+  it("offers nothing when nothing on the page is sold by size", () => {
+    // A shop selling phone chargers gets no size filter at all, rather than
+    // three bakery labels that would hide its whole catalogue when ticked.
+    expect(getFilterWeightOptions([cake({ slug: "charger" })])).toEqual([]);
+  });
+
+  it("ignores a size row left without a name", () => {
+    expect(
+      getFilterWeightOptions([
+        cake({ slug: "a", weights: [{ label: "  ", price: 100 }, { label: "1 kg", price: 900 }] }),
+      ]),
+    ).toEqual(["1 kg"]);
   });
 });
