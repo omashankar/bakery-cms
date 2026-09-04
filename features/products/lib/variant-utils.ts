@@ -58,17 +58,22 @@ export function createVariantGroup(
   options: ProductVariantOption[],
   required = true
 ): ProductVariantGroup {
-  const normalizedOptions =
-    options.length > 0 && !options.some((option) => option.isDefault)
-      ? options.map((option, index) => ({ ...option, isDefault: index === 0 }))
-      : options;
+  /*
+    NO DEFAULT IS INVENTED HERE ANY MORE.
+    
+    This promoted the first option whenever none was marked, which made every
+    group mandatory the moment it was created — the admin could add “Eggless
+    +₹80” and the page would charge for it before anybody ticked anything.
+    Both callers pass what they mean: the seeded egg and photo groups name
+    their default explicitly, and a group added by hand starts as an add-on.
+  */
 
   return {
     id: `group-${crypto.randomUUID().slice(0, 8)}`,
     name,
     type,
     required,
-    options: normalizedOptions,
+    options,
   };
 }
 
@@ -190,8 +195,21 @@ export function getDefaultVariantSelections(
   const selections: Record<string, string> = {};
 
   for (const group of groups) {
-    const defaultOption =
-      group.options.find((option) => option.isDefault) ?? group.options[0];
+    /**
+     * A group that names NO default starts with nothing selected.
+     *
+     * This fell back to the first option, so every group was always answered
+     * and always charged — which made an opt-in impossible to express. A shop
+     * adding one option, “Eggless +₹80”, and leaving Default clear means
+     * exactly what it looks like: the customer does not have it until they
+     * ask for it.
+     *
+     * Legacy data is unaffected. `normalizeVariantGroups` still marks the
+     * first option of a group whose options carry no `isDefault` KEY AT ALL,
+     * which is what an import or a pre-`createVariantOption` row looks like —
+     * so those keep the option they have always been charged for.
+     */
+    const defaultOption = group.options.find((option) => option.isDefault);
     if (defaultOption) {
       selections[group.id] = defaultOption.id;
     }
@@ -276,7 +294,25 @@ export function mapLegacyChoice(
 
 export function asAddOn(
   group: ProductVariantGroup,
-): { off: ProductVariantOption; on: ProductVariantOption; extra: number } | null {
+): { off: ProductVariantOption | null; on: ProductVariantOption; extra: number } | null {
+  /**
+   * ONE OPTION AND NO DEFAULT is the plainest add-on there is.
+   *
+   * A shop types “Eggless”, puts ₹80 beside it, and leaves Default clear. The
+   * customer either wants it or does not; there is no second option because
+   * not-wanting-it is not a thing the shop sells. Unticked selects nothing at
+   * all and costs nothing, which is what `getDefaultVariantSelections` and
+   * `calculateVariantAdjustment` now mean by an unanswered group.
+   *
+   * One option WITH a default is not this. That is a fact about the product —
+   * it comes this way — and a box the customer cannot untick is not a choice.
+   */
+  if (group.options.length === 1) {
+    const only = group.options[0];
+    if (!only || only.isDefault) return null;
+    return { off: null, on: only, extra: only.priceAdjustment };
+  }
+
   if (group.options.length !== 2) return null;
 
   /**
@@ -341,16 +377,30 @@ export function calculateVariantAdjustment(
 ): number {
   return groups.reduce((total, group) => {
     const optionId = selections[group.id];
+    /**
+     * No selection and no default means NOTHING, not the first option.
+     *
+     * The default is still substituted when there is one — a group the shop
+     * answers on the customer's behalf must be charged whether or not the
+     * browser sent the selection, which is what stops a crafted request
+     * dropping a surcharge. But falling through to `options[0]` charged for a
+     * choice nobody had made and no default claimed.
+     */
     const option =
       group.options.find((item) => item.id === optionId) ??
-      group.options.find((item) => item.isDefault) ??
-      group.options[0];
+      group.options.find((item) => item.isDefault);
 
     return total + (option?.priceAdjustment ?? 0);
   }, 0);
 }
 
-/** Resolve the option a selection points at, falling back to the group default. */
+/**
+ * The option a selection points at, or the group's default, or nothing.
+ *
+ * Nothing is a real answer: a group the customer opted out of has no option,
+ * and a cart line that named one anyway would tell the kitchen to make
+ * something nobody asked for.
+ */
 function resolveSelectedOption(
   group: ProductVariantGroup,
   selections: Record<string, string>
@@ -359,7 +409,6 @@ function resolveSelectedOption(
   return (
     group.options.find((option) => option.id === selectedId) ??
     group.options.find((option) => option.isDefault) ??
-    group.options[0] ??
     null
   );
 }

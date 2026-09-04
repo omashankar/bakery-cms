@@ -65,7 +65,7 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
       createVariantGroup(
         type === "custom" ? "Custom option" : groupTypeLabels[type],
         type,
-        [createVariantOption("Option 1", 0, true)],
+        [createVariantOption("Option 1", 0, false)],
         type !== "photo"
       ),
     ]);
@@ -123,15 +123,25 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
     );
   }
 
+  /**
+   * Ticking one clears the others; ticking the ticked one clears them all.
+   *
+   * This could only ever SET a default, so every group had one for ever and an
+   * opt-in was impossible to describe. No default now means what it looks
+   * like: nothing is chosen until the customer chooses it, and nothing is
+   * charged — which is how a shop says “Eggless +₹80” and gets one tickbox.
+   */
   function setDefaultOption(groupId: string, optionId: string) {
     onChange(
       groups.map((group) => {
         if (group.id !== groupId) return group;
+        const wasDefault =
+          group.options.find((option) => option.id === optionId)?.isDefault === true;
         return {
           ...group,
           options: group.options.map((option) => ({
             ...option,
-            isDefault: option.id === optionId,
+            isDefault: !wasDefault && option.id === optionId,
           })),
         };
       })
@@ -146,7 +156,10 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
           ...group,
           options: [
             ...group.options,
-            createVariantOption(`Option ${group.options.length + 1}`, 0, group.options.length === 0),
+            // Never default. A group starts as an add-on the customer opts
+            // into; the owner ticks Default when they want one chosen for
+            // them.
+            createVariantOption(`Option ${group.options.length + 1}`, 0, false),
           ],
         };
       })
@@ -160,9 +173,10 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
           if (group.id !== groupId) return group;
           const options = group.options.filter((option) => option.id !== optionId);
           if (options.length === 0) return null;
-          if (!options.some((option) => option.isDefault)) {
-            options[0] = { ...options[0], isDefault: true };
-          }
+          // No default is re-imposed here. Removing the ticked option leaves a
+          // group nobody has answered, which is a state this now supports —
+          // silently promoting the next one would charge for a choice the
+          // owner had just deleted the reason for.
           return { ...group, options };
         })
         .filter((group): group is ProductVariantGroup => group !== null)

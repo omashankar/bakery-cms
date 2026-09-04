@@ -87,10 +87,12 @@ export function formatVariantSummary(
   return groups
     .map((group) => {
       const optionId = selections[group.id];
+      // No selection and no default means the customer opted OUT of this
+      // group, and a line that named an option anyway would tell the kitchen
+      // to make something nobody asked for.
       const option =
         group.options.find((item) => item.id === optionId) ??
-        group.options.find((item) => item.isDefault) ??
-        group.options[0];
+        group.options.find((item) => item.isDefault);
       return option ? `${group.name}: ${option.label}` : null;
     })
     .filter((value): value is string => Boolean(value));

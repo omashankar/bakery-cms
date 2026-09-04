@@ -38,14 +38,19 @@ describe("createVariantOption", () => {
 });
 
 describe("createVariantGroup", () => {
-  it("promotes the first option to default when none is marked", () => {
+  it("leaves a group nobody has answered alone", () => {
+    /**
+     * This promoted the first option, which made every group mandatory the
+     * moment it was created: a shop could add “Eggless +₹80” and the page would
+     * charge for it before anybody ticked anything. No default is now a state
+     * the model supports — it is how an opt-in add-on is described.
+     */
     const group = createVariantGroup("Size", "custom", [
       createVariantOption("Small"),
       createVariantOption("Large"),
     ]);
 
-    expect(group.options[0].isDefault).toBe(true);
-    expect(group.options[1].isDefault).toBe(false);
+    expect(group.options.some((option) => option.isDefault)).toBe(false);
   });
 
   it("leaves an explicit default alone", () => {

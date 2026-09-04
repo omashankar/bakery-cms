@@ -885,10 +885,23 @@ export function ProductDetailPage({
                       <Checkbox
                         checked={on}
                         onCheckedChange={(checked) =>
-                          setVariantSelections((current) => ({
-                            ...current,
-                            [group.id]: checked === true ? addOn.on.id : addOn.off.id,
-                          }))
+                          setVariantSelections((current) => {
+                            if (checked === true) {
+                              return { ...current, [group.id]: addOn.on.id };
+                            }
+                            /*
+                              Unticking an add-on with no off-state REMOVES the
+                              answer rather than choosing another one — there is
+                              no other option to choose, and an empty string
+                              would be an id that matches nothing while still
+                              looking like an answer.
+                            */
+                            if (!addOn.off) {
+                              const { [group.id]: _dropped, ...rest } = current;
+                              return rest;
+                            }
+                            return { ...current, [group.id]: addOn.off.id };
+                          })
                         }
                       />
                       <span>{addOn.on.label}</span>
