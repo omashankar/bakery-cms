@@ -105,6 +105,45 @@ function sameCopy(a: string, b: string): boolean {
   return normalise(a) === normalise(b);
 }
 
+export interface CartOffer {
+  code: string;
+  /** The discount, in the shop’s own words. */
+  label: string;
+  /** What the basket is still short of, or 0 when the code already applies. */
+  shortfall: number;
+}
+
+/**
+ * The live offers a basket has not taken yet, and what each one needs.
+ *
+ * A list of codes on its own is an advertisement; with the subtotal in hand it
+ * becomes an answer — “add ₹300 more and SAVE500 applies”. That difference is
+ * the whole reason this takes the cart rather than being another copy of the
+ * homepage offers row.
+ *
+ * `isLiveCoupon` deliberately ignores `minSubtotal`, because an offer with a
+ * minimum is still a real offer. The shortfall is how it gets SAID, which the
+ * module has always insisted on: a card that hides the condition sends
+ * somebody to a checkout that refuses the code.
+ */
+export function offersForCart(
+  coupons: StoredCoupon[],
+  subtotal: number,
+  options: { exclude?: string; currency?: string; now?: number } = {},
+): CartOffer[] {
+  const skip = options.exclude?.trim().toUpperCase();
+  return coupons
+    .filter((coupon) => isLiveCoupon(coupon, options.now ?? Date.now()))
+    // The one already applied is not an offer, it is the current state, and
+    // the chip above says so.
+    .filter((coupon) => coupon.code.trim().toUpperCase() !== skip)
+    .map((coupon) => ({
+      code: coupon.code,
+      label: couponDiscountLabel(coupon, options.currency),
+      shortfall: Math.max(0, (coupon.minSubtotal ?? 0) - subtotal),
+    }));
+}
+
 export function couponToOffer(
   coupon: StoredCoupon,
   index = 0,

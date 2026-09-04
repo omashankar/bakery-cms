@@ -147,8 +147,19 @@ export function ProductDetailPage({
 }: ProductDetailPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
-  // Related/recommended lists merge localStorage-backed admin cakes (absent during
-  // SSR) — gate them behind mount to avoid a hydration mismatch.
+  /**
+   * For the RECOMMENDED rail only.
+   *
+   * Both rails used to merge a localStorage-backed catalogue that the server
+   * does not have, so both were gated behind mount. `related` is a server prop
+   * now — and leaving the gate on it kept the one rail the crawler could have
+   * had out of the initial HTML of the page this shop is found for, on a route
+   * whose per-product metadata exists for exactly that reason.
+   *
+   * `recommended` still ranks by recently-viewed and past orders, which live in
+   * this browser and nowhere else. That one genuinely cannot render until it
+   * has one.
+   */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -1037,25 +1048,27 @@ export function ProductDetailPage({
                 </div>
               </div>
 
+              {/*
+                ONE button, where there were two.
+
+                "Buy Now" added the same line as "Add to Cart" and then pushed
+                to the cart — the same action, differently worded, sitting
+                beside it in the loudest place on the page. Two primary CTAs
+                make a customer choose between them before they can do the one
+                thing they came to do, and the difference between the pair was
+                a navigation they can make for themselves; the header cart
+                count and the toast both already point the way.
+              */}
               <div className="hidden flex-wrap gap-3 lg:flex">
                 <Button
                   size="lg"
-                  variant="outline"
+                  variant="bakery"
                   className="flex-1"
                   disabled={isOutOfStock}
                   onClick={() => handleAddToCart(false)}
                 >
                   <ShoppingBag className="size-4" />
                   {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="bakery"
-                  className="flex-1"
-                  disabled={isOutOfStock}
-                  onClick={() => handleAddToCart(true)}
-                >
-                  Buy Now
                 </Button>
               </div>
 
@@ -1428,12 +1441,31 @@ export function ProductDetailPage({
                     )}
                   </div>
                 </DetailSection>
+
+                {/*
+                  THE ONE STORED FIELD NO STOREFRONT SURFACE SHOWED.
+
+                  The admin has taken a “Barcode / SKU” for as long as the
+                  product form has existed and nothing anywhere rendered it —
+                  a field an owner fills in and never sees again.
+
+                  Generic Name and Country of Origin are asked for in the same
+                  breath and are deliberately NOT new fields: a shop states
+                  those through `attributes`, which is the system this project
+                  already has for owner-defined facts and which the section
+                  above renders. Three more columns would be a parallel one.
+                */}
+                {cake.barcode ? (
+                  <p className="border-t border-border pt-6 text-xs text-muted-foreground">
+                    SKU: {cake.barcode}
+                  </p>
+                ) : null}
               </div>
 
             </div>
           </div>
 
-          {mounted && related.length > 0 ? (
+          {related.length > 0 ? (
             <div className="mt-16 border-t border-border pt-16">
               <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
                 <h2 className="font-heading text-2xl font-bold">You May Also Like</h2>
@@ -1464,20 +1496,12 @@ export function ProductDetailPage({
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white p-4 lg:hidden">
         <div className="mx-auto flex max-w-lg gap-3">
           <Button
-            variant="outline"
+            variant="bakery"
             className="flex-1"
             disabled={isOutOfStock}
             onClick={() => handleAddToCart(false)}
           >
             {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
-          </Button>
-          <Button
-            variant="bakery"
-            className="flex-1"
-            disabled={isOutOfStock}
-            onClick={() => handleAddToCart(true)}
-          >
-            Buy Now
           </Button>
         </div>
       </div>

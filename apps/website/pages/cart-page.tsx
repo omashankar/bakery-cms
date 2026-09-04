@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, Heart, Lock, Pencil, ShoppingBag, Trash2 } from "lucide-react";
+import {
+  Bookmark,
+  Heart,
+  Lock,
+  Pencil,
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  Trash2,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
@@ -13,6 +23,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
+import { offersForCart } from "@/features/commerce/lib/coupon-offers";
+import {
+  getActiveCoupons,
+  type StoredCoupon,
+} from "@/features/commerce/lib/coupons-repository";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { getDeliveryPromise } from "@/apps/website/lib/product-details";
 import { getCheckoutDraft, saveCheckoutDraft } from "@/features/orders/lib/checkout-draft";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
@@ -83,6 +100,15 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * field on the page that changes what the customer pays.
    */
   const [coupon, setCoupon] = useState<AppliedCoupon | undefined>(undefined);
+  /**
+   * The shop's live coupons, read in `refresh` beside every other store.
+   *
+   * Not read during render: `getActiveCoupons` seeds localStorage and fires an
+   * event on a cold cache, and a render that writes is a render that can
+   * schedule its own next one. `refresh` already runs on mount and on every
+   * settings, cart and session event, which is exactly when this can change.
+   */
+  const [liveCoupons, setLiveCoupons] = useState<StoredCoupon[]>([]);
   const labels = useBusinessLabels();
 
   function refresh() {
@@ -92,6 +118,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
     setCommerce(getCommerceSettings());
     setSignedIn(hasCustomerSession());
     setCoupon(getCheckoutDraft().coupon);
+    setLiveCoupons(getActiveCoupons());
   }
 
   useEffect(() => {
@@ -180,6 +207,30 @@ export function CartPage({ catalog = [] }: CartPageProps) {
     setCoupon(next);
     saveCheckoutDraft({ ...getCheckoutDraft(), coupon: next });
   }
+
+  /**
+   * Offers this basket has not taken yet, with what each still needs.
+   *
+   * Read from the same coupon store the box below applies from, so the page
+   * cannot advertise a code its own input would refuse. Empty is the common
+   * answer — every coupon this install ships is inactive until an owner turns
+   * it on — and an empty list renders nothing at all.
+   */
+  const offers = useMemo(
+    () => offersForCart(liveCoupons, subtotal, { exclude: coupon?.code }),
+    [liveCoupons, subtotal, coupon?.code],
+  );
+
+  /**
+   * What the shop has actually promised, in its own settings.
+   *
+   * Not a strip of badges. Every row is a value an owner typed or a rule they
+   * configured, and a row with nothing behind it does not render — the product
+   * page’s own trust rows were rewritten to that standard after one of them
+   * printed a fallback as a fact under every product in the shop.
+   */
+  const promise = loaded ? getDeliveryPromise() : "";
+  const freeDeliveryOver = loaded ? getFreeDeliveryThreshold() : 0;
 
   const totals = useMemo(    () =>
       calculateCartTotals({
@@ -474,6 +525,40 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   ))}
                 </div>
 
+                {/*
+                  WHAT THIS BASKET COULD STILL GET, and what it needs.
+
+                  A list of codes on its own is an advertisement. With the
+                  subtotal in hand it is an answer — and the shortfall is the
+                  part that must be said, or a card sends somebody to a
+                  checkout that refuses the code.
+
+                  Nothing renders when the shop has no live coupons, which is
+                  every install until an owner switches one on.
+                */}
+                {offers.length > 0 ? (
+                  <div className="rounded-xl border border-dashed border-bakery-300 bg-white p-4">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
+                      <Tag className="size-4" />
+                      Offers you can use
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                      {offers.map((offer) => (
+                        <li key={offer.code} className="flex gap-2">
+                          <span aria-hidden className="text-bakery-700">•</span>
+                          <span>
+                            <span className="font-medium text-foreground">{offer.code}</span>{" "}
+                            — {offer.label}
+                            {offer.shortfall > 0
+                              ? ` · add ${formatCurrency(offer.shortfall)} more to use it`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
                 <div className="rounded-xl border border-border bg-cream-50 p-4">
                   <p className="text-sm font-medium">Order extras</p>
                   {commerce.giftWrapEnabled ? (
@@ -573,6 +658,34 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 >
                   Continue shopping
                 </Button>
+
+                {/*
+                  Only what the shop has actually configured.
+
+                  No badge row of unsupported claims — “6000 cities”, “20M
+                  happy customers” — which is what this space is usually filled
+                  with. The delivery promise is the shop’s own sentence from
+                  its commerce settings, and the threshold is the rule its own
+                  totals apply. Neither is here when it has not been set.
+                */}
+                {promise || freeDeliveryOver > 0 ? (
+                  <ul className="space-y-2 rounded-xl border border-border bg-cream-50 p-3 text-xs text-muted-foreground">
+                    {promise ? (
+                      <li className="flex items-start gap-2">
+                        <Truck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
+                        <span>{promise}</span>
+                      </li>
+                    ) : null}
+                    {freeDeliveryOver > 0 ? (
+                      <li className="flex items-start gap-2">
+                        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
+                        <span>
+                          Free delivery on orders over {formatCurrency(freeDeliveryOver)}
+                        </span>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
               </div>
               </div>
             </div>
