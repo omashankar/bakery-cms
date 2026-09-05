@@ -1,14 +1,14 @@
 "use client";
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ZoomIn } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { cn } from "@/lib/utils";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
@@ -27,12 +27,22 @@ interface ProductGalleryProps {
 }
 
 /**
+ * How much bigger the hover panel shows the photo.
+ *
+ * 2.5 rather than 3 or 4: a shop's photos are its own, mostly around a thousand
+ * pixels wide, and past about two and a half times the browser is enlarging
+ * pixels rather than revealing detail — which reads as a blurry mistake instead
+ * of a closer look.
+ */
+const HOVER_ZOOM = 2.5;
+
+/**
  * Every photo of one product, with the rest of them beside it.
  *
  * The thumbnail rail was written the day this component was, and no customer
  * had ever seen it: it renders on `images.length > 1`, and the helper feeding
  * it returned `[cake.image]` — one element, always — because the admin form had
- * a single photo box. All three are fixed together; a rail with nothing to put
+ * a single photo box. All three were fixed together; a rail with nothing to put
  * in it is not worth laying out.
  *
  * On a wide screen the rail is a VERTICAL strip to the left of the photo, which
@@ -44,7 +54,43 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
   const labels = useBusinessLabels();
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
+  /**
+   * Where the pointer is over the photo, as a fraction of it, or null.
+   *
+   * Null means no magnifier: the pointer has left, or it was never a mouse in
+   * the first place. Fractions rather than pixels, so the same two numbers
+   * drive both the lens and the panel's background position whatever size
+   * either happens to be drawn at.
+   */
+  const [lens, setLens] = useState<{ x: number; y: number } | null>(null);
   const activeImage = images[activeIndex] ?? images[0];
+
+  const step = (delta: number) => {
+    setActiveIndex((current) => (current + delta + images.length) % images.length);
+  };
+
+  /**
+   * Arrow keys move through the photos while the lightbox is open.
+   *
+   * Bound to the window rather than the dialog, because the dialog moves focus
+   * to its close button and a key pressed before anything else is clicked would
+   * otherwise go nowhere. Bound only while it is open, so the arrows do nothing
+   * to the page behind it.
+   */
+  useEffect(() => {
+    if (!zoomOpen || images.length < 2) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        setActiveIndex((current) => (current - 1 + images.length) % images.length);
+      }
+      if (event.key === "ArrowRight") {
+        setActiveIndex((current) => (current + 1) % images.length);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomOpen, images.length]);
 
   /**
    * A frame, even with nothing in it.
@@ -52,8 +98,8 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
    * This returned `null`, which is not a missing photo but a missing COLUMN:
    * the product page puts the gallery in the left cell of a two-column grid,
    * so a product with no image left that cell empty and the text stranded
-   * beside it. A product with no photo is reachable — a new one is born with
-   * `images: []` — and `OptimizedImage` already draws a placeholder for an
+   * beside it. A product with no photo is reachable — a new one is born with an
+   * empty image list — and `OptimizedImage` already draws a placeholder for an
    * empty src.
    */
   if (!activeImage) {
@@ -64,12 +110,27 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
     );
   }
 
-  const step = (delta: number) => {
-    setActiveIndex((current) => {
-      const next = (current + delta + images.length) % images.length;
-      return next;
+  /** The same repair `OptimizedImage` applies, for the CSS background below. */
+  const magnifiedSrc = fixBrokenImageUrl(activeImage);
+  /** The lens is the slice the panel is showing, so it is 1/zoom of the photo. */
+  const lensSize = 100 / HOVER_ZOOM;
+  const lensEdge = (value: number) =>
+    Math.min(100 - lensSize, Math.max(0, value * 100 - lensSize / 2));
+
+  function trackPointer(event: React.PointerEvent<HTMLElement>) {
+    /*
+      MOUSE ONLY. A finger has no hover: on a touchscreen every tap would flash
+      a magnifier over the very thing being tapped and then leave it there, and
+      the panel would cover the buy box the tap was heading for.
+    */
+    if (event.pointerType !== "mouse") return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    setLens({
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
     });
-  };
+  }
 
   return (
     <>
@@ -79,10 +140,12 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
         instead would hand a screen reader, and the browser's image priority,
         four thumbnails before the photo the page is about.
       */}
-      <div className="flex flex-col gap-4 lg:flex-row-reverse lg:items-start lg:gap-4">
+      <div className="relative flex flex-col gap-4 lg:flex-row-reverse lg:items-start lg:gap-4">
         <button
           type="button"
           onClick={() => setZoomOpen(true)}
+          onPointerMove={trackPointer}
+          onPointerLeave={() => setLens(null)}
           className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
           aria-label={`Zoom ${labels.productWord.toLowerCase()} image`}
         >
@@ -97,11 +160,36 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             fill
             priority
             sizes="(max-width: 1024px) 100vw, 45vw"
-            className="object-cover transition-transform group-hover:scale-[1.02]"
+            className="object-cover"
           />
-          <div className="absolute right-4 bottom-4 rounded-lg border border-border bg-white/95 p-2 text-bakery-700">
-            <ZoomIn className="size-4" />
-          </div>
+          {/*
+            The lens — the part of the photo the panel beside it is showing.
+
+            Without it the panel is a picture that moves for no visible reason.
+            `hidden lg:block`, because the panel it belongs to only exists there.
+          */}
+          {lens ? (
+            <span
+              aria-hidden
+              data-testid="zoom-lens"
+              className="pointer-events-none absolute hidden border-2 border-bakery-700/70 bg-white/20 lg:block"
+              style={{
+                width: `${lensSize}%`,
+                height: `${lensSize}%`,
+                left: `${lensEdge(lens.x)}%`,
+                top: `${lensEdge(lens.y)}%`,
+              }}
+            />
+          ) : (
+            /*
+              The magnifying-glass hint hides while the magnifier is running. It
+              is an invitation, and it stops being one the moment it has been
+              accepted.
+            */
+            <div className="absolute right-4 bottom-4 rounded-lg border border-border bg-white/95 p-2 text-bakery-700">
+              <ZoomIn className="size-4" />
+            </div>
+          )}
         </button>
 
         {images.length > 1 ? (
@@ -138,33 +226,98 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             ))}
           </div>
         ) : null}
+
+        {/*
+          THE PANEL, beside the photo and over the column next to it.
+
+          A drawn element rather than a second image: `background-size` past
+          100% with a percentage `background-position` is the one way to show a
+          slice of a picture at its own resolution without fetching another copy
+          of it. The browser already has this file.
+
+          `pointer-events-none` is the important part — the panel sits over the
+          buy box, and somebody moving towards Add to Cart must not have their
+          click land on a magnifier that is about to disappear.
+        */}
+        {lens ? (
+          <div
+            aria-hidden
+            data-testid="zoom-panel"
+            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-white bg-no-repeat shadow-lg lg:block"
+            style={{
+              backgroundImage: `url("${magnifiedSrc}")`,
+              backgroundSize: `${HOVER_ZOOM * 100}%`,
+              backgroundPosition: `${lens.x * 100}% ${lens.y * 100}%`,
+            }}
+          />
+        ) : null}
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
-        <DialogContent className="border-border p-2 sm:max-w-3xl sm:p-3" showCloseButton>
+        <DialogContent className="border-border p-2 sm:max-w-4xl sm:p-3" showCloseButton>
           <DialogTitle className="sr-only">{productName}</DialogTitle>
           <div className="relative aspect-square overflow-hidden rounded-xl bg-cream-100">
-            <OptimizedImage src={activeImage} alt={productName} fill className="object-contain" sizes="90vw" />
+            <OptimizedImage
+              src={activeImage}
+              alt={productName}
+              fill
+              className="object-contain"
+              sizes="90vw"
+            />
+
+            {/*
+              The arrows sit ON the picture, at its edges, where the reference
+              puts them and where a hand already is. They were a Previous and a
+              Next button in a row underneath — further to travel, and reading
+              as a form rather than a viewer.
+            */}
+            {images.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => step(-1)}
+                  aria-label="Previous image"
+                  className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-white"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(1)}
+                  aria-label="Next image"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-white"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+              </>
+            ) : null}
           </div>
+
           {/*
-            The zoom showed `activeImage` and nothing else. With one photo that
-            was complete; with several it is a dead end — the customer opens the
-            picture they wanted a closer look at and has to close it to see the
-            next one.
+            The strip, so somebody can go straight to the photo they want rather
+            than stepping through the ones they do not. The zoom showed
+            `activeImage` and nothing else: with one photo that was complete,
+            with several it was a dead end.
           */}
           {images.length > 1 ? (
-            <div className="flex items-center justify-between gap-3 px-1 pb-1">
-              <Button type="button" variant="outline" size="sm" onClick={() => step(-1)}>
-                <ChevronLeft className="size-4" />
-                Previous
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {activeIndex + 1} of {images.length}
-              </span>
-              <Button type="button" variant="outline" size="sm" onClick={() => step(1)}>
-                Next
-                <ChevronRight className="size-4" />
-              </Button>
+            <div className="flex flex-wrap justify-center gap-2 pb-1">
+              {images.map((src, index) => (
+                <button
+                  key={`zoom-${src}-${index}`}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`Show image ${index + 1} of ${images.length} in the viewer`}
+                  aria-current={activeIndex === index}
+                  className={cn(
+                    "relative size-14 overflow-hidden rounded-lg border bg-cream-100 transition-premium",
+                    activeIndex === index
+                      ? "border-bakery-700 ring-2 ring-bakery-200"
+                      : "border-border hover:border-bakery-300"
+                  )}
+                >
+                  <OptimizedImage src={src} alt="" fill className="object-cover" sizes="56px" />
+                </button>
+              ))}
             </div>
           ) : null}
         </DialogContent>
