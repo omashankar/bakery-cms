@@ -172,6 +172,10 @@ export const defaultCommerceSettings: CommerceSettings = {
   giftWrapEnabled: true,
   giftWrapFee: 49,
   giftWrapLabel: "Gift wrap",
+  // Both blank: a shop says these or it does not, and a shipped default
+  // would be this software making a claim on every shop's behalf.
+  productImageNote: "",
+  sameDayCutoff: "",
   paymentMethods: {
     cod: true,
     upi: true,

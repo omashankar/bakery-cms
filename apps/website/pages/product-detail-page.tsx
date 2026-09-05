@@ -41,6 +41,7 @@ import { markReviewHelpfulRequest } from "@/features/reviews/lib/reviews-api";
 import { getHelpfulMarks, rememberHelpfulMark } from "@/features/reviews/lib/helpful-marks";
 import {
   getProductGalleryImages,
+  timeLeftToday,
   getProductReviews,
   getDeliveryTimeSlots,
   getDeliveryPromise,
@@ -431,8 +432,19 @@ export function ProductDetailPage({
    * nothing is hidden: asking is still one click, and it is a click somebody
    * makes on purpose.
    */
-  const [askOpen, setAskOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  /**
+   * The countdown, and why it is null until the browser has it.
+   *
+   * The server has no idea what time it is where the customer is, and a
+   * server-rendered clock would be wrong from the moment it was sent — so
+   * this starts empty and fills in after mount. It also stops on its own
+   * when the cutoff passes, which is the whole point: a timer that has run
+   * out is worse than none, because it is still telling somebody to hurry
+   * for a delivery they can no longer have.
+   */
+  const [timeLeft, setTimeLeft] = useState<string | null>(null);
+
+  const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
 
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
 
@@ -575,6 +587,19 @@ export function ProductDetailPage({
    * mean a link that can assert a size or an option the shop does not sell.
    */
   const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
+
+  useEffect(() => {
+    const cutoff = commerce.sameDayCutoff;
+    // No clearing here: the render is gated on the cutoff as well, so a shop
+    // that empties the field stops showing a countdown without this effect
+    // having to write state to say so.
+    if (!cutoff) return;
+
+    const tick = () => setTimeLeft(timeLeftToday(cutoff, new Date()));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [commerce.sameDayCutoff]);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
@@ -909,6 +934,20 @@ export function ProductDetailPage({
                 productName={cake.name}
                 badge={cake.badge}
               />
+              {/*
+                The shop's own caveat about its own photos.
+
+                A handmade item varies from the picture and a sealed one does
+                not, so this is a claim only the shop can make. Blank until an
+                owner writes it, and nothing is printed while it is — which is
+                the right answer for most trades.
+              */}
+              {commerce.productImageNote ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">NOTE:</span>{" "}
+                  {commerce.productImageNote}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-6">
@@ -1299,6 +1338,14 @@ export function ProductDetailPage({
                 a navigation they can make for themselves; the header cart
                 count and the toast both already point the way.
               */}
+              {/*
+                Under the button, because it is about the button.
+
+                Null until the browser has a clock — the server does not know
+                what time it is where the customer is — and null again the
+                moment the cutoff passes, so it can never sit there having run
+                out.
+              */}
               <div className="hidden flex-wrap gap-3 lg:flex">
                 <Button
                   size="lg"
@@ -1311,6 +1358,11 @@ export function ProductDetailPage({
                   {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
                 </Button>
               </div>
+              {commerce.sameDayCutoff && timeLeft ? (
+                <p className="text-center text-sm font-medium text-bakery-700">
+                  {timeLeft} hours left for today&apos;s delivery
+                </p>
+              ) : null}
 
               {offers.length > 0 ? (
                 <div className="rounded-xl border border-dashed border-bakery-300 bg-white p-4">

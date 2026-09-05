@@ -48,6 +48,17 @@ function validate(settings: CommerceSettings) {
         : prefix.length > 8
           ? "Keep the prefix to 8 characters or fewer."
           : "",
+    /**
+     * The same rule `commerceSchema` applies, checked here too.
+     *
+     * The server refuses anything but `HH:MM` or blank, and a 422 reaches the
+     * owner as "saved on this device only" — which reads as an outage rather
+     * than a typo, and takes the whole commerce section down with it. The
+     * browser's own time input mostly prevents this; mostly is not a rule.
+     */
+    sameDayCutoff: /^$|^([01]\d|2[0-3]):[0-5]\d$/.test(settings.sameDayCutoff.trim())
+      ? ""
+      : "Use a 24-hour time such as 17:00, or leave it empty.",
   };
 }
 
@@ -272,6 +283,51 @@ export function CommerceSettingsPage() {
                     }
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">What the product page says</CardTitle>
+              <CardDescription>
+                Two lines the shop can add to every product page. Both are blank
+                until you write them, and nothing is printed while they are.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="productImageNote">Note under the photo</Label>
+                <Input
+                  id="productImageNote"
+                  value={settings.productImageNote}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, productImageNote: e.target.value }))
+                  }
+                  placeholder="Design and icing may vary from the image shown"
+                />
+                <p className="text-xs text-muted-foreground">
+                  For anything made by hand, where the photo is a likeness rather
+                  than the exact item. Leave it blank for anything sold sealed.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sameDayCutoff">Same-day orders close at</Label>
+                <Input
+                  id="sameDayCutoff"
+                  type="time"
+                  value={settings.sameDayCutoff}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, sameDayCutoff: e.target.value }))
+                  }
+                  aria-invalid={Boolean(errors.sameDayCutoff)}
+                />
+                <FieldError id="sameDayCutoff-error" message={errors.sameDayCutoff} />
+                <p className="text-xs text-muted-foreground">
+                  Shows a countdown on the product page until this time each day.
+                  Leave it empty if you do not promise same-day delivery — a timer
+                  with nothing behind it is pressure, not information.
+                </p>
               </div>
             </CardContent>
           </Card>

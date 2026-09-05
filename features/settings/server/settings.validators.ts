@@ -197,6 +197,19 @@ export const commerceSchema = z.object({
   giftWrapEnabled: z.boolean(),
   giftWrapFee: nonNegative,
   giftWrapLabel: z.string().default(""),
+  productImageNote: z.string().default(""),
+  /**
+   * `HH:MM` on a 24-hour clock, or blank.
+   *
+   * Validated rather than trusted: this drives a countdown a customer decides
+   * on, and "5pm" or "17:70" would either render nothing or count towards a
+   * time that does not exist.
+   */
+  sameDayCutoff: z
+    .string()
+    .trim()
+    .regex(/^$|^([01]\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time such as 17:00")
+    .default(""),
   paymentMethods: z.object({
     cod: z.boolean(),
     upi: z.boolean(),

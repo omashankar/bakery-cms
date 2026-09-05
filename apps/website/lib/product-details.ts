@@ -42,6 +42,30 @@ export interface ProductReview {
  * Still never padded. A gallery filled out with stock photos is a picture of
  * something the customer is not buying.
  */
+/**
+ * How long is left before same-day orders close, as `HH:MM:SS`.
+ *
+ * A pure function of the cutoff and the clock, so the arithmetic can be
+ * tested without waiting for a second to pass. Null means say nothing, and
+ * there are three ways to get it: the shop has named no cutoff, the string is
+ * not a time, or today's has already gone. That last one matters most — a
+ * countdown that has run out is worse than none, because it is still on the
+ * page telling a customer to hurry for a delivery they can no longer have.
+ */
+export function timeLeftToday(cutoff: string, now: Date): string | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(cutoff.trim());
+  if (!match) return null;
+
+  const closes = new Date(now);
+  closes.setHours(Number(match[1]), Number(match[2]), 0, 0);
+
+  const seconds = Math.floor((closes.getTime() - now.getTime()) / 1000);
+  if (seconds <= 0) return null;
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+}
+
 export function getProductGalleryImages(cake: LandingProduct): string[] {
   const stored = (cake.images ?? [])
     .map((url) => (typeof url === "string" ? url.trim() : ""))

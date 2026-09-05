@@ -128,6 +128,24 @@ export interface CommerceSettings {
   giftWrapEnabled: boolean;
   giftWrapFee: number;
   giftWrapLabel: string;
+  /**
+   * One line under every product photo, in the shop's own words.
+   *
+   * "Design and icing may vary from the image shown" is the thing a shop that
+   * makes each item by hand needs to say, and it is a claim only the shop can
+   * make — a handmade cake varies, a sealed charger does not. Blank means
+   * nothing is printed, which is the right answer for most trades.
+   */
+  productImageNote: string;
+  /**
+   * When same-day orders close, as `HH:MM` on a 24-hour clock.
+   *
+   * Drives the countdown under Add to Cart. Blank means the shop has not said,
+   * and nothing counts down — a timer with no cutoff behind it is a pressure
+   * tactic rather than information, and this is the one place on the page a
+   * customer is most likely to act on what it says.
+   */
+  sameDayCutoff: string;
   paymentMethods: PaymentMethodSettings;
 }
 
