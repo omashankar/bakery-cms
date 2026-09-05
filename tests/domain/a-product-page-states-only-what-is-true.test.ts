@@ -538,7 +538,7 @@ describe("the page does not call every product a cake", () => {
     });
     try {
       expect(html).not.toContain("without eggs");
-      expect(html).not.toContain("Upload your photo");
+      expect(html).not.toContain("Upload photo and write name");
     } finally {
       unmount();
     }
@@ -552,7 +552,7 @@ describe("the page does not call every product a cake", () => {
       allowsPhotoUpload: true,
     });
     try {
-      expect(html).toContain("Upload your photo");
+      expect(html).toContain("Upload photo and write name");
     } finally {
       unmount();
     }

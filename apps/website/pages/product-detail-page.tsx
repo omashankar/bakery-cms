@@ -7,6 +7,7 @@ import {
   Check,
   Gift,
   Heart,
+  ImageUp,
   Leaf,
   Share2,
   Tag,
@@ -19,6 +20,11 @@ import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import type { ProductVariantGroup } from "@/types/product";
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
+import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
+import {
+  emptyPhotoPrintDraft,
+  type PhotoPrintDraft,
+} from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
@@ -286,6 +292,19 @@ export function ProductDetailPage({
   /** The uploaded photo's URL, once the shop has it. Empty until then. */
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
+  /**
+   * The editor's working copy: the customer's own file, and where they have
+   * put it in the frame.
+   *
+   * It lives on the PAGE rather than inside the dialog because a closed
+   * dialog's content is unmounted — so somebody who pressed Change to nudge
+   * the zoom would find their photograph gone and every slider back at the
+   * start. What crosses to the shop is neither of these: it is the flattened
+   * frame the editor paints from them.
+   */
+  const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoDraft, setPhotoDraft] = useState<PhotoPrintDraft>(emptyPhotoPrintDraft);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -735,7 +754,7 @@ export function ProductDetailPage({
    * was chosen, which was true about the browser and false about everything
    * else. Nothing is claimed here until the server answers with a URL.
    */
-  async function handlePhotoUpload(file: File) {
+  async function handlePhotoUpload(file: File): Promise<boolean> {
     /**
      * No sign-in gate. This asked for a phone number and an OTP the moment
      * somebody pressed Upload — before they had bought anything, on the one
@@ -756,21 +775,42 @@ export function ProductDetailPage({
         | null;
 
       if (!res.ok || !parsed?.data?.url) {
-        setPhotoUrl("");
+        /*
+          The photo already attached is LEFT ALONE.
+
+          This cleared it, so a customer who pressed Change, picked a new
+          photograph and hit a flaky connection lost the one they already
+          had — for a change they never completed. A failed replacement is
+          not a removal.
+        */
         toast.error(parsed?.message ?? "Could not upload that photo");
-        return;
+        return false;
       }
 
       setPhotoUrl(parsed.data.url);
       toast.success("Photo attached");
+      return true;
     } catch {
-      setPhotoUrl("");
       toast.error("Could not reach the shop", {
         description: "Please check your connection and try again.",
       });
+      return false;
     } finally {
       setPhotoUploading(false);
     }
+  }
+
+  /**
+   * The finished frame, on its way to the shop.
+   *
+   * The editor hands over a flattened JPEG and this puts it through the same
+   * upload the file input used. The dialog closes only once the shop
+   * actually has it — a failure leaves it open with the photograph and the
+   * name still in place, so the customer tries again rather than starts
+   * again.
+   */
+  async function handlePhotoReady(file: File) {
+    if (await handlePhotoUpload(file)) setPhotoEditorOpen(false);
   }
 
   const handleAddToCart = (redirectToCart = false) => {
@@ -809,7 +849,18 @@ export function ProductDetailPage({
       // option — one place, which is what `cartLineChoices` was written for.
       // The field stays on the type because ORDERS ALREADY PLACED carry it.
       message: message.trim() || undefined,
-      photoUrl: photoUrl || undefined,
+      /*
+        Gated the way `weight` above it is gated, and for the same reason.
+
+        `showPhotoUpload` is not only the module switch — it follows the
+        VARIANT too: a shop's photo group ships as “Standard design” (+0) and
+        “Custom photo print” (+₹250). Somebody who picked the paid one,
+        uploaded a photograph, then thought better of the money and switched
+        back made the whole control disappear — and this line put the photo on
+        the cart line anyway. The kitchen got something to print on an order
+        that was never charged for it.
+      */
+      photoUrl: (showPhotoUpload && photoUrl) || undefined,
       deliveryDate,
       deliveryTime,
       // Only the groups the customer could see. `calculateVariantAdjustment`
@@ -1251,20 +1302,44 @@ export function ProductDetailPage({
               */}
               {showPhotoUpload ? (
                 <div className="space-y-2" data-gate-photo>
-                  <Label htmlFor="photo-upload">Upload your photo</Label>
-                  <Input
-                    id="photo-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={photoUploading}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      // The input is cleared either way, so choosing the same
-                      // file again after a failure still fires a change.
-                      event.target.value = "";
-                      if (file) void handlePhotoUpload(file);
-                    }}
-                  />
+                  {/*
+                    ONE control, and it opens an editor.
+
+                    It was a bare file input: whatever the camera produced
+                    went to the shop at whatever crop, and nobody — customer
+                    or baker — saw what would be printed until it was. A
+                    round print area cuts the corners off a rectangular
+                    photograph, so the customer is the only person who can
+                    say which corners are the expendable ones.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => setPhotoEditorOpen(true)}
+                    className="flex w-full items-center gap-3 rounded-md border border-input bg-card px-3 py-2.5 text-left transition-premium hover:border-bakery-300"
+                  >
+                    {photoUrl ? (
+                      <>
+                        <span className="relative size-9 shrink-0 overflow-hidden rounded-full border border-border">
+                          <OptimizedImage
+                            src={photoUrl}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="36px"
+                          />
+                        </span>
+                        <span className="text-sm font-medium">Photo added</span>
+                        <span className="ml-auto text-sm font-medium text-bakery-700">
+                          Change photo or name
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <ImageUp className="size-5 shrink-0 text-bakery-700" />
+                        <span className="text-sm font-medium">Upload photo and write name</span>
+                      </>
+                    )}
+                  </button>
                   {photoUploading ? (
                     <p className="text-xs text-muted-foreground">Uploading your photo…</p>
                   ) : photoUrl ? (
@@ -1274,9 +1349,22 @@ export function ProductDetailPage({
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      JPEG, PNG or WebP, up to 6 MB.
+                      Fit it in the frame, and add a name if you want one.
                     </p>
                   )}
+
+                  <PhotoPrintEditor
+                    open={photoEditorOpen}
+                    onOpenChange={setPhotoEditorOpen}
+                    file={photoFile}
+                    onFileChange={setPhotoFile}
+                    draft={photoDraft}
+                    onDraftChange={setPhotoDraft}
+                    busy={photoUploading}
+                    attachedUrl={photoUrl}
+                    onUse={(chosen) => void handlePhotoReady(chosen)}
+                    onProblem={(problem) => toast.error(problem)}
+                  />
                 </div>
               ) : null}
 

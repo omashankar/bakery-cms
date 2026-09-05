@@ -227,8 +227,21 @@ describe("the photo a photo cake is printed with", () => {
     expect(claim).toBeGreaterThan(body.indexOf("setPhotoUrl(parsed.data.url)"));
   });
 
-  it("travels with the line the customer added", () => {
+  it("travels with the line the customer added, and only while it is offered", () => {
+    /**
+     * The gate is half of this now.
+     *
+     * `showPhotoUpload` follows the photo VARIANT as well as the module, so a
+     * customer who picked “Custom photo print”, uploaded, and then switched
+     * back to the free option hid the whole control while the URL stayed in
+     * state — and an ungated line sent the kitchen a photo to print on an
+     * order that was never charged for one. The same shape as the `weight`
+     * bug two lines above it in the same object.
+     */
     const handler = page.slice(page.indexOf("const handleAddToCart"));
-    expect(handler.slice(0, handler.indexOf("toast.success"))).toContain("photoUrl: photoUrl");
+    const body = handler.slice(0, handler.indexOf("toast.success"));
+
+    expect(body).toContain("photoUrl: (showPhotoUpload && photoUrl) || undefined");
+    expect(body).not.toContain("photoUrl: photoUrl || undefined");
   });
 });
