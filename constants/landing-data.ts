@@ -3,7 +3,11 @@
  */
 
 import { demoPhotoIds, unsplash } from "./demo-images";
-import type { ProductAttribute, ProductVariantGroup } from "@/types/product";
+import type {
+  PhotoFrameShapeId,
+  ProductAttribute,
+  ProductVariantGroup,
+} from "@/types/product";
 
 export interface LandingProduct {
   id: string;
@@ -36,6 +40,7 @@ export interface LandingProduct {
   shapes?: string[];
   allowsMessage?: boolean;
   allowsPhotoUpload?: boolean;
+  photoFrameShape?: PhotoFrameShapeId;
   ingredients?: string;
   weights?: Array<{ label: string; price: number; serves?: string }>;
   /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */

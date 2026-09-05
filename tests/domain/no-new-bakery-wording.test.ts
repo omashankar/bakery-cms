@@ -39,6 +39,13 @@ const SCANNED = [
   "features/media/lib",
   "app",
   "lib/admin-breadcrumbs.ts",
+  /**
+   * The photo-print layout keeps BOTH sides' words: the refusals a customer
+   * reads ("That photo is too large") and the outline names a shop picks from
+   * ("Round", "Square", "Heart"). It sits in lib/ because it is geometry, not
+   * because it is invisible.
+   */
+  "lib/images",
 ];
 
 /**
@@ -274,3 +281,4 @@ describe("no new bakery wording on a shop surface", () => {
     expect(codeLines(source).map((entry) => entry.number)).toEqual([1, 5]);
   });
 });
+

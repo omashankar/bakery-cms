@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ImageUp, RotateCcw } from "lucide-react";
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
@@ -20,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   charactersLeft,
   emptyPhotoPrintDraft,
+  frameShape,
+  frameSize,
   MAX_CHOSEN_BYTES,
   NAME_LIMIT,
   OUTPUT_PX,
@@ -30,6 +32,7 @@ import {
   PREVIEW_PX,
   type PhotoPrintDraft,
 } from "@/lib/images/photo-print-layout";
+import type { PhotoFrameShapeId } from "@/types/product";
 import { cn } from "@/lib/utils";
 
 interface PhotoPrintEditorProps {
@@ -40,6 +43,13 @@ interface PhotoPrintEditorProps {
   onFileChange: (file: File | null) => void;
   draft: PhotoPrintDraft;
   onDraftChange: (draft: PhotoPrintDraft) => void;
+  /**
+   * The outline this product is printed inside, as the shop set it.
+   *
+   * Absent means round — what every photo product printed before there was
+   * a choice — so a shop that never opens the new picker sees no change.
+   */
+  shape?: PhotoFrameShapeId;
   /** True while the shop is being sent the finished frame. */
   busy: boolean;
   /** Hand over the flattened frame. The caller uploads it and closes this. */
@@ -87,6 +97,7 @@ export function PhotoPrintEditor({
   onFileChange,
   draft,
   onDraftChange,
+  shape,
   busy,
   attachedUrl,
   onUse,
@@ -118,6 +129,13 @@ export function PhotoPrintEditor({
     null,
   );
   const image = decoded && decoded.file === file ? decoded.element : null;
+  const outline = frameShape(shape);
+  /**
+   * Memoised so the paint effect can depend on the BOX rather than on its two
+   * numbers. A fresh object every render would repaint the canvas on every
+   * keystroke in the name field, at 512 square, for no change at all.
+   */
+  const previewBox = useMemo(() => frameSize(outline, PREVIEW_PX), [outline]);
   /**
    * Painting and encoding 2400 square takes a moment, and `busy` is a whole
    * async hop away.
@@ -184,8 +202,17 @@ export function PhotoPrintEditor({
     // jsdom has no canvas, and neither does a browser that has run out of
     // contexts. Nothing here is worth throwing over.
     if (!context) return;
-    paintPhotoFrame(context, PREVIEW_PX, image, draft);
-  }, [canvas, image, draft]);
+    paintPhotoFrame(
+      context,
+      // `guide` is the one thing the preview has that the file must not:
+      // everything outside the outline is white, and so is the page, so
+      // without a cut line a round print and a square one look identical
+      // and nobody can see which corners they are losing.
+      { ...previewBox, shape: outline, guide: true },
+      image,
+      draft,
+    );
+  }, [canvas, image, draft, previewBox, outline]);
 
   const patch = (change: Partial<PhotoPrintDraft>) => onDraftChange({ ...draft, ...change });
 
@@ -223,9 +250,10 @@ export function PhotoPrintEditor({
   async function flatten() {
     if (latch.current || working) return;
 
+    const printBox = frameSize(outline, OUTPUT_PX);
     const sheet = document.createElement("canvas");
-    sheet.width = OUTPUT_PX;
-    sheet.height = OUTPUT_PX;
+    sheet.width = printBox.width;
+    sheet.height = printBox.height;
     const context = sheet.getContext("2d");
     if (!context || !image) {
       onProblem("This browser could not prepare the photo. Please try another one.");
@@ -245,7 +273,7 @@ export function PhotoPrintEditor({
   /** The painting half, split out so the latch above has a clean finally. */
   async function paint(sheet: HTMLCanvasElement, context: FramePainter) {
     if (!image) return;
-    paintPhotoFrame(context, OUTPUT_PX, image, draft);
+    paintPhotoFrame(context, { ...frameSize(outline, OUTPUT_PX), shape: outline }, image, draft);
 
     const encode = (quality: number) =>
       new Promise<Blob | null>((resolve) => {
@@ -294,11 +322,19 @@ export function PhotoPrintEditor({
             — and rounding the box is how the customer sees the part that
             survives rather than the part that does not.
           */}
-          <div className="relative mx-auto mb-5 aspect-square w-full max-w-sm overflow-hidden rounded-full border border-border bg-white sm:mb-0">
+          {/*
+            The box takes the PRINT's proportions, so an upright frame is
+            upright here too. The outline itself is drawn on the canvas —
+            rounding the box instead only worked while every print was round.
+          */}
+          <div
+            className="relative mx-auto mb-5 w-full max-w-sm overflow-hidden rounded-lg border border-border bg-white sm:mb-0"
+            style={{ aspectRatio: `${previewBox.width} / ${previewBox.height}` }}
+          >
             <canvas
               ref={setCanvas}
-              width={PREVIEW_PX}
-              height={PREVIEW_PX}
+              width={previewBox.width}
+              height={previewBox.height}
               className="h-full w-full"
               aria-label="Preview of what will be printed"
               role="img"

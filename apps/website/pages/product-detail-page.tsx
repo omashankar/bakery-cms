@@ -1360,6 +1360,7 @@ export function ProductDetailPage({
                     onFileChange={setPhotoFile}
                     draft={photoDraft}
                     onDraftChange={setPhotoDraft}
+                    shape={cake.photoFrameShape}
                     busy={photoUploading}
                     attachedUrl={photoUrl}
                     onUse={(chosen) => void handlePhotoReady(chosen)}
@@ -1904,3 +1905,4 @@ export function ProductDetailPage({
     </>
   );
 }
+

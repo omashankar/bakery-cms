@@ -3,6 +3,16 @@ import type { BaseEntity, EntityStatus, SeoFields } from "./common";
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
 /**
+ * The outlines a customer photograph can be printed inside.
+ *
+ * Declared here rather than beside the drawing code because it is a fact
+ * about the PRODUCT: it crosses the Mongoose schema, the validator, the
+ * storefront mapper and the admin form, and only then reaches a canvas.
+ * `lib/images/photo-print-layout` holds the geometry for each one.
+ */
+export type PhotoFrameShapeId = "circle" | "square" | "heart";
+
+/**
  * `shape` joined these when the flat `shapes: string[]` was retired.
  *
  * That list held NAMES with nowhere to put a price, so a shop could say a cake
@@ -121,6 +131,15 @@ export interface Product extends BaseEntity, ProductDetails {
   lowStockThreshold?: number;
   allowsMessage: boolean;
   allowsPhotoUpload: boolean;
+  /**
+   * Which shape the customer's photograph is printed in.
+   *
+   * A print area is GEOMETRY — the browser has to clip to it — so unlike a
+   * size or an option label the shop picks from a list rather than typing its
+   * own. Absent means round, which is what every photo product printed before
+   * there was a choice.
+   */
+  photoFrameShape?: PhotoFrameShapeId;
   ingredients?: string;
   variantGroups: ProductVariantGroup[];
   /** Owner-defined facts. See ProductAttribute — never a choice, never priced. */
@@ -155,3 +174,4 @@ export interface ProductOccasion extends BaseEntity {
 }
 
 export type ProductFormData = Omit<Product, "id" | "createdAt" | "updatedAt">;
+

@@ -86,6 +86,17 @@ export const productFormSchema = z
     lowStockThreshold: z.number().min(0).optional(),
     allowsMessage: z.boolean(),
     allowsPhotoUpload: z.boolean(),
+    /**
+     * Optional, unlike the three booleans around it.
+     *
+     * Those are required, so every product literal in the app and in the
+     * suite already carries them. A required seventh would 400 every import,
+     * seed and API client written before today for a field whose absence has
+     * a perfectly good meaning.
+     */
+    photoFrameShape: z
+      .enum(["circle", "square", "heart"])
+      .optional(),
     ingredients: z.string().optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
     attributes: z.array(attributeSchema).max(40).default([]),
@@ -102,3 +113,4 @@ export const productFormSchema = z
   .passthrough();
 
 export type ProductFormInput = z.infer<typeof productFormSchema>;
+

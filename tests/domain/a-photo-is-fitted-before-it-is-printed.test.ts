@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +10,9 @@ import { Slider } from "@/components/ui/slider";
 import {
   charactersLeft,
   emptyPhotoPrintDraft,
+  frameShape,
+  frameSize,
+  PHOTO_FRAME_SHAPES,
   NAME_LIMIT,
   namePlacement,
   OUTPUT_PX,
@@ -37,6 +43,14 @@ import {
  * lettering is flattened into the image before it leaves the browser.
  */
 
+/** A square frame of side n, which is what most of these cases want. */
+const box = (side: number) => ({ width: side, height: side });
+/** …and the round outline inside it, the shape a product has by default. */
+const round = (side: number) => ({ ...box(side), shape: frameShape("circle") });
+
+const ADMIN_FORM = "apps/admin/products/components/product-form-page.tsx";
+const MODULES_PAGE = "apps/admin/settings/components/modules-settings-page.tsx";
+
 const SQUARE = { width: 1000, height: 1000 };
 const LANDSCAPE = { width: 2000, height: 1000 };
 const PORTRAIT = { width: 1000, height: 2500 };
@@ -50,7 +64,7 @@ describe("fitting a photograph to a round frame", () => {
      */
     const frame = 400;
     for (const image of [SQUARE, LANDSCAPE, PORTRAIT]) {
-      const placed = photoPlacement(image, frame, emptyPhotoPrintDraft);
+      const placed = photoPlacement(image, box(frame), emptyPhotoPrintDraft);
       expect(Math.min(placed.width, placed.height)).toBeCloseTo(frame, 6);
       expect(Math.max(placed.width, placed.height)).toBeGreaterThanOrEqual(frame);
     }
@@ -58,21 +72,21 @@ describe("fitting a photograph to a round frame", () => {
 
   it("keeps the photograph's own proportions", () => {
     // A face squashed to fit is worse than a face cropped to fit.
-    const placed = photoPlacement(LANDSCAPE, 400, emptyPhotoPrintDraft);
+    const placed = photoPlacement(LANDSCAPE, box(400), emptyPhotoPrintDraft);
     expect(placed.width / placed.height).toBeCloseTo(2, 6);
   });
 
   it("zooms from the fitted size, not from the pixel size", () => {
-    const one = photoPlacement(PORTRAIT, 400, emptyPhotoPrintDraft);
-    const two = photoPlacement(PORTRAIT, 400, { ...emptyPhotoPrintDraft, zoom: 2 });
+    const one = photoPlacement(PORTRAIT, box(400), emptyPhotoPrintDraft);
+    const two = photoPlacement(PORTRAIT, box(400), { ...emptyPhotoPrintDraft, zoom: 2 });
     expect(two.width).toBeCloseTo(one.width * 2, 6);
     expect(two.height).toBeCloseTo(one.height * 2, 6);
   });
 
   it("moves the photograph by half the frame at each end of the slider", () => {
     const frame = 400;
-    const right = photoPlacement(SQUARE, frame, { ...emptyPhotoPrintDraft, offsetX: 1 });
-    const down = photoPlacement(SQUARE, frame, { ...emptyPhotoPrintDraft, offsetY: -1 });
+    const right = photoPlacement(SQUARE, box(frame), { ...emptyPhotoPrintDraft, offsetX: 1 });
+    const down = photoPlacement(SQUARE, box(frame), { ...emptyPhotoPrintDraft, offsetY: -1 });
 
     expect(right.centreX).toBeCloseTo(frame / 2 + frame / 2, 6);
     expect(right.centreY).toBeCloseTo(frame / 2, 6);
@@ -81,14 +95,14 @@ describe("fitting a photograph to a round frame", () => {
 
   it("turns degrees into radians the way a canvas wants them", () => {
     expect(
-      photoPlacement(SQUARE, 400, { ...emptyPhotoPrintDraft, rotation: 90 }).radians,
+      photoPlacement(SQUARE, box(400), { ...emptyPhotoPrintDraft, rotation: 90 }).radians,
     ).toBeCloseTo(Math.PI / 2, 9);
   });
 
   it("answers zero rather than NaN for an image with no size", () => {
     // Reachable: a file that decodes to nothing, and a stub in a test. NaN would
     // reach `drawImage` and silently paint an empty frame with no error.
-    const placed = photoPlacement({ width: 0, height: 0 }, 400, emptyPhotoPrintDraft);
+    const placed = photoPlacement({ width: 0, height: 0 }, box(400), emptyPhotoPrintDraft);
     expect(placed.width).toBe(0);
     expect(Number.isNaN(placed.height)).toBe(false);
   });
@@ -119,8 +133,8 @@ describe("the preview is the printed file, drawn smaller", () => {
   const ratio = OUTPUT_PX / 512;
 
   it("places the photograph at the same fraction of either frame", () => {
-    const small = photoPlacement(PORTRAIT, 512, busy);
-    const large = photoPlacement(PORTRAIT, OUTPUT_PX, busy);
+    const small = photoPlacement(PORTRAIT, box(512), busy);
+    const large = photoPlacement(PORTRAIT, box(OUTPUT_PX), busy);
 
     expect(large.centreX).toBeCloseTo(small.centreX * ratio, 6);
     expect(large.centreY).toBeCloseTo(small.centreY * ratio, 6);
@@ -130,8 +144,8 @@ describe("the preview is the printed file, drawn smaller", () => {
   });
 
   it("places the lettering at the same fraction of either frame", () => {
-    const small = namePlacement(512, busy);
-    const large = namePlacement(OUTPUT_PX, busy);
+    const small = namePlacement(box(512), busy);
+    const large = namePlacement(box(OUTPUT_PX), busy);
 
     expect(large.x).toBeCloseTo(small.x * ratio, 6);
     expect(large.y).toBeCloseTo(small.y * ratio, 6);
@@ -143,12 +157,12 @@ describe("the preview is the printed file, drawn smaller", () => {
 describe("how the name is set", () => {
   it("sizes the lettering against the frame, not in fixed points", () => {
     // 14pt is a caption on the preview and a speck on the printed sheet.
-    expect(namePlacement(400, { ...emptyPhotoPrintDraft, nameSize: 0.1 }).fontSize).toBeCloseTo(40);
+    expect(namePlacement(box(400), { ...emptyPhotoPrintDraft, nameSize: 0.1 }).fontSize).toBeCloseTo(40);
   });
 
   it("says bold and italic in the one string a canvas understands", () => {
-    const plain = namePlacement(400, { ...emptyPhotoPrintDraft, bold: false, italic: false }).font;
-    const both = namePlacement(400, { ...emptyPhotoPrintDraft, bold: true, italic: true }).font;
+    const plain = namePlacement(box(400), { ...emptyPhotoPrintDraft, bold: false, italic: false }).font;
+    const both = namePlacement(box(400), { ...emptyPhotoPrintDraft, bold: true, italic: true }).font;
 
     expect(plain).toContain("400 ");
     expect(plain).not.toContain("italic");
@@ -160,15 +174,15 @@ describe("how the name is set", () => {
     // The same units as the photo sliders, so the two halves of this editor
     // do not need learning separately.
     const frame = 400;
-    expect(namePlacement(frame, { ...emptyPhotoPrintDraft, nameX: 1, nameY: 0 }).x).toBeCloseTo(
+    expect(namePlacement(box(frame), { ...emptyPhotoPrintDraft, nameX: 1, nameY: 0 }).x).toBeCloseTo(
       400,
       6,
     );
-    expect(namePlacement(frame, { ...emptyPhotoPrintDraft, nameX: 0, nameY: -1 }).y).toBeCloseTo(
+    expect(namePlacement(box(frame), { ...emptyPhotoPrintDraft, nameX: 0, nameY: -1 }).y).toBeCloseTo(
       0,
       6,
     );
-    expect(namePlacement(frame, { ...emptyPhotoPrintDraft, nameX: 0, nameY: 0 }).x).toBeCloseTo(
+    expect(namePlacement(box(frame), { ...emptyPhotoPrintDraft, nameX: 0, nameY: 0 }).x).toBeCloseTo(
       200,
       6,
     );
@@ -176,7 +190,7 @@ describe("how the name is set", () => {
 
   it("tilts the lettering by the degrees the slider says", () => {
     expect(
-      namePlacement(400, { ...emptyPhotoPrintDraft, nameRotation: -90 }).radians,
+      namePlacement(box(400), { ...emptyPhotoPrintDraft, nameRotation: -90 }).radians,
     ).toBeCloseTo(-Math.PI / 2, 9);
   });
 
@@ -190,7 +204,7 @@ describe("how the name is set", () => {
      * this is here to keep out.
      */
     const shipped = ["Georgia", '"Times New Roman"', "serif"];
-    const families = namePlacement(400, emptyPhotoPrintDraft)
+    const families = namePlacement(box(400), emptyPhotoPrintDraft)
       .font.replace(/^.*?\d+(?:\.\d+)?px /, "")
       .split(",")
       .map((family) => family.trim());
@@ -246,6 +260,13 @@ describe("what gets painted, and in what order", () => {
       restore: () => calls.push("restore"),
       beginPath: () => calls.push("beginPath"),
       arc: (x: number, y: number, r: number) => calls.push(`arc:${x},${y},${r}`),
+      rect: (x: number, y: number, w: number, h: number) => calls.push(`rect:${x},${y},${w},${h}`),
+      moveTo: (x: number, y: number) => calls.push(`moveTo:${x},${y}`),
+      lineTo: (x: number, y: number) => calls.push(`lineTo:${x},${y}`),
+      quadraticCurveTo: () => calls.push("quad"),
+      bezierCurveTo: () => calls.push("bezier"),
+      closePath: () => calls.push("closePath"),
+      stroke: () => calls.push("stroke"),
       clip: () => calls.push("clip"),
       translate: (x: number, y: number) => calls.push(`translate:${x},${y}`),
       rotate: (a: number) => calls.push(`rotate:${a.toFixed(4)}`),
@@ -255,6 +276,8 @@ describe("what gets painted, and in what order", () => {
         calls.push(`drawImage:${dx.toFixed(1)},${dy.toFixed(1)},${dw.toFixed(1)},${dh.toFixed(1)}`),
       fillText: (text: string) => calls.push(`fillText:${text}`),
       fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 0,
       font: "",
       textAlign: "start" as CanvasTextAlign,
       textBaseline: "alphabetic" as CanvasTextBaseline,
@@ -271,7 +294,7 @@ describe("what gets painted, and in what order", () => {
      * not get printed — and white is what that is.
      */
     const { painter, calls, state } = recorder();
-    paintPhotoFrame(painter, 400, SQUARE, emptyPhotoPrintDraft);
+    paintPhotoFrame(painter, round(400), SQUARE, emptyPhotoPrintDraft);
 
     expect(calls).toContain("fillRect:0,0,400,400");
     expect(at(calls, "fillRect")).toBeLessThan(at(calls, "clip"));
@@ -280,7 +303,7 @@ describe("what gets painted, and in what order", () => {
 
   it("clips to the circle the frame contains", () => {
     const { painter, calls } = recorder();
-    paintPhotoFrame(painter, 400, SQUARE, emptyPhotoPrintDraft);
+    paintPhotoFrame(painter, round(400), SQUARE, emptyPhotoPrintDraft);
 
     expect(calls).toContain("arc:200,200,200");
     expect(at(calls, "arc")).toBeLessThan(at(calls, "clip"));
@@ -290,7 +313,7 @@ describe("what gets painted, and in what order", () => {
 
   it("draws the photograph centred on its own middle", () => {
     const { painter, calls } = recorder();
-    paintPhotoFrame(painter, 400, LANDSCAPE, emptyPhotoPrintDraft);
+    paintPhotoFrame(painter, round(400), LANDSCAPE, emptyPhotoPrintDraft);
 
     expect(calls).toContain("translate:200,200");
     // 2000x1000 covering a 400 frame is 800x400, drawn from -400,-200.
@@ -301,7 +324,7 @@ describe("what gets painted, and in what order", () => {
     // The dialog opens before anything is picked, and an unpainted canvas is a
     // grey rectangle that reads as broken.
     const { painter, calls } = recorder();
-    paintPhotoFrame(painter, 400, null, emptyPhotoPrintDraft);
+    paintPhotoFrame(painter, round(400), null, emptyPhotoPrintDraft);
 
     expect(calls).toContain("fillRect:0,0,400,400");
     expect(at(calls, "drawImage")).toBe(-1);
@@ -309,7 +332,7 @@ describe("what gets painted, and in what order", () => {
 
   it("puts the lettering over the photograph, not under it", () => {
     const { painter, calls } = recorder();
-    paintPhotoFrame(painter, 400, SQUARE, { ...emptyPhotoPrintDraft, name: "Manisha" });
+    paintPhotoFrame(painter, round(400), SQUARE, { ...emptyPhotoPrintDraft, name: "Manisha" });
 
     expect(calls).toContain("fillText:Manisha");
     expect(at(calls, "drawImage")).toBeLessThan(at(calls, "fillText"));
@@ -317,14 +340,14 @@ describe("what gets painted, and in what order", () => {
 
   it("writes nothing at all when no name was typed", () => {
     const { painter, calls } = recorder();
-    paintPhotoFrame(painter, 400, SQUARE, { ...emptyPhotoPrintDraft, name: "   " });
+    paintPhotoFrame(painter, round(400), SQUARE, { ...emptyPhotoPrintDraft, name: "   " });
 
     expect(at(calls, "fillText")).toBe(-1);
   });
 
   it("uses the colour the customer picked", () => {
     const { painter, state } = recorder();
-    paintPhotoFrame(painter, 400, SQUARE, {
+    paintPhotoFrame(painter, round(400), SQUARE, {
       ...emptyPhotoPrintDraft,
       name: "Manisha",
       colour: "#123456",
@@ -560,6 +583,7 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
   interface Paint {
     /** The backing store the paint went to, read at the moment it started. */
     width: number;
+    height: number;
     calls: string[];
   }
 
@@ -577,6 +601,13 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
       restore: () => calls.push("restore"),
       beginPath: () => calls.push("beginPath"),
       arc: (x: number, y: number, r: number) => calls.push(`arc:${x},${y},${r}`),
+      rect: (x: number, y: number, w: number, h: number) => calls.push(`rect:${x},${y},${w},${h}`),
+      moveTo: (x: number, y: number) => calls.push(`moveTo:${x},${y}`),
+      lineTo: (x: number, y: number) => calls.push(`lineTo:${x},${y}`),
+      quadraticCurveTo: () => calls.push("quad"),
+      bezierCurveTo: () => calls.push("bezier"),
+      closePath: () => calls.push("closePath"),
+      stroke: () => calls.push("stroke"),
       clip: () => calls.push("clip"),
       translate: (x: number, y: number) => calls.push(`translate:${x},${y}`),
       rotate: (a: number) => calls.push(`rotate:${a.toFixed(4)}`),
@@ -586,6 +617,8 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
         calls.push(`drawImage:${dx.toFixed(1)},${dy.toFixed(1)},${dw.toFixed(1)},${dh.toFixed(1)}`),
       fillText: (text: string) => calls.push(`fillText:${text}`),
       fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 0,
       font: "",
       textAlign: "start",
       textBaseline: "alphabetic",
@@ -594,7 +627,7 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
 
   beforeAll(() => {
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement) {
-      const paint: Paint = { width: this.width, calls: [] };
+      const paint: Paint = { width: this.width, height: this.height, calls: [] };
       paints.push(paint);
       return recorder(paint.calls);
     } as never;
@@ -747,7 +780,7 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
 
     expect(paints.length).toBeGreaterThan(1);
     for (const paint of paints) {
-      expect(paint.calls).toContain(`fillRect:0,0,${paint.width},${paint.width}`);
+      expect(paint.calls).toContain(`fillRect:0,0,${paint.width},${paint.height}`);
     }
     // …and the two canvases really are the two different sizes.
     expect(paints.map((paint) => paint.width)).toContain(PREVIEW_PX);
@@ -764,10 +797,59 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
 
     const printed = paints.find((paint) => paint.width === OUTPUT_PX);
     expect(printed?.calls).toContain(`fillRect:0,0,${OUTPUT_PX},${OUTPUT_PX}`);
+    // …and no cut line: a guide printed on a cake is a mistake.
+    expect(printed?.calls).not.toContain("stroke");
     expect(printed?.calls).toContain("fillText:Manisha");
     // The LIVE draft, not a default: zoom 1.6 of a 1200x900 photo in a 2400
     // frame is 5120x3840.
     expect(printed?.calls).toContain("drawImage:-2560.0,-1920.0,5120.0,3840.0");
+  });
+
+  it("cuts the file to the shape the shop chose, not always to a circle", async () => {
+    /**
+     * The first version printed every product round. A square topper cut round
+     * loses its corners, and a heart cut round is not a heart — and only the
+     * shop knows which of its products is which.
+     */
+    const view = mount({ file: photo(), shape: "heart" });
+    await decode();
+    await press(view.button("Use this photo"));
+
+    const printed = paints.find((paint) => paint.width === OUTPUT_PX);
+    expect(printed?.calls.filter((call) => call === "bezier").length).toBeGreaterThan(3);
+    expect(printed?.calls).not.toContain("arc:1200,1200,1200");
+
+    // …and the preview was cut to the same outline, at preview size.
+    const shown = paints.find((paint) => paint.width === PREVIEW_PX);
+    expect(shown?.calls.filter((call) => call === "bezier").length).toBeGreaterThan(3);
+  });
+
+  it("prints round for a product whose shop never chose", async () => {
+    // Every photo product predates the picker, so the absent case is the
+    // common one and has to keep doing what it always did.
+    const view = mount({ file: photo() });
+    await decode();
+    await press(view.button("Use this photo"));
+
+    const printed = paints.find((paint) => paint.width === OUTPUT_PX);
+    expect(printed?.calls).toContain("arc:1200,1200,1200");
+  });
+
+  it("shows the cut line on screen and never in the file", async () => {
+    /**
+     * Everything outside the outline is white, and so is the page — so
+     * without a hairline a round print and a square one look identical and
+     * the customer cannot see which corners they are losing. Printed on a
+     * cake, that same line is a mistake.
+     */
+    const view = mount({ file: photo() });
+    await decode();
+    await press(view.button("Use this photo"));
+
+    const shown = paints.find((paint) => paint.width === PREVIEW_PX);
+    const printed = paints.find((paint) => paint.width === OUTPUT_PX);
+    expect(shown?.calls).toContain("stroke");
+    expect(printed?.calls).not.toContain("stroke");
   });
 
   it("hands the flattened frame over as a file the upload will accept", async () => {
@@ -921,7 +1003,7 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
       expect(view.dialog()?.textContent).toContain("Fit your photo in the frame");
     } finally {
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement) {
-        const paint: Paint = { width: this.width, calls: [] };
+        const paint: Paint = { width: this.width, height: this.height, calls: [] };
         paints.push(paint);
         return recorder(paint.calls);
       } as never;
@@ -1018,6 +1100,335 @@ describe("the slider these eight controls are built from", () => {
     const thumb = view.input?.parentElement;
     expect(thumb?.className).toContain("has-[:focus-visible]:ring-3");
     expect(thumb?.className).not.toMatch(/(^|\s)focus-visible:ring-3/);
+  });
+});
+
+/**
+ * The outline a shop prints inside, which is not always a circle.
+ *
+ * The first version of this hard-coded a round frame, which is right for one
+ * kind of cake and wrong for a square one, a heart one, and every photo frame,
+ * mug and cushion a gift shop sells. A print area is GEOMETRY the canvas has to
+ * clip to, so unlike a size or an option label a shop cannot type its own — it
+ * picks, and the picker is on the product because one shop has several.
+ */
+describe("the outline a product is printed inside", () => {
+  const ids = PHOTO_FRAME_SHAPES.map((shape) => shape.id);
+
+  function trace(shape: (typeof PHOTO_FRAME_SHAPES)[number], width: number, height: number) {
+    const calls: string[] = [];
+    shape.outline(
+      {
+        arc: (x: number, y: number, r: number) => calls.push(`arc:${x},${y},${r}`),
+        rect: (x: number, y: number, w: number, h: number) => calls.push(`rect:${x},${y},${w},${h}`),
+        moveTo: (x: number, y: number) => calls.push(`moveTo:${x},${y}`),
+        lineTo: (x: number, y: number) => calls.push(`lineTo:${x},${y}`),
+        quadraticCurveTo: () => calls.push("quad"),
+        bezierCurveTo: () => calls.push("bezier"),
+        closePath: () => calls.push("closePath"),
+      } as never,
+      width,
+      height,
+    );
+    return calls;
+  }
+
+  it("offers the three the shop asked for, and no more", () => {
+    /**
+     * Pinned rather than counted. A shape is not free: it is a picker option
+     * a shop has to read, a value the validator has to admit, and an outline
+     * the canvas has to draw — so a fourth is a decision, not a tidy-up.
+     */
+    expect(ids).toEqual(["circle", "square", "heart"]);
+  });
+
+  it("offers each outline once", () => {
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBeGreaterThan(1);
+  });
+
+  it("offers exactly what a product is allowed to be saved with", async () => {
+    /**
+     * The registry draws them and the validator admits them, and they are two
+     * lists. A shape added to one and not the other is either a picker option
+     * that 400s on save, or a stored value nothing knows how to draw.
+     */
+    const { productFormSchema } = await import("@/features/products/server/product.validators");
+    const field = productFormSchema.shape.photoFrameShape;
+    const allowed = (field as unknown as { unwrap: () => { options: string[] } }).unwrap().options;
+
+    expect([...allowed].sort()).toEqual([...ids].sort());
+  });
+
+  it("prints round when the shop has never said otherwise", () => {
+    // Every photo product predates this picker, so the absent case is the
+    // common one and it has to keep doing what it always did.
+    expect(frameShape(undefined).id).toBe("circle");
+    expect(frameShape(null).id).toBe("circle");
+    expect(frameShape("").id).toBe("circle");
+  });
+
+  it("prints round rather than throwing on a value it does not know", () => {
+    // This reads whatever is in the database — an old export, a hand-edited
+    // row. A product page that will not render is worse than a round print.
+    expect(frameShape("oval").id).toBe("circle");
+  });
+
+  it("gives back the outline the shop actually chose", () => {
+    for (const id of ids) expect(frameShape(id).id).toBe(id);
+  });
+
+  it("keeps the long side at the size it was asked for", () => {
+    for (const shape of PHOTO_FRAME_SHAPES) {
+      const size = frameSize(shape, 2400);
+      expect(Math.max(size.width, size.height)).toBe(2400);
+      expect(size.width / size.height).toBeCloseTo(shape.ratio, 2);
+    }
+  });
+
+  it("gives every shipped shape a square box", () => {
+    for (const shape of PHOTO_FRAME_SHAPES) {
+      expect(frameSize(shape, 512), shape.id).toEqual({ width: 512, height: 512 });
+    }
+  });
+
+  it("would stand an upright frame up, and lay a wide one down", () => {
+    /**
+     * No shipped shape is a rectangle yet. The machinery is measured anyway,
+     * because a photo frame or a mug wrap is the obvious fourth and this is
+     * the difference between adding a row to a list and redoing every
+     * measurement in the file.
+     */
+    const upright = { ...frameShape("square"), ratio: 3 / 4 };
+    const wide = { ...frameShape("square"), ratio: 4 / 3 };
+
+    expect(frameSize(upright, 2400)).toEqual({ width: 1800, height: 2400 });
+    expect(frameSize(wide, 2400)).toEqual({ width: 2400, height: 1800 });
+  });
+
+  it("actually traces something for every one of them", () => {
+    // An outline that draws nothing clips to nothing, and the canvas comes out
+    // blank white — which reads as a broken page rather than a missing shape.
+    for (const shape of PHOTO_FRAME_SHAPES) {
+      expect(trace(shape, 400, 400).length, shape.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("draws each outline as the thing it is called", () => {
+    // A circle inscribed in its box…
+    expect(trace(frameShape("circle"), 400, 400)).toContain("arc:200,200,200");
+    // …a square that is the whole box…
+    expect(trace(frameShape("square"), 400, 400)).toEqual(["rect:0,0,400,400"]);
+    // …and a heart, which is a drawing rather than a formula: four curves at
+    // the very least, starting from the notch at the top rather than a corner.
+    const heart = trace(frameShape("heart"), 400, 400);
+    expect(heart[0]).toMatch(/^moveTo:200,63[.]16/);
+    expect(heart.filter((call) => call === "bezier").length).toBeGreaterThan(3);
+    expect(heart).toContain("closePath");
+    expect(heart).not.toContain("rect:0,0,400,400");
+  });
+
+  it("never reaches for roundRect, which older Safari does not have", () => {
+    // A missing method throws inside the paint, on the one device most of
+    // these customers are holding.
+    for (const shape of PHOTO_FRAME_SHAPES) {
+      expect(trace(shape, 400, 400).join(" ")).not.toContain("roundRect");
+    }
+  });
+});
+
+describe("a frame that is not square", () => {
+  /**
+   * Built as a BOX rather than looked up as a shape: none of the three a shop
+   * can pick today is a rectangle. What is being measured is the geometry, and
+   * the geometry is what a fourth shape would arrive needing.
+   */
+  const upright = { width: 1800, height: 2400 };
+
+  it("still covers, in both directions", () => {
+    // A photo that leaves white down the sides of an upright frame is not a
+    // crop, it is a mistake nobody chose.
+    for (const image of [SQUARE, LANDSCAPE, PORTRAIT]) {
+      const placed = photoPlacement(image, upright, emptyPhotoPrintDraft);
+      expect(placed.width).toBeGreaterThanOrEqual(upright.width - 0.001);
+      expect(placed.height).toBeGreaterThanOrEqual(upright.height - 0.001);
+    }
+  });
+
+  it("sizes the lettering off the short side", () => {
+    /**
+     * Off the long side, the same slider position would give lettering a third
+     * taller the moment a shop switched a product from square to upright — and
+     * a name set to fit a round topper would run off the edges of a tall one.
+     */
+    expect(namePlacement(upright, { ...emptyPhotoPrintDraft, nameSize: 0.1 }).fontSize).toBeCloseTo(
+      180,
+      6,
+    );
+  });
+
+  it("keeps the preview and the print the same picture", () => {
+    const small = { width: 384, height: 512 };
+    const ratio = upright.width / small.width;
+    const busy = { ...emptyPhotoPrintDraft, zoom: 1.4, offsetX: -0.3, offsetY: 0.2, name: "Anaya" };
+
+    const near = photoPlacement(LANDSCAPE, small, busy);
+    const far = photoPlacement(LANDSCAPE, upright, busy);
+    expect(far.centreX).toBeCloseTo(near.centreX * ratio, 2);
+    expect(far.centreY).toBeCloseTo(near.centreY * ratio, 2);
+    expect(far.width).toBeCloseTo(near.width * ratio, 2);
+    expect(namePlacement(upright, busy).fontSize).toBeCloseTo(
+      namePlacement(small, busy).fontSize * ratio,
+      2,
+    );
+  });
+});
+
+/**
+ * The five gates a new product field has to clear, and the sixth nobody counts.
+ *
+ * `photoFrameShape` is stored on the PRODUCT because one shop has several: a
+ * round topper, a heart topper and a rectangular frame can all be in the same
+ * catalogue. Four of the five gates fail SILENTLY — Mongoose discards an
+ * undeclared path while answering 201, and the storefront mapper is a
+ * whitelist — so each is checked here rather than assumed.
+ */
+describe("the shape belongs to the product", () => {
+  it("survives the write path the admin form posts through", async () => {
+    const { productFormSchema } = await import("@/features/products/server/product.validators");
+    const { createEmptyProductForm } = await import(
+      "@/features/products/lib/products-repository"
+    );
+
+    const parsed = productFormSchema.safeParse({
+      ...createEmptyProductForm(),
+      name: "Photo frame",
+      slug: "photo-frame",
+      allowsPhotoUpload: true,
+      photoFrameShape: "heart",
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.photoFrameShape).toBe("heart");
+  });
+
+  it("is optional, so nothing written before today is refused", () => {
+    /**
+     * The three flags beside it are REQUIRED booleans, so every product
+     * literal in the app and the suite already carries them. A required
+     * seventh would 400 every import, seed and API client written before
+     * today — for a field whose absence has a perfectly good meaning.
+     */
+    return import("@/features/products/server/product.validators").then(
+      async ({ productFormSchema }) => {
+        const { createEmptyProductForm } = await import(
+          "@/features/products/lib/products-repository"
+        );
+        const bare = { ...createEmptyProductForm(), name: "Tee", slug: "tee" } as Record<
+          string,
+          unknown
+        >;
+        delete bare.photoFrameShape;
+
+        expect(productFormSchema.safeParse(bare).success).toBe(true);
+      },
+    );
+  });
+
+  it("refuses an outline nothing knows how to draw", async () => {
+    const { productFormSchema } = await import("@/features/products/server/product.validators");
+    const { createEmptyProductForm } = await import(
+      "@/features/products/lib/products-repository"
+    );
+
+    const parsed = productFormSchema.safeParse({
+      ...createEmptyProductForm(),
+      name: "Tee",
+      slug: "tee",
+      photoFrameShape: "oval",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("is not dropped by Mongoose strict mode", async () => {
+    /**
+     * THE TRAP. `productSchema` runs with strict on, so a path it has not been
+     * told about is discarded when the document is BUILT — no error, no
+     * rejected write, and the API answers 201. Constructed rather than saved,
+     * so no database is needed to prove it.
+     */
+    const { ProductModel } = await import("@/lib/server/db/models/product.model");
+    const doc = new ProductModel({
+      _id: "p-frame",
+      name: "Photo frame",
+      slug: "photo-frame",
+      photoFrameShape: "heart",
+    });
+
+    const stored = doc.toObject() as { photoFrameShape?: string };
+    expect(stored.photoFrameShape, "Mongoose strict mode dropped the field").toBe("heart");
+  });
+
+  it("crosses the storefront mapper, which is a whitelist and not a spread", async () => {
+    // The other silent failure: a field missing from that list persists
+    // perfectly and is never seen by a customer.
+    const { mapAdminProductToStorefront } = await import(
+      "@/features/products/lib/product-mapper"
+    );
+
+    const mapped = mapAdminProductToStorefront({
+      id: "p-frame",
+      name: "Photo frame",
+      slug: "photo-frame",
+      description: "",
+      price: 499,
+      images: ["/frame.jpg"],
+      categoryId: "cat-gifts",
+      occasionIds: [],
+      weights: [],
+      status: "published",
+      shapes: [],
+      flavourOptions: [],
+      attributes: [],
+      rating: 0,
+      reviewCount: 0,
+      allowsPhotoUpload: true,
+      photoFrameShape: "square",
+    } as never);
+
+    expect(mapped.photoFrameShape).toBe("square");
+  });
+
+  it("is switched on under a name any trade can read", () => {
+    /**
+     * The switch was called “Photo Cake”. Flavour, egg, weight and shape name
+     * bakery product fields and should — that is what tells a florist which to
+     * turn off. A printed photograph is not one of those: a frame, a mug, a
+     * cushion and a cake all take one, and a shop selling frames should not
+     * have to switch on something named after a cake to offer it.
+     *
+     * The stored KEY stays `photoCake`; renaming that would rewrite every
+     * settings document for a caption.
+     */
+    const page = readFileSync(join(process.cwd(), MODULES_PAGE), "utf8");
+
+    expect(page).toContain('key: "photoCake"');
+    expect(page).toContain('title: "Printed photo"');
+    expect(page).not.toContain('title: "Photo Cake"');
+  });
+
+  it("is offered to the shop wherever it can be printed", () => {
+    /**
+     * The sixth gate: a field can clear all five and still be unreachable
+     * because no control was ever drawn for it.
+     */
+    const form = readFileSync(join(process.cwd(), ADMIN_FORM), "utf8");
+    expect(form).toContain("photoFrameShape");
+    expect(form).toContain("PHOTO_FRAME_SHAPES");
+    // …and only once the upload is on, because until then there is no print
+    // to have a shape.
+    expect(form).toContain("modules.photoCake && form.allowsPhotoUpload");
   });
 });
 

@@ -56,6 +56,8 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
+import { PHOTO_FRAME_SHAPES } from "@/lib/images/photo-print-layout";
+import type { PhotoFrameShapeId } from "@/types/product";
 import { ProductAttributesFields } from "./product-attributes-fields";
 import { ProductDetailsFields } from "./product-details-fields";
 import { ProductVariantManager } from "./product-variant-manager";
@@ -955,6 +957,41 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 </div>
 
                 {/*
+                  Shown only once the upload is switched on, because until then
+                  there is no print to have a shape.
+
+                  A picker rather than a text box: this is GEOMETRY the browser
+                  clips a photograph to, so unlike a size or an option label the
+                  shop cannot invent one. Round is what every photo product
+                  printed before there was a choice, so a shop that never opens
+                  this sees nothing change.
+                */}
+                {modules.photoCake && form.allowsPhotoUpload ? (
+                  <div className="grid gap-2 sm:max-w-sm">
+                    <Label htmlFor="photo-frame-shape">Printed photo shape</Label>
+                    <AdminSelect
+                      id="photo-frame-shape"
+                      value={form.photoFrameShape ?? "circle"}
+                      onChange={(event) =>
+                        patchForm({
+                          photoFrameShape: event.target.value as PhotoFrameShapeId,
+                        })
+                      }
+                    >
+                      {PHOTO_FRAME_SHAPES.map((shape) => (
+                        <option key={shape.id} value={shape.id}>
+                          {shape.label}
+                        </option>
+                      ))}
+                    </AdminSelect>
+                    <p className="text-xs text-muted-foreground">
+                      The customer fits their photo inside this outline, and the
+                      file you receive is cut to it.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/*
                   Shown, not edited.
 
                   Both were editable number inputs whose values `updateProduct`
@@ -1209,3 +1246,4 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     </AdminPage>
   );
 }
+

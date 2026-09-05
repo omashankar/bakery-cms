@@ -54,6 +54,10 @@ const productSchema = new mongoose.Schema(
     lowStockThreshold: { type: Number },
     allowsMessage: { type: Boolean, default: true },
     allowsPhotoUpload: { type: Boolean, default: false },
+    // No `enum` and no default: an unknown value resolves to round at read
+    // time (`frameShape`), and a validation error here would refuse a whole
+    // product save over a picture's outline.
+    photoFrameShape: { type: String },
     ingredients: { type: String },
     variantGroups: { type: [mongoose.Schema.Types.Mixed], default: [] },
     /**

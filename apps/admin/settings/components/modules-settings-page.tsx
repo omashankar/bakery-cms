@@ -42,10 +42,21 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
     title: "Shape",
     description: "Available shapes for the product.",
   },
+  /*
+    The ONE on this page that is not a trade's own field.
+
+    Flavour, egg, weight and shape name bakery product fields, and naming
+    them is what tells a florist which to switch off. A printed photograph
+    is not like that: a frame, a mug, a cushion and a cake all take one, and
+    a shop that sells frames should not have to switch on something called
+    Photo Cake to offer it. The stored KEY stays `photoCake` — renaming that
+    would rewrite every settings document for a caption.
+  */
   {
     key: "photoCake",
-    title: "Photo Cake",
-    description: "Photo upload / personalised photo option.",
+    title: "Printed photo",
+    description:
+      "Lets a customer upload a photo to be printed on a product. Switch it on per product.",
   },
 ];
 
@@ -192,3 +203,4 @@ function ModuleSwitch({
     </div>
   );
 }
+
