@@ -253,6 +253,23 @@ describe("the viewer a photo opens into", () => {
     expect(shown(view)).toContain("c.jpg");
   });
 
+  it("changes photo on a click in the strip, not on a mouse passing over it", () => {
+    /**
+     * The rail on the page switches on hover, because that is a hand on its
+     * way past. The strip in the viewer does not, and the difference is
+     * deliberate: this is a full-screen picture somebody chose to open, and
+     * having it change under a mouse crossing the bottom of the screen is a
+     * picture taken away rather than one offered.
+     */
+    const view = open(["/a.jpg", "/b.jpg", "/c.jpg"]);
+    const strip = view.viewer()?.querySelectorAll("button[aria-label*='in the viewer']") ?? [];
+
+    act(() => {
+      strip[2]?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+    });
+    expect(shown(view)).toContain("a.jpg");
+  });
+
   it("answers the arrow keys while it is open", () => {
     const view = open(["/a.jpg", "/b.jpg", "/c.jpg"]);
 

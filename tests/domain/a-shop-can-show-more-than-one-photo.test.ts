@@ -107,6 +107,27 @@ describe("the gallery a customer actually sees", () => {
     }
   });
 
+  it("follows the pointer along the rail without waiting for a click", () => {
+    /**
+     * `pointerover`, not `pointerenter`: enter does not bubble, so React
+     * never listens for it — it synthesises enter from the over event at the
+     * root. Dispatching enter directly would test a listener the browser is
+     * never going to call.
+     */
+    const view = render(["/a.jpg", "/b.jpg", "/c.jpg"]);
+    try {
+      act(() => {
+        view
+          .thumbs()[2]
+          ?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+      });
+      const main = view.container.querySelector("button[aria-label^='Zoom'] img");
+      expect(main?.getAttribute("src")).toContain("c.jpg");
+    } finally {
+      view.unmount();
+    }
+  });
+
   it("shows no rail for a product with one photo", () => {
     const view = render(["/only.jpg"]);
     try {

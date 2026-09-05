@@ -206,6 +206,16 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                 key={`${src}-${index}`}
                 type="button"
                 onClick={() => setActiveIndex(index)}
+                /*
+                  Hover moves the rail too, not only a click.
+
+                  It is what a hand already does on the way past, and it is
+                  the difference between a rail that answers and one that
+                  has to be operated. The click stays and does the same
+                  thing: a keyboard reaches these with Enter, and a tap on a
+                  phone is a click — where there is no hover to have.
+                */
+                onPointerEnter={() => setActiveIndex(index)}
                 aria-label={`Show image ${index + 1} of ${images.length}`}
                 aria-current={activeIndex === index}
                 className={cn(
