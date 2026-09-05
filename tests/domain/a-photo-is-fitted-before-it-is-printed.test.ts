@@ -35,7 +35,7 @@ import {
  *
  * Two things in here are worth testing and one of them is not the drawing. The
  * first is that the preview and the printed file are the SAME PICTURE: they are
- * painted at 512 and 1600 pixels by one function, and the moment those two
+ * painted at 512 and 2400 pixels by one function, and the moment those two
  * disagree a customer centres a face, presses the button, and the shop prints
  * something else. The second is that a name typed is a name printed — there is
  * no Set button to forget, and no styling record travelling through the nine
@@ -113,9 +113,9 @@ describe("the preview is the printed file, drawn smaller", () => {
    * THE one that matters.
    *
    * The customer nudges a face into the middle of a 512-pixel circle and the
-   * shop is sent a 1600-pixel one. If the two are computed differently — or the
-   * same maths is copied into two places and one of them is edited — the
-   * printed cake is not the picture anybody agreed to.
+   * shop is sent a 2400-pixel one. If the two are computed differently — or the
+   * same maths is copied into two places and one of them is edited — what is
+   * printed is not the picture anybody agreed to.
    */
   const busy: PhotoPrintDraft = {
     ...emptyPhotoPrintDraft,
