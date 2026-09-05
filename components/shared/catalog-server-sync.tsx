@@ -14,7 +14,7 @@ import {
 
 /**
  * Hydrates the local catalog from the server once on mount, so the taxonomy
- * (categories, flavours, occasions, weights) the admin and storefront read
+ * (categories, occasions) the admin and storefront read
  * reflects the durable server state, not a stale per-browser copy.
  *
  * The catalog read is public, so this runs for everyone. Server values replace
@@ -40,7 +40,6 @@ export function CatalogServerSync() {
       saveCatalogStore({
         ...current,
         categories: server.categories ?? current.categories,
-        flavours: server.flavours ?? current.flavours,
         occasions: server.occasions ?? current.occasions,
       });
 

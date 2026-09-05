@@ -111,7 +111,6 @@ export interface Product extends BaseEntity, ProductDetails {
   compareAtPrice?: number;
   images: string[];
   categoryId: string;
-  flavourId?: string;
   occasionIds: string[];
   weights: ProductWeight[];
   /** What this product's size tiers are CALLED. Blank means the generic word. */
@@ -163,10 +162,6 @@ export interface ProductCategory extends BaseEntity {
   cakeCount?: number;
 }
 
-export interface ProductFlavour extends BaseEntity {
-  name: string;
-  slug: string;
-}
 
 export interface ProductOccasion extends BaseEntity {
   name: string;

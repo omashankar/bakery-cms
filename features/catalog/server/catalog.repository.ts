@@ -18,7 +18,6 @@ export async function getOrCreateCatalog() {
   return CatalogModel.create({
     key: SINGLETON,
     categories: defaultCatalogStore.categories,
-    flavours: defaultCatalogStore.flavours,
     occasions: defaultCatalogStore.occasions,
   });
 }

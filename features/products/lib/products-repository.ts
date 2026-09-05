@@ -12,10 +12,8 @@ import { fixBrokenImageUrl } from "@/constants/demo-images";
 import type { Product, ProductFormData } from "@/types";
 import {
   adminCategories,
-  adminFlavours,
   adminOccasions,
   getCategoryByName,
-  getFlavourByName,
 } from "./catalog-options";
 import { slugify } from "./product-utils";
 import { createDefaultVariantGroups, normalizeVariantGroups } from "./variant-utils";
@@ -65,11 +63,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
       updatedAt: timestamp,
     };
 
-  const flavour =
-    getFlavourByName(cake.category) ??
-    adminFlavours().find((item) =>
-      cake.description.toLowerCase().includes(item.slug)
-    );
 
   const occasionIds =
     cake.category.toLowerCase().includes("wedding") ||
@@ -91,7 +84,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     compareAtPrice: cake.compareAtPrice,
     images: [cake.image],
     categoryId: category.id,
-    flavourId: flavour?.id,
     occasionIds,
     /**
      * The demo cakes' own sizes, named here rather than derived.
@@ -462,7 +454,6 @@ export function createEmptyProductForm(): ProductFormData {
     compareAtPrice: undefined,
     images: [],
     categoryId: adminCategories()[0]?.id ?? "1",
-    flavourId: undefined,
     occasionIds: [],
     /**
      * A NEW PRODUCT IS BORN EMPTY.

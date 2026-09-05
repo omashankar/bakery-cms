@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
-  deleteFlavours,
   deleteOccasions,
   loadCatalogStore,
   resetCatalogStore,
@@ -36,18 +35,11 @@ import {
   catalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
 import { loadProducts } from "@/features/products/lib/products-repository";
-import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
-import {
-  getModuleSettings,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_STORE: CatalogStore = {
   categories: [],
-  flavours: [],
   occasions: [],
   updatedAt: "",
 };
@@ -59,7 +51,6 @@ const tabs: Array<{
 }> = [
   { id: "categories", label: "Categories", singular: "Category" },
   { id: "occasions", label: "Occasions", singular: "Occasion" },
-  { id: "flavours", label: "Flavours", singular: "Flavour" },
 ];
 
 // Tab bar order — includes a Themes placeholder (design-theme data model comes later).
@@ -67,7 +58,6 @@ const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }
   { id: "categories", label: "Categories" },
   { id: "occasions", label: "Occasions" },
   { id: "themes", label: "Themes", soon: true },
-  { id: "flavours", label: "Flavours" },
   /*
     A Weights tab stood here. Sizes are typed on the product now — a shop-wide
     list forced one product's sizes onto every other, and editing it changed
@@ -79,7 +69,6 @@ export function CatalogAdminPage() {
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -125,37 +114,18 @@ export function CatalogAdminPage() {
     };
   }, []);
 
-  // Flavours is an optional bakery module — hide that tab when it is off.
-  useEffect(() => {
-    const sync = () => {
-      const next = getModuleSettings();
-      setModules(next);
-      setActiveTab((current) => {
-        if (current === "flavours" && !next.flavour) return "categories";
-        return current;
-      });
-    };
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
+  /*
+    A module gate stood here, and Flavours was the only tab it hid.
 
-  const moduleForTab: Partial<Record<CatalogTab | "themes", keyof ModuleSettings>> = {
-    flavours: "flavour",
-  };
-  const visibleTabBar = tabBar.filter((tab) => {
-    const mod = moduleForTab[tab.id];
-    return mod ? modules[mod] : true;
-  });
+    Flavours have left the Catalog: a flavour was never a list a shop
+    maintained, it was a word typed on a product, and `modules.flavour` now
+    gates that box on the product form instead. Nothing left on this screen
+    is optional, so there is nothing to filter.
+  */
 
   const items = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const list =
-      activeTab === "categories"
-        ? store.categories
-        : activeTab === "flavours"
-          ? store.flavours
-          : store.occasions;
+    const list = activeTab === "categories" ? store.categories : store.occasions;
 
     if (!query) return list;
     return list.filter(
@@ -179,11 +149,10 @@ export function CatalogAdminPage() {
 
   const counts = {
     categories: store.categories.length,
-    flavours: store.flavours.length,
     occasions: store.occasions.length,
   };
 
-  const totalItems = counts.categories + counts.flavours + counts.occasions;
+  const totalItems = counts.categories + counts.occasions;
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const allSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(item.id));
@@ -249,12 +218,7 @@ export function CatalogAdminPage() {
       );
       if (!ok) return;
     }
-    const remove =
-      activeTab === "categories"
-        ? deleteCategories
-        : activeTab === "flavours"
-          ? deleteFlavours
-          : deleteOccasions;
+    const remove = activeTab === "categories" ? deleteCategories : deleteOccasions;
 
     const { value: count, persisted } = await remove(selectedIds);
     refresh();
@@ -262,13 +226,13 @@ export function CatalogAdminPage() {
   }
 
   async function handleReset() {
-    // One click on "Reset defaults" replaced all four taxonomies in the database
+    // One click on "Reset defaults" replaced every taxonomy in the database
     // with the shipped ones, unconfirmed. Everything a shop had named — its
-    // categories, occasions, flavours and weight tiers — gone, and every product
-    // left pointing at ids that no longer existed.
+    // categories and occasions — gone, and every product left pointing at ids
+    // that no longer existed.
     const ok = window.confirm(
-      `This replaces all three lists — ${counts.categories} categories, ` +
-        `${counts.occasions} occasions and ${counts.flavours} flavours — ` +
+      `This replaces both lists — ${counts.categories} categories and ` +
+        `${counts.occasions} occasions — ` +
         `with the ones this software ships with.\n\n` +
         "Anything you have named here is lost, and products using those values will " +
         "point at entries that no longer exist.\n\nReset the whole catalog?"
@@ -346,7 +310,7 @@ export function CatalogAdminPage() {
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
-          {visibleTabBar.map((tab) => {
+          {tabBar.map((tab) => {
             const isThemes = tab.id === "themes";
             const active = isThemes ? showThemes : !showThemes && activeTab === tab.id;
             return (

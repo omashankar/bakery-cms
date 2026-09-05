@@ -27,7 +27,6 @@ const productSchema = new mongoose.Schema(
     compareAtPrice: { type: Number },
     images: { type: [String], default: [] },
     categoryId: { type: String, default: "" },
-    flavourId: { type: String },
     occasionIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
     weightLabel: { type: String },

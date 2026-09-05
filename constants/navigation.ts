@@ -79,7 +79,7 @@ export const adminNavSections: AdminNavSection[] = [
       // neutral default rather than "Cakes" so the data is not a claim the app
       // does not honour.
       { label: "Products", href: routes.admin.cakes.list, icon: "Cake" },
-      // Catalog uses in-page tabs (Categories / Occasions / Themes / Flavours / Weights).
+      // Catalog uses in-page tabs (Categories / Occasions / Themes).
       { label: "Catalog", href: routes.admin.catalog, icon: "Tags" },
       { label: "Inventory", href: routes.admin.commerce.inventory, icon: "Package" },
       { label: "Reviews", href: routes.admin.commerce.reviews, icon: "Star" },

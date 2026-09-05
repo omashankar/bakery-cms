@@ -1,9 +1,7 @@
 import { categories } from "@/constants/landing-data";
 import type {
   ProductCategory,
-  ProductFlavour,
   ProductOccasion,
-  ProductWeight,
 } from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
 
@@ -56,14 +54,6 @@ export const defaultCategories: ProductCategory[] = [
   */
 ];
 
-export const defaultFlavours: ProductFlavour[] = [
-  { id: "fl-chocolate", name: "Chocolate", slug: "chocolate", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "fl-vanilla", name: "Vanilla", slug: "vanilla", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "fl-fruit", name: "Fruit", slug: "fruit", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "fl-butterscotch", name: "Butterscotch", slug: "butterscotch", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "fl-red-velvet", name: "Red Velvet", slug: "red-velvet", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "fl-pistachio", name: "Pistachio", slug: "pistachio", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
-];
 
 export const defaultOccasions: ProductOccasion[] = [
   { id: "oc-birthday", name: "Birthday", slug: "birthday", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
@@ -74,7 +64,6 @@ export const defaultOccasions: ProductOccasion[] = [
 
 export const defaultCatalogStore: CatalogStore = {
   categories: defaultCategories,
-  flavours: defaultFlavours,
   occasions: defaultOccasions,
   updatedAt: nowIso(),
 };

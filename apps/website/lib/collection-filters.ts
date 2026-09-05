@@ -1,12 +1,6 @@
 import type { LandingProduct } from "@/constants/landing-data";
-import {
-  getFlavours,
-  getOccasions,
-} from "@/features/catalog/lib/catalog-repository";
-import {
-  defaultFlavours,
-  defaultOccasions,
-} from "@/features/catalog/lib/catalog-utils";
+import { getOccasions } from "@/features/catalog/lib/catalog-repository";
+import { defaultOccasions } from "@/features/catalog/lib/catalog-utils";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
@@ -77,8 +71,36 @@ export function getFilterOccasionOptions(): string[] {
   return getOccasions().map((item) => item.name);
 }
 
-export function getFilterFlavourOptions(): string[] {
-  return getFlavours().map((item) => item.name);
+/**
+ * The flavours this shop actually sells, read off the products it is selling.
+ *
+ * It was the shop-wide Catalog taxonomy — a list somebody had to maintain
+ * beside the products, which could offer Butterscotch when nothing on the page
+ * is butterscotch, and could miss the one flavour a shop had typed on twenty
+ * products but never added to the list.
+ *
+ * Now it reads the same two fields `matchesFlavour` compares against, so the
+ * panel can no longer offer a tick that matches nothing. Ordered by how many
+ * products carry it, so a shop's usual flavours come first rather than
+ * whichever product happened to be added first.
+ */
+export function getFilterFlavourOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const product of products) {
+    // The same pair, in the same order, that `matchesFlavour` reads: the
+    // variant group first, then the legacy list kept for products stored
+    // before flavours became one.
+    for (const raw of [...(product.optionLabels ?? []), ...(product.flavours ?? [])]) {
+      const label = raw?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
 }
 
 /**
@@ -116,13 +138,16 @@ export function getFilterWeightOptions(products: LandingProduct[]): string[] {
 }
 
 /**
- * Stable occasion / flavour defaults for SSR and the client's first paint —
- * identical on server and client, so the filter panel hydrates without a
- * mismatch. The panel swaps in the (possibly customized) catalog values from
- * localStorage after mount.
+ * Stable occasion defaults for SSR and the client's first paint — identical on
+ * server and client, so the filter panel hydrates without a mismatch. The panel
+ * swaps in the (possibly customized) catalog values from localStorage after
+ * mount.
+ *
+ * There is no flavour twin any more, and there does not need to be: flavours
+ * come from the products the page was handed, which the server and the client
+ * both have before they paint.
  */
 export const DEFAULT_FILTER_OCCASION_OPTIONS: string[] = defaultOccasions.map((item) => item.name);
-export const DEFAULT_FILTER_FLAVOUR_OPTIONS: string[] = defaultFlavours.map((item) => item.name);
 
 /**
  * Match the occasions the cake is TAGGED with.

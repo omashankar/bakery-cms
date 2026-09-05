@@ -23,7 +23,6 @@ import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/c
 import type { ProductFormData, EntityStatus } from "@/types";
 import {
   adminCategories,
-  adminFlavours,
   adminOccasions,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
@@ -729,25 +728,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       ))}
                     </AdminSelect>
                   </div>
-                  {modules.flavour ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="flavour">Flavour</Label>
-                      <AdminSelect
-                        id="flavour"
-                        value={form.flavourId ?? ""}
-                        onChange={(e) =>
-                          patchForm({ flavourId: e.target.value || undefined })
-                        }
-                      >
-                        <option value="">Select flavour</option>
-                        {adminFlavours().map((flavour) => (
-                          <option key={flavour.id} value={flavour.id}>
-                            {flavour.name}
-                          </option>
-                        ))}
-                      </AdminSelect>
-                    </div>
-                  ) : null}
+                  {/*
+                    A “Flavour” dropdown stood here, picking one row out of a
+                    shop-wide Catalog list.
+
+                    It bought nothing. The list was a second place to keep in
+                    step, the id it wrote reached no customer and no order, and
+                    the box that actually decides what a customer is offered —
+                    “Flavour options”, further down this same form — was
+                    already free text this shop types for itself. A flavour is
+                    a word on a product, not a taxonomy.
+                  */}
                 </div>
                 <div className="space-y-2">
                   <Label>Occasions</Label>

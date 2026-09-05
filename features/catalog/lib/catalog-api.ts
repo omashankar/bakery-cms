@@ -21,7 +21,7 @@ interface Envelope<T> {
  * three are pushed and the slice still reports success, because
  * `pushCatalogSections` only fails when NOTHING recognised is present.
  */
-export const CATALOG_SECTIONS = ["categories", "flavours", "occasions"] as const;
+export const CATALOG_SECTIONS = ["categories", "occasions"] as const;
 
 /** Full catalog (public — no auth needed). */
 export async function fetchCatalog(): Promise<Partial<CatalogStore> | null> {

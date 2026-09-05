@@ -16,19 +16,16 @@ import {
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
+import type { ProductCategory, ProductOccasion } from "@/types/product";
 import type { CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import { findSlugClash } from "@/features/catalog/lib/catalog-utils";
 import {
   createCategory,
-  createFlavour,
   createOccasion,
   getCategories,
-  getFlavours,
   getOccasions,
   updateCategory,
-  updateFlavour,
   updateOccasion,
 } from "@/features/catalog/lib/catalog-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -36,7 +33,6 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 /** The rows a new slug has to be unique against, for the section being edited. */
 function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
   if (tab === "categories") return getCategories();
-  if (tab === "flavours") return getFlavours();
   if (tab === "occasions") return getOccasions();
   return [];
 }
@@ -81,12 +77,7 @@ export function CatalogFormDialog({
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
       }
-    } else if (tab === "flavours") {
-      const item = getFlavours().find((entry) => entry.id === itemId);
-      if (item) {
-        setName(item.name);
-        setSlug(item.slug);
-      }
+
     } else if (tab === "occasions") {
       const item = getOccasions().find((entry) => entry.id === itemId);
       if (item) {
@@ -154,18 +145,7 @@ export function CatalogFormDialog({
         const { persisted } = await createCategory(payload);
         reportWrite(persisted, "Category created");
       }
-    } else if (tab === "flavours") {
-      const payload: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt"> = {
-        name: name.trim(),
-        slug: finalSlug,
-      };
-      if (isEdit && itemId) {
-        const { persisted } = await updateFlavour(itemId, payload);
-        reportWrite(persisted, "Flavour updated");
-      } else {
-        const { persisted } = await createFlavour(payload);
-        reportWrite(persisted, "Flavour created");
-      }
+
     } else {
       const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
@@ -186,7 +166,6 @@ export function CatalogFormDialog({
 
   const titles: Record<CatalogTab, string> = {
     categories: "Category",
-    flavours: "Flavour",
     occasions: "Occasion",
   };
 

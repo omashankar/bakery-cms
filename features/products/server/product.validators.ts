@@ -67,7 +67,6 @@ export const productFormSchema = z
     compareAtPrice: z.number().min(0).optional(),
     images: z.array(z.string()).default([]),
     categoryId: z.string().default(""),
-    flavourId: z.string().optional(),
     occasionIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),
     weightLabel: z.string().optional(),

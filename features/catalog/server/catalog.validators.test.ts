@@ -23,21 +23,21 @@ describe("catalog validators", () => {
   });
 
 
-  it("exposes exactly the three catalog sections", () => {
+  it("exposes exactly the two catalog sections", () => {
     /**
-     * There was a fourth, `weights` — a shop-wide list of sizes every product
-     * derived its tiers from. Sizes are typed on the product now, so the
-     * section is gone and a PUT or a reset naming it is refused by the
-     * allowlist, which is the same answer any other unknown section gets.
+     * There were four. `weights` went when sizes became something typed on the
+     * product, and `flavours` went the same way for the same reason — a
+     * flavour was a word on a product, not a list anybody maintained, and the
+     * shop-wide copy could offer one nothing was sold in while missing one
+     * twenty products carried.
+     *
+     * A PUT or a reset naming either is refused by the allowlist, which is the
+     * same answer any other unknown section gets.
      *
      * Exact equality on purpose: a section added or dropped without a
      * deliberate decision fails here.
      */
-    expect(CATALOG_SECTIONS.sort()).toEqual(["categories", "flavours", "occasions"]);
-    expect(Object.keys(catalogSectionSchemas).sort()).toEqual([
-      "categories",
-      "flavours",
-      "occasions",
-    ]);
+    expect(CATALOG_SECTIONS.sort()).toEqual(["categories", "occasions"]);
+    expect(Object.keys(catalogSectionSchemas).sort()).toEqual(["categories", "occasions"]);
   });
 });

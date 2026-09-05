@@ -15,6 +15,7 @@ import {
   collectionPriceCeiling,
   countActiveFilters,
   defaultCollectionFilters,
+  getFilterFlavourOptions,
   getFilterWeightOptions,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
@@ -105,6 +106,7 @@ export function CollectionsPage({
    * filtered result, or the options would vanish as the customer used them.
    */
   const sizeOptions = useMemo(() => getFilterWeightOptions(catalog), [catalog]);
+  const flavourOptions = useMemo(() => getFilterFlavourOptions(catalog), [catalog]);
   const [filters, setFilters] = useState<CollectionFilters>(() =>
     defaultCollectionFilters(collectionPriceCeiling(catalog)),
   );
@@ -178,6 +180,7 @@ export function CollectionsPage({
               filters={filters}
               priceCeiling={priceCeiling}
               sizeOptions={sizeOptions}
+              flavourOptions={flavourOptions}
               onChange={updateFilters}
               className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
             />
@@ -214,6 +217,7 @@ export function CollectionsPage({
                         filters={filters}
                         priceCeiling={priceCeiling}
                         sizeOptions={sizeOptions}
+                        flavourOptions={flavourOptions}
                         onChange={(next) => {
                           updateFilters(next);
                         }}

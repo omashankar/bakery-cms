@@ -106,14 +106,14 @@ export const docChapters: DocChapter[] = [
     steps: [
       {
         title: "Add a cake",
-        body: "Name, description, photographs, price, category and occasion. Add weight tiers (half kilo, one kilo) and flavour options; each can carry its own surcharge, and the storefront prices the default combination.",
+        body: "Name, description, photographs, price, category and occasion. Add the sizes and flavours this product comes in; each can carry its own surcharge, and the storefront prices the default combination.",
         where: { label: "Cakes → Add", href: routes.admin.cakes.add },
         caution:
           "A cake stays hidden from customers until its status is Published. Draft and archived items are not shown, and not sold.",
       },
       {
         title: "Organise the menu",
-        body: "Categories, flavours, occasions and weight options all live in one place. Renaming a category here renames it everywhere — the storefront menu, the filters and the product pages.",
+        body: "Categories and occasions live in one place. Renaming a category here renames it everywhere — the storefront menu, the filters and the product pages. Sizes and flavours are typed on the product itself, so one product's list is never forced onto another.",
         where: { label: "Catalog", href: routes.admin.catalog },
       },
       {

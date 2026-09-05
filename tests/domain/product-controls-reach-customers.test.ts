@@ -7,11 +7,9 @@ import { describe, expect, it, vi } from "vitest";
 // weight re-derivation can be exercised as arithmetic rather than as a mock.
 vi.mock("@/features/catalog/lib/catalog-repository", () => ({
   getCategories: () => [],
-  getFlavours: () => [],
   getOccasions: () => [],
   getCategoryById: () => undefined,
   getCategoryByName: () => undefined,
-  getFlavourByName: () => undefined,
   getWeightOptions: () => [
     { id: "w1", label: "0.5 kg", modifier: 0, serves: "2-4", sortOrder: 1 },
     { id: "w2", label: "1 kg", modifier: 400, serves: "6-8", sortOrder: 2 },

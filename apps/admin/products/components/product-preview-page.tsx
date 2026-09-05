@@ -11,16 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { routes } from "@/constants/routes";
 import type { Product } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { adminCategories, adminFlavours, adminOccasions } from "@/features/products/lib/catalog-options";
+import { adminCategories, adminOccasions } from "@/features/products/lib/catalog-options";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getProductById } from "@/features/products/lib/products-repository";
 import { fetchProduct } from "@/features/products/data/products-client";
-import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
-import {
-  getModuleSettings,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
+
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
@@ -32,7 +27,6 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
   const [cake, setCake] = useState<Product | null>(null);
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,12 +55,6 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
     };
   }, [cakeId, router]);
 
-  useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
 
   if (!cake) {
     return (
@@ -77,9 +65,7 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   }
 
   const category = adminCategories().find((item) => item.id === cake.categoryId)?.name ?? "—";
-  const flavour = modules.flavour
-    ? adminFlavours().find((item) => item.id === cake.flavourId)?.name
-    : undefined;
+
   const occasions = adminOccasions()
     .filter((item) => cake.occasionIds.includes(item.id))
     .map((item) => item.name)
@@ -147,12 +133,6 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
                 <dt className="text-muted-foreground">Category</dt>
                 <dd className="font-medium">{category}</dd>
               </div>
-              {flavour ? (
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
-                  <dt className="text-muted-foreground">Flavour</dt>
-                  <dd className="font-medium">{flavour}</dd>
-                </div>
-              ) : null}
               {occasions ? (
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
                   <dt className="text-muted-foreground">Occasions</dt>

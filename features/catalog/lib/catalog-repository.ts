@@ -1,10 +1,9 @@
-import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
+import type { ProductCategory, ProductOccasion } from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
   defaultCatalogStore,
   defaultCategories,
-  defaultFlavours,
   defaultOccasions,
 } from "./catalog-utils";
 import {
@@ -58,7 +57,6 @@ function persist(store: CatalogStore): void {
 function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
   return {
     categories: partial.categories ?? defaultCategories,
-    flavours: partial.flavours ?? defaultFlavours,
     occasions: partial.occasions ?? defaultOccasions,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
@@ -120,9 +118,6 @@ export function getCategories(): ProductCategory[] {
   return loadCatalogStore().categories;
 }
 
-export function getFlavours(): ProductFlavour[] {
-  return loadCatalogStore().flavours;
-}
 
 export function getOccasions(): ProductOccasion[] {
   return loadCatalogStore().occasions;
@@ -176,7 +171,7 @@ async function updateStore(
   const saved = saveCatalogStore({ ...current, ...patch });
 
   // `pushCatalogSection` already returned a boolean; this used to discard it
-  // with `void`. Categories, flavours, occasions and weights are what the
+  // with `void`. Categories and occasions are what the
   // product form and the storefront filters are built from, so a section the
   // server refused leaves the admin editing a taxonomy nobody else has.
   const sections = Object.keys(patch).filter((key) =>
@@ -236,46 +231,6 @@ export async function deleteCategories(ids: string[]): Promise<WriteResult<numbe
   return { value: persisted ? store.categories.length - next.length : 0, persisted };
 }
 
-export async function createFlavour(
-  data: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt">
-): Promise<WriteResult<ProductFlavour | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const item: ProductFlavour = {
-    ...data,
-    id: newId("fl"),
-    slug: data.slug || slugify(data.name),
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  const { persisted } = await updateStore(store, { flavours: [...store.flavours, item] });
-  return { value: item, persisted };
-}
-
-export async function updateFlavour(
-  id: string,
-  patch: Partial<ProductFlavour>
-): Promise<WriteResult<ProductFlavour | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const index = store.flavours.findIndex((item) => item.id === id);
-  if (index < 0) return { value: null, persisted: false };
-  const next = [...store.flavours];
-  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  const { persisted } = await updateStore(store, { flavours: next });
-  return { value: next[index], persisted };
-}
-
-export async function deleteFlavours(ids: string[]): Promise<WriteResult<number>> {
-  const store = await hydratedStore();
-  if (!store) return { value: 0, persisted: false };
-
-  const next = store.flavours.filter((item) => !ids.includes(item.id));
-  const { persisted } = await updateStore(store, { flavours: next });
-  return { value: persisted ? store.flavours.length - next.length : 0, persisted };
-}
 
 export async function createOccasion(
   data: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt">
@@ -329,9 +284,3 @@ export function getCategoryByName(name: string): ProductCategory | undefined {
   );
 }
 
-export function getFlavourByName(name: string): ProductFlavour | undefined {
-  const normalized = name.toLowerCase();
-  return getFlavours().find(
-    (item) => item.name.toLowerCase() === normalized || item.slug === normalized
-  );
-}

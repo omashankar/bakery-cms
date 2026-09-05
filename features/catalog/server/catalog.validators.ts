@@ -15,13 +15,11 @@ const taxonomyItem = z
   .passthrough();
 
 export const categoriesSchema = z.array(taxonomyItem);
-export const flavoursSchema = z.array(taxonomyItem);
 export const occasionsSchema = z.array(taxonomyItem);
 
 
 export const catalogSectionSchemas = {
   categories: categoriesSchema,
-  flavours: flavoursSchema,
   occasions: occasionsSchema,
 } as const;
 

@@ -78,27 +78,25 @@ export function getProductGalleryImages(cake: LandingProduct): string[] {
   return single ? [single] : [];
 }
 
-/**
- * Flavours this product is actually offered in — empty when the merchant has
- * not configured any.
- *
- * This used to fall back to the first four catalogue flavours, which produced
- * nonsense: a "Red Velvet Classic" was offered in Chocolate/Vanilla/Fruit/
- * Butterscotch (Red Velvet itself was cut off by the slice), and Chocolate was
- * preselected — so the order recorded a flavour that contradicted the cake and
- * that the customer never chose. A global flavour list is a catalogue taxonomy,
- * not a per-product option set.
- */
-export function getProductFlavourOptions(cake: LandingProduct): string[] {
-  return cake.flavours ?? [];
-}
+/*
+  `getProductFlavourOptions` stood here, and by the end nothing called it.
+
+  It used to fall back to the first four CATALOGUE flavours, which produced
+  nonsense: a "Red Velvet Classic" was offered in Chocolate/Vanilla/Fruit/
+  Butterscotch — Red Velvet itself cut off by the slice — and Chocolate was
+  preselected, so the order recorded a flavour that contradicted the cake and
+  that the customer never chose. The fallback went first, then its last
+  caller, and now the catalogue list it was named after has gone too.
+
+  `getProductShapeOptions` below is the same argument, still in use.
+*/
 
 /**
  * The shapes this product is offered in — empty when the merchant named none.
  *
  * The Round/Square/Heart fallback meant a customer buying a charger was shown a
  * shape picker, and `addToCart` stamped the chosen one onto the order line. The
- * same reasoning as `getProductFlavourOptions` above: a shipped list is not a
+ * same reasoning as the flavour list above: a shipped list is not a
  * statement about this product.
  */
 export function getProductShapeOptions(cake?: LandingProduct): string[] {

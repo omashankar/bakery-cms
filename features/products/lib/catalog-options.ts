@@ -2,15 +2,12 @@
 import type { ProductWeight } from "@/types/product";
 import {
   getCategories,
-  getFlavours,
   getOccasions,
   getCategoryById,
   getCategoryByName,
-  getFlavourByName,
 } from "@/features/catalog/lib/catalog-repository";
 
 export const adminCategories = getCategories;
-export const adminFlavours = getFlavours;
 export const adminOccasions = getOccasions;
 
 /*
@@ -65,4 +62,4 @@ export function rederiveWeights(
   }));
 }
 
-export { getCategoryById, getCategoryByName, getFlavourByName };
+export { getCategoryById, getCategoryByName };

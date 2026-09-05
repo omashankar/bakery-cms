@@ -25,7 +25,7 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
   {
     key: "flavour",
     title: "Flavour",
-    description: "Flavour selector and flavour options on products.",
+    description: "The flavour options box on a product, and the flavour filter on collections.",
   },
   {
     key: "eggEggless",

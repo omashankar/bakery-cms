@@ -8,10 +8,8 @@ import { Label } from "@/components/ui/label";
 import {
   COLLECTION_PRICE_FLOOR,
   defaultCollectionFilters,
-  DEFAULT_FILTER_FLAVOUR_OPTIONS,
   DEFAULT_FILTER_OCCASION_OPTIONS,
   type CollectionFilters,
-  getFilterFlavourOptions,
   getFilterOccasionOptions,
 } from "@/apps/website/lib/collection-filters";
 import { formatCurrency } from "@/utils/format";
@@ -40,6 +38,13 @@ interface CollectionFiltersPanelProps {
    * nothing on the page is sold in — a tick that hides everything.
    */
   sizeOptions?: string[];
+  /**
+   * The flavours to offer, read off the products being filtered.
+   *
+   * Passed in for the same reason sizes are: this was a shop-wide list, and a
+   * list nobody keeps in step offers ticks that match nothing.
+   */
+  flavourOptions?: string[];
   className?: string;
 }
 
@@ -48,14 +53,15 @@ export function CollectionFiltersPanel({
   onChange,
   priceCeiling = COLLECTION_PRICE_FLOOR,
   sizeOptions = [],
+  flavourOptions = [],
   className,
 }: CollectionFiltersPanelProps) {
   const weights = sizeOptions;
-  // Occasion / flavour options live in the catalog store (localStorage on the
-  // client). Seed with the SAME defaults the server renders, then refresh after
-  // mount — otherwise a customized catalog would mismatch the SSR HTML.
+  const flavours = flavourOptions;
+  // Occasions still live in the catalog store (localStorage on the client).
+  // Seed with the SAME defaults the server renders, then refresh after mount —
+  // otherwise a customized catalog would mismatch the SSR HTML.
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_FILTER_OCCASION_OPTIONS);
-  const [flavours, setFlavours] = useState<string[]>(DEFAULT_FILTER_FLAVOUR_OPTIONS);
   // Flavour / weight / eggless filters are bakery modules — hide when off.
   // Default ON so SSR / bakery render exactly as before.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
@@ -63,7 +69,6 @@ export function CollectionFiltersPanel({
     const sync = () => {
       setModules(getModuleSettings());
       setOccasions(getFilterOccasionOptions());
-      setFlavours(getFilterFlavourOptions());
     };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);

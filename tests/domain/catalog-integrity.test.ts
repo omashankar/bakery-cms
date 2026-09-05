@@ -118,10 +118,11 @@ describe("the catalog gate guards the read, not just the write", () => {
     const code = stripComments(source);
     const mutations = [
       "createCategory", "updateCategory", "deleteCategories",
-      "createFlavour", "updateFlavour", "deleteFlavours",
       "createOccasion", "updateOccasion", "deleteOccasions",
-      // The three weight writers were here. Sizes are typed on the product now,
-      // so the shop-wide list and everything that wrote to it is gone.
+      // The weight writers were here, and then the flavour ones. Both were
+      // shop-wide lists that a product had to be kept in step with; a size and
+      // a flavour are typed on the product now, so everything that wrote to
+      // either list is gone.
     ];
 
     for (const name of mutations) {

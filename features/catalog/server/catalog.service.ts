@@ -4,7 +4,6 @@ import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
 import {
   defaultCategories,
-  defaultFlavours,
   defaultOccasions,
 } from "@/features/catalog/lib/catalog-utils";
 
@@ -20,14 +19,12 @@ interface RequestCtx {
 /** Per-section defaults, used by resetSection. */
 const SECTION_DEFAULTS: Record<string, unknown> = {
   categories: defaultCategories,
-  flavours: defaultFlavours,
   occasions: defaultOccasions,
 };
 
 function toCatalog(json: Record<string, unknown>) {
   return {
     categories: json.categories ?? [],
-    flavours: json.flavours ?? [],
     occasions: json.occasions ?? [],
     weights: json.weights ?? [],
     updatedAt: json.updatedAt,

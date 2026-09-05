@@ -3,7 +3,7 @@ import { CatalogAdminPage } from "@/apps/admin/catalog";
 
 export const metadata: Metadata = {
   title: "Catalog",
-  description: "Manage categories, occasions, flavours, and weight options.",
+  description: "Manage categories and occasions.",
 };
 
 export default function Page() {
