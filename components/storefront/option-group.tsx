@@ -25,17 +25,28 @@ import { cn } from "@/lib/utils";
 export function OptionGroup({
   label,
   count,
+  aside,
   children,
 }: {
   label: string;
   count: number;
+  /**
+   * Something small beside the heading — a “Serving Info” link, a size guide.
+   *
+   * Optional, and rendered only when passed, so every other group keeps the
+   * heading it had.
+   */
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (count <= 0) return null;
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium">{label}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm font-medium">{label}</p>
+        {aside}
+      </div>
       {children}
     </div>
   );

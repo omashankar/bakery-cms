@@ -15,6 +15,15 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 interface ProductGalleryProps {
   images: string[];
   productName: string;
+  /**
+   * Featured / Bestseller / Trending, on the photo rather than beside the
+   * name.
+   *
+   * It is a claim about the PRODUCT, and it reads as one where the product
+   * is. In the text column it sat in a row with the category and the eggless
+   * mark, three chips deep, and was the least visible of the three.
+   */
+  badge?: string;
 }
 
 /**
@@ -31,7 +40,7 @@ interface ProductGalleryProps {
  * as the column allows. Below `lg` it stays a row underneath, because a strip
  * beside the photo on a phone leaves neither of them big enough to read.
  */
-export function ProductGallery({ images, productName }: ProductGalleryProps) {
+export function ProductGallery({ images, productName, badge }: ProductGalleryProps) {
   const labels = useBusinessLabels();
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -77,6 +86,11 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
           aria-label={`Zoom ${labels.productWord.toLowerCase()} image`}
         >
+          {badge ? (
+            <span className="absolute top-0 left-0 z-10 rounded-br-lg bg-bakery-700 px-3 py-1 text-xs font-semibold text-white">
+              {badge}
+            </span>
+          ) : null}
           <OptimizedImage
             src={activeImage}
             alt={productName}

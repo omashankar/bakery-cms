@@ -929,3 +929,135 @@ describe("one Product Description, the way a customer reads it", () => {
     }
   });
 });
+
+describe("the buy box says what this shop can back", () => {
+  it("does not claim the price includes tax", () => {
+    /**
+     * The reference storefront prints "Inclusive of all taxes" under the price.
+     * Copying it here would be a lie: `computeTaxAmount` returns tax as a
+     * SEPARATE line and the total is `subtotal + … + tax`, so the number above
+     * it is the pre-tax one. The invoice terms were rewritten for exactly this
+     * reason once already — they used to say "GST is included where applicable"
+     * over a breakdown that printed it separately.
+     */
+    const { html, unmount } = render(CAKE);
+    try {
+      expect(html).not.toContain("Inclusive of all taxes");
+      expect(html).toContain("added at checkout");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("puts the badge on the photo rather than in a row of chips", () => {
+    const view = render({ ...CAKE, badge: "Bestseller" } as never);
+    try {
+      const gallery = view.container.querySelector("button[aria-label^='Zoom']");
+      expect(gallery?.textContent).toContain("Bestseller");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("says nothing where the shop has awarded no badge", () => {
+    const view = render(CAKE);
+    try {
+      const gallery = view.container.querySelector("button[aria-label^='Zoom']");
+      expect((gallery?.textContent ?? "").trim()).toBe("");
+    } finally {
+      view.unmount();
+    }
+  });
+});
+
+describe("serving info, where the shop has said", () => {
+  it("offers it beside the size picker", () => {
+    // CAKE's tiers carry `serves`, which is what makes the link honest.
+    const { html, unmount } = render(CAKE);
+    try {
+      expect(html).toContain("Serving Info");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("lists who each size feeds once opened", () => {
+    const view = render(CAKE);
+    try {
+      const link = [...view.container.querySelectorAll("button")].find(
+        (node) => node.textContent?.trim() === "Serving Info",
+      );
+      act(() => {
+        link?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+
+      const text = view.container.textContent ?? "";
+      expect(text).toContain("1 kg");
+      expect(text).toContain("serves 8–10");
+      expect(text).toContain("serves 16–20");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("offers nothing for a product priced by size with no headcount claimed", () => {
+    /**
+     * `serves` is optional per size. A shop selling cable by the metre prices
+     * three lengths and claims no headcount for any of them — a "Serving Info"
+     * link over an empty panel would be worse than no link.
+     */
+    const { html, unmount } = render({
+      ...CAKE,
+      weights: [
+        { label: "1 m", price: 300 },
+        { label: "2 m", price: 500 },
+      ],
+    } as never);
+    try {
+      expect(html).not.toContain("Serving Info");
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe("the two forms that used to stand open", () => {
+  it("invites a question rather than opening a form nobody asked for", () => {
+    const view = render(CAKE);
+    try {
+      expect(view.html).toContain("Ask us");
+      // The form itself is behind it.
+      expect(view.html).not.toContain("Your question");
+
+      const ask = [...view.container.querySelectorAll("button")].find(
+        (node) => node.textContent?.trim() === "Ask us",
+      );
+      act(() => {
+        ask?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+
+      expect(view.container.textContent).toContain("Your question");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("does the same for the review form", () => {
+    const view = render(CAKE);
+    try {
+      expect(view.html).toContain("Write a review");
+      expect(view.html).not.toContain("Your review");
+
+      const write = [...view.container.querySelectorAll("button")].find(
+        (node) => node.textContent?.trim() === "Write a review",
+      );
+      act(() => {
+        write?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+
+      expect(view.container.textContent).toContain("Your review");
+    } finally {
+      view.unmount();
+    }
+  });
+});

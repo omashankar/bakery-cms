@@ -64,9 +64,11 @@ import {
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
 import {
+  getCommerceSettings,
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
@@ -266,6 +268,13 @@ export function ProductDetailPage({
    * Read on the client because both come from local settings, and empty until
    * they do: a shop running no offers gets no block, not an empty heading.
    */
+  /**
+   * The shop's commerce settings, for the one line under the price.
+   *
+   * Seeded with the shipped defaults so the server pass and the first client
+   * paint agree, then refreshed by the same `sync` the offers use.
+   */
+  const [commerce, setCommerce] = useState(defaultCommerceSettings);
   const [offers, setOffers] = useState<string[]>([]);
 
   const [selectedWeight, setSelectedWeight] = useState(0);
@@ -402,7 +411,32 @@ export function ProductDetailPage({
       cake.description,
   );
 
-  const weight = weightOptions[selectedWeight] ?? weightOptions[0];  /**
+  /**
+   * Who each size feeds, for the panel behind “Serving Info”.
+   *
+   * Only the tiers the shop actually answered for. `serves` is optional per
+   * size, so a shop that prices by size without claiming a headcount gets no
+   * link rather than a panel of blanks.
+   */
+  const servingInfo = weightOptions
+    .map((option) => ({ label: option.label, serves: option.serves?.trim() ?? "" }))
+    .filter((row) => row.serves.length > 0);
+  const [servingInfoOpen, setServingInfoOpen] = useState(false);
+  /**
+   * The two forms, behind the bar that invites them.
+   *
+   * Both stood open at all times, so the page ended in two long forms most
+   * visitors will never fill in — between them and the reviews they came to
+   * read. The bar is the affordance and it says exactly what it does, so
+   * nothing is hidden: asking is still one click, and it is a click somebody
+   * makes on purpose.
+   */
+  const [askOpen, setAskOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const weight = weightOptions[selectedWeight] ?? weightOptions[0];
+
+  /**
    * The shop's own word for the axis, not the literal “Weight”.
    *
    * Every OTHER picker on this page is headed by a name the shop typed —
@@ -491,6 +525,8 @@ export function ProductDetailPage({
    */
   useEffect(() => {
     const sync = () => {
+      // The same read the offers already do, for the tax line under the price.
+      setCommerce(getCommerceSettings());
       const threshold = getFreeDeliveryThreshold();
       setOffers(
         [
@@ -868,7 +904,11 @@ export function ProductDetailPage({
               no longer see what they were reading about.
             */}
             <div className="lg:sticky lg:top-24">
-              <ProductGallery images={galleryImages} productName={cake.name} />
+              <ProductGallery
+                images={galleryImages}
+                productName={cake.name}
+                badge={cake.badge}
+              />
             </div>
 
             <div className="space-y-6">
@@ -883,7 +923,6 @@ export function ProductDetailPage({
                       </Badge>
                     </span>
                   ) : null}
-                  {cake.badge ? <Badge variant="gold">{cake.badge}</Badge> : null}
                 </div>
                 <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
                 {cake.rating ? (
@@ -913,6 +952,26 @@ export function ProductDetailPage({
 
               <div className="rounded-xl border border-border bg-cream-50 p-4">
                 <PriceDisplay price={displayPrice} compareAtPrice={displayCompareAt} />
+                {/*
+                  THE OPPOSITE OF WHAT THE REFERENCE SAYS, because it is what
+                  this pipeline does.
+
+                  Winni prints “Inclusive of all taxes” under the price. Copying
+                  that here would be a lie: `computeTaxAmount` returns tax as a
+                  SEPARATE line and the total is `subtotal + … + tax`, so the
+                  number above this sentence is the pre-tax one. The invoice
+                  terms were rewritten for exactly this reason once already —
+                  they used to say “GST is included where applicable” over a
+                  breakdown that printed it separately.
+
+                  Shown only where the shop has switched tax on, and named with
+                  the shop's own label rather than a hard-coded “GST”.
+                */}
+                {commerce.taxEnabled ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {commerce.taxLabel} added at checkout
+                  </p>
+                ) : null}
                 {/*
                   Only when this product IS sold by size.
                   `weight?.serves ?? "8–10"` and `weight?.label ?? "1 kg"` were
@@ -949,7 +1008,32 @@ export function ProductDetailPage({
 
               {modules.weight ? (
                 <div className="contents" data-gate-weight>
-                  <OptionGroup label={sizeAxisLabel} count={weightOptions.length}>
+                  <OptionGroup
+                    label={sizeAxisLabel}
+                    count={weightOptions.length}
+                    aside={
+                      /*
+                        WHO EACH SIZE FEEDS, on the one control where the
+                        question is asked. The line under the price answers it
+                        for the selected size only, and a customer choosing
+                        between three sizes is comparing, not reading one.
+
+                        Only where the shop has actually said. `serves` is
+                        optional per tier, so a shop that prices by size without
+                        claiming a headcount gets no link at all rather than an
+                        empty panel.
+                      */
+                      servingInfo.length > 0 ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-bakery-700 hover:underline"
+                          onClick={() => setServingInfoOpen((open) => !open)}
+                        >
+                          Serving Info
+                        </button>
+                      ) : null
+                    }
+                  >
                     <div className="flex flex-wrap gap-2">
                       {weightOptions.map((option, index) => (
                         <OptionButton
@@ -961,6 +1045,16 @@ export function ProductDetailPage({
                         </OptionButton>
                       ))}
                     </div>
+                    {servingInfoOpen ? (
+                      <ul className="space-y-1 rounded-lg border border-border bg-cream-50 p-3 text-xs text-muted-foreground">
+                        {servingInfo.map((row) => (
+                          <li key={row.label}>
+                            <span className="font-medium text-foreground">{row.label}</span> —
+                            {" "}serves {row.serves}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </OptionGroup>
                 </div>
               ) : null}
@@ -1249,26 +1343,37 @@ export function ProductDetailPage({
                 “Freshly baked” was removed from here earlier for the same
                 reason. Each row now waits for something true to say.
               */}
-              <ul className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+              {/*
+                CARDS, and still one line each.
+
+                The reference puts three of these under the photo with a title
+                and a boast beneath it — “20M Happy Customers”, “100%
+                Satisfaction”. There is no number behind either and this shop
+                would be inventing both, so each card carries the one thing
+                that is true and nothing under it.
+              */}
+              <ul className="grid gap-3 text-sm sm:grid-cols-3">
                 {deliveryPromise ? (
-                  <li className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3">
-                    <Truck className="mt-0.5 size-4 shrink-0 text-bakery-700" />
-                    <span>{deliveryPromise}</span>
+                  <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
+                    <Truck className="size-6 text-bakery-700" />
+                    <span className="font-medium text-foreground">Timely Delivery</span>
+                    <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
                   </li>
                 ) : null}
                 {modules.eggEggless && isEggless ? (
                   <li
-                    className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3"
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
                     data-gate-egg
                   >
-                    <Leaf className="mt-0.5 size-4 shrink-0 text-bakery-700" />
-                    <span>Made without eggs</span>
+                    <Leaf className="size-6 text-bakery-700" />
+                    <span className="font-medium text-foreground">Made without eggs</span>
                   </li>
                 ) : null}
                 {cake.allowsMessage !== false ? (
-                  <li className="flex items-start gap-2 rounded-xl border border-border bg-cream-50 p-3">
-                    <Gift className="mt-0.5 size-4 shrink-0 text-bakery-700" />
-                    <span>Free message card</span>
+                  <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
+                    <Gift className="size-6 text-bakery-700" />
+                    <span className="font-medium text-foreground">Free message card</span>
+                    <span className="text-xs text-muted-foreground">Written as you ask</span>
                   </li>
                 ) : null}
               </ul>
@@ -1407,10 +1512,25 @@ export function ProductDetailPage({
                         ))}
                       </div>
                     ) : null}
-                    <ProductQuestionForm
-                      productSlug={cake.slug}
-                      productName={cake.name}
-                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
+                      <p className="text-sm font-medium">
+                        Didn&apos;t find the answer you were looking for?
+                      </p>
+                      <Button
+                        type="button"
+                        variant="bakery"
+                        size="sm"
+                        onClick={() => setAskOpen((open) => !open)}
+                      >
+                        Ask us
+                      </Button>
+                    </div>
+                    {askOpen ? (
+                      <ProductQuestionForm
+                        productSlug={cake.slug}
+                        productName={cake.name}
+                      />
+                    ) : null}
                   </div>
                 </DetailSection>
 
@@ -1425,18 +1545,33 @@ export function ProductDetailPage({
                       is nothing to summarise.
                     */}
                     <RatingSummary reviews={reviews} />
-                    <ProductReviewForm
-                      productSlug={cake.slug}
-                      cakeName={cake.name}
-                      onSubmitted={() => {
-                        // A new review is pending, so this re-read normally comes
-                        // back unchanged — which is the honest outcome. It runs so
-                        // that anything approved since the page loaded appears.
-                        void getProductReviews(cake).then((next) => {
-                          if (next) setReviews(next);
-                        });
-                      }}
-                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
+                      <p className="text-sm font-medium">Ordered this before?</p>
+                      <Button
+                        type="button"
+                        variant="bakery"
+                        size="sm"
+                        onClick={() => setReviewOpen((open) => !open)}
+                      >
+                        Write a review
+                      </Button>
+                    </div>
+                    {reviewOpen ? (
+                      <ProductReviewForm
+                        productSlug={cake.slug}
+                        cakeName={cake.name}
+                        onSubmitted={() => {
+                          setReviewOpen(false);
+                          // A new review is pending, so this re-read normally
+                          // comes back unchanged — which is the honest outcome.
+                          // It runs so that anything approved since the page
+                          // loaded appears.
+                          void getProductReviews(cake).then((next) => {
+                            if (next) setReviews(next);
+                          });
+                        }}
+                      />
+                    ) : null}
                     {reviews.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         {/*
