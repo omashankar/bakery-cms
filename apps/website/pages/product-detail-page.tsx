@@ -57,6 +57,7 @@ import {
 import {
   asAddOn,
   getDefaultVariantSelections,
+  formatPreparationTime,
   getProductVariantGroups,
   mapLegacyChoice,
   variantGroupsEnabledBy,
@@ -179,10 +180,49 @@ export function ProductDetailPage({
   const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
   /** The shop's own facts about this product. Empty when it states none. */
   const attributes = useMemo(() => cake.attributes ?? [], [cake]);
-  /** The nutrition tab has something to say only if one of its three fields does. */
-  const hasNutrition = Boolean(
-    cake.calories || cake.preparationTimeMinutes || cake.shelfLifeDays,
-  );
+  /**
+   * Everything the shop has stated about this product, as one bulleted list.
+   *
+   * The shop's own `attributes` first — Brand, Material, Country of Origin,
+   * whatever it chose to say — then the three fixed food facts, each of which
+   * had a heading of its own and three lines beneath it. Same data, one list.
+   */
+  const productFacts = useMemo(() => {
+    const facts = attributes.map((attribute) => ({
+      label: attribute.label,
+      value: attribute.value,
+    }));
+
+    if (cake.calories) {
+      facts.push({ label: "Calories", value: `${cake.calories} kcal per serving` });
+    }
+    if (cake.preparationTimeMinutes) {
+      facts.push({
+        label: "Preparation",
+        value: formatPreparationTime(cake.preparationTimeMinutes) ?? "",
+      });
+    }
+    if (cake.shelfLifeDays) {
+      facts.push({
+        label: "Shelf life",
+        value: `${cake.shelfLifeDays} day${cake.shelfLifeDays === 1 ? "" : "s"} when stored properly`,
+      });
+    }
+
+    return facts.filter((fact) => fact.value.trim().length > 0);
+  }, [attributes, cake.calories, cake.preparationTimeMinutes, cake.shelfLifeDays]);
+
+  /**
+   * One line typed is one bullet.
+   *
+   * A shop writes care notes as a list and they arrived as one run-on
+   * paragraph held together by `whitespace-pre-line`. Splitting needs no new
+   * field and no new habit: what the shop already types is already a list.
+   */
+  const careNotes = (cake.careInstructions ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   /**
@@ -327,8 +367,42 @@ export function ProductDetailPage({
     );
   }, [visibleVariantGroups, variantSelections]);
 
-  const weight = weightOptions[selectedWeight] ?? weightOptions[0];
   /**
+   * What the shop can actually say about getting this to the customer.
+   *
+   * Three bullets at most, and each is a fact rather than a policy paragraph:
+   * the promise the shop configured, the slot this customer has picked, and
+   * the message card — which is offered only where the product takes one,
+   * because it was once promised to every buyer of a phone charger.
+   *
+   * The reference storefronts pad this out with courier terms and
+   * redirection policies. There is no field behind any of that here, and a
+   * paragraph of invented policy is worse than a short list of true ones.
+   */
+  const deliveryNotes = [
+    deliveryPromise,
+    deliveryDate
+      ? `Scheduled delivery on ${formatDate(deliveryDate)}${deliveryTime ? ` between ${deliveryTime}` : ""}`
+      : "",
+    cake.allowsMessage !== false ? "Custom message card included at no extra charge" : "",
+  ].filter((note) => note.trim().length > 0);
+
+  /**
+   * The whole section hides when the shop has filled in none of it.
+   *
+   * `deliveryNotes` is never empty in practice — the slot is always picked —
+   * so this is really asking whether there is anything to READ beyond the
+   * delivery line, and a product with nothing said about it gets no heading.
+   */
+  const hasDescription = Boolean(
+    productFacts.length > 0 ||
+      cake.ingredients ||
+      cake.allergens ||
+      careNotes.length > 0 ||
+      cake.description,
+  );
+
+  const weight = weightOptions[selectedWeight] ?? weightOptions[0];  /**
    * The shop's own word for the axis, not the literal “Weight”.
    *
    * Every OTHER picker on this page is headed by a name the shop typed —
@@ -818,7 +892,14 @@ export function ProductDetailPage({
                     {reviews.length ? <span>({reviews.length} reviews)</span> : null}
                   </div>
                 ) : null}
-                <p className="text-muted-foreground">{cake.description}</p>
+                {/*
+                  The description moved into Product Description, below.
+
+                  A paragraph of prose stood directly between the product name
+                  and the price block — the two things a customer opens this
+                  page for — and pushed the size picker and the add-ons below
+                  the fold on a phone.
+                */}
                 {detailBadges.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {detailBadges.map((badge) => (
@@ -1207,127 +1288,102 @@ export function ProductDetailPage({
                 shows no Ingredients heading at all rather than an empty one.
               */}
               <div className="space-y-6">
-                {attributes.length > 0 ? (
-                  <DetailSection title={`${labels.productWord} details`}>
-                    {/* The shop's own facts, as a spec list. */}
-                    <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                      {attributes.map((attribute) => (
-                        <div
-                          key={attribute.id}
-                          className="flex flex-wrap justify-between gap-2 border-b border-border/60 pb-2"
-                        >
-                          <dt className="text-muted-foreground">{attribute.label}</dt>
-                          <dd className="font-medium text-foreground">{attribute.value}</dd>
+                {/*
+                  ONE SECTION, the way a customer reads it.
+
+                  This was six stacked sections, each with its own heading:
+                  details, ingredients, nutrition, allergens, care, delivery.
+                  Every one of them was true and every one was gated properly,
+                  but six headings for six short blocks reads as six subjects
+                  when it is one — what this thing is and what to know about it.
+
+                  So it is a single Product Description with labelled parts,
+                  which is what the reference storefronts do and what a customer
+                  scanning for “does it have nuts” actually scans. Nothing is
+                  added and nothing is invented: every part still shows only
+                  where the shop filled the field, and disappears entirely when
+                  none of them did.
+                */}
+                {hasDescription ? (
+                  <DetailSection title="Product Description">
+                    <div className="space-y-5 text-sm text-muted-foreground">
+                      {productFacts.length > 0 ? (
+                        <div>
+                          <p className="mb-2 font-medium text-foreground">
+                            {labels.productWord} Details:
+                          </p>
+                          <ul className="list-disc space-y-1 pl-5">
+                            {productFacts.map((fact) => (
+                              <li key={fact.label}>
+                                {fact.label}: {fact.value}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      ))}
-                    </dl>
-                  </DetailSection>
-                ) : null}
-
-                {cake.ingredients ? (
-                  <DetailSection title="Ingredients">
-                    <p className="whitespace-pre-line text-sm text-muted-foreground">
-                      {cake.ingredients}
-                      {modules.eggEggless && isEggless
-                        ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.`
-                        : ""}
-                    </p>
-                  </DetailSection>
-                ) : null}
-
-                {hasNutrition ? (
-                  <DetailSection title="Nutrition">
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      {cake.calories ? (
-                        <p>
-                          <span className="font-medium text-foreground">Calories:</span>{" "}
-                          {cake.calories} kcal per serving
-                        </p>
                       ) : null}
-                      {cake.preparationTimeMinutes ? (
-                        <p>
-                          <span className="font-medium text-foreground">Preparation:</span>{" "}
-                          {detailBadges.find((badge) => badge.includes("prep")) ??
-                            `${cake.preparationTimeMinutes} minutes`}
-                        </p>
+
+                      {cake.ingredients ? (
+                        <div>
+                          <p className="mb-2 font-medium text-foreground">Ingredients:</p>
+                          <p className="whitespace-pre-line">
+                            {cake.ingredients}
+                            {modules.eggEggless && isEggless
+                              ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.`
+                              : ""}
+                          </p>
+                        </div>
                       ) : null}
-                      {cake.shelfLifeDays ? (
-                        <p>
-                          <span className="font-medium text-foreground">Shelf life:</span>{" "}
-                          {cake.shelfLifeDays} day{cake.shelfLifeDays === 1 ? "" : "s"} when stored
-                          properly
-                        </p>
+
+                      {cake.allergens ? (
+                        <div>
+                          <p className="mb-2 font-medium text-foreground">Allergens:</p>
+                          <p className="whitespace-pre-line">{cake.allergens}</p>
+                        </div>
+                      ) : null}
+
+                      {deliveryNotes.length > 0 ? (
+                        <div>
+                          <p className="mb-2 font-medium text-foreground">Delivery Information:</p>
+                          <ul className="list-disc space-y-1 pl-5">
+                            {deliveryNotes.map((note) => (
+                              <li key={note}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {/*
+                        Bulleted, because a shop writes these as a list and it
+                        was reading as one run-on paragraph. One line typed is
+                        one bullet — no new field, and a shop that wrote a
+                        single sentence still gets a single bullet.
+                      */}
+                      {careNotes.length > 0 ? (
+                        <div>
+                          <p className="mb-2 font-medium text-foreground">Care Instructions:</p>
+                          <ul className="list-disc space-y-1 pl-5">
+                            {careNotes.map((note) => (
+                              <li key={note}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {/*
+                        The shop's own words, LAST rather than under the title.
+
+                        It sat directly beneath the product name, above the
+                        price — so a paragraph of prose stood between the
+                        customer and the two things they came for. It belongs
+                        with the rest of what the shop has to say.
+                      */}
+                      {cake.description ? (
+                        <p className="whitespace-pre-line">{cake.description}</p>
                       ) : null}
                     </div>
                   </DetailSection>
                 ) : null}
 
-                {cake.allergens ? (
-                  <DetailSection title="Allergens">
-                    <p className="whitespace-pre-line text-sm text-muted-foreground">
-                      {cake.allergens}
-                    </p>
-                  </DetailSection>
-                ) : null}
-
-                {cake.careInstructions ? (
-                  <DetailSection title="Care instructions">
-                    {/*
-                      `whitespace-pre-line`, because a shop writes care notes as
-                      a list. Without it every line break collapsed and four
-                      instructions arrived as one run-on sentence.
-                    */}
-                    <p className="whitespace-pre-line text-sm text-muted-foreground">
-                      {cake.careInstructions}
-                    </p>
-                  </DetailSection>
-                ) : null}
-
-                <DetailSection title="Delivery">
-                  <p className="text-sm text-muted-foreground">
-                    {/*
-                      "within city limits" went with the rest of the invented
-                      delivery-area copy: there is no field behind it, and a shop
-                      that delivers to four localities was making a claim about a
-                      whole city.
-                    */}
-                    {/*
-                      Guarded, like the trust-strip row above. `deliveryPromise`
-                      starts “” and is filled by a client effect, so the crawled
-                      HTML read “. Scheduled delivery on your selected date.” —
-                      a sentence beginning with a full stop. Under tabs this
-                      panel was unmounted and never shipped at all.
-                    */}
-                    {deliveryPromise ? `${deliveryPromise}. ` : ""}
-                    Scheduled delivery on{" "}
-                    {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
-                    {deliveryTime ? ` between ${deliveryTime}` : ""}.
-                    {/*
-                      Only promised where the product actually takes a message.
-                      This was unconditional, so a shop selling chargers offered
-                      every customer a free message card it had no way to send.
-                    */}
-                    {cake.allowsMessage !== false
-                      ? " Custom message card included at no extra charge."
-                      : ""}
-                  </p>
-                </DetailSection>
-
-                {/*
-                  `id`, so the star rating beside the title has somewhere to jump
-                  to — and so the review-request email can link straight here.
-                */}
-                {/*
-                  Questions and answers, on the enquiry system this shop
-                  already runs. Only ANSWERED ones are here: an unanswered
-                  question is a stranger’s message in the shop’s inbox, and
-                  publishing it unread would put their words on the shop’s
-                  page under the shop’s name.
-
-                  The list hides itself when there is nothing in it; the form
-                  does not, because being able to ask is the point and a shop
-                  with no questions yet is the normal case.
-                */}
                 <DetailSection id="questions" title="Questions">
                   <div className="space-y-4">
                     {questions.length > 0 ? (

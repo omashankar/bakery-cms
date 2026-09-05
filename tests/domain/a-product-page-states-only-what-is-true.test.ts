@@ -129,6 +129,8 @@ const CAKE: Product = {
 };
 
 function render(cake: Product, modules = defaultModuleSettings): {
+  /** The mounted DOM, for the few assertions that are about ELEMENTS. */
+  container: HTMLDivElement;
   html: string;
   /**
    * Open a tab by its label and hand back the markup that follows.
@@ -163,6 +165,7 @@ function render(cake: Product, modules = defaultModuleSettings): {
   });
 
   return {
+    container,
     html: container.innerHTML,
     section: (heading: string) => {
       const found = [...container.querySelectorAll("section")].find((element) =>
@@ -269,7 +272,7 @@ describe("the shop's own facts reach the page", () => {
       ],
     });
     try {
-      const opened = section("Product details");
+      const opened = section("Product Description");
       expect(opened).toContain("Brand");
       expect(opened).toContain("Anker");
       expect(opened).toContain("Warranty");
@@ -300,10 +303,9 @@ describe("the food tabs belong to food", () => {
      */
     const { html, unmount } = render(CHARGER);
     try {
-      expect(html).not.toContain(">Ingredients<");
-      expect(html).not.toContain(">Nutrition<");
-      expect(html).not.toContain(">Allergens<");
-      expect(html).not.toContain(">Care<");
+      expect(html).not.toContain("Ingredients:");
+      expect(html).not.toContain("Allergens:");
+      expect(html).not.toContain("Care Instructions:");
       expect(html).not.toContain("Flour, sugar, butter");
       expect(html).not.toContain("Refrigerate within 2 hours");
       expect(html).not.toContain("Calorie information will be updated soon");
@@ -323,7 +325,7 @@ describe("the food tabs belong to food", () => {
     }
   });
 
-  it("still shows a cake the tabs it actually fills", () => {
+  it("still shows a cake everything it actually fills", () => {
     const { html, section, unmount } = render({
       ...CAKE,
       ingredients: "Flour, cocoa, cream.",
@@ -332,13 +334,22 @@ describe("the food tabs belong to food", () => {
       calories: 320,
     });
     try {
-      expect(html).toContain(">Ingredients<");
-      expect(html).toContain(">Nutrition<");
-      expect(html).toContain(">Allergens<");
-      expect(html).toContain(">Care instructions<");
+      /**
+       * One section with labelled parts, where there were six headings. Same
+       * data, same gating — a part still appears only where the shop filled
+       * the field — but a customer scanning for “does it have nuts” reads one
+       * block rather than six.
+       */
+      expect(html).toContain("Ingredients:");
+      expect(html).toContain("Allergens:");
+      expect(html).toContain("Care Instructions:");
       // In the HTML, not behind a click — which is also what a crawler gets.
-      expect(section("Ingredients")).toContain("Flour, cocoa, cream.");
-      expect(section("Care instructions")).toContain("Refrigerate on arrival.");
+      const described = section("Product Description");
+      expect(described).toContain("Flour, cocoa, cream.");
+      expect(described).toContain("Refrigerate on arrival.");
+      // The three fixed food facts are bullets in the same list as the
+      // shop's own, rather than a Nutrition heading over three lines.
+      expect(described).toContain("320 kcal per serving");
     } finally {
       unmount();
     }
@@ -456,11 +467,18 @@ describe("the page does not call every product a cake", () => {
      * matched and the case passed for the bug it names.
      */
     promise.value = "";
-    const { section, unmount } = render(CHARGER);
+    const { html, section, unmount } = render(CHARGER);
     try {
-      const text = section("Delivery").replace(/^Delivery/, "").trim();
-      expect(text).not.toMatch(/^\./);
-      expect(text).toMatch(/^Scheduled delivery/);
+      /**
+       * The promise is a BULLET now, and an empty one is filtered out rather
+       * than rendered — so the failure this names cannot take the shape it
+       * once did. An empty `<li>` is what it would look like instead, and that
+       * is what this looks for.
+       */
+      expect(html, "an empty delivery note reached the page").not.toMatch(
+        /<li[^>]*>\s*<\/li>/,
+      );
+      expect(section("Product Description")).toContain("Scheduled delivery");
     } finally {
       unmount();
       promise.value = "Next-day delivery";
@@ -563,7 +581,7 @@ describe("the page does not call every product a cake", () => {
   it("does not promise a message card on a product that takes no message", () => {
     const { section, unmount } = render({ ...CHARGER, allowsMessage: false });
     try {
-      expect(section("Delivery")).not.toContain("message card");
+      expect(section("Product Description")).not.toContain("message card");
     } finally {
       unmount();
     }
@@ -800,6 +818,112 @@ describe("an upgrade whose base option is not free", () => {
     } as never);
     try {
       expect(html).toContain(">Egg preference<");
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe("one Product Description, the way a customer reads it", () => {
+  /** A cake with something in every part of it. */
+  const FULL = {
+    ...CAKE,
+    description: "A classic, finished the morning it goes out.",
+    ingredients: "Flour, cocoa, cream.",
+    allergens: "Contains milk and wheat.",
+    careInstructions: "Refrigerate on arrival.\nServe at room temperature.\n\nEat within 24 hours.",
+    calories: 320,
+    shelfLifeDays: 3,
+    attributes: [
+      { id: "a1", label: "Country of Origin", value: "India" },
+      { id: "a2", label: "Net Quantity", value: "1 cake" },
+    ],
+  };
+
+  it("gathers six headings into one", () => {
+    /**
+     * Details, ingredients, nutrition, allergens, care and delivery each had a
+     * heading of its own. Every one was true and properly gated, but six
+     * headings for six short blocks reads as six subjects when it is one.
+     */
+    const { html, unmount } = render(FULL as never);
+    try {
+      expect(html).toContain("Product Description");
+      // The old headings, gone — these are labelled parts now.
+      expect(html).not.toContain(">Nutrition<");
+      expect(html).not.toContain(">Care instructions<");
+      expect(html).not.toContain(">Delivery<");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("puts the shop's own facts and the food facts in one list", () => {
+    const { section, unmount } = render(FULL as never);
+    try {
+      const described = section("Product Description");
+      expect(described).toContain("Country of Origin: India");
+      expect(described).toContain("Net Quantity: 1 cake");
+      // …and the three fixed fields that used to have a Nutrition heading.
+      expect(described).toContain("320 kcal per serving");
+      expect(described).toContain("3 days when stored properly");
+    } finally {
+      unmount();
+    }
+  });
+
+  it("makes one bullet of each line the shop typed", () => {
+    /**
+     * A shop writes care notes as a list and they arrived as one run-on
+     * paragraph. Blank lines between them are spacing, not a bullet.
+     */
+    const view = render(FULL as never);
+    try {
+      // Scoped to the section: the breadcrumb above renders its separators as
+      // empty list items, so counting every <li> on the page measures the
+      // wrong thing.
+      const described = [...view.container.querySelectorAll("section")].find((element) =>
+        element.querySelector("h2")?.textContent?.includes("Product Description"),
+      );
+      const bullets = [...(described?.querySelectorAll("li") ?? [])].map((node) =>
+        (node.textContent ?? "").trim(),
+      );
+      expect(bullets).toContain("Refrigerate on arrival.");
+      expect(bullets).toContain("Serve at room temperature.");
+      expect(bullets).toContain("Eat within 24 hours.");
+      expect(bullets).not.toContain("");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("moves the shop's paragraph out from between the name and the price", () => {
+    /**
+     * It sat directly under the product name, above the price block — a
+     * paragraph of prose between the customer and the two things they opened
+     * the page for.
+     */
+    const view = render(FULL as never);
+    try {
+      const described = view.section("Product Description");
+      expect(described).toContain("A classic, finished the morning it goes out.");
+
+      const heading = view.container.querySelector("h2");
+      const priceIndex = (view.container.textContent ?? "").indexOf("₹");
+      const proseIndex = (view.container.textContent ?? "").indexOf("A classic, finished");
+      expect(heading).toBeTruthy();
+      expect(proseIndex, "the description is still above the price").toBeGreaterThan(priceIndex);
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("says nothing at all about a product the shop has described nowhere", () => {
+    // A charger with no ingredients, no care notes, no attributes and no prose
+    // gets no heading — not an empty one.
+    const { html, unmount } = render({ ...CHARGER, description: "" } as never);
+    try {
+      expect(html).not.toContain("Product Description");
     } finally {
       unmount();
     }
