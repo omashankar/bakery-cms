@@ -221,7 +221,6 @@ export const commerceSchema = z.object({
 export const modulesSchema = z.object({
   weddingBuilder: z.boolean(),
   flavour: z.boolean(),
-  eggEggless: z.boolean(),
   weight: z.boolean(),
   shape: z.boolean(),
   photoCake: z.boolean(),

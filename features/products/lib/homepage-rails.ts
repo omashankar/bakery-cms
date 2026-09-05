@@ -18,7 +18,6 @@ export type HomepageProductSource =
   | "trending"
   | "best-sellers"
   | "photo-cakes"
-  | "eggless"
   | "seasonal";
 
 function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
@@ -59,7 +58,6 @@ export function buildHomepageProducts(
     trending: published.filter((cake) => cake.isTrending),
     bestSellers: published.filter((cake) => cake.isBestSeller),
     photo: published.filter((cake) => cake.isPhotoCake),
-    eggless: published.filter((cake) => cake.isEggless),
     seasonal: published.filter((cake) => cake.isSeasonal),
   };
 
@@ -86,10 +84,7 @@ export function buildHomepageProducts(
       const admin = pickAdmin(flags.photo);
       return mergeWithCatalog(admin, filterProductsByCategory(all, "photo-cakes"));
     },
-    eggless: () => {
-      const admin = pickAdmin(flags.eggless);
-      return mergeWithCatalog(admin, filterProductsByCategory(all, "eggless"));
-    },
+
     seasonal: () => {
       const admin = pickAdmin(flags.seasonal);
       return mergeWithCatalog(admin, filterProductsByCategory(all, "seasonal"));
@@ -110,7 +105,6 @@ export function buildHomepageProducts(
     "trending",
     "best-sellers",
     "photo-cakes",
-    "eggless",
     "seasonal",
   ];
   const offset = extras.length

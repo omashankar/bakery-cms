@@ -28,11 +28,6 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
     description: "The flavour options box on a product, and the flavour filter on collections.",
   },
   {
-    key: "eggEggless",
-    title: "Egg / Eggless",
-    description: "Egg or eggless choice on products.",
-  },
-  {
     key: "weight",
     title: "Weight",
     description: "Weight variants and per-weight pricing.",

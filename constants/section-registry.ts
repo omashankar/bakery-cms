@@ -441,28 +441,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "ctaHref", label: "CTA link", type: "url" },
     ],
   },
-  {
-    type: "eggless",
-    label: "Eggless Cakes",
-    icon: "Leaf",
-    defaultBackground: "cream",
-    defaultContent: {
-      overline: "100% Eggless",
-      title: "Eggless Collection",
-      description: "Every bit as delicious — crafted without eggs for all celebrations.",
-      maxCount: 4,
-      ctaLabel: "Shop Eggless",
-      ctaHref: routes.store.collection("eggless"),
-    },
-    fields: [
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
-      { key: "maxCount", label: "Max {products} shown", type: "number" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
-    ],
-  },
+
   {
     type: "seasonal",
     label: "Seasonal Collection",

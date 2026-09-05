@@ -74,7 +74,6 @@ export const productFormSchema = z
     isFeatured: z.boolean(),
     isBestSeller: z.boolean(),
     isTrending: z.boolean(),
-    isEggless: z.boolean(),
     isPhotoCake: z.boolean(),
     isSeasonal: z.boolean(),
     shapes: z.array(z.string()).default([]),

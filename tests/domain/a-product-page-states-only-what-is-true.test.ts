@@ -533,7 +533,6 @@ describe("the page does not call every product a cake", () => {
     const { html, unmount } = render({
       ...CHARGER,
       category: "Eggless Photo Frames",
-      isEggless: false,
       allowsPhotoUpload: false,
     });
     try {

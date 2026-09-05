@@ -30,7 +30,6 @@ export interface LandingProduct {
   badge?: string;
   rating?: number;
   reviewCount?: number;
-  isEggless?: boolean;
   flavours?: string[];
   /** Every visible variant option’s label — what the search haystack matches. */
   optionLabels?: string[];
@@ -464,7 +463,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Eggless",
     rating: 4.8,
-    isEggless: true,
   },
   {
     id: "eg-2",
@@ -476,7 +474,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Eggless",
     rating: 4.7,
-    isEggless: true,
   },
   {
     id: "eg-3",
@@ -488,7 +485,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Bestseller",
     rating: 4.9,
-    isEggless: true,
   },
   {
     id: "eg-4",
@@ -499,7 +495,6 @@ export const egglessCakes: LandingProduct[] = [
     image: unsplash(demoPhotoIds.dessertPlate, 600, 600),
     category: "Eggless",
     rating: 4.6,
-    isEggless: true,
   },
 ];
 

@@ -474,7 +474,6 @@ html.dark {
  */
 html[data-wed="0"] [data-gate-wedding],
 html[data-mod-flavour="0"] [data-gate-flavour],
-html[data-mod-egg="0"] [data-gate-egg],
 html[data-mod-weight="0"] [data-gate-weight],
 html[data-mod-shape="0"] [data-gate-shape],
 html[data-mod-photo="0"] [data-gate-photo] {

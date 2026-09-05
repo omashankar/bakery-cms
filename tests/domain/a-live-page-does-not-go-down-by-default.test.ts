@@ -127,9 +127,10 @@ describe("the pre-paint script", () => {
     }
   });
 
-  it("still hides the five module pickers only when explicitly switched off", () => {
-    // The other five gates were always fail-open and must stay that way.
-    for (const key of ["flavour", "eggEggless", "weight", "shape", "photoCake"]) {
+  it("still hides the module pickers only when explicitly switched off", () => {
+    // These gates were always fail-open and must stay that way. There were
+    // five; `eggEggless` went with the egg special case.
+    for (const key of ["flavour", "weight", "shape", "photoCake"]) {
       expect(BUSINESS_BLOCKING_SCRIPT).toContain(`m.${key}===false`);
     }
   });

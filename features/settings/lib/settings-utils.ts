@@ -63,7 +63,6 @@ export const defaultGeneralSettings: GeneralSettings = {
 export const defaultModuleSettings: ModuleSettings = {
   weddingBuilder: true,
   flavour: true,
-  eggEggless: true,
   weight: true,
   shape: true,
   photoCake: true,

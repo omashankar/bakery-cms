@@ -77,7 +77,6 @@ export function mapAdminProductToStorefront(
           : undefined,
     rating: cake.rating,
     reviewCount: cake.reviewCount,
-    isEggless: cake.isEggless,
     flavours: cake.flavourOptions.length > 0 ? cake.flavourOptions : undefined,
     inStock: cake.stockStatus !== "out_of_stock",
     shapes: cake.shapes,

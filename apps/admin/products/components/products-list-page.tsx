@@ -94,7 +94,6 @@ function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeE
       if (filters.flag === "featured" && !cake.isFeatured) return false;
       if (filters.flag === "trending" && !cake.isTrending) return false;
       if (filters.flag === "best-seller" && !cake.isBestSeller) return false;
-      if (filters.productType === "eggless" && !cake.isEggless) return false;
       if (filters.productType === "photo" && !cake.isPhotoCake) return false;
       if (filters.productType === "seasonal" && !cake.isSeasonal) return false;
       if (filters.stock !== "all") {
@@ -432,7 +431,6 @@ export function ProductsListPage() {
               aria-label={`${labels.productWord} type`}
             >
               <option value="all">All types</option>
-              {modules.eggEggless ? <option value="eggless">Eggless</option> : null}
               {modules.photoCake ? <option value="photo">Photo</option> : null}
               <option value="seasonal">Seasonal</option>
             </AdminSelect>
@@ -567,11 +565,6 @@ export function ProductsListPage() {
                             {cake.isBestSeller ? (
                               <Badge variant="bakery" className="text-[10px]">
                                 Best Seller
-                              </Badge>
-                            ) : null}
-                            {modules.eggEggless && cake.isEggless ? (
-                              <Badge variant="outline" className="text-[10px]">
-                                Eggless
                               </Badge>
                             ) : null}
                           </div>

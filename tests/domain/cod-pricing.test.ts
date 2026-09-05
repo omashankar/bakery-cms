@@ -23,7 +23,6 @@ const CATALOGUE: Record<string, Record<string, unknown>> = {
     price: 5000,
     image: "/bf.jpg",
     category: "Cakes",
-    isEggless: false,
     allowsPhotoUpload: false,
     weights: [],
   },

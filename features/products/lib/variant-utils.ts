@@ -35,9 +35,7 @@ function backfillSemantic(
   if (option.semantic) return option;
 
   const label = option.label.toLowerCase();
-  if (groupType === "egg" && label.includes("eggless")) {
-    return { ...option, semantic: "eggless" };
-  }
+
   if (groupType === "photo" && label.includes("photo")) {
     return { ...option, semantic: "photo-print" };
   }
@@ -77,20 +75,21 @@ export function createVariantGroup(
   };
 }
 
+/**
+ * The groups a brand-new product starts with.
+ *
+ * It used to open with an "Egg preference" row on every product a shop ever
+ * created — a bakery question asked of a charger, and a special case in the
+ * type system to carry it. A shop that wants to offer eggless makes an
+ * ordinary option named Eggless and prices it; the page renders any two-option
+ * group as a single tickbox already.
+ *
+ * So this now starts EMPTY unless a photo print was asked for.
+ */
 export function createDefaultVariantGroups(input?: {
-  isEggless?: boolean;
   isPhotoCake?: boolean;
 }): ProductVariantGroup[] {
-  const groups: ProductVariantGroup[] = [
-    createVariantGroup(
-      "Egg preference",
-      "egg",
-      [
-        createVariantOption("Regular", 0, !input?.isEggless),
-        createVariantOption("Eggless", 80, Boolean(input?.isEggless), "eggless"),
-      ]
-    ),
-  ];
+  const groups: ProductVariantGroup[] = [];
 
   if (input?.isPhotoCake) {
     groups.push(
@@ -161,7 +160,7 @@ export function getProductVariantGroups(cake: LandingProduct): ProductVariantGro
  * used to be "Reset to defaults" and REPLACED the array, which is why it is
  * now additive and gated on the module.)
  */
-export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isEggless" | "isPhotoCake">): ProductVariantGroup[] {
+export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isPhotoCake">): ProductVariantGroup[] {
   if (!cake.variantGroups?.length) return [];
 
   return backfillLegacyGroups(cake.variantGroups).map((group) => {
@@ -361,11 +360,10 @@ export function variantGroupsEnabledBy(
    * the storefront, the card projection and the server’s pricing all share, so
    * a caller that forgot to pass it would price a group the page had hidden.
    */
-  modules: { eggEggless: boolean; photoCake: boolean; shape: boolean },
+  modules: { photoCake: boolean; shape: boolean },
 ): ProductVariantGroup[] {
   return groups.filter(
     (group) =>
-      (group.type !== "egg" || modules.eggEggless) &&
       (group.type !== "photo" || modules.photoCake) &&
       (group.type !== "shape" || modules.shape),
   );
@@ -394,36 +392,14 @@ export function calculateVariantAdjustment(
   }, 0);
 }
 
-/**
- * The option a selection points at, or the group's default, or nothing.
- *
- * Nothing is a real answer: a group the customer opted out of has no option,
- * and a cart line that named one anyway would tell the kitchen to make
- * something nobody asked for.
- */
-function resolveSelectedOption(
-  group: ProductVariantGroup,
-  selections: Record<string, string>
-): ProductVariantOption | null {
-  const selectedId = selections[group.id];
-  return (
-    group.options.find((option) => option.id === selectedId) ??
-    group.options.find((option) => option.isDefault) ??
-    null
-  );
-}
 
-/** True when the chosen option of this group carries the given meaning. */
-export function isSelectionSemantic(
-  groups: ProductVariantGroup[],
-  groupType: ProductVariantGroupType,
-  semantic: VariantOptionSemantic,
-  selections: Record<string, string>
-): boolean {
-  const group = groups.find((item) => item.type === groupType);
-  if (!group) return false;
-  return resolveSelectedOption(group, selections)?.semantic === semantic;
-}
+/*
+  `isSelectionSemantic` stood here, and its only caller was the egg branch of
+  `syncLegacyFlagsFromVariants` — the one that asked whether the option a
+  customer had landed on MEANT eggless. Nothing asks that any more: a shop
+  that sells an eggless version sells it as an option with a price, and a shop
+  whose product simply is eggless says so in its name.
+*/
 
 /** True when the product offers an option with the given meaning at all. */
 export function offersSemantic(
@@ -433,77 +409,31 @@ export function offersSemantic(
   return groups.some((group) => group.options.some((option) => option.semantic === semantic));
 }
 
-/**
- * Move a group's default onto (or off) the option carrying `semantic`.
- *
- * This is what keeps an admin toggle and the variant system in agreement: the
- * toggle expresses intent, and the variant data is updated to match it.
- * Returns the original array when the group or option is absent.
- */
-export function setGroupDefaultBySemantic(
-  groups: ProductVariantGroup[],
-  groupType: ProductVariantGroupType,
-  semantic: VariantOptionSemantic,
-  enabled: boolean
-): ProductVariantGroup[] {
-  const group = groups.find((item) => item.type === groupType);
-  if (!group) return groups;
-
-  const target = enabled
-    ? group.options.find((option) => option.semantic === semantic)
-    : group.options.find((option) => option.semantic !== semantic);
-  if (!target) return groups;
-
-  return groups.map((item) =>
-    item.id === group.id
-      ? {
-          ...item,
-          options: item.options.map((option) => ({
-            ...option,
-            isDefault: option.id === target.id,
-          })),
-        }
-      : item
-  );
-}
+/*
+  `setGroupDefaultBySemantic` stood here. Its only caller was the admin's
+  "Eggless" tick, which moved a group's default onto the eggless option so the
+  flag and the variant data could not disagree. Both halves of that pair have
+  gone: the tick, and the flag it kept in step with.
+*/
 
 /**
- * Derive the legacy product flags from the variant system.
+ * Derive the legacy flag from the variant data — but only where there IS any.
  *
- * The two flags mean different things, which is why they are computed differently:
+ * `isPhotoCake` is an OFFER, not a selection: the photo group's default is
+ * deliberately "Standard design", because the print is a paid upsell, so
+ * deriving this from the chosen option would make it permanently false. Where
+ * no group offers it, the admin's own tick is the only statement there is.
  *
- * - `isEggless` — the product ITSELF is eggless, i.e. its chosen/default egg
- *   option is the eggless one. A regular cake that merely offers an eggless
- *   upgrade is not an eggless cake.
- * - `isPhotoCake` — the product OFFERS photo printing. The photo group's default
- *   is deliberately "Standard design" (the print is a paid upsell), so deriving
- *   this from the default selection would make it permanently false.
- */
-/**
- * Derive the legacy flags from the variant data — but only where there IS any.
- *
- * `isEggless` was derived unconditionally, so a product with no egg variant
- * group had the tick overwritten with `false` on save: the admin ticked
- * "Eggless", saved, and it came back unticked, with the eggless filter and badge
- * never applying. Most products have no such group.
- *
- * `current` is what the form holds. Where the variants cannot answer, it stands.
+ * `isEggless` was the other half of this pair and is gone. It said the product
+ * ITSELF was eggless, which is a claim only a shop can make about its own
+ * recipe — so a shop makes it in the product's name and description now, and
+ * an eggless VERSION is an option with a price like any other.
  */
 export function syncLegacyFlagsFromVariants(
   groups: ProductVariantGroup[],
-  selections: Record<string, string>,
-  current?: { isEggless?: boolean; isPhotoCake?: boolean }
-): { isEggless: boolean; isPhotoCake: boolean } {
-  // Groups are addressed by `type`, which is what `isSelectionSemantic` matches
-  // on — not by a `semantic` field, which groups do not carry.
-  const hasEggGroup = groups.some((group) => group.type === "egg");
-
+  current?: { isPhotoCake?: boolean }
+): { isPhotoCake: boolean } {
   return {
-    isEggless: hasEggGroup
-      ? isSelectionSemantic(groups, "egg", "eggless", selections)
-      : (current?.isEggless ?? false),
-    // Photo printing is an offer, not a selection: if no group offers it, the
-    // admin's own tick is the only statement there is.
     isPhotoCake: offersSemantic(groups, "photo-print") || (current?.isPhotoCake ?? false),
   };
 }

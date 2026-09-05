@@ -65,13 +65,18 @@ const CATALOGUE: Record<string, Record<string, unknown>> = {
     weights: [],
     variantGroups: [
       {
-        id: "g-egg",
-        name: "Egg preference",
-        type: "egg",
-        required: true,
+        id: "g-photo",
+        name: "Photo cake",
+        type: "photo",
+        required: false,
         options: [
-          { id: "o-reg", label: "Regular", priceAdjustment: 0, isDefault: true },
-          { id: "o-egl", label: "Eggless", semantic: "eggless", priceAdjustment: 80 },
+          { id: "o-plain", label: "Standard design", priceAdjustment: 0, isDefault: true },
+          {
+            id: "o-print",
+            label: "Custom photo print",
+            semantic: "photo-print",
+            priceAdjustment: 80,
+          },
         ],
       },
     ],
@@ -148,25 +153,25 @@ describe("a priced line says what was chosen", () => {
 });
 
 describe("the summary and the price come from the same groups", () => {
-  it("says Eggless when it charged for Eggless", async () => {
-    const line = await quoteOne("black-forest", { "g-egg": "o-egl" });
+  it("says what it charged for", async () => {
+    const line = await quoteOne("black-forest", { "g-photo": "o-print" });
 
     expect(line.price).toBe(1079);
-    expect(line.variantSummary).toEqual(["Egg preference: Eggless"]);
+    expect(line.variantSummary).toEqual(["Photo cake: Custom photo print"]);
   });
 
   it("omits a group the shop has switched off — the same group it does not charge for", async () => {
     /**
-     * A module that is off used to hide only the PICKER, so an eggless cake was
-     * still charged its +80 default and still stamped "Egg preference: Eggless"
-     * on an order line for a choice the customer was never shown.
+     * A module that is off used to hide only the PICKER, so a product was still
+     * charged for its default and still had the choice stamped on the order line
+     * — a choice the customer was never shown.
      * `variantGroupsEnabledBy` removes the group from PRICING; the summary has
      * to be built from that same filtered list, or the order narrates a group
      * the shop does not sell.
      */
-    state.modules = { eggEggless: false };
+    state.modules = { photoCake: false };
     try {
-      const line = await quoteOne("black-forest", { "g-egg": "o-egl" });
+      const line = await quoteOne("black-forest", { "g-photo": "o-print" });
 
       expect(line.price).toBe(999);
       expect(line.variantSummary).toEqual([]);

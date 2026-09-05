@@ -36,7 +36,6 @@ export function applyBusinessAttributes() {
     on !== false ? root.removeAttribute(attr) : root.setAttribute(attr, "0");
   toggle("data-wed", m.weddingBuilder);
   toggle("data-mod-flavour", m.flavour);
-  toggle("data-mod-egg", m.eggEggless);
   toggle("data-mod-weight", m.weight);
   toggle("data-mod-shape", m.shape);
   toggle("data-mod-photo", m.photoCake);

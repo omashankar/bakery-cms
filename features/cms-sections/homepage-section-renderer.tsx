@@ -1276,14 +1276,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
           showCta
         />
       );
-    case "eggless":
-      return (
-        <ProductGridSection
-          {...props}
-          cakes={railFor("eggless", contentNumber(section.content, "maxCount", 4))}
-          showCta
-        />
-      );
+
     case "seasonal":
       return (
         <ProductGridSection

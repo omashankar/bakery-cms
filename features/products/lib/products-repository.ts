@@ -103,7 +103,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     isFeatured: cake.badge === "Featured",
     isBestSeller: cake.badge === "Bestseller",
     isTrending: cake.badge === "Trending",
-    isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
     isPhotoCake: cake.category.toLowerCase().includes("photo"),
     isSeasonal: cake.category.toLowerCase().includes("seasonal"),
     // Nothing in the landing data says a product comes in Round, Square and
@@ -136,12 +135,16 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     preparationTimeMinutes: cake.category.toLowerCase().includes("photo") ? 180 : 120,
     shelfLifeDays: undefined,
     calories: undefined,
-    allergens: cake.isEggless
-      ? "Contains milk, wheat. Prepared without eggs."
-      : "Contains milk, wheat, eggs.",
+    /*
+      Left for the shop to write.
+
+      This picked one of two sentences from a derived flag. Allergens are the
+      last thing software should guess at on a shop's behalf, and the flag it
+      guessed from has gone — a recipe is stated by whoever makes it.
+    */
+    allergens: undefined,
     careInstructions: undefined,
     variantGroups: createDefaultVariantGroups({
-      isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
       isPhotoCake: cake.category.toLowerCase().includes("photo"),
     }),
     // Zero, not 4.5. A shop opened advertising “4.5 ★ · 12 reviews” on every
@@ -192,7 +195,6 @@ export function normalizeCommerceFields(cake: Product): Product {
 
   return {
     ...cake,
-    isEggless: cake.isEggless ?? false,
     isPhotoCake: cake.isPhotoCake ?? false,
     isSeasonal: cake.isSeasonal ?? false,
     // Never Round/Square/Heart by default. This runs on every repository read,
@@ -477,7 +479,6 @@ export function createEmptyProductForm(): ProductFormData {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isEggless: false,
     isPhotoCake: false,
     isSeasonal: false,
     shapes: [],

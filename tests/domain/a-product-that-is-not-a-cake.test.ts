@@ -60,7 +60,6 @@ const CATALOGUE: Record<string, Record<string, unknown>> = {
     categoryId: "cat-chargers",
     weights: [],
     variantGroups: [],
-    isEggless: false,
     allowsPhotoUpload: false,
   },
 };
@@ -87,7 +86,6 @@ const charger = {
   shapes: [],
   flavourOptions: [],
   occasionIds: [],
-  isEggless: false,
   isPhotoCake: false,
 } as unknown as Product;
 
@@ -169,7 +167,6 @@ describe("the bakery does not move", () => {
     shapes: ["Round", "Heart"],
     flavourOptions: ["Chocolate"],
     occasionIds: [],
-    isEggless: true,
     isPhotoCake: false,
     variantGroups: [
       {
@@ -199,20 +196,21 @@ describe("the bakery does not move", () => {
 
   it("still upgrades legacy stored options that predate `semantic`", () => {
     // backfillLegacyGroups is the one place a label may be inspected, and it
-    // must keep working — it is what makes old records readable.
+    // must keep working — it is what makes old records readable. The egg
+    // branch went with the egg special case; the photo one is what is left.
     const legacy = {
       ...cake,
       variantGroups: [
         {
-          id: "g-egg",
-          name: "Egg preference",
-          type: "egg",
-          required: true,
-          options: [{ id: "o-egl", label: "Eggless upgrade", priceAdjustment: 80 }],
+          id: "g-photo",
+          name: "Photo cake",
+          type: "photo",
+          required: false,
+          options: [{ id: "o-print", label: "Custom photo print", priceAdjustment: 250 }],
         },
       ],
     } as unknown as Product;
 
-    expect(normalizeVariantGroups(legacy)[0].options[0].semantic).toBe("eggless");
+    expect(normalizeVariantGroups(legacy)[0].options[0].semantic).toBe("photo-print");
   });
 });

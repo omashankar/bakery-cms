@@ -22,7 +22,7 @@ export type PhotoFrameShapeId = "circle" | "square" | "heart";
  * cakes already were, so shapes stop being a second system, and the type is
  * what lets `modules.shape` keep gating them.
  */
-export type ProductVariantGroupType = "egg" | "photo" | "shape" | "custom";
+export type ProductVariantGroupType = "photo" | "shape" | "custom";
 
 /**
  * Machine-readable meaning of a variant option.
@@ -34,7 +34,7 @@ export type ProductVariantGroupType = "egg" | "photo" | "shape" | "custom";
  * The mechanism is generic — a flower shop would define its own semantics and
  * leave these unused. Only the values below are bakery-specific.
  */
-export type VariantOptionSemantic = "eggless" | "photo-print";
+export type VariantOptionSemantic = "photo-print";
 
 export interface ProductVariantOption {
   id: string;
@@ -119,7 +119,6 @@ export interface Product extends BaseEntity, ProductDetails {
   isFeatured: boolean;
   isBestSeller: boolean;
   isTrending: boolean;
-  isEggless: boolean;
   isPhotoCake: boolean;
   isSeasonal: boolean;
   shapes: string[];

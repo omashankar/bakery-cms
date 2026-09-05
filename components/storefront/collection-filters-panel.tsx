@@ -193,15 +193,6 @@ export function CollectionFiltersPanel({
       </FilterGroup>
 
       <FilterGroup title="Preferences">
-        {modules.eggEggless ? (
-          <FilterCheckbox
-            id="eggless-only"
-            label="Eggless only"
-            checked={filters.egglessOnly}
-            onCheckedChange={(checked) => onChange({ ...filters, egglessOnly: checked })}
-            data-gate-egg=""
-          />
-        ) : null}
         <FilterCheckbox
           id="in-stock-only"
           label="In stock only"

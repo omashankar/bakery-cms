@@ -30,14 +30,22 @@ import { calculateProductUnitPrice } from "@/features/products/lib/product-prici
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { ProductVariantGroup } from "@/types/product";
 
-const egg = {
-  id: "egg",
-  name: "Egg preference",
-  type: "egg",
+/**
+ * An ordinary priced group. It was the "Egg preference" special case, which
+ * had a type of its own and a module of its own; a shop that offers eggless
+ * now names an option and prices it, exactly like this.
+ *
+ * It stays in this file as the group NO module gates — which is the case the
+ * filter has to get right just as much as the gated ones.
+ */
+const addOn = {
+  id: "add-on",
+  name: "Finish",
+  type: "custom",
   required: true,
   options: [
-    { id: "regular", label: "Regular", priceAdjustment: 0, isDefault: false },
-    { id: "eggless", label: "Eggless", priceAdjustment: 80, isDefault: true, semantic: "eggless" },
+    { id: "plain", label: "Plain", priceAdjustment: 0, isDefault: false },
+    { id: "gold", label: "Gold leaf", priceAdjustment: 80, isDefault: true },
   ],
 } as unknown as ProductVariantGroup;
 
@@ -73,17 +81,9 @@ const size = {
 
 describe("the groups a shop with these modules sells", () => {
   it("keeps everything when every module is on", () => {
-    expect(variantGroupsEnabledBy([egg, photo, size], defaultModuleSettings)).toHaveLength(3);
+    expect(variantGroupsEnabledBy([addOn, photo, size], defaultModuleSettings)).toHaveLength(3);
   });
 
-  it("drops the egg group when Egg/Eggless is off", () => {
-    const kept = variantGroupsEnabledBy([egg, photo, size], {
-      ...defaultModuleSettings,
-      eggEggless: false,
-    });
-
-    expect(kept.map((group) => group.id)).toEqual(["photo", "tier"]);
-  });
 
   /**
    * Shapes became a typed group when the flat `shapes: string[]` was retired.
@@ -93,12 +93,12 @@ describe("the groups a shop with these modules sells", () => {
    * still be charged for.
    */
   it("drops the shape group when Shape is off", () => {
-    const kept = variantGroupsEnabledBy([egg, photo, shape, size], {
+    const kept = variantGroupsEnabledBy([addOn, photo, shape, size], {
       ...defaultModuleSettings,
       shape: false,
     });
 
-    expect(kept.map((group) => group.id)).toEqual(["egg", "photo", "tier"]);
+    expect(kept.map((group) => group.id)).toEqual(["add-on", "photo", "tier"]);
   });
 
   it("does not charge for a shape the page did not show", () => {
@@ -112,22 +112,21 @@ describe("the groups a shop with these modules sells", () => {
   });
 
   it("drops the photo group when Photo Cake is off", () => {
-    const kept = variantGroupsEnabledBy([egg, photo, size], {
+    const kept = variantGroupsEnabledBy([addOn, photo, size], {
       ...defaultModuleSettings,
       photoCake: false,
     });
 
-    expect(kept.map((group) => group.id)).toEqual(["egg", "tier"]);
+    expect(kept.map((group) => group.id)).toEqual(["add-on", "tier"]);
   });
 
   it("never drops a group the modules have nothing to say about", () => {
-    const kept = variantGroupsEnabledBy([size], {
+    const kept = variantGroupsEnabledBy([size, addOn], {
       ...defaultModuleSettings,
-      eggEggless: false,
       photoCake: false,
     });
 
-    expect(kept).toEqual([size]);
+    expect(kept).toEqual([size, addOn]);
   });
 });
 
@@ -136,16 +135,16 @@ describe("what the shop charges", () => {
     const priced = (groups: ProductVariantGroup[]) =>
       calculateProductUnitPrice({ basePrice: 1099, variantGroups: groups, variantSelections: {} });
 
-    expect(priced([egg])).toBe(1179);
+    expect(priced([photo])).toBe(1349);
     expect(
-      priced(variantGroupsEnabledBy([egg], { ...defaultModuleSettings, eggEggless: false })),
+      priced(variantGroupsEnabledBy([photo], { ...defaultModuleSettings, photoCake: false })),
     ).toBe(1099);
   });
 
   it("is not fixed by omitting the selection, which is why the group must go", () => {
     // The reason the gate cannot live on the client alone: an empty selection
     // map still resolves to the group's default option.
-    expect(calculateVariantAdjustment([egg], {})).toBe(80);
+    expect(calculateVariantAdjustment([photo], {})).toBe(250);
   });
 });
 
@@ -189,7 +188,6 @@ describe("where the gate is applied", () => {
   });
 
   it("defaults to every module ON, so an older settings document prices as before", () => {
-    expect(defaultModuleSettings.eggEggless).toBe(true);
     expect(defaultModuleSettings.photoCake).toBe(true);
 
     for (const path of [

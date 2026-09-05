@@ -63,8 +63,6 @@ import { ProductVariantManager } from "./product-variant-manager";
 import {
   createVariantGroup,
   createVariantOption,
-  getDefaultVariantSelections,
-  setGroupDefaultBySemantic,
   syncLegacyFlagsFromVariants,
 } from "@/features/products/lib/variant-utils";
 
@@ -363,13 +361,11 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
        */
       weights: form.weights.filter((tier) => tier.label.trim().length > 0),
       ...resolveStockFields(form),
-      ...syncLegacyFlagsFromVariants(
-        form.variantGroups,
-        getDefaultVariantSelections(form.variantGroups),
-        // Without the form's own flags, a product with no egg variant group
-        // had its "Eggless" tick overwritten with false on every save.
-        { isEggless: form.isEggless, isPhotoCake: form.isPhotoCake },
-      ),
+      // Without the form's own flag, a product with no photo variant group
+      // had its tick overwritten with false on every save.
+      ...syncLegacyFlagsFromVariants(form.variantGroups, {
+        isPhotoCake: form.isPhotoCake,
+      }),
     };
 
     try {
@@ -763,29 +759,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
               <TabsContent value="commerce" className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {modules.eggEggless ? (
-                    <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                      <Checkbox
-                        checked={form.isEggless}
-                        onCheckedChange={(checked) => {
-                          const isEggless = checked === true;
-                          // Move the egg group's default too, so the variant data
-                          // agrees with the toggle. Without this the derived flag
-                          // overwrites the tick on save.
-                          patchForm({
-                            isEggless,
-                            variantGroups: setGroupDefaultBySemantic(
-                              form.variantGroups,
-                              "egg",
-                              "eggless",
-                              isEggless
-                            ),
-                          });
-                        }}
-                      />
-                      Eggless
-                    </label>
-                  ) : null}
+                  {/*
+                    An "Eggless" tick stood here, and a matching module switch
+                    behind it.
+
+                    It said the product ITSELF was eggless — a claim about a
+                    recipe, which only the shop can make and which it makes
+                    better in the name and the description. What a CUSTOMER
+                    needs is the choice, and that is an ordinary option group
+                    named "Eggless" with a price on it: the product page renders
+                    any two-option group as a single tickbox already.
+                  */}
                   {modules.photoCake ? (
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                     <Checkbox

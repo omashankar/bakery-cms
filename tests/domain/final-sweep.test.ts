@@ -264,35 +264,48 @@ describe("a name with no Latin characters", () => {
   });
 });
 
-describe("the eggless tick survives a save", () => {
+describe("the photo tick survives a save", () => {
+  /**
+   * This described the EGGLESS tick, which was derived unconditionally — so a
+   * product with no egg group had it overwritten with false on every save.
+   * Both the tick and the flag have gone: a recipe is the shop's claim to make
+   * in its own words. The photo flag is the same mechanism and the same trap,
+   * and it is still here.
+   */
   const noGroups: ProductVariantGroup[] = [];
-  const eggGroup: ProductVariantGroup[] = [
+  const photoGroup: ProductVariantGroup[] = [
     {
       id: "g1",
-      name: "Egg",
-      type: "egg",
+      name: "Photo",
+      type: "photo",
       required: true,
       options: [
-        { id: "o1", label: "With egg", priceDelta: 0, isDefault: true, semantic: "with-egg" },
-        { id: "o2", label: "Eggless", priceDelta: 50, isDefault: false, semantic: "eggless" },
+        { id: "o1", label: "Standard design", priceAdjustment: 0, isDefault: true },
+        {
+          id: "o2",
+          label: "Custom photo print",
+          priceAdjustment: 250,
+          isDefault: false,
+          semantic: "photo-print",
+        },
       ],
     } as unknown as ProductVariantGroup,
   ];
 
-  it("keeps the admin's tick when there is no egg variant group", () => {
-    // Most products have none, and the flag was derived unconditionally — so the
-    // tick came back off, and the eggless filter and badge never applied.
-    const flags = syncLegacyFlagsFromVariants(noGroups, {}, { isEggless: true });
-    expect(flags.isEggless).toBe(true);
+  it("keeps the admin's tick when there is no photo variant group", () => {
+    expect(syncLegacyFlagsFromVariants(noGroups, { isPhotoCake: true }).isPhotoCake).toBe(true);
   });
 
-  it("still derives from the variants when there IS a group", () => {
-    const flags = syncLegacyFlagsFromVariants(eggGroup, {}, { isEggless: true });
-    expect(flags.isEggless).toBe(false);
+  it("says so when a group offers the print, whatever the tick said", () => {
+    // An OFFER, not a selection: the group's default is deliberately the free
+    // option, so deriving this from the chosen one would make it always false.
+    expect(syncLegacyFlagsFromVariants(photoGroup, { isPhotoCake: false }).isPhotoCake).toBe(
+      true,
+    );
   });
 
   it("defaults to false when nothing says otherwise", () => {
-    expect(syncLegacyFlagsFromVariants(noGroups, {}).isEggless).toBe(false);
+    expect(syncLegacyFlagsFromVariants(noGroups).isPhotoCake).toBe(false);
   });
 });
 

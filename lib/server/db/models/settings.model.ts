@@ -137,7 +137,6 @@ const modulesSchema = new mongoose.Schema(
     // default, which fills in for a document that simply does not say.
     weddingBuilder: { type: Boolean, default: true },
     flavour: { type: Boolean, default: true },
-    eggEggless: { type: Boolean, default: true },
     weight: { type: Boolean, default: true },
     shape: { type: Boolean, default: true },
     photoCake: { type: Boolean, default: true },

@@ -48,7 +48,6 @@ const HOMEPAGE_SOURCES = [
   "trending",
   "best-sellers",
   "photo-cakes",
-  "eggless",
   "seasonal",
 ] as const;
 
@@ -67,7 +66,6 @@ function cake(over: Partial<Product> & { slug: string }): Product {
     isBestSeller: false,
     isTrending: false,
     isPhotoCake: false,
-    isEggless: false,
     isSeasonal: false,
     shapes: [],
     flavourOptions: [],

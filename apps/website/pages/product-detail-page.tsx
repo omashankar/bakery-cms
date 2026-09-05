@@ -8,7 +8,6 @@ import {
   Gift,
   Heart,
   ImageUp,
-  Leaf,
   Share2,
   Tag,
   ShoppingBag,
@@ -382,7 +381,6 @@ export function ProductDetailPage({
   /** The selectors the storefront tests hang the module gates off. */
   function gatesFor(group: ProductVariantGroup) {
     return {
-      "data-gate-egg": group.type === "egg" ? "" : undefined,
       "data-gate-photo": group.type === "photo" ? "" : undefined,
       "data-gate-shape": group.type === "shape" ? "" : undefined,
     };
@@ -503,32 +501,32 @@ export function ProductDetailPage({
     () => formatVariantSummary(visibleVariantGroups, visibleSelections),
     [visibleVariantGroups, visibleSelections]
   );
-  const eggGroup = variantGroups.find((group) => group.type === "egg");
-  const selectedEggOption = eggGroup?.options.find(
-    (option) => option.id === variantSelections[eggGroup.id]
-  );
+
   const photoGroup = variantGroups.find((group) => group.type === "photo");
   const selectedPhotoOption = photoGroup?.options.find(
     (option) => option.id === variantSelections[photoGroup.id]
   );
-  // Branch on the option's semantic, never its label — labels are merchant-editable
-  // display text and may be reworded or translated.
   /**
-   * NO CATEGORY STRING-MATCHING.
+   * NO CATEGORY STRING-MATCHING, and no egg claim at all any more.
    *
-   * These read `category.toLowerCase().includes("eggless")` and
+   * This read `category.toLowerCase().includes("eggless")` and
    * `.includes("photo")` — so what a shop had NAMED a category decided what
    * the page claimed about the product and which controls it offered. A
    * category called “Photo Frames” got a photo-cake uploader; one called
    * “Eggless Sponges” had every product in it described as made without eggs,
-   * whatever the product said. That is business-type control by another name,
+   * whatever the product said. That was business-type control by another name,
    * decided by a word the shop typed for its own filing.
    *
-   * What is left is what the PRODUCT states: the option the customer picked
-   * (by `semantic`, never by label — labels are merchant-editable display
-   * text), or the product’s own flag.
+   * The eggless half then went further: the page no longer says a product is
+   * made without eggs at all. That is a claim about a recipe, and the shop
+   * makes it in the name, the description and the ingredients — where it can
+   * be worded, qualified and corrected — rather than in a badge this software
+   * derives. An eggless VERSION is an ordinary priced option, and the buy box
+   * renders it as a tickbox like any other.
+   *
+   * What is left is what the PRODUCT states: the option the customer picked,
+   * by `semantic`, never by label — labels are merchant-editable display text.
    */
-  const isEggless = selectedEggOption?.semantic === "eggless" || cake.isEggless === true;
   const showPhotoUpload =
     (cake.allowsPhotoUpload === true || selectedPhotoOption?.semantic === "photo-print") &&
     modules.photoCake;
@@ -1005,14 +1003,6 @@ export function ProductDetailPage({
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {cake.category ? <Badge variant="accent">{cake.category}</Badge> : null}
-                  {modules.eggEggless && isEggless ? (
-                    <span className="contents" data-gate-egg>
-                      <Badge variant="outline" className="gap-1">
-                        <Leaf className="size-3" />
-                        Eggless
-                      </Badge>
-                    </span>
-                  ) : null}
                 </div>
                 <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
                 {cake.rating ? (
@@ -1501,15 +1491,6 @@ export function ProductDetailPage({
                     <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
                   </li>
                 ) : null}
-                {modules.eggEggless && isEggless ? (
-                  <li
-                    className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
-                    data-gate-egg
-                  >
-                    <Leaf className="size-6 text-bakery-700" />
-                    <span className="font-medium text-foreground">Made without eggs</span>
-                  </li>
-                ) : null}
                 {cake.allowsMessage !== false ? (
                   <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
                     <Gift className="size-6 text-bakery-700" />
@@ -1571,12 +1552,13 @@ export function ProductDetailPage({
                       {cake.ingredients ? (
                         <div>
                           <p className="mb-2 font-medium text-foreground">Ingredients:</p>
-                          <p className="whitespace-pre-line">
-                            {cake.ingredients}
-                            {modules.eggEggless && isEggless
-                              ? ` This ${labels.productWord.toLowerCase()} is prepared without eggs.`
-                              : ""}
-                          </p>
+                          {/*
+                            " This … is prepared without eggs." used to be
+                            appended here from a derived flag. A shop writes
+                            what is and is not in its own recipe; this box is
+                            already the place for it.
+                          */}
+                          <p className="whitespace-pre-line">{cake.ingredients}</p>
                         </div>
                       ) : null}
 

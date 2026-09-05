@@ -10,7 +10,6 @@ import type { ProductVariantGroup, ProductVariantGroupType } from "@/types/produ
 import type { ModuleSettings } from "@/types/settings";
 import { formatCurrency } from "@/utils/format";
 import {
-  createDefaultVariantGroups,
   createVariantGroup,
   createVariantOption,
 } from "@/features/products/lib/variant-utils";
@@ -31,7 +30,6 @@ interface ProductVariantManagerProps {
 }
 
 const groupTypeLabels: Record<ProductVariantGroupType, string> = {
-  egg: "Egg preference",
   photo: "Photo cake",
   shape: "Shape",
   custom: "Custom",
@@ -71,39 +69,19 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
     ]);
   }
 
-  /** True when this product already carries the bakery's egg group. */
-  const hasEggGroup = groups.some((group) => group.type === "egg");
 
   /**
-   * Whether to offer the bakery-only Type control for a group of this type.
+   * Whether to offer the typed-group control for a group of this type.
    *
-   * A group already using egg or photo always keeps it, so switching a module
-   * off never strands data an admin can no longer edit.
+   * A group already using photo or shape always keeps it, so switching a
+   * module off never strands data an admin can no longer edit.
    */
   const showTypeControl = (type: ProductVariantGroupType): boolean =>
-    modules.eggEggless ||
     modules.photoCake ||
     modules.shape ||
-    type === "egg" ||
     type === "photo" ||
     type === "shape";
 
-  /**
-   * Give a bakery its egg/eggless group — without taking anything away.
-   *
-   * The button this replaces called `createDefaultVariantGroups()` and passed
-   * the result straight to `onChange`, which REPLACES. So "Reset defaults" on a
-   * phone charger deleted Storage and Colour and left an egg question in their
-   * place, and on a photo cake it discarded the photo group the Commerce tab
-   * had just added. Appending is the only thing this was ever wanted for.
-   */
-  function addEggOptions() {
-    if (hasEggGroup) return;
-    onChange([
-      ...groups,
-      ...createDefaultVariantGroups().filter((group) => group.type === "egg"),
-    ]);
-  }
 
   function updateOption(
     groupId: string,
@@ -195,21 +173,15 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
         </div>
         <div className="flex flex-wrap gap-2">
           {/*
-            "Reset defaults" was here, and it was a trap rather than a shortcut.
-            It called `createDefaultVariantGroups()` with no arguments and
-            REPLACED the array, so one click on a phone charger deleted Storage
-            and Colour and installed "Egg preference / Regular / Eggless +80" —
-            no confirm, and not even gated on the egg module being on.
+            "Reset defaults" stood here, then "Add egg / eggless".
 
-            It is now additive, gated on the module, and disabled once the group
-            exists, so it can only ever give a bakery something it is missing.
+            The first was a trap: it REPLACED the array, so one click on a phone
+            charger deleted Storage and Colour and installed "Egg preference /
+            Regular / Eggless +80". The second was the same button made
+            additive — and it has gone with the special case it added. A shop
+            that offers eggless adds an option group and names it, which is what
+            "Add option" beside this does.
           */}
-          {modules.eggEggless && !hasEggGroup ? (
-            <Button type="button" variant="outline" size="sm" onClick={addEggOptions}>
-              <Plus className="size-4" />
-              Add egg / eggless
-            </Button>
-          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={() => addGroup("custom")}>
             <Plus className="size-4" />
             Add option
@@ -266,9 +238,7 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                         })
                       }
                     >
-                      {modules.eggEggless || group.type === "egg" ? (
-                        <option value="egg">Egg preference</option>
-                      ) : null}
+
                       {modules.photoCake || group.type === "photo" ? (
                         <option value="photo">Photo cake</option>
                       ) : null}

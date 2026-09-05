@@ -167,7 +167,6 @@ export interface ActivityLog {
 export interface ModuleSettings {
   weddingBuilder: boolean;
   flavour: boolean;
-  eggEggless: boolean;
   weight: boolean;
   shape: boolean;
   photoCake: boolean;

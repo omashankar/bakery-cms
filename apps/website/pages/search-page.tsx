@@ -25,12 +25,11 @@ import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 // `requires` chips only show when that bakery module (or wedding) is enabled.
 const POPULAR_SEARCHES: Array<{
   term: string;
-  requires?: "wedding" | "eggEggless" | "photoCake";
+  requires?: "wedding" | "photoCake";
 }> = [
   { term: "Chocolate" },
   { term: "Wedding", requires: "wedding" },
   { term: "Red Velvet" },
-  { term: "Eggless", requires: "eggEggless" },
   { term: "Photo Cake", requires: "photoCake" },
   { term: "Butterscotch" },
 ];
@@ -78,11 +77,10 @@ export function SearchPage({ catalog }: SearchPageProps) {
     () =>
       POPULAR_SEARCHES.filter((item) => {
         if (item.requires === "wedding" && !weddingEnabled) return false;
-        if (item.requires === "eggEggless" && !modules.eggEggless) return false;
         if (item.requires === "photoCake" && !modules.photoCake) return false;
         return searchProducts(item.term, catalog).length > 0;
       }),
-    [catalog, modules.eggEggless, modules.photoCake, weddingEnabled],
+    [catalog, modules.photoCake, weddingEnabled],
   );
 
   // Searching stays on the client (it is interactive); the catalogue it searches
@@ -137,7 +135,6 @@ export function SearchPage({ catalog }: SearchPageProps) {
                   type="button"
                   onClick={() => runSearch(item.term)}
                   data-gate-wedding={item.requires === "wedding" ? "" : undefined}
-                  data-gate-egg={item.requires === "eggEggless" ? "" : undefined}
                   data-gate-photo={item.requires === "photoCake" ? "" : undefined}
                   className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                 >

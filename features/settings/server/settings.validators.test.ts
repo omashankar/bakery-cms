@@ -116,12 +116,13 @@ describe("settings validators", () => {
     expect(commerceSchema.safeParse({ ...base, taxRate: 0.05 }).success).toBe(true);
   });
 
-  it("modules requires all six booleans", () => {
+  it("modules requires all five booleans", () => {
+    // It was six. `eggEggless` went with the egg special case — a shop that
+    // offers eggless prices an option for it now.
     expect(
       modulesSchema.safeParse({
         weddingBuilder: true,
         flavour: true,
-        eggEggless: true,
         weight: true,
         shape: true,
         photoCake: true,

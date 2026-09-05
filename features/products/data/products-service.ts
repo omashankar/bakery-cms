@@ -244,7 +244,6 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
       (group) => group.options.map((option) => option.label),
     ),
     occasions: product.occasions,
-    isEggless: product.isEggless,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),
   };
@@ -401,7 +400,6 @@ export async function getHomepageRails(
     "trending",
     "best-sellers",
     "photo-cakes",
-    "eggless",
     "seasonal",
   ];
 

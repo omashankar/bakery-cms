@@ -65,36 +65,33 @@ describe("createVariantGroup", () => {
 });
 
 describe("createDefaultVariantGroups", () => {
-  it("always produces an egg-preference group", () => {
-    const groups = createDefaultVariantGroups();
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0].type).toBe("egg");
-    expect(groups[0].options.map((o) => o.label)).toEqual(["Regular", "Eggless"]);
-  });
-
-  it("defaults to Regular for an egg cake and Eggless for an eggless one", () => {
-    const regular = createDefaultVariantGroups({ isEggless: false });
-    const eggless = createDefaultVariantGroups({ isEggless: true });
-
-    expect(regular[0].options.find((o) => o.isDefault)?.label).toBe("Regular");
-    expect(eggless[0].options.find((o) => o.isDefault)?.label).toBe("Eggless");
+  it("produces nothing at all for an ordinary product", () => {
+    /**
+     * It always produced an "Egg preference" group — a bakery question asked
+     * of a phone charger, and a typed special case to carry it. A shop that
+     * offers eggless names an option and prices it; the buy box renders any
+     * two-option group as a single tickbox already.
+     */
+    expect(createDefaultVariantGroups()).toEqual([]);
+    expect(createDefaultVariantGroups({ isPhotoCake: false })).toEqual([]);
   });
 
   it("adds an optional photo group only for photo cakes", () => {
     const withPhoto = createDefaultVariantGroups({ isPhotoCake: true });
     const withoutPhoto = createDefaultVariantGroups({ isPhotoCake: false });
 
-    expect(withPhoto.map((g) => g.type)).toEqual(["egg", "photo"]);
-    expect(withoutPhoto.map((g) => g.type)).toEqual(["egg"]);
-    expect(withPhoto[1].required).toBe(false);
+    expect(withPhoto.map((g) => g.type)).toEqual(["photo"]);
+    expect(withoutPhoto).toEqual([]);
+    expect(withPhoto[0].required).toBe(false);
   });
 
-  it("prices the eggless upgrade at +80 and the custom photo print at +250", () => {
+  it("prices the custom photo print at +250 and the standard design at nothing", () => {
     const groups = createDefaultVariantGroups({ isPhotoCake: true });
 
-    expect(groups[0].options.find((o) => o.label === "Eggless")?.priceAdjustment).toBe(80);
-    expect(groups[1].options.find((o) => o.label === "Custom photo print")?.priceAdjustment).toBe(250);
+    expect(groups[0].options.find((o) => o.label === "Standard design")?.priceAdjustment).toBe(0);
+    expect(groups[0].options.find((o) => o.label === "Custom photo print")?.priceAdjustment).toBe(
+      250,
+    );
   });
 });
 
@@ -115,7 +112,6 @@ describe("normalizeVariantGroups", () => {
 
     const result = normalizeVariantGroups({
       variantGroups: existing,
-      isEggless: false,
       isPhotoCake: false,
     });
 
@@ -137,7 +133,6 @@ describe("normalizeVariantGroups", () => {
      */
     const result = normalizeVariantGroups({
       variantGroups: [],
-      isEggless: true,
       isPhotoCake: false,
     });
 
@@ -166,7 +161,6 @@ describe("normalizeVariantGroups", () => {
           ],
         },
       ],
-      isEggless: false,
       isPhotoCake: false,
     });
 
@@ -188,7 +182,6 @@ describe("normalizeVariantGroups", () => {
           ],
         },
       ],
-      isEggless: false,
       isPhotoCake: false,
     });
 
@@ -202,55 +195,66 @@ describe("selections and pricing", () => {
     const groups = createDefaultVariantGroups({ isPhotoCake: true });
     const selections = getDefaultVariantSelections(groups);
 
-    expect(Object.keys(selections)).toHaveLength(2);
+    expect(Object.keys(selections)).toHaveLength(1);
     expect(selections[groups[0].id]).toBe(groups[0].options[0].id);
   });
 
   it("sums the price adjustments of the selected options", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
+    const groups = [
+      ...createDefaultVariantGroups({ isPhotoCake: true }),
+      {
+        id: "g-finish",
+        name: "Finish",
+        type: "custom" as const,
+        required: false,
+        options: [
+          { id: "plain", label: "Plain", priceAdjustment: 0, isDefault: true },
+          { id: "gold", label: "Gold leaf", priceAdjustment: 80, isDefault: false },
+        ],
+      },
+    ];
     const selections = {
-      [groups[0].id]: groups[0].options[1].id, // Eggless +80
-      [groups[1].id]: groups[1].options[1].id, // Custom photo print +250
+      [groups[0].id]: groups[0].options[1].id, // Custom photo print +250
+      [groups[1].id]: "gold", // +80
     };
 
     expect(calculateVariantAdjustment(groups, selections)).toBe(330);
   });
 
   it("falls back to the default option when a selection is missing", () => {
-    const groups = createDefaultVariantGroups({ isEggless: true });
+    const groups = createDefaultVariantGroups({ isPhotoCake: true });
 
-    // No selection passed: falls back to the default (Eggless, +80).
-    expect(calculateVariantAdjustment(groups, {})).toBe(80);
+    // No selection passed: falls back to the default, which for a photo group
+    // is deliberately the FREE one — the print is a paid upsell.
+    expect(calculateVariantAdjustment(groups, {})).toBe(0);
   });
 
   it("returns null for an unknown group or option", () => {
-    const groups = createDefaultVariantGroups();
+    const groups = createDefaultVariantGroups({ isPhotoCake: true });
 
     expect(getVariantOption(groups, "nope", "nope")).toBeNull();
     expect(getVariantOption(groups, groups[0].id, "nope")).toBeNull();
+    // …and finds one that IS there, so the two above cannot pass on an
+    // empty list.
+    expect(getVariantOption(groups, groups[0].id, groups[0].options[0].id)).not.toBeNull();
   });
 });
 
 describe("syncLegacyFlagsFromVariants", () => {
-  it("derives isEggless from the selected egg option label", () => {
-    const groups = createDefaultVariantGroups({ isEggless: true });
-    const selections = getDefaultVariantSelections(groups);
+  /**
+   * The `isEggless` half of this is gone with the flag it derived. It said the
+   * product ITSELF was eggless, which is a claim about a recipe — the shop's
+   * to make, in the name and the description.
+   */
+  it("says a product offers a print when a group offers one", () => {
+    const groups = createDefaultVariantGroups({ isPhotoCake: true });
 
-    expect(syncLegacyFlagsFromVariants(groups, selections).isEggless).toBe(true);
-  });
-
-  it("reports isEggless false when Regular is selected", () => {
-    const groups = createDefaultVariantGroups({ isEggless: false });
-    const selections = getDefaultVariantSelections(groups);
-
-    expect(syncLegacyFlagsFromVariants(groups, selections).isEggless).toBe(false);
+    // An OFFER, not a selection: the default is the free option, so deriving
+    // this from the chosen one would make it permanently false.
+    expect(syncLegacyFlagsFromVariants(groups).isPhotoCake).toBe(true);
   });
 
   it("reports isPhotoCake false when there is no photo group", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: false });
-
-    expect(syncLegacyFlagsFromVariants(groups, getDefaultVariantSelections(groups)).isPhotoCake).toBe(
-      false
-    );
+    expect(syncLegacyFlagsFromVariants(createDefaultVariantGroups()).isPhotoCake).toBe(false);
   });
 });

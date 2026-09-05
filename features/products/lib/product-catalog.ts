@@ -142,7 +142,6 @@ export function filterProductsByCategory(
    */
   const byAttribute = (cake: LandingProduct) => {
     if (slug === "photo-cakes" || slug === "photo") return cake.allowsPhotoUpload === true;
-    if (slug === "eggless") return cake.isEggless === true;
     return false;
   };
 

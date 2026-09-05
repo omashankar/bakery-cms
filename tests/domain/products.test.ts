@@ -180,16 +180,24 @@ describe("cakes repository", () => {
     expect(empty.stockStatus).toBe("in_stock");
   });
 
-  it("still offers the bakery its defaults, when a human asks for them", () => {
-    // The Variants tab's "Reset to defaults" button. Removing the automatic
-    // injection must not remove the merchant's ability to opt in.
-    const groups = createDefaultVariantGroups({ isEggless: true });
+  it("starts a new product with no option groups at all", () => {
+    /**
+       Every product a shop created used to open with an "Egg preference" row
+       — a bakery question asked of a phone charger. It has gone with the egg
+       special case: a shop that offers eggless adds an option and prices it,
+       and the product page renders any two-option group as one tickbox.
+     */
+    expect(createDefaultVariantGroups()).toEqual([]);
+  });
+
+  it("still builds the photo group for a product that prints one", () => {
+    const groups = createDefaultVariantGroups({ isPhotoCake: true });
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].type).toBe("egg");
+    expect(groups[0].type).toBe("photo");
     expect(
-      groups[0].options.find((o: ProductVariantOption) => o.isDefault)?.label,
-    ).toBe("Eggless");
+      groups[0].options.some((o: ProductVariantOption) => o.semantic === "photo-print"),
+    ).toBe(true);
   });
 });
 

@@ -12,7 +12,6 @@ export interface CollectionFilters {
   weights: string[];
   priceMin: number;
   priceMax: number;
-  egglessOnly: boolean;
   inStockOnly: boolean;
 }
 
@@ -63,7 +62,6 @@ export const DEFAULT_COLLECTION_FILTERS: CollectionFilters = {
   weights: [],
   priceMin: 0,
   priceMax: COLLECTION_PRICE_FLOOR,
-  egglessOnly: false,
   inStockOnly: false,
 };
 
@@ -232,9 +230,19 @@ export function applyCollectionFilters(
     }
 
     if (cake.price < filters.priceMin || cake.price > filters.priceMax) return false;
-    if (filters.egglessOnly && !cake.isEggless && !cake.category.toLowerCase().includes("eggless")) {
-      return false;
-    }
+    /*
+      An "Eggless only" tick stood here, reading `cake.isEggless` — and, as a
+      second chance, whether the shop happened to have typed "eggless" into
+      the category name. Both are gone: the flag, because a recipe is the
+      shop's claim to make in its own words rather than a boolean this
+      software derives, and the category match because a word typed for filing
+      should never decide what a page claims (see the note in
+      product-detail-page.tsx).
+
+      Nothing on a product says machine-readably that it is eggless any more,
+      so a cross-catalogue tick for it cannot be honest. Searching the name
+      and description is what remains, and that is what the shop writes.
+    */
     if (filters.inStockOnly && cake.inStock === false) return false;
 
     return (
@@ -263,7 +271,6 @@ export function countActiveFilters(
   if (filters.occasions.length) count += 1;
   if (filters.flavours.length) count += 1;
   if (filters.weights.length) count += 1;
-  if (filters.egglessOnly) count += 1;
   if (filters.inStockOnly) count += 1;
   if (filters.priceMin > 0 || filters.priceMax < priceCeiling) count += 1;
   return count;

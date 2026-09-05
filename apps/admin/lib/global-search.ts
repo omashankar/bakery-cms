@@ -118,7 +118,7 @@ const SETTINGS_ENTRIES: GlobalSearchResult[] = [
     title: "Modules",
     subtitle: "Optional features & wedding builder",
     href: routes.admin.settings.modules,
-    keywords: ["flavour", "weight", "shape", "egg", "eggless", "photo cake", "wedding"],
+    keywords: ["flavour", "weight", "shape", "photo cake", "wedding"],
   },
   {
     id: "settings-contact",

@@ -246,7 +246,7 @@ describe("collection filters use the product's real data", () => {
     const start = source.indexOf("function toCard(");
     const fn = source.slice(start, source.indexOf("\n}", start));
 
-    for (const field of ["occasions", "isEggless", "flavours", "weights"]) {
+    for (const field of ["occasions", "flavours", "weights"]) {
       expect(fn, `toCard must carry ${field} or the filter that reads it is dead`).toContain(
         `${field}: product.${field}`,
       );
