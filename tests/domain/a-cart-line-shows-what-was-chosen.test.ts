@@ -275,7 +275,19 @@ describe("changing a choice on a line already in the cart", () => {
     expect(cart[0]?.quantity).toBe(2);
   });
 
-  it("keeps the line when only the quantity changed", () => {
+  it("carries the line's own quantity across a change of size", () => {
+    /**
+     * This used to drive the product page's quantity stepper and check the
+     * line survived. The stepper has gone — the cart is where a customer says
+     * how many — so the scenario it described is unreachable from this page.
+     *
+     * What replaced it is the risk that removing a control creates. `quantity`
+     * is still state and still sent with the line, seeded from the line being
+     * edited; if that seeding were dropped, a customer editing a line of two
+     * would silently come back holding one, with nothing on screen to have
+     * told them. Changing the SIZE takes the replace branch, which builds a
+     * whole new line — the branch most likely to lose it.
+     */
     addToCart(cartLineToAddInput({ ...LINE, weight: "M", price: 800, quantity: 2 }));
     const lineId = getCartItems()[0]!.id;
 
@@ -289,13 +301,29 @@ describe("changing a choice on a line already in the cart", () => {
       } as never),
     );
 
-    // The stepper labels its buttons rather than writing on them.
-    click(container!.querySelector('button[aria-label="Increase quantity"]'));
+    click([...container!.querySelectorAll("button")].find((node) => node.textContent?.trim() === "L"));
     click(buttonSaying("Update cart"));
 
     const cart = getCartItems();
     expect(cart).toHaveLength(1);
-    expect(cart[0]?.quantity).toBe(3);
+    expect(cart[0]?.weight).toBe("L");
+    expect(cart[0]?.quantity, "the customer's quantity was reset by the edit").toBe(2);
+  });
+
+  it("does not offer a quantity control on the product page at all", () => {
+    // The cart has one, and it is the screen a customer is on when they think
+    // about how many. Adding from a grid card never asked either.
+    const view = mount(
+      createElement(ProductDetailPage, {
+        cake: PRODUCT,
+        modules: defaultModuleSettings,
+        related: [],
+        catalog: [],
+      } as never),
+    );
+
+    expect(view.querySelector('button[aria-label="Increase quantity"]')).toBeNull();
+    expect(view.textContent).not.toContain("Quantity");
   });
 
   it("replaces the line instead of leaving a second one beside it", () => {

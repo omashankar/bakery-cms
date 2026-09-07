@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, createElement } from "react";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { createRoot } from "react-dom/client";
@@ -605,11 +608,20 @@ describe("the page does not call every product a cake", () => {
 });
 
 describe("a cake still says everything it used to", () => {
-  it("prints its own tier under the price, not a fallback", () => {
+  it("offers its own tiers, not a fallback", () => {
+    /**
+     * This used to read the line under the price — "Serves 8–10 people ·
+     * 1 kg" — which the shop has since asked us to drop. The thing the test
+     * was actually about survives it: a cake shows the tiers IT declares,
+     * where a charger that declares none shows nothing at all. The picker
+     * is where that now reads.
+     */
     const { html, unmount } = render(CAKE);
     try {
-      expect(html).toContain("Serves 8–10 people");
       expect(html).toContain("1 kg");
+      expect(html).toContain("2 kg");
+      // …and the headcount is nowhere on the page any more.
+      expect(html).not.toContain("Serves 8–10 people");
     } finally {
       unmount();
     }
@@ -1008,17 +1020,55 @@ describe("the four things the shop asked us to stop showing", () => {
     }
   });
 
-  it("still states the headcount once, under the price", () => {
+  it("does not state the headcount anywhere on the page", () => {
     /**
-     * The removal must not cost the shop the claim itself, only the repeat.
-     * This is the line the panel was echoing.
+     * The panel went first and this line stayed, on the argument that a
+     * claim stated once is not a repeat. The shop then asked for the line
+     * too — so the page no longer says who a cake feeds at all.
+     *
+     * The DATA is untouched: `serves` is still stored per tier, still
+     * editable, and still the thing a shop would write in the description
+     * if it wants to say it. This is about the buy box, not the product.
      */
     const view = render(CAKE);
+    const text = view.container.textContent ?? "";
     try {
-      expect(view.container.textContent ?? "").toContain("Serves 8–10 people");
+      expect(text).not.toContain("Serves 8–10 people");
+      expect(text).not.toContain("serves 8–10");
+      // The size itself is still offered — that is the picker, not a claim.
+      expect(text).toContain("1 kg");
     } finally {
       view.unmount();
     }
+  });
+
+  it("does not ask how many, because the cart does", () => {
+    /**
+     * A Quantity stepper stood beside Wishlist. The cart has one and is the
+     * screen a customer is on when they think about how many; adding from a
+     * grid card never asked either.
+     */
+    const view = render(CAKE);
+    try {
+      expect(view.container.textContent ?? "").not.toContain("Quantity");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("still sends a quantity, so editing a cart line keeps its own", () => {
+    /**
+     * The control went; the value must not. `quantity` is still state, still
+     * on the payload, and still restored by the edit path — a customer who
+     * edits a line of three must not have it silently reset to one.
+     */
+    const page = readFileSync(
+      join(process.cwd(), "apps/website/pages/product-detail-page.tsx"),
+      "utf8",
+    );
+
+    expect(page).toContain("setQuantity(line.quantity);");
+    expect(page).toContain("updateCartItemQuantity(line.id, quantity);");
   });
 
   it("does not offer a Share button", () => {

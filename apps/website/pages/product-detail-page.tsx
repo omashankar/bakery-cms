@@ -24,7 +24,6 @@ import {
   type PhotoPrintDraft,
 } from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
-import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
 import { RatingSummary } from "@/components/storefront/rating-summary";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -1029,22 +1028,20 @@ export function ProductDetailPage({
                   </p>
                 ) : null}
                 {/*
-                  Only when this product IS sold by size.
-                  `weight?.serves ?? "8–10"` and `weight?.label ?? "1 kg"` were
-                  unreachable while `getProductWeightOptions` could not return an
-                  empty list. It can now, deliberately — so a phone charger stated,
-                  under its price and gated by nothing, that it serves 8–10 people
-                  and weighs 1 kg. A fallback is not a fact.
+                  "Serves 4–6 people · 0.5 kg" stood here, under the price.
 
-                  `serves` stays optional within that: a tier can be priced without
-                  claiming a headcount.
+                  Removed at the shop's request, and it is the last of the three
+                  places that said it: the Serving Info panel went first, and the
+                  size the customer is buying is on the button they picked it
+                  with. The headcount is still stored per tier and still
+                  editable — nothing about the product has changed, only how
+                  many times the page repeats it.
+
+                  Worth keeping in view: this line was ALSO the only place a
+                  shop with the size module switched off saw its tier, and that
+                  shop still pays tier 0's price. It shows no size now, which
+                  is what switching the module off asks for.
                 */}
-                {weight ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {weight.serves ? `Serves ${weight.serves} people · ` : ""}
-                    {weight.label}
-                  </p>
-                ) : null}
                 {variantSummary.length > 0 ? (
                   <p className="mt-1 text-xs text-muted-foreground">{variantSummary.join(" · ")}</p>
                 ) : null}
@@ -1346,11 +1343,20 @@ export function ProductDetailPage({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Quantity</p>
-                  <QuantityStepper value={quantity} onChange={setQuantity} />
-                </div>
+              {/*
+                A Quantity stepper stood to the left of these buttons.
+
+                Removed at the shop's request: the cart has one, and it is the
+                screen a customer is on when they think about how many. Adding
+                from a grid card never offered the question either, so the
+                product page was the only place that asked it.
+
+                The VALUE stays. `quantity` is still state, still sent with the
+                line, and still restored by the edit-a-cart-line path — a
+                customer who edits a line of three must not have it silently
+                reset to one because the control that set it has gone.
+              */}
+              <div className="flex flex-wrap items-center justify-end gap-4">
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={handleWishlist}>
                     <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
