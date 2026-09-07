@@ -48,6 +48,7 @@ const HOMEPAGE_SOURCES = [
   "trending",
   "best-sellers",
   "photo-cakes",
+  "eggless",
   "seasonal",
 ] as const;
 

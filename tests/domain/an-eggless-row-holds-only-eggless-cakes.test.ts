@@ -216,14 +216,17 @@ describe("the rows beside it", () => {
 
 describe("the section the shop already has stored", () => {
   it("is a type the renderer knows again", () => {
-    expect(read("types/homepage-builder.ts")).toContain('| "eggless"');
-    expect(read("features/cms-sections/homepage-section-renderer.tsx")).toContain(
+    // Comment-stripped, like the sibling below: this repo leaves a tombstone
+    // naming what it removed at every such site, and the removal commit added
+    // fifteen of them — so a raw search can be satisfied by the explanation.
+    expect(code("types/homepage-builder.ts")).toContain('| "eggless"');
+    expect(code("features/cms-sections/homepage-section-renderer.tsx")).toContain(
       'case "eggless":',
     );
   });
 
   it("is offered in the builder, so it can be edited or removed", () => {
-    expect(read("constants/section-registry.ts")).toContain('type: "eggless"');
+    expect(code("constants/section-registry.ts")).toContain('type: "eggless"');
   });
 
   it("is one of the rails the server actually builds, with the list it needs", () => {
@@ -233,11 +236,33 @@ describe("the section the shop already has stored", () => {
      * source, and the renderer reads `props.rails?.[source]`.
      */
     const service = code("features/products/data/products-service.ts");
-    const rails = service.slice(service.indexOf("export async function getHomepageRails"));
+    // Bounded at the function's closing brace, not run to EOF — this is the
+    // last export in the file today, and a slice that relies on that stops
+    // meaning "inside getHomepageRails" the moment somebody appends one.
+    const start = service.indexOf("export async function getHomepageRails");
+    const rails = service.slice(start, service.indexOf("\n}", start));
 
+    expect(rails.length).toBeGreaterThan(200);
     expect(rails).toContain('"eggless"');
     expect(rails).toContain("categorySlugs()");
     expect(rails).toContain("buildHomepageProducts(source, maxCount, products, all, names, categories)");
+  });
+
+  it("tells the admin to file a product, not to set a flag that is gone", () => {
+    /**
+     * An empty row renders nothing on the live site and an explanation in the
+     * builder. That explanation said "Flag some cakes under Products" for every
+     * row — and for this one and Seasonal there is no flag any more, so an
+     * admin could hunt for a tick that does not exist and conclude the builder
+     * was broken.
+     */
+    const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
+
+    expect(renderer).toContain('const CATEGORY_ROWS: ReadonlySet<string> = new Set(["eggless", "seasonal"])');
+    expect(renderer).toContain("CATEGORY_ROWS.has(props.section.type)");
+    expect(renderer).toContain("Nothing is filed under this category yet");
+    // …and the flag wording survives for the rows that DO have one.
+    expect(renderer).toContain("Flag some cakes under Products");
   });
 
   it("ships no promise about what is in the cake", () => {
@@ -254,7 +279,10 @@ describe("the section the shop already has stored", () => {
     );
 
     expect(entry).toContain('title: "Eggless Collection"');
+    // The invariant is that both loud fields ship EMPTY. Forbidding the two
+    // sentences that used to be there only rules out those two sentences.
     expect(entry).toContain('overline: ""');
+    expect(entry).toContain('description: ""');
     expect(entry).not.toContain("100% Eggless");
     expect(entry).not.toContain("without eggs for all celebrations");
   });

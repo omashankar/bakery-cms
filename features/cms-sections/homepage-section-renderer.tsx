@@ -495,6 +495,15 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/**
+ * The rows that select on a CATEGORY rather than on a flag set per product.
+ *
+ * Only used to word the empty-row hint below — the selection itself lives in
+ * `homepage-rails.ts`, and this is deliberately a list of section types rather
+ * than an import from there, because the two unions are not the same thing.
+ */
+const CATEGORY_ROWS: ReadonlySet<string> = new Set(["eggless", "seasonal"]);
+
 function ProductGridSection(
   props: HomepageSectionRendererProps & {
     cakes: LandingProduct[];
@@ -524,10 +533,29 @@ function ProductGridSection(
           title={contentString(c, "title")}
           description={contentString(c, "description")}
         />
+        {/*
+          The advice has to match how the row actually chooses.
+
+          It said "Flag some cakes under Products" for every row, and for two of
+          them there is no longer a flag to set: Eggless and Seasonal select on
+          the CATEGORY now, which is what the nav links and the collection pages
+          read. An admin following this could look for a tick that does not
+          exist and conclude the builder was broken.
+        */}
         <div className="mt-8 rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
-          No cake is set for this row yet, so it stays hidden on the live
-          homepage. Flag some cakes under Products, or lower &ldquo;Max cakes
-          shown&rdquo;.
+          {CATEGORY_ROWS.has(props.section.type) ? (
+            <>
+              Nothing is filed under this category yet, so the row stays hidden
+              on the live homepage. Set the category on a product under
+              Products, or lower &ldquo;Max cakes shown&rdquo;.
+            </>
+          ) : (
+            <>
+              No cake is set for this row yet, so it stays hidden on the live
+              homepage. Flag some cakes under Products, or lower &ldquo;Max
+              cakes shown&rdquo;.
+            </>
+          )}
         </div>
       </SectionShell>
     );
