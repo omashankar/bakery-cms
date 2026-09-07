@@ -86,33 +86,55 @@ export interface ProductVariantGroup {
  * Optional, because `mapLandingProductToAdmin` builds a whole `Product` literal
  * for the seed and a required field would break it.
  */
-export interface ProductAttribute {
+/**
+ * One labelled list in the product description.
+ *
+ * Six reference storefronts, six different shapes. A cake had Product Details,
+ * Delivery Information, Care Instructions and a Note. A plant had no heading at
+ * all over its first list, then Benefits, Disclaimer, Do's and Dont's. A candle
+ * called the same two blocks Delivery DETAILS and Care DIRECTIVES.
+ *
+ * So the headings are not three fixed slots, and they are not shop-wide either:
+ * they belong to the PRODUCT, and there can be any number of them. A shop
+ * selling cakes and phone chargers writes “our delivery boy hand-delivers it”
+ * on one and “shipped by our courier partners, you will get a tracking number”
+ * on the other — opposite policies, same shop.
+ *
+ * `heading` may be blank: two of the six list their facts with no label over
+ * them, and a heading nobody typed should not be invented.
+ *
+ * `body` is one line per bullet, like every other list this project renders —
+ * the same rule as the delivery setting, so a shop learns it once. A line that
+ * is not `Label: Value` is fine: the reference lists whole sentences beside its
+ * key-value pairs.
+ */
+export interface ProductDescriptionBlock {
   id: string;
-  label: string;
-  value: string;
+  heading: string;
+  body: string;
 }
 
-export interface ProductDetails {
-  /*
-    SIX FIELDS STOOD HERE, and the shop asked for all of them.
+/*
+  `ProductDetails` stood here, and by the end it was empty.
 
-    Barcode / SKU, Preparation time, Shelf life, Calories, Ingredients and
-    Allergens. None of them drove any logic — no delivery date was computed
-    from a prep time, no stock was looked up by barcode, no order was stopped
-    by an allergen. All six were display, and the product page is meant to
-    read as the shop's own three headings: what it is, how it travels, how to
-    keep it.
+  It held seven fields a product could state about itself: Barcode / SKU,
+  Preparation time, Shelf life, Calories, Ingredients, Allergens and Care
+  instructions. The shop asked for all of them to go, and none drove any
+  logic — no delivery date was computed from a preparation time, no stock was
+  found by barcode, no order was stopped by an allergen. All seven were
+  display, and four of them printed a second time as a chip beside the name.
 
-    The shop was told plainly what removing Allergens costs — a list of what
-    is in the food is the one field here where being wrong can hurt somebody —
-    and asked for it anyway. It can still say so in the description, or as a
-    "Contains" line under Product details, which is the system this project
-    already has for a shop's own facts.
-  */
-  careInstructions?: string;
-}
+  The shop was told plainly what dropping Allergens costs — a list of what is
+  in the food is the one field here where being wrong can hurt somebody — and
+  asked for it anyway. It can still say so in a description block, which is
+  where everything a shop wants stated now goes.
 
-export interface Product extends BaseEntity, ProductDetails {
+  Care instructions were the last to leave, and not because they were wrong:
+  they were one free-text box under one fixed heading, and six reference
+  storefronts wanted Care Instructions, Care Directives, Do's and Dont's. A
+  block carries its own heading, so the shop names it.
+*/
+export interface Product extends BaseEntity {
   name: string;
   slug: string;
   description: string;
@@ -147,8 +169,16 @@ export interface Product extends BaseEntity, ProductDetails {
    */
   photoFrameShape?: PhotoFrameShapeId;
   variantGroups: ProductVariantGroup[];
-  /** Owner-defined facts. See ProductAttribute — never a choice, never priced. */
-  attributes?: ProductAttribute[];
+  /**
+   * The product description, as the shop writes it. See
+   * ProductDescriptionBlock — never a choice, never priced.
+   *
+   * This was `attributes: { label, value }[]`, which could only say
+   * "Brand: Samsung" and had exactly one heading above the lot. Two of the
+   * six reference pages need no heading, one needs five, and none of them
+   * keeps to Label: Value throughout.
+   */
+  descriptionBlocks?: ProductDescriptionBlock[];
   rating: number;
   reviewCount: number;
   seo: SeoFields;

@@ -86,7 +86,6 @@ export function mapAdminProductToStorefront(
     weights: cake.weights,
     weightLabel: cake.weightLabel,
 
-    careInstructions: cake.careInstructions,
     variantGroups: cake.variantGroups,
     /**
      * This list is a WHITELIST, not a spread — a field missing from it persists
@@ -94,7 +93,7 @@ export function mapAdminProductToStorefront(
      * silent failures a new product field has to survive. The first is the
      * Mongoose path.
      */
-    attributes: cake.attributes,
+    descriptionBlocks: cake.descriptionBlocks,
   };
 }
 

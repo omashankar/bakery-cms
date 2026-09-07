@@ -5,7 +5,7 @@
 import { demoPhotoIds, unsplash } from "./demo-images";
 import type {
   PhotoFrameShapeId,
-  ProductAttribute,
+  ProductDescriptionBlock,
   ProductVariantGroup,
 } from "@/types/product";
 
@@ -44,10 +44,9 @@ export interface LandingProduct {
   /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */
   weightLabel?: string;
 
-  careInstructions?: string;
   variantGroups?: ProductVariantGroup[];
   /** Owner-defined facts, printed as a spec list. Never a choice, never priced. */
-  attributes?: ProductAttribute[];
+  descriptionBlocks?: ProductDescriptionBlock[];
   /**
    * What a one-tap add from a grid commits to, resolved by the SHOP.
    *

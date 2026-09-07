@@ -39,18 +39,22 @@ const variantGroupSchema = z
   .passthrough();
 
 /**
- * A shop's own fact about a product. A real schema, not the top-level
- * `.passthrough()` — which would accept `attributes: "hello"` and an entry with
- * no value, both of which reach Mongo as Mixed and then render as nothing or as
- * "[object Object]" on the product page.
+ * One labelled list in the product description. A real schema, not the
+ * top-level `.passthrough()` — which would accept `descriptionBlocks: "hello"`
+ * and an entry with no body, both of which reach Mongo as Mixed and then render
+ * as nothing or as "[object Object]" on the product page.
+ *
+ * The HEADING may be empty, deliberately: two of the six reference pages list
+ * their facts with no label over them. The BODY may not — a heading with
+ * nothing under it is the empty section this project keeps deleting.
  *
  * Bounded because it is free text an admin types and the storefront prints: the
  * caps stop a paste turning one product document into a page nobody can read.
  */
-const attributeSchema = z.object({
+const descriptionBlockSchema = z.object({
   id: z.string().trim().min(1),
-  label: z.string().trim().min(1, "An attribute needs a name").max(60),
-  value: z.string().trim().min(1, "An attribute needs a value").max(300),
+  heading: z.string().trim().max(80).default(""),
+  body: z.string().trim().min(1, "A block needs something under its heading").max(4000),
 });
 
 export const productFormSchema = z
@@ -94,12 +98,11 @@ export const productFormSchema = z
       .enum(["circle", "square", "heart"])
       .optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
-    attributes: z.array(attributeSchema).max(40).default([]),
+    descriptionBlocks: z.array(descriptionBlockSchema).max(20).default([]),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().min(0),
     seo: seoSchema.default({}),
 
-    careInstructions: z.string().optional(),
   })
   .passthrough();
 

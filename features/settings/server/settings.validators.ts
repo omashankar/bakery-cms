@@ -234,9 +234,6 @@ export const labelOverridesSchema = z.object({
   productWord: z.string().trim().optional(),
   productWordPlural: z.string().trim().optional(),
   descriptionHeading: z.string().trim().optional(),
-  detailsHeading: z.string().trim().optional(),
-  deliveryHeading: z.string().trim().optional(),
-  careHeading: z.string().trim().optional(),
 });
 
 /** section name -> its schema, used by the controller to validate PUT bodies. */

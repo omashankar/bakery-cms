@@ -121,7 +121,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
       the one that remains, and it stays blank because a care note is the
       shop own to write.
     */
-    careInstructions: undefined,
     /*
       A "Photo cake" group used to be built here for any demo product filed
       under a category with the word in it — a paid print option beside a free
@@ -190,11 +189,10 @@ export function normalizeCommerceFields(cake: Product): Product {
     allowsMessage: cake.allowsMessage ?? true,
     allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
 
-    careInstructions: cake.careInstructions,
     variantGroups,
     // Owner-defined facts. Absent means the shop has stated none, not that it
     // needs some invented for it — the mistake this function made with shapes.
-    attributes: cake.attributes ?? [],
+    descriptionBlocks: cake.descriptionBlocks ?? [],
     /**
      * A product nobody has reviewed has no stars.
      *
@@ -463,9 +461,8 @@ export function createEmptyProductForm(): ProductFormData {
     allowsMessage: true,
     allowsPhotoUpload: false,
 
-    careInstructions: "",
     variantGroups: [],
-    attributes: [],
+    descriptionBlocks: [],
     // A cake with no reviews has no rating. This started at 4.5.
     rating: 0,
     reviewCount: 0,

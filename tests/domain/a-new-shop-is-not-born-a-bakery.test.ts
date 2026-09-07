@@ -92,16 +92,15 @@ describe("the demo products a fresh shop is seeded with", () => {
     expect(seeded.every((product) => product.shapes.length === 0)).toBe(true);
   });
 
-  it("invents no care instructions", () => {
+  it("writes no description of its own", () => {
     /**
-     * Calories and shelf life were asserted here too — 320 kcal on every
-     * product in the shop is not data, it is a placeholder rendered as a fact
-     * on the customer's page. Both fields have since gone from the product
-     * altogether, so the seed cannot invent them and there is nothing left to
-     * assert. A care note is the one of the three still on a product, and it
-     * is still the shop's to write.
+     * Calories, shelf life and a care sentence were all asserted here — 320
+     * kcal on every product in the shop is not data, it is a placeholder
+     * rendered as a fact on the customer's page. Those fields have since gone
+     * from the product altogether, and what a shop says about a product is now
+     * description BLOCKS it writes itself. A seed has no business writing one.
      */
-    expect(seeded.every((product) => !product.careInstructions)).toBe(true);
+    expect(seeded.every((product) => (product.descriptionBlocks ?? []).length === 0)).toBe(true);
   });
 
   it("keeps what the demo data actually declares", () => {

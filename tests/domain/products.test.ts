@@ -174,7 +174,7 @@ describe("cakes repository", () => {
     // `preparationTimeMinutes` and `shelfLifeDays` were checked here for the
     // same reason. Both have gone from the product entirely, so a new one
     // cannot be born with them and there is nothing left to assert.
-    expect(empty.careInstructions).toBe("");
+    expect(empty.descriptionBlocks).toEqual([]);
 
     expect(empty.status).toBe("draft");
     expect(empty.allowsMessage).toBe(true);

@@ -139,14 +139,6 @@ interface ProductDetailPageProps {
    */
   related: LandingProduct[];
   catalog: LandingProduct[];
-  /**
-   * The shop's delivery policy, one line per bullet.
-   *
-   * A PROP rather than a client read: it is prose the page says, so it has
-   * to be in the HTML the browser and the crawler receive. Optional and
-   * blank by default — a shop that has written none gets no heading.
-   */
-  deliveryInformation?: string;
 }
 
 export function ProductDetailPage({
@@ -155,7 +147,6 @@ export function ProductDetailPage({
   editLineId,
   related: relatedFromServer,
   catalog,
-  deliveryInformation,
 }: ProductDetailPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
@@ -187,37 +178,34 @@ export function ProductDetailPage({
    */
   const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
-  /** The shop's own facts about this product. Empty when it states none. */
-  const attributes = useMemo(() => cake.attributes ?? [], [cake]);
   /**
-   * What the SHOP has said about this product. Its own words, only.
+   * The description the shop wrote, block by block. One line is one bullet.
    *
-   * Calories, Preparation and Shelf life used to be appended here as three
-   * more bullets. They are already the chips under the product name —
-   * "280 kcal / serving", "2 hr prep", "Best within 3 days" — so the page
-   * printed each of them twice, once as a chip and once as a sentence. The
-   * chips are the shorter and the higher of the two, and they stay; this
-   * list is now exactly the facts a shop typed into Product details.
+   * This was two separate things with two fixed headings: `attributes`, a
+   * list of Label: Value pairs under "Product Details", and
+   * `careInstructions`, a box of prose under "Care Instructions". Six
+   * reference storefronts were read one by one and none of them fits that —
+   * a plant lists its first block under no heading at all and then wants
+   * Benefits, Disclaimer, Do's and Dont's; a candle wants Care Directives.
+   *
+   * A block with a heading and nothing under it is dropped: an empty
+   * heading is the thing this page keeps deleting, and the admin can leave a
+   * row half-typed at any moment.
    */
-  const productFacts = useMemo(
+  const descriptionBlocks = useMemo(
     () =>
-      attributes
-        .map((attribute) => ({ label: attribute.label, value: attribute.value }))
-        .filter((fact) => fact.value.trim().length > 0),
-    [attributes],
+      (cake.descriptionBlocks ?? [])
+        .map((block) => ({
+          id: block.id,
+          heading: (block.heading ?? "").trim(),
+          lines: (block.body ?? "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0),
+        }))
+        .filter((block) => block.lines.length > 0),
+    [cake],
   );
-
-  /**
-   * One line typed is one bullet.
-   *
-   * A shop writes care notes as a list and they arrived as one run-on
-   * paragraph held together by `whitespace-pre-line`. Splitting needs no new
-   * field and no new habit: what the shop already types is already a list.
-   */
-  const careNotes = (cake.careInstructions ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   /**
@@ -387,25 +375,13 @@ export function ProductDetailPage({
    * redirection policies. There is no field behind any of that here, and a
    * paragraph of invented policy is worse than a short list of true ones.
    */
-  /**
-   * The shop's own delivery policy, one line typed is one bullet.
-   *
-   * This list used to be written by the software: the derived delivery
-   * promise, an echo of the date picked in the two fields that stood above
-   * the buy button, and the flat sentence "Custom message card included at
-   * no extra charge". The first two are said elsewhere on the page already —
-   * the promise on the "Timely Delivery" tile, and the date at checkout,
-   * where it is actually decided — and the third is a tile of its own.
-   *
-   * So three bullets that were a duplicate, a duplicate and a hard-coded
-   * claim, under a heading a shop had no way to write. It writes it now, in
-   * Settings → Commerce, once for every product.
-   */
-  const deliveryNotes = (deliveryInformation ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
+  /*
+    `deliveryNotes` stood here, splitting the shop-wide delivery setting into
+    bullets for every product page. It is a description BLOCK now, written on
+    the product — the setting survives as the draft the admin copies in with
+    one button, because a cake and a phone charger travel differently and one
+    text cannot be true of both.
+  */
   /**
    * The whole section hides when the shop has filled in none of it.
    *
@@ -414,12 +390,7 @@ export function ProductDetailPage({
    * every product in every shop, which is what the rest of this list exists
    * to prevent.
    */
-  const hasDescription = Boolean(
-    productFacts.length > 0 ||
-      deliveryNotes.length > 0 ||
-      careNotes.length > 0 ||
-      cake.description,
-  );
+  const hasDescription = descriptionBlocks.length > 0 || Boolean(cake.description);
 
   /**
    * The two forms, behind the bar that invites them.
@@ -1476,54 +1447,34 @@ export function ProductDetailPage({
                 {hasDescription ? (
                   <DetailSection title={labels.descriptionHeading}>
                     <div className="space-y-5 text-sm text-muted-foreground">
-                      {productFacts.length > 0 ? (
-                        <div>
-                          <p className="mb-2 font-medium text-foreground">
-                            {labels.detailsHeading}:
-                          </p>
-                          <ul className="list-disc space-y-1 pl-5">
-                            {productFacts.map((fact) => (
-                              <li key={fact.label}>
-                                {fact.label}: {fact.value}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-
                       {/*
-                        Ingredients and Allergens had a labelled part each,
-                        and both fields have gone from the product at the
-                        shop's request. The note on ProductDetailsFields says
-                        what that costs and what the shop can use instead.
-                      */}
-                      {deliveryNotes.length > 0 ? (
-                        <div>
-                          <p className="mb-2 font-medium text-foreground">{labels.deliveryHeading}:</p>
-                          <ul className="list-disc space-y-1 pl-5">
-                            {deliveryNotes.map((note) => (
-                              <li key={note}>{note}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
+                        Three fixed parts stood here — Product Details from a
+                        Label: Value list, Delivery Information from a shop-wide
+                        setting, Care Instructions from a box on the product —
+                        each under a heading the renderer chose.
 
-                      {/*
-                        Bulleted, because a shop writes these as a list and it
-                        was reading as one run-on paragraph. One line typed is
-                        one bullet — no new field, and a shop that wrote a
-                        single sentence still gets a single bullet.
+                        None of the six reference pages fits three fixed parts,
+                        and the delivery one could not be shop-wide at all: a
+                        cake goes out with the shop's own driver and a charger
+                        goes by courier, so one text is false on one of them.
+
+                        A heading nobody typed is not invented — two of the six
+                        list their first block with no label over it.
                       */}
-                      {careNotes.length > 0 ? (
-                        <div>
-                          <p className="mb-2 font-medium text-foreground">{labels.careHeading}:</p>
+                      {descriptionBlocks.map((block) => (
+                        <div key={block.id}>
+                          {block.heading ? (
+                            <p className="mb-2 font-medium text-foreground">
+                              {block.heading}:
+                            </p>
+                          ) : null}
                           <ul className="list-disc space-y-1 pl-5">
-                            {careNotes.map((note) => (
-                              <li key={note}>{note}</li>
+                            {block.lines.map((line) => (
+                              <li key={line}>{line}</li>
                             ))}
                           </ul>
                         </div>
-                      ) : null}
+                      ))}
 
                       {/*
                         The shop's own words, LAST rather than under the title.

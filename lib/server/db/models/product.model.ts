@@ -65,13 +65,12 @@ const productSchema = new mongoose.Schema(
      * in `.passthrough()`, which looks like the escape hatch and is not — it
      * governs validation, not persistence.
      */
-    attributes: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    descriptionBlocks: { type: [mongoose.Schema.Types.Mixed], default: [] },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     seo: { type: mongoose.Schema.Types.Mixed, default: {} },
     // ProductDetails
 
-    careInstructions: { type: String },
     // App-managed ISO timestamps (not Mongoose `timestamps`).
     createdAt: { type: String },
     updatedAt: { type: String },

@@ -45,6 +45,7 @@ import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-
 import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
@@ -57,8 +58,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
 import { PHOTO_FRAME_SHAPES } from "@/lib/images/photo-print-layout";
 import type { PhotoFrameShapeId } from "@/types/product";
-import { ProductAttributesFields } from "./product-attributes-fields";
-import { ProductDetailsFields } from "./product-details-fields";
+import { ProductDescriptionBlocksFields } from "./product-description-blocks-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import {
 } from "@/features/products/lib/variant-utils";
@@ -675,20 +675,21 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
               <TabsContent value="details" className="space-y-6">
                 {/*
-                  The shop's OWN facts come first. What follows them is six fixed
-                  food fields — prep time, shelf life, calories, allergens, care
-                  instructions — which are right for a bakery and dead space for a
-                  charger. Putting the generic editor above them is what makes the
-                  tab usable by a shop that sells neither cake nor anything edible.
+                  A key-value list under one fixed heading stood here, and six
+                  fixed food fields under it — prep time, shelf life, calories,
+                  allergens, care instructions — right for a bakery and dead
+                  space for a charger.
+
+                  Six reference storefronts were read one by one and not one of
+                  them fits that: a cake has four blocks, a plant has five with
+                  no heading over the first, a candle calls the same two Delivery
+                  DETAILS and Care DIRECTIVES. So the shop writes the headings
+                  and adds as many blocks as the product needs.
                 */}
-                <ProductAttributesFields
-                  value={form.attributes ?? []}
-                  onChange={(attributes) => patchForm({ attributes })}
-                />
-                <Separator />
-                <ProductDetailsFields
-                  value={form}
-                  onChange={(patch) => patchForm(patch)}
+                <ProductDescriptionBlocksFields
+                  value={form.descriptionBlocks ?? []}
+                  onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}
+                  deliveryInformation={getCommerceSettings().deliveryInformation}
                 />
               </TabsContent>
 
@@ -1093,7 +1094,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               {/*
                 SKU, Prep and Shelf life were summarised here. All three were
                 removed from the product at the shop's request — see the note
-                on ProductDetailsFields for what went and why.
+                on ProductDescriptionBlocksFields for what went and why.
               */}
               <p>
                 <span className="text-muted-foreground">Variant groups:</span>{" "}

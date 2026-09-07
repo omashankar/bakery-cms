@@ -8,10 +8,7 @@ import {
   getStorefrontProductCards,
 } from "@/features/products/data/products-service";
 import { getServerLabels } from "@/features/settings/server/labels.server";
-import {
-  getServerDeliveryInformation,
-  getServerModules,
-} from "@/features/settings/server/modules.server";
+import { getServerModules } from "@/features/settings/server/modules.server";
 import { getSiteIdentity } from "@/features/settings/server/site-identity.server";
 import { buildCanonicalUrl } from "@/features/seo/lib/seo-metadata";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
@@ -139,7 +136,7 @@ export default async function Page(props: PageProps) {
   // Fetched on the server, so the first paint already carries real catalogue
   // data — previously this ran against localStorage, which the server does not
   // have, so SSR rendered seed data and the client swapped it on hydration.
-  const [cake, catalog, { modules }, deliveryInformation] = await Promise.all([
+  const [cake, catalog, { modules }] = await Promise.all([
     getStorefrontProductBySlug(slug),
     getStorefrontProductCards(),
     /**
@@ -152,17 +149,7 @@ export default async function Page(props: PageProps) {
      * later. A gate that fails open on the server is not a gate.
      */
     getServerModules(),
-    /**
-     * The shop's delivery policy, READ ON THE SERVER for the same reason the
-     * modules are. The page's other commerce reads happen in a client effect
-     * off localStorage — fine for a note under a photo, wrong for a block of
-     * prose that is part of what the page SAYS: it would be absent from the
-     * HTML the browser and the crawler receive and appear a beat later.
-     *
-     * `getPublicSettings` shares this request's cached settings read, so this
-     * costs nothing on top of the modules above it.
-     */
-    getServerDeliveryInformation(),
+
   ]);
 
   if (!cake) {
@@ -174,7 +161,6 @@ export default async function Page(props: PageProps) {
       cake={cake}
       modules={modules}
       editLineId={editLineId}
-      deliveryInformation={deliveryInformation}
       related={pickRelated(catalog, cake.slug, cake.category)}
       catalog={catalog}
     />

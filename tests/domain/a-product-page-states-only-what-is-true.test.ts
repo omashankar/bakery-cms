@@ -131,11 +131,7 @@ const CAKE: Product = {
   ],
 };
 
-function render(
-  cake: Product,
-  modules = defaultModuleSettings,
-  deliveryInformation = "",
-): {
+function render(cake: Product, modules = defaultModuleSettings): {
   /** The mounted DOM, for the few assertions that are about ELEMENTS. */
   container: HTMLDivElement;
   html: string;
@@ -164,7 +160,6 @@ function render(
         cake,
         related: [],
         catalog: [],
-        deliveryInformation,
         // Every module ON, which is what these cases assume — and now stated
         // rather than inherited from a default the page no longer has.
         modules,
@@ -271,22 +266,54 @@ describe("a module the shop switched off", () => {
 });
 
 describe("the shop's own facts reach the page", () => {
-  it("prints the attributes a charger declares", () => {
+  it("prints the blocks a charger declares, under the headings it typed", () => {
     const { section, unmount } = render({
       ...CHARGER,
-      attributes: [
-        { id: "a1", label: "Brand", value: "Anker" },
-        { id: "a2", label: "Warranty", value: "1 year" },
+      descriptionBlocks: [
+        {
+          id: "b1",
+          heading: "Product Details",
+          body: "Brand: Anker\nWarranty: 1 year",
+        },
+        {
+          id: "b2",
+          heading: "Delivery Details",
+          body: "Shipped by our courier partners.",
+        },
       ],
     });
     try {
       const opened = section("Product Description");
-      expect(opened).toContain("Brand");
-      expect(opened).toContain("Anker");
-      expect(opened).toContain("Warranty");
-      expect(opened).toContain("1 year");
+      expect(opened).toContain("Product Details");
+      expect(opened).toContain("Brand: Anker");
+      expect(opened).toContain("Warranty: 1 year");
+      // The shop's own second heading, which no renderer chose for it.
+      expect(opened).toContain("Delivery Details");
+      expect(opened).toContain("Shipped by our courier partners.");
     } finally {
       unmount();
+    }
+  });
+
+  it("prints a block the shop gave no heading, without inventing one", () => {
+    /**
+     * Two of the six reference pages — a plant and a candle — list their
+     * first block with no label over it at all.
+     */
+    const view = render({
+      ...CHARGER,
+      descriptionBlocks: [
+        { id: "b1", heading: "", body: "Jar Candle\nWeight: 100ml" },
+      ],
+    } as never);
+    try {
+      const opened = view.section("Product Description");
+      expect(opened).toContain("Jar Candle");
+      expect(opened).toContain("Weight: 100ml");
+      // No stray colon where a heading would have been.
+      expect(opened).not.toContain(":Jar Candle");
+    } finally {
+      view.unmount();
     }
   });
 
@@ -343,8 +370,10 @@ describe("the food tabs belong to food", () => {
      */
     const { html, section, unmount } = render({
       ...CAKE,
-      careInstructions: "Refrigerate on arrival.",
-    });
+      descriptionBlocks: [
+        { id: "b1", heading: "Care Instructions", body: "Refrigerate on arrival." },
+      ],
+    } as never);
     try {
       expect(html).toContain("Care Instructions:");
       expect(html).not.toContain("Ingredients:");
@@ -870,14 +899,17 @@ describe("one Product Description, the way a customer reads it", () => {
   const FULL = {
     ...CAKE,
     description: "A classic, finished the morning it goes out.",
-    ingredients: "Flour, cocoa, cream.",
-    allergens: "Contains milk and wheat.",
-    careInstructions: "Refrigerate on arrival.\nServe at room temperature.\n\nEat within 24 hours.",
-    calories: 320,
-    shelfLifeDays: 3,
-    attributes: [
-      { id: "a1", label: "Country of Origin", value: "India" },
-      { id: "a2", label: "Net Quantity", value: "1 cake" },
+    descriptionBlocks: [
+      {
+        id: "b1",
+        heading: "Product Details",
+        body: "Country of Origin: India\nNet Quantity: 1 cake",
+      },
+      {
+        id: "b2",
+        heading: "Care Instructions",
+        body: "Refrigerate on arrival.\nServe at room temperature.\n\nEat within 24 hours.",
+      },
     ],
   };
 
@@ -899,24 +931,24 @@ describe("one Product Description, the way a customer reads it", () => {
     }
   });
 
-  it("puts the shop's own facts in one list, and only those", () => {
+  it("keeps each block's lines under that block's heading", () => {
     /**
-     * Calories, Preparation and Shelf life were appended to this list too,
-     * under the argument that six headings should be one. They are also the
-     * chips under the product name, so what the merge actually produced was
-     * the same three facts printed twice on one page.
+     * The order the shop typed is the order a customer reads, and nothing
+     * merges two blocks into one list.
      */
     const view = render(FULL as never);
     try {
       const described = view.section("Product Description");
-      expect(described).toContain("Country of Origin: India");
-      expect(described).toContain("Net Quantity: 1 cake");
 
-      // Neither as a bullet nor as a chip: Calories and Shelf life are not
-      // fields on a product any more.
-      expect(described).not.toContain("320 kcal per serving");
-      expect(view.container.textContent ?? "").not.toContain("320 kcal / serving");
-      expect(view.container.textContent ?? "").not.toContain("Best within 3 days");
+      expect(described).toContain("Product Details");
+      expect(described).toContain("Country of Origin: India");
+      expect(described).toContain("Care Instructions");
+      expect(described).toContain("Refrigerate on arrival.");
+
+      // Details before Care, as typed.
+      expect(described.indexOf("Country of Origin")).toBeLessThan(
+        described.indexOf("Refrigerate on arrival."),
+      );
     } finally {
       view.unmount();
     }
@@ -1220,23 +1252,27 @@ describe("the product description says what the shop wrote, once", () => {
    * policy, written by the software, that no shop could edit.
    */
 
-  it("lists the facts the shop typed, and has nowhere else to get any", () => {
+  it("lists what the shop typed, and has nowhere else to get any", () => {
     /**
      * Calories, Preparation and Shelf life were bullets here AND chips beside
      * the name — the same three facts printed twice on one page. The shop
      * removed the fields, so neither surface has them: what a shop wants
-     * said goes under "Add detail", which is the one system for its own
-     * facts and the one the reference storefront uses for all eight of its.
+     * said goes in a description block, which is the one system for its own
+     * words and the one all six reference pages use for every line they have.
      */
     const view = render({
       ...CAKE,
-      attributes: [
-        { id: "a1", label: "Country of Origin", value: "India" },
-        { id: "a2", label: "Net Quantity", value: "1 Cake" },
+      descriptionBlocks: [
+        {
+          id: "b1",
+          heading: "Product Details",
+          body: "Country of Origin: India\nNet Quantity: 1 Cake",
+        },
       ],
       calories: 280,
       preparationTimeMinutes: 120,
       shelfLifeDays: 3,
+      barcode: "SKU-42",
     } as never);
     try {
       const described = view.section("Product Description");
@@ -1245,30 +1281,41 @@ describe("the product description says what the shop wrote, once", () => {
       expect(described).toContain("Country of Origin: India");
       expect(described).toContain("Net Quantity: 1 Cake");
 
-      // Nowhere on the page, from either direction.
+      // Nowhere on the page, from either direction — the fields are gone,
+      // so a stored document that still carries them reaches nobody.
       expect(described).not.toContain("Calories:");
       expect(page).not.toContain("280 kcal / serving");
       expect(page).not.toContain("2 hr prep");
       expect(page).not.toContain("Best within 3 days");
-      // …and the SKU, which used to print as a chip AND at the foot.
       expect(page).not.toContain("SKU");
     } finally {
       view.unmount();
     }
   });
 
-  it("prints the shop's delivery policy, one line typed as one bullet", () => {
-    const view = render(
-      CAKE,
-      defaultModuleSettings,
-      "Hand-delivered in a sealed box.\nPerishable, so delivery is attempted once.\n\n   \nCandles are included where available.",
-    );
+  it("prints a delivery block on the product that wrote one", () => {
+    /**
+     * This was a shop-wide setting printed on every product page. Six
+     * reference pages later that is plainly wrong: a cake goes out with the
+     * shop's own driver and a candle goes by courier with a tracking number,
+     * and one text cannot be true of both. The setting survives as the draft
+     * the admin copies into a block; the words belong to the product.
+     */
+    const view = render({
+      ...CAKE,
+      descriptionBlocks: [
+        {
+          id: "b1",
+          heading: "Delivery Information",
+          body: "Hand-delivered in a sealed box.\nPerishable, so delivery is attempted once.\n\n   \nCandles are included where available.",
+        },
+      ],
+    } as never);
     try {
       const described = view.section("Product Description");
 
       expect(described).toContain("Delivery Information:");
       expect(described).toContain("Hand-delivered in a sealed box.");
-      expect(described).toContain("Perishable, so delivery is attempted once.");
       expect(described).toContain("Candles are included where available.");
 
       // Three lines typed, three bullets — the blank ones are not bullets.
@@ -1287,12 +1334,42 @@ describe("the product description says what the shop wrote, once", () => {
     }
   });
 
-  it("says nothing about delivery when the shop has written nothing", () => {
+  it("drops a block whose body is empty, heading and all", () => {
     /**
-     * The heading used to be unconditional in practice, because the software
-     * always had something to put under it. A shop that has not written a
-     * policy has not got one, and an empty heading is worse than no heading.
+     * The validator refuses one on the way in, but a document stored before
+     * this existed can still carry it, and an admin can leave a row half-typed
+     * at any moment. A heading with nothing under it is the empty section this
+     * page keeps deleting.
      */
+    const view = render({
+      ...CHARGER,
+      description: "",
+      descriptionBlocks: [
+        { id: "b1", heading: "Care Directives", body: "   \n  " },
+        { id: "b2", heading: "Delivery Details", body: "Shipped by courier." },
+      ],
+    } as never);
+    try {
+      const described = view.section("Product Description");
+
+      expect(described).not.toContain("Care Directives");
+      expect(described).toContain("Delivery Details");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("is the field the admin editor writes to", () => {
+    const form = readFileSync(
+      join(process.cwd(), "apps/admin/products/components/product-form-page.tsx"),
+      "utf8",
+    );
+
+    expect(form).toContain("onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}");
+    expect(form).toContain("value={form.descriptionBlocks ?? []}");
+  });
+
+  it("says nothing about delivery when the product has written nothing", () => {
     const view = render(CAKE);
     try {
       const described = view.section("Product Description");
@@ -1304,31 +1381,26 @@ describe("the product description says what the shop wrote, once", () => {
     }
   });
 
-  it("shows the block for a product whose only prose is the shop's policy", () => {
+  it("shows the block for a product whose only prose is one it typed", () => {
     /**
-     * `hasDescription` gates the whole section, and the delivery copy has to
-     * count towards it. It did not need to before — the software always had
-     * something to put under that heading, so the list was never empty and
-     * asking about it would have raised the heading for every product in every
-     * shop. Now it is the shop's own, it can be the only thing there is.
+     * `hasDescription` gates the whole section, and the blocks have to count
+     * towards it — a product may have nothing else at all.
      */
     const bare = {
       ...CHARGER,
       description: "",
-      attributes: [],
-      ingredients: undefined,
-      allergens: undefined,
-      careInstructions: undefined,
+      descriptionBlocks: [
+        { id: "b1", heading: "Delivery Details", body: "Hand-delivered in a sealed box." },
+      ],
     };
 
-    const view = render(bare as never, defaultModuleSettings, "Hand-delivered in a sealed box.");
+    const view = render(bare as never);
     try {
       expect(view.section("Product Description")).toContain("Hand-delivered in a sealed box.");
     } finally {
       view.unmount();
     }
   });
-
   it("hides the whole block for a product with nothing said about it", () => {
     const view = render({
       ...CHARGER,
@@ -1372,20 +1444,25 @@ describe("the product description says what the shop wrote, once", () => {
     expect(defaultCommerceSettings.deliveryInformation).toBe("");
   });
 
-  it("is read on the SERVER, so the crawler gets the prose too", () => {
+  it("needs no server read, because the prose is on the product", () => {
     /**
-     * The page's other commerce reads happen in a client effect off
-     * localStorage. Fine for a note under a photo; wrong for a block of prose
-     * that is part of what the page says — it would be missing from the HTML a
-     * crawler receives, which is the exact failure the stacked description
-     * sections were written to end.
+     * The shop-wide delivery copy WAS read on the server and passed down as a
+     * prop, so a crawler would get it — the page's other commerce reads happen
+     * in a client effect off localStorage, which is fine for a note under a
+     * photo and wrong for prose the page says.
+     *
+     * The prose is a field on the product now, which the route already fetches
+     * on the server, so the whole problem goes away rather than being solved:
+     * no prop, no second settings read, and nothing to arrive a beat late.
      */
     const route = readFileSync(
       join(process.cwd(), "app/(storefront)/store/cakes/[slug]/page.tsx"),
       "utf8",
     );
 
-    expect(route).toContain("getServerDeliveryInformation()");
-    expect(route).toContain("deliveryInformation={deliveryInformation}");
+    expect(route).not.toContain("getServerDeliveryInformation");
+    expect(route).not.toContain("deliveryInformation");
+    // The product itself is still fetched on the server, which is what carries it.
+    expect(route).toContain("getStorefrontProductBySlug(slug)");
   });
 });

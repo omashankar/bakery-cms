@@ -341,7 +341,7 @@ export function GeneralSettingsPage() {
                 “Bouquet Details” without touching this at all.
               */}
               <p className="text-sm font-medium sm:col-span-2">
-                Headings on the product page
+                Heading on the product page
               </p>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="descriptionHeading">The block heading</Label>
@@ -351,34 +351,6 @@ export function GeneralSettingsPage() {
                   onChange={(e) => editWording({ descriptionHeading: e.target.value })}
                   placeholder={labels.descriptionHeading}
                 />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="detailsHeading">Above your own facts</Label>
-                <Input
-                  id="detailsHeading"
-                  value={wording.detailsHeading ?? ""}
-                  onChange={(e) => editWording({ detailsHeading: e.target.value })}
-                  placeholder={labels.detailsHeading}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="deliveryHeading">Above your delivery lines</Label>
-                <Input
-                  id="deliveryHeading"
-                  value={wording.deliveryHeading ?? ""}
-                  onChange={(e) => editWording({ deliveryHeading: e.target.value })}
-                  placeholder={labels.deliveryHeading}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="careHeading">Above your care notes</Label>
-                <Input
-                  id="careHeading"
-                  value={wording.careHeading ?? ""}
-                  onChange={(e) => editWording({ careHeading: e.target.value })}
-                  placeholder={labels.careHeading}
-                />
-                <p className="text-xs text-muted-foreground">Leave any of these blank to use the wording shown in grey.</p>
               </div>
             </div>
             {/*

@@ -202,19 +202,18 @@ export interface LabelOverrides {
   productWord?: string;
   productWordPlural?: string;
   /**
-   * The four headings in the product description block.
+   * The title over the whole product description block.
    *
-   * A shop writes what goes under them — its own facts, its delivery policy,
-   * its care notes — so it should be able to write the headings too. A
-   * florist has no "Care Instructions", it has "Looking after your flowers".
+   * Three more headings sat beside this one — details, delivery, care — from
+   * when the block had three fixed parts. The parts are the shop's own now,
+   * any number of them, each with a heading typed on the PRODUCT: a candle
+   * wants "Care Directives" where a cake wants "Care Instructions", and no
+   * shop-wide word is right for both. This one stays shop-wide because it
+   * names the section rather than anything inside it.
    *
-   * Blank means the default, like every other override here: clearing a box
-   * gives the preset back rather than an unnamed heading.
+   * Blank means the default, like every other override here.
    */
   descriptionHeading?: string;
-  detailsHeading?: string;
-  deliveryHeading?: string;
-  careHeading?: string;
 }
 
 export interface AppSettings {
