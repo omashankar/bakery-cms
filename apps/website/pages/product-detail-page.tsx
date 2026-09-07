@@ -8,7 +8,6 @@ import {
   Gift,
   Heart,
   ImageUp,
-  Share2,
   Tag,
   ShoppingBag,
   ThumbsUp,
@@ -428,17 +427,6 @@ export function ProductDetailPage({
       cake.description,
   );
 
-  /**
-   * Who each size feeds, for the panel behind “Serving Info”.
-   *
-   * Only the tiers the shop actually answered for. `serves` is optional per
-   * size, so a shop that prices by size without claiming a headcount gets no
-   * link rather than a panel of blanks.
-   */
-  const servingInfo = weightOptions
-    .map((option) => ({ label: option.label, serves: option.serves?.trim() ?? "" }))
-    .filter((row) => row.serves.length > 0);
-  const [servingInfoOpen, setServingInfoOpen] = useState(false);
   /**
    * The two forms, behind the bar that invites them.
    *
@@ -940,19 +928,6 @@ export function ProductDetailPage({
     toast.success(added ? "Added to wishlist" : "Removed from wishlist");
   };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: cake.name, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard");
-    } catch {
-      toast.error("Could not share link");
-    }
-  };
 
   return (
     <>
@@ -999,9 +974,12 @@ export function ProductDetailPage({
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {cake.category ? <Badge variant="accent">{cake.category}</Badge> : null}
-                </div>
+                {/*
+                  The category pill stood here — “Engagement Cake” over
+                  “Ring Ceremony Special Cake”. The shop asked for it gone:
+                  the name says what the thing is, and the customer arrived
+                  through the category in the first place.
+                */}
                 <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
                 {cake.rating ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -1089,28 +1067,19 @@ export function ProductDetailPage({
                   <OptionGroup
                     label={sizeAxisLabel}
                     count={weightOptions.length}
-                    aside={
-                      /*
-                        WHO EACH SIZE FEEDS, on the one control where the
-                        question is asked. The line under the price answers it
-                        for the selected size only, and a customer choosing
-                        between three sizes is comparing, not reading one.
+                    /*
+                      A “Serving Info” link sat here, opening a panel that
+                      listed every size against the headcount it feeds.
 
-                        Only where the shop has actually said. `serves` is
-                        optional per tier, so a shop that prices by size without
-                        claiming a headcount gets no link at all rather than an
-                        empty panel.
-                      */
-                      servingInfo.length > 0 ? (
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-bakery-700 hover:underline"
-                          onClick={() => setServingInfoOpen((open) => !open)}
-                        >
-                          Serving Info
-                        </button>
-                      ) : null
-                    }
+                      The shop asked for both gone, and on this catalogue they
+                      were saying the same thing three times: the price block
+                      already reads “Serves 4–6 people · 0.5 kg”, the size
+                      button already reads “0.5 kg”, and the panel then
+                      repeated “0.5 kg — serves 4–6” underneath. It was written
+                      for a shop selling three tiers side by side, where the
+                      comparison is the point; a shop selling one size gets a
+                      row that only restates the line above it.
+                    */
                   >
                     <div className="flex flex-wrap gap-2">
                       {weightOptions.map((option, index) => (
@@ -1123,16 +1092,6 @@ export function ProductDetailPage({
                         </OptionButton>
                       ))}
                     </div>
-                    {servingInfoOpen ? (
-                      <ul className="space-y-1 rounded-lg border border-border bg-cream-50 p-3 text-xs text-muted-foreground">
-                        {servingInfo.map((row) => (
-                          <li key={row.label}>
-                            <span className="font-medium text-foreground">{row.label}</span> —
-                            {" "}serves {row.serves}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
                   </OptionGroup>
                 </div>
               ) : null}
@@ -1397,10 +1356,11 @@ export function ProductDetailPage({
                     <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
                     Wishlist
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleShare}>
-                    <Share2 className="size-4" />
-                    Share
-                  </Button>
+                  {/*
+                    A Share button stood beside Wishlist. Removed at the
+                    shop's request — every browser this page runs in already
+                    has one, and the page has a canonical URL for it to use.
+                  */}
                 </div>
               </div>
 

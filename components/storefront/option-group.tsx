@@ -22,31 +22,27 @@ import { cn } from "@/lib/utils";
  * again, and a second copy is how two screens come to disagree about what an
  * empty group looks like.
  */
+/*
+  An `aside` slot stood here — something small beside the heading, a “Serving
+  Info” link or a size guide. It had exactly one caller, the size group on the
+  product page, and the shop asked for that link gone; nothing passes it now.
+  A slot with no filler is an invitation to put something in it, which is how a
+  heading row acquires clutter one prop at a time.
+*/
 export function OptionGroup({
   label,
   count,
-  aside,
   children,
 }: {
   label: string;
   count: number;
-  /**
-   * Something small beside the heading — a “Serving Info” link, a size guide.
-   *
-   * Optional, and rendered only when passed, so every other group keeps the
-   * heading it had.
-   */
-  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (count <= 0) return null;
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-sm font-medium">{label}</p>
-        {aside}
-      </div>
+      <p className="text-sm font-medium">{label}</p>
       {children}
     </div>
   );

@@ -969,53 +969,69 @@ describe("the buy box says what this shop can back", () => {
   });
 });
 
-describe("serving info, where the shop has said", () => {
-  it("offers it beside the size picker", () => {
-    // CAKE's tiers carry `serves`, which is what makes the link honest.
+describe("the four things the shop asked us to stop showing", () => {
+  /**
+   * All four were true, and none of them earned its place on the buy box.
+   *
+   * The category pill repeated a word the customer had just clicked to get
+   * here. The Share button duplicated one every browser already has. And the
+   * "Serving Info" link opened a panel that, on a product sold in ONE size,
+   * restated the line above it twice over: the price block reads "Serves 4–6
+   * people · 0.5 kg", the size button reads "0.5 kg", and the panel then said
+   * "0.5 kg — serves 4–6".
+   *
+   * The serving panel was written for a shop selling three tiers side by
+   * side, where comparing them is the whole question. That shop can still
+   * ask it — `serves` is stored per size and the price line reads it. What
+   * has gone is the second place to read the same answer.
+   */
+
+  it("does not print the category over the name", () => {
     const { html, unmount } = render(CAKE);
     try {
-      expect(html).toContain("Serving Info");
+      // The name is still there; only the pill above it has gone.
+      expect(html).toContain(CAKE.name);
+      expect(html).not.toContain(`>${CAKE.category}<`);
     } finally {
       unmount();
     }
   });
 
-  it("lists who each size feeds once opened", () => {
+  it("does not offer a Serving Info link or the panel behind it", () => {
     const view = render(CAKE);
     try {
-      const link = [...view.container.querySelectorAll("button")].find(
-        (node) => node.textContent?.trim() === "Serving Info",
-      );
-      act(() => {
-        link?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      });
-
-      const text = view.container.textContent ?? "";
-      expect(text).toContain("1 kg");
-      expect(text).toContain("serves 8–10");
-      expect(text).toContain("serves 16–20");
+      // CAKE's tiers DO carry `serves` — this is the case that used to show it.
+      expect(view.html).not.toContain("Serving Info");
+      expect(view.container.textContent ?? "").not.toContain("serves 8–10");
     } finally {
       view.unmount();
     }
   });
 
-  it("offers nothing for a product priced by size with no headcount claimed", () => {
+  it("still states the headcount once, under the price", () => {
     /**
-     * `serves` is optional per size. A shop selling cable by the metre prices
-     * three lengths and claims no headcount for any of them — a "Serving Info"
-     * link over an empty panel would be worse than no link.
+     * The removal must not cost the shop the claim itself, only the repeat.
+     * This is the line the panel was echoing.
      */
-    const { html, unmount } = render({
-      ...CAKE,
-      weights: [
-        { label: "1 m", price: 300 },
-        { label: "2 m", price: 500 },
-      ],
-    } as never);
+    const view = render(CAKE);
     try {
-      expect(html).not.toContain("Serving Info");
+      expect(view.container.textContent ?? "").toContain("Serves 8–10 people");
     } finally {
-      unmount();
+      view.unmount();
+    }
+  });
+
+  it("does not offer a Share button", () => {
+    const view = render(CAKE);
+    try {
+      const buttons = [...view.container.querySelectorAll("button")].map((node) =>
+        node.textContent?.trim(),
+      );
+      expect(buttons).not.toContain("Share");
+      // Wishlist, which stood beside it, stays.
+      expect(buttons).toContain("Wishlist");
+    } finally {
+      view.unmount();
     }
   });
 });
