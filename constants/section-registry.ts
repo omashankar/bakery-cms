@@ -441,7 +441,37 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "ctaHref", label: "CTA link", type: "url" },
     ],
   },
+  {
+    type: "eggless",
+    label: "Eggless Cakes",
+    icon: "Leaf",
+    defaultBackground: "cream",
+    defaultContent: {
+      /*
+        No claim in the copy this ships with.
 
+        It read "100% Eggless" over a row that shows whatever the shop has
+        filed under Eggless, and a description promising every cake was
+        crafted without eggs — a guarantee the software made about FOOD, on
+        every install, on the shop behalf. The title names the category; a
+        shop that wants to promise more writes it here itself.
+      */
+      overline: "",
+      title: "Eggless Collection",
+      description: "",
+      maxCount: 4,
+      ctaLabel: "Shop Eggless",
+      ctaHref: routes.store.collection("eggless"),
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
+      { key: "ctaLabel", label: "CTA label", type: "text" },
+      { key: "ctaHref", label: "CTA link", type: "url" },
+    ],
+  },
   {
     type: "seasonal",
     label: "Seasonal Collection",

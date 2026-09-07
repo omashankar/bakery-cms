@@ -18,7 +18,18 @@ export type HomepageProductSource =
   | "trending"
   | "best-sellers"
   | "photo-cakes"
+  | "eggless"
   | "seasonal";
+
+/**
+ * The rows whose heading is a claim about the product, not a curation.
+ * See the note at the top-up below for why they are exempt from it.
+ */
+const UNPADDED_SOURCES: ReadonlySet<HomepageProductSource> = new Set([
+  "eggless",
+  "seasonal",
+  "photo-cakes",
+]);
 
 function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
   if (adminCakes.length === 0) return fallback;
@@ -50,7 +61,17 @@ export function buildHomepageProducts(
    * different answers inside one row. The browser did not have the bug, which
    * is why it went unnoticed: there the store is real.
    */
-  names?: TaxonomyNames
+  names?: TaxonomyNames,
+  /**
+   * The shop own categories, so a slug can be resolved to its NAME.
+   *
+   * `filterProductsByCategory` falls back to slugifying the product category
+   * name, and that only works where a shop has not renamed a category away
+   * from its slug. This shop has “Eggless Cakes” at /eggless, so the fallback
+   * compares “eggless-cakes” with “eggless” and the row comes back empty.
+   * Seasonal happened to work only because its name IS its slug.
+   */
+  categories?: { name: string; slug: string }[],
 ): LandingProduct[] {
   const published = adminProducts.filter((cake) => cake.status === "published");
   const flags = {
@@ -96,14 +117,49 @@ export function buildHomepageProducts(
      * One list now: put the product in the Seasonal category and every
      * surface agrees.
      */
+    /**
+     * Also the CATEGORY. `isEggless` was a boolean on the product, and a
+     * claim about a RECIPE that the software derived from an option label;
+     * it went with the egg special case. What a shop files under Eggless is
+     * the shop saying so in its own catalogue, which is the same answer the
+     * nav link and /collections/eggless already give.
+     */
+    eggless: () => {
+      const admin = filterProductsByCategory(adminMapped, "eggless", categories);
+      return mergeWithCatalog(
+        admin,
+        filterProductsByCategory(all, "eggless", categories),
+      );
+    },
+
     seasonal: () => {
-      const admin = filterProductsByCategory(adminMapped, "seasonal");
-      return mergeWithCatalog(admin, filterProductsByCategory(all, "seasonal"));
+      const admin = filterProductsByCategory(adminMapped, "seasonal", categories);
+      return mergeWithCatalog(
+        admin,
+        filterProductsByCategory(all, "seasonal", categories),
+      );
     },
   };
 
   const matched = sourceMatchers[source]();
   if (matched.length >= maxCount) return matched.slice(0, maxCount);
+
+  /**
+   * A row that says what its products ARE cannot be topped up.
+   *
+   * The padding below keeps a grid full when too few products match, which
+   * is a fair display decision for a row the shop CURATES — Featured,
+   * Trending, Best Sellers are its own selection, and a fourth cake beside
+   * three chosen ones says nothing untrue about any of them.
+   *
+   * It is not fair for a row that names a property. “Eggless Collection”
+   * padded with an ordinary sponge is not untidy, it is a false statement
+   * about food; the eggless rail was removed rather than left to do exactly
+   * that. “Photo Cakes” padded with a cake that takes no photograph sends
+   * the customer to a page with no uploader on it, and “Seasonal” pads with
+   * whatever is in stock. A shop with two eggless cakes has a row of two.
+   */
+  if (UNPADDED_SOURCES.has(source)) return matched;
 
   // Keep grids full even when few cakes carry a given flag — relevant ones first,
   // then top up from the wider catalogue so a section never shows a lone card.
@@ -116,6 +172,7 @@ export function buildHomepageProducts(
     "trending",
     "best-sellers",
     "photo-cakes",
+    "eggless",
     "seasonal",
   ];
   const offset = extras.length

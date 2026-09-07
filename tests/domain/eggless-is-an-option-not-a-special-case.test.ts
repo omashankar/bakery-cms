@@ -188,14 +188,32 @@ describe("what the shop loses, stated rather than discovered", () => {
     expect(fn).toContain("occasions: product.occasions");
   });
 
-  it("no longer heads a homepage row it cannot fill", () => {
+  it("no longer heads a homepage row that selects on the flag", () => {
     /**
-     * The rail selected on the flag alone. Left standing, it would have padded
-     * itself from the whole catalogue under the heading "100% Eggless" — cakes
-     * with eggs in them, advertised as having none.
+     * The rail selected on `isEggless` alone, and left standing it would have
+     * padded itself from the whole catalogue under the heading "100% Eggless" —
+     * cakes with eggs in them, advertised as having none. So it went with the
+     * flag, and this asserted the section type was gone from the registry too.
+     *
+     * That was one step too far, and it cost the shop a row it had configured:
+     * the stored layout still carried `type: "eggless"`, visible, in draft and
+     * published, so the renderer's `default: return null` swallowed it and the
+     * homepage was silently a row shorter. The row is back — reading the
+     * CATEGORY, which is what the nav link and /collections/eggless already
+     * read, and exempt from the top-up so it can never pad.
+     *
+     * What must stay gone is what this test was really about: selecting a row
+     * of eggless cakes from a flag the software derived. See
+     * `an-eggless-row-holds-only-eggless-cakes.test.ts`.
      */
-    expect(read("constants/section-registry.ts")).not.toContain('type: "eggless"');
-    expect(read("features/products/lib/homepage-rails.ts")).not.toContain("eggless");
+    const rails = read("features/products/lib/homepage-rails.ts");
+    // Comment-stripped: the note explaining the removal names the very field
+    // this forbids, so an unstripped search passes for the thing it guards.
+    const declared = rails.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+
+    expect(declared).not.toContain("isEggless");
+    expect(rails).toContain('filterProductsByCategory(adminMapped, "eggless", categories)');
+    expect(rails).toContain('"eggless",');
   });
 
   it("still finds them the way a customer would type it", () => {

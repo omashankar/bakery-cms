@@ -60,6 +60,27 @@ async function categoryNames(): Promise<TaxonomyNames> {
 }
 
 /**
+ * The same catalogue, as the slug/name pairs `filterProductsByCategory` needs.
+ *
+ * `categoryNames` above answers “what is this category called”, keyed by id.
+ * A homepage row keyed by SLUG needs the other direction, and cannot get it
+ * by slugifying the name: this shop has “Eggless Cakes” at /eggless.
+ *
+ * `getCatalog` is request-cached, so asking twice costs one read.
+ */
+async function categorySlugs(): Promise<{ name: string; slug: string }[]> {
+  try {
+    const catalog = await getCatalog();
+    return (catalog.categories as Array<{ name: string; slug: string }>).map(
+      (category) => ({ name: category.name, slug: category.slug }),
+    );
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
+  }
+}
+
+/**
  * The product collection, read AT MOST ONCE per request.
  *
  * Five readers here take the whole list — `getProducts`, `getProductById`,
@@ -386,9 +407,10 @@ export async function setProductStatus(
 export async function getHomepageRails(
   maxCount = 8
 ): Promise<Record<HomepageProductSource, LandingProduct[]>> {
-  const [products, names, modules] = await Promise.all([
+  const [products, names, categories, modules] = await Promise.all([
     readProductsOnce(),
     categoryNames(),
+    categorySlugs(),
     readModuleSettings(),
   ]);
   const all = products
@@ -400,13 +422,14 @@ export async function getHomepageRails(
     "trending",
     "best-sellers",
     "photo-cakes",
+    "eggless",
     "seasonal",
   ];
 
   return Object.fromEntries(
     sources.map((source) => [
       source,
-      buildHomepageProducts(source, maxCount, products, all, names).map((product) =>
+      buildHomepageProducts(source, maxCount, products, all, names, categories).map((product) =>
         toCard(product, modules),
       ),
     ])

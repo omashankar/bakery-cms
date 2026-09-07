@@ -40,7 +40,16 @@ export function getHomepageProducts(
   maxCount = 8
 ): LandingProduct[] {
   const cached = loadProducts();
-  return buildHomepageProducts(source, maxCount, cached, getPublishedStorefrontProducts(cached));
+  return buildHomepageProducts(
+    source,
+    maxCount,
+    cached,
+    getPublishedStorefrontProducts(cached),
+    undefined,
+    // Same reason as the server path: a category slug cannot be recovered
+    // from the name, so the row needs the shop own list to resolve it.
+    getCategories(),
+  );
 }
 
 /**

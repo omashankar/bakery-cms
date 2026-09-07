@@ -12,6 +12,7 @@ export type HomepageSectionType =
   | "offers"
   | "wedding"
   | "photo-cakes"
+  | "eggless"
   | "seasonal"
   | "why-us"
   | "testimonials"
