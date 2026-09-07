@@ -60,7 +60,20 @@ export function isBeforeLeadTime(
   leadDays: number,
   now: Date = new Date(),
 ): boolean {
-  if (!chosen || !Number.isFinite(leadDays) || leadDays <= 0) return false;
+  /**
+   * A lead time of ZERO is still a floor.
+   *
+   * This read `|| leadDays <= 0` and returned false, so a shop that delivers
+   * same-day had no date check at all: the only two callers — the quote in
+   * `checkout.controller` and `placeOrder` — accepted `2020-01-01` as happily
+   * as tomorrow, and the browser's `min=` on the date input was the whole
+   * defence, which a direct POST does not have.
+   *
+   * Zero means “today is early enough”, not “any day will do”. The arithmetic
+   * below is already right for it: `earliestDeliveryDateString` clamps to
+   * today, and the one day of slack then refuses anything before yesterday.
+   */
+  if (!chosen || !Number.isFinite(leadDays)) return false;
   const floor = earliestDeliveryDateString(leadDays, now);
   return chosen < addDays(floor, -1);
 }
@@ -101,4 +114,93 @@ export function isOfferedTimeSlot(chosen: string, offered: readonly string[]): b
   if (list.length === 0) return true;
 
   return list.includes(wanted);
+}
+
+/**
+ * The minute a slot's window closes, as minutes past midnight. Null if the
+ * shop's wording does not say.
+ *
+ * A slot is free text — the admin types the list — so this reads what it can
+ * and declines to guess at the rest. “10:00 AM – 12:00 PM” and “10:00 - 12:00”
+ * both parse; “Evening” does not, and an unparseable slot is left alone rather
+ * than refused, which is the same choice `isOfferedTimeSlot` makes for a shop
+ * that has defined no slots at all.
+ */
+export function timeSlotEndsAt(slot: string): number | null {
+  const text = normaliseTimeSlot(slot);
+  if (!text) return null;
+
+  const meridiem = [...text.matchAll(/(\d{1,2}):(\d{2})\s*(am|pm)/g)];
+  const last = meridiem.at(-1);
+  if (last) {
+    // 12am is midnight and 12pm is noon: the hour wraps, the half-day does not.
+    const hour = (Number(last[1]) % 12) + (last[3] === "pm" ? 12 : 0);
+    return hour * 60 + Number(last[2]);
+  }
+
+  // No am/pm anywhere: read it as a 24-hour clock rather than assuming.
+  const plain = [...text.matchAll(/(\d{1,2}):(\d{2})/g)].at(-1);
+  if (!plain) return null;
+  const hour = Number(plain[1]);
+  const minute = Number(plain[2]);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+/** Minutes past midnight, on the LOCAL clock — the one the shop bakes on. */
+function minutesIntoDay(now: Date): number {
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+/**
+ * Has this delivery window already closed?
+ *
+ * Only TODAY can be in the past — a date before today is `isBeforeLeadTime`'s
+ * question, and a later date has no window that has passed yet.
+ *
+ * Nothing filtered slots by the clock: the picker rendered every stored window
+ * unconditionally and the server checked only that the wording was one the shop
+ * offers. So a shop with no preparation lead — which is what “same-day” means —
+ * took an order at 11pm for that morning's 10:00 AM – 12:00 PM delivery, printed
+ * it on the invoice and pushed it to the kitchen as a delivery it owes.
+ */
+export function isPastTimeSlot(
+  chosen: string,
+  timeSlot: string,
+  now: Date = new Date(),
+): boolean {
+  if (!chosen || !timeSlot) return false;
+  if (chosen !== todayAsDateString(now)) return false;
+
+  const closes = timeSlotEndsAt(timeSlot);
+  if (closes === null) return false;
+
+  return minutesIntoDay(now) >= closes;
+}
+
+/**
+ * Has the shop stopped taking orders for today?
+ *
+ * `commerce.sameDayCutoff` is the shop's own answer to “how late can somebody
+ * ask for today”, and it drove a countdown on the product page and NOTHING else
+ * — the same shape as `deliveryTimeSlots` before the server learned to read it,
+ * and as `minOrderValue` before that. A setting the shop can edit and the shop
+ * cannot enforce is worse than no setting, because it reads like a rule.
+ *
+ * Empty means the shop has named no cutoff, so there is nothing to enforce; a
+ * date that is not today is not a same-day order and is none of this rule's
+ * business. The format is the one the admin field validates, `HH:MM`.
+ */
+export function isPastSameDayCutoff(
+  chosen: string,
+  cutoff: string,
+  now: Date = new Date(),
+): boolean {
+  if (!chosen || !cutoff) return false;
+  if (chosen !== todayAsDateString(now)) return false;
+
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(cutoff.trim());
+  if (!match) return false;
+
+  return minutesIntoDay(now) >= Number(match[1]) * 60 + Number(match[2]);
 }

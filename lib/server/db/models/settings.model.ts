@@ -112,6 +112,19 @@ const commerceSchema = new mongoose.Schema(
     estimatedDeliveryDays: { type: Number, default: 1 },
     deliveryTimeSlots: { type: [String], default: [] },
     orderNumberPrefix: { type: String, default: "BK" },
+    /*
+      Two settings that could not be saved.
+
+      `sameDayCutoff` and `productImageNote` are declared on CommerceSettings
+      and validated by `commerceSchema`, and both have a field on an admin
+      screen — but neither was ever a path here, and Mongoose's strict mode
+      drops an undeclared path silently on write. So the admin typed a
+      closing time, the form said saved, the value went nowhere, and the
+      countdown it drives never appeared. This shop's cutoff is unset for
+      exactly that reason.
+    */
+    sameDayCutoff: { type: String, default: "" },
+    productImageNote: { type: String, default: "" },
     checkoutTerms: { type: String, default: "" },
     giftWrapEnabled: { type: Boolean, default: false },
     giftWrapFee: { type: Number, default: 0 },

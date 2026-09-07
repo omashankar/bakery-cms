@@ -72,7 +72,12 @@ import {
 } from "@/features/orders/lib/unconfirmed-order";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
-import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
+import {
+  addDays,
+  earliestDeliveryDateString,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+} from "@/features/orders/lib/delivery-date";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
@@ -575,15 +580,28 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    */
   const earliestDeliveryDate = useMemo(() => {
     const zoneDays = totals.deliveryMinDays;
-    if (typeof zoneDays !== "number" || zoneDays <= 0) return minDeliveryDate;
 
     // Calendar arithmetic, not Date arithmetic. The first version built a LOCAL
     // midnight and read it back through `toISOString()`, which is UTC — so in
     // IST the floor came out a day early and the picker offered exactly the date
     // the server refuses, with the refusal landing after the card was charged.
-    const zoneFloor = earliestDeliveryDateString(zoneDays);
-    return zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
-  }, [totals.deliveryMinDays, minDeliveryDate]);
+    const zoneFloor =
+      typeof zoneDays === "number" && zoneDays > 0
+        ? earliestDeliveryDateString(zoneDays)
+        : minDeliveryDate;
+    const floor = zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
+
+    /**
+     * And past the shop own closing time for today.
+     *
+     * `sameDayCutoff` drove a countdown on the product page and nothing else,
+     * so a shop that closes at 2pm went on offering today at 11pm. The quote
+     * refuses that now; this is so the customer is never offered it.
+     */
+    return isPastSameDayCutoff(floor, commerce.sameDayCutoff)
+      ? addDays(floor, 1)
+      : floor;
+  }, [totals.deliveryMinDays, minDeliveryDate, commerce.sameDayCutoff]);
 
   // Anything that changes the price invalidates the shop's last answer.
   useEffect(() => {
@@ -1284,11 +1302,24 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
                           >
                             <option value="">Select a time</option>
-                            {slotOptions.map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
+                            {/*
+                              Today windows that have already closed are not
+                              offered — the quote refuses them. The one already
+                              chosen stays listed whatever the clock says, so the
+                              select never renders a value it has no option for;
+                              changing the date is what clears it.
+                            */}
+                            {slotOptions
+                              .filter(
+                                (slot) =>
+                                  slot === deliverySlot.timeSlot ||
+                                  !isPastTimeSlot(deliverySlot.date, slot),
+                              )
+                              .map((slot) => (
+                                <option key={slot} value={slot}>
+                                  {slot}
+                                </option>
+                              ))}
                           </select>
                         </div>
                       </div>

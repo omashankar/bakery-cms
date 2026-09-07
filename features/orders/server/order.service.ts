@@ -22,7 +22,12 @@ import {
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
-import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
+import {
+  isBeforeLeadTime,
+  isOfferedTimeSlot,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+} from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
   priceCart,
@@ -375,6 +380,35 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
       "That delivery time is not one this shop offers. Please choose another.",
       409,
     );
+  }
+
+  /**
+   * And a window that has not already closed.
+   *
+   * Nothing anywhere looked at the CLOCK. The date floor answers “is this day
+   * far enough ahead” and the slot check answers “is this a window the shop
+   * offers” — neither asks whether the window has been and gone. On a shop
+   * with no preparation lead, which is what same-day means, that let an order
+   * arrive at 11pm for that morning's 10:00 AM – 12:00 PM delivery.
+   *
+   * Only for a cart that was never quoted, for the same reason as the slot
+   * list above it: a customer who quoted at 11:55 and paid at 12:05 must not
+   * be refused after the gateway has captured. The quote endpoint refuses it
+   * while it is still free.
+   */
+  if (!draft && input.deliverySlot?.date) {
+    if (isPastSameDayCutoff(input.deliverySlot.date, commerce.sameDayCutoff ?? "")) {
+      throw new AppError(
+        "We have stopped taking orders for delivery today. Please choose a later date.",
+        409,
+      );
+    }
+    if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "")) {
+      throw new AppError(
+        "That delivery window has already passed today. Please choose another.",
+        409,
+      );
+    }
   }
 
   // The shop's minimum order value, enforced by the shop.
