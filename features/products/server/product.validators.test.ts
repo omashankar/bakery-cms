@@ -15,7 +15,6 @@ const valid = {
   isFeatured: false,
   isBestSeller: false,
   isTrending: false,
-  isSeasonal: false,
   shapes: ["Round"],
   flavourOptions: [],
   stockStatus: "in_stock",

@@ -137,7 +137,6 @@ describe("the word survives the write path", () => {
       isFeatured: false,
       isBestSeller: false,
       isTrending: false,
-      isSeasonal: false,
       shapes: [],
       flavourOptions: [],
       stockStatus: "in_stock",

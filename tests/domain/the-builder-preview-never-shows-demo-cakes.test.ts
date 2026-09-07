@@ -65,7 +65,6 @@ function cake(over: Partial<Product> & { slug: string }): Product {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isSeasonal: false,
     shapes: [],
     flavourOptions: [],
     stockStatus: "in-stock",

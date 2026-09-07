@@ -95,7 +95,6 @@ function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeE
       if (filters.flag === "trending" && !cake.isTrending) return false;
       if (filters.flag === "best-seller" && !cake.isBestSeller) return false;
       if (filters.productType === "photo" && !cake.allowsPhotoUpload) return false;
-      if (filters.productType === "seasonal" && !cake.isSeasonal) return false;
       if (filters.stock !== "all") {
         const derivedStatus = deriveStockStatus(cake, settings);
         if (filters.stock === "unlimited") {
@@ -432,7 +431,6 @@ export function ProductsListPage() {
             >
               <option value="all">All types</option>
               {modules.photoCake ? <option value="photo">Photo</option> : null}
-              <option value="seasonal">Seasonal</option>
             </AdminSelect>
             <AdminSelect
               value={filters.sort}

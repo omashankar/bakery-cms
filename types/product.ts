@@ -118,7 +118,6 @@ export interface Product extends BaseEntity, ProductDetails {
   isFeatured: boolean;
   isBestSeller: boolean;
   isTrending: boolean;
-  isSeasonal: boolean;
   shapes: string[];
   flavourOptions: string[];
   stockStatus: StockStatus;

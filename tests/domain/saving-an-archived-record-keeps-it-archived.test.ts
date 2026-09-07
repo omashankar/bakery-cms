@@ -42,7 +42,6 @@ const ARCHIVED: Product = {
   isFeatured: false,
   isBestSeller: false,
   isTrending: false,
-  isSeasonal: false,
   shapes: [],
   flavourOptions: [],
   stockStatus: "in_stock",

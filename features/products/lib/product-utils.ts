@@ -13,7 +13,7 @@ export function formatStatusLabel(status: EntityStatus): string {
 }
 
 export type ProductFlagFilter = "all" | "featured" | "trending" | "best-seller";
-export type ProductTypeFilter = "all" | "photo" | "seasonal";
+export type ProductTypeFilter = "all" | "photo";
 export type StockFilter = "all" | "in_stock" | "low_stock" | "out_of_stock" | "unlimited";
 
 export interface ProductListFilters {

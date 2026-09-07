@@ -58,7 +58,6 @@ export function buildHomepageProducts(
     trending: published.filter((cake) => cake.isTrending),
     bestSellers: published.filter((cake) => cake.isBestSeller),
     photo: published.filter((cake) => cake.allowsPhotoUpload),
-    seasonal: published.filter((cake) => cake.isSeasonal),
   };
 
   const adminMapped = getPublishedStorefrontProducts(adminProducts, names);
@@ -85,8 +84,20 @@ export function buildHomepageProducts(
       return mergeWithCatalog(admin, filterProductsByCategory(all, "photo-cakes"));
     },
 
+    /**
+     * The CATEGORY, not a flag on the product.
+     *
+     * There was an `isSeasonal` tick, and it disagreed with the rest of the
+     * site: the nav's “Seasonal” link and the mega-menu card both point at
+     * `/collections/seasonal`, which is served by the category — so a cake
+     * ticked Seasonal but filed under Birthday appeared in this row and was
+     * missing from the page the row links to. Two answers to one question.
+     *
+     * One list now: put the product in the Seasonal category and every
+     * surface agrees.
+     */
     seasonal: () => {
-      const admin = pickAdmin(flags.seasonal);
+      const admin = filterProductsByCategory(adminMapped, "seasonal");
       return mergeWithCatalog(admin, filterProductsByCategory(all, "seasonal"));
     },
   };

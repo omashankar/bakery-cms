@@ -74,7 +74,6 @@ export const productFormSchema = z
     isFeatured: z.boolean(),
     isBestSeller: z.boolean(),
     isTrending: z.boolean(),
-    isSeasonal: z.boolean(),
     shapes: z.array(z.string()).default([]),
     flavourOptions: z.array(z.string()).default([]),
     stockStatus: z.enum(["in_stock", "low_stock", "out_of_stock"]),

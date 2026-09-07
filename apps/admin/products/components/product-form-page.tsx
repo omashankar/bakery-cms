@@ -750,40 +750,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </TabsContent>
 
               <TabsContent value="commerce" className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {/*
-                    An "Eggless" tick stood here, and a matching module switch
-                    behind it.
+                {/*
+                  A row of three ticks stood here — Eggless, Photo cake, and
+                  Seasonal — and all three have gone the same way.
 
-                    It said the product ITSELF was eggless — a claim about a
-                    recipe, which only the shop can make and which it makes
-                    better in the name and the description. What a CUSTOMER
-                    needs is the choice, and that is an ordinary option group
-                    named "Eggless" with a price on it: the product page renders
-                    any two-option group as a single tickbox already.
-                  */}
-                  {/*
-                    A "Photo cake" tick stood here, and it did two things: it set
-                    a flag, and it built a "Standard design / Custom photo print
-                    +₹250" group so the flag had something to be derived from.
-
-                    Both have gone. A product that takes a photograph takes one —
-                    there is no cheaper version of it to choose between, and what
-                    printing costs is part of what the thing costs. The shop ticks
-                    "Allow photo upload" further down this form and prices the
-                    product accordingly.
-                  */}
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={form.isSeasonal}
-                      onCheckedChange={(checked) =>
-                        patchForm({ isSeasonal: checked === true })
-                      }
-                    />
-                    Seasonal
-                  </label>
-                </div>
-
+                  Each was a FLAG on the product that some other part of the
+                  shop derived a claim or a list from, and each had a better
+                  answer already in the product itself. Eggless is a recipe,
+                  which a shop states in the name and the description. A photo
+                  print is priced in, behind "Allow photo upload" below.
+                  Seasonal is a CATEGORY: the nav link, the mega-menu card and
+                  the homepage row all read that, so a tick beside it was a
+                  second list that could disagree with the first — and did.
+                */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
                     <Checkbox

@@ -103,7 +103,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     isFeatured: cake.badge === "Featured",
     isBestSeller: cake.badge === "Bestseller",
     isTrending: cake.badge === "Trending",
-    isSeasonal: cake.category.toLowerCase().includes("seasonal"),
     // Nothing in the landing data says a product comes in Round, Square and
     // Heart — the seed said it on their behalf, and the storefront then offered
     // the picker. The last copy of the injection 46b04b2 removed.
@@ -198,7 +197,6 @@ export function normalizeCommerceFields(cake: Product): Product {
 
   return {
     ...cake,
-    isSeasonal: cake.isSeasonal ?? false,
     // Never Round/Square/Heart by default. This runs on every repository read,
     // so a phone charger came back from the database with three cake shapes on
     // it — offered to the customer, and stamped onto the order line they chose
@@ -480,7 +478,6 @@ export function createEmptyProductForm(): ProductFormData {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isSeasonal: false,
     shapes: [],
     flavourOptions: [],
     stockStatus: "in_stock",
