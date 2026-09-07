@@ -46,9 +46,7 @@ import {
   getProductGalleryImages,
   timeLeftToday,
   getProductReviews,
-  getDeliveryTimeSlots,
   getDeliveryPromise,
-  getMinDeliveryDate,
   getProductDetailBadges,
   type ProductReview,
 } from "@/apps/website/lib/product-details";
@@ -80,12 +78,11 @@ import { ProductRailSection } from "@/apps/website/components/product-rail-secti
 import type { LandingProduct } from "@/constants/landing-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
+import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -256,10 +253,7 @@ export function ProductDetailPage({
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
-  const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
   const [deliveryPromise, setDeliveryPromise] = useState("");
-  const [minDeliveryDate, setMinDeliveryDate] = useState("");
-  const [deliveryReady, setDeliveryReady] = useState(false);
   /**
    * What this shop is offering, said where the decision is made.
    *
@@ -302,8 +296,6 @@ export function ProductDetailPage({
   const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoPrintDraft>(emptyPhotoPrintDraft);
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
 
@@ -405,9 +397,13 @@ export function ProductDetailPage({
    */
   const deliveryNotes = [
     deliveryPromise,
-    deliveryDate
-      ? `Scheduled delivery on ${formatDate(deliveryDate)}${deliveryTime ? ` between ${deliveryTime}` : ""}`
-      : "",
+    /*
+      A “Scheduled delivery on …” note sat here, echoing the date picked in
+      the two fields above the buy button. Both have gone; the shop's own
+      promise — “Same-day delivery”, read from `deliveryLeadDays` — is the
+      one this list still carries, because it is true of the product rather
+      than of one customer's order.
+    */
     cake.allowsMessage !== false ? "Custom message card included at no extra charge" : "",
   ].filter((note) => note.trim().length > 0);
 
@@ -517,15 +513,13 @@ export function ProductDetailPage({
   const showPhotoUpload = cake.allowsPhotoUpload === true && modules.photoCake;
   const isOutOfStock = cake.inStock === false;
 
+  /*
+    This also read the slot list and the earliest date, to fill the two
+    delivery fields that stood above the buy button. Only the shop's own
+    promise is left — one string, for the “Timely Delivery” card.
+  */
   useEffect(() => {
-    const slots = getDeliveryTimeSlots();
-    const minDate = getMinDeliveryDate();
     setDeliveryPromise(getDeliveryPromise());
-    setDeliverySlots(slots);
-    setMinDeliveryDate(minDate);
-    setDeliveryDate(minDate);
-    setDeliveryTime(slots[3] ?? slots[0] ?? "");
-    setDeliveryReady(true);
   }, []);
 
   /**
@@ -844,8 +838,6 @@ export function ProductDetailPage({
         that was never charged for it.
       */
       photoUrl: (showPhotoUpload && photoUrl) || undefined,
-      deliveryDate,
-      deliveryTime,
       // Only the groups the customer could see. `calculateVariantAdjustment`
       // falls back to a group's default option when no selection is sent, so
       // the server-side gate in pricing.server.ts is what actually stops the
@@ -1313,35 +1305,24 @@ export function ProductDetailPage({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-date">Delivery date</Label>
-                  <Input
-                    id="delivery-date"
-                    type="date"
-                    min={minDeliveryDate}
-                    value={deliveryDate}
-                    onChange={(event) => setDeliveryDate(event.target.value)}
-                    disabled={!deliveryReady}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-time">Delivery time</Label>
-                  <select
-                    id="delivery-time"
-                    value={deliveryTime}
-                    onChange={(event) => setDeliveryTime(event.target.value)}
-                    disabled={!deliveryReady}
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-                  >
-                    {deliverySlots.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/*
+                A Delivery date and a Delivery time stood here.
+
+                Removed at the shop's request: when a cake arrives is settled
+                AFTER the cart, not before it. Checkout asks the same two
+                questions, refuses to move on without an answer, and its
+                answer already won — `resolveEstimatedDelivery` says so in as
+                many words: “the slot chosen at checkout is the promise made
+                to the customer, so it takes precedence over dates picked per
+                item on the product page.” So this pair set a value that the
+                checkout then overrode, on a page the customer visits once per
+                cake and a decision they make once per order.
+
+                New lines carry no date. The FIELDS stay on the cart line and
+                the order item, and the cart still prints one when it finds
+                it, because a cart in somebody's browser from before this
+                deploy still has values in it and carts do not expire.
+              */}
 
               {/*
                 A Quantity stepper stood to the left of these buttons.

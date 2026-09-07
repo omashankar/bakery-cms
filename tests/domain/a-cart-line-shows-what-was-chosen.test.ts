@@ -326,6 +326,37 @@ describe("changing a choice on a line already in the cart", () => {
     expect(view.textContent).not.toContain("Quantity");
   });
 
+  it("adds a line with no delivery date, because checkout settles that", () => {
+    /**
+     * The product page used to carry a Delivery date and time, and stamped them
+     * onto the line. Checkout asks the same two questions, refuses to move on
+     * without an answer, and its answer already won — `resolveEstimatedDelivery`
+     * prefers the checkout slot "over dates picked per item on the product
+     * page". So the pair set a value that was then overridden.
+     *
+     * The FIELDS survive on the line, deliberately: a cart sitting in somebody's
+     * browser from before this deploy still has values in it, carts do not
+     * expire, and the cart page still prints one where it finds one. What must
+     * not happen is a NEW line acquiring one from a control that is gone.
+     */
+    const view = mount(
+      createElement(ProductDetailPage, {
+        cake: PRODUCT,
+        modules: defaultModuleSettings,
+        related: [],
+        catalog: [],
+      } as never),
+    );
+
+    expect(view.querySelector('input[type="date"]')).toBeNull();
+    click(buttonSaying("Add to Cart"));
+
+    const line = getCartItems()[0];
+    expect(line, "nothing was added").toBeTruthy();
+    expect(line?.deliveryDate).toBeUndefined();
+    expect(line?.deliveryTime).toBeUndefined();
+  });
+
   it("replaces the line instead of leaving a second one beside it", () => {
     /**
      * `cartLineId` folds the size and the options into a line's identity, so

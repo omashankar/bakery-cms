@@ -481,7 +481,26 @@ describe("the page does not call every product a cake", () => {
       expect(html, "an empty delivery note reached the page").not.toMatch(
         /<li[^>]*>\s*<\/li>/,
       );
-      expect(section("Product Description")).toContain("Scheduled delivery");
+      /**
+       * The list still has something in it, so the assertion above is not
+       * passing because nothing rendered at all. This used to anchor on
+       * "Scheduled delivery on …", the echo of the date picked in the two
+       * delivery fields — both gone, because when a cake arrives is settled at
+       * checkout rather than on the product page.
+       */
+      expect(section("Product Description")).toContain("Custom message card");
+    } finally {
+      unmount();
+      promise.value = "Next-day delivery";
+    }
+  });
+
+  it("prints the shop's promise as a note once it has loaded", () => {
+    // The other half: the bullet is filtered when empty, rendered when not.
+    promise.value = "Same-day delivery";
+    const { section, unmount } = render(CHARGER);
+    try {
+      expect(section("Product Description")).toContain("Same-day delivery");
     } finally {
       unmount();
       promise.value = "Next-day delivery";
@@ -1051,6 +1070,42 @@ describe("the four things the shop asked us to stop showing", () => {
     const view = render(CAKE);
     try {
       expect(view.container.textContent ?? "").not.toContain("Quantity");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("does not ask when to deliver, because checkout does and wins", () => {
+    /**
+     * A Delivery date and a Delivery time stood above the buy button. When a
+     * cake arrives is settled AFTER the cart: checkout asks the same two
+     * questions, refuses to move on without an answer, and its answer already
+     * took precedence — `resolveEstimatedDelivery` says so in as many words.
+     * So this pair set a value the checkout then overrode, on a page visited
+     * once per cake for a decision made once per order.
+     */
+    const view = render(CAKE);
+    const text = view.container.textContent ?? "";
+    try {
+      expect(text).not.toContain("Delivery date");
+      expect(text).not.toContain("Delivery time");
+      expect(view.container.querySelector('input[type="date"]')).toBeNull();
+      // …and no echo of a date under the description either.
+      expect(text).not.toContain("Scheduled delivery");
+    } finally {
+      view.unmount();
+    }
+  });
+
+  it("still names the shop's delivery speed, which is about the product", () => {
+    /**
+     * The removal must not take the promise with it. "Same-day delivery" is
+     * read from the shop's own lead time and is true of the cake whoever is
+     * buying it — unlike a date, which belongs to one order.
+     */
+    const view = render(CAKE);
+    try {
+      expect(view.container.textContent ?? "").toContain("Next-day delivery");
     } finally {
       view.unmount();
     }
