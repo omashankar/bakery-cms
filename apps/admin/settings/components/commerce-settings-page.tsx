@@ -291,8 +291,9 @@ export function CommerceSettingsPage() {
             <CardHeader>
               <CardTitle className="text-base">What the product page says</CardTitle>
               <CardDescription>
-                Two lines the shop can add to every product page. Both are blank
-                until you write them, and nothing is printed while they are.
+                What every product page adds beyond the product itself. All
+                blank until you write them, and nothing is printed while they
+                are.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -327,6 +328,25 @@ export function CommerceSettingsPage() {
                   Shows a countdown on the product page until this time each day.
                   Leave it empty if you do not promise same-day delivery — a timer
                   with nothing behind it is pressure, not information.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deliveryInformation">Delivery information</Label>
+                <textarea
+                  id="deliveryInformation"
+                  className={adminTextareaClassName}
+                  rows={6}
+                  value={settings.deliveryInformation}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, deliveryInformation: e.target.value }))
+                  }
+                  placeholder={"Hand-delivered in a sealed box.\nCandles and a knife are included where available.\nPerishable — delivery is attempted once and cannot be redirected."}
+                />
+                <p className="text-xs text-muted-foreground">
+                  One line per point. These appear as a bulleted “Delivery
+                  Information” list on every product page — how it travels, what
+                  is included, what you cannot promise. Written once here rather
+                  than retyped per product, so they cannot drift apart.
                 </p>
               </div>
             </CardContent>

@@ -146,6 +146,19 @@ export interface CommerceSettings {
    * customer is most likely to act on what it says.
    */
   sameDayCutoff: string;
+  /**
+   * What the shop wants every product page to say about delivery.
+   *
+   * One line typed is one bullet, under a “Delivery Information” heading in
+   * the product description — how it travels, what is included, what cannot
+   * be promised. SHOP-WIDE rather than per product, because it is a policy:
+   * the same seven lines on every cake, and retyping them per product is how
+   * they come to disagree with each other.
+   *
+   * Blank until the shop writes it, and the heading does not render while it
+   * is. This software has no delivery policy of its own to offer.
+   */
+  deliveryInformation: string;
   paymentMethods: PaymentMethodSettings;
 }
 

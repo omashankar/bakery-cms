@@ -59,7 +59,6 @@ import {
 import {
   asAddOn,
   getDefaultVariantSelections,
-  formatPreparationTime,
   getProductVariantGroups,
   mapLegacyChoice,
   variantGroupsEnabledBy,
@@ -141,6 +140,14 @@ interface ProductDetailPageProps {
    */
   related: LandingProduct[];
   catalog: LandingProduct[];
+  /**
+   * The shop's delivery policy, one line per bullet.
+   *
+   * A PROP rather than a client read: it is prose the page says, so it has
+   * to be in the HTML the browser and the crawler receive. Optional and
+   * blank by default — a shop that has written none gets no heading.
+   */
+  deliveryInformation?: string;
 }
 
 export function ProductDetailPage({
@@ -149,6 +156,7 @@ export function ProductDetailPage({
   editLineId,
   related: relatedFromServer,
   catalog,
+  deliveryInformation,
 }: ProductDetailPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
@@ -184,36 +192,22 @@ export function ProductDetailPage({
   /** The shop's own facts about this product. Empty when it states none. */
   const attributes = useMemo(() => cake.attributes ?? [], [cake]);
   /**
-   * Everything the shop has stated about this product, as one bulleted list.
+   * What the SHOP has said about this product. Its own words, only.
    *
-   * The shop's own `attributes` first — Brand, Material, Country of Origin,
-   * whatever it chose to say — then the three fixed food facts, each of which
-   * had a heading of its own and three lines beneath it. Same data, one list.
+   * Calories, Preparation and Shelf life used to be appended here as three
+   * more bullets. They are already the chips under the product name —
+   * "280 kcal / serving", "2 hr prep", "Best within 3 days" — so the page
+   * printed each of them twice, once as a chip and once as a sentence. The
+   * chips are the shorter and the higher of the two, and they stay; this
+   * list is now exactly the facts a shop typed into Product details.
    */
-  const productFacts = useMemo(() => {
-    const facts = attributes.map((attribute) => ({
-      label: attribute.label,
-      value: attribute.value,
-    }));
-
-    if (cake.calories) {
-      facts.push({ label: "Calories", value: `${cake.calories} kcal per serving` });
-    }
-    if (cake.preparationTimeMinutes) {
-      facts.push({
-        label: "Preparation",
-        value: formatPreparationTime(cake.preparationTimeMinutes) ?? "",
-      });
-    }
-    if (cake.shelfLifeDays) {
-      facts.push({
-        label: "Shelf life",
-        value: `${cake.shelfLifeDays} day${cake.shelfLifeDays === 1 ? "" : "s"} when stored properly`,
-      });
-    }
-
-    return facts.filter((fact) => fact.value.trim().length > 0);
-  }, [attributes, cake.calories, cake.preparationTimeMinutes, cake.shelfLifeDays]);
+  const productFacts = useMemo(
+    () =>
+      attributes
+        .map((attribute) => ({ label: attribute.label, value: attribute.value }))
+        .filter((fact) => fact.value.trim().length > 0),
+    [attributes],
+  );
 
   /**
    * One line typed is one bullet.
@@ -395,29 +389,38 @@ export function ProductDetailPage({
    * redirection policies. There is no field behind any of that here, and a
    * paragraph of invented policy is worse than a short list of true ones.
    */
-  const deliveryNotes = [
-    deliveryPromise,
-    /*
-      A “Scheduled delivery on …” note sat here, echoing the date picked in
-      the two fields above the buy button. Both have gone; the shop's own
-      promise — “Same-day delivery”, read from `deliveryLeadDays` — is the
-      one this list still carries, because it is true of the product rather
-      than of one customer's order.
-    */
-    cake.allowsMessage !== false ? "Custom message card included at no extra charge" : "",
-  ].filter((note) => note.trim().length > 0);
+  /**
+   * The shop's own delivery policy, one line typed is one bullet.
+   *
+   * This list used to be written by the software: the derived delivery
+   * promise, an echo of the date picked in the two fields that stood above
+   * the buy button, and the flat sentence "Custom message card included at
+   * no extra charge". The first two are said elsewhere on the page already —
+   * the promise on the "Timely Delivery" tile, and the date at checkout,
+   * where it is actually decided — and the third is a tile of its own.
+   *
+   * So three bullets that were a duplicate, a duplicate and a hard-coded
+   * claim, under a heading a shop had no way to write. It writes it now, in
+   * Settings → Commerce, once for every product.
+   */
+  const deliveryNotes = (deliveryInformation ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
   /**
    * The whole section hides when the shop has filled in none of it.
    *
-   * `deliveryNotes` is never empty in practice — the slot is always picked —
-   * so this is really asking whether there is anything to READ beyond the
-   * delivery line, and a product with nothing said about it gets no heading.
+   * `deliveryNotes` counts now. It used to be written by the software and so
+   * was never empty — asking about it would have kept the heading up for
+   * every product in every shop, which is what the rest of this list exists
+   * to prevent.
    */
   const hasDescription = Boolean(
     productFacts.length > 0 ||
       cake.ingredients ||
       cake.allergens ||
+      deliveryNotes.length > 0 ||
       careNotes.length > 0 ||
       cake.description,
   );

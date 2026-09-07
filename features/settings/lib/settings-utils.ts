@@ -174,6 +174,7 @@ export const defaultCommerceSettings: CommerceSettings = {
   // Both blank: a shop says these or it does not, and a shipped default
   // would be this software making a claim on every shop's behalf.
   productImageNote: "",
+  deliveryInformation: "",
   sameDayCutoff: "",
   paymentMethods: {
     cod: true,

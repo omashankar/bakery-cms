@@ -198,6 +198,7 @@ export const commerceSchema = z.object({
   giftWrapFee: nonNegative,
   giftWrapLabel: z.string().default(""),
   productImageNote: z.string().default(""),
+  deliveryInformation: z.string().default(""),
   /**
    * `HH:MM` on a 24-hour clock, or blank.
    *

@@ -70,3 +70,33 @@ export const getServerModules = cache(async (): Promise<ServerModules> => {
 export async function isWeddingEnabledOnServer(): Promise<boolean> {
   return (await getServerModules()).weddingEnabled;
 }
+
+/**
+ * The shop's delivery policy, read on the SERVER.
+ *
+ * Beside the modules rather than in a file of its own because it answers the
+ * same question they do: what must the server already know to render a page
+ * correctly the first time. The product page's other commerce reads happen in a
+ * client effect off localStorage, which is right for a note under a photo and
+ * wrong for a block of prose that is part of what the page SAYS — it would be
+ * missing from the HTML a crawler receives and appear a beat later for everyone
+ * else, which is the exact failure the stacked description sections were
+ * written to end.
+ *
+ * `getPublicSettings` shares the request's cached settings read, so asking here
+ * costs nothing on top of `getServerModules`.
+ *
+ * Empty on a failed read, like every other storefront copy read: a shop that
+ * cannot be reached says nothing rather than saying the software's words.
+ */
+export const getServerDeliveryInformation = cache(async (): Promise<string> => {
+  try {
+    const settings = (await getPublicSettings()) as {
+      commerce?: { deliveryInformation?: unknown };
+    };
+    const copy = settings.commerce?.deliveryInformation;
+    return typeof copy === "string" ? copy : "";
+  } catch {
+    return "";
+  }
+});
