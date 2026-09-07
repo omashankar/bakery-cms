@@ -334,31 +334,24 @@ describe("the food tabs belong to food", () => {
   });
 
   it("still shows a cake everything it actually fills", () => {
+    /**
+     * Six of the fields this used to cover have gone from the product
+     * entirely, at the shop's request: Barcode/SKU, Preparation time, Shelf
+     * life, Calories, Ingredients and Allergens. None of them drove any
+     * logic, and four of them printed a second time as a chip beside the
+     * name. What is left is the three headings the shop asked for.
+     */
     const { html, section, unmount } = render({
       ...CAKE,
-      ingredients: "Flour, cocoa, cream.",
-      allergens: "Contains milk and wheat.",
       careInstructions: "Refrigerate on arrival.",
-      calories: 320,
     });
     try {
-      /**
-       * One section with labelled parts, where there were six headings. Same
-       * data, same gating — a part still appears only where the shop filled
-       * the field — but a customer scanning for “does it have nuts” reads one
-       * block rather than six.
-       */
-      expect(html).toContain("Ingredients:");
-      expect(html).toContain("Allergens:");
       expect(html).toContain("Care Instructions:");
+      expect(html).not.toContain("Ingredients:");
+      expect(html).not.toContain("Allergens:");
       // In the HTML, not behind a click — which is also what a crawler gets.
       const described = section("Product Description");
-      expect(described).toContain("Flour, cocoa, cream.");
       expect(described).toContain("Refrigerate on arrival.");
-      // The three fixed food facts are CHIPS under the name. They used to be
-      // bullets here as well, so the page printed each of them twice.
-      expect(described).not.toContain("320 kcal per serving");
-      expect(html).toContain("320 kcal / serving");
     } finally {
       unmount();
     }
@@ -919,11 +912,11 @@ describe("one Product Description, the way a customer reads it", () => {
       expect(described).toContain("Country of Origin: India");
       expect(described).toContain("Net Quantity: 1 cake");
 
+      // Neither as a bullet nor as a chip: Calories and Shelf life are not
+      // fields on a product any more.
       expect(described).not.toContain("320 kcal per serving");
-      expect(described).not.toContain("3 days when stored properly");
-      // …because the chips beside the name carry them, as they always did.
-      expect(view.container.textContent ?? "").toContain("320 kcal / serving");
-      expect(view.container.textContent ?? "").toContain("Best within 3 days");
+      expect(view.container.textContent ?? "").not.toContain("320 kcal / serving");
+      expect(view.container.textContent ?? "").not.toContain("Best within 3 days");
     } finally {
       view.unmount();
     }
@@ -1227,26 +1220,38 @@ describe("the product description says what the shop wrote, once", () => {
    * policy, written by the software, that no shop could edit.
    */
 
-  it("lists only the facts the shop typed, not the ones already on a chip", () => {
+  it("lists the facts the shop typed, and has nowhere else to get any", () => {
+    /**
+     * Calories, Preparation and Shelf life were bullets here AND chips beside
+     * the name — the same three facts printed twice on one page. The shop
+     * removed the fields, so neither surface has them: what a shop wants
+     * said goes under "Add detail", which is the one system for its own
+     * facts and the one the reference storefront uses for all eight of its.
+     */
     const view = render({
       ...CAKE,
-      attributes: [{ id: "a1", label: "Country of Origin", value: "India" }],
+      attributes: [
+        { id: "a1", label: "Country of Origin", value: "India" },
+        { id: "a2", label: "Net Quantity", value: "1 Cake" },
+      ],
       calories: 280,
       preparationTimeMinutes: 120,
       shelfLifeDays: 3,
     } as never);
     try {
       const described = view.section("Product Description");
+      const page = view.container.textContent ?? "";
 
       expect(described).toContain("Country of Origin: India");
-      expect(described).not.toContain("Calories:");
-      expect(described).not.toContain("Preparation:");
-      expect(described).not.toContain("Shelf life:");
+      expect(described).toContain("Net Quantity: 1 Cake");
 
-      // …because they are up beside the name, where they were all along.
-      expect(view.container.textContent ?? "").toContain("280 kcal / serving");
-      expect(view.container.textContent ?? "").toContain("2 hr prep");
-      expect(view.container.textContent ?? "").toContain("Best within 3 days");
+      // Nowhere on the page, from either direction.
+      expect(described).not.toContain("Calories:");
+      expect(page).not.toContain("280 kcal / serving");
+      expect(page).not.toContain("2 hr prep");
+      expect(page).not.toContain("Best within 3 days");
+      // …and the SKU, which used to print as a chip AND at the foot.
+      expect(page).not.toContain("SKU");
     } finally {
       view.unmount();
     }

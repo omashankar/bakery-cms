@@ -83,14 +83,9 @@ export function mapAdminProductToStorefront(
     allowsMessage: cake.allowsMessage,
     allowsPhotoUpload: cake.allowsPhotoUpload,
     photoFrameShape: cake.photoFrameShape,
-    ingredients: cake.ingredients,
     weights: cake.weights,
     weightLabel: cake.weightLabel,
-    barcode: cake.barcode,
-    preparationTimeMinutes: cake.preparationTimeMinutes,
-    shelfLifeDays: cake.shelfLifeDays,
-    calories: cake.calories,
-    allergens: cake.allergens,
+
     careInstructions: cake.careInstructions,
     variantGroups: cake.variantGroups,
     /**

@@ -93,11 +93,22 @@ export interface ProductAttribute {
 }
 
 export interface ProductDetails {
-  barcode?: string;
-  preparationTimeMinutes?: number;
-  shelfLifeDays?: number;
-  calories?: number;
-  allergens?: string;
+  /*
+    SIX FIELDS STOOD HERE, and the shop asked for all of them.
+
+    Barcode / SKU, Preparation time, Shelf life, Calories, Ingredients and
+    Allergens. None of them drove any logic — no delivery date was computed
+    from a prep time, no stock was looked up by barcode, no order was stopped
+    by an allergen. All six were display, and the product page is meant to
+    read as the shop's own three headings: what it is, how it travels, how to
+    keep it.
+
+    The shop was told plainly what removing Allergens costs — a list of what
+    is in the food is the one field here where being wrong can hurt somebody —
+    and asked for it anyway. It can still say so in the description, or as a
+    "Contains" line under Product details, which is the system this project
+    already has for a shop's own facts.
+  */
   careInstructions?: string;
 }
 
@@ -135,7 +146,6 @@ export interface Product extends BaseEntity, ProductDetails {
    * there was a choice.
    */
   photoFrameShape?: PhotoFrameShapeId;
-  ingredients?: string;
   variantGroups: ProductVariantGroup[];
   /** Owner-defined facts. See ProductAttribute — never a choice, never priced. */
   attributes?: ProductAttribute[];

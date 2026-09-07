@@ -1090,27 +1090,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               <CardDescription>Stock, options and classification</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {form.barcode ? (
-                <p>
-                  <span className="text-muted-foreground">SKU:</span> {form.barcode}
-                </p>
-              ) : null}
+              {/*
+                SKU, Prep and Shelf life were summarised here. All three were
+                removed from the product at the shop's request — see the note
+                on ProductDetailsFields for what went and why.
+              */}
               <p>
                 <span className="text-muted-foreground">Variant groups:</span>{" "}
                 {form.variantGroups.length}
               </p>
-              {form.preparationTimeMinutes ? (
-                <p>
-                  <span className="text-muted-foreground">Prep:</span>{" "}
-                  {form.preparationTimeMinutes} min
-                </p>
-              ) : null}
-              {form.shelfLifeDays ? (
-                <p>
-                  <span className="text-muted-foreground">Shelf life:</span>{" "}
-                  {form.shelfLifeDays} day{form.shelfLifeDays === 1 ? "" : "s"}
-                </p>
-              ) : null}
             </CardContent>
           </Card>
 

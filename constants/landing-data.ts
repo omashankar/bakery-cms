@@ -40,15 +40,10 @@ export interface LandingProduct {
   allowsMessage?: boolean;
   allowsPhotoUpload?: boolean;
   photoFrameShape?: PhotoFrameShapeId;
-  ingredients?: string;
   weights?: Array<{ label: string; price: number; serves?: string }>;
   /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */
   weightLabel?: string;
-  barcode?: string;
-  preparationTimeMinutes?: number;
-  shelfLifeDays?: number;
-  calories?: number;
-  allergens?: string;
+
   careInstructions?: string;
   variantGroups?: ProductVariantGroup[];
   /** Owner-defined facts, printed as a spec list. Never a choice, never priced. */

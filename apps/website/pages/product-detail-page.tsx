@@ -47,7 +47,6 @@ import {
   timeLeftToday,
   getProductReviews,
   getDeliveryPromise,
-  getProductDetailBadges,
   type ProductReview,
 } from "@/apps/website/lib/product-details";
 import {
@@ -188,7 +187,6 @@ export function ProductDetailPage({
    */
   const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
-  const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
   /** The shop's own facts about this product. Empty when it states none. */
   const attributes = useMemo(() => cake.attributes ?? [], [cake]);
   /**
@@ -418,8 +416,6 @@ export function ProductDetailPage({
    */
   const hasDescription = Boolean(
     productFacts.length > 0 ||
-      cake.ingredients ||
-      cake.allergens ||
       deliveryNotes.length > 0 ||
       careNotes.length > 0 ||
       cake.description,
@@ -989,15 +985,13 @@ export function ProductDetailPage({
                   page for — and pushed the size picker and the add-ons below
                   the fold on a phone.
                 */}
-                {detailBadges.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {detailBadges.map((badge) => (
-                      <Badge key={badge} variant="outline">
-                        {badge}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
+                {/*
+                  A row of chips stood here, and every one of them came from a
+                  field the shop has since removed: "2 hr prep", "Best within 3
+                  days", "280 kcal / serving", "SKU 2542". Three of the four
+                  were also bullets in the description below, and the SKU was
+                  printed a second time at the foot of the page.
+                */}
               </div>
 
               <div className="rounded-xl border border-border bg-cream-50 p-4">
@@ -1497,26 +1491,12 @@ export function ProductDetailPage({
                         </div>
                       ) : null}
 
-                      {cake.ingredients ? (
-                        <div>
-                          <p className="mb-2 font-medium text-foreground">Ingredients:</p>
-                          {/*
-                            " This … is prepared without eggs." used to be
-                            appended here from a derived flag. A shop writes
-                            what is and is not in its own recipe; this box is
-                            already the place for it.
-                          */}
-                          <p className="whitespace-pre-line">{cake.ingredients}</p>
-                        </div>
-                      ) : null}
-
-                      {cake.allergens ? (
-                        <div>
-                          <p className="mb-2 font-medium text-foreground">Allergens:</p>
-                          <p className="whitespace-pre-line">{cake.allergens}</p>
-                        </div>
-                      ) : null}
-
+                      {/*
+                        Ingredients and Allergens had a labelled part each,
+                        and both fields have gone from the product at the
+                        shop's request. The note on ProductDetailsFields says
+                        what that costs and what the shop can use instead.
+                      */}
                       {deliveryNotes.length > 0 ? (
                         <div>
                           <p className="mb-2 font-medium text-foreground">Delivery Information:</p>
@@ -1782,11 +1762,6 @@ export function ProductDetailPage({
                   already has for owner-defined facts and which the section
                   above renders. Three more columns would be a parallel one.
                 */}
-                {cake.barcode ? (
-                  <p className="border-t border-border pt-6 text-xs text-muted-foreground">
-                    SKU: {cake.barcode}
-                  </p>
-                ) : null}
               </div>
 
             </div>

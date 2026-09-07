@@ -143,14 +143,24 @@ describe("the rail built from what the server sent", () => {
   });
 });
 
-describe("the field the admin fills in and never sees again", () => {
-  it("prints the SKU when the product carries one", () => {
-    expect(render({ cake: { ...PRODUCT, barcode: "8901234567890" } }).textContent).toContain(
-      "SKU: 8901234567890",
-    );
-  });
+describe("the field the admin filled in and never saw again", () => {
+  /**
+   * Barcode / SKU was taken by the product form for as long as the form had
+   * existed and rendered nowhere, so this file gave it two places to show:
+   * a chip beside the name and a line at the foot of the page. Which turned
+   * out to be one place too many — it printed twice.
+   *
+   * The shop has now removed the field itself, along with Preparation time,
+   * Shelf life, Calories, Ingredients and Allergens. So the answer to “where
+   * does the SKU show” is nowhere, and that is what this asserts.
+   */
 
-  it("prints nothing when it does not", () => {
-    expect(render().textContent).not.toContain("SKU:");
+  it("is not on the product page, because it is not on the product", () => {
+    // Passed anyway: `LandingProduct` no longer declares it, and a stored
+    // document that still carries one must not find its way back to a customer.
+    const text = render({ cake: { ...PRODUCT, barcode: "SKU-42" } }).textContent ?? "";
+
+    expect(text).not.toContain("SKU-42");
+    expect(text).not.toContain("SKU");
   });
 });

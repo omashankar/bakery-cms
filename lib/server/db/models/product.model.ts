@@ -54,7 +54,6 @@ const productSchema = new mongoose.Schema(
     // time (`frameShape`), and a validation error here would refuse a whole
     // product save over a picture's outline.
     photoFrameShape: { type: String },
-    ingredients: { type: String },
     variantGroups: { type: [mongoose.Schema.Types.Mixed], default: [] },
     /**
      * Owner-defined facts (Brand, Material, Warranty, RAM). Load-bearing line.
@@ -71,11 +70,7 @@ const productSchema = new mongoose.Schema(
     reviewCount: { type: Number, default: 0 },
     seo: { type: mongoose.Schema.Types.Mixed, default: {} },
     // ProductDetails
-    barcode: { type: String },
-    preparationTimeMinutes: { type: Number },
-    shelfLifeDays: { type: Number },
-    calories: { type: Number },
-    allergens: { type: String },
+
     careInstructions: { type: String },
     // App-managed ISO timestamps (not Mongoose `timestamps`).
     createdAt: { type: String },

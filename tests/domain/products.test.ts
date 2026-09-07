@@ -171,8 +171,10 @@ describe("cakes repository", () => {
     expect(empty.weights).toEqual([]);
     expect(empty.variantGroups).toEqual([]);
     expect(empty.flavourOptions).toEqual([]);
-    expect(empty.preparationTimeMinutes).toBeUndefined();
-    expect(empty.shelfLifeDays).toBeUndefined();
+    // `preparationTimeMinutes` and `shelfLifeDays` were checked here for the
+    // same reason. Both have gone from the product entirely, so a new one
+    // cannot be born with them and there is nothing left to assert.
+    expect(empty.careInstructions).toBe("");
 
     expect(empty.status).toBe("draft");
     expect(empty.allowsMessage).toBe(true);

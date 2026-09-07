@@ -93,17 +93,12 @@ export const productFormSchema = z
     photoFrameShape: z
       .enum(["circle", "square", "heart"])
       .optional(),
-    ingredients: z.string().optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
     attributes: z.array(attributeSchema).max(40).default([]),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().min(0),
     seo: seoSchema.default({}),
-    barcode: z.string().optional(),
-    preparationTimeMinutes: z.number().min(0).optional(),
-    shelfLifeDays: z.number().min(0).optional(),
-    calories: z.number().min(0).optional(),
-    allergens: z.string().optional(),
+
     careInstructions: z.string().optional(),
   })
   .passthrough();

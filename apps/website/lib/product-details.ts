@@ -3,8 +3,6 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import {
-  formatPreparationTime,
-  formatShelfLife,
 } from "@/features/products/lib/variant-utils";
 import { fetchApprovedReviews } from "@/features/reviews/lib/reviews-api";
 
@@ -103,16 +101,16 @@ export function getProductShapeOptions(cake?: LandingProduct): string[] {
   return cake?.shapes ?? [];
 }
 
-export function getProductDetailBadges(cake: LandingProduct): string[] {
-  const badges: string[] = [];
-  const prep = formatPreparationTime(cake.preparationTimeMinutes);
-  const shelf = formatShelfLife(cake.shelfLifeDays);
-  if (prep) badges.push(prep);
-  if (shelf) badges.push(shelf);
-  if (cake.calories) badges.push(`${cake.calories} kcal / serving`);
-  if (cake.barcode) badges.push(`SKU ${cake.barcode}`);
-  return badges;
-}
+/*
+  `getProductDetailBadges` stood here, and every chip it could build came
+  from a field the shop has since removed: "2 hr prep", "Best within 3 days",
+  "280 kcal / serving" and "SKU 2542". With all four gone the function could
+  only ever return an empty array, and the row it filled renders nothing.
+
+  Two of them said it twice, too — prep, shelf life and calories were also
+  bullets in the description, and the SKU was printed again at the foot of
+  the page.
+*/
 
 export function getDeliveryTimeSlots(): string[] {
   const slots =

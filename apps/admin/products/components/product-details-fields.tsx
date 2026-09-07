@@ -1,113 +1,51 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProductDetails } from "@/types/product";
 import { adminTextareaClassName } from "./admin-field";
 
+/*
+  SIX FIELDS STOOD HERE, and the shop asked for every one of them.
+
+  Barcode / SKU, Preparation time, Shelf life, Calories, Ingredients and
+  Allergens. None of them drove any logic — no delivery date was computed from a
+  preparation time, no stock was found by barcode, no order was stopped by an
+  allergen. All six were display, and four of them printed a second time as a
+  chip beside the product name.
+
+  What the product page reads as now is the shop's own three headings: Product
+  Details (whatever facts it types under "Add detail"), Delivery Information
+  (written once in Settings → Commerce) and Care Instructions, which is what is
+  left in this file.
+
+  The shop was told plainly what dropping Allergens costs — it is the one field
+  here where being wrong can hurt somebody — and asked for it anyway. It can
+  still say so in the description or as a "Contains" line under Product details,
+  which is the system this project already has for a shop's own facts.
+*/
 interface ProductDetailsFieldsProps {
-  value: ProductDetails & { ingredients?: string };
-  onChange: (patch: Partial<ProductDetails & { ingredients?: string }>) => void;
+  value: ProductDetails;
+  onChange: (patch: Partial<ProductDetails>) => void;
 }
 
 export function ProductDetailsFields({ value, onChange }: ProductDetailsFieldsProps) {
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="barcode">Barcode / SKU</Label>
-          <Input
-            id="barcode"
-            value={value.barcode ?? ""}
-            onChange={(event) => onChange({ barcode: event.target.value })}
-            placeholder="SKU-001"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="preparationTimeMinutes">Preparation time (minutes)</Label>
-          <Input
-            id="preparationTimeMinutes"
-            type="number"
-            min={0}
-            value={value.preparationTimeMinutes ?? ""}
-            onChange={(event) =>
-              onChange({
-                preparationTimeMinutes: event.target.value
-                  ? Math.max(Number(event.target.value) || 0, 0)
-                  : undefined,
-              })
-            }
-            placeholder="120"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="shelfLifeDays">Shelf life (days)</Label>
-          <Input
-            id="shelfLifeDays"
-            type="number"
-            min={0}
-            value={value.shelfLifeDays ?? ""}
-            onChange={(event) =>
-              onChange({
-                shelfLifeDays: event.target.value
-                  ? Math.max(Number(event.target.value) || 0, 0)
-                  : undefined,
-              })
-            }
-            placeholder="3"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="calories">Calories (per serving)</Label>
-          <Input
-            id="calories"
-            type="number"
-            min={0}
-            value={value.calories ?? ""}
-            onChange={(event) =>
-              onChange({
-                calories: event.target.value
-                  ? Math.max(Number(event.target.value) || 0, 0)
-                  : undefined,
-              })
-            }
-            placeholder="320"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="ingredients">Ingredients</Label>
-        <textarea
-          id="ingredients"
-          className={adminTextareaClassName}
-          value={value.ingredients ?? ""}
-          onChange={(event) => onChange({ ingredients: event.target.value })}
-          placeholder="Flour, sugar, cocoa, butter..."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="allergens">Allergens</Label>
-        <textarea
-          id="allergens"
-          className={adminTextareaClassName}
-          value={value.allergens ?? ""}
-          onChange={(event) => onChange({ allergens: event.target.value })}
-          placeholder="Contains milk, wheat, nuts..."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="careInstructions">Care instructions</Label>
-        <textarea
-          id="careInstructions"
-          className={adminTextareaClassName}
-          value={value.careInstructions ?? ""}
-          onChange={(event) => onChange({ careInstructions: event.target.value })}
-          placeholder="Refrigerate within 2 hours. Serve at room temperature..."
-        />
-      </div>
+    <div className="space-y-2">
+      <Label htmlFor="careInstructions">Care instructions</Label>
+      <textarea
+        id="careInstructions"
+        className={adminTextareaClassName}
+        rows={5}
+        value={value.careInstructions ?? ""}
+        onChange={(event) => onChange({ careInstructions: event.target.value })}
+        placeholder={
+          "Refrigerate on arrival.\nServe at room temperature.\nEat within 24 hours."
+        }
+      />
+      <p className="text-xs text-muted-foreground">
+        One line per point. These show as a bulleted “Care Instructions” list on
+        the product page.
+      </p>
     </div>
   );
 }

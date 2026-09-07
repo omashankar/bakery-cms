@@ -92,11 +92,15 @@ describe("the demo products a fresh shop is seeded with", () => {
     expect(seeded.every((product) => product.shapes.length === 0)).toBe(true);
   });
 
-  it("invents no nutrition, shelf life or care instructions", () => {
-    // 320 kcal on every product in the shop is not data, it is a placeholder
-    // rendered as a fact on the customer's page.
-    expect(seeded.every((product) => product.calories === undefined)).toBe(true);
-    expect(seeded.every((product) => product.shelfLifeDays === undefined)).toBe(true);
+  it("invents no care instructions", () => {
+    /**
+     * Calories and shelf life were asserted here too — 320 kcal on every
+     * product in the shop is not data, it is a placeholder rendered as a fact
+     * on the customer's page. Both fields have since gone from the product
+     * altogether, so the seed cannot invent them and there is nothing left to
+     * assert. A care note is the one of the three still on a product, and it
+     * is still the shop's to write.
+     */
     expect(seeded.every((product) => !product.careInstructions)).toBe(true);
   });
 

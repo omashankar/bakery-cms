@@ -114,33 +114,13 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     lowStockThreshold: undefined,
     allowsMessage: true,
     allowsPhotoUpload: cake.category.toLowerCase().includes("photo"),
-    ingredients: undefined,
-    barcode: undefined,
-    /**
-     * Only what the demo data actually says.
-     *
-     * This stamped `shelfLifeDays: 3`, `calories: 320` and "Refrigerate within
-     * 2 hours" onto EVERY seeded product — the same invention 46b04b2 removed
-     * from `normalizeCommerceFields`, left in the one place that writes it
-     * straight into a fresh shop's database. 320 kcal on all 25 products is not
-     * data; it is a placeholder rendered to a customer as a fact, and the
-     * product page's Nutrition and Care tabs now correctly hide when the field
-     * is empty rather than printing prose nobody wrote.
-     *
-     * `preparationTimeMinutes` and `allergens` stay: both are derived from what
-     * the landing data declares about the product, not asserted over it.
-     */
-    preparationTimeMinutes: cake.category.toLowerCase().includes("photo") ? 180 : 120,
-    shelfLifeDays: undefined,
-    calories: undefined,
     /*
-      Left for the shop to write.
-
-      This picked one of two sentences from a derived flag. Allergens are the
-      last thing software should guess at on a shop's behalf, and the flag it
-      guessed from has gone — a recipe is stated by whoever makes it.
+      A seed used to stamp shelfLifeDays 3, calories 320 and a care sentence
+      onto every demo product, and preparationTimeMinutes was derived from the
+      category. All four fields have gone from the product; careInstructions is
+      the one that remains, and it stays blank because a care note is the
+      shop own to write.
     */
-    allergens: undefined,
     careInstructions: undefined,
     /*
       A "Photo cake" group used to be built here for any demo product filed
@@ -209,11 +189,7 @@ export function normalizeCommerceFields(cake: Product): Product {
     lowStockThreshold: cake.lowStockThreshold,
     allowsMessage: cake.allowsMessage ?? true,
     allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
-    barcode: cake.barcode,
-    preparationTimeMinutes: cake.preparationTimeMinutes,
-    shelfLifeDays: cake.shelfLifeDays,
-    calories: cake.calories,
-    allergens: cake.allergens,
+
     careInstructions: cake.careInstructions,
     variantGroups,
     // Owner-defined facts. Absent means the shop has stated none, not that it
@@ -486,12 +462,7 @@ export function createEmptyProductForm(): ProductFormData {
     lowStockThreshold: undefined,
     allowsMessage: true,
     allowsPhotoUpload: false,
-    ingredients: "",
-    barcode: "",
-    preparationTimeMinutes: undefined,
-    shelfLifeDays: undefined,
-    calories: undefined,
-    allergens: "",
+
     careInstructions: "",
     variantGroups: [],
     attributes: [],
