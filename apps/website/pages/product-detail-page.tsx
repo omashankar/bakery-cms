@@ -1474,12 +1474,12 @@ export function ProductDetailPage({
                   none of them did.
                 */}
                 {hasDescription ? (
-                  <DetailSection title="Product Description">
+                  <DetailSection title={labels.descriptionHeading}>
                     <div className="space-y-5 text-sm text-muted-foreground">
                       {productFacts.length > 0 ? (
                         <div>
                           <p className="mb-2 font-medium text-foreground">
-                            {labels.productWord} Details:
+                            {labels.detailsHeading}:
                           </p>
                           <ul className="list-disc space-y-1 pl-5">
                             {productFacts.map((fact) => (
@@ -1499,7 +1499,7 @@ export function ProductDetailPage({
                       */}
                       {deliveryNotes.length > 0 ? (
                         <div>
-                          <p className="mb-2 font-medium text-foreground">Delivery Information:</p>
+                          <p className="mb-2 font-medium text-foreground">{labels.deliveryHeading}:</p>
                           <ul className="list-disc space-y-1 pl-5">
                             {deliveryNotes.map((note) => (
                               <li key={note}>{note}</li>
@@ -1516,7 +1516,7 @@ export function ProductDetailPage({
                       */}
                       {careNotes.length > 0 ? (
                         <div>
-                          <p className="mb-2 font-medium text-foreground">Care Instructions:</p>
+                          <p className="mb-2 font-medium text-foreground">{labels.careHeading}:</p>
                           <ul className="list-disc space-y-1 pl-5">
                             {careNotes.map((note) => (
                               <li key={note}>{note}</li>

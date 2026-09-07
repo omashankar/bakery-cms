@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { DEFAULT_LABELS, type ResolvedLabels } from "@/config/business-labels";
+import { resolveLabels, type ResolvedLabels } from "@/config/business-labels";
 
 import { getLabels } from "./settings.service";
 
@@ -27,11 +27,9 @@ export const getServerLabels = cache(async (): Promise<ResolvedLabels> => {
   try {
     return await getLabels();
   } catch {
-    return {
-      collectionsTitle: DEFAULT_LABELS.collectionsTitle,
-      collectionsSubtitle: DEFAULT_LABELS.collectionsSubtitle,
-      productWord: DEFAULT_LABELS.productWord,
-      productWordPlural: DEFAULT_LABELS.productWordPlural,
-    };
+    // Through `resolveLabels` rather than field by field: it is the one place
+    // a blank means "use the default", and listing the fields here meant a new
+    // label was missing from the failure path until a type error found it.
+    return resolveLabels({});
   }
 });

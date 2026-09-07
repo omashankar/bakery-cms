@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_LABELS } from "@/config/business-labels";
+import { DEFAULT_LABELS, resolveLabels } from "@/config/business-labels";
 import { getAdminBreadcrumbs } from "@/lib/admin-breadcrumbs";
 
 /**
@@ -125,7 +125,11 @@ describe("reading the shop word on the server", () => {
 
     const { getServerLabels } = await import("@/features/settings/server/labels.server");
 
-    await expect(getServerLabels()).resolves.toEqual({
+    // Against `resolveLabels({})` rather than a hand-written object: the
+    // fallback lists no fields any more, and a list here would go stale the
+    // next time a label is added — which is exactly how it went stale now.
+    await expect(getServerLabels()).resolves.toEqual(resolveLabels({}));
+    await expect(getServerLabels()).resolves.toMatchObject({
       collectionsTitle: DEFAULT_LABELS.collectionsTitle,
       collectionsSubtitle: DEFAULT_LABELS.collectionsSubtitle,
       productWord: DEFAULT_LABELS.productWord,

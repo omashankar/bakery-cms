@@ -326,6 +326,60 @@ export function GeneralSettingsPage() {
                   placeholder={labels.collectionsSubtitle}
                 />
               </div>
+
+              {/*
+                The four headings in the product description block.
+
+                A shop writes everything UNDER them — its own facts under Add
+                detail, its delivery policy in Settings → Commerce, its care
+                notes on the product — and could not write the headings
+                themselves. A florist has no “Care Instructions”; it has
+                “Looking after your flowers”.
+
+                Blank means the default, like every box above: the details one
+                follows the product noun, so a shop that types “Bouquet” gets
+                “Bouquet Details” without touching this at all.
+              */}
+              <p className="text-sm font-medium sm:col-span-2">
+                Headings on the product page
+              </p>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="descriptionHeading">The block heading</Label>
+                <Input
+                  id="descriptionHeading"
+                  value={wording.descriptionHeading ?? ""}
+                  onChange={(e) => editWording({ descriptionHeading: e.target.value })}
+                  placeholder={labels.descriptionHeading}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="detailsHeading">Above your own facts</Label>
+                <Input
+                  id="detailsHeading"
+                  value={wording.detailsHeading ?? ""}
+                  onChange={(e) => editWording({ detailsHeading: e.target.value })}
+                  placeholder={labels.detailsHeading}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="deliveryHeading">Above your delivery lines</Label>
+                <Input
+                  id="deliveryHeading"
+                  value={wording.deliveryHeading ?? ""}
+                  onChange={(e) => editWording({ deliveryHeading: e.target.value })}
+                  placeholder={labels.deliveryHeading}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="careHeading">Above your care notes</Label>
+                <Input
+                  id="careHeading"
+                  value={wording.careHeading ?? ""}
+                  onChange={(e) => editWording({ careHeading: e.target.value })}
+                  placeholder={labels.careHeading}
+                />
+                <p className="text-xs text-muted-foreground">Leave any of these blank to use the wording shown in grey.</p>
+              </div>
             </div>
             {/*
               * These two were bare URL boxes with no picker of any kind, which

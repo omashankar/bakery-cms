@@ -28,6 +28,12 @@ export interface BusinessLabels {
   productWord: string;
   /** Plural noun for catalog items. */
   productWordPlural: string;
+  /** Heading over the whole product description block. */
+  descriptionHeading: string;
+  /** Heading over the shop's own facts about the product. */
+  deliveryHeading: string;
+  /** Heading over the shop's care notes. */
+  careHeading: string;
   /**
    * The catalog icon in the admin sidebar and empty states.
    *
@@ -44,6 +50,9 @@ export const DEFAULT_LABELS: BusinessLabels = {
   collectionsSubtitle: "Browse everything we sell by category.",
   productWord: "Product",
   productWordPlural: "Products",
+  descriptionHeading: "Product Description",
+  deliveryHeading: "Delivery Information",
+  careHeading: "Care Instructions",
   productIcon: Package,
 };
 
@@ -58,6 +67,16 @@ export interface ResolvedLabels {
   collectionsSubtitle: string;
   productWord: string;
   productWordPlural: string;
+  descriptionHeading: string;
+  /**
+   * Derived rather than fixed, which is why it has no entry in
+   * `DEFAULT_LABELS`: the details heading follows the shop's own product
+   * noun, so a shop selling Bouquets gets "Bouquet Details" without typing
+   * anything. Typing something overrides it, like every other label here.
+   */
+  detailsHeading: string;
+  deliveryHeading: string;
+  careHeading: string;
 }
 
 /**
@@ -73,11 +92,16 @@ export interface ResolvedLabels {
  */
 export function resolveLabels(overrides: LabelOverrides = {}): ResolvedLabels {
   const base = DEFAULT_LABELS;
+  const productWord = overrides.productWord?.trim() || base.productWord;
   return {
     collectionsTitle: overrides.collectionsTitle?.trim() || base.collectionsTitle,
     collectionsSubtitle: overrides.collectionsSubtitle?.trim() || base.collectionsSubtitle,
-    productWord: overrides.productWord?.trim() || base.productWord,
+    productWord,
     productWordPlural: overrides.productWordPlural?.trim() || base.productWordPlural,
+    descriptionHeading: overrides.descriptionHeading?.trim() || base.descriptionHeading,
+    detailsHeading: overrides.detailsHeading?.trim() || `${productWord} Details`,
+    deliveryHeading: overrides.deliveryHeading?.trim() || base.deliveryHeading,
+    careHeading: overrides.careHeading?.trim() || base.careHeading,
   };
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   getBusinessLabels,
   resolveLabels,
+  type ResolvedLabels,
   type BusinessLabels,
 } from "@/config/business-labels";
 import {
@@ -21,8 +22,19 @@ import {
  * Changes visible wording only (e.g. "Products" → "Flowers"). Routes, folders,
  * components and database collections are never renamed from here.
  */
-export function useBusinessLabels(): BusinessLabels {
-  const [labels, setLabels] = useState<BusinessLabels>(getBusinessLabels);
+/**
+ * Both halves, because the merged object below genuinely is both: the icon and
+ * the nouns from the presets, and every resolved label over the top. The return
+ * type said `BusinessLabels` alone, so a caller could not read a label that was
+ * there at runtime.
+ */
+export type ShopLabels = BusinessLabels & ResolvedLabels;
+
+export function useBusinessLabels(): ShopLabels {
+  const [labels, setLabels] = useState<ShopLabels>(() => ({
+    ...getBusinessLabels(),
+    ...resolveLabels({}),
+  }));
 
   useEffect(() => {
     /**
