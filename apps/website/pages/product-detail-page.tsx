@@ -381,7 +381,6 @@ export function ProductDetailPage({
   /** The selectors the storefront tests hang the module gates off. */
   function gatesFor(group: ProductVariantGroup) {
     return {
-      "data-gate-photo": group.type === "photo" ? "" : undefined,
       "data-gate-shape": group.type === "shape" ? "" : undefined,
     };
   }
@@ -502,10 +501,7 @@ export function ProductDetailPage({
     [visibleVariantGroups, visibleSelections]
   );
 
-  const photoGroup = variantGroups.find((group) => group.type === "photo");
-  const selectedPhotoOption = photoGroup?.options.find(
-    (option) => option.id === variantSelections[photoGroup.id]
-  );
+
   /**
    * NO CATEGORY STRING-MATCHING, and no egg claim at all any more.
    *
@@ -524,12 +520,14 @@ export function ProductDetailPage({
    * derives. An eggless VERSION is an ordinary priced option, and the buy box
    * renders it as a tickbox like any other.
    *
-   * What is left is what the PRODUCT states: the option the customer picked,
-   * by `semantic`, never by label — labels are merchant-editable display text.
+   * The photo half then went the same way. It used to be an OPTION too — a
+   * "Standard design / Custom photo print +₹250" row a customer chose
+   * between — so the uploader appeared when either the product's own flag
+   * said so OR the paid option had been picked. A product that takes a
+   * photograph takes one; what printing costs is part of what the product
+   * costs, and the shop prices it in. One flag is the whole statement.
    */
-  const showPhotoUpload =
-    (cake.allowsPhotoUpload === true || selectedPhotoOption?.semantic === "photo-print") &&
-    modules.photoCake;
+  const showPhotoUpload = cake.allowsPhotoUpload === true && modules.photoCake;
   const isOutOfStock = cake.inStock === false;
 
   useEffect(() => {

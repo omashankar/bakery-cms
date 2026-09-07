@@ -55,7 +55,6 @@ function chargerForm(overrides: Record<string, unknown> = {}) {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isPhotoCake: false,
     isSeasonal: false,
     shapes: [],
     flavourOptions: [],

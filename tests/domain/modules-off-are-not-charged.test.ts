@@ -49,14 +49,20 @@ const addOn = {
   ],
 } as unknown as ProductVariantGroup;
 
-const photo = {
-  id: "photo",
-  name: "Photo cake",
-  type: "photo",
+/**
+ * A gated group whose DEFAULT costs money — the dangerous shape, and the
+ * reason this file exists. It was the photo group ("Custom photo print" as the
+ * default, +₹250); a photo print is priced into the product now, so `shape` is
+ * the last typed group a module gates.
+ */
+const paidShape = {
+  id: "paid-shape",
+  name: "Shape",
+  type: "shape",
   required: false,
   options: [
-    { id: "standard", label: "Standard design", priceAdjustment: 0, isDefault: false },
-    { id: "print", label: "Custom photo print", priceAdjustment: 250, isDefault: true },
+    { id: "round", label: "Round", priceAdjustment: 0, isDefault: false },
+    { id: "tiered", label: "Two tiers", priceAdjustment: 250, isDefault: true },
   ],
 } as unknown as ProductVariantGroup;
 
@@ -81,7 +87,7 @@ const size = {
 
 describe("the groups a shop with these modules sells", () => {
   it("keeps everything when every module is on", () => {
-    expect(variantGroupsEnabledBy([addOn, photo, size], defaultModuleSettings)).toHaveLength(3);
+    expect(variantGroupsEnabledBy([addOn, paidShape, size], defaultModuleSettings)).toHaveLength(3);
   });
 
 
@@ -93,12 +99,12 @@ describe("the groups a shop with these modules sells", () => {
    * still be charged for.
    */
   it("drops the shape group when Shape is off", () => {
-    const kept = variantGroupsEnabledBy([addOn, photo, shape, size], {
+    const kept = variantGroupsEnabledBy([addOn, shape, size], {
       ...defaultModuleSettings,
       shape: false,
     });
 
-    expect(kept.map((group) => group.id)).toEqual(["add-on", "photo", "tier"]);
+    expect(kept.map((group) => group.id)).toEqual(["add-on", "tier"]);
   });
 
   it("does not charge for a shape the page did not show", () => {
@@ -111,19 +117,19 @@ describe("the groups a shop with these modules sells", () => {
     ).toBe(0);
   });
 
-  it("drops the photo group when Photo Cake is off", () => {
-    const kept = variantGroupsEnabledBy([addOn, photo, size], {
-      ...defaultModuleSettings,
-      photoCake: false,
-    });
+  /*
+    "drops the photo group when Photo Cake is off" stood here.
 
-    expect(kept.map((group) => group.id)).toEqual(["add-on", "tier"]);
-  });
+    There is no photo group to drop. A product that takes a photograph says
+    so with one tick and prices the printing into itself, so the module gates
+    the UPLOADER rather than an option group — and `shape` is the last typed
+    group this filter has anything to say about.
+  */
 
   it("never drops a group the modules have nothing to say about", () => {
     const kept = variantGroupsEnabledBy([size, addOn], {
       ...defaultModuleSettings,
-      photoCake: false,
+      shape: false,
     });
 
     expect(kept).toEqual([size, addOn]);
@@ -135,16 +141,16 @@ describe("what the shop charges", () => {
     const priced = (groups: ProductVariantGroup[]) =>
       calculateProductUnitPrice({ basePrice: 1099, variantGroups: groups, variantSelections: {} });
 
-    expect(priced([photo])).toBe(1349);
+    expect(priced([paidShape])).toBe(1349);
     expect(
-      priced(variantGroupsEnabledBy([photo], { ...defaultModuleSettings, photoCake: false })),
+      priced(variantGroupsEnabledBy([paidShape], { ...defaultModuleSettings, shape: false })),
     ).toBe(1099);
   });
 
   it("is not fixed by omitting the selection, which is why the group must go", () => {
     // The reason the gate cannot live on the client alone: an empty selection
     // map still resolves to the group's default option.
-    expect(calculateVariantAdjustment([photo], {})).toBe(250);
+    expect(calculateVariantAdjustment([paidShape], {})).toBe(250);
   });
 });
 

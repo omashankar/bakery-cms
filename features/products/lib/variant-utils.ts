@@ -3,7 +3,6 @@ import type {
   ProductVariantGroup,
   ProductVariantGroupType,
   ProductVariantOption,
-  VariantOptionSemantic,
 } from "@/types/product";
 import type { LandingProduct } from "@/constants/landing-data";
 
@@ -11,44 +10,27 @@ export function createVariantOption(
   label: string,
   priceAdjustment = 0,
   isDefault = false,
-  semantic?: VariantOptionSemantic
 ): ProductVariantOption {
   return {
     id: `opt-${crypto.randomUUID().slice(0, 8)}`,
     label,
-    ...(semantic ? { semantic } : {}),
     priceAdjustment,
     isDefault,
   };
 }
 
-/**
- * One-time migration for options stored before `semantic` existed.
- *
- * This is the ONLY place a label may be inspected, and only to upgrade legacy
- * records. New code must read `option.semantic`.
- */
-function backfillSemantic(
-  option: ProductVariantOption,
-  groupType: ProductVariantGroupType
-): ProductVariantOption {
-  if (option.semantic) return option;
+/*
+  `backfillSemantic` and `backfillLegacyGroups` stood here: a one-time
+  migration that read an option's LABEL — the only place in the codebase
+  allowed to — so that options stored before `semantic` existed could be
+  upgraded to carry one.
 
-  const label = option.label.toLowerCase();
-
-  if (groupType === "photo" && label.includes("photo")) {
-    return { ...option, semantic: "photo-print" };
-  }
-  return option;
-}
-
-/** Upgrade stored groups to carry explicit semantics. Idempotent. */
-export function backfillLegacyGroups(groups: ProductVariantGroup[]): ProductVariantGroup[] {
-  return groups.map((group) => ({
-    ...group,
-    options: group.options.map((option) => backfillSemantic(option, group.type)),
-  }));
-}
+  There are no semantics left to backfill. Both values were bakery special
+  cases and both have gone, so an option is what its label and its price say
+  and nothing more. Stored options keep whatever `semantic` key they were
+  saved with; nothing reads it, and Mongoose keeps it because `variantGroups`
+  is Mixed.
+*/
 
 export function createVariantGroup(
   name: string,
@@ -86,27 +68,6 @@ export function createVariantGroup(
  *
  * So this now starts EMPTY unless a photo print was asked for.
  */
-export function createDefaultVariantGroups(input?: {
-  isPhotoCake?: boolean;
-}): ProductVariantGroup[] {
-  const groups: ProductVariantGroup[] = [];
-
-  if (input?.isPhotoCake) {
-    groups.push(
-      createVariantGroup(
-        "Photo cake",
-        "photo",
-        [
-          createVariantOption("Standard design", 0, true),
-          createVariantOption("Custom photo print", 250, false, "photo-print"),
-        ],
-        false
-      )
-    );
-  }
-
-  return groups;
-}
 
 /**
  * The variant groups a storefront product is actually sold in: the ones the
@@ -123,7 +84,7 @@ export function createDefaultVariantGroups(input?: {
  * layer, and no other storefront could reuse the pricing at all.
  *
  * Not the same function as normalizeVariantGroups below, despite the shape.
- * That one runs backfillLegacyGroups and forces isDefault; this one does not.
+ * That one forces isDefault; this one does not.
  * Keep them separate — they sit on different paths and have disagreed before.
  *
  * IT NO LONGER INVENTS GROUPS FOR A PRODUCT THAT HAS NONE, for two reasons.
@@ -154,16 +115,14 @@ export function getProductVariantGroups(cake: LandingProduct): ProductVariantGro
  * This runs on EVERY repository read (`normalizeCommerceFields`), so its old
  * fallback is what put an "Egg preference" group on every product in the shop
  * that had not configured its own, whatever that product was. The merchant
- * declares a product's options; no options is a valid answer, and
- * `createDefaultVariantGroups` is still exported for the Options tab's
- * "Add egg / eggless" button, where a human is asking for it. (That button
- * used to be "Reset to defaults" and REPLACED the array, which is why it is
- * now additive and gated on the module.)
+ * declares a product's options; no options is a valid answer, and there is no
+ * longer any function that builds one nobody asked for — the two it used to
+ * build, egg preference and photo cake, were both bakery special cases.
  */
-export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isPhotoCake">): ProductVariantGroup[] {
+export function normalizeVariantGroups(cake: Pick<Product, "variantGroups">): ProductVariantGroup[] {
   if (!cake.variantGroups?.length) return [];
 
-  return backfillLegacyGroups(cake.variantGroups).map((group) => {
+  return cake.variantGroups.map((group) => {
     /**
      * "First option wins" is a fallback for a group that names no default —
      * not a vote each option casts on its own.
@@ -360,13 +319,9 @@ export function variantGroupsEnabledBy(
    * the storefront, the card projection and the server’s pricing all share, so
    * a caller that forgot to pass it would price a group the page had hidden.
    */
-  modules: { photoCake: boolean; shape: boolean },
+  modules: { shape: boolean },
 ): ProductVariantGroup[] {
-  return groups.filter(
-    (group) =>
-      (group.type !== "photo" || modules.photoCake) &&
-      (group.type !== "shape" || modules.shape),
-  );
+  return groups.filter((group) => group.type !== "shape" || modules.shape);
 }
 
 export function calculateVariantAdjustment(
@@ -401,13 +356,12 @@ export function calculateVariantAdjustment(
   whose product simply is eggless says so in its name.
 */
 
-/** True when the product offers an option with the given meaning at all. */
-export function offersSemantic(
-  groups: ProductVariantGroup[],
-  semantic: VariantOptionSemantic
-): boolean {
-  return groups.some((group) => group.options.some((option) => option.semantic === semantic));
-}
+/*
+  `offersSemantic` stood here, and one call site left: it asked whether a
+  product offered a paid photo print, which is how `isPhotoCake` was derived.
+  A product that takes a photograph says so with `allowsPhotoUpload` and
+  prices it into its own price — there is no second option to offer.
+*/
 
 /*
   `setGroupDefaultBySemantic` stood here. Its only caller was the admin's
@@ -416,27 +370,16 @@ export function offersSemantic(
   gone: the tick, and the flag it kept in step with.
 */
 
-/**
- * Derive the legacy flag from the variant data — but only where there IS any.
- *
- * `isPhotoCake` is an OFFER, not a selection: the photo group's default is
- * deliberately "Standard design", because the print is a paid upsell, so
- * deriving this from the chosen option would make it permanently false. Where
- * no group offers it, the admin's own tick is the only statement there is.
- *
- * `isEggless` was the other half of this pair and is gone. It said the product
- * ITSELF was eggless, which is a claim only a shop can make about its own
- * recipe — so a shop makes it in the product's name and description now, and
- * an eggless VERSION is an option with a price like any other.
- */
-export function syncLegacyFlagsFromVariants(
-  groups: ProductVariantGroup[],
-  current?: { isPhotoCake?: boolean }
-): { isPhotoCake: boolean } {
-  return {
-    isPhotoCake: offersSemantic(groups, "photo-print") || (current?.isPhotoCake ?? false),
-  };
-}
+/*
+  `syncLegacyFlagsFromVariants` stood here, and it derived two flags from what
+  a product's options MEANT: `isEggless` and `isPhotoCake`.
+
+  Both are gone, and the last one for the reason the shop gave: if a product
+  takes a photograph, it takes one — there is no second, dearer version to
+  choose between, and the price of printing is part of the price of the thing.
+  `allowsPhotoUpload` is the whole statement, and an admin tick is the only
+  place it can come from.
+*/
 
 export function formatPreparationTime(minutes?: number): string | null {
   if (!minutes || minutes <= 0) return null;

@@ -30,7 +30,6 @@ interface ProductVariantManagerProps {
 }
 
 const groupTypeLabels: Record<ProductVariantGroupType, string> = {
-  photo: "Photo cake",
   shape: "Shape",
   custom: "Custom",
 };
@@ -64,7 +63,7 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
         type === "custom" ? "Custom option" : groupTypeLabels[type],
         type,
         [createVariantOption("Option 1", 0, false)],
-        type !== "photo"
+        true
       ),
     ]);
   }
@@ -73,14 +72,11 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
   /**
    * Whether to offer the typed-group control for a group of this type.
    *
-   * A group already using photo or shape always keeps it, so switching a
-   * module off never strands data an admin can no longer edit.
+   * A group already using shape always keeps it, so switching the module off
+   * never strands data an admin can no longer edit.
    */
   const showTypeControl = (type: ProductVariantGroupType): boolean =>
-    modules.photoCake ||
-    modules.shape ||
-    type === "photo" ||
-    type === "shape";
+    modules.shape || type === "shape";
 
 
   function updateOption(
@@ -215,12 +211,13 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                 </div>
                 {/*
                   The Type control is a BAKERY control, and only a bakery sees it.
-                  `type` drives two things and neither is generic: which module
-                  hides the group, and which legacy flag `syncLegacyFlagsFromVariants`
-                  derives. A shop selling chargers was made to answer
+                  `type` drives exactly one thing now, and it is not generic:
+                  which module hides the group. It used to drive a second — the
+                  product flag derived from what an option meant — and it used to
+                  offer three answers. A shop selling chargers was made to pick
                   "Egg preference / Photo cake / Custom" on every option group it
                   created, which is the single loudest reason the options tab read
-                  as a cake feature.
+                  as a cake feature. Shape is the last one left.
 
                   Shown when either module is on, and always for a group that
                   already uses one of those types — the same data-preservation
@@ -239,9 +236,6 @@ export function ProductVariantManager({ groups, basePrice, onChange }: ProductVa
                       }
                     >
 
-                      {modules.photoCake || group.type === "photo" ? (
-                        <option value="photo">Photo cake</option>
-                      ) : null}
                       {/*
                         Typed, so `modules.shape` can still hide these the way
                         it hid the old checkbox list — and so a shop that

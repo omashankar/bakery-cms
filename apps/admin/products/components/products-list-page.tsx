@@ -94,7 +94,7 @@ function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeE
       if (filters.flag === "featured" && !cake.isFeatured) return false;
       if (filters.flag === "trending" && !cake.isTrending) return false;
       if (filters.flag === "best-seller" && !cake.isBestSeller) return false;
-      if (filters.productType === "photo" && !cake.isPhotoCake) return false;
+      if (filters.productType === "photo" && !cake.allowsPhotoUpload) return false;
       if (filters.productType === "seasonal" && !cake.isSeasonal) return false;
       if (filters.stock !== "all") {
         const derivedStatus = deriveStockStatus(cake, settings);

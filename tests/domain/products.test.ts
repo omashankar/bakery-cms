@@ -21,8 +21,7 @@ import {
   getPublishedStorefrontProducts,
   mapAdminProductToStorefront,
 } from "@/features/products/lib/product-mapper";
-import { createDefaultVariantGroups } from "@/features/products/lib/variant-utils";
-import type { ProductFormData, ProductVariantOption } from "@/types/product";
+import type { ProductFormData } from "@/types/product";
 
 function form(overrides: Partial<ProductFormData> = {}): ProductFormData {
   return { ...createEmptyProductForm(), name: "Test Cake", slug: "test-cake", ...overrides };
@@ -183,21 +182,12 @@ describe("cakes repository", () => {
   it("starts a new product with no option groups at all", () => {
     /**
        Every product a shop created used to open with an "Egg preference" row
-       — a bakery question asked of a phone charger. It has gone with the egg
-       special case: a shop that offers eggless adds an option and prices it,
-       and the product page renders any two-option group as one tickbox.
+       — a bakery question asked of a phone charger — and then a "Photo cake"
+       one for anything filed under a category with the word in it. Both were
+       bakery special cases; a shop names its own option groups, and a photo
+       print is priced into the product rather than chosen between.
      */
-    expect(createDefaultVariantGroups()).toEqual([]);
-  });
-
-  it("still builds the photo group for a product that prints one", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0].type).toBe("photo");
-    expect(
-      groups[0].options.some((o: ProductVariantOption) => o.semantic === "photo-print"),
-    ).toBe(true);
+    expect(createEmptyProductForm().variantGroups).toEqual([]);
   });
 });
 
@@ -273,11 +263,17 @@ describe("mapAdminProductToStorefront", () => {
     expect(mapAdminProductToStorefront(withoutFlavours).flavours).toBeUndefined();
   });
 
-  it("does not expose isPhotoCake to the storefront at all", () => {
-    const cake = createProduct(form({ slug: "p1", isPhotoCake: true }));
+  it("says a product takes a photograph with one field, not two", () => {
+    /**
+     * `isPhotoCake` never crossed the mapper, and there is no such field to
+     * cross any more: it meant “offers a paid photo print”, and the print is
+     * priced into the product now. `allowsPhotoUpload` is the whole statement
+     * — it is what the uploader reads and what the photo rail selects on.
+     */
+    const cake = createProduct(form({ slug: "p1", allowsPhotoUpload: true }));
 
-    // The storefront re-derives this from allowsPhotoUpload/category instead.
     expect("isPhotoCake" in mapAdminProductToStorefront(cake)).toBe(false);
+    expect(mapAdminProductToStorefront(cake).allowsPhotoUpload).toBe(true);
   });
 
   it("getPublishedStorefrontProducts returns only published cakes", () => {

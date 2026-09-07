@@ -61,9 +61,6 @@ import { ProductAttributesFields } from "./product-attributes-fields";
 import { ProductDetailsFields } from "./product-details-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import {
-  createVariantGroup,
-  createVariantOption,
-  syncLegacyFlagsFromVariants,
 } from "@/features/products/lib/variant-utils";
 
 interface ProductFormPageProps {
@@ -361,11 +358,6 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
        */
       weights: form.weights.filter((tier) => tier.label.trim().length > 0),
       ...resolveStockFields(form),
-      // Without the form's own flag, a product with no photo variant group
-      // had its tick overwritten with false on every save.
-      ...syncLegacyFlagsFromVariants(form.variantGroups, {
-        isPhotoCake: form.isPhotoCake,
-      }),
     };
 
     try {
@@ -770,51 +762,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     named "Eggless" with a price on it: the product page renders
                     any two-option group as a single tickbox already.
                   */}
-                  {modules.photoCake ? (
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={form.isPhotoCake}
-                      onCheckedChange={(checked) => {
-                        const isPhotoCake = checked === true;
-                        const hasPhotoGroup = form.variantGroups.some(
-                          (group) => group.type === "photo"
-                        );
-                        // isPhotoCake is derived from whether a photo-print option
-                        // is offered, so the group must be added AND removed in
-                        // step with the toggle — otherwise the derived value
-                        // overwrites the merchant's choice on save.
-                        const variantGroups = isPhotoCake
-                          ? hasPhotoGroup
-                            ? form.variantGroups
-                            : [
-                                ...form.variantGroups,
-                                createVariantGroup(
-                                  "Photo cake",
-                                  "photo",
-                                  [
-                                    createVariantOption("Standard design", 0, true),
-                                    createVariantOption(
-                                      "Custom photo print",
-                                      250,
-                                      false,
-                                      "photo-print"
-                                    ),
-                                  ],
-                                  false
-                                ),
-                              ]
-                          : form.variantGroups.filter((group) => group.type !== "photo");
+                  {/*
+                    A "Photo cake" tick stood here, and it did two things: it set
+                    a flag, and it built a "Standard design / Custom photo print
+                    +₹250" group so the flag had something to be derived from.
 
-                        patchForm({
-                          isPhotoCake,
-                          allowsPhotoUpload: isPhotoCake ? true : form.allowsPhotoUpload,
-                          variantGroups,
-                        });
-                      }}
-                    />
-                    Photo cake
-                  </label>
-                  ) : null}
+                    Both have gone. A product that takes a photograph takes one —
+                    there is no cheaper version of it to choose between, and what
+                    printing costs is part of what the thing costs. The shop ticks
+                    "Allow photo upload" further down this form and prices the
+                    product accordingly.
+                  */}
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                     <Checkbox
                       checked={form.isSeasonal}

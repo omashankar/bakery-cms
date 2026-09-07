@@ -42,7 +42,6 @@ const productSchema = new mongoose.Schema(
     isFeatured: { type: Boolean, default: false },
     isBestSeller: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },
-    isPhotoCake: { type: Boolean, default: false },
     isSeasonal: { type: Boolean, default: false },
     shapes: { type: [String], default: [] },
     flavourOptions: { type: [String], default: [] },

@@ -9,14 +9,24 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateVariantAdjustment,
-  createDefaultVariantGroups,
   createVariantGroup,
   createVariantOption,
   getDefaultVariantSelections,
   getVariantOption,
   normalizeVariantGroups,
-  syncLegacyFlagsFromVariants,
 } from "@/features/products/lib/variant-utils";
+
+const finish = () => [
+  createVariantGroup(
+    "Finish",
+    "custom",
+    [
+      createVariantOption("Plain", 0, true),
+      createVariantOption("Gold leaf", 250, false),
+    ],
+    false,
+  ),
+];
 
 describe("createVariantOption", () => {
   it("creates an option with a unique id and the given price adjustment", () => {
@@ -64,36 +74,15 @@ describe("createVariantGroup", () => {
   });
 });
 
-describe("createDefaultVariantGroups", () => {
-  it("produces nothing at all for an ordinary product", () => {
-    /**
-     * It always produced an "Egg preference" group — a bakery question asked
-     * of a phone charger, and a typed special case to carry it. A shop that
-     * offers eggless names an option and prices it; the buy box renders any
-     * two-option group as a single tickbox already.
-     */
-    expect(createDefaultVariantGroups()).toEqual([]);
-    expect(createDefaultVariantGroups({ isPhotoCake: false })).toEqual([]);
-  });
+/*
+  `createDefaultVariantGroups` stood here, with three cases.
 
-  it("adds an optional photo group only for photo cakes", () => {
-    const withPhoto = createDefaultVariantGroups({ isPhotoCake: true });
-    const withoutPhoto = createDefaultVariantGroups({ isPhotoCake: false });
-
-    expect(withPhoto.map((g) => g.type)).toEqual(["photo"]);
-    expect(withoutPhoto).toEqual([]);
-    expect(withPhoto[0].required).toBe(false);
-  });
-
-  it("prices the custom photo print at +250 and the standard design at nothing", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
-
-    expect(groups[0].options.find((o) => o.label === "Standard design")?.priceAdjustment).toBe(0);
-    expect(groups[0].options.find((o) => o.label === "Custom photo print")?.priceAdjustment).toBe(
-      250,
-    );
-  });
-});
+  It built an "Egg preference" group on every product a shop created, then
+  only a "Photo cake" one, then nothing at all — at which point there was no
+  function left. A shop names its own option groups; the two it used to build
+  for free were both bakery special cases, and both are ordinary options now
+  or nothing at all.
+*/
 
 describe("normalizeVariantGroups", () => {
   it("keeps existing groups and backfills a missing default", () => {
@@ -110,10 +99,7 @@ describe("normalizeVariantGroups", () => {
       },
     ];
 
-    const result = normalizeVariantGroups({
-      variantGroups: existing,
-      isPhotoCake: false,
-    });
+    const result = normalizeVariantGroups({ variantGroups: existing });
 
     expect(result[0].options[0].isDefault).toBe(true);
     expect(result[0].options[1].isDefault).toBe(false);
@@ -126,15 +112,12 @@ describe("normalizeVariantGroups", () => {
      * charger got "Egg preference: Regular / Eggless +80" on the picker, in the
      * price, and on the order line, for a group nobody configured.
      *
-     * `isEggless: true` is the strongest case: the old fallback made Eggless the
-     * DEFAULT option, so the product silently cost 80 more than its own record
-     * said. Absent is the honest answer; `createDefaultVariantGroups` still
-     * exists for the admin's "reset to defaults", where a human asked for it.
+     * `isEggless: true` was the strongest case: the old fallback made Eggless
+     * the DEFAULT option, so the product silently cost 80 more than its own
+     * record said. Absent is the honest answer, and there is no longer any
+     * function that builds a group nobody asked for.
      */
-    const result = normalizeVariantGroups({
-      variantGroups: [],
-      isPhotoCake: false,
-    });
+    const result = normalizeVariantGroups({ variantGroups: [] });
 
     expect(result).toEqual([]);
   });
@@ -161,7 +144,6 @@ describe("normalizeVariantGroups", () => {
           ],
         },
       ],
-      isPhotoCake: false,
     });
 
     expect(result[0].options.filter((o) => o.isDefault)).toHaveLength(1);
@@ -182,7 +164,6 @@ describe("normalizeVariantGroups", () => {
           ],
         },
       ],
-      isPhotoCake: false,
     });
 
     expect(result[0].options[0].isDefault).toBe(true);
@@ -192,7 +173,7 @@ describe("normalizeVariantGroups", () => {
 
 describe("selections and pricing", () => {
   it("selects the default option of every group", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
+    const groups = finish();
     const selections = getDefaultVariantSelections(groups);
 
     expect(Object.keys(selections)).toHaveLength(1);
@@ -201,36 +182,34 @@ describe("selections and pricing", () => {
 
   it("sums the price adjustments of the selected options", () => {
     const groups = [
-      ...createDefaultVariantGroups({ isPhotoCake: true }),
+      ...finish(),
       {
-        id: "g-finish",
-        name: "Finish",
+        id: "g-wrap",
+        name: "Wrapping",
         type: "custom" as const,
         required: false,
         options: [
-          { id: "plain", label: "Plain", priceAdjustment: 0, isDefault: true },
-          { id: "gold", label: "Gold leaf", priceAdjustment: 80, isDefault: false },
+          { id: "none", label: "None", priceAdjustment: 0, isDefault: true },
+          { id: "gift", label: "Gift box", priceAdjustment: 80, isDefault: false },
         ],
       },
     ];
     const selections = {
-      [groups[0].id]: groups[0].options[1].id, // Custom photo print +250
-      [groups[1].id]: "gold", // +80
+      [groups[0].id]: groups[0].options[1].id, // Gold leaf +250
+      [groups[1].id]: "gift", // +80
     };
 
     expect(calculateVariantAdjustment(groups, selections)).toBe(330);
   });
 
   it("falls back to the default option when a selection is missing", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
-
-    // No selection passed: falls back to the default, which for a photo group
-    // is deliberately the FREE one — the print is a paid upsell.
-    expect(calculateVariantAdjustment(groups, {})).toBe(0);
+    // No selection passed: falls back to the default, which here is the free
+    // one — an option nobody has ticked costs nothing.
+    expect(calculateVariantAdjustment(finish(), {})).toBe(0);
   });
 
   it("returns null for an unknown group or option", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
+    const groups = finish();
 
     expect(getVariantOption(groups, "nope", "nope")).toBeNull();
     expect(getVariantOption(groups, groups[0].id, "nope")).toBeNull();
@@ -240,21 +219,9 @@ describe("selections and pricing", () => {
   });
 });
 
-describe("syncLegacyFlagsFromVariants", () => {
-  /**
-   * The `isEggless` half of this is gone with the flag it derived. It said the
-   * product ITSELF was eggless, which is a claim about a recipe — the shop's
-   * to make, in the name and the description.
-   */
-  it("says a product offers a print when a group offers one", () => {
-    const groups = createDefaultVariantGroups({ isPhotoCake: true });
-
-    // An OFFER, not a selection: the default is the free option, so deriving
-    // this from the chosen one would make it permanently false.
-    expect(syncLegacyFlagsFromVariants(groups).isPhotoCake).toBe(true);
-  });
-
-  it("reports isPhotoCake false when there is no photo group", () => {
-    expect(syncLegacyFlagsFromVariants(createDefaultVariantGroups()).isPhotoCake).toBe(false);
-  });
-});
+/*
+  `syncLegacyFlagsFromVariants` stood here. It derived two product flags from
+  what an option MEANT — isEggless and isPhotoCake — and both are gone with the
+  semantics they read. A shop states what a product is; the options state what
+  a customer can choose and what it costs.
+*/

@@ -57,7 +57,7 @@ export function buildHomepageProducts(
     featured: published.filter((cake) => cake.isFeatured),
     trending: published.filter((cake) => cake.isTrending),
     bestSellers: published.filter((cake) => cake.isBestSeller),
-    photo: published.filter((cake) => cake.isPhotoCake),
+    photo: published.filter((cake) => cake.allowsPhotoUpload),
     seasonal: published.filter((cake) => cake.isSeasonal),
   };
 

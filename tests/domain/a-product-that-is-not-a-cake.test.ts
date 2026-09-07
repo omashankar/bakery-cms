@@ -86,7 +86,6 @@ const charger = {
   shapes: [],
   flavourOptions: [],
   occasionIds: [],
-  isPhotoCake: false,
 } as unknown as Product;
 
 describe("checkout survives a product that carries no cake fields", () => {
@@ -167,7 +166,6 @@ describe("the bakery does not move", () => {
     shapes: ["Round", "Heart"],
     flavourOptions: ["Chocolate"],
     occasionIds: [],
-    isPhotoCake: false,
     variantGroups: [
       {
         id: "g-egg",
@@ -194,23 +192,30 @@ describe("the bakery does not move", () => {
     expect(chosen?.priceAdjustment).toBe(80);
   });
 
-  it("still upgrades legacy stored options that predate `semantic`", () => {
-    // backfillLegacyGroups is the one place a label may be inspected, and it
-    // must keep working — it is what makes old records readable. The egg
-    // branch went with the egg special case; the photo one is what is left.
-    const legacy = {
+  it("leaves a stored option exactly as the shop typed it", () => {
+    /**
+     * `backfillLegacyGroups` used to run here — the ONE place a label could
+     * be inspected, to upgrade options stored before `semantic` existed. Both
+     * semantics were bakery special cases and both have gone, so an option is
+     * its label and its price and nothing is read into it.
+     */
+    const stored = {
       ...cake,
       variantGroups: [
         {
-          id: "g-photo",
-          name: "Photo cake",
-          type: "photo",
+          id: "g-finish",
+          name: "Finish",
+          type: "custom",
           required: false,
-          options: [{ id: "o-print", label: "Custom photo print", priceAdjustment: 250 }],
+          options: [{ id: "o-gold", label: "Gold leaf", priceAdjustment: 250 }],
         },
       ],
     } as unknown as Product;
 
-    expect(normalizeVariantGroups(legacy)[0].options[0].semantic).toBe("photo-print");
+    const [group] = normalizeVariantGroups(stored);
+    expect(group.options[0].label).toBe("Gold leaf");
+    expect("semantic" in group.options[0]).toBe(false);
+    // …and the default is still backfilled, which is what this function is for.
+    expect(group.options[0].isDefault).toBe(true);
   });
 });

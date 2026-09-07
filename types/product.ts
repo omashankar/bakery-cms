@@ -19,28 +19,27 @@ export type PhotoFrameShapeId = "circle" | "square" | "heart";
  * came in Round and Heart and could not charge more for the Heart — and the
  * four names it offered were hardcoded, so a shop wanting “Number” or a bouquet
  * size had no way to say so. A typed group is what egg preference and photo
- * cakes already were, so shapes stop being a second system, and the type is
- * what lets `modules.shape` keep gating them.
+ * cakes were at the time, so shapes stopped being a second system — and the
+ * type is what lets `modules.shape` keep gating them. Those two have since
+ * gone, and `shape` is the last typed one left.
  */
-export type ProductVariantGroupType = "photo" | "shape" | "custom";
+export type ProductVariantGroupType = "shape" | "custom";
 
-/**
- * Machine-readable meaning of a variant option.
- *
- * Business logic must branch on this, never on `label`. Labels are display text:
- * merchants rename them ("No egg"), translate them ("अंडा रहित"), and word them
- * for their own storefront. A label is for humans; a semantic is for code.
- *
- * The mechanism is generic — a flower shop would define its own semantics and
- * leave these unused. Only the values below are bakery-specific.
- */
-export type VariantOptionSemantic = "photo-print";
+/*
+  `VariantOptionSemantic` stood here — a machine-readable meaning an option
+  could carry so business logic branched on it rather than on a merchant's
+  label. It had two values, and both were bakery special cases: `eggless`,
+  which went when eggless became an ordinary priced option, and `photo-print`,
+  which went with the photo-print option itself.
+
+  A product that takes a photograph now says so with `allowsPhotoUpload` and
+  prices it into its own price. There is nothing left for an option to MEAN
+  that its label and its price do not already say.
+*/
 
 export interface ProductVariantOption {
   id: string;
   label: string;
-  /** Optional: absent means the option carries no special meaning (e.g. "Regular"). */
-  semantic?: VariantOptionSemantic;
   priceAdjustment: number;
   isDefault?: boolean;
 }
@@ -119,7 +118,6 @@ export interface Product extends BaseEntity, ProductDetails {
   isFeatured: boolean;
   isBestSeller: boolean;
   isTrending: boolean;
-  isPhotoCake: boolean;
   isSeasonal: boolean;
   shapes: string[];
   flavourOptions: string[];

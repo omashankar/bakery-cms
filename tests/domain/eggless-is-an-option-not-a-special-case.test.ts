@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   asAddOn,
-  createDefaultVariantGroups,
-  syncLegacyFlagsFromVariants,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
@@ -64,16 +62,27 @@ describe("what a shop does instead", () => {
 });
 
 describe("the special case is gone", () => {
-  it("starts a new product with no egg question on it", () => {
+  it("starts a new product with no egg question on it", async () => {
     // Every product a shop created opened with an "Egg preference" row — a
     // bakery question asked of a phone charger.
-    expect(createDefaultVariantGroups()).toEqual([]);
+    const { createEmptyProductForm } = await import(
+      "@/features/products/lib/products-repository"
+    );
+
+    expect(createEmptyProductForm().variantGroups).toEqual([]);
   });
 
-  it("no longer derives a flag from what an option means", () => {
-    const flags = syncLegacyFlagsFromVariants([eggless()]);
+  it("no longer derives anything from what an option means", async () => {
+    /**
+     * `syncLegacyFlagsFromVariants` read an option's `semantic` to set two
+     * product flags. Both flags and both semantics have gone — an option is
+     * its label and its price, and nothing is read into it.
+     */
+    const utils = await import("@/features/products/lib/variant-utils");
 
-    expect(Object.keys(flags)).toEqual(["isPhotoCake"]);
+    for (const gone of ["syncLegacyFlagsFromVariants", "offersSemantic", "backfillLegacyGroups"]) {
+      expect(gone in utils, `${gone} is still exported`).toBe(false);
+    }
   });
 
   it("does not gate a group behind a module that no longer exists", () => {
@@ -88,7 +97,7 @@ describe("the special case is gone", () => {
 
     expect(variantGroupsEnabledBy([stored], defaultModuleSettings)).toEqual([stored]);
     expect(
-      variantGroupsEnabledBy([stored], { ...defaultModuleSettings, photoCake: false, shape: false }),
+      variantGroupsEnabledBy([stored], { ...defaultModuleSettings, shape: false }),
     ).toEqual([stored]);
   });
 

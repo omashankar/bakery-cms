@@ -65,18 +65,13 @@ const CATALOGUE: Record<string, Record<string, unknown>> = {
     weights: [],
     variantGroups: [
       {
-        id: "g-photo",
-        name: "Photo cake",
-        type: "photo",
+        id: "g-shape",
+        name: "Shape",
+        type: "shape",
         required: false,
         options: [
-          { id: "o-plain", label: "Standard design", priceAdjustment: 0, isDefault: true },
-          {
-            id: "o-print",
-            label: "Custom photo print",
-            semantic: "photo-print",
-            priceAdjustment: 80,
-          },
+          { id: "o-round", label: "Round", priceAdjustment: 0, isDefault: true },
+          { id: "o-heart", label: "Heart", priceAdjustment: 80 },
         ],
       },
     ],
@@ -154,10 +149,10 @@ describe("a priced line says what was chosen", () => {
 
 describe("the summary and the price come from the same groups", () => {
   it("says what it charged for", async () => {
-    const line = await quoteOne("black-forest", { "g-photo": "o-print" });
+    const line = await quoteOne("black-forest", { "g-shape": "o-heart" });
 
     expect(line.price).toBe(1079);
-    expect(line.variantSummary).toEqual(["Photo cake: Custom photo print"]);
+    expect(line.variantSummary).toEqual(["Shape: Heart"]);
   });
 
   it("omits a group the shop has switched off — the same group it does not charge for", async () => {
@@ -169,9 +164,9 @@ describe("the summary and the price come from the same groups", () => {
      * to be built from that same filtered list, or the order narrates a group
      * the shop does not sell.
      */
-    state.modules = { photoCake: false };
+    state.modules = { shape: false };
     try {
-      const line = await quoteOne("black-forest", { "g-photo": "o-print" });
+      const line = await quoteOne("black-forest", { "g-shape": "o-heart" });
 
       expect(line.price).toBe(999);
       expect(line.variantSummary).toEqual([]);

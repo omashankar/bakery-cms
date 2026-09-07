@@ -16,7 +16,7 @@ import {
   getCategoryByName,
 } from "./catalog-options";
 import { slugify } from "./product-utils";
-import { createDefaultVariantGroups, normalizeVariantGroups } from "./variant-utils";
+import { normalizeVariantGroups } from "./variant-utils";
 
 const STORAGE_KEY = "bakery-cms-admin-cakes";
 const STORAGE_VERSION_KEY = "bakery-cms-admin-cakes-version";
@@ -103,7 +103,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     isFeatured: cake.badge === "Featured",
     isBestSeller: cake.badge === "Bestseller",
     isTrending: cake.badge === "Trending",
-    isPhotoCake: cake.category.toLowerCase().includes("photo"),
     isSeasonal: cake.category.toLowerCase().includes("seasonal"),
     // Nothing in the landing data says a product comes in Round, Square and
     // Heart — the seed said it on their behalf, and the storefront then offered
@@ -144,9 +143,13 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     */
     allergens: undefined,
     careInstructions: undefined,
-    variantGroups: createDefaultVariantGroups({
-      isPhotoCake: cake.category.toLowerCase().includes("photo"),
-    }),
+    /*
+      A "Photo cake" group used to be built here for any demo product filed
+      under a category with the word in it — a paid print option beside a free
+      one. A product that takes a photograph takes one, and the price of
+      printing is part of its price, so there is no group to build.
+    */
+    variantGroups: [],
     // Zero, not 4.5. A shop opened advertising “4.5 ★ · 12 reviews” on every
     // product with no review behind any of it — and the honest aggregate then
     // averaged its first real review against a number that was never earned.
@@ -195,7 +198,6 @@ export function normalizeCommerceFields(cake: Product): Product {
 
   return {
     ...cake,
-    isPhotoCake: cake.isPhotoCake ?? false,
     isSeasonal: cake.isSeasonal ?? false,
     // Never Round/Square/Heart by default. This runs on every repository read,
     // so a phone charger came back from the database with three cake shapes on
@@ -208,8 +210,7 @@ export function normalizeCommerceFields(cake: Product): Product {
     unlimitedStock: cake.unlimitedStock ?? false,
     lowStockThreshold: cake.lowStockThreshold,
     allowsMessage: cake.allowsMessage ?? true,
-    allowsPhotoUpload:
-      cake.allowsPhotoUpload ?? cake.isPhotoCake ?? false,
+    allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
     barcode: cake.barcode,
     preparationTimeMinutes: cake.preparationTimeMinutes,
     shelfLifeDays: cake.shelfLifeDays,
@@ -479,7 +480,6 @@ export function createEmptyProductForm(): ProductFormData {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isPhotoCake: false,
     isSeasonal: false,
     shapes: [],
     flavourOptions: [],
