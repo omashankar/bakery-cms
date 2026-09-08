@@ -107,6 +107,27 @@ export interface PaymentMethodSettings {
   razorpay: boolean;
 }
 
+/**
+ * One card in the row under the product photo.
+ *
+ * The reference storefront puts three there — “100% Purchase Protection /
+ * Assured Quality Secure Payments”, “Serving Excellence / 20M Happy
+ * Customers + 100% Satisfaction!”, “Timely Delivery / Different Time Slots
+ * Available”. Every one is a claim, and two of the three are numbers this
+ * software has no way to know. So the shop writes them, or the row is one
+ * card long, or it is not there at all.
+ *
+ * SHOP-WIDE, unlike a description block: these say what the shop is like,
+ * not what this product is. `icon` is a name from a fixed list because a
+ * component cannot be stored or crossed over an API.
+ */
+export interface ProductTrustCard {
+  id: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+}
+
 export interface CommerceSettings {
   deliveryFee: number;
   freeDeliveryThreshold: number;
@@ -159,6 +180,15 @@ export interface CommerceSettings {
    * is. This software has no delivery policy of its own to offer.
    */
   deliveryInformation: string;
+  /**
+   * The cards under the product photo. Empty until the shop writes them.
+   *
+   * A hard-coded pair stood in the page instead: “Timely Delivery” and “Free
+   * message card / Written as you ask”. The first is kept, because it reads
+   * the shop's own lead time and so cannot go stale; the second was two
+   * English sentences a shop selling anything else could not change.
+   */
+  productTrustCards: ProductTrustCard[];
   paymentMethods: PaymentMethodSettings;
 }
 

@@ -200,6 +200,23 @@ export const commerceSchema = z.object({
   productImageNote: z.string().default(""),
   deliveryInformation: z.string().default(""),
   /**
+   * Bounded, because it is free text an admin types and every product page
+   * prints. A title with no words in it is a card with nothing to say, so it
+   * is refused rather than rendered as an empty box; a SUBTITLE may be blank,
+   * because "Timely Delivery" on its own is a complete thing to say.
+   */
+  productTrustCards: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        icon: z.string().trim().min(1).max(40),
+        title: z.string().trim().min(1, "A card needs a title").max(60),
+        subtitle: z.string().trim().max(120).default(""),
+      }),
+    )
+    .max(6)
+    .default([]),
+  /**
    * `HH:MM` on a 24-hour clock, or blank.
    *
    * Validated rather than trusted: this drives a countdown a customer decides

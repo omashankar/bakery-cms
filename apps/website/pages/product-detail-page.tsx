@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
-  Gift,
   Heart,
   ImageUp,
   Tag,
@@ -75,6 +74,7 @@ import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed"
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import type { LandingProduct } from "@/constants/landing-data";
 import { Badge } from "@/components/ui/badge";
+import { productTrustIcon } from "@/config/product-trust-icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -1388,13 +1388,22 @@ export function ProductDetailPage({
                 reason. Each row now waits for something true to say.
               */}
               {/*
-                CARDS, and still one line each.
+                THE ROW UNDER THE PHOTO, and it is the shop's to write.
 
-                The reference puts three of these under the photo with a title
-                and a boast beneath it — “20M Happy Customers”, “100%
-                Satisfaction”. There is no number behind either and this shop
-                would be inventing both, so each card carries the one thing
-                that is true and nothing under it.
+                The reference puts three cards here — “100% Purchase Protection
+                / Assured Quality Secure Payments”, “Serving Excellence / 20M
+                Happy Customers + 100% Satisfaction!”, “Timely Delivery /
+                Different Time Slots Available”. Every one is a claim and two
+                are numbers this software cannot know, so it had two cards
+                hard-coded here instead: a delivery one, and “Free message card
+                / Written as you ask” — two English sentences a shop selling
+                anything else could not change.
+
+                The delivery card stays, because it is not copy: it renders the
+                shop's own `deliveryLeadDays` and so says “Same-day delivery”
+                the day the shop changes its lead time. Everything else is
+                typed in Settings → Commerce, and a shop that has typed nothing
+                gets one card rather than a boast made up for it.
               */}
               <ul className="grid gap-3 text-sm sm:grid-cols-3">
                 {deliveryPromise ? (
@@ -1404,13 +1413,25 @@ export function ProductDetailPage({
                     <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
                   </li>
                 ) : null}
-                {cake.allowsMessage !== false ? (
-                  <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
-                    <Gift className="size-6 text-bakery-700" />
-                    <span className="font-medium text-foreground">Free message card</span>
-                    <span className="text-xs text-muted-foreground">Written as you ask</span>
-                  </li>
-                ) : null}
+                {(commerce.productTrustCards ?? [])
+                  .filter((card) => card.title.trim().length > 0)
+                  .map((card) => {
+                    const Icon = productTrustIcon(card.icon);
+                    return (
+                      <li
+                        key={card.id}
+                        className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
+                      >
+                        <Icon className="size-6 text-bakery-700" />
+                        <span className="font-medium text-foreground">{card.title}</span>
+                        {card.subtitle.trim() ? (
+                          <span className="text-xs text-muted-foreground">
+                            {card.subtitle}
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
               </ul>
 
               {/*

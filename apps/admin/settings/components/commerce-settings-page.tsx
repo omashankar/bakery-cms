@@ -7,6 +7,7 @@ import {
   reportSettingsWrite,
 } from "@/apps/admin/settings/lib/report-settings-write";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
+import { ProductTrustCardsFields } from "./product-trust-cards-fields";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -343,12 +344,18 @@ export function CommerceSettingsPage() {
                   placeholder={"Hand-delivered in a sealed box.\nCandles and a knife are included where available.\nPerishable — delivery is attempted once and cannot be redirected."}
                 />
                 <p className="text-xs text-muted-foreground">
-                  One line per point. These appear as a bulleted “Delivery
-                  Information” list on every product page — how it travels, what
-                  is included, what you cannot promise. Written once here rather
-                  than retyped per product, so they cannot drift apart.
+                  One line per point. A starting draft: the product form has a
+                  button that copies these into a block on the product, where
+                  you can change them. Nothing is printed from here — two
+                  things you sell may not travel the same way.
                 </p>
               </div>
+              <ProductTrustCardsFields
+                value={settings.productTrustCards ?? []}
+                onChange={(productTrustCards) =>
+                  edit((prev) => ({ ...prev, productTrustCards }))
+                }
+              />
             </CardContent>
           </Card>
 

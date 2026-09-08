@@ -126,6 +126,7 @@ const commerceSchema = new mongoose.Schema(
     sameDayCutoff: { type: String, default: "" },
     productImageNote: { type: String, default: "" },
     deliveryInformation: { type: String, default: "" },
+    productTrustCards: { type: [mongoose.Schema.Types.Mixed], default: [] },
     checkoutTerms: { type: String, default: "" },
     giftWrapEnabled: { type: Boolean, default: false },
     giftWrapFee: { type: Number, default: 0 },

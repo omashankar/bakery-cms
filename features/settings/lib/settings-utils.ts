@@ -175,6 +175,9 @@ export const defaultCommerceSettings: CommerceSettings = {
   // would be this software making a claim on every shop's behalf.
   productImageNote: "",
   deliveryInformation: "",
+  // Empty, like the two above it: this software has no boast of its own to
+  // make on a shop's behalf, and the reference's are numbers it cannot know.
+  productTrustCards: [],
   sameDayCutoff: "",
   paymentMethods: {
     cod: true,
