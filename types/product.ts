@@ -71,12 +71,30 @@ export interface ProductVariantGroup {
  * A fact about the product, in the merchant's own words.
  *
  * Brand: Samsung. Material: Ceramic. Warranty: 1 year. RAM: 8 GB. Not a choice
- * the customer makes and not a price — which is exactly what separates it from
- * `ProductVariantOption`, and why abusing a one-option variant group for it is
- * wrong: the product page renders every group as a row of clickable buttons, so
- * "Brand: Samsung" would read as something to pick, and `formatVariantSummary`
- * would fold it into `variantSummary` and stamp it on the order line as though
- * the customer had chosen it.
+ * the customer makes and not a price — which is what separates it from
+ * `ProductVariantOption`.
+ *
+ * WHERE THE LINE NOW FALLS, because this comment used to draw it in the wrong
+ * place. It said a one-option variant group was an ABUSE, for two reasons that
+ * were both true when it was written and are not now: that the page renders
+ * every group as clickable buttons, and that `formatVariantSummary` would stamp
+ * it on the order as though the customer had chosen it.
+ *
+ * The first is fixed — `asStatement` gives a one-option defaulted group its own
+ * rendering, a tick and the word, with nothing to press. The second turns out to
+ * be the distinction itself rather than an objection to it:
+ *
+ *   A CATALOGUE fact is one nobody makes anything from. Brand: Samsung. Country
+ *   of Origin. RAM: 8 GB. It belongs here, in a description block, and it must
+ *   stay off the order — an order line reading "Brand: Samsung" is noise on an
+ *   invoice and noise in a kitchen.
+ *
+ *   A MANUFACTURING fact changes what gets made. This cake is eggless. This
+ *   shelf ships assembled. That belongs on the line, because the person building
+ *   the thing has to be told, and it is a one-option variant group with Default
+ *   ticked.
+ *
+ * So the two are not rivals. Ask whether anybody downstream acts on it.
  *
  * Deliberately NOT part of `ProductDetails`. Those six are typed food scalars
  * that four formatters consume as numbers — `${calories} kcal / serving`,

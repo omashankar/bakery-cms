@@ -311,6 +311,46 @@ export function asAddOn(
   return { off, on, extra };
 }
 
+/**
+ * The rest of the sentence `asAddOn` starts three comments above.
+ *
+ * It says: “One option WITH a default is not this. That is a fact about the
+ * product — it comes this way — and a box the customer cannot untick is not a
+ * choice.” It then returns null and leaves the group to the picker path, where
+ * it renders as a bold heading over a single already-pressed button. The shop
+ * has been shown, on this page, a control that offers nothing to control.
+ *
+ * A shop describes a cake it only makes eggless by typing one option, Eggless,
+ * and ticking Default. That is not a question; it is the answer, and the
+ * reference storefront prints exactly that: a tick, and the word.
+ *
+ *   ✓ Eggless        ✓ Waterproof        ✓ Ships assembled
+ *
+ * The predicate is the EXACT complement of `asAddOn`'s one-option branch — that
+ * branch returns null precisely when `only.isDefault` is truthy, and its other
+ * branch needs two options — so a group lands in exactly one of the three
+ * buckets by construction rather than by the two of them agreeing to be careful.
+ * `asAddOn` is not touched: it is the fence that keeps a fact out of the tick
+ * path, where a customer could untick something the page called already true.
+ *
+ * Reads the option count, one boolean and whether the label is blank. Nothing
+ * else — not `group.type` (the union is "shape" | "custom" while live rows carry
+ * `egg` and `photo`, so a two-case switch typechecks as exhaustive and is wrong
+ * for most of the catalogue), not the name, not what the label SAYS, and not
+ * `required`, which is documented inert and is true on two live paid opt-ins.
+ */
+export function asStatement(group: ProductVariantGroup): ProductVariantOption | null {
+  if (group.options.length !== 1) return null;
+
+  const only = group.options[0];
+  if (!only?.isDefault) return null;
+  // A tick with nothing after it states nothing — the emptiness guard
+  // `OptionGroup` already applies to a group with no options to show.
+  if (typeof only.label !== "string" || !only.label.trim()) return null;
+
+  return only;
+}
+
 export function variantGroupsEnabledBy(
   groups: ProductVariantGroup[],
   /**

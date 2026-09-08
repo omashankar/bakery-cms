@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
-import type { ProductVariantGroup } from "@/types/product";
+import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
@@ -56,6 +56,7 @@ import {
 } from "@/features/products/lib/product-pricing";
 import {
   asAddOn,
+  asStatement,
   getDefaultVariantSelections,
   getProductVariantGroups,
   mapLegacyChoice,
@@ -343,8 +344,36 @@ export function ProductDetailPage({
         ),
     [visibleVariantGroups],
   );
+  /**
+   * The THIRD kind: a group that asks nothing.
+   *
+   * One option, and the shop ticked Default — “this cake is eggless”, “this
+   * lamp is waterproof”. It was rendered as a heading over a single button the
+   * customer could press and nothing would happen, which is a control offering
+   * no control. It prints as a statement now: a tick, and the shop's own word.
+   */
+  const statementGroups = useMemo(
+    () =>
+      visibleVariantGroups
+        .map((group) => ({ group, stated: asStatement(group) }))
+        .filter(
+          (entry): entry is { group: ProductVariantGroup; stated: ProductVariantOption } =>
+            entry.stated !== null,
+        ),
+    [visibleVariantGroups],
+  );
+  /**
+   * Everything else — and it has to subtract BOTH of the others.
+   *
+   * This was written as “not an add-on”, which meant the moment a second bucket
+   * appeared every group in it would also render here, as the heading-and-button
+   * the new one exists to replace, directly above its own tick.
+   */
   const choiceGroups = useMemo(
-    () => visibleVariantGroups.filter((group) => asAddOn(group) === null),
+    () =>
+      visibleVariantGroups.filter(
+        (group) => asAddOn(group) === null && asStatement(group) === null,
+      ),
     [visibleVariantGroups],
   );
 
@@ -453,6 +482,28 @@ export function ProductDetailPage({
     () => formatVariantSummary(visibleVariantGroups, visibleSelections),
     [visibleVariantGroups, visibleSelections]
   );
+  /**
+   * The same summary, minus what the page is already stating in full.
+   *
+   * DISPLAY ONLY. The grey line under the price repeats every answered group as
+   * “Shape: Round”, and a statement group is answered from the first paint — so
+   * a cake made only in round would say so twice, forty pixels apart, in two
+   * different voices. That is the duplication the serving line and the Serving
+   * Info panel were both deleted for.
+   *
+   * `variantSummary` above is untouched, because it is what goes on the cart
+   * line: the kitchen still has to be told the cake is round, and a customer
+   * reading their invoice still has to see what they were sold. These two are
+   * one keystroke apart, which is why a test mounts this page, adds to the cart
+   * and asserts the fact is still on the line.
+   */
+  const chosenSummary = useMemo(() => {
+    const stated = new Set(statementGroups.map(({ group }) => group.id));
+    return formatVariantSummary(
+      visibleVariantGroups.filter((group) => !stated.has(group.id)),
+      visibleSelections,
+    );
+  }, [statementGroups, visibleVariantGroups, visibleSelections]);
 
 
   /**
@@ -1002,8 +1053,8 @@ export function ProductDetailPage({
                   shop still pays tier 0's price. It shows no size now, which
                   is what switching the module off asks for.
                 */}
-                {variantSummary.length > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{variantSummary.join(" · ")}</p>
+                {chosenSummary.length > 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{chosenSummary.join(" · ")}</p>
                 ) : null}
               </div>
 
@@ -1110,6 +1161,51 @@ export function ProductDetailPage({
                   </OptionGroup>
                 </div>
               ))}
+
+              {/*
+                WHAT THE PRODUCT IS, between what you pick and what you can add.
+
+                A COLUMN, not a wrapping row — deliberately unlike the tick row
+                directly beneath it. Copying that row's classes would put two
+                visually identical lines next to each other, one of which can be
+                clicked and one of which cannot, which is the confusion this is
+                supposed to remove. A column also survives a label that is a
+                sentence: “Ships assembled — no tools needed”.
+
+                Green on the GLYPH only. Five green rows read as five
+                confirmations of something the customer just did.
+
+                An <li>, never a Checkbox: a bordered box invites a click, and
+                the add-on tests count `[data-slot="checkbox"]`.
+              */}
+              {statementGroups.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                  {statementGroups.map(({ group, stated }) => (
+                    <li
+                      key={group.id}
+                      className="flex items-start gap-2"
+                      {...gatesFor(group)}
+                    >
+                      <Check className="mt-0.5 size-4 shrink-0 text-green-700" aria-hidden="true" />
+                      <span>
+                        {stated.label}
+                        {/*
+                          A fact can carry a price — “Ceramic pot included,
+                          +₹250” — and the customer cannot decline it, so the
+                          number can never be demonstrated by ticking something.
+                          It is printed here, in the same words the button
+                          printed it in before, so nothing is disclosed less
+                          than it is today. For this shop's data it is ₹0 and
+                          nothing prints: “✓ Eggless”.
+                        */}
+                        {stated.priceAdjustment !== 0
+                          ? ` (${stated.priceAdjustment > 0 ? "+" : ""}${formatCurrency(stated.priceAdjustment)})`
+                          : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
               {addOnGroups.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
