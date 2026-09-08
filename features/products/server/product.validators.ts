@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
+
 /**
  * Server-side validation for product writes (ProductFormData). Core commerce
  * fields are strict; deeply-nested rich shapes (weights, variantGroups, seo)
@@ -69,7 +71,22 @@ export const productFormSchema = z
     shortDescription: z.string().optional(),
     price: z.number().min(0, "Price cannot be negative"),
     compareAtPrice: z.number().min(0).optional(),
-    images: z.array(z.string()).default([]),
+    /**
+     * Capped, and capped HERE as well as in the form.
+     *
+     * The form is where an admin meets the limit; this is where it holds. A
+     * cap only in the browser is a suggestion — the same shape as the
+     * delivery slots, the minimum order and the shop-wide lead time, each of
+     * which was configured in the admin, checked in the browser, and honoured
+     * by nothing when a request arrived without one.
+     */
+    images: z
+      .array(z.string())
+      .max(
+        MAX_PRODUCT_PHOTOS,
+        `A product can have at most ${MAX_PRODUCT_PHOTOS} photos. Remove one and save again.`,
+      )
+      .default([]),
     categoryId: z.string().default(""),
     occasionIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),

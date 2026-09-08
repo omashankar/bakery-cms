@@ -46,6 +46,7 @@ import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
@@ -327,6 +328,21 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }
     if (!form.slug.trim()) {
       toast.error("Slug is required");
+      return;
+    }
+    /**
+     * Said here so the admin reads a sentence rather than a 400.
+     *
+     * The server refuses this too — a browser check is not a rule. What this
+     * adds is the WHY, at the moment of pressing Save, for a product stored
+     * with more photos than the cap now allows: the boxes are all still on
+     * screen with their Remove buttons, and this says which one to press.
+     */
+    const photos = form.images.filter(Boolean);
+    if (photos.length > MAX_PRODUCT_PHOTOS) {
+      toast.error(
+        `A ${productLower} can have at most ${MAX_PRODUCT_PHOTOS} photos — this one has ${photos.length}. Remove ${photos.length - MAX_PRODUCT_PHOTOS} and save again.`,
+      );
       return;
     }
 
@@ -960,21 +976,38 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     ) : null}
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setForm((prev) => ({
-                    ...prev,
-                    images: [...(prev.images.length > 0 ? prev.images : [""]), ""],
-                  }))}
-                >
-                  Add another photo
-                </Button>
+                {photoSlots.length < MAX_PRODUCT_PHOTOS ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm((prev) => ({
+                      ...prev,
+                      images: [...(prev.images.length > 0 ? prev.images : [""]), ""],
+                    }))}
+                  >
+                    Add another photo
+                  </Button>
+                ) : null}
+                {/*
+                  A product stored with MORE than the cap keeps its photos and
+                  says so. Trimming them here would delete a photograph the shop
+                  uploaded, silently, on a save it made for some other reason —
+                  so every box stays on screen with its Remove button and the
+                  save is refused until the count is down.
+                */}
+                {photoSlots.filter(Boolean).length > MAX_PRODUCT_PHOTOS ? (
+                  <p className="text-xs text-amber-700">
+                    This {productLower} has {photoSlots.filter(Boolean).length}{" "}
+                    photos and the limit is {MAX_PRODUCT_PHOTOS}. Remove{" "}
+                    {photoSlots.filter(Boolean).length - MAX_PRODUCT_PHOTOS} to save.
+                  </p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                   The first photo is the one customers see on cards and in search,
                   and the one that appears when somebody shares the link. The rest
-                  become thumbnails on the product page.
+                  become thumbnails on the product page. Up to{" "}
+                  {MAX_PRODUCT_PHOTOS} in all.
                 </p>
               </TabsContent>
 
