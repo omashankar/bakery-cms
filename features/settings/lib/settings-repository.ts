@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type {
   ActivityLog,
   AnalyticsSettings,
@@ -339,7 +340,7 @@ function rollBackCache(previousRaw: string | null, attempted: AppSettings): void
   if (!stillOurs) return;
 
   if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
-  else localStorage.setItem(STORAGE_KEY, previousRaw);
+  else safeSetItem(STORAGE_KEY, previousRaw);
 
   /**
    * The undo has to be announced, exactly as the write was.
@@ -708,7 +709,7 @@ export function importLocalStorageBackup(
   for (const [key, value] of Object.entries(backup)) {
     if (!key.startsWith("bakery-cms") || value === null) continue;
     if (key === BACKUP_HISTORY_KEY) continue;
-    localStorage.setItem(key, value);
+    safeSetItem(key, value);
     count += 1;
   }
   return count;

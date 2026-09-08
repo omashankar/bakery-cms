@@ -21,6 +21,7 @@
  * directive, as it did not before.
  */
 
+import { safeSetItem } from "@/lib/safe-storage";
 import {
   replaceCustomCodeRequest,
 } from "@/features/admin-config/lib/admin-config-api";
@@ -57,7 +58,7 @@ export async function saveCustomCode(code: CustomCode): Promise<boolean> {
 
   const previous = localStorage.getItem(STORAGE_KEY);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(code));
+    safeSetItem(STORAGE_KEY, JSON.stringify(code));
   } catch {
     return false;
   }
@@ -74,7 +75,7 @@ export async function saveCustomCode(code: CustomCode): Promise<boolean> {
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(code);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       window.dispatchEvent(new Event(CUSTOM_CODE_UPDATED_EVENT));
     }
   }
@@ -86,7 +87,7 @@ export async function saveCustomCode(code: CustomCode): Promise<boolean> {
 export function persistServerCustomCode(code: CustomCode): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(code));
+    safeSetItem(STORAGE_KEY, JSON.stringify(code));
   } catch {
     return;
   }

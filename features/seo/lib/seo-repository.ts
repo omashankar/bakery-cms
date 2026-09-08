@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { brandInfo } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { replaceSeoRequest } from "@/features/site-layout/lib/site-layout-api";
@@ -176,8 +177,8 @@ export function seedStore(): SeoStore {
 
 function persist(store: SeoStore): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  localStorage.setItem(STORAGE_VERSION_KEY, String(SEO_STORAGE_VERSION));
+  safeSetItem(STORAGE_KEY, JSON.stringify(store));
+  safeSetItem(STORAGE_VERSION_KEY, String(SEO_STORAGE_VERSION));
   window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
 }
 
@@ -253,7 +254,7 @@ async function persistAndSync(next: SeoStore): Promise<boolean> {
       const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
       if (stillOurs) {
         if (previous === null) localStorage.removeItem(STORAGE_KEY);
-        else localStorage.setItem(STORAGE_KEY, previous);
+        else safeSetItem(STORAGE_KEY, previous);
         window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
       }
     }

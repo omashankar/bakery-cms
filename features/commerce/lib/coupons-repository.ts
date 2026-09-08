@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { specialOffers } from "@/constants/landing-data";
 import { couponsHydration, replaceCouponsRequest } from "./commerce-api";
 import { hasExpired } from "@/lib/expiry-date";
@@ -151,7 +152,7 @@ async function readHydratedCoupons(): Promise<StoredCoupon[] | null> {
 /** Local-only write (localStorage + event). No server dual-write. */
 function lowWriteCoupons(coupons: StoredCoupon[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
+  safeSetItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
   window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
 }
 
@@ -195,7 +196,7 @@ async function writeCoupons(
       localStorage.getItem(COUPONS_STORAGE_KEY) === JSON.stringify(coupons);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(COUPONS_STORAGE_KEY);
-      else localStorage.setItem(COUPONS_STORAGE_KEY, previous);
+      else safeSetItem(COUPONS_STORAGE_KEY, previous);
       window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
     }
   }

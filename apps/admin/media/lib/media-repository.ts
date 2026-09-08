@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import {
   categories,
   galleryImages,
@@ -154,7 +155,7 @@ export function loadMediaFiles(): MediaFile[] {
   if (!raw) {
     const seeded = seedMedia();
     lowPersistMedia(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
     return seeded;
   }
 
@@ -171,7 +172,7 @@ export function loadMediaFiles(): MediaFile[] {
     if (!Array.isArray(parsed)) {
       const seeded = seedMedia();
       lowPersistMedia(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
       return seeded;
     }
 
@@ -180,7 +181,7 @@ export function loadMediaFiles(): MediaFile[] {
     if (storedVersion < MEDIA_LIBRARY_VERSION) {
       const repaired = repairMediaLibrary(parsed);
       lowPersistMedia(repaired);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
       return repaired;
     }
 
@@ -194,7 +195,7 @@ export function loadMediaFiles(): MediaFile[] {
   } catch {
     const seeded = seedMedia();
     lowPersistMedia(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(MEDIA_LIBRARY_VERSION));
     return seeded;
   }
 }
@@ -202,7 +203,7 @@ export function loadMediaFiles(): MediaFile[] {
 /** Local-only write. Used by the seed/repair/normalize paths (no dual-write). */
 function lowPersistMedia(files: MediaFile[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+  safeSetItem(STORAGE_KEY, JSON.stringify(files));
 }
 
 /**

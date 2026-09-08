@@ -1,5 +1,6 @@
 "use client";
 
+import { safeSetItem } from "@/lib/safe-storage";
 import { useEffect, useId, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -167,7 +168,7 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+      safeSetItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
     } catch {
       // ignore storage errors
     }

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { FooterSettings } from "@/types/site-layout";
 import { defaultFooterSettings } from "./footer-utils";
 import { replaceFooterRequest } from "./site-layout-api";
@@ -13,7 +14,7 @@ function nowIso(): string {
 
 function persist(settings: FooterSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  safeSetItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
 export function loadFooterSettings(): FooterSettings {
@@ -22,7 +23,7 @@ export function loadFooterSettings(): FooterSettings {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     persist(defaultFooterSettings);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(FOOTER_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(FOOTER_STORAGE_VERSION));
     return defaultFooterSettings;
   }
 
@@ -41,7 +42,7 @@ export function loadFooterSettings(): FooterSettings {
     };
     const storedVersion = Number(localStorage.getItem(STORAGE_VERSION_KEY) ?? 0);
     if (storedVersion < FOOTER_STORAGE_VERSION) {
-      localStorage.setItem(STORAGE_VERSION_KEY, String(FOOTER_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(FOOTER_STORAGE_VERSION));
     }
     return next;
   } catch {
@@ -74,7 +75,7 @@ async function persistAndSync(next: FooterSettings): Promise<boolean> {
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
     }
   }
 

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 
 const STORAGE_KEY = "bakery-cms-saved-for-later";
@@ -55,7 +56,7 @@ function readSavedItems(): CartLineItem[] {
 
 function writeSavedItems(items: CartLineItem[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  safeSetItem(STORAGE_KEY, JSON.stringify(items));
   notifySavedUpdated();
 }
 

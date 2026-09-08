@@ -1,3 +1,5 @@
+
+import { safeSetItem } from "@/lib/safe-storage";
 const WISHLIST_STORAGE_KEY = "bakery-cms-wishlist";
 
 export function getWishlistSlugs(): string[] {
@@ -23,7 +25,7 @@ export function toggleWishlist(slug: string): boolean {
   const next = exists ? current.filter((item) => item !== slug) : [...current, slug];
 
   if (typeof window !== "undefined") {
-    localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
+    safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new Event("bakery-wishlist-updated"));
   }
 
@@ -35,7 +37,7 @@ export function addToWishlist(slug: string): boolean {
   if (current.includes(slug)) return false;
 
   if (typeof window !== "undefined") {
-    localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify([...current, slug]));
+    safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify([...current, slug]));
     window.dispatchEvent(new Event("bakery-wishlist-updated"));
   }
 
@@ -68,7 +70,7 @@ export function pruneWishlist(availableSlugs: Iterable<string>): number {
   const next = current.filter((slug) => available.has(slug));
   if (next.length === current.length) return 0;
 
-  localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
+  safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
   window.dispatchEvent(new Event("bakery-wishlist-updated"));
   return current.length - next.length;
 }

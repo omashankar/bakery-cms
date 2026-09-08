@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { LandingProduct } from "@/constants/landing-data";
 
 const STORAGE_KEY = "bakery-cms-recently-viewed";
@@ -25,7 +26,7 @@ function readSlugs(): string[] {
 
 function writeSlugs(slugs: string[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(slugs.slice(0, MAX_ITEMS)));
+  safeSetItem(STORAGE_KEY, JSON.stringify(slugs.slice(0, MAX_ITEMS)));
   notifyUpdated();
 }
 

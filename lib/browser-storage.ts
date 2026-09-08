@@ -1,3 +1,5 @@
+
+import { safeSetItem } from "@/lib/safe-storage";
 /**
  * Writing to localStorage without letting it break the page.
  *
@@ -21,7 +23,7 @@
 export function writeLocal(key: string, value: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    localStorage.setItem(key, value);
+    safeSetItem(key, value);
     return true;
   } catch {
     return false;

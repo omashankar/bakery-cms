@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { migrateLegacyCartItem, withStableLineIds, type CartLineItem } from "@/features/cart/lib/cart";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -172,12 +173,12 @@ function writeOrders(orders: PlacedOrder[]): void {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+    safeSetItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
   } catch {
     // Out of room. Orders are newest-first, so keep the ones a customer is
     // most likely to look at and try once more.
     try {
-      localStorage.setItem(
+      safeSetItem(
         ORDERS_STORAGE_KEY,
         JSON.stringify(orders.slice(0, ORDERS_KEPT_UNDER_PRESSURE)),
       );

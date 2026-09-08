@@ -1,3 +1,5 @@
+
+import { safeSetItem } from "@/lib/safe-storage";
 const HELPFUL_MARKS_KEY = "bakery-cms-helpful-reviews";
 
 /**
@@ -27,7 +29,7 @@ export function rememberHelpfulMark(reviewId: string): void {
   const marks = getHelpfulMarks();
   if (marks.includes(reviewId)) return;
   try {
-    window.localStorage.setItem(HELPFUL_MARKS_KEY, JSON.stringify([...marks, reviewId]));
+    safeSetItem(HELPFUL_MARKS_KEY, JSON.stringify([...marks, reviewId]));
   } catch {
     // Nothing to do: the press already reached the server, and the worst case
     // is that this browser offers the button again.

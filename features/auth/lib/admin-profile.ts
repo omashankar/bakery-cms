@@ -21,6 +21,7 @@
  * did not change with the move.
  */
 
+import { safeSetItem } from "@/lib/safe-storage";
 import { getDemoSession } from "@/features/auth/lib/session";
 import {
   replaceAdminProfileRequest,
@@ -70,7 +71,7 @@ function read(): StoredProfile {
 function write(data: StoredProfile): boolean {
   if (typeof window === "undefined") return false;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    safeSetItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     return false;
   }
@@ -128,7 +129,7 @@ export function persistServerAccount(user: Record<string, unknown> | null): void
     status: asString(user.status),
   };
 
-  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  safeSetItem(ACCOUNT_KEY, JSON.stringify(account));
   window.dispatchEvent(new Event(ADMIN_PROFILE_UPDATED_EVENT));
 }
 
@@ -190,7 +191,7 @@ export async function saveAdminProfile(
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       window.dispatchEvent(new Event(ADMIN_PROFILE_UPDATED_EVENT));
     }
   }

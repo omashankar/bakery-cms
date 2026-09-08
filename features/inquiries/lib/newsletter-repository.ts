@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {
@@ -57,7 +58,7 @@ export function seedSubscribers(): NewsletterSubscriber[] {
 
 function persistSubscribers(subscribers: NewsletterSubscriber[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(subscribers));
+  safeSetItem(STORAGE_KEY, JSON.stringify(subscribers));
   window.dispatchEvent(new Event(NEWSLETTER_UPDATED_EVENT));
 }
 

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import type {
   ProductReview,
@@ -50,7 +51,7 @@ function readReviews(): ProductReview[] {
 
 function writeReviews(reviews: ProductReview[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
+  safeSetItem(STORAGE_KEY, JSON.stringify(reviews));
   emitReviewsUpdated();
 }
 

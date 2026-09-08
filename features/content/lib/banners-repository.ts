@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { Banner } from "@/types/media";
 import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
@@ -20,7 +21,7 @@ function nowIso(): string {
 
 function persist(banners: Banner[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(banners));
+  safeSetItem(STORAGE_KEY, JSON.stringify(banners));
 }
 
 function normalizeBanner(banner: Banner): Banner {
@@ -53,7 +54,7 @@ export function loadBanners(): Banner[] {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     persist(defaultBanners);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
     return defaultBanners;
   }
 
@@ -69,7 +70,7 @@ export function loadBanners(): Banner[] {
     // put them back on the storefront. Only a missing or non-array value seeds.
     if (!Array.isArray(parsed)) {
       persist(defaultBanners);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
       return defaultBanners;
     }
 
@@ -78,13 +79,13 @@ export function loadBanners(): Banner[] {
 
     if (changed || storedVersion < BANNERS_STORAGE_VERSION) {
       persist(normalized);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
     }
 
     return normalized;
   } catch {
     persist(defaultBanners);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(BANNERS_STORAGE_VERSION));
     return defaultBanners;
   }
 }

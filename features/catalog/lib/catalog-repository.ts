@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { ProductCategory, ProductOccasion } from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
@@ -50,7 +51,7 @@ export const CATALOG_UPDATED_EVENT = "bakery-catalog-updated";
 
 function persist(store: CatalogStore): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  safeSetItem(STORAGE_KEY, JSON.stringify(store));
   window.dispatchEvent(new Event(CATALOG_UPDATED_EVENT));
 }
 
@@ -154,7 +155,7 @@ function rollBackCache(previousRaw: string | null, attempted: CatalogStore): voi
   if (localStorage.getItem(STORAGE_KEY) !== JSON.stringify(attempted)) return;
 
   if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
-  else localStorage.setItem(STORAGE_KEY, previousRaw);
+  else safeSetItem(STORAGE_KEY, previousRaw);
 }
 
 /**

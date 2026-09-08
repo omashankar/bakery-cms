@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { Product, StockStatus } from "@/types/product";
 import type {
   InventoryItem,
@@ -64,7 +65,7 @@ export async function saveInventorySettings(
   settings: InventorySettings
 ): Promise<{ settings: InventorySettings; persisted: boolean }> {
   if (typeof window === "undefined") return { settings, persisted: false };
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   const persisted = await saveInventorySettingsRequest(settings);
   emitInventoryUpdated();
   return { settings, persisted };
@@ -77,13 +78,13 @@ export async function saveInventorySettings(
  */
 export function persistServerHistory(entries: StockHistoryEntry[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
+  safeSetItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
   emitInventoryUpdated();
 }
 
 export function persistServerSettings(settings: InventorySettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   emitInventoryUpdated();
 }
 
@@ -111,7 +112,7 @@ function appendStockHistory(entry: StockHistoryEntry): void {
 
   const history = loadStockHistory();
   const next = [entry, ...history].slice(0, MAX_HISTORY);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  safeSetItem(HISTORY_KEY, JSON.stringify(next));
 }
 
 export function getInventoryItems(): InventoryItem[] {

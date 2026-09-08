@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { GlobalSearchResult } from "./global-search";
 
 const STORAGE_KEY = "bakery-cms-global-search-recent";
@@ -42,7 +43,7 @@ export function recordRecentSearch(result: GlobalSearchResult): void {
     ...loadRecentSearches().filter((item) => item.id !== result.id),
   ].slice(0, MAX_RECENT);
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  safeSetItem(STORAGE_KEY, JSON.stringify(next));
 }
 
 export function clearRecentSearches(): void {

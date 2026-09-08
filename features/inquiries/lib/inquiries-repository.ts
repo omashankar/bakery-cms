@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { createHydrationGate } from "@/lib/hydration-gate";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
 import {
@@ -201,7 +202,7 @@ export function seedInquiries(): Inquiry[] {
 
 function persistInquiries(inquiries: Inquiry[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(inquiries));
+  safeSetItem(STORAGE_KEY, JSON.stringify(inquiries));
   window.dispatchEvent(new Event(INQUIRIES_UPDATED_EVENT));
 }
 

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { weightAxisLabel } from "@/features/products/lib/product-pricing";
 import {
   addSavedForLaterItem,
@@ -238,7 +239,7 @@ function readCart(): CartLineItem[] {
 function writeCart(items: CartLineItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    safeSetItem(CART_STORAGE_KEY, JSON.stringify(items));
   } catch {
     // A browser at its storage limit must not make the cart throw. The item is
     // already in the React state that called this, so the customer's own screen
@@ -442,7 +443,7 @@ export function getCartPreferences(): CartPreferences {
 
 export function saveCartPreferences(preferences: CartPreferences): CartPreferences {
   if (typeof window === "undefined") return preferences;
-  localStorage.setItem(CART_PREFS_KEY, JSON.stringify(preferences));
+  safeSetItem(CART_PREFS_KEY, JSON.stringify(preferences));
   notifyPreferencesUpdated();
   return preferences;
 }

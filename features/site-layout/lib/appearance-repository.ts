@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { AppearanceSettings } from "@/types/appearance";
 import { replaceAppearanceRequest } from "@/features/site-layout/lib/site-layout-api";
 import type { WriteResult } from "@/lib/write-result";
@@ -18,8 +19,8 @@ export const APPEARANCE_STORAGE_KEY = STORAGE_KEY;
 
 function persist(settings: AppearanceSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  localStorage.setItem(STORAGE_VERSION_KEY, String(APPEARANCE_STORAGE_VERSION));
+  safeSetItem(STORAGE_KEY, JSON.stringify(settings));
+  safeSetItem(STORAGE_VERSION_KEY, String(APPEARANCE_STORAGE_VERSION));
 }
 
 function normalizeSettings(settings: AppearanceSettings): AppearanceSettings {
@@ -58,7 +59,7 @@ export function loadAppearanceSettings(): AppearanceSettings {
 
     const storedVersion = Number(localStorage.getItem(STORAGE_VERSION_KEY) ?? 0);
     if (storedVersion < APPEARANCE_STORAGE_VERSION) {
-      localStorage.setItem(STORAGE_VERSION_KEY, String(APPEARANCE_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(APPEARANCE_STORAGE_VERSION));
     }
 
     return normalizeSettings({
@@ -99,7 +100,7 @@ async function persistAndSync(next: AppearanceSettings): Promise<boolean> {
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       // Repaint from whatever the cache now holds, so the screen and the
       // stored value agree again.
       applyAppearanceSettings(loadAppearanceSettings());

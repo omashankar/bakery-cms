@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { EmailTemplateFormData, EmailTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "@/lib/template-render";
 import {
@@ -49,7 +50,7 @@ function readTemplates(): EmailTemplateRecord[] | null {
 
 function writeTemplates(templates: EmailTemplateRecord[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+  safeSetItem(STORAGE_KEY, JSON.stringify(templates));
   emitUpdated();
 }
 
@@ -101,7 +102,7 @@ async function persistAndSync(templates: EmailTemplateRecord[]): Promise<boolean
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(templates);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       emitUpdated();
     }
   }
@@ -113,7 +114,7 @@ async function persistAndSync(templates: EmailTemplateRecord[]): Promise<boolean
 export function persistServerEmailTemplates(templates: EmailTemplateRecord[]): void {
   if (typeof window === "undefined") return;
   writeTemplates(templates);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
 }
 
 function normalizeTemplate(template: EmailTemplateRecord): EmailTemplateRecord {
@@ -141,7 +142,7 @@ export function loadEmailTemplates(): EmailTemplateRecord[] {
   if (existing === null || version < STORAGE_VERSION) {
     const seeded = existing === null ? seedEmailTemplates() : existing.map(normalizeTemplate);
     writeTemplates(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
     return seeded;
   }
 
@@ -255,7 +256,7 @@ export async function resetEmailTemplates(): Promise<WriteResult<EmailTemplateRe
   const seeded = seedEmailTemplates();
   const result = await mutateEmailTemplates(seeded, () => ({ next: seeded, value: seeded }));
   if (result.persisted) {
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   }
   return result;
 }

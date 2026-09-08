@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { HydrationGate } from "@/lib/hydration-gate";
 import type { ContentRead } from "./content-api";
 import { settleFromRead } from "./content-api";
@@ -96,7 +97,7 @@ export async function saveWithRollback<T>(opts: {
     const stillOurs = localStorage.getItem(opts.storageKey) === JSON.stringify(opts.next);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(opts.storageKey);
-      else localStorage.setItem(opts.storageKey, previous);
+      else safeSetItem(opts.storageKey, previous);
       opts.announce?.();
     }
   }

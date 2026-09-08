@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   bestSellers,
@@ -44,7 +45,7 @@ function emitProductsUpdated(): void {
  */
 function writeProducts(cakes: Product[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cakes));
+  safeSetItem(STORAGE_KEY, JSON.stringify(cakes));
 }
 
 function nowIso(): string {
@@ -310,7 +311,7 @@ export function loadProducts(): Product[] {
     if (!raw) {
       const seeded = seedProducts();
       writeProducts(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
       return seeded;
     }
 
@@ -321,7 +322,7 @@ export function loadProducts(): Product[] {
     if (!Array.isArray(parsed)) {
       const seeded = seedProducts();
       writeProducts(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
       return seeded;
     }
 
@@ -330,7 +331,7 @@ export function loadProducts(): Product[] {
 
     if (changed || storedVersion < CAKES_STORAGE_VERSION) {
       writeProducts(normalized);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
     }
 
     return normalized;

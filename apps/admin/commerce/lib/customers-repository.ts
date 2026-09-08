@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { CustomerAdminMeta } from "@/types/customer";
 import { saveCustomerMetaRequest } from "./customers-api";
 
@@ -40,7 +41,7 @@ function readAllMeta(): Record<string, CustomerAdminMeta> {
  */
 function writeAllMeta(store: Record<string, CustomerAdminMeta>): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  safeSetItem(STORAGE_KEY, JSON.stringify(store));
 }
 
 export function getCustomerAdminMeta(email: string): CustomerAdminMeta {

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { Testimonial, TestimonialFormData } from "@/types/content";
 import type { WriteResult } from "@/lib/write-result";
 import type { LandingTestimonial } from "@/constants/landing-data";
@@ -38,7 +39,7 @@ export function seedFromLanding(): Testimonial[] {
 /** Local-only write. Used by the seed/migration paths (no server dual-write). */
 function lowPersist(items: Testimonial[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  safeSetItem(STORAGE_KEY, JSON.stringify(items));
 }
 
 /** Mutation write: local first, then the server, reporting what the server did. */
@@ -98,7 +99,7 @@ export function loadTestimonials(): Testimonial[] {
   if (!raw) {
     const seeded = seedFromLanding();
     lowPersist(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     return seeded;
   }
 
@@ -114,7 +115,7 @@ export function loadTestimonials(): Testimonial[] {
     if (!Array.isArray(parsed)) {
       const seeded = seedFromLanding();
       lowPersist(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
       return seeded;
     }
 
@@ -123,14 +124,14 @@ export function loadTestimonials(): Testimonial[] {
 
     if (changed || storedVersion < TESTIMONIALS_STORAGE_VERSION) {
       lowPersist(normalized);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     }
 
     return normalized;
   } catch {
     const seeded = seedFromLanding();
     lowPersist(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(TESTIMONIALS_STORAGE_VERSION));
     return seeded;
   }
 }
