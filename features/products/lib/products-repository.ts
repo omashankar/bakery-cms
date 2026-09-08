@@ -76,7 +76,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     name: cake.name,
     slug: cake.slug,
     description: cake.description,
-    shortDescription: cake.description.slice(0, 100),
     price: cake.price,
     // NO INVENTED MRP. This was `price > 1000 ? price * 1.1 : undefined`, so
     // every demo product over Rs 1000 wore a permanent “9% OFF” against a
@@ -425,7 +424,6 @@ export function createEmptyProductForm(): ProductFormData {
     name: "",
     slug: "",
     description: "",
-    shortDescription: "",
     price: 999,
     compareAtPrice: undefined,
     images: [],

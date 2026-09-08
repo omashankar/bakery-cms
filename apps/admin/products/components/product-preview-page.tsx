@@ -115,7 +115,7 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
               {cake.isBestSeller ? <Badge variant="bakery">Best Seller</Badge> : null}
             </div>
             <CardTitle className="font-heading text-2xl">{cake.name}</CardTitle>
-            <CardDescription>{cake.shortDescription || cake.description}</CardDescription>
+            <CardDescription>{cake.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-baseline gap-2">

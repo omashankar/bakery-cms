@@ -96,9 +96,17 @@ describe("the tabs", () => {
 
 describe("every field is still on the form, under the heading it belongs to", () => {
   it("puts what a product IS under Basics", () => {
-    for (const field of ['htmlFor="name"', 'htmlFor="slug"', 'htmlFor="description"']) {
+    for (const field of ['htmlFor="name"', 'htmlFor="slug"']) {
       expect(tabOf(field), field).toBe("basics");
     }
+    /**
+     * The description is NOT here. It prints as the paragraph under the
+     * blocks, so it is edited beside them — and the short description that
+     * sat above it is gone entirely, being a second box for the SEO tab's
+     * job. Three things called a description; one now.
+     */
+    expect(tabOf('htmlFor="description"')).toBe("description");
+    expect(form).not.toContain('htmlFor="shortDescription"');
     // Category and occasions had a tab of their own called "Classification".
     expect(tabOf('htmlFor="category"')).toBe("basics");
     expect(tabOf("adminOccasions()")).toBe("basics");

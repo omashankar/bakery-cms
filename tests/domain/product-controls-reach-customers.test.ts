@@ -60,8 +60,35 @@ describe("each cake ships its own metadata", () => {
   it("falls back to the cake's own name and copy", () => {
     // A shop that never opens the SEO tab must still get distinct pages.
     expect(code).toMatch(/typed \|\| cake\.name/);
-    expect(code).toContain("cake.shortDescription?.trim()");
     expect(code).toContain("cake.description?.trim()");
+    /**
+     * `shortDescription` was the middle step of three, and it was a second
+     * box for the first step's job: nothing on the storefront rendered it,
+     * and the SEO tab already has a meta description field. Two steps now.
+     */
+    expect(code).not.toContain("shortDescription");
+  });
+
+  it("cannot be stored either, so nothing can put it back by writing one", async () => {
+    /**
+     * The gate a removed field has to pass as surely as a new one. Left as a
+     * Mongoose path, an import or an old client could go on writing a value
+     * that no screen shows and no read uses — dead weight in every product
+     * document, and a field somebody would eventually wire back up.
+     */
+    const { ProductModel } = await import("@/lib/server/db/models/product.model");
+    const doc = new ProductModel({
+      _id: "p-x",
+      name: "Black Forest",
+      slug: "black-forest",
+      shortDescription: "One line for Google",
+      description: "Cherries and cream.",
+    });
+
+    const stored = doc.toObject() as { shortDescription?: string; description?: string };
+
+    expect(stored.shortDescription).toBeUndefined();
+    expect(stored.description).toBe("Cherries and cream.");
   });
 
   it("does not publish metadata for an unpublished cake", () => {
@@ -100,11 +127,21 @@ describe("the product form keeps what was typed", () => {
     expect(form).not.toContain("weights: getDefaultWeights(price)");
   });
 
-  it("describes the short description by what it actually does", () => {
-    // The placeholder promised "One-line summary for cards" and no card rendered
-    // it. It is now the search-result description when the SEO tab is blank.
-    expect(form).not.toContain("One-line summary for cards");
-    expect(form).toContain("Used as the search-result description when the SEO tab is empty.");
+  it("no longer offers a short description at all", () => {
+    /**
+     * Its placeholder promised "One-line summary for cards" and no card
+     * rendered it; the hint was then corrected to say it fed the search
+     * result. Both were papering over the real problem — the SEO tab has a
+     * meta description of its own, so this was a second box for one job,
+     * named as though customers would read it, in the tab about what a
+     * product IS. Three things called a description on one form.
+     */
+    const code = stripComments(form);
+
+    expect(code).not.toContain("shortDescription");
+    expect(code).not.toContain("Short description");
+    // …and the paragraph that IS real moved to the tab it prints in.
+    expect(code).toContain("Opening paragraph");
   });
 });
 

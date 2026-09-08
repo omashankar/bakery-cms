@@ -68,7 +68,6 @@ export const productFormSchema = z
       .min(1, "Slug is required")
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "Slug may contain only letters, numbers and hyphens"),
     description: z.string().default(""),
-    shortDescription: z.string().optional(),
     price: z.number().min(0, "Price cannot be negative"),
     compareAtPrice: z.number().min(0).optional(),
     /**

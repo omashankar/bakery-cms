@@ -138,7 +138,24 @@ export interface Product extends BaseEntity {
   name: string;
   slug: string;
   description: string;
-  shortDescription?: string;
+  /*
+    `shortDescription` stood here, and it was not a description.
+
+    Nothing on the storefront ever rendered it. Its one destination was the
+    META description, as the middle link of a three-step fallback:
+
+      seo.metaDescription  ->  shortDescription  ->  description
+
+    So it duplicated the SEO tab's own box, under a name that promised a
+    summary customers would read, in the tab about what a product IS. A shop
+    wanting a shorter line for Google has the field for it; a shop that does
+    not now falls straight through to the description, which is what the last
+    step always was.
+
+    The seed set it to `description.slice(0, 100)` — a truncation of the very
+    field it fell through to — so it carried nothing of its own for any
+    product this shop has.
+  */
   price: number;
   compareAtPrice?: number;
   images: string[];

@@ -22,7 +22,6 @@ const productSchema = new mongoose.Schema(
     // cakes is unreachable and the other answers for it.
     slug: { type: String, required: true, unique: true, index: true },
     description: { type: String, default: "" },
-    shortDescription: { type: String },
     price: { type: Number, default: 0 },
     compareAtPrice: { type: Number },
     images: { type: [String], default: [] },

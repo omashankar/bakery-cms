@@ -42,8 +42,8 @@ interface PageProps {
  */
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const { slug } = await props.params;
-  // The full product, not the storefront projection — `seo` and
-  // `shortDescription` are admin-side fields the projection does not carry.
+  // The full product, not the storefront projection: `seo` is an admin-side
+  // field the projection does not carry.
   const cake = await getProductBySlug(slug);
 
   if (!cake || cake.status !== "published") {
@@ -53,9 +53,10 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
 
   // Falling back to the product's own name and description keeps a shop that has
   // never opened the SEO tab from publishing one shared title anyway.
+  // Two steps, not three. `shortDescription` sat between these and was a
+  // second box for the first one's job — see the note on types/product.ts.
   const description =
     cake.seo?.metaDescription?.trim() ||
-    cake.shortDescription?.trim() ||
     cake.description?.trim() ||
     "Product details, pricing, and order inquiry.";
 

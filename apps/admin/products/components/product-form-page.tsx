@@ -536,34 +536,20 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     placeholder="chocolate-truffle-cake"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shortDescription">Short description</Label>
-                  <Input
-                    id="shortDescription"
-                    value={form.shortDescription ?? ""}
-                    onChange={(e) => patchForm({ shortDescription: e.target.value })}
-                    placeholder="One line, shown in Google results"
-                  />
-                  {/*
-                    The placeholder said "One-line summary for cards" and no card
-                    rendered it — nothing did. It is now the meta description
-                    this cake's page ships when the SEO tab is left blank, which
-                    is a real destination, so the hint says that instead.
-                  */}
-                  <p className="text-xs text-muted-foreground">
-                    Used as the search-result description when the SEO tab is empty.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Full description</Label>
-                  <textarea
-                    id="description"
-                    className={adminTextareaClassName}
-                    value={form.description}
-                    onChange={(e) => patchForm({ description: e.target.value })}
-                    placeholder="What it is, what makes it good, anything a buyer should know..."
-                  />
-                </div>
+                {/*
+                  TWO BOXES STOOD HERE, and between them and the Description
+                  tab there were three things called a description.
+
+                  "Short description" was not one: nothing on the storefront
+                  rendered it, and its only destination was the meta
+                  description, as the middle step of a fallback whose first
+                  step is the SEO tab's own box. A second field for one job.
+
+                  "Full description" is real — it is the paragraph under the
+                  bullets on the product page — so it has moved to the
+                  Description tab, beside the blocks it prints with. What the
+                  page SAYS is now edited in one place.
+                */}
 
                 <Separator />
 
@@ -936,6 +922,24 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </TabsContent>
 
               <TabsContent value="description" className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="description">Opening paragraph</Label>
+                  <textarea
+                    id="description"
+                    className={adminTextareaClassName}
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => patchForm({ description: e.target.value })}
+                    placeholder="What it is, what makes it good, anything a buyer should know..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Prose, under the blocks below. Also the search-result
+                    description when the SEO tab is empty.
+                  </p>
+                </div>
+
+                <Separator />
+
                 {/*
                   A key-value list under one fixed heading stood here, and six
                   fixed food fields under it — prep time, shelf life, calories,
@@ -1176,7 +1180,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
               </p>
               <p className="line-clamp-3 text-xs text-muted-foreground">
                 {form.seo.metaDescription ||
-                  form.shortDescription ||
+                  form.description ||
                   "Meta description preview will appear here."}
               </p>
               <Badge variant="outline">{form.status}</Badge>
