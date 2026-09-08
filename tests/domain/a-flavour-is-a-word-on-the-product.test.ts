@@ -11,6 +11,7 @@ import {
   applyCollectionFilters,
   DEFAULT_COLLECTION_FILTERS,
   getFilterFlavourOptions,
+  getFilterOptionFacets,
 } from "@/apps/website/lib/collection-filters";
 import { CATALOG_SECTIONS } from "@/features/catalog/lib/catalog-api";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -108,16 +109,30 @@ describe("the filter offers what is on the page", () => {
     ).toEqual(["Butterscotch", "Vanilla"]);
   });
 
-  it("reads the variant group as well as the legacy list", () => {
+  it("does NOT file a variant option under the word flavour", () => {
     /**
-     * Flavours are a priced variant group on a modern product and a plain
-     * array on one stored before that. `matchesFlavour` looks at both, so the
-     * option list has to look at both or a tick goes missing for half the
-     * catalogue.
+     * This test used to assert the opposite, and the opposite was the bug.
+     *
+     * Reading `optionLabels` here meant every variant option in the catalogue
+     * arrived under one hard-coded heading. On this shop that heading read
+     * "Flavour: Regular, Eggless, Round, Square, Heart" — five ticks, not one of
+     * them a flavour — and a shop selling chargers would have read "Flavour:
+     * 65W, Type-C". The old test could not see it, because it fed ONE label and
+     * never asked what heading the label ended up under.
+     *
+     * A variant option belongs to the group the shop typed it into, and
+     * `getFilterOptionFacets` is where it goes now.
      */
-    expect(
-      getFilterFlavourOptions([product({ optionLabels: ["Butterscotch"], flavours: [] })]),
-    ).toEqual(["Butterscotch"]);
+    const cake = product({
+      optionLabels: ["Butterscotch"],
+      optionGroups: [{ name: "Egg preference", labels: ["Butterscotch"] }],
+      flavours: [],
+    });
+
+    expect(getFilterFlavourOptions([cake])).toEqual([]);
+    expect(getFilterOptionFacets([cake, product({ id: "z", slug: "z" })])).toEqual([
+      { key: "egg preference", name: "Egg preference", options: ["Butterscotch"] },
+    ]);
   });
 
   it("offers nothing to a shop that sells nothing by flavour", () => {

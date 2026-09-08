@@ -16,7 +16,9 @@ import {
   countActiveFilters,
   defaultCollectionFilters,
   getFilterFlavourOptions,
+  getFilterOptionFacets,
   getFilterWeightOptions,
+  pruneOptionSelections,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
 import { categories as demoCategories } from "@/constants/landing-data";
@@ -107,6 +109,20 @@ export function CollectionsPage({
    */
   const sizeOptions = useMemo(() => getFilterWeightOptions(catalog), [catalog]);
   const flavourOptions = useMemo(() => getFilterFlavourOptions(catalog), [catalog]);
+  /**
+   * The filter boxes, built from THIS CATEGORY rather than the whole shop.
+   *
+   * Not `catalog`, and the difference is visible: a shop whose Chargers carry
+   * a “Wattage” group would otherwise head a box “Wattage” on the Plants page
+   * too, where nothing answers it — and since a product that does not carry a
+   * group falls back to its own words, every tick of that box empties the grid
+   * with nothing on screen to say why.
+   *
+   * `inCategory` is not the FILTERED result, which is the trap the note above
+   * `sizeOptions` warns about: it moves with the route, never with a tick, so
+   * the boxes do not vanish as the customer uses them.
+   */
+  const optionFacets = useMemo(() => getFilterOptionFacets(inCategory), [inCategory]);
   const [filters, setFilters] = useState<CollectionFilters>(() =>
     defaultCollectionFilters(collectionPriceCeiling(catalog)),
   );
@@ -136,15 +152,35 @@ export function CollectionsPage({
    * was shown the opposite of what they asked for and given no sign of it.
    * An honest empty state is the smaller disappointment.
    */
+  /**
+   * The ticks that still mean something on THIS page.
+   *
+   * A customer ticks “Wattage: 65W” on Chargers and clicks through to Plants,
+   * where no box shows it — and because a product that does not carry a group
+   * falls back to its own words, that tick would empty the grid with nothing on
+   * screen to explain it.
+   *
+   * Derived rather than written back into state. Writing back would be a
+   * setState inside an effect — a cascading render on every category change —
+   * and it would also FORGET the tick, so walking back to Chargers would lose
+   * it. `pruneOptionSelections` returns the same object when nothing is
+   * dropped, so `filters` identity still changes only on a user action, which
+   * is what keeps the `setPage(1)` effect below from firing every render.
+   */
+  const shownFilters = useMemo(
+    () => pruneOptionSelections(filters, optionFacets),
+    [filters, optionFacets],
+  );
+
   const filtered = useMemo(
-    () => applyCollectionFilters(inCategory, filters),
-    [inCategory, filters],
+    () => applyCollectionFilters(inCategory, shownFilters),
+    [inCategory, shownFilters],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const activeFilterCount = countActiveFilters(filters, priceCeiling);
+  const activeFilterCount = countActiveFilters(shownFilters, priceCeiling);
   // Nothing here at all, versus nothing that matches what was ticked. "Try
   // adjusting your filters" is useless advice when no filter is the reason.
   const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
@@ -177,10 +213,12 @@ export function CollectionsPage({
         <div className={layoutSpacing.container}>
           <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
             <CollectionFiltersPanel
-              filters={filters}
+              filters={shownFilters}
               priceCeiling={priceCeiling}
               sizeOptions={sizeOptions}
               flavourOptions={flavourOptions}
+              optionFacets={optionFacets}
+              idPrefix="side-"
               onChange={updateFilters}
               className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
             />
@@ -214,10 +252,12 @@ export function CollectionsPage({
                         <DialogTitle>Filters</DialogTitle>
                       </DialogHeader>
                       <CollectionFiltersPanel
-                        filters={filters}
+                        filters={shownFilters}
                         priceCeiling={priceCeiling}
                         sizeOptions={sizeOptions}
                         flavourOptions={flavourOptions}
+                        optionFacets={optionFacets}
+                        idPrefix="sheet-"
                         onChange={(next) => {
                           updateFilters(next);
                         }}

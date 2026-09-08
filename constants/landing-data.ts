@@ -9,6 +9,20 @@ import type {
   ProductVariantGroup,
 } from "@/types/product";
 
+/**
+ * One variant group as a card carries it: the shop's own question, and the
+ * answers it offers. No ids, no prices, no defaults — a filter needs to read
+ * the words, and `variantGroups` itself stays off the card payload.
+ *
+ * Named, deliberately, rather than keyed by `group.id`: `createVariantGroup`
+ * mints a fresh id per product, so "Shape" carries 29 different ids across this
+ * shop's 29 cakes. The name is the only thing two products' groups share.
+ */
+export interface ProductOptionGroup {
+  name: string;
+  labels: string[];
+}
+
 export interface LandingProduct {
   id: string;
   name: string;
@@ -33,6 +47,20 @@ export interface LandingProduct {
   flavours?: string[];
   /** Every visible variant option’s label — what the search haystack matches. */
   optionLabels?: string[];
+  /**
+   * The same labels, still under the question the shop asked them for.
+   *
+   * `optionLabels` throws the grouping away, and the collections sidebar was
+   * built on it: every option in the catalogue poured into one checkbox list
+   * under a hard-coded “Flavour”. On this shop that heading offered Regular,
+   * Eggless, Round, Square and Heart — not one of them a flavour — and on a
+   * shop selling chargers it would offer 65W and Type-C.
+   *
+   * Kept BESIDE the flat list rather than replacing it: search wants one bag of
+   * words and the filter wants the questions. `toCard` derives the flat one
+   * from this, so the two cannot drift.
+   */
+  optionGroups?: ProductOptionGroup[];
   /** Occasion names this cake is tagged with, for the storefront filter. */
   occasions?: string[];
   inStock?: boolean;

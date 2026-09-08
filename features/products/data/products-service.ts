@@ -178,6 +178,30 @@ function buildQuickAdd(
 }
 
 function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduct {
+  /**
+   * The groups a customer would actually be shown, resolved ONCE.
+   *
+   * The same gate the two prices below use. It was called four separate times
+   * in this function; a fifth caller that forgot the argument would have put a
+   * filter box on the storefront for a module the shop had switched off.
+   */
+  const visibleGroups = variantGroupsEnabledBy(product.variantGroups ?? [], modules);
+  const optionGroups = visibleGroups
+    .map((group) => ({
+      name: group.name?.trim() ?? "",
+      // Deduped case-insensitively: two options spelled "Eggless" and "eggless"
+      // are one checkbox, not two that split the same products between them.
+      labels: [
+        ...new Map(
+          group.options
+            .map((option) => option.label?.trim() ?? "")
+            .filter(Boolean)
+            .map((label) => [label.toLowerCase(), label] as const),
+        ).values(),
+      ],
+    }))
+    .filter((group) => group.name.length > 0 && group.labels.length > 0);
+
   return {
     id: product.id,
     slug: product.slug,
@@ -204,7 +228,7 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
       weights: product.weights,
       // A module the shop has switched off is not priced, so a card must not
       // show its surcharge either — the server would not charge it.
-      variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+      variantGroups: visibleGroups,
     }),
     /**
      * Moved by whatever moved the price above it.
@@ -226,7 +250,7 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
       defaultProductUnitPrice({
         price: product.price,
         weights: product.weights,
-        variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+        variantGroups: visibleGroups,
       }),
     ),
     badge: product.badge,
@@ -253,17 +277,28 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     quickAdd: buildQuickAdd(product, modules),
     // Filter inputs.
     /**
-     * Every visible option’s LABEL, flattened.
+     * Every visible option, under the question the shop asked it for.
      *
      * The card carried `flavours` and nothing else, so a customer typing
      * “Eggless”, “Heart”, “Black” or “256GB” matched nothing — the search
-     * haystack could only see one bakery-shaped field. `variantGroups` itself
-     * stays dropped for the payload-size reason above; these are a handful of
-     * short strings and they make the filter work for any trade.
+     * haystack could only see one bakery-shaped field. The first answer to that
+     * was a flat `optionLabels`, and flattening turned out to be the bug one
+     * layer down: the collections sidebar poured the whole catalogue's options
+     * into a single list headed “Flavour”.
+     *
+     * So the card carries the grouping too. Still not `variantGroups` — no ids,
+     * no prices, no defaults, for the payload reason above — just each group's
+     * name and the words under it.
      */
-    optionLabels: variantGroupsEnabledBy(product.variantGroups ?? [], modules).flatMap(
-      (group) => group.options.map((option) => option.label),
-    ),
+    optionGroups,
+    /**
+     * DERIVED, never gathered a second time.
+     *
+     * Search reads this and the sidebar reads the groups. Building them
+     * separately is how "tick Heart in the sidebar, type Heart in search" comes
+     * apart later — silently, because both halves still return results.
+     */
+    optionLabels: optionGroups.flatMap((group) => group.labels),
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),

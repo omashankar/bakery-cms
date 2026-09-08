@@ -25,7 +25,15 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
   {
     key: "flavour",
     title: "Flavour",
-    description: "The flavour options box on a product, and the flavour filter on collections.",
+    /*
+      This said "and the flavour filter on collections", which stopped being
+      true: there is no single flavour filter any more. Every variant group a
+      product carries gets its own filter box under its own name, and this
+      switch does not touch them — it used to, which is how switching Flavour
+      off also took the Shape filter down.
+    */
+    description:
+      "The flavour options box on a product, and the filter built from it. Variant groups get their own filters under their own names either way.",
   },
   {
     key: "weight",
