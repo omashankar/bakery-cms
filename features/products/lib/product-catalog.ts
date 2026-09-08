@@ -70,11 +70,21 @@ export function getProductBySlug(slug: string): LandingProduct | undefined {
  * "wedding"). The description stays in the haystack for callers that pass full
  * products, where it is real.
  */
+/**
+ * Everything a customer might type to find this product.
+ *
+ * `optionLabels` was missing, and the collections FILTER has read it all
+ * along (`collection-filters.ts`) — so the two disagreed: ticking “Heart” in
+ * the sidebar found the cake, typing “Heart” into search found nothing. Both
+ * run over the same card projection, where `description` is empty, so option
+ * labels are most of what a card has to match on.
+ */
 function searchHaystack(cake: LandingProduct): string {
   return [
     cake.name,
     cake.category,
     cake.description,
+    ...(cake.optionLabels ?? []),
     ...(cake.flavours ?? []),
     ...(cake.occasions ?? []),
   ]

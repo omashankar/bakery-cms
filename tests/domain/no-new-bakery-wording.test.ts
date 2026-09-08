@@ -58,10 +58,6 @@ const ALLOWED: { path: string; why: string }[] = [
     why: "the optional modules ARE bakery product fields — flavour, egg preference, weight, shape, photo cake. Naming them is what tells a florist which to switch off.",
   },
   {
-    path: "apps/admin/settings/components/settings-overview-page",
-    why: "the same list, described from the Settings index.",
-  },
-  {
     path: "app/(admin)/admin/settings/modules/page",
     why: "that page's own metadata, describing the same modules.",
   },
@@ -69,17 +65,23 @@ const ALLOWED: { path: string; why: string }[] = [
     path: "apps/website/pages/search-page",
     why: "the Photo Cake quick-search chip: gated on the photoCake module and filtered against the catalogue, so it shows only where it finds something.",
   },
-  {
-    path: "apps/admin/products/components/product-variant-manager",
-    why: "the Type control is a bakery control (Egg preference / Photo cake), shown only while those modules are on.",
-  },
+  /*
+    THREE ENTRIES STOOD HERE and protected nothing.
+
+    `settings-overview-page`, `product-variant-manager` and
+    `product-detail-page` were each allowed for a bakery word that has since
+    been removed — the Type control offers only Shape and Custom now, the
+    settings index stopped listing the modules by their food names, and the
+    upload panel is captioned “Printed photo”. Replaying this guard's own
+    matcher over all three finds zero offenders, so the entries exempted
+    2,557 lines to defend nothing: whatever drifted into them next would
+    have passed.
+
+    An allowance is a debt. It has to be re-read when the reason for it goes.
+  */
   {
     path: "apps/admin/products/components/product-form-page",
-    why: "the Photo cake option label, and a name placeholder that deliberately shows one edible and one not — 'Chocolate Truffle Cake, 65W Type-C Charger'.",
-  },
-  {
-    path: "apps/website/pages/product-detail-page",
-    why: "the photo-cake upload panel, behind the photoCake module.",
+    why: "one placeholder, deliberately naming one edible thing and one not — 'Chocolate Truffle Cake, 65W Type-C Charger' — so the box shows a shop that this field is not about cake. It is the only match in the file.",
   },
   {
     path: "features/design-system",
@@ -225,7 +227,24 @@ describe("no new bakery wording on a shop surface", () => {
   const offenders: string[] = [];
   for (const file of files) {
     const rel = file.slice(ROOT.length + 1).split(sep).join("/");
-    if (ALLOWED.some((entry) => rel.startsWith(entry.path))) continue;
+    /**
+     * A path, not a PREFIX of one.
+     *
+     * `startsWith` made `{ path: "app/(admin)/admin/page" }` — written for one
+     * metadata export — exempt four files: that page plus the whole CMS Pages
+     * editor at `app/(admin)/admin/pages/…`. A `why` about a browser tab was
+     * silently covering an admin route group, because one string happened to
+     * begin with the other.
+     *
+     * An entry may still name a DIRECTORY; it just has to end at a boundary.
+     */
+    const exempt = ALLOWED.some(
+      (entry) =>
+        rel === entry.path ||
+        rel.startsWith(`${entry.path}.`) ||
+        rel.startsWith(`${entry.path}/`),
+    );
+    if (exempt) continue;
 
     for (const { line, number } of codeLines(readFileSync(file, "utf8"))) {
       for (const text of readableStrings(line)) {

@@ -111,11 +111,21 @@ describe("each cake ships its own metadata", () => {
 describe("the product form keeps what was typed", () => {
   const form = stripComments(read("apps/admin/products/components/product-form-page.tsx"));
 
-  it("stops deriving the meta title once the admin edits it", () => {
-    // It was `prev.seo.metaTitle || `${name} | Acme``, so the FIRST keystroke
-    // made it truthy and it froze there: "Rose Truffle Delight" left it as "R".
-    expect(form).toContain("metaTitle: metaTitleTouched ? prev.seo.metaTitle : name");
-    expect(form).toContain("setMetaTitleTouched(true)");
+  it("does not copy the name into the meta title at all", () => {
+    /**
+     * Two versions of one mistake. First the title was derived with `||`, so the
+     * first keystroke made it truthy and froze it at "R". Then it tracked the
+     * name while ADDING and stopped in edit mode — so every product shipped with
+     * a stored title, and a later rename left it behind: a cake renamed "Belgian
+     * Truffle" went on telling Google "Chocolate Cake", with nothing on screen
+     * to say why.
+     *
+     * Nothing writes it now. The box is blank and shows the name as a
+     * placeholder, and the route falls back to `cake.name` when it is blank — so
+     * it follows a rename for ever unless somebody types something else.
+     */
+    expect(form).not.toContain("metaTitleTouched");
+    expect(form).toContain("placeholder={form.name ||");
   });
 
   it("no longer stamps a hard-coded brand into tenant data", () => {
@@ -141,7 +151,9 @@ describe("the product form keeps what was typed", () => {
     expect(code).not.toContain("shortDescription");
     expect(code).not.toContain("Short description");
     // …and the paragraph that IS real moved to the tab it prints in.
-    expect(code).toContain("Opening paragraph");
+    // Renamed once the render order was checked: the blocks print as bullets
+    // first and this prints as prose AFTER them.
+    expect(code).toContain("Closing paragraph");
   });
 });
 

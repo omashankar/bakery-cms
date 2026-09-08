@@ -46,6 +46,7 @@ import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
@@ -131,14 +132,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       return { ...prev, images: next };
     });
   }
+  /**
+   * The form as it was last SAVED — or as a new one is born.
+   *
+   * The two builders in this admin have had an unsaved-changes guard since
+   * the day one of them lost somebody's work; the longest form in the admin,
+   * with six tabs and its own “Back to products” link three inches from the
+   * last field, had none. Every item in the sidebar was a silent discard.
+   *
+   * Compared by JSON rather than by a dirty FLAG, because a flag has to be
+   * set by every writer — and this file has nine `setForm` call sites, so one
+   * of them would eventually forget.
+   */
+  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyProductForm()));
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   /** The status the SERVER holds, which is the only one the storefront honours. */
   const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(null);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
-  // Once the admin types a meta title of their own, the name stops driving it.
-  // In edit mode the stored value is already theirs.
-  const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
+  /*
+    `metaTitleTouched` stood here, tracking whether the admin had typed a meta
+    title of their own so the name could stop driving it. Nothing drives it now:
+    the box is left blank and shows the name as a placeholder, and the route
+    falls back to the name when it is blank. A flag with nothing to gate.
+  */
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
@@ -210,6 +227,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         if (cancelled) return;
         const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
         setForm(data);
+        setBaseline(JSON.stringify(data));
         setSavedStatus(data.status);
         setIsLoading(false);
       } catch {
@@ -226,6 +244,16 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     };
   }, [mode, cakeId, router]);
 
+  /**
+   * Anything typed and not yet saved.
+   *
+   * Compared against the baseline rather than tracked as a flag: this file has
+   * nine `setForm` call sites and a flag would eventually be forgotten by one
+   * of them. It also means undoing an edit by hand correctly stops counting.
+   */
+  const isDirty = !isLoading && JSON.stringify(form) !== baseline;
+  useUnsavedChangesGuard(isDirty);
+
   function patchForm(patch: Partial<ProductFormData>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
@@ -237,14 +265,22 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugTouched ? prev.slug : slugify(name),
       seo: {
         ...prev.seo,
-        // Tracks the name until the admin edits the meta title themselves.
-        //
-        // This was `prev.seo.metaTitle || `${name} | Acme``, so the FIRST
-        // keystroke made it truthy and the `||` short-circuited for every one
-        // after: typing "Rose Truffle Delight" left the SEO tab, the search
-        // preview card and the stored record all reading "R | Acme". The
-        // brand was hard-coded too, in a CMS meant to run more than one shop.
-        metaTitle: metaTitleTouched ? prev.seo.metaTitle : name,
+        /*
+          The name is NOT copied in here any more.
+
+          It used to track the name while adding, so every product shipped
+          with a stored meta title equal to whatever it was called at
+          creation. In edit mode the tracking is off, so a later rename left
+          the stored title behind — a cake renamed “Belgian Truffle” went on
+          telling Google “Chocolate Cake”, and nothing on the screen said why.
+
+          The box is empty and shows the name as its PLACEHOLDER instead. The
+          route already falls back to `cake.name` when the field is blank, so
+          a shop that never opens this tab gets the right title for ever, and
+          one that types here means it. Same shape as `weightLabel` two tabs
+          over, which shows its default the same way.
+        */
+        metaTitle: prev.seo.metaTitle,
       },
     }));
   }
@@ -373,6 +409,18 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
        * first row's price.
        */
       weights: form.weights.filter((tier) => tier.label.trim().length > 0),
+      /**
+       * And a block with nothing under its heading, for the same reason.
+       *
+       * The validator refuses one — a heading over no bullets is the empty
+       * section this project keeps deleting — so leaving it in meant the
+       * whole save bounced on a row the admin had merely started. The photo
+       * slots and the size rows beside it were already dropped silently; this
+       * was the one that argued instead.
+       */
+      descriptionBlocks: (form.descriptionBlocks ?? []).filter(
+        (block) => block.body.trim().length > 0,
+      ),
       ...resolveStockFields(form),
     };
 
@@ -383,6 +431,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       } else if (cakeId) {
         await updateProductRequest(cakeId, payload);
         setSavedStatus(payload.status);
+        setBaseline(JSON.stringify(payload));
         // The form's own copy too, so the badge and the button labels cannot
         // disagree with what the server was just told.
         setForm(payload);
@@ -923,7 +972,14 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
               <TabsContent value="description" className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="description">Opening paragraph</Label>
+                  {/*
+                    It read “Opening paragraph” and its own hint said “under the
+                    blocks below”, which is where the page actually puts it:
+                    `product-detail-page` maps the blocks into bulleted lists
+                    first and renders this prose LAST, deliberately — “the
+                    shop's own words, LAST rather than under the title.”
+                  */}
+                  <Label htmlFor="description">Closing paragraph</Label>
                   <textarea
                     id="description"
                     className={adminTextareaClassName}
@@ -933,8 +989,9 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     placeholder="What it is, what makes it good, anything a buyer should know..."
                   />
                   <p className="text-xs text-muted-foreground">
-                    Prose, under the blocks below. Also the search-result
-                    description when the SEO tab is empty.
+                    Printed as prose AFTER the blocks below, which print as
+                    bullets. Also the search-result description when the SEO tab
+                    is empty.
                   </p>
                 </div>
 
@@ -1031,11 +1088,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   <Input
                     id="metaTitle"
                     value={form.seo.metaTitle ?? ""}
-                    onChange={(e) => {
-                      setMetaTitleTouched(true);
-                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } });
-                    }}
+                    onChange={(e) =>
+                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } })
+                    }
+                    placeholder={form.name || `${labels.productWord} name`}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Leave it blank to use the {productLower} name, which then
+                    follows a rename. Type here only to say something different.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="metaDescription">Meta description</Label>

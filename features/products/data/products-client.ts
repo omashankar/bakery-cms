@@ -25,11 +25,31 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     // summary in `error`. Only the summary was read, so a product rejected for
     // one bad field toasted a bare "Validation failed" and the admin had no way
     // to learn which field, or why.
+    /**
+     * `field`, not `path`.
+     *
+     * The server builds `{ field, message }` — `lib/server/http/validate.ts`
+     * joins `issue.path` INTO `field` before it leaves. This read `item.path`,
+     * which is never present, so the name always came out undefined and every
+     * rejection toasted the bare message. The comment above was written for a
+     * fix that then keyed on the wrong property: an admin with twenty
+     * description blocks across six tabs was told “A block needs something
+     * under its heading” and not which block.
+     *
+     * The `path` branch stays as a fallback: nothing else sends that shape
+     * today, and removing it would make this the second place to look if
+     * something ever does.
+     */
     const detail = Array.isArray(payload?.errors)
       ? payload.errors
-          .map((item: { path?: unknown; message?: unknown }) => {
-            const path = Array.isArray(item?.path) ? item.path.join(".") : item?.path;
-            return path ? `${path}: ${item?.message}` : String(item?.message ?? "");
+          .map((item: { field?: unknown; path?: unknown; message?: unknown }) => {
+            const named =
+              typeof item?.field === "string" && item.field !== "_"
+                ? item.field
+                : Array.isArray(item?.path)
+                  ? item.path.join(".")
+                  : item?.path;
+            return named ? `${named}: ${item?.message}` : String(item?.message ?? "");
           })
           .filter(Boolean)
           .join("; ")
