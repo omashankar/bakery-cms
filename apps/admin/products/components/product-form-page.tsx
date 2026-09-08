@@ -480,26 +480,41 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
         <Card>
           <CardContent className="pt-6">
-            <Tabs defaultValue="basic">
+            <Tabs defaultValue="basics">
+              {/*
+                SIX TABS, each one a question a shop owner already asks.
+
+                There were eight, and the strip scrolled sideways on anything
+                narrower than a desktop — so the last two were behind an arrow
+                most people never press. Worse, three of the names were ours
+                rather than theirs: “Basic” and “Classification” split what a
+                product IS across two tabs, and “Commerce” held four unrelated
+                subjects — stock levels, a flavour list, two customisation ticks
+                and a read-only review score.
+
+                And “Details” had come to hold exactly one editor, whose own
+                first block is usually headed “Product Details”. Two different
+                Details on one screen.
+
+                Nothing here changes what is stored. Every field is the same
+                field, under the heading somebody would look for it under.
+              */}
               <TabsList className="mb-6 w-full justify-start overflow-x-auto">
-                <TabsTrigger value="basic">Basic</TabsTrigger>
-                <TabsTrigger value="pricing">Pricing</TabsTrigger>
+                <TabsTrigger value="basics">Basics</TabsTrigger>
+                <TabsTrigger value="price">Price &amp; stock</TabsTrigger>
                 {/*
-                  "Options" third, not "Variants" fourth.
-                  This is the tab that answers what most shops actually need —
-                  a size, a colour, a capacity — and it sat behind "Details",
-                  which is seven food fields. "Variant" is a word a developer
-                  chose; "Options" is what the customer is being asked for.
+                  “Options” rather than “Variants”: this is the tab that answers
+                  what most shops actually need — a size, a colour, a capacity.
+                  “Variant” is a word a developer chose; “Options” is what the
+                  customer is being asked for.
                 */}
-                <TabsTrigger value="variants">Options</TabsTrigger>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="classification">Classification</TabsTrigger>
-                <TabsTrigger value="commerce">Commerce</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="options">Options</TabsTrigger>
+                <TabsTrigger value="description">Description</TabsTrigger>
+                <TabsTrigger value="photos">Photos</TabsTrigger>
                 <TabsTrigger value="seo">SEO</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="basic" className="space-y-4">
+              <TabsContent value="basics" className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">{labels.productWord} name</Label>
                   <Input
@@ -549,9 +564,64 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     placeholder="What it is, what makes it good, anything a buyer should know..."
                   />
                 </div>
+
+                <Separator />
+
+                {/*
+                  Category and occasions were a tab of their own called
+                  “Classification”. Where a product is filed is part of what it
+                  is, and a shop owner setting one up says the name and the
+                  category in the same breath.
+                */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <AdminSelect
+                      id="category"
+                      value={form.categoryId}
+                      onChange={(e) => patchForm({ categoryId: e.target.value })}
+                    >
+                      {adminCategories().map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </AdminSelect>
+                  </div>
+                  {/*
+                    A “Flavour” dropdown stood here, picking one row out of a
+                    shop-wide Catalog list.
+
+                    It bought nothing. The list was a second place to keep in
+                    step, the id it wrote reached no customer and no order, and
+                    the box that actually decides what a customer is offered —
+                    “Flavour options”, further down this same form — was
+                    already free text this shop types for itself. A flavour is
+                    a word on a product, not a taxonomy.
+                  */}
+                </div>
+                <div className="space-y-2">
+                  <Label>Occasions</Label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {adminOccasions().map((occasion) => (
+                      <label
+                        key={occasion.id}
+                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={form.occasionIds.includes(occasion.id)}
+                          onCheckedChange={(checked) =>
+                            toggleOccasion(occasion.id, checked === true)
+                          }
+                        />
+                        {occasion.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </TabsContent>
 
-              <TabsContent value="pricing" className="space-y-4">
+              <TabsContent value="price" className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="price">Base price ({getActiveLocale().currency})</Label>
@@ -687,98 +757,13 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     </div>
                   </>
                 ) : null}
-              </TabsContent>
 
-              <TabsContent value="details" className="space-y-6">
+                <Separator />
+
                 {/*
-                  A key-value list under one fixed heading stood here, and six
-                  fixed food fields under it — prep time, shelf life, calories,
-                  allergens, care instructions — right for a bakery and dead
-                  space for a charger.
-
-                  Six reference storefronts were read one by one and not one of
-                  them fits that: a cake has four blocks, a plant has five with
-                  no heading over the first, a candle calls the same two Delivery
-                  DETAILS and Care DIRECTIVES. So the shop writes the headings
-                  and adds as many blocks as the product needs.
-                */}
-                <ProductDescriptionBlocksFields
-                  value={form.descriptionBlocks ?? []}
-                  onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}
-                  deliveryInformation={getCommerceSettings().deliveryInformation}
-                />
-              </TabsContent>
-
-              <TabsContent value="variants" className="space-y-4">
-                <ProductVariantManager
-                  groups={form.variantGroups}
-                  basePrice={form.price}
-                  onChange={(variantGroups) => patchForm({ variantGroups })}
-                />
-              </TabsContent>
-
-              <TabsContent value="classification" className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <AdminSelect
-                      id="category"
-                      value={form.categoryId}
-                      onChange={(e) => patchForm({ categoryId: e.target.value })}
-                    >
-                      {adminCategories().map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </AdminSelect>
-                  </div>
-                  {/*
-                    A “Flavour” dropdown stood here, picking one row out of a
-                    shop-wide Catalog list.
-
-                    It bought nothing. The list was a second place to keep in
-                    step, the id it wrote reached no customer and no order, and
-                    the box that actually decides what a customer is offered —
-                    “Flavour options”, further down this same form — was
-                    already free text this shop types for itself. A flavour is
-                    a word on a product, not a taxonomy.
-                  */}
-                </div>
-                <div className="space-y-2">
-                  <Label>Occasions</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {adminOccasions().map((occasion) => (
-                      <label
-                        key={occasion.id}
-                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={form.occasionIds.includes(occasion.id)}
-                          onCheckedChange={(checked) =>
-                            toggleOccasion(occasion.id, checked === true)
-                          }
-                        />
-                        {occasion.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="commerce" className="space-y-4">
-                {/*
-                  A row of three ticks stood here — Eggless, Photo cake, and
-                  Seasonal — and all three have gone the same way.
-
-                  Each was a FLAG on the product that some other part of the
-                  shop derived a claim or a list from, and each had a better
-                  answer already in the product itself. Eggless is a recipe,
-                  which a shop states in the name and the description. A photo
-                  print is priced in, behind "Allow photo upload" below.
-                  Seasonal is a CATEGORY: the nav link, the mega-menu card and
-                  the homepage row all read that, so a tick beside it was a
-                  second list that could disagree with the first — and did.
+                  Stock sat under “Commerce” with a flavour list and a review
+                  score. How many there are is a question about selling this
+                  product, which is what the rest of this tab is about.
                 */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
@@ -833,7 +818,36 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     showQuantity
                   />
                 </div>
+              </TabsContent>
 
+              <TabsContent value="options" className="space-y-6">
+                <ProductVariantManager
+                  groups={form.variantGroups}
+                  basePrice={form.price}
+                  onChange={(variantGroups) => patchForm({ variantGroups })}
+                />
+
+                <Separator />
+
+                {/*
+                  These three sat under “Commerce”. Every one of them is
+                  something the CUSTOMER chooses or adds on this product — a
+                  flavour, a message, a photograph — which is exactly what the
+                  option groups above are.
+                */}
+                {/*
+                  A row of three ticks stood here — Eggless, Photo cake, and
+                  Seasonal — and all three have gone the same way.
+
+                  Each was a FLAG on the product that some other part of the
+                  shop derived a claim or a list from, and each had a better
+                  answer already in the product itself. Eggless is a recipe,
+                  which a shop states in the name and the description. A photo
+                  print is priced in, behind "Allow photo upload" below.
+                  Seasonal is a CATEGORY: the nav link, the mega-menu card and
+                  the homepage row all read that, so a tick beside it was a
+                  second list that could disagree with the first — and did.
+                */}
                 {/*
                   The four hardcoded shape checkboxes — Round, Square, Heart,
                   Rectangle — are gone. They wrote a list of NAMES with nowhere
@@ -919,33 +933,29 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     </p>
                   </div>
                 ) : null}
-
-                {/*
-                  Shown, not edited.
-
-                  Both were editable number inputs whose values `updateProduct`
-                  deliberately re-imposes from the stored record — its comment
-                  says so: they are "owned by the reviews aggregate". So the
-                  admin typed a rating, pressed Save, read "Cake updated &
-                  published", and the number went back to what it was. The one
-                  thing the form must not do is invite a change it discards.
-                */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="rating">Rating</Label>
-                    <Input id="rating" value={form.rating || "No reviews yet"} readOnly disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reviewCount">Review count</Label>
-                    <Input id="reviewCount" value={form.reviewCount} readOnly disabled />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Set by customer reviews. Moderate them under Commerce → Reviews.
-                </p>
               </TabsContent>
 
-              <TabsContent value="media" className="space-y-4">
+              <TabsContent value="description" className="space-y-6">
+                {/*
+                  A key-value list under one fixed heading stood here, and six
+                  fixed food fields under it — prep time, shelf life, calories,
+                  allergens, care instructions — right for a bakery and dead
+                  space for a charger.
+
+                  Six reference storefronts were read one by one and not one of
+                  them fits that: a cake has four blocks, a plant has five with
+                  no heading over the first, a candle calls the same two Delivery
+                  DETAILS and Care DIRECTIVES. So the shop writes the headings
+                  and adds as many blocks as the product needs.
+                */}
+                <ProductDescriptionBlocksFields
+                  value={form.descriptionBlocks ?? []}
+                  onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}
+                  deliveryInformation={getCommerceSettings().deliveryInformation}
+                />
+              </TabsContent>
+
+              <TabsContent value="photos" className="space-y-6">
                 {/*
                   One box wrote `images: [url]`, so a shop could store exactly
                   one photo — while the type, the database, the validator and this
@@ -1011,7 +1021,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 </p>
               </TabsContent>
 
-              <TabsContent value="seo" className="space-y-4">
+              <TabsContent value="seo" className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="metaTitle">Meta title</Label>
                   <Input
@@ -1133,6 +1143,21 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 <span className="text-muted-foreground">Variant groups:</span>{" "}
                 {form.variantGroups.length}
               </p>
+              {/*
+                Shown here rather than in a tab. They are read-only — the
+                reviews aggregate owns them — so they are a fact about the
+                product, like the count above, and not a field to fill in.
+              */}
+              <p>
+                <span className="text-muted-foreground">Rating:</span>{" "}
+                {form.rating || "No reviews yet"}
+              </p>
+              {form.reviewCount > 0 ? (
+                <p>
+                  <span className="text-muted-foreground">Reviews:</span>{" "}
+                  {form.reviewCount}
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 

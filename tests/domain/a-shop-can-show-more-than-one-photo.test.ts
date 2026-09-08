@@ -223,8 +223,10 @@ describe("the admin box that capped it", () => {
    * a guard passes for the thing it forbids.
    */
   const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  // The tab is called "photos" now — eight tabs became six, and "Media" was
+  // a word for a folder rather than for what is in it.
   const mediaTab = code.slice(
-    code.indexOf('<TabsContent value="media"'),
+    code.indexOf('<TabsContent value="photos"'),
     code.indexOf('<TabsContent value="seo"'),
   );
 

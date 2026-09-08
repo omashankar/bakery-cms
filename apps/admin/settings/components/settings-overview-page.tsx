@@ -82,7 +82,8 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "Modules",
-        description: "Enable optional bakery features — flavour, weight, shape, and wedding builder.",
+        description:
+          "Switch product options on and off — flavour, weight, shape, printed photo, wedding builder.",
         href: routes.admin.settings.modules,
         icon: Blocks,
       },
@@ -135,7 +136,8 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "Order Settings",
-        description: "Gift wrap, minimum order, and free-delivery rules.",
+        description:
+          "Gift wrap, minimum order, free delivery — and what every product page says about delivery.",
         href: routes.admin.settings.commerce,
         icon: ShoppingBag,
       },
