@@ -1187,21 +1187,30 @@ export function ProductDetailPage({
                       {...gatesFor(group)}
                     >
                       <Check className="mt-0.5 size-4 shrink-0 text-green-700" aria-hidden="true" />
-                      <span>
-                        {stated.label}
-                        {/*
-                          A fact can carry a price — “Ceramic pot included,
-                          +₹250” — and the customer cannot decline it, so the
-                          number can never be demonstrated by ticking something.
-                          It is printed here, in the same words the button
-                          printed it in before, so nothing is disclosed less
-                          than it is today. For this shop's data it is ₹0 and
-                          nothing prints: “✓ Eggless”.
-                        */}
-                        {stated.priceAdjustment !== 0
-                          ? ` (${stated.priceAdjustment > 0 ? "+" : ""}${formatCurrency(stated.priceAdjustment)})`
-                          : ""}
-                      </span>
+                      {/*
+                        THE LABEL, and only the label — the same rule the tick
+                        below it follows.
+
+                        The surcharge was printed here for one release, on the
+                        reasoning that a fact cannot be ticked, so the price
+                        block can never demonstrate the amount. That reasoning
+                        had it exactly backwards, and the shop's own page showed
+                        why: Ring Ceremony Special Cake states “Eggless” at +₹80
+                        under a price reading ₹1,079 — which is ₹999 plus that
+                        same ₹80. The number is ALREADY in the figure above. A
+                        customer reading “₹1,079” and then “+₹80” concludes
+                        ₹1,159, and is wrong by exactly the amount we thought we
+                        were disclosing.
+
+                        A default is inside the displayed price by construction
+                        (`defaultProductUnitPrice`), and inside the charge by the
+                        same route (`calculateVariantAdjustment`). Nothing is
+                        hidden by leaving it out; something is invented by
+                        putting it in. An add-on is the opposite case and keeps
+                        its price out for the opposite reason: it is NOT in the
+                        figure until you tick it, and then the figure moves.
+                      */}
+                      <span>{stated.label}</span>
                     </li>
                   ))}
                 </ul>

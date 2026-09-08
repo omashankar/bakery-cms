@@ -239,12 +239,16 @@ describe("what the page shows", () => {
     expect(text).toContain("Shape: Round");
   });
 
-  it("prints a price when there is one to print", () => {
+  it("never prints a price beside the fact, because the price above contains it", () => {
     /**
-     * A fact can cost money — "Ceramic pot included, +₹250" — and the customer
-     * cannot decline it, so the amount can never be demonstrated by ticking
-     * anything. It is stated in the same words the button used to state it in,
-     * so nothing is disclosed less than it is today.
+     * This asserted the opposite for one release, and the shop's own page
+     * proved it wrong. Ring Ceremony Special Cake states Eggless at +₹80 under
+     * a price of ₹1,079 — which is its ₹999 base plus that same ₹80. Printing
+     * "+₹80" beside the words tells a customer reading ₹1,079 to expect ₹1,159.
+     *
+     * A default is inside the displayed price by construction, so the amount is
+     * disclosed once, in the only place a total can be right when several
+     * groups carry one.
      */
     const view = render({
       ...CAKE,
@@ -260,10 +264,14 @@ describe("what the page shows", () => {
       ],
     });
 
-    expect(view.textContent).toContain("Gold leaf");
-    expect(view.textContent).toContain("+₹250");
-    // …and the price above it already includes the same 250, once.
+    const row = [...view.querySelectorAll("li")].find((node) =>
+      node.textContent?.includes("Gold leaf"),
+    );
+
+    expect(row?.textContent?.trim()).toBe("Gold leaf");
+    // …and the 250 is in the figure above it, exactly once.
     expect(view.textContent).toContain("₹1,249");
+    expect(view.textContent).not.toContain("+₹250");
   });
 
   it("sits above the things that can be ticked", () => {
