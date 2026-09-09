@@ -25,6 +25,33 @@ export type PhotoFrameShapeId = "circle" | "square" | "heart";
  */
 export type ProductVariantGroupType = "shape" | "custom";
 
+/**
+ * How a block of options is DRAWN — the shop's own answer, not ours.
+ *
+ * All three renderings already existed. The storefront picked between them by
+ * reading the data: two options meant buttons, one option with no default meant
+ * a tickbox, one option WITH a default meant a stated fact. The shop was never
+ * told that rule, and could not see it — ticking Default on a lone option
+ * silently changed the whole rendering, and the form said nothing.
+ *
+ *   buttons   [0.5 kg] [1 kg] [1.5 kg]   pick one of several
+ *   checkbox  [ ] Gift wrap              have it if you ask
+ *   stated    ✓ Eggless                  it simply is this
+ *
+ * Deliberately NOT part of `ProductVariantGroupType`, which is a different
+ * question with a different answer: `type` says which module may hide a group,
+ * and its union has been wrong for most of this shop's catalogue for a long
+ * time — live rows carry `egg` and `photo` that the union has never listed. One
+ * field cannot mean both "who hides this" and "how does it look", and folding
+ * them together is how the first one came to be read as the second.
+ *
+ * OPTIONAL, and that is the deploy plan. A group with no `render` is drawn the
+ * way it has always been drawn, by the same two predicates; the key is written
+ * only when the shop saves a product, freezing what it already looked like.
+ * So nothing moves on the day this ships, and there is no migration.
+ */
+export type ProductBlockRender = "buttons" | "checkbox" | "stated";
+
 /*
   `VariantOptionSemantic` stood here — a machine-readable meaning an option
   could carry so business logic branched on it rather than on a merchant's
@@ -64,6 +91,14 @@ export interface ProductVariantGroup {
    * Do not gate anything on it without making it mean something first.
    */
   required?: boolean;
+  /**
+   * What the shop chose this to look like, once it has chosen.
+   *
+   * Absent means "nobody has said" — which is every group stored before this
+   * existed — and the storefront then derives it exactly as it always did. See
+   * `ProductBlockRender` above for why that is the whole migration.
+   */
+  render?: ProductBlockRender;
   options: ProductVariantOption[];
 }
 

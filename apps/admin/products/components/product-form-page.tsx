@@ -62,8 +62,7 @@ import { PHOTO_FRAME_SHAPES } from "@/lib/images/photo-print-layout";
 import type { PhotoFrameShapeId } from "@/types/product";
 import { ProductDescriptionBlocksFields } from "./product-description-blocks-fields";
 import { ProductVariantManager } from "./product-variant-manager";
-import {
-} from "@/features/products/lib/variant-utils";
+import { resolveBlockRender } from "@/features/products/lib/variant-utils";
 
 interface ProductFormPageProps {
   mode: "add" | "edit";
@@ -458,6 +457,25 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
        */
       weights: form.weights.filter((tier) => tier.label.trim().length > 0),
       /**
+       * WHAT EACH OPTION BLOCK LOOKS LIKE, written down on the way out.
+       *
+       * This is the whole migration, and it happens one product at a time as
+       * the shop touches them. A block stored before the dropdown existed
+       * carries no `render`, and the storefront draws it by the same two
+       * predicates it always did — so the day this ships nothing moves. The
+       * first save of a product freezes what it ALREADY looked like, resolved
+       * by the same function the customer's page resolves it with, so the
+       * freezing cannot change the picture either.
+       *
+       * `resolveBlockRender` and not `group.render`: a stored answer the
+       * options no longer fit is ignored by the page, and writing it back
+       * would keep a lie on the record.
+       */
+      variantGroups: form.variantGroups.map((group) => ({
+        ...group,
+        render: resolveBlockRender(group).render,
+      })),
+      /**
        * And a block with nothing under its heading, for the same reason.
        *
        * The validator refuses one — a heading over no bullets is the empty
@@ -759,6 +777,92 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     </p>
                   </div>
                 </div>
+
+                <Separator />
+
+                {/*
+                  Stock sat under “Commerce” with a flavour list and a review
+                  score. How many there are is a question about selling this
+                  product, which is what the rest of this tab is about.
+                */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
+                    <Checkbox
+                      checked={form.unlimitedStock ?? false}
+                      onCheckedChange={(checked) =>
+                        patchForm({ unlimitedStock: checked === true })
+                      }
+                    />
+                    Unlimited stock
+                  </label>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="stockQuantity">Stock quantity</Label>
+                    <Input
+                      id="stockQuantity"
+                      type="number"
+                      min={0}
+                      disabled={form.unlimitedStock}
+                      value={form.stockQuantity}
+                      onChange={(e) =>
+                        patchForm({ stockQuantity: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lowStockThreshold">Low stock threshold</Label>
+                    <Input
+                      id="lowStockThreshold"
+                      type="number"
+                      min={1}
+                      disabled={form.unlimitedStock}
+                      placeholder={`Default (${getInventorySettings().defaultLowStockThreshold})`}
+                      value={form.lowStockThreshold ?? ""}
+                      onChange={(e) =>
+                        patchForm({
+                          lowStockThreshold: e.target.value
+                            ? Math.max(Number(e.target.value) || 1, 1)
+                            : undefined,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Derived stock status</span>
+                  <StockStatusBadge
+                    status={deriveStockStatus(form, getInventorySettings())}
+                    unlimited={form.unlimitedStock}
+                    quantity={form.stockQuantity}
+                    showQuantity
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="options" className="space-y-6">
+                {/*
+                  SIZE IS AN OPTION, and it lived on another tab.
+
+                  It was under Price & stock because every row carries a price,
+                  and that is a true thing about it and the wrong reason: the
+                  customer is being asked a QUESTION here — which size do you
+                  want — exactly like colour and gift wrap two inches below. A
+                  shop setting up a product met the same job in two places, in
+                  two different shapes, and nothing on either screen said they
+                  were the same job.
+
+                  It sits FIRST because it is the question that decides the
+                  price the others adjust — and because that is the order the
+                  product page draws them in.
+
+                  Its price column is the one that stays ABSOLUTE. Every other
+                  block adds to the price; this one IS the price. Two blocks
+                  both claiming to be the whole price cannot both be right, and
+                  the size ladder is the one the pricing code already reads that
+                  way — `priceLine` charges `weights[i].price` and never reaches
+                  the base once a row exists.
+                */}
                 {modules.weight ? (
                   <>
                     <Separator />
@@ -869,70 +973,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
                 <Separator />
 
-                {/*
-                  Stock sat under “Commerce” with a flavour list and a review
-                  score. How many there are is a question about selling this
-                  product, which is what the rest of this tab is about.
-                */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
-                    <Checkbox
-                      checked={form.unlimitedStock ?? false}
-                      onCheckedChange={(checked) =>
-                        patchForm({ unlimitedStock: checked === true })
-                      }
-                    />
-                    Unlimited stock
-                  </label>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stockQuantity">Stock quantity</Label>
-                    <Input
-                      id="stockQuantity"
-                      type="number"
-                      min={0}
-                      disabled={form.unlimitedStock}
-                      value={form.stockQuantity}
-                      onChange={(e) =>
-                        patchForm({ stockQuantity: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lowStockThreshold">Low stock threshold</Label>
-                    <Input
-                      id="lowStockThreshold"
-                      type="number"
-                      min={1}
-                      disabled={form.unlimitedStock}
-                      placeholder={`Default (${getInventorySettings().defaultLowStockThreshold})`}
-                      value={form.lowStockThreshold ?? ""}
-                      onChange={(e) =>
-                        patchForm({
-                          lowStockThreshold: e.target.value
-                            ? Math.max(Number(e.target.value) || 1, 1)
-                            : undefined,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">Derived stock status</span>
-                  <StockStatusBadge
-                    status={deriveStockStatus(form, getInventorySettings())}
-                    unlimited={form.unlimitedStock}
-                    quantity={form.stockQuantity}
-                    showQuantity
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="options" className="space-y-6">
                 <ProductVariantManager
                   groups={form.variantGroups}
-                  basePrice={form.price}
                   onChange={(variantGroups) => patchForm({ variantGroups })}
                 />
 

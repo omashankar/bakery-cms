@@ -56,10 +56,10 @@ import {
 } from "@/features/products/lib/product-pricing";
 import {
   asAddOn,
-  asStatement,
   getDefaultVariantSelections,
   getProductVariantGroups,
   mapLegacyChoice,
+  resolveBlockRender,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
@@ -326,55 +326,54 @@ export function ProductDetailPage({
   );
 
   /**
-   * The two kinds of group, told apart once.
+   * THE THREE KINDS OF BLOCK, told apart ONCE.
    *
-   * A real choice needs a heading and a row of buttons; an add-on is one small
-   * tick, and the ticks belong together on a line rather than stacked down the
-   * page with a name each. Split here rather than inside the render so the
-   * decision is made in one place and both lists are ordered exactly as the
-   * shop arranged them.
+   * A real choice needs a heading and a row of buttons; a tick is one small box
+   * on a shared line; a stated fact is a line of text with a mark beside it.
+   *
+   * `resolveBlockRender` is that single decision. It reads the shop's own answer
+   * where there is one and derives it exactly as this page always did where
+   * there is not — which is what makes the dropdown a zero-pixel deploy.
+   *
+   * Three independent reads is what this replaces, and they could disagree. The
+   * tick bucket asked one predicate for MEMBERSHIP and a second for the on/off
+   * PAIR, so a block could be in the bucket with a null pair and the row below
+   * dereferenced it. Carrying the pair out of the same decision makes that
+   * unrepresentable rather than merely untested.
    */
-  const addOnGroups = useMemo(
-    () =>
-      visibleVariantGroups
-        .map((group) => ({ group, addOn: asAddOn(group) }))
-        .filter(
-          (entry): entry is { group: ProductVariantGroup; addOn: NonNullable<ReturnType<typeof asAddOn>> } =>
-            entry.addOn !== null,
-        ),
+  const blocks = useMemo(
+    () => visibleVariantGroups.map((group) => ({ group, ...resolveBlockRender(group) })),
     [visibleVariantGroups],
   );
-  /**
-   * The THIRD kind: a group that asks nothing.
-   *
-   * One option, and the shop ticked Default — “this cake is eggless”, “this
-   * lamp is waterproof”. It was rendered as a heading over a single button the
-   * customer could press and nothing would happen, which is a control offering
-   * no control. It prints as a statement now: a tick, and the shop's own word.
-   */
+  const choiceGroups = useMemo(
+    () => blocks.filter((entry) => entry.render === "buttons").map((entry) => entry.group),
+    [blocks],
+  );
   const statementGroups = useMemo(
     () =>
-      visibleVariantGroups
-        .map((group) => ({ group, stated: asStatement(group) }))
-        .filter(
-          (entry): entry is { group: ProductVariantGroup; stated: ProductVariantOption } =>
-            entry.stated !== null,
-        ),
-    [visibleVariantGroups],
-  );
-  /**
-   * Everything else — and it has to subtract BOTH of the others.
-   *
-   * This was written as “not an add-on”, which meant the moment a second bucket
-   * appeared every group in it would also render here, as the heading-and-button
-   * the new one exists to replace, directly above its own tick.
-   */
-  const choiceGroups = useMemo(
-    () =>
-      visibleVariantGroups.filter(
-        (group) => asAddOn(group) === null && asStatement(group) === null,
+      blocks.filter(
+        (
+          entry,
+        ): entry is { group: ProductVariantGroup; render: "stated"; stated: ProductVariantOption } =>
+          entry.render === "stated",
       ),
-    [visibleVariantGroups],
+    [blocks],
+  );
+  const addOnGroups = useMemo(
+    () =>
+      blocks
+        .filter(
+          (
+            entry,
+          ): entry is {
+            group: ProductVariantGroup;
+            render: "checkbox";
+            tick: NonNullable<ReturnType<typeof asAddOn>>;
+          } => entry.render === "checkbox",
+        )
+        // `addOn` is the name the tick row below has always used for the pair.
+        .map((entry) => ({ group: entry.group, addOn: entry.tick })),
+    [blocks],
   );
 
   /** The selectors the storefront tests hang the module gates off. */

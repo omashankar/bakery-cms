@@ -36,6 +36,17 @@ const variantGroupSchema = z
     // Inert — see the note on ProductVariantGroup.required. Optional so a group
     // that arrives without it is not a 400 on a field nothing reads.
     required: z.boolean().optional(),
+    /**
+     * How the shop chose to draw this block.
+     *
+     * `.catch(undefined)` rather than a bare `.optional()`, and the difference
+     * matters on the day something goes wrong: a rollback to a build that does
+     * not know the word, or an import carrying junk in this key, must lose the
+     * KEY rather than 400 the whole product save. An unknown value then means
+     * exactly what an absent one means — nobody has said — and the storefront
+     * derives the rendering as it always has.
+     */
+    render: z.enum(["buttons", "checkbox", "stated"]).optional().catch(undefined),
     options: z.array(z.any()),
   })
   .passthrough();

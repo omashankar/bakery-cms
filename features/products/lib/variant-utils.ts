@@ -1,5 +1,6 @@
 import type {
   Product,
+  ProductBlockRender,
   ProductVariantGroup,
   ProductVariantGroupType,
   ProductVariantOption,
@@ -349,6 +350,127 @@ export function asStatement(group: ProductVariantGroup): ProductVariantOption | 
   if (typeof only.label !== "string" || !only.label.trim()) return null;
 
   return only;
+}
+
+/**
+ * A tickbox the shop ASKED for, which is a slightly wider thing than one we
+ * inferred.
+ *
+ * `asAddOn` refuses a two-option group whose upgrade costs nothing (`extra <= 0`
+ * above), because with no price to tell them apart it cannot know which side is
+ * "off" and picking one would be an invention. When the shop has typed the
+ * answer into the dropdown that reasoning no longer applies to the RENDERING —
+ * "Gift wrap: No / Yes", both free, is a real tickbox — so the refusal is
+ * relaxed here and here only.
+ *
+ * What is NOT relaxed is the off-state. `asAddOn` falls back to `options[0]`
+ * when no default is named, and this change hands the shop arrows that move
+ * `options[0]`. A tick whose unticked meaning depends on array order would
+ * change what it charges when somebody tidies the list, so a declared two-option
+ * tick requires a NAMED default and reports itself unachievable without one.
+ *
+ * Never substituted into the derivation path: doing that would flip every
+ * two-option group in this shop from buttons to ticks on the day it shipped.
+ */
+function asTick(
+  group: ProductVariantGroup,
+): { off: ProductVariantOption | null; on: ProductVariantOption; extra: number } | null {
+  if (group.options.length === 1) {
+    const only = group.options[0];
+    if (!only || only.isDefault) return null;
+    return { off: null, on: only, extra: only.priceAdjustment };
+  }
+
+  if (group.options.length !== 2) return null;
+
+  const off = group.options.find((option) => option.isDefault);
+  if (!off) return null;
+  const on = group.options.find((option) => option.id !== off.id);
+  if (!on) return null;
+
+  const extra = on.priceAdjustment - off.priceAdjustment;
+  // A negative upgrade would start the box unticked at the HIGHER price, so the
+  // page and the grid card — which price each group's default — would disagree
+  // by exactly that much. Free is fine; cheaper-than-default is not.
+  if (extra < 0) return null;
+
+  return { off, on, extra };
+}
+
+/** What the shop typed into the dropdown, if it is a word we know. */
+function requestedBlockRender(group: ProductVariantGroup): ProductBlockRender | null {
+  return group.render === "buttons" || group.render === "checkbox" || group.render === "stated"
+    ? group.render
+    : null;
+}
+
+/**
+ * What a group with no stored answer looks like — the rule the storefront has
+ * always followed, written down.
+ *
+ * This is the whole migration. Every group stored before the dropdown existed
+ * resolves through here and renders exactly as it did yesterday.
+ */
+function deriveBlockRender(group: ProductVariantGroup): ProductBlockRender {
+  if (asStatement(group)) return "stated";
+  if (asAddOn(group)) return "checkbox";
+  return "buttons";
+}
+
+/**
+ * Can this block actually be drawn the way it was asked to be?
+ *
+ * Exported because the admin needs the same answer the storefront uses: an
+ * entry the page would refuse is offered disabled, with the reason, rather than
+ * accepted and then quietly ignored.
+ */
+export function blockRenderIsAchievable(
+  group: ProductVariantGroup,
+  render: ProductBlockRender,
+): boolean {
+  if (render === "stated") return asStatement(group) !== null;
+  if (render === "checkbox") return asTick(group) !== null;
+  // Buttons need something to press. One option is a statement or a tick, never
+  // a choice, and zero options is nothing at all.
+  return group.options.length > 1;
+}
+
+/**
+ * How this block is drawn, and — for a tickbox — the pair it is drawn from.
+ *
+ * ONE call answers both, deliberately. An earlier shape resolved the bucket from
+ * the stored value and the on/off pair from a second function reading the same
+ * group, and the two could disagree: a declared checkbox whose options carry no
+ * default landed in the tick bucket while the pair came back null, and the page
+ * dereferenced it. Carrying the pair out of the same decision makes that
+ * unrepresentable rather than merely tested.
+ *
+ * A request that cannot be honoured falls back to the derivation rather than
+ * rendering something impossible. The form is where the shop is told; a
+ * customer-facing page is not the place to argue with the data.
+ */
+export type ResolvedBlockRender =
+  | { render: "buttons" }
+  | { render: "checkbox"; tick: NonNullable<ReturnType<typeof asTick>> }
+  | { render: "stated"; stated: ProductVariantOption };
+
+export function resolveBlockRender(group: ProductVariantGroup): ResolvedBlockRender {
+  const requested = requestedBlockRender(group);
+  const render =
+    requested && blockRenderIsAchievable(group, requested) ? requested : deriveBlockRender(group);
+
+  if (render === "stated") {
+    const stated = asStatement(group);
+    if (stated) return { render: "stated", stated };
+  }
+  if (render === "checkbox") {
+    // `asTick` for a declared one, `asAddOn` for a derived one — the derivation
+    // must keep its own refusals, or every free two-option group in the shop
+    // becomes a tick.
+    const tick = requested === "checkbox" ? asTick(group) : asAddOn(group);
+    if (tick) return { render: "checkbox", tick };
+  }
+  return { render: "buttons" };
 }
 
 export function variantGroupsEnabledBy(

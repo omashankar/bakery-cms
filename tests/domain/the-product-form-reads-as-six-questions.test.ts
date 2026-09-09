@@ -113,7 +113,7 @@ describe("every field is still on the form, under the heading it belongs to", ()
   });
 
   it("puts what it costs and how many under Price & stock", () => {
-    for (const field of ['htmlFor="price"', 'htmlFor="compareAtPrice"', 'htmlFor="weightLabel"']) {
+    for (const field of ['htmlFor="price"', 'htmlFor="compareAtPrice"']) {
       expect(tabOf(field), field).toBe("price");
     }
     // Stock sat under "Commerce", beside a flavour list and a review score.
@@ -129,6 +129,27 @@ describe("every field is still on the form, under the heading it belongs to", ()
     expect(tabOf('htmlFor="flavourOptions"')).toBe("options");
     expect(tabOf("Allow {productLower} message")).toBe("options");
     expect(tabOf('htmlFor="photo-frame-shape"')).toBe("options");
+  });
+
+  it("counts the size list as one of the things the customer chooses", () => {
+    /**
+     * It was on Price & stock, and this test asserted so, because every size
+     * row carries a price. That is true and it is the wrong reason: the
+     * customer is being asked WHICH SIZE — a question, exactly like colour and
+     * gift wrap. A shop met the same job twice, on two screens, in two shapes,
+     * and nothing said they were the same job.
+     *
+     * It sits FIRST in the tab, above the other blocks, because it is the
+     * question whose answer the others adjust — and because that is the order
+     * the product page draws them in.
+     */
+    expect(tabOf('htmlFor="weightLabel"')).toBe("options");
+    expect(tabOf('id="size-labels-in-use"')).toBe("options");
+
+    expect(
+      form.indexOf('htmlFor="weightLabel"'),
+      "the size list is below the option blocks",
+    ).toBeLessThan(form.indexOf("<ProductVariantManager"));
   });
 
   it("puts the blocks under Description, and calls the tab that", () => {
