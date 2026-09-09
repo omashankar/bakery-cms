@@ -99,6 +99,22 @@ function draw(groups: ProductVariantGroup[]) {
   return container;
 }
 
+/**
+ * Type into a controlled input the way a person does.
+ *
+ * Setting `.value` directly is invisible to React: its own value tracker sees
+ * no change and swallows the event, so the handler never runs and the
+ * assertion below it passes on `undefined`. The prototype setter is what makes
+ * the tracker notice.
+ */
+const type = (element: HTMLInputElement, value: string) => {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+};
+
 const press = (label: string) => {
   const button = [...(container?.querySelectorAll("button") ?? [])].find(
     (node) => node.getAttribute("aria-label") === label,
@@ -121,59 +137,79 @@ afterEach(() => {
   handed = null;
 });
 
-describe("the shop says how a block looks", () => {
-  it("offers the three drawings in words a shop owner uses", () => {
-    const text = draw([group()]).textContent ?? "";
-
-    expect(text).toContain("Buttons");
-    expect(text).toContain("Tickbox");
-    expect(text).toContain("Already true");
+/** One thing the customer can tick — which is every block this editor makes. */
+const block = (over: Record<string, unknown> = {}): ProductVariantGroup =>
+  group({
+    name: "Gift wrap",
+    options: [option({ id: "o", label: "Gift wrap", priceAdjustment: 120 })],
+    ...over,
   });
 
-  it("shows what the customer will ACTUALLY get, not what is stored", () => {
+describe("a block is one thing, named once", () => {
+  it("asks for a word, a price and a tick — and nothing else", () => {
     /**
-     * A three-option block stored as "stated" cannot be drawn that way, and the
-     * page ignores it. A dropdown showing an answer the page ignores is worse
-     * than no dropdown, so the box reads the resolved value.
+     * The card asked for a question, then its answers, then a dropdown choosing
+     * between three renderings. Every one of those was a concept the shop had to
+     * learn before it could describe a gift wrap.
+     *
+     * The reference storefront has none of it: an option is a tickbox with a
+     * word and a price, and the shop decides only whether it starts ticked.
      */
-    const impossible = group({
-      render: "stated",
+    const view = draw([block()]);
+    const text = view.textContent ?? "";
+
+    expect(view.querySelector("select"), "the How-it-looks dropdown is still here").toBeNull();
+    expect(text).toContain("Option");
+    expect(text).toContain("Adds to price");
+    expect(text).toContain("Already on");
+    // The two most similar words on the old card, for the two least similar
+    // things. One box writes both now.
+    expect(text).not.toContain("Option label");
+  });
+
+  it("writes the shop's word as both the question and the answer", () => {
+    /**
+     * A block offering one thing is NAMED after the thing. Both are written
+     * because both are read — the label is what the customer sees, the name is
+     * what the collections sidebar builds a filter box from — and
+     * `formatVariantSummary` prints the pair once so an order line does not say
+     * "Eggless: Eggless".
+     */
+    draw([block()]);
+    type(container!.querySelector("input") as HTMLInputElement, "Eggless");
+
+    expect(handed?.[0]?.name).toBe("Eggless");
+    expect(handed?.[0]?.options[0]?.label).toBe("Eggless");
+  });
+
+  it("tells the shop what the page will draw, in the mark it will be read beside", () => {
+    const asked = draw([block()]).textContent ?? "";
+    expect(asked).toContain("☐ Gift wrap");
+
+    const stated = draw([block({ options: [option({ id: "o", label: "65W", isDefault: true })] })])
+      .textContent ?? "";
+    expect(stated).toContain("✓ 65W");
+  });
+
+  it("still edits a stored block that holds several choices", () => {
+    /**
+     * Twenty-five products in this shop carry a Shape holding Round, Square and
+     * Heart. A form that could no longer show them would strand data the shop
+     * can see on its own storefront — so those keep the older surface, and only
+     * those.
+     */
+    const legacy = group({
       options: [
         option({ id: "a", label: "Round", isDefault: true }),
         option({ id: "b", label: "Square" }),
         option({ id: "c", label: "Heart" }),
       ],
     });
-    const select = draw([impossible]).querySelector("select");
+    const text = draw([legacy]).textContent ?? "";
 
-    expect(select).toBeTruthy();
-    expect((select as HTMLSelectElement).value).toBe("buttons");
-  });
-
-  it("greys out an answer this block cannot give, and says why", () => {
-    const view = draw([
-      group({
-        options: [
-          option({ id: "a", label: "Round", isDefault: true }),
-          option({ id: "b", label: "Square" }),
-          option({ id: "c", label: "Heart" }),
-        ],
-      }),
-    ]);
-    const disabled = [...view.querySelectorAll("option")].filter(
-      (node) => (node as HTMLOptionElement).disabled,
-    );
-
-    expect(disabled.length).toBeGreaterThan(0);
-    // The reason travels with the refusal, in the line the shop is reading.
-    expect(disabled.map((node) => node.textContent).join(" ")).toContain("needs");
-  });
-
-  it("tells the shop what the page will draw, using its own words", () => {
-    const text = draw([group({ name: "Wattage", options: [option({ id: "a", label: "65W", isDefault: true })] })])
-      .textContent ?? "";
-
-    expect(text).toContain("✓ 65W");
+    expect(text).toContain("Choice");
+    expect(text).toContain("Add a choice");
+    expect(text).toContain("Round  ·  Square  ·  Heart");
   });
 });
 
@@ -233,19 +269,15 @@ describe("what the editor no longer asks", () => {
      * thing the Shape module can still hide. The control is gone; the value is
      * not.
      */
-    draw([group({ type: "shape", name: "Shape" })]);
+    draw([block({ type: "shape", name: "Heart shape" })]);
 
-    // Through the DROPDOWN, which is the one write that replaces a group
-    // wholesale. A move only reorders, so it could carry `type` while the
-    // control that matters dropped it.
-    const select = container!.querySelector("select") as HTMLSelectElement;
-    act(() => {
-      select.value = "checkbox";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    // Through the NAME box, which is the write that replaces a group wholesale.
+    // A move only reorders, so it could carry `type` while the control that
+    // matters dropped it.
+    type(container!.querySelector("input") as HTMLInputElement, "Heart");
 
     expect(handed?.[0]?.type).toBe("shape");
-    expect(handed?.[0]?.render).toBe("checkbox");
+    expect(handed?.[0]?.name).toBe("Heart");
   });
 
   it("holds the ends of both lists in the handler as well as on the button", () => {

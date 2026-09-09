@@ -106,6 +106,23 @@ function click(element: Element | undefined) {
   });
 }
 
+/**
+ * The row a stated fact renders as.
+ *
+ * Found by what it IS — a thing carrying the shop's word and no tickbox — and
+ * not by its tag. This was `querySelectorAll("li")` while facts stacked in a
+ * column of their own; they sit inline beside the ticks now, and a test that
+ * pins the tag fails on a layout change while saying nothing about behaviour.
+ */
+function statementRow(view: HTMLElement, contains: string): Element | undefined {
+  return [...view.querySelectorAll("span, li")].find(
+    (node) =>
+      node.textContent?.includes(contains) &&
+      !node.querySelector('[data-slot="checkbox"]') &&
+      node.querySelector("svg") !== null,
+  );
+}
+
 function addToCart() {
   click(
     [...(container?.querySelectorAll("button") ?? [])].find((node) =>
@@ -221,7 +238,7 @@ describe("what the page shows", () => {
     const ticks = container?.querySelectorAll('[data-slot="checkbox"]') ?? [];
 
     expect(ticks.length).toBe(0);
-    expect(container?.querySelectorAll("li")?.length).toBeGreaterThan(0);
+    expect(statementRow(container as HTMLElement, "Eggless"), "no statement rendered").toBeTruthy();
   });
 
   it("does not say it twice", () => {
@@ -264,9 +281,7 @@ describe("what the page shows", () => {
       ],
     });
 
-    const row = [...view.querySelectorAll("li")].find((node) =>
-      node.textContent?.includes("Gold leaf"),
-    );
+    const row = statementRow(view, "Gold leaf");
 
     expect(row?.textContent?.trim()).toBe("Gold leaf");
     // …and the 250 is in the figure above it, exactly once.
@@ -285,7 +300,7 @@ describe("what the page shows", () => {
       variantGroups: [EGGLESS_FACT, { ...EGGLESS_OFFER, name: "Gift wrap" }],
     });
 
-    const statement = view.querySelector("li");
+    const statement = statementRow(view, "Eggless");
     const tick = view.querySelector('[data-slot="checkbox"]');
 
     expect(statement, "no statement rendered").toBeTruthy();
@@ -317,9 +332,7 @@ describe("what the page shows", () => {
       ],
     });
 
-    const row = [...view.querySelectorAll("li")].find((node) =>
-      node.textContent?.includes("Flarn-treated"),
-    );
+    const row = statementRow(view, "Flarn-treated");
 
     /**
      * EXACTLY the shop's word, and nothing beside it.
@@ -404,6 +417,6 @@ describe("a module the shop switched off", () => {
       variantGroups: [{ ...SHAPE_CHOICE, options: [SHAPE_CHOICE.options[0]] }],
     });
 
-    expect(view.querySelector("li[data-gate-shape]"), "the statement carries no gate").toBeTruthy();
+    expect(view.querySelector("[data-gate-shape]"), "the statement carries no gate").toBeTruthy();
   });
 });

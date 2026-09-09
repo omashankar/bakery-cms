@@ -93,7 +93,26 @@ export function formatVariantSummary(
       const option =
         group.options.find((item) => item.id === optionId) ??
         group.options.find((item) => item.isDefault);
-      return option ? `${group.name}: ${option.label}` : null;
+      if (!option) return null;
+
+      /**
+       * "Egg preference: Eggless" is a question and its answer. "Eggless:
+       * Eggless" is a stutter.
+       *
+       * A block that offers ONE thing is named after the thing — the shop types
+       * "Eggless" once and the editor writes it as both the question and the
+       * answer, because a customer ticking a box is not choosing between
+       * alternatives. Printing it twice puts the stutter on the kitchen ticket,
+       * the invoice and the confirmation email.
+       *
+       * Compared folded, so "Gift wrap" and "gift wrap " are one word rather
+       * than two — the shop typed it once either way.
+       */
+      const name = group.name?.trim() ?? "";
+      const label = option.label?.trim() ?? "";
+      if (!name || name.toLowerCase() === label.toLowerCase()) return label;
+
+      return `${name}: ${label}`;
     })
     .filter((value): value is string => Boolean(value));
 }

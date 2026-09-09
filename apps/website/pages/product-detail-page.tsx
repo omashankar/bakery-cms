@@ -1177,46 +1177,42 @@ export function ProductDetailPage({
                 An <li>, never a Checkbox: a bordered box invites a click, and
                 the add-on tests count `[data-slot="checkbox"]`.
               */}
-              {statementGroups.length > 0 ? (
-                <ul className="space-y-2 text-sm">
+              {/*
+                ONE ROW, for the things that are true and the things that can be
+                asked for.
+
+                They were two blocks: the facts stacked in a column, the ticks on
+                a wrapping row underneath. The reference storefront puts them
+                together, and it is right to — “✓ Eggless   ♡ Heart Shape” reads
+                as one line of small print about this cake, which is what it is.
+                Two blocks with a gap between them read as two unrelated
+                sections, and the first of them looked like a list.
+
+                Facts first, deliberately: what the cake IS, then what can be
+                added to it.
+
+                THE LABEL AND NOTHING ELSE, on both. A fact's surcharge was
+                printed here for one release, on the reasoning that it cannot be
+                ticked so the price block can never demonstrate it. That had it
+                backwards, and this shop's own page showed why: Ring Ceremony
+                stated “Eggless” at +₹80 under a price reading ₹1,079 — which is
+                ₹999 plus that same ₹80. The number is ALREADY in the figure
+                above, so printing it tells a customer to expect ₹1,159. A tick
+                leaves its price out for the mirror reason: it is NOT in the
+                figure until you tick it, and then the figure moves.
+              */}
+              {statementGroups.length > 0 || addOnGroups.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                   {statementGroups.map(({ group, stated }) => (
-                    <li
+                    <span
                       key={group.id}
-                      className="flex items-start gap-2"
+                      className="flex items-center gap-2 text-sm"
                       {...gatesFor(group)}
                     >
-                      <Check className="mt-0.5 size-4 shrink-0 text-green-700" aria-hidden="true" />
-                      {/*
-                        THE LABEL, and only the label — the same rule the tick
-                        below it follows.
-
-                        The surcharge was printed here for one release, on the
-                        reasoning that a fact cannot be ticked, so the price
-                        block can never demonstrate the amount. That reasoning
-                        had it exactly backwards, and the shop's own page showed
-                        why: Ring Ceremony Special Cake states “Eggless” at +₹80
-                        under a price reading ₹1,079 — which is ₹999 plus that
-                        same ₹80. The number is ALREADY in the figure above. A
-                        customer reading “₹1,079” and then “+₹80” concludes
-                        ₹1,159, and is wrong by exactly the amount we thought we
-                        were disclosing.
-
-                        A default is inside the displayed price by construction
-                        (`defaultProductUnitPrice`), and inside the charge by the
-                        same route (`calculateVariantAdjustment`). Nothing is
-                        hidden by leaving it out; something is invented by
-                        putting it in. An add-on is the opposite case and keeps
-                        its price out for the opposite reason: it is NOT in the
-                        figure until you tick it, and then the figure moves.
-                      */}
-                      <span>{stated.label}</span>
-                    </li>
+                      <Check className="size-4 shrink-0 text-green-700" aria-hidden="true" />
+                      <span className="text-muted-foreground">{stated.label}</span>
+                    </span>
                   ))}
-                </ul>
-              ) : null}
-
-              {addOnGroups.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                   {addOnGroups.map(({ group, addOn }) => (
                     <label
                       key={group.id}

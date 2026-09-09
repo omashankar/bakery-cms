@@ -6,18 +6,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
-  ProductBlockRender,
   ProductVariantGroup,
   ProductVariantGroupType,
 } from "@/types/product";
 import {
-  blockRenderIsAchievable,
   createVariantGroup,
   createVariantOption,
   resolveBlockRender,
 } from "@/features/products/lib/variant-utils";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
-import { AdminSelect } from "./admin-field";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductVariantManagerProps {
@@ -25,22 +22,18 @@ interface ProductVariantManagerProps {
   onChange: (groups: ProductVariantGroup[]) => void;
 }
 
-/**
- * The three shapes a block can take, in the words a shop owner uses.
- *
- * `needs` is what the options underneath have to be for the answer to hold —
- * printed inside the disabled entry, so the dropdown explains itself rather
- * than simply refusing. A shop asking why "Already true" is greyed out has the
- * answer in the same line it is reading.
- */
-const RENDER_CHOICES: { value: ProductBlockRender; label: string; needs: string }[] = [
-  { value: "buttons", label: "Buttons — pick one", needs: "needs two choices or more" },
-  { value: "checkbox", label: "Tickbox — have it if you ask", needs: "needs one choice, or two with a default" },
-  { value: "stated", label: "Already true — just says so", needs: "needs exactly one choice, ticked Default" },
-];
 
-const renderIsPossible = (group: ProductVariantGroup, render: ProductBlockRender) =>
-  blockRenderIsAchievable(group, render);
+/**
+ * The one choice a block offers, when it offers exactly one.
+ *
+ * Which is every block this editor CREATES. Groups holding several choices
+ * still exist in stored data — this shop has a Shape carrying Round, Square and
+ * Heart on twenty-five products — and they keep their old editing surface below
+ * rather than being stranded by a form that can no longer show them.
+ */
+function soleOption(group: ProductVariantGroup) {
+  return group.options.length === 1 ? group.options[0] : undefined;
+}
 
 /**
  * One line saying what this block turns into on the customer's page.
@@ -54,13 +47,14 @@ function previewOf(
   drawn: ReturnType<typeof resolveBlockRender>,
 ): string {
   const labelled = group.options.map((option) => option.label.trim()).filter(Boolean);
-  if (labelled.length === 0) return "Name the choices to see how this will look.";
+  if (labelled.length === 0) return "Name it to see how it will look.";
 
-  if (drawn.render === "stated") return `The page will say: ✓ ${labelled[0]}`;
+  // The words the customer reads, in the marks they will read them beside.
+  if (drawn.render === "stated") return `On the page:  ✓ ${labelled[0]}`;
   if (drawn.render === "checkbox") {
-    return `The page will show a tickbox: ${drawn.tick.on.label.trim() || labelled[0]}`;
+    return `On the page:  ☐ ${drawn.tick.on.label.trim() || labelled[0]}`;
   }
-  return `The page will show buttons: ${labelled.join(" · ")}`;
+  return `On the page:  ${labelled.join("  ·  ")}  (one of these)`;
 }
 
 export function ProductVariantManager({ groups, onChange }: ProductVariantManagerProps) {
@@ -98,6 +92,30 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
       */
       createVariantGroup("", type, [createVariantOption("", 0, false)], true),
     ]);
+  }
+
+  /**
+   * One box writes both names.
+   *
+   * A group carries a NAME (the question) and its option a LABEL (the answer),
+   * and for a block offering one thing those are the same word — "Eggless" is
+   * the question and the answer. Asking twice is how the old card ended up with
+   * "Option name" and "Option label" side by side, the two most similar words on
+   * the tab, for the two least similar things.
+   *
+   * Both are written because both are read: the label is what the customer sees,
+   * and the name is what the collections sidebar builds a filter box from.
+   * `formatVariantSummary` prints the pair once when they match.
+   *
+   * A legacy group with several choices keeps its name edited on its own — its
+   * name really is a question there.
+   */
+  function renameBlock(group: ProductVariantGroup, value: string) {
+    const sole = soleOption(group);
+    updateGroup(group.id, {
+      name: value,
+      ...(sole ? { options: [{ ...sole, label: value }] } : {}),
+    });
   }
 
   /** Order is what the customer reads, so it has to be the shop's to set. */
@@ -225,9 +243,9 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
         <div>
           <p className="text-sm font-medium">Options</p>
           <p className="text-xs text-muted-foreground">
-            What the customer chooses before buying — a colour, a capacity, a
-            gift wrap. Each block is one question, and you say how it looks: a
-            row of buttons, a tickbox, or a line that just states a fact.
+            Extras the customer can tick — eggless, a heart shape, gift wrapping.
+            Each one adds its price when ticked. Tick “Already on” yourself and
+            the page states it instead, with nothing to press.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -250,64 +268,79 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
 
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted px-4 py-8 text-center text-sm text-muted-foreground">
-          No options yet. Add one if this {labels.productWord.toLowerCase()} comes in more than one version —
-          a size, a colour, a capacity. {labels.productWordPlural} sold one way need none.
+          No options yet. Add one for anything the customer can ask for on top —
+          or for a fact worth stating. {labels.productWordPlural} sold one way need none.
         </div>
       ) : (
         <div className="space-y-4">
           {groups.map((group, groupIndex) => {
             const drawn = resolveBlockRender(group);
-            const named = group.name.trim() || "this option";
+            const sole = soleOption(group);
+            const named = (sole?.label || group.name).trim() || "this option";
 
             return (
             <div key={group.id} className="rounded-xl border border-border bg-card p-4">
-              <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_190px_auto]">
+              {/*
+                ONE THING PER BLOCK, and the shop names it once.
+
+                This card asked for a question and its answers, then a dropdown
+                choosing between three renderings. Every one of those was a
+                concept the shop had to learn before it could describe a gift
+                wrap. The reference storefront has none of it: an option is a
+                tickbox with a word and a price, and the shop decides only
+                whether it starts ticked.
+
+                So the name and the label are one field. A block that offers one
+                thing is NAMED after the thing — "Eggless", "Heart Shape" — and
+                `formatVariantSummary` prints it once rather than as
+                "Eggless: Eggless".
+              */}
+              <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_150px_auto_auto]">
                 <div className="space-y-2">
-                  <Label htmlFor={`grp-name-${group.id}`}>Option name</Label>
+                  <Label htmlFor={`grp-name-${group.id}`}>Option</Label>
                   <Input
                     id={`grp-name-${group.id}`}
-                    value={group.name}
-                    onChange={(event) => updateGroup(group.id, { name: event.target.value })}
-                    placeholder="Size, Colour, Gift wrap"
+                    value={soleOption(group)?.label ?? group.name}
+                    onChange={(event) => renameBlock(group, event.target.value)}
+                    placeholder="Eggless, Heart shape, Gift wrap"
                   />
                 </div>
+                {sole ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={`grp-price-${group.id}`}>
+                      Adds to price ({getActiveLocale().currency})
+                    </Label>
+                    <Input
+                      id={`grp-price-${group.id}`}
+                      type="number"
+                      value={sole.priceAdjustment}
+                      onChange={(event) =>
+                        updateOption(group.id, sole.id, {
+                          priceAdjustment: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div />
+                )}
                 {/*
-                  HOW IT LOOKS, which the shop could never say before.
-
-                  All three of these renderings already existed; the storefront
-                  chose between them by reading the data — two options meant
-                  buttons, one option with no Default meant a tickbox, one option
-                  WITH a Default meant a stated fact. Nothing on this screen said
-                  so, so ticking Default silently turned an offer into a claim.
-
-                  The value shown is what the customer will ACTUALLY get, not
-                  what is stored: `resolveBlockRender` falls back to the
-                  derivation when a stored answer does not fit the options under
-                  it, and a box showing an answer the page ignores is worse than
-                  no box. The ones that cannot be drawn are disabled and say why.
+                  The shop's own tick, and the only thing that decides how this
+                  is drawn. Ticked, the page STATES it — "✓ Eggless", nothing to
+                  press, and the price above already contains whatever it adds.
+                  Clear, it is a box the customer ticks and the price moves.
                 */}
-                <div className="space-y-2">
-                  <Label htmlFor={`grp-render-${group.id}`}>How it looks</Label>
-                  <AdminSelect
-                    id={`grp-render-${group.id}`}
-                    value={drawn.render}
-                    onChange={(event) =>
-                      updateGroup(group.id, {
-                        render: event.target.value as ProductBlockRender,
-                      })
-                    }
-                  >
-                    {RENDER_CHOICES.map((choice) => {
-                      const possible = renderIsPossible(group, choice.value);
-                      return (
-                        <option key={choice.value} value={choice.value} disabled={!possible}>
-                          {choice.label}
-                          {possible ? "" : ` — ${choice.needs}`}
-                        </option>
-                      );
-                    })}
-                  </AdminSelect>
-                </div>
+                {sole ? (
+                  <label className="flex items-end gap-2 pb-2 text-xs">
+                    <Checkbox
+                      checked={sole.isDefault === true}
+                      onCheckedChange={() => setDefaultOption(group.id, sole.id)}
+                    />
+                    Already on
+                  </label>
+                ) : (
+                  <div />
+                )}
                 <div className="flex items-end gap-1">
                   <Button
                     type="button"
@@ -364,6 +397,17 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
                 shape, as `PaymentMethodSettings.upi/card`, and removed the same
                 way: the control goes, the stored field stays.
               */}
+              {/*
+                THE OLD CHOICE ROWS, kept for stored groups that hold several.
+
+                A block this editor creates offers ONE thing, and its word, its
+                price and its tick are in the header above — repeating them here
+                would be the same three boxes twice. But twenty-five products in
+                this shop carry a Shape holding Round, Square and Heart, and a
+                form that could no longer show them would strand data the shop
+                can see on its own storefront.
+              */}
+              {sole ? null : (
               <div className="space-y-3">
                 {group.options.map((option, optionIndex) => (
                   <div
@@ -455,11 +499,15 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
                 ))}
               </div>
 
+              )}
+
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                {sole ? <span /> : (
                 <Button type="button" variant="outline" size="sm" onClick={() => addOption(group.id)}>
                   <Plus className="size-4" />
                   Add a choice
                 </Button>
+                )}
                 {/*
                   WHAT THE CUSTOMER WILL SEE, drawn from the same function the
                   product page draws it from.
