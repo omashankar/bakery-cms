@@ -53,3 +53,6 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# One-off migration snapshots: whole collections, including customer addresses.
+scripts/.snapshots/
