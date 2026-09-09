@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BadgeCheck,
   CalendarClock,
@@ -31,6 +31,12 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatDate } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { uploadMediaRequest } from "@/apps/admin/media/lib/media-api";
+import {
+  MAX_INLINE_BYTES,
+  MAX_SOURCE_BYTES,
+} from "@/apps/admin/media/lib/use-media-upload";
+import { shrinkImageFile } from "@/lib/images/shrink-image";
 
 /** Shown only while hydration is pending, behind the skeleton. */
 const EMPTY_PROFILE: AdminProfile = {
@@ -75,6 +81,14 @@ export function AdminProfilePage() {
     updatedEvent: ADMIN_PROFILE_UPDATED_EVENT,
   });
   const fileRef = useRef<HTMLInputElement>(null);
+  /**
+   * A photo now leaves the browser, so there is a wait where there was none.
+   *
+   * Without this the camera button looks inert for as long as the upload
+   * takes, and the obvious thing to do with a button that did nothing is
+   * press it again.
+   */
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -90,17 +104,73 @@ export function AdminProfilePage() {
     set(profile);
   }
 
-  function handlePhoto(event: React.ChangeEvent<HTMLInputElement>) {
+  /**
+   * The one photo box in this admin that never learned to upload.
+   *
+   * It read the file straight into a data URI and stored the whole picture as
+   * text — a 2 MB limit that a phone camera clears in one shot, and base64 adds
+   * a third on top. That string went into localStorage with the rest of the
+   * admin config, which browsers cap near 5 MB, so a single profile photo could
+   * fill the cache on its own and every later save would throw. One did: 2.3 MB
+   * of this shop's 16 MB of pasted images was this field.
+   *
+   * Everything it needed already existed. `shrinkImageFile` and
+   * `uploadMediaRequest` are what the media library and every product photo
+   * have used for a long time; this box simply never called them.
+   *
+   * The three outcomes are kept apart deliberately, and the reason is written
+   * up at `media-api.ts`: treating a REFUSED upload as "no image host" is how a
+   * shop that had Cloudinary configured silently went back to writing base64
+   * under a green success toast, while being told to add credentials it already
+   * had.
+   */
+  async function handlePhoto(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image too large — keep it under 2 MB.");
+    // Cleared so choosing the same file again still fires a change.
+    event.target.value = "";
+
+    if (file.size > MAX_SOURCE_BYTES) {
+      toast.error("That file is too large to open");
       return;
     }
-    const reader = new FileReader();
-    reader.onerror = () => toast.error("Could not read that image");
-    reader.onload = () => edit((f) => ({ ...f, photoUrl: String(reader.result) }));
-    reader.readAsDataURL(file);
+
+    setUploading(true);
+    try {
+      const { dataUrl, bytes } = await shrinkImageFile(file);
+      const outcome = await uploadMediaRequest(dataUrl, "bakery-cms/profile");
+
+      if (outcome.status === "uploaded") {
+        edit((current) => ({ ...current, photoUrl: outcome.asset.url }));
+        return;
+      }
+
+      if (outcome.status === "failed") {
+        toast.error("Could not upload that photo", {
+          description: "Your image host refused it. Check the account, then try again.",
+        });
+        return;
+      }
+
+      // No image host at all. The picture is stored as text, in this browser's
+      // localStorage and in one Mongo document, so it has to stay small — and
+      // the shop is told why rather than finding out when a save starts failing.
+      if (bytes > MAX_INLINE_BYTES) {
+        toast.error("Image storage is not configured", {
+          description: `Without an image host, a photo must stay under ${Math.round(
+            MAX_INLINE_BYTES / 1024,
+          )} KB. Add Cloudinary credentials, or paste a hosted image URL instead.`,
+          duration: 10000,
+        });
+        return;
+      }
+
+      edit((current) => ({ ...current, photoUrl: dataUrl }));
+    } catch {
+      toast.error("Could not read that image");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSave() {
@@ -173,16 +243,22 @@ export function AdminProfilePage() {
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full border-2 border-bakery-700 bg-white text-bakery-700 shadow-sm transition-colors hover:bg-cream-100"
-                aria-label="Change photo"
+                disabled={uploading}
+                className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full border-2 border-bakery-700 bg-white text-bakery-700 shadow-sm transition-colors hover:bg-cream-100 disabled:opacity-70"
+                aria-label={uploading ? "Uploading photo" : "Change photo"}
               >
-                <Camera className="size-4" />
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Camera className="size-4" />
+                )}
               </button>
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
+                disabled={uploading}
                 onChange={handlePhoto}
               />
             </div>
