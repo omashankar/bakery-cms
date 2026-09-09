@@ -1157,9 +1157,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                         </option>
                       ))}
                     </AdminSelect>
+                    {/*
+                      No semicolons, deliberately. `no-new-bakery-wording` reads
+                      bare JSX prose only when the line carries none of the
+                      punctuation an expression would — so a sentence written
+                      with semicolons is a sentence that guard cannot police.
+                    */}
                     <p className="text-xs text-muted-foreground">
-                      The customer fits their photo inside this outline, and the
-                      file you receive is cut to it.
+                      The customer fits their photo inside this outline, and the file
+                      you receive is cut to it. Round, Square and Heart are printed
+                      toppers. Upright and Wide are frame proportions. Long strip is
+                      the band that goes round a mug or a bottle.
                     </p>
                   </div>
                 ) : null}

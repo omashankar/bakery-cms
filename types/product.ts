@@ -10,7 +10,13 @@ export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
  * storefront mapper and the admin form, and only then reaches a canvas.
  * `lib/images/photo-print-layout` holds the geometry for each one.
  */
-export type PhotoFrameShapeId = "circle" | "square" | "heart";
+export type PhotoFrameShapeId =
+  | "circle"
+  | "square"
+  | "heart"
+  | "portrait"
+  | "landscape"
+  | "wrap";
 
 /**
  * `shape` joined these when the flat `shapes: string[]` was retired.

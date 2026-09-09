@@ -1133,13 +1133,25 @@ describe("the outline a product is printed inside", () => {
     return calls;
   }
 
-  it("offers the three the shop asked for, and no more", () => {
+  it("offers the six the shop asked for, and no more", () => {
     /**
      * Pinned rather than counted. A shape is not free: it is a picker option
      * a shop has to read, a value the validator has to admit, and an outline
-     * the canvas has to draw — so a fourth is a decision, not a tidy-up.
+     * the canvas has to draw — so a seventh is a decision, not a tidy-up.
+     *
+     * It was three, and all three were square. This CMS has ONE printed-photo
+     * switch, meant to serve a frame, a mug, a cushion and a topper alike — so
+     * a shop selling frames had one usable outline and it cropped every
+     * upright photograph its customers sent to a square.
      */
-    expect(ids).toEqual(["circle", "square", "heart"]);
+    expect(ids).toEqual([
+      "circle",
+      "square",
+      "heart",
+      "portrait",
+      "landscape",
+      "wrap",
+    ]);
   });
 
   it("offers each outline once", () => {
@@ -1186,24 +1198,33 @@ describe("the outline a product is printed inside", () => {
     }
   });
 
-  it("gives every shipped shape a square box", () => {
-    for (const shape of PHOTO_FRAME_SHAPES) {
-      expect(frameSize(shape, 512), shape.id).toEqual({ width: 512, height: 512 });
+  it("gives the three toppers a square box", () => {
+    // The outlines a topper is cut to. The rectangles below are the ones a
+    // frame and a mug need, and they are the reason this test is no longer
+    // "every shipped shape".
+    for (const id of ["circle", "square", "heart"] as const) {
+      expect(frameSize(frameShape(id), 512), id).toEqual({ width: 512, height: 512 });
     }
   });
 
-  it("would stand an upright frame up, and lay a wide one down", () => {
+  it("stands an upright frame up, and lays a wide one down", () => {
     /**
-     * No shipped shape is a rectangle yet. The machinery is measured anyway,
-     * because a photo frame or a mug wrap is the obvious fourth and this is
-     * the difference between adding a row to a list and redoing every
-     * measurement in the file.
+     * This measured the machinery against a made-up shape, because no shipped
+     * one was a rectangle. Both are real now, and the numbers are the ones the
+     * made-up pair was written to predict — which is what "adding a row to a
+     * list rather than redoing every measurement" was claiming.
      */
-    const upright = { ...frameShape("square"), ratio: 3 / 4 };
-    const wide = { ...frameShape("square"), ratio: 4 / 3 };
+    expect(frameSize(frameShape("portrait"), 2400)).toEqual({ width: 1800, height: 2400 });
+    expect(frameSize(frameShape("landscape"), 2400)).toEqual({ width: 2400, height: 1800 });
+  });
 
-    expect(frameSize(upright, 2400)).toEqual({ width: 1800, height: 2400 });
-    expect(frameSize(wide, 2400)).toEqual({ width: 2400, height: 1800 });
+  it("lays a wrap out much longer than it is tall", () => {
+    // The band that goes round a mug or a bottle. Far enough from Wide that a
+    // shop cannot pick one meaning the other.
+    const wrap = frameSize(frameShape("wrap"), 2100);
+
+    expect(wrap).toEqual({ width: 2100, height: 900 });
+    expect(wrap.width / wrap.height).toBeGreaterThan(2);
   });
 
   it("actually traces something for every one of them", () => {

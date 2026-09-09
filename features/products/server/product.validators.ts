@@ -122,7 +122,7 @@ export const productFormSchema = z
      * a perfectly good meaning.
      */
     photoFrameShape: z
-      .enum(["circle", "square", "heart"])
+      .enum(["circle", "square", "heart", "portrait", "landscape", "wrap"])
       .optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
     descriptionBlocks: z.array(descriptionBlockSchema).max(20).default([]),

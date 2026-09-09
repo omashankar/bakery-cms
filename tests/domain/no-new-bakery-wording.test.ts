@@ -52,7 +52,14 @@ const SCANNED = [
  * Naming the trade is RIGHT in these places. Each needs a reason, and "it was
  * already like that" is not one.
  */
-const ALLOWED: { path: string; why: string }[] = [
+/**
+ * `only` narrows an allowance to ONE string.
+ *
+ * Without it an entry forgives its whole file, which is how a `why` reading
+ * "It is the only match in the file" came to cover a second one nobody had
+ * argued for. Give it whenever the reason is about a particular sentence.
+ */
+const ALLOWED: { path: string; why: string; only?: string }[] = [
   {
     path: "apps/admin/settings/components/modules-settings-page",
     why: "the optional modules ARE bakery product fields — flavour, egg preference, weight, shape, photo cake. Naming them is what tells a florist which to switch off.",
@@ -81,7 +88,8 @@ const ALLOWED: { path: string; why: string }[] = [
   */
   {
     path: "apps/admin/products/components/product-form-page",
-    why: "one placeholder, deliberately naming one edible thing and one not — 'Chocolate Truffle Cake, 65W Type-C Charger' — so the box shows a shop that this field is not about cake. It is the only match in the file.",
+    why: "one placeholder, deliberately naming one edible thing and one not — 'Chocolate Truffle Cake, 65W Type-C Charger' — so the box shows a shop that this field is not about cake. It is the only match in the file, and `only` is what keeps that true.",
+    only: "e.g. Chocolate Truffle Cake, 65W Type-C Charger",
   },
   {
     path: "features/design-system",
@@ -238,16 +246,31 @@ describe("no new bakery wording on a shop surface", () => {
      *
      * An entry may still name a DIRECTORY; it just has to end at a boundary.
      */
-    const exempt = ALLOWED.some(
+    const allowance = ALLOWED.find(
       (entry) =>
         rel === entry.path ||
         rel.startsWith(`${entry.path}.`) ||
         rel.startsWith(`${entry.path}/`),
     );
-    if (exempt) continue;
+
+    /**
+     * An allowance that names its STRING forgives that string and nothing else.
+     *
+     * Every entry used to exempt its whole file, however narrow the reason it
+     * gave. `product-form-page`'s says in as many words "It is the only match in
+     * the file" — and a second one was written into that file, shipped, and
+     * caught by a mutation rather than by this. A guard whose allowlist grows
+     * silently is the shape of guard this project keeps finding broken.
+     *
+     * A file-wide allowance is still allowed, because some are honestly
+     * file-wide: the vendor's own marketing pages, a historical record kept
+     * verbatim. Those simply give no `only`.
+     */
+    if (allowance && !allowance.only) continue;
 
     for (const { line, number } of codeLines(readFileSync(file, "utf8"))) {
       for (const text of readableStrings(line)) {
+        if (allowance?.only && text.includes(allowance.only)) continue;
         offenders.push(`${rel}:${number}  ${text.trim().slice(0, 90)}`);
       }
     }

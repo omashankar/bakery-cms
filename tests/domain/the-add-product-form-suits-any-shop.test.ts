@@ -218,13 +218,24 @@ describe("the bakery-wording ratchet covers what it claims to", () => {
      */
   });
 
-  it("keeps the one allowance that is real, and says what it covers", () => {
+  it("keeps the one allowance that is real, and holds it to what it covers", () => {
+    /**
+     * The `why` here has always claimed "It is the only match in the file", and
+     * for a while that was a promise nobody was keeping: the allowance exempted
+     * the whole file, so a SECOND trade word could be written into it and ship.
+     * One was, and a mutation caught it rather than this guard.
+     *
+     * `only` is the promise made enforceable. The file is scanned like any
+     * other and this one string is forgiven, so the sentence in the `why` is now
+     * a fact about the code rather than a note about it.
+     */
     const source = read(guard);
+    const placeholder = "e.g. Chocolate Truffle Cake, 65W Type-C Charger";
 
     expect(source).toContain('path: "apps/admin/products/components/product-form-page"');
-    expect(source).toContain("It is the only match in the file.");
+    expect(source).toContain(`only: "${placeholder}"`);
     // The string it exists for: one edible, one not.
-    expect(read(FORM)).toContain("e.g. Chocolate Truffle Cake, 65W Type-C Charger");
+    expect(read(FORM)).toContain(placeholder);
   });
 });
 

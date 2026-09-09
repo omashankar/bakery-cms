@@ -181,12 +181,21 @@ const HEART: [number, number, number, number, number, number][] = [
  *
  * A frame is GEOMETRY the canvas has to clip to, so unlike a size or an option
  * label the shop cannot invent one — it picks, per product, in the admin.
- * Three: the toppers these shops actually cut.
  *
- * All three are square boxes today. The width-and-height machinery below is
- * still there because a rectangle — a photo frame, a mug wrap — is the obvious
- * fourth, and it is the one addition that would otherwise mean redoing every
- * measurement in this file rather than adding a row to this list.
+ * The first three are the toppers a cake shop cuts, and for a long time they
+ * were the whole list: three square boxes, in a CMS whose one printed-photo
+ * switch is meant to serve "a frame, a mug, a cushion and a cake". A shop
+ * selling photo frames had one shape available and it was a square, so a
+ * customer's upright photograph was cropped to a square before anybody saw it.
+ *
+ * The three rectangles fix that, and they cost a row each: the width-and-height
+ * machinery below was written and measured for them before any shipped, which
+ * is why this is a list entry rather than a rewrite. `ratio` does all the work —
+ * every outline here is still one `rect` or one traced curve.
+ *
+ * Named by their PROPORTIONS, not by what a shop prints on. A wrap is the right
+ * shape for a mug, a bottle and a pen case alike, and this file has no business
+ * knowing which of those a shop sells.
  */
 export const PHOTO_FRAME_SHAPES: PhotoFrameShape[] = [
   {
@@ -221,6 +230,34 @@ export const PHOTO_FRAME_SHAPES: PhotoFrameShape[] = [
       }
       painter.closePath();
     },
+  },
+  /**
+   * A frame stood up. 3:4, the proportion of a 6×8 print and of most upright
+   * frames a shop sells — and the one a phone camera takes by default.
+   */
+  {
+    id: "portrait",
+    label: "Upright",
+    ratio: 3 / 4,
+    outline: (painter, width, height) => painter.rect(0, 0, width, height),
+  },
+  /** The same frame laid down. */
+  {
+    id: "landscape",
+    label: "Wide",
+    ratio: 4 / 3,
+    outline: (painter, width, height) => painter.rect(0, 0, width, height),
+  },
+  /**
+   * The band that goes round something: a mug, a bottle, a pen case. 7:3 is a
+   * standard mug's printable area, and it is far enough from Wide that a shop
+   * cannot pick one meaning the other.
+   */
+  {
+    id: "wrap",
+    label: "Long strip",
+    ratio: 7 / 3,
+    outline: (painter, width, height) => painter.rect(0, 0, width, height),
   },
 ];
 
