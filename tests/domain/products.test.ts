@@ -162,8 +162,12 @@ describe("cakes repository", () => {
      * them, on every product, and the CMS read as though it were telling the
      * owner what kind of shop to run.
      *
-     * The commerce defaults below are NOT product-type opinions and stay: a
-     * draft, in stock, and personalisable.
+     * The same reasoning has since reached three more of them. A category, a
+     * stock count and a message box are answers about THIS product that the CMS
+     * was giving on the shop's behalf, and four shops walked through this form
+     * shipped all three untouched: a charger filed under Birthday Cakes, fifty
+     * units nobody had counted, and a plant page asking the buyer for a birthday
+     * message.
      */
     const empty = createEmptyProductForm();
 
@@ -177,8 +181,22 @@ describe("cakes repository", () => {
     expect(empty.descriptionBlocks).toEqual([]);
 
     expect(empty.status).toBe("draft");
-    expect(empty.allowsMessage).toBe(true);
+
+    // Nobody has filed it anywhere. `saveProduct` refuses to PUBLISH without a
+    // category and still lets a draft be parked.
+    expect(empty.categoryId).toBe("");
+
+    // Nobody has counted anything, and that is safe because nothing is being
+    // counted: a shop that never opens this tab keeps selling, which is what
+    // most of them mean. Unticking "Unlimited" is the act of saying otherwise.
+    expect(empty.stockQuantity).toBe(0);
+    expect(empty.unlimitedStock).toBe(true);
     expect(empty.stockStatus).toBe("in_stock");
+
+    // Most products are not written on. This was ON, so every plant, saree and
+    // charger this CMS created carried a "Message on this order" box the shop
+    // had to find and untick.
+    expect(empty.allowsMessage).toBe(false);
   });
 
   it("starts a new product with no option groups at all", () => {

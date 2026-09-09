@@ -11,11 +11,7 @@ import {
 } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import type { Product, ProductFormData } from "@/types";
-import {
-  adminCategories,
-  adminOccasions,
-  getCategoryByName,
-} from "./catalog-options";
+import { adminOccasions, getCategoryByName } from "./catalog-options";
 import { slugify } from "./product-utils";
 import { normalizeVariantGroups } from "./variant-utils";
 
@@ -444,7 +440,25 @@ export function createEmptyProductForm(): ProductFormData {
     price: 0,
     compareAtPrice: undefined,
     images: [],
-    categoryId: adminCategories()[0]?.id ?? "1",
+    /**
+     * NO CATEGORY IS CHOSEN YET.
+     *
+     * This was `adminCategories()[0]?.id ?? "1"` — the first row of whatever
+     * taxonomy this browser happened to be holding, which on a fresh install is
+     * the shipped demo's "Birthday Cakes". A shop adding a phone charger met a
+     * box that looked answered, moved past it, and filed the charger under
+     * Birthday Cakes. All four shops walked through this form did exactly that,
+     * and every one of them shipped.
+     *
+     * Worse than a wrong answer: the server's taxonomy replaces that cached
+     * list after mount, so on a cold browser the id was often one the shop's
+     * real list has never held — a box reading empty over an id that saved
+     * without a word.
+     *
+     * Empty is the honest start, and `saveProduct` refuses to PUBLISH without
+     * one while still letting a draft be parked.
+     */
+    categoryId: "",
     occasionIds: [],
     /**
      * A NEW PRODUCT IS BORN EMPTY.
@@ -471,10 +485,31 @@ export function createEmptyProductForm(): ProductFormData {
     shapes: [],
     flavourOptions: [],
     stockStatus: "in_stock",
-    stockQuantity: 50,
-    unlimitedStock: false,
+    /**
+     * NOBODY HAS COUNTED ANYTHING YET.
+     *
+     * This was 50 — a number no shop typed, on the field that decides when its
+     * product stops selling. A bake-to-order shop was handed fifty units it had
+     * never made and would stop taking orders on the fifty-first; a shop with
+     * three sarees in the room would sell forty-seven it does not have.
+     *
+     * The honest start is nothing counted, and it is safe because `unlimitedStock`
+     * starts ON: a shop that never opens this tab keeps selling, which is what
+     * most shops mean. The moment it unticks that box it has said "I sell from a
+     * fixed number", and the number below it is the one it typed.
+     */
+    stockQuantity: 0,
+    unlimitedStock: true,
     lowStockThreshold: undefined,
-    allowsMessage: true,
+    /**
+     * OFF, because most products are not written on.
+     *
+     * This started ON, so every plant, saree and phone charger this CMS ever
+     * created carried a "Message on this order — e.g. Happy Birthday!" box that
+     * the shop never asked for and had to find and untick. A cake shop ticks it
+     * once per product; every other trade was unticking it once per product.
+     */
+    allowsMessage: false,
     allowsPhotoUpload: false,
 
     variantGroups: [],

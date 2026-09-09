@@ -26,7 +26,7 @@ import {
   adminOccasions,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
-import { slugify } from "@/features/products/lib/product-utils";
+import { slugify, slugOrFallback } from "@/features/products/lib/product-utils";
 import {
   createEmptyProductForm,
   sizeLabelsInUse,
@@ -261,7 +261,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     setForm((prev) => ({
       ...prev,
       name,
-      slug: slugTouched ? prev.slug : slugify(name),
+      slug: slugTouched ? prev.slug : slugOrFallback(name),
       seo: {
         ...prev.seo,
         /*
@@ -404,6 +404,21 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
      * Drafts are exempt on purpose: a half-built product must stay parkable.
      */
     if (intent === "publish") {
+      /**
+       * A product on the shop is filed somewhere.
+       *
+       * The box no longer answers itself, so this is what stops a blank one
+       * reaching customers — and it is a PUBLISH rule, not a save rule: a
+       * half-built product must stay parkable while the shop decides where it
+       * belongs, or works out that it needs a new category first.
+       */
+      if (!form.categoryId.trim()) {
+        toast.error("Choose a category before publishing", {
+          description: `Basics, under the name. It decides where this ${productLower} is found on your shop.`,
+        });
+        return;
+      }
+
       const namedSizes = modules.weight
         ? form.weights.filter((tier) => tier.label.trim().length > 0)
         : [];
@@ -640,16 +655,31 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slug">URL slug</Label>
+                  <Label htmlFor="slug">Web address</Label>
                   <Input
                     id="slug"
                     value={form.slug}
                     onChange={(e) => {
                       setSlugTouched(true);
-                      patchForm({ slug: slugify(e.target.value) });
+                      /**
+                       * LENIENT WHILE TYPING, tidied when the box is left.
+                       *
+                       * `slugify` ran on every keystroke, and its last step
+                       * strips a trailing hyphen — so the separator was deleted
+                       * the instant it was typed. "chocolate truffle cake"
+                       * became "chocolatetrufflecake", and a hyphen typed by
+                       * hand simply never appeared. The box could not be typed
+                       * into; it could only be watched.
+                       */
+                      patchForm({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-") });
                     }}
-                    placeholder="chocolate-truffle-cake"
+                    onBlur={(e) => patchForm({ slug: slugify(e.target.value) })}
+                    placeholder={`${slugify(labels.productWord) || "product"}-name`}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    The end of this {productLower}&apos;s address on your shop. Filled in
+                    from the name — change it only if you want a shorter or clearer link.
+                  </p>
                 </div>
                 {/*
                   TWO BOXES STOOD HERE, and between them and the Description
@@ -682,12 +712,34 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       value={form.categoryId}
                       onChange={(e) => patchForm({ categoryId: e.target.value })}
                     >
+                      {/*
+                        AN UNANSWERED BOX LOOKS UNANSWERED.
+
+                        A new product used to open on whatever category happened
+                        to be first in this browser's list — the shipped demo's
+                        "Birthday Cakes" on a fresh install. The box looked
+                        filled in, so it was moved past, and four shops walked
+                        through this form all shipped: a phone charger, a Snake
+                        Plant and a Kanjivaram silk saree, every one of them
+                        filed under Birthday Cakes.
+
+                        A blank first row is what makes "not answered" visible.
+                        `saveProduct` refuses to publish over it and still lets a
+                        draft be parked, which is the same rule the price follows.
+                      */}
+                      <option value="">Choose a category…</option>
                       {adminCategories().map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
                       ))}
                     </AdminSelect>
+                    {adminCategories().length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No categories yet. Add them under Catalog, then come back —
+                        a {productLower} needs one before it can go on the shop.
+                      </p>
+                    ) : null}
                   </div>
                   {/*
                     A “Flavour” dropdown stood here, picking one row out of a
@@ -1027,26 +1079,53 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   </div>
                 ) : null}
 
+                {/*
+                  "PDP" is "product detail page", an abbreviation only a
+                  developer has ever said out loud, printed to a shop owner —
+                  twice, on the two ticks that decide what a customer is asked
+                  for. Both are named here in the words the customer will
+                  actually read on the page, so the two screens join up.
+
+                  The message tick also interpolated the shop's product word and
+                  read "Allow bouquet message" or "Allow dish message" for two of
+                  the shipped business types. A message is not made of the thing
+                  it accompanies, so `productWord` was the wrong mechanism here
+                  rather than a mechanism used wrongly — dropped, not translated.
+                */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.allowsMessage}
-                      onCheckedChange={(checked) =>
-                        patchForm({ allowsMessage: checked === true })
-                      }
-                    />
-                    Allow {productLower} message on PDP
-                  </label>
-                  {modules.photoCake ? (
-                    <label className="flex items-center gap-2 text-sm">
+                  <div className="space-y-1">
+                    <label className="flex items-start gap-2 text-sm">
                       <Checkbox
-                        checked={form.allowsPhotoUpload}
+                        className="mt-0.5"
+                        checked={form.allowsMessage}
                         onCheckedChange={(checked) =>
-                          patchForm({ allowsPhotoUpload: checked === true })
+                          patchForm({ allowsMessage: checked === true })
                         }
                       />
-                      Allow photo upload on PDP
+                      Ask for a message
                     </label>
+                    <p className="text-xs text-muted-foreground">
+                      Puts a &ldquo;Message on this order&rdquo; box on the page. For
+                      something written on or sent with the {productLower}.
+                    </p>
+                  </div>
+                  {modules.photoCake ? (
+                    <div className="space-y-1">
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={form.allowsPhotoUpload}
+                          onCheckedChange={(checked) =>
+                            patchForm({ allowsPhotoUpload: checked === true })
+                          }
+                        />
+                        Ask for a photo
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        The customer uploads a picture and you receive it cut to the
+                        outline below. The printing is part of the price.
+                      </p>
+                    </div>
                   ) : null}
                 </div>
 

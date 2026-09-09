@@ -41,7 +41,14 @@ describe("what a shop does now", () => {
   const FORM = "apps/admin/products/components/product-form-page.tsx";
 
   it("keeps the one tick that turns the uploader on", () => {
-    expect(read(FORM)).toContain("Allow photo upload on PDP");
+    /**
+     * It read "Allow photo upload on PDP" until the four shops walked through
+     * this form met it — "PDP" is "product detail page", an abbreviation only a
+     * developer says out loud, printed to a shop owner. Named here the way the
+     * page names it, so the two screens join up.
+     */
+    expect(read(FORM)).toContain("Ask for a photo");
+    expect(read(FORM)).not.toContain("on PDP");
   });
 
   it("no longer builds a priced option group behind that tick", () => {

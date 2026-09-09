@@ -127,7 +127,10 @@ describe("every field is still on the form, under the heading it belongs to", ()
     expect(tabOf("<ProductVariantManager")).toBe("options");
     // All three of these sat under "Commerce".
     expect(tabOf('htmlFor="flavourOptions"')).toBe("options");
-    expect(tabOf("Allow {productLower} message")).toBe("options");
+    // "Allow {productLower} message on PDP" — an abbreviation only a developer
+    // says out loud, built out of the shop word so it read "Allow bouquet message".
+    expect(tabOf("Ask for a message")).toBe("options");
+    expect(tabOf("Ask for a photo")).toBe("options");
     expect(tabOf('htmlFor="photo-frame-shape"')).toBe("options");
   });
 
