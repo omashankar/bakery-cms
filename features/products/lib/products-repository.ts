@@ -424,7 +424,24 @@ export function createEmptyProductForm(): ProductFormData {
     name: "",
     slug: "",
     description: "",
-    price: 999,
+    /**
+     * ZERO, because the shop has not said what this costs yet.
+     *
+     * This was 999 — a number no merchant ever typed, sitting on the one field
+     * that decides whether a sale makes money. It is the same invention as the
+     * 4.5 stars `rating` used to be born with a few lines above, and it carries
+     * further: a product whose Price & stock tab is never opened went LIVE at
+     * 999, priced by the CMS on the shop's behalf.
+     *
+     * Nothing downstream wants a seed. `weights` starts empty, so
+     * `rederiveWeights` has no tier to re-derive, and 0 actually repairs
+     * `renameSize`: it only offers a usual price for a size still priced at
+     * nothing, and a row cloned from a 999 base never qualified.
+     *
+     * 0 reads as unset, and `saveProduct` refuses to PUBLISH at a price of
+     * nothing while still letting a draft be parked.
+     */
+    price: 0,
     compareAtPrice: undefined,
     images: [],
     categoryId: adminCategories()[0]?.id ?? "1",

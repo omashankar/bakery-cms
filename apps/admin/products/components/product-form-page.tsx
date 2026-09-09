@@ -382,6 +382,54 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       return;
     }
 
+    /**
+     * A product may not go on the shop priced at nothing.
+     *
+     * `price` starts at 0 now — unset, rather than the invented 999 — and the
+     * server takes `z.number().min(0)`, so 0 is a perfectly valid PUBLISHED
+     * price as far as validation is concerned. This was the only field on the
+     * form with no check at all, on the number the whole shop turns on.
+     *
+     * Read the way `priceLine` reads it, not as a bare `form.price > 0`. Once a
+     * product has named size rows the base is never charged — `weights[i].price`
+     * is — so a shop that prices every size and leaves the base at 0 has priced
+     * its product and must not be stopped. A NAMED row at 0 is the failure,
+     * because that size sells free. Blank rows are dropped from the payload
+     * below and are nobody's answer to anything.
+     *
+     * The row half is asked only while `modules.weight` is on. Modules hide
+     * fields without clearing the data under them, so a shop with the size axis
+     * switched off can still hold legacy rows — and refusing to publish over a
+     * row that is not on screen is a dead end with no way out of it.
+     *
+     * Drafts are exempt on purpose: a half-built product must stay parkable.
+     */
+    if (intent === "publish") {
+      const namedSizes = modules.weight
+        ? form.weights.filter((tier) => tier.label.trim().length > 0)
+        : [];
+      const freeSizes = namedSizes.filter((tier) => tier.price <= 0);
+
+      if (freeSizes.length > 0) {
+        toast.error(
+          `Price every ${weightAxisLabel(form.weightLabel).toLowerCase()} before publishing`,
+          {
+            description: `${freeSizes
+              .map((tier) => tier.label.trim())
+              .join(", ")} would sell for nothing. Price & stock.`,
+          },
+        );
+        return;
+      }
+
+      if (namedSizes.length === 0 && form.price <= 0) {
+        toast.error("Set a base price before publishing", {
+          description: `Price & stock, at the top. Save as a draft to keep this ${productLower} while you decide.`,
+        });
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     /**
@@ -664,9 +712,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       id="price"
                       type="number"
                       min={0}
-                      value={form.price}
-                      onChange={(e) => handlePriceChange(Number(e.target.value) || 0)}
+                      /*
+                        EMPTY reads as unset, the way the compare-at box beside
+                        it already does. `form.price` starts at 0 now, and a box
+                        showing a literal 0 is a shop claiming this is free;
+                        clearing it to retype snapped straight back to 0 too.
+                      */
+                      value={form.price === 0 ? "" : form.price}
+                      /*
+                        Clamped here as the size rows already are. A typed minus
+                        went through to the server, which answers "Price cannot
+                        be negative" — a 400 for something the field can simply
+                        decline to hold.
+                      */
+                      onChange={(e) =>
+                        handlePriceChange(Math.max(0, Number(e.target.value) || 0))
+                      }
                     />
+                    <p className="text-xs text-muted-foreground">
+                      What you charge for one, before the customer chooses anything.
+                      {modules.weight
+                        ? " Add sizes below and each one carries its own price instead of this."
+                        : ""}{" "}
+                      Options on the Options tab add to it or take off it.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="compareAtPrice">Compare-at price</Label>
@@ -683,6 +752,11 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                         })
                       }
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. The old price, shown crossed out next to the new one.
+                      It has to be higher than the base price — at or below it there
+                      is no saving to show, so nothing is shown.
+                    </p>
                   </div>
                 </div>
                 {modules.weight ? (

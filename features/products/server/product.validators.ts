@@ -120,7 +120,46 @@ export const productFormSchema = z
     seo: seoSchema.default({}),
 
   })
-  .passthrough();
+  .passthrough()
+  /**
+   * A PUBLISHED product has a price. Held here as well as in the form.
+   *
+   * The same reasoning as the photo cap above: the form is where an admin meets
+   * the rule, this is where it holds. `price` is `min(0)`, so zero was a
+   * perfectly valid published price — and the form used to open at a hardcoded
+   * 999, so the field could go live either invented or empty and nothing on
+   * either side objected.
+   *
+   * Only for `published`. A draft priced at nothing is a product half built,
+   * which is what drafts are for, and archiving one must never become
+   * impossible because of what it costs.
+   *
+   * Named size rows decide it when there are any, because `priceLine` charges
+   * `weights[index].price` and never reaches the base once they exist. Every
+   * named row has to be priced: one at zero sells that size free. Rows with a
+   * blank label are ignored — the form drops them from the payload, and
+   * `priceLine` cannot sell one either.
+   */
+  .superRefine((product, ctx) => {
+    if (product.status !== "published") return;
+
+    const namedSizes = (product.weights ?? []).filter(
+      (tier) => String(tier.label ?? "").trim().length > 0,
+    );
+    const priced =
+      namedSizes.length > 0
+        ? namedSizes.every((tier) => tier.price > 0)
+        : product.price > 0;
+
+    if (!priced) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["price"],
+        message:
+          "A published product needs a price above zero — its own, or one on every size it is sold in.",
+      });
+    }
+  });
 
 export type ProductFormInput = z.infer<typeof productFormSchema>;
-
+
