@@ -138,12 +138,17 @@ test.describe("a customer placing an order", () => {
      * control now, and unticked to begin with, so a journey that does not
      * tick it reaches a Place order button that can never enable.
      */
-    // The LABEL, not the box. Base UI puts the id on a hidden input and
-    // renders the visible control beside it, so the label is both the
-    // stable handle and what a customer actually clicks.
-    const terms = page.locator("label:has(#acceptTerms)");
-    // Scrolled to first: it sits below the fold on a short viewport, and a
-    // click that never lands reads as a button that never enables.
+    /**
+     * The visible control, not the label around it.
+     *
+     * Base UI puts the id on a hidden input and renders the tick beside it, so
+     * the id locates the pair but cannot be clicked. The LABEL can, and does
+     * toggle it — but it is a full-width centred row, so the click lands at its
+     * midpoint, which is the terms sentence and not always on top. Clicking the
+     * control itself is both what a customer aims at and a target that cannot
+     * be covered by its own text.
+     */
+    const terms = page.locator("label:has(#acceptTerms) [role=\"checkbox\"]");
     await terms.scrollIntoViewIfNeeded();
     await terms.click();
 
