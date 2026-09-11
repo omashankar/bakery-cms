@@ -197,6 +197,23 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   /** The form is only shown when adding or editing — otherwise the cards are enough. */
   const [showAddressForm, setShowAddressForm] = useState(false);
+  /**
+   * THE STEP COULD RENDER NEITHER A CARD NOR A FORM, and there was no way back.
+   *
+   * `showAddressForm` was set true only at mount, and set false again on submit.
+   * `DeliveryAddressPicker` returns null on an empty book — and its "Add new"
+   * button is inside that early return, as is the form's own Cancel, which
+   * renders only when a saved address exists. So a customer with NO saved
+   * address who unticked "save this address" and pressed Back arrived at a step
+   * with no picker, no form, and no control that could summon one: just the
+   * date box and a Continue button. The typed values survived in the form state
+   * and still submitted, which is worse than losing them — the address was
+   * there, being sent, and could not be read or corrected.
+   *
+   * Derived, not stored, so the two cannot drift apart again: when there is
+   * nothing to pick from, the form IS the step.
+   */
+  const addressFormOpen = showAddressForm || savedAddresses.length === 0;
   const [placing, setPlacing] = useState(false);
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
   // Null while unknown — do not hide a method on a guess.
@@ -396,8 +413,10 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       // A typed-but-unsaved address must stay editable on return.
       if (!matching) setShowAddressForm(true);
     }
-    // Nothing to choose from: go straight to the form.
-    if (addresses.length === 0) setShowAddressForm(true);
+    // "Nothing to choose from: go straight to the form" stood here, and it was
+    // the ONLY thing opening the form for a first-time customer — once, at
+    // mount, never again. `addressFormOpen` derives that from the book itself,
+    // so it now holds on every render including the one after Back.
 
     setItems(cartItems);
     setDeliverySlot(draft.deliverySlot ?? EMPTY_DELIVERY_SLOT);
@@ -1108,7 +1127,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     />
 
 
-                    {showAddressForm ? (
+                    {addressFormOpen ? (
                       <div className="space-y-4 rounded-xl border border-border bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-medium">
