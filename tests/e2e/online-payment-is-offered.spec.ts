@@ -57,6 +57,13 @@ test.describe("paying online", () => {
     await page.getByLabel(/state/i).fill("MH");
     await page.getByLabel(/PIN code/i).fill("400001");
 
+    await page.getByRole("button", { name: /continue|next/i }).first().click();
+
+    // ---- the personalize step ----
+    // Date and slot moved here from the address step when the flow became
+    // Cart → Address → Personalize → Payment. Both are still enforced on the
+    // server: the date must be a real calendar day at or after the lead time,
+    // and the slot must be one the shop offers.
     const earliest = new Date();
     earliest.setDate(earliest.getDate() + 5);
     const isoDay = [
@@ -90,7 +97,8 @@ test.describe("paying online", () => {
     ).toBeVisible();
 
     await online.click();
-    await page.getByRole("button", { name: /continue|next|review/i }).first().click();
+    // The Review hop stood here. Payment and Review are one screen now, so
+    // the method is chosen and the order placed without leaving it.
 
     /**
      * The button that PAYS, anchored at the start of its name.

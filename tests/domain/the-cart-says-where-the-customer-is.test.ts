@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,11 +17,20 @@ import { addToCart, cartLineToAddInput, type CartLineItem } from "@/features/car
  * The cart IS a step.
  *
  * The shop owner asked for "Cart → Address → Personalize → Payment" and, in the
- * same breath, said not to fake a step this project does not have. It does not
- * have Personalize: a message on the cake, an uploaded photo and gift wrap are
- * controls on the product page and in the cart, not screens. So the bar says
- * what is true — Cart, Delivery, Payment, Review — and this file holds it to
- * that.
+ * same breath, said not to fake a step this project does not have. At the time
+ * it did not have Personalize — a message, an uploaded photo and gift wrap were
+ * controls on the product page and in the cart, not screens — so this file held
+ * the bar to Cart, Delivery, Payment, Review.
+ *
+ * It is a screen now. When the order should arrive is asked there, and Payment
+ * absorbed Review: confirming what you are about to pay for was never worth a
+ * screen of its own, and the details read back beside the money where they can
+ * still be changed. So the bar says the four the owner named.
+ *
+ * The rule the old test was really protecting survives, and is what the second
+ * test below now checks: a circle may only carry a name the flow can actually
+ * take the customer to. It is checked against the step machine rather than
+ * against a list, so a fifth label cannot be added without a screen behind it.
  */
 
 vi.mock("next/navigation", () => ({
@@ -77,23 +89,49 @@ describe("the progress bar on the cart", () => {
     const text = view.textContent ?? "";
 
     expect(text).toContain("Cart");
-    expect(text).toContain("Delivery");
+    expect(text).toContain("Address");
+    expect(text).toContain("Personalize");
     expect(text).toContain("Payment");
-    expect(text).toContain("Review");
+
+    /**
+     * Scoped to the BAR, not the page. The cart's own subtitle opens "Review
+     * your items…", so a page-wide search for the retired label passes on a
+     * sentence that has nothing to do with the flow.
+     */
+    const bar = view.querySelector("ol");
+    expect(bar?.textContent).not.toContain("Review");
 
     const current = view.querySelector('[aria-current="step"]');
     expect(current?.textContent).toContain("Cart");
   });
 
-  it("does not invent a step this checkout does not have", () => {
+  it("names only steps the flow can actually reach", () => {
     /**
-     * The owner named "Personalize" and asked to be told if it was not real. It
-     * is not: there is no route, no step value and no screen for it. A circle
-     * that never lights up is a promise the flow cannot keep.
+     * The rule the owner set — do not draw a circle for a screen that is not
+     * there — checked against the machine rather than against a list of words.
+     *
+     * The bar's ids beyond the cart are the checkout's own step values, so a
+     * fifth circle would have to be a fourth `step === n` branch on the
+     * checkout page before this passes.
      */
-    addToCart(cartLineToAddInput(LINE));
+    const bar = readFileSync(
+      join(process.cwd(), "apps/website/checkout/components/checkout-progress.tsx"),
+      "utf8",
+    );
+    const page = readFileSync(
+      join(process.cwd(), "apps/website/checkout/pages/checkout-page.tsx"),
+      "utf8",
+    );
 
-    expect(render().textContent ?? "").not.toContain("Personalize");
+    const circles = [...bar.matchAll(/\{ id: (\d+), label: "([^"]+)" \}/g)];
+    expect(circles.length, "the bar's own step list").toBe(4);
+
+    for (const [, id, label] of circles) {
+      if (id === "0") continue; // the cart is a route, not a step of the form
+      expect(page, `${label} is drawn but ${id} is not a screen`).toContain(
+        `{step === ${id} ? (`,
+      );
+    }
   });
 
   it("shows no progress bar over an empty cart", () => {

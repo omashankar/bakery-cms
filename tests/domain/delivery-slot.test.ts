@@ -106,7 +106,58 @@ describe("the draft carries the slot", () => {
     );
 
     expect(getCheckoutDraft().deliverySlot).toEqual(EMPTY_DELIVERY_SLOT);
-    expect(getCheckoutDraft().step).toBe(2);
+  });
+
+  it("but keeps nothing of WHERE that customer was standing", () => {
+    /**
+     * This asserted `step: 2` — written when 2 was the payment screen. The
+     * flow is Cart → Address → Personalize → Payment now, so the same number
+     * names a different screen, and honouring it would drop a customer who
+     * crossed a deploy onto one they had never filled in. On the old 3, that
+     * screen was the one that takes the money.
+     *
+     * What they typed is kept; only the position is forgotten.
+     */
+    sessionStorage.setItem(
+      "bakery-cms-checkout-draft",
+      JSON.stringify({ step: 3, address, paymentMethod: "cod" })
+    );
+
+    const draft = getCheckoutDraft();
+    expect(draft.step).toBe(1);
+    expect(draft.address.addressLine1).toBe(address.addressLine1);
+  });
+
+  it("while a draft this flow wrote keeps its place across a reload", () => {
+    /**
+     * The other side of the version gate, and the one that bites hardest if it
+     * is dropped. `saveCheckoutDraft` stamps the version itself rather than
+     * trusting the caller — a write that forgot would be thrown back to the
+     * first screen by the very next read, so a customer on Payment would be
+     * returned to Address by every reload, with no error anywhere.
+     */
+    // Built field by field rather than spread from the default, so the stamp
+    // inside `saveCheckoutDraft` is the only thing that can supply a version.
+    saveCheckoutDraft({
+      step: 3,
+      address,
+      deliverySlot: { date: "2026-08-01", timeSlot: "4:00 PM – 6:00 PM" },
+      paymentMethod: "cod",
+    });
+
+    expect(getCheckoutDraft().step).toBe(3);
+  });
+
+  it("and refuses a step number nobody wrote", () => {
+    // `step` was spread through unchecked, so a corrupted or hand-edited draft
+    // could name a screen that does not exist — rendering a checkout with the
+    // whole middle column missing.
+    sessionStorage.setItem(
+      "bakery-cms-checkout-draft",
+      JSON.stringify({ version: 2, step: 7, address, paymentMethod: "cod" })
+    );
+
+    expect(getCheckoutDraft().step).toBe(1);
   });
 });
 

@@ -50,6 +50,7 @@ import {
   hasDeliverySlot,
   saveCheckoutDraft,
   type CheckoutAddress,
+  type CheckoutStep,
   type DeliverySlot,
   type PaymentMethod,
 } from "@/features/orders/lib/checkout-draft";
@@ -180,7 +181,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [ready, setReady] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<CheckoutStep>(1);
   const [coupon, setCoupon] = useState<AppliedCoupon | undefined>();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [orderNotes, setOrderNotes] = useState("");
@@ -440,11 +441,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       : enabledMethods[0]?.value ?? "cod";
     setPaymentMethod(initialMethod);
 
-    // ?step=3 is a deep link back into Review. Only honour it when the draft
-    // already holds a deliverable address — otherwise the URL alone would skip
-    // the address form and place an order with nowhere to send it.
+    /**
+     * ?step=2 and ?step=3 are deep links into Personalize and Payment.
+     *
+     * Honoured only when the draft already holds what that screen stands on:
+     * Personalize needs somewhere to deliver to, and Payment needs a booked
+     * slot as well. Otherwise a URL on its own skips a screen — and on the
+     * last one that means taking money for an order with no date on it.
+     */
     const stepParam = searchParams.get("step");
-    if (stepParam === "3" && hasDeliverableAddress(draft.address)) {
+    const deliverable = hasDeliverableAddress(draft.address);
+    if (stepParam === "2" && deliverable) {
+      setStep(2);
+    }
+    if (stepParam === "3" && deliverable && hasDeliverySlot(draft.deliverySlot)) {
       setStep(3);
     }
 
@@ -457,7 +467,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   }, [reset, router, searchParams]);
 
   /** Moves between steps and records it in history, so Back walks the flow. */
-  function goToStep(next: 1 | 2 | 3) {
+  function goToStep(next: CheckoutStep) {
     setStep(next);
     const params = new URLSearchParams(searchParams.toString());
     if (next === 1) params.delete("step");
@@ -471,10 +481,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   useEffect(() => {
     if (!ready) return;
     const param = Number(searchParams.get("step"));
-    const target: 1 | 2 | 3 = param === 2 || param === 3 ? param : 1;
+    const target: CheckoutStep = param === 2 || param === 3 ? param : 1;
     if (target === step) return;
-    // Never land on a later step without an address to deliver to.
-    if (target > 1 && !hasDeliverableAddress(getCheckoutDraft().address)) return;
+    // Never land on a later step without what it stands on: an address to
+    // deliver to, and — for Payment — a slot to deliver in.
+    const draft = getCheckoutDraft();
+    if (target > 1 && !hasDeliverableAddress(draft.address)) return;
+    if (target === 3 && !hasDeliverySlot(draft.deliverySlot)) return;
     setStep(target);
   }, [searchParams, ready, step]);
 
@@ -630,7 +643,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   function persistDraft(
     patch: Partial<{
-      step: 1 | 2 | 3;
+      step: CheckoutStep;
       address: CheckoutAddress;
       deliverySlot: DeliverySlot;
       paymentMethod: PaymentMethod;
@@ -649,12 +662,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   }
 
   const onDeliverySubmit = (address: CheckoutAddress) => {
-    if (!hasDeliverySlot(deliverySlot)) {
-      setSlotError("Choose a delivery date and time");
-      return;
-    }
-    setSlotError(null);
-
     // Keeping the address book current is a convenience — it must never block
     // the order, so every path here is best-effort.
     try {
@@ -682,14 +689,22 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     setShowAddressForm(false);
     setEditingAddressId(null);
 
-    persistDraft({ step: 2, address, deliverySlot });
+    // The slot is asked for on the next screen now, so it is not this one's
+    // to persist — writing it here would stamp an empty slot over one the
+    // customer had already chosen and come back from.
+    persistDraft({ step: 2, address });
     goToStep(2);
   };
 
-  const onPaymentContinue = () => {
-    persistDraft({ step: 3, paymentMethod, orderNotes });
+  /** Leaving Personalize: the slot is what this screen exists to collect. */
+  const onPersonalizeContinue = () => {
+    if (!hasDeliverySlot(deliverySlot)) {
+      setSlotError("Choose a delivery date and time");
+      return;
+    }
+    setSlotError(null);
+    persistDraft({ step: 3, deliverySlot, paymentMethod });
     goToStep(3);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   /**
@@ -1048,7 +1063,10 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       label: "Change method",
                       onClick: () => {
                         setPayUI(null);
-                        goToStep(2);
+                        // Payment, which is step 3 now — 2 is Personalize, and
+                        // sending someone to re-pick a date they had already
+                        // chosen is not what "Change method" offers.
+                        goToStep(3);
                       },
                       variant: "outline",
                     },
@@ -1087,7 +1105,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
               {step === 1 ? (
                 <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-                  <h2 className="font-heading text-lg font-semibold">Delivery details</h2>
+                  {/*
+                    "Delivery details" covered two questions — where, and when —
+                    and only one of them is still asked here. The when moved to
+                    Personalize, so this says the one thing it now does.
+                  */}
+                  <h2 className="font-heading text-lg font-semibold">Delivery address</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Where should we deliver your order?
                   </p>
@@ -1281,74 +1304,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                     ) : null}
 
-                    {/* One slot for the whole order — an order is delivered
-                        once, even when each cake was added separately. */}
-                    <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
-                      <div>
-                        <p className="text-sm font-medium">When should we deliver?</p>
-                        <p className="text-xs text-muted-foreground">
-                          The earliest date depends on preparation time.
-                        </p>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="deliveryDate">Delivery date</Label>
-                          <Input
-                            id="deliveryDate"
-                            type="date"
-                            min={earliestDeliveryDate}
-                            value={deliverySlot.date}
-                            aria-invalid={Boolean(slotError) && !deliverySlot.date}
-                            onChange={(event) => {
-                              setSlotError(null);
-                              setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="deliveryTime">Delivery time</Label>
-                          <select
-                            id="deliveryTime"
-                            value={deliverySlot.timeSlot}
-                            aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
-                            onChange={(event) => {
-                              setSlotError(null);
-                              setDeliverySlot((prev) => ({
-                                ...prev,
-                                timeSlot: event.target.value,
-                              }));
-                            }}
-                            className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                          >
-                            <option value="">Select a time</option>
-                            {/*
-                              Today windows that have already closed are not
-                              offered — the quote refuses them. The one already
-                              chosen stays listed whatever the clock says, so the
-                              select never renders a value it has no option for;
-                              changing the date is what clears it.
-                            */}
-                            {slotOptions
-                              .filter(
-                                (slot) =>
-                                  slot === deliverySlot.timeSlot ||
-                                  !isPastTimeSlot(deliverySlot.date, slot),
-                              )
-                              .map((slot) => (
-                                <option key={slot} value={slot}>
-                                  {slot}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                      </div>
-                      {slotError ? (
-                        <p role="alert" className="text-xs text-destructive">
-                          {slotError}
-                        </p>
-                      ) : null}
-                    </div>
-
                     <CartIssuesAlert issues={cartIssues} />
 
                     <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
@@ -1356,7 +1311,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         Back to cart
                       </Button>
                       <Button type="submit" variant="bakery" disabled={cartBlocked}>
-                        Continue to payment
+                        Continue
                       </Button>
                     </div>
                   </form>
@@ -1364,6 +1319,97 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               ) : null}
 
               {step === 2 ? (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                    <h2 className="font-heading text-lg font-semibold">Personalize your order</h2>
+
+                    <div className="mt-5 space-y-4">
+                  {/* One slot for the whole order — an order is delivered
+                      once, even when each cake was added separately. */}
+                  <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
+                    <div>
+                      <p className="text-sm font-medium">When should we deliver?</p>
+                      <p className="text-xs text-muted-foreground">
+                        The earliest date depends on preparation time.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="deliveryDate">Delivery date</Label>
+                        <Input
+                          id="deliveryDate"
+                          type="date"
+                          min={earliestDeliveryDate}
+                          value={deliverySlot.date}
+                          aria-invalid={Boolean(slotError) && !deliverySlot.date}
+                          onChange={(event) => {
+                            setSlotError(null);
+                            setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="deliveryTime">Delivery time</Label>
+                        <select
+                          id="deliveryTime"
+                          value={deliverySlot.timeSlot}
+                          aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
+                          onChange={(event) => {
+                            setSlotError(null);
+                            setDeliverySlot((prev) => ({
+                              ...prev,
+                              timeSlot: event.target.value,
+                            }));
+                          }}
+                          className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
+                        >
+                          <option value="">Select a time</option>
+                          {/*
+                            Today windows that have already closed are not
+                            offered — the quote refuses them. The one already
+                            chosen stays listed whatever the clock says, so the
+                            select never renders a value it has no option for;
+                            changing the date is what clears it.
+                          */}
+                          {slotOptions
+                            .filter(
+                              (slot) =>
+                                slot === deliverySlot.timeSlot ||
+                                !isPastTimeSlot(deliverySlot.date, slot),
+                            )
+                            .map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    {slotError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {slotError}
+                      </p>
+                    ) : null}
+                  </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                    <Button variant="outline" onClick={() => goToStep(1)}>
+                      Back
+                    </Button>
+                    <Button
+                      variant="bakery"
+                      onClick={onPersonalizeContinue}
+                      disabled={cartBlocked}
+                    >
+                      Continue to payment
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {step === 3 ? (
                 <div className="space-y-6">
                   <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Payment method</h2>
@@ -1400,26 +1446,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       placeholder="Gate code, delivery instructions, etc."
                       value={orderNotes}
                       onChange={(event) => setOrderNotes(event.target.value)}
+                      // Persisted on blur because this box no longer has a
+                      // screen to leave: the step that used to write it away on
+                      // its way to Review is the step the order is placed from.
+                      onBlur={(event) => persistDraft({ orderNotes: event.target.value })}
                     />
                   </div>
 
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                    <Button variant="outline" onClick={() => goToStep(1)}>
-                      Back
-                    </Button>
-                    <Button
-                      variant="bakery"
-                      onClick={onPaymentContinue}
-                      disabled={availablePaymentOptions.length === 0}
-                    >
-                      Review order
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {step === 3 ? (
-                <div className="space-y-6">
                   <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Review & confirm</h2>
                     <p className="mt-1 text-sm text-muted-foreground">

@@ -76,6 +76,13 @@ test.describe("a customer placing an order", () => {
     await page.getByLabel(/state/i).fill("MH");
     await page.getByLabel(/PIN code/i).fill("400001");
 
+    await page.getByRole("button", { name: /continue|next/i }).first().click();
+
+    // ---- the personalize step ----
+    // Date and slot moved here from the address step when the flow became
+    // Cart → Address → Personalize → Payment. Both are still enforced on the
+    // server: the date must be a real calendar day at or after the lead time,
+    // and the slot must be one the shop offers.
     // The shop requires a delivery date and slot, and both are enforced on the
     // server — the date must be a real calendar day at or after the lead time,
     // and the slot must be one the shop offers.
@@ -99,7 +106,8 @@ test.describe("a customer placing an order", () => {
     const cod = page.getByText(/cash on delivery/i).first();
     if (await cod.isVisible().catch(() => false)) await cod.click();
 
-    await page.getByRole("button", { name: /continue|next|review/i }).first().click();
+    // The Review hop stood here. Payment and Review are one screen now, so
+    // the method is chosen and the order placed without leaving it.
 
     const placeOrder = page.getByRole("button", { name: /place order/i });
     await expect(placeOrder, "Place order never became available").toBeEnabled();

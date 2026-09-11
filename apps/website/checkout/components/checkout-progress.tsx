@@ -11,16 +11,25 @@ import { cn } from "@/lib/utils";
  * all, and the first thing the bar said after they left it was that they were
  * at the beginning.
  *
- * There is no "Personalize" step and this does not invent one. A message on the
- * cake, an uploaded photo and gift wrap are all controls on the product page and
- * in the cart; none of them is a screen, and a fourth circle that never lights
- * up is a promise the flow cannot keep.
+ * PERSONALIZE IS NOW A SCREEN, and this bar used to carry a written refusal to
+ * add one: "a fourth circle that never lights up is a promise the flow cannot
+ * keep". That was right while the only things it could have held were controls
+ * on other pages. It is a screen now — when the order should arrive is asked
+ * there, and it is where what the customer wants done to the order goes — so
+ * the circle lights up and the refusal has gone with it.
+ *
+ * Two steps changed meaning in the same move: Payment is where the order is
+ * placed, and Review is gone. Confirming what you are about to pay for was
+ * never worth a screen of its own — the details are read back beside the
+ * money, where they can still be changed. The numbers in the URL and in the
+ * saved draft therefore mean something new, which is what
+ * `CHECKOUT_FLOW_VERSION` exists to notice.
  */
 const steps = [
   { id: 0, label: "Cart" },
-  { id: 1, label: "Delivery" },
-  { id: 2, label: "Payment" },
-  { id: 3, label: "Review" },
+  { id: 1, label: "Address" },
+  { id: 2, label: "Personalize" },
+  { id: 3, label: "Payment" },
 ] as const;
 
 interface CheckoutProgressProps {
