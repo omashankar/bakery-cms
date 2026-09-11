@@ -125,7 +125,7 @@ export function SmtpSettingsPage() {
       description={
         hydration === "ready"
           ? `${saved.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${saved.host}` : ""}`
-          : "Configure outbound email for inquiry notifications and newsletters."
+          : "The account your shop sends order confirmations and sign-in codes from."
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Gating only
@@ -159,8 +159,21 @@ export function SmtpSettingsPage() {
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
             <CardTitle className="text-base">Mail server</CardTitle>
+            {/*
+              BOTH SENTENCES WERE FALSE, on the screen most likely to be left
+              half-filled because of them.
+
+              These values are PUT to the server and kept in the database; the
+              password is stored server-side and redacted on read, which the
+              hint under that very field says out loud. And "Send test email"
+              sends a real message. A shop reading "demo purposes" has every
+              reason to stop here — and then no order confirmation, no sign-in
+              code and no password reset ever leaves.
+            */}
             <CardDescription>
-              Stored locally for demo purposes. Connect a real provider in production.
+              The email account your shop sends from. Order confirmations, sign-in
+              codes and password resets all go out through it. Get these details
+              from whoever provides your email.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -182,17 +195,52 @@ export function SmtpSettingsPage() {
               value={settings.host}
               onChange={(e) => edit((prev) => ({ ...prev, host: e.target.value }))}
             />
+            <p className="text-xs text-muted-foreground">
+              From your email provider. It usually starts with smtp.
+            </p>
           </div>
+          {/*
+            PORT AND ENCRYPTION ARE ONE DECISION, and they were the two cells
+            furthest apart on the card — Port second, Encryption last, across a
+            full-width row at the bottom. They only make sense as a pair: 587
+            with TLS, or 465 with SSL. Split up, a shop pairs 587 with SSL and
+            the send fails with a timeout that names neither.
+          */}
           <div className="space-y-2">
-            <Label htmlFor="port">Port</Label>
-            <Input
-              id="port"
-              type="number"
-              value={settings.port}
-              onChange={(e) =>
-                edit((prev) => ({ ...prev, port: Number(e.target.value) || 587 }))
-              }
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="port">Port</Label>
+                <Input
+                  id="port"
+                  type="number"
+                  value={settings.port}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, port: Number(e.target.value) || 587 }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="encryption">Encryption</Label>
+                <AdminSelect
+                  id="encryption"
+                  value={settings.encryption}
+                  onChange={(e) =>
+                    edit((prev) => ({
+                      ...prev,
+                      encryption: e.target.value as SmtpSettings["encryption"],
+                    }))
+                  }
+                >
+                  <option value="tls">TLS</option>
+                  <option value="ssl">SSL</option>
+                  <option value="none">None</option>
+                </AdminSelect>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              These two go together. Port 587 with TLS, or port 465 with SSL.
+              Your provider&rsquo;s help page says which.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
@@ -202,6 +250,9 @@ export function SmtpSettingsPage() {
               onChange={(e) => edit((prev) => ({ ...prev, username: e.target.value }))}
               autoComplete="off"
             />
+            <p className="text-xs text-muted-foreground">
+              Usually the full email address of the account.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -250,6 +301,10 @@ export function SmtpSettingsPage() {
               value={settings.fromEmail}
               onChange={(e) => edit((prev) => ({ ...prev, fromEmail: e.target.value }))}
             />
+            <p className="text-xs text-muted-foreground">
+              What a customer sees the mail came from. Most providers refuse to
+              send unless this matches the account above.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromName">From name</Label>
@@ -258,23 +313,9 @@ export function SmtpSettingsPage() {
               value={settings.fromName}
               onChange={(e) => edit((prev) => ({ ...prev, fromName: e.target.value }))}
             />
-          </div>
-          <div className="space-y-2 lg:col-span-2">
-            <Label htmlFor="encryption">Encryption</Label>
-            <AdminSelect
-              id="encryption"
-              value={settings.encryption}
-              onChange={(e) =>
-                edit((prev) => ({
-                  ...prev,
-                  encryption: e.target.value as SmtpSettings["encryption"],
-                }))
-              }
-            >
-              <option value="tls">TLS</option>
-              <option value="ssl">SSL</option>
-              <option value="none">None</option>
-            </AdminSelect>
+            <p className="text-xs text-muted-foreground">
+              The name beside that address in the customer&rsquo;s inbox — your shop&rsquo;s.
+            </p>
           </div>
         </CardContent>
       </Card>

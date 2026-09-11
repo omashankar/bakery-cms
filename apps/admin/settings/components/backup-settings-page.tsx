@@ -427,19 +427,31 @@ export function BackupSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Import this backup?</DialogTitle>
+            {/*
+              A RESTORE REMOVES, and neither dialog said so.
+
+              Delivery zones, coupons and both template sets are written back
+              with the ids the backup holds, so a row the backup does NOT hold
+              is deleted — deliberate, documented in the repository, and stated
+              nowhere the owner could see it. Somebody restoring last month's
+              file to undo one edit loses every coupon and zone made since.
+            */}
             <DialogDescription>
               <strong>{pendingImport?.fileName}</strong> contains {pendingImport?.keyCount} CMS
-              data {pendingImport?.keyCount === 1 ? "key" : "keys"}. Server-backed sections are
-              pushed to the database (so they survive reload); the rest overwrite this browser. A
-              snapshot of your current data is archived first, so you can roll back from history.
+              data {pendingImport?.keyCount === 1 ? "key" : "keys"}, and replaces what you have
+              now with what it holds. Anything created since it was taken —{" "}
+              coupons, delivery zones, email and WhatsApp templates — is removed.
+              A snapshot of your current data is archived first, so you can roll
+              back from history.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setPendingImport(null)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={confirmImport} disabled={busy}>
-              Import backup
+            {/* Warm primary is the Save button on every other screen. */}
+            <Button variant="destructive" onClick={confirmImport} disabled={busy}>
+              Replace my data
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -449,18 +461,30 @@ export function BackupSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Restore this backup?</DialogTitle>
+            {/*
+              THE DIFFERENCE FROM IMPORT WAS ONLY A DIFFERENCE OF TONE.
+
+              Import archives a snapshot first and refuses outright if that
+              snapshot comes back incomplete. This path does neither — it
+              writes straight through. The dialogs said so as "a snapshot is
+              archived first" against "export first if you need a rollback",
+              which reads as advice rather than as the absence of the safety
+              net the other one has.
+            */}
             <DialogDescription>
-              This restores the snapshot from <strong>{restoreTarget?.label}</strong>:
-              server-backed sections are pushed to the database and the rest overwrite this
-              browser. Export current data first if you need a rollback.
+              This replaces what you have now with the snapshot from{" "}
+              <strong>{restoreTarget?.label}</strong>. Anything created since —{" "}
+              coupons, delivery zones, email and WhatsApp templates — is removed.
+              <strong> No snapshot is taken first</strong>, so there is nothing to
+              roll back to. Export your current data before you press this.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setRestoreTarget(null)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="bakery" onClick={confirmRestore} disabled={busy}>
-              Restore snapshot
+            <Button variant="destructive" onClick={confirmRestore} disabled={busy}>
+              Replace my data
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -470,16 +494,24 @@ export function BackupSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete snapshot?</DialogTitle>
+            {/*
+              THE ONLY RED BUTTON ON THIS SCREEN WAS THE HARMLESS ONE.
+
+              This drops one row from a list. The two buttons that push a whole
+              backup over the live database were the warm primary — the same
+              button an owner presses to Save everywhere else. The colours were
+              the wrong way round on the most dangerous screen in the admin.
+            */}
             <DialogDescription>
-              Remove <strong>{deleteTarget?.label}</strong> from backup history. Downloaded JSON
-              files are not affected.
+              Remove <strong>{deleteTarget?.label}</strong> from this list. Nothing in
+              your shop changes, and any JSON file you downloaded is untouched.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
+            <Button variant="outline" onClick={confirmDelete}>
               Delete
             </Button>
           </DialogFooter>
