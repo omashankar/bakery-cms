@@ -59,7 +59,9 @@ test.describe("paying for real, on a test key", () => {
 
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
     await page.getByLabel(/email/i).fill(customerEmail);
-    await page.getByLabel(/phone/i).fill("9000000002");
+    // EXACT. The address step also carries "Alternate phone (optional)", so
+    // a loose /phone/i matches two boxes and the fill refuses to guess.
+    await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
     await page.getByLabel(/city/i).fill("Mumbai");
     await page.getByLabel(/state/i).fill("MH");
@@ -93,8 +95,31 @@ test.describe("paying for real, on a test key", () => {
     await page.getByText(/pay online/i).first().click();
     // The Review hop stood here. Payment and Review are one screen now, so
     // the method is chosen and the order placed without leaving it.
+    /**
+     * The terms tick GATES the order button.
+     *
+     * It was a grey sentence saying agreement had already happened; it is a
+     * control now, and unticked to begin with, so a journey that does not tick
+     * it reaches a button that can never enable.
+     */
+    // The LABEL, not the box. Base UI puts the id on a hidden input and
+    // renders the visible control beside it, so the label is both the
+    // stable handle and what a customer actually clicks.
+    const terms = page.locator("label:has(#acceptTerms)");
+    // Scrolled to first: it sits below the fold on a short viewport, and a
+    // click that never lands reads as a button that never enables.
+    await terms.scrollIntoViewIfNeeded();
+    await terms.click();
+
+    /**
+     * Anchored on the AMOUNT, not on the word.
+     *
+     * The method card is named "Pay Online" and shares this screen with the
+     * money button now — the old flow had them one step apart — so `/^pay\b/`
+     * matched the card first, and clicking it only re-selected the method.
+     */
     await page
-      .getByRole("button", { name: /^(pay\b|place order)/i })
+      .getByRole("button", { name: /^(pay[^a-z]*\d|place order)/i })
       .filter({ hasNotText: /go back|edit/i })
       .first()
       .click();

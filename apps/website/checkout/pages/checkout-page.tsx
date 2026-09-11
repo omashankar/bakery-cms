@@ -288,8 +288,35 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     async function checkGateway() {
       try {
         const response = await fetch("/api/razorpay/availability");
-        const status = await response.json();
-        if (!cancelled) setOnlinePaymentReady(Boolean(status?.configured));
+        /**
+         * A REFUSAL IS NOT AN ANSWER.
+         *
+         * This read `Boolean(status?.configured)` off whatever came back. A
+         * throw was handled — that left the state `null`, which means unknown
+         * and keeps the method on offer — but a response that ARRIVED and said
+         * something else was not: a 500, an error envelope, a rate-limit page,
+         * anything without a `configured` key, all became `Boolean(undefined)`,
+         * which is `false`, which hides Pay Online for the rest of that page
+         * load.
+         *
+         * The shop then looks to that customer like a shop that takes cash
+         * only, on a gateway that was working the whole time — and a reload is
+         * the only thing that fixes it, which nobody thinks to do.
+         *
+         * Caught in the browser, not in a unit test: the same spec passed once
+         * and failed twice against a gateway the server confirmed was live.
+         */
+        if (!response.ok) {
+          if (!cancelled) setOnlinePaymentReady(null);
+          return;
+        }
+        const status = (await response.json()) as { configured?: unknown };
+        if (cancelled) return;
+        // Still unknown when the body does not say. Only an explicit answer
+        // decides, in either direction.
+        setOnlinePaymentReady(
+          typeof status?.configured === "boolean" ? status.configured : null,
+        );
       } catch {
         if (!cancelled) setOnlinePaymentReady(null);
       }
@@ -305,11 +332,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const enabledMethods = useMemo(
     () =>
       ready
-        ? getEnabledCheckoutMethods().filter(
+        ? // The SWITCHES THIS RENDER HOLDS, not whatever the cache says when
+          // this line runs. Reading the cache here made the list a snapshot of
+          // an arbitrary moment, and nothing re-took it.
+          getEnabledCheckoutMethods(commerce.paymentMethods).filter(
             (method) => method.id !== "razorpay" || onlinePaymentReady !== false
           )
         : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [ready, commerce.paymentMethods, onlinePaymentReady]
   );
 
@@ -2074,7 +2103,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       fact that a page once contained the words.
                     */}
                     <label className="flex cursor-pointer items-start justify-center gap-3 text-xs text-muted-foreground">
+                      {/*
+                        An id, because the visible label is the shop's own
+                        terms wording and therefore not a stable handle for
+                        anything that needs to find this control. The label
+                        still names it for a screen reader, which is what a
+                        reader of a consent box should hear.
+                      */}
                       <Checkbox
+                        id="acceptTerms"
                         checked={termsAccepted}
                         onCheckedChange={(checked) => setTermsAccepted(checked === true)}
                       />

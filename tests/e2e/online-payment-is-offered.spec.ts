@@ -51,7 +51,9 @@ test.describe("paying online", () => {
     // ---- the address step, exactly as place-an-order does it ----
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
     await page.getByLabel(/email/i).fill(customerEmail);
-    await page.getByLabel(/phone/i).fill("9000000002");
+    // EXACT. The address step also carries "Alternate phone (optional)", so
+    // a loose /phone/i matches two boxes and the fill refuses to guess.
+    await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
     await page.getByLabel(/city/i).fill("Mumbai");
     await page.getByLabel(/state/i).fill("MH");
@@ -73,10 +75,30 @@ test.describe("paying online", () => {
     ].join("-");
     await page.getByLabel(/delivery date/i).fill(isoDay);
 
+    /**
+     * WAIT for a real window, then insist one was chosen.
+     *
+     * This read the options once and selected one only `if (firstReal)` —
+     * so when the shop's slots had not loaded yet, it selected nothing,
+     * pressed Continue anyway, and was correctly refused. The run then sat on
+     * Personalize and reported that checkout offers no online payment, which
+     * blamed the payment switch for a delivery slot that was never picked.
+     */
     const slot = page.getByLabel(/delivery time/i);
-    const options = await slot.locator("option").allTextContents();
-    const firstReal = options.find((text) => text && !/select a time/i.test(text));
-    if (firstReal) await slot.selectOption({ label: firstReal });
+    await expect
+      .poll(
+        async () =>
+          (await slot.locator("option").allTextContents()).filter(
+            (text) => text && !/select a time/i.test(text),
+          ).length,
+        { message: "the shop offered no delivery window to choose" },
+      )
+      .toBeGreaterThan(0);
+
+    const windows = (await slot.locator("option").allTextContents()).filter(
+      (text) => text && !/select a time/i.test(text),
+    );
+    await slot.selectOption({ label: windows[0] });
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -101,15 +123,41 @@ test.describe("paying online", () => {
     // the method is chosen and the order placed without leaving it.
 
     /**
+     * The terms tick GATES the order button.
+     *
+     * It was a grey sentence saying agreement had already happened; it is a
+     * control now, and unticked to begin with, so a journey that does not tick
+     * it reaches a button that can never enable.
+     *
+     * The LABEL, not the box: Base UI puts the id on a hidden input and renders
+     * the visible control beside it, so the label is both the stable handle and
+     * what a customer actually clicks.
+     */
+    const terms = page.locator("label:has(#acceptTerms)");
+    // Scrolled to first: it sits below the fold on a short viewport, and a
+    // click that never lands reads as a button that never enables.
+    await terms.scrollIntoViewIfNeeded();
+    await terms.click();
+
+    /**
      * The button that PAYS, anchored at the start of its name.
      *
      * A loose `/pay/i` also matches the stepper's "✓ Payment — completed, go
      * back to edit", which sits earlier in the DOM — so `.first()` clicked the
      * breadcrumb, walked back a step, and the test then waited thirty seconds
      * for a request the page had every reason not to make.
+     *
+     * And `/^pay\b/` is no longer enough either, because the METHOD CARD is
+     * named "Pay Online" and now shares a screen with the money button — the
+     * old flow had them one step apart. `.first()` took the card, clicking it
+     * re-selected the method already selected, nothing was requested, and the
+     * run again waited thirty seconds for a call nobody had asked for.
+     *
+     * So it is anchored on the amount: only the button that takes the money
+     * carries a price in its name.
      */
     const placeOrder = page
-      .getByRole("button", { name: /^(pay\b|place order)/i })
+      .getByRole("button", { name: /^(pay[^a-z]*\d|place order)/i })
       .filter({ hasNotText: /go back|edit/i })
       .first();
     await expect(placeOrder, "the review step never became payable").toBeEnabled();

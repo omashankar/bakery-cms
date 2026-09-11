@@ -70,7 +70,9 @@ test.describe("a customer placing an order", () => {
     // ---- the address step ----
     await page.getByLabel(/full name/i).fill("E2E Probe");
     await page.getByLabel(/email/i).fill(customerEmail);
-    await page.getByLabel(/phone/i).fill("9000000001");
+    // EXACT. The address step also carries "Alternate phone (optional)", so
+    // a loose /phone/i matches two boxes and the fill refuses to guess.
+    await page.getByLabel("Phone", { exact: true }).fill("9000000001");
     await page.getByLabel(/address line 1|address/i).first().fill("1 Probe Lane");
     await page.getByLabel(/city/i).fill("Mumbai");
     await page.getByLabel(/state/i).fill("MH");
@@ -95,10 +97,30 @@ test.describe("a customer placing an order", () => {
     ].join("-");
     await page.getByLabel(/delivery date/i).fill(isoDay);
 
+    /**
+     * WAIT for a real window, then insist one was chosen.
+     *
+     * This read the options once and selected one only `if (firstReal)` —
+     * so when the shop's slots had not loaded yet, it selected nothing,
+     * pressed Continue anyway, and was correctly refused. The run then sat on
+     * Personalize and reported that checkout offers no online payment, which
+     * blamed the payment switch for a delivery slot that was never picked.
+     */
     const slot = page.getByLabel(/delivery time/i);
-    const options = await slot.locator("option").allTextContents();
-    const firstReal = options.find((text) => text && !/select a time/i.test(text));
-    if (firstReal) await slot.selectOption({ label: firstReal });
+    await expect
+      .poll(
+        async () =>
+          (await slot.locator("option").allTextContents()).filter(
+            (text) => text && !/select a time/i.test(text),
+          ).length,
+        { message: "the shop offered no delivery window to choose" },
+      )
+      .toBeGreaterThan(0);
+
+    const windows = (await slot.locator("option").allTextContents()).filter(
+      (text) => text && !/select a time/i.test(text),
+    );
+    await slot.selectOption({ label: windows[0] });
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -108,6 +130,22 @@ test.describe("a customer placing an order", () => {
 
     // The Review hop stood here. Payment and Review are one screen now, so
     // the method is chosen and the order placed without leaving it.
+
+    /**
+     * The terms tick GATES the order button.
+     *
+     * It was a grey sentence saying agreement had already happened; it is a
+     * control now, and unticked to begin with, so a journey that does not
+     * tick it reaches a Place order button that can never enable.
+     */
+    // The LABEL, not the box. Base UI puts the id on a hidden input and
+    // renders the visible control beside it, so the label is both the
+    // stable handle and what a customer actually clicks.
+    const terms = page.locator("label:has(#acceptTerms)");
+    // Scrolled to first: it sits below the fold on a short viewport, and a
+    // click that never lands reads as a button that never enables.
+    await terms.scrollIntoViewIfNeeded();
+    await terms.click();
 
     const placeOrder = page.getByRole("button", { name: /place order/i });
     await expect(placeOrder, "Place order never became available").toBeEnabled();
