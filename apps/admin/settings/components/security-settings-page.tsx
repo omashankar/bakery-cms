@@ -106,6 +106,15 @@ export function SecuritySettingsPage() {
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [clearFailedOpen, setClearFailedOpen] = useState(false);
   const [logoutEverywhereOpen, setLogoutEverywhereOpen] = useState(false);
+  /*
+    The twin of the button below it asks first; this one did not.
+
+    Both end sessions that are not this browser's, and they sit side by side
+    in the same row. One click here logged out every other admin — on a shop
+    with staff, mid-shift, with no dialog and no undo — while the button
+    beside it, which only adds this device to the same list, stopped to ask.
+  */
+  const [logoutOthersOpen, setLogoutOthersOpen] = useState(false);
 
   function refreshCenter() {
     setLoginHistory(getLoginHistory());
@@ -348,6 +357,11 @@ export function SecuritySettingsPage() {
                       }))
                     }
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Wrong passwords allowed per minute before sign-in is refused.
+                    Counted per internet connection, not per person — so everyone
+                    on the shop&rsquo;s WiFi shares this number.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -488,7 +502,7 @@ export function SecuritySettingsPage() {
 
         <TabsContent value="sessions" className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => void handleLogoutAll()}>
+            <Button variant="outline" size="sm" onClick={() => setLogoutOthersOpen(true)}>
               <LogOut className="size-4" />
               Sign out other devices
             </Button>
@@ -628,6 +642,33 @@ export function SecuritySettingsPage() {
             </Button>
             <Button variant="destructive" onClick={confirmClearFailed}>
               Clear all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={logoutOthersOpen} onOpenChange={setLogoutOthersOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sign out the other devices?</DialogTitle>
+            <DialogDescription>
+              Everyone signed in to this admin on another device — including your
+              staff, mid-shift — is signed out and has to sign in again. This
+              device stays signed in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setLogoutOthersOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setLogoutOthersOpen(false);
+                void handleLogoutAll();
+              }}
+            >
+              Sign out other devices
             </Button>
           </DialogFooter>
         </DialogContent>

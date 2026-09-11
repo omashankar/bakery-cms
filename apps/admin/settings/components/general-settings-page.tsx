@@ -192,7 +192,11 @@ export function GeneralSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="siteName">Site name</Label>
+              {/*
+                The only required field on the screen, and it said so only once
+                you had emptied it and pressed Save.
+              */}
+              <Label htmlFor="siteName">Site name (required)</Label>
               <Input
                 id="siteName"
                 value={settings.siteName}
@@ -201,6 +205,10 @@ export function GeneralSettingsPage() {
                 className={cn(errors.siteName && "border-destructive")}
                 onChange={(e) => edit((prev) => ({ ...prev, siteName: e.target.value }))}
               />
+              <p className="text-xs text-muted-foreground">
+                Your shop&rsquo;s name. It shows in the browser tab, on invoices and
+                at the top of every email your shop sends.
+              </p>
               <FieldError id="siteName-error" message={errors.siteName} />
             </div>
             <div className="space-y-2">
@@ -210,6 +218,9 @@ export function GeneralSettingsPage() {
                 value={settings.siteTagline}
                 onChange={(e) => edit((prev) => ({ ...prev, siteTagline: e.target.value }))}
               />
+              <p className="text-xs text-muted-foreground">
+                One short line under your shop&rsquo;s name on the home page.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="siteDescription">Description</Label>
@@ -222,6 +233,10 @@ export function GeneralSettingsPage() {
                 }
                 rows={4}
               />
+              <p className="text-xs text-muted-foreground">
+                The sentence Google shows under your shop in its results. Two lines
+                is about all it prints.
+              </p>
             </div>
           </CardContent>
         </Card>

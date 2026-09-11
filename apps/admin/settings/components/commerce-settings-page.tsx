@@ -149,7 +149,11 @@ export function CommerceSettingsPage() {
       title="Order Settings"
       description={
         hydration === "ready"
-          ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)} · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
+          ? `${
+              saved.freeDeliveryThreshold > 0
+                ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
+                : "Delivery free on every order"
+            } · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
           : "Shipping, tax, payments, and delivery rules used across cart and checkout."
       }
       isDirty={isDirty}
@@ -212,6 +216,21 @@ export function CommerceSettingsPage() {
                     }))
                   }
                 />
+                {/*
+                  ZERO MEANS THE OPPOSITE HERE FROM WHAT IT MEANS BELOW.
+
+                  The box under this one says "Set to 0 to disable minimum order
+                  enforcement" — so the screen teaches, two inches apart, that 0
+                  switches a rule OFF. In this box 0 switches it fully on: every
+                  order is at or above ₹0, so delivery is free on all of them and
+                  the fee beside it is never charged once.
+                */}
+                <p className="text-xs text-muted-foreground">
+                  Orders at or above this amount are delivered free. 0 here means
+                  EVERY order is free — the fee beside this box is then never
+                  charged. To charge on every order, set this above the largest
+                  order you expect.
+                </p>
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="minOrderValue">Minimum order value</Label>
@@ -446,7 +465,9 @@ export function CommerceSettingsPage() {
               <span>{formatCurrency(previewTotals.total)}</span>
             </div>
             <p className="pt-2 text-xs text-muted-foreground">
-              Free delivery above {formatCurrency(settings.freeDeliveryThreshold)}.
+              {settings.freeDeliveryThreshold > 0
+                ? `Free delivery above ${formatCurrency(settings.freeDeliveryThreshold)}.`
+                : "Delivery is free on every order."}
               {settings.minOrderValue > 0
                 ? ` Minimum order ${formatCurrency(settings.minOrderValue)}.`
                 : ""}
