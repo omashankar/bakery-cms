@@ -7,6 +7,7 @@ import {
   BarChart3,
   Blocks,
   ChevronRight,
+  Clock,
   Code2,
   CreditCard,
   Database,
@@ -16,6 +17,7 @@ import {
   Mail,
   Menu,
   MessageCircle,
+  PackageCheck,
   Palette,
   Smartphone,
   PanelBottom,
@@ -116,11 +118,35 @@ const groups: SettingsGroup[] = [
         href: routes.admin.commerce.payments,
         icon: CreditCard,
       },
+      /*
+        ONE ROW PROMISED THREE SCREENS AND OPENED ONE.
+
+        "Delivery zones, time slots, and shipping rules" linked to zones only,
+        and no other menu in the CMS reaches the other two — so a shop looking
+        for its delivery times, or for when delivery is free, arrived at a list
+        of areas and had nowhere else to go.
+
+        Each row is named after the heading it opens, never a friendlier
+        invention: a row whose name does not match the page is the same defect
+        one size smaller. The plain-language half goes in the description.
+      */
       {
-        title: "Delivery",
-        description: "Delivery zones, time slots, and shipping rules.",
+        title: "Delivery Zones",
+        description: "The areas you deliver to, and what delivery costs in each.",
         href: routes.admin.commerce.deliveryZones,
         icon: Truck,
+      },
+      {
+        title: "Delivery Slots",
+        description: "The delivery times a customer can pick, and how far ahead they must order.",
+        href: routes.admin.commerce.deliverySlots,
+        icon: Clock,
+      },
+      {
+        title: "Shipping Rules",
+        description: "The delivery fee, and when delivery is free.",
+        href: routes.admin.commerce.shippingRules,
+        icon: PackageCheck,
       },
       {
         title: "Taxes",
@@ -251,7 +277,7 @@ const groups: SettingsGroup[] = [
         icon: Shield,
       },
       {
-        title: "Activity Logs",
+        title: "Activity Log",
         description: "Recent admin actions across the CMS.",
         href: routes.admin.settings.activity,
         icon: Activity,

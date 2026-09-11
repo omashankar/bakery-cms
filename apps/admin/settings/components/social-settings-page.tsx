@@ -111,7 +111,7 @@ export function SocialSettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Social"
+      title="Social Media"
       description={
         hydration === "ready"
           ? `${activeCount} active of ${links.length} link${links.length === 1 ? "" : "s"}`

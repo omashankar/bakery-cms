@@ -121,7 +121,7 @@ export function ContactSettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Contact"
+      title="Contact Information"
       description={
         hydration === "ready"
           ? `${emailSet ? settings.email : "No email"} · ${hoursCount} hour row${hoursCount === 1 ? "" : "s"}`

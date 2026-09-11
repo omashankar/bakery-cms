@@ -121,7 +121,7 @@ export function MaintenanceSettingsPage({
 
   return (
     <SettingsSectionShell
-      title="Maintenance"
+      title="Maintenance Mode"
       description={
         hydration === "ready"
           ? `${liveEnabled ? "Store closed" : "Store open"} · ${allowedIpCount} allowed IP${allowedIpCount === 1 ? "" : "s"}`

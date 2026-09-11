@@ -245,7 +245,7 @@ export function SecuritySettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Security"
+      title="Login Security"
       description={
         // The SAVED policy, not the draft. This read the working copy, so
         // dragging the timeout slider or flipping 2FA restated the header as

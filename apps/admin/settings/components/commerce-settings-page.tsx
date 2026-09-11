@@ -146,7 +146,7 @@ export function CommerceSettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Commerce"
+      title="Order Settings"
       description={
         hydration === "ready"
           ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)} · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
