@@ -465,7 +465,9 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Favorite products</CardTitle>
-              <CardDescription>Most ordered cakes</CardDescription>
+              <CardDescription>
+                What this customer orders most
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {profile.favoriteProducts.length === 0 ? (

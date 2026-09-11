@@ -187,6 +187,22 @@ export function readableStrings(line: string): string[] {
     found.push(bare[1]);
   }
 
+  /**
+   * JSX text sharing a line with its own tags.
+   *
+   * `<CardDescription>Primary ways customers can reach your bakery.</CardDescription>`
+   * — invisible to both readers above. The quoted-string one finds no quotes,
+   * and the bare-prose one needs the line to OPEN with a letter, which this
+   * opens with "<". A sentence the shop reads, on a screen in a CMS sold to any
+   * trade, that the ratchet was structurally unable to see.
+   *
+   * Bounded the same way the bare-prose branch is: text carrying the
+   * punctuation an expression needs is code, not words.
+   */
+  for (const inline of line.matchAll(/>([A-Za-z][^<>{}"`=$]{5,160})</g)) {
+    found.push(inline[1]!);
+  }
+
   return found.filter((text) => {
     const trimmed = text.trim();
     if (!TRADE.test(trimmed)) return false;

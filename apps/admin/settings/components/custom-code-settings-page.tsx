@@ -141,9 +141,25 @@ export function CustomCodeSettingsPage() {
         )}
       >
         <Info className="mt-0.5 size-4 shrink-0" />
+        {/*
+          IT WARNED ABOUT THE WRONG DANGER, and then read as though nothing
+          were live.
+
+          "Invalid code can break your storefront" is the small risk — a broken
+          style shows up at once and is undone at once. The large one is that
+          anything pasted here RUNS in every visitor's browser, on every page,
+          with the run of whatever they type. A shop pasting a snippet from a
+          stranger is the case this box has to speak to.
+
+          And "stored now and applied when the backend renders it" is a
+          sentence about this system's internals that reads as "not live yet" —
+          on the screen where believing that is most expensive.
+        */}
         <p>
-          Advanced. Invalid code can break your storefront. It is stored now and applied when the
-          backend renders it.
+          Anything you put here runs on your live shop, in every visitor&rsquo;s
+          browser, on every page — so only paste code you understand or trust the
+          source of. A mistake here can break the storefront or leak what
+          customers type. Saving publishes it straight away.
         </p>
       </div>
 
