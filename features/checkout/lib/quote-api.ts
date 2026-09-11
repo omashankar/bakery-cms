@@ -1,5 +1,6 @@
 import type { CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
+import type { CheckoutAddress } from "@/features/orders/lib/checkout-draft";
 
 /**
  * Asks the SERVER what this cart costs.
@@ -33,16 +34,14 @@ export interface QuoteRequest {
    * the draft alone if the browser never comes back — a payment that completes
    * after the tab closes used to leave money with no order behind it.
    */
-  address?: {
-    fullName: string;
-    email: string;
-    phone: string;
-    addressLine1: string;
-    addressLine2?: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
+  /**
+   * The type itself, not a copy of its fields.
+   *
+   * This was an inline duplicate of `CheckoutAddress`, which meant a field
+   * added to the address had two more places to be forgotten — here, and in
+   * the server schema this posts to. One of them is now impossible to miss.
+   */
+  address?: CheckoutAddress;
   deliverySlot?: { date?: string; timeSlot?: string };
   orderNotes?: string;
 }

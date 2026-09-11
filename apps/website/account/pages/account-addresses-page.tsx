@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { formatAddress } from "@/features/orders/lib/address-format";
+import {
+  EMPTY_CHECKOUT_ADDRESS,
+  type CheckoutAddress,
+} from "@/features/orders/lib/checkout-draft";
 import { toast } from "sonner";
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
@@ -21,31 +26,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-type AddressForm = {
+/**
+ * The checkout's address, plus the two things only the book has.
+ *
+ * This was a hand-written copy of `CheckoutAddress` that did not extend it,
+ * so widening the address left this screen behind — silently, because every
+ * new field is optional. Built from the type now, so there is nothing left
+ * to forget.
+ */
+type AddressForm = CheckoutAddress & {
   label: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  addressLine1: string;
-  addressLine2?: string;
-  city: string;
-  state: string;
-  pincode: string;
   isDefault: boolean;
 };
 
 const emptyForm: AddressForm = {
+  ...EMPTY_CHECKOUT_ADDRESS,
   label: "Home",
-  fullName: "",
-  email: "",
-  phone: "",
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  state: "",
-  pincode: "",
+  addressLabel: "Home",
   isDefault: false,
 };
+
+/**
+ * A saved record as the form wants it.
+ *
+ * Spread rather than listed, and over `emptyForm`, so a field added to the
+ * address arrives here on its own and an older record without it yields a
+ * string instead of `undefined`. The three storage keys are dropped because
+ * the form has no business editing them.
+ */
+function toForm(address: SavedAddress): AddressForm {
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = address;
+  return { ...emptyForm, ...rest };
+}
 
 export function AccountAddressesPage() {
   const { session, ready } = useCustomerAuth();
@@ -57,6 +69,8 @@ export function AccountAddressesPage() {
   });
 
   const isDefault = watch("isDefault");
+  // The 3-up control is not an <input>, so it is watched rather than registered.
+  const watchedLabel = watch("label");
 
   useEffect(() => {
     const refresh = () => setAddresses(getSavedAddresses());
@@ -78,18 +92,10 @@ export function AccountAddressesPage() {
 
   function startEdit(address: SavedAddress) {
     setEditingId(address.id);
-    reset({
-      label: address.label,
-      fullName: address.fullName,
-      email: address.email,
-      phone: address.phone,
-      addressLine1: address.addressLine1,
-      addressLine2: address.addressLine2,
-      city: address.city,
-      state: address.state,
-      pincode: address.pincode,
-      isDefault: address.isDefault,
-    });
+    // Listed field by field before, which made Edit destructive for anything
+    // the list had not caught up with: the boxes opened blank and Update
+    // wrote the blanks back over a good record.
+    reset(toForm(address));
   }
 
   function cancelEdit() {
@@ -162,15 +168,7 @@ export function AccountAddressesPage() {
                       {address.fullName} · {address.phone}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {[
-                        address.addressLine1,
-                        address.addressLine2,
-                        address.city,
-                        address.state,
-                        address.pincode,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
+                      {formatAddress(address)}
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -225,8 +223,37 @@ export function AccountAddressesPage() {
           <div className="mt-1 h-px bg-border" />
           <form className="mt-5 space-y-3" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
-              <Label htmlFor="label">Label</Label>
-              <Input id="label" placeholder="Home, Office..." {...register("label", { required: true })} />
+              <Label>Label</Label>
+              {/*
+                The same three choices the checkout offers. Free text here
+                and a three-way control there meant the two screens could
+                disagree about what a label may even contain.
+              */}
+              <div role="radiogroup" aria-label="Label" className="grid grid-cols-3 gap-2">
+                {(["Home", "Office", "Other"] as const).map((option) => {
+                  const active = watchedLabel === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        setValue("label", option);
+                        setValue("addressLabel", option);
+                      }}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "border-bakery-700 bg-bakery-700 text-white"
+                          : "border-border bg-white text-foreground hover:border-bakery-700"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
@@ -249,6 +276,24 @@ export function AccountAddressesPage() {
             <div className="space-y-2">
               <Label htmlFor="addressLine2">Address line 2</Label>
               <Input id="addressLine2" {...register("addressLine2")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="landmark">Landmark</Label>
+              <Input
+                id="landmark"
+                placeholder="A shop, a turning, anything easy to spot"
+                {...register("landmark")}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="altPhone">Alternate phone</Label>
+                <Input id="altPhone" {...register("altPhone")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input id="country" {...register("country")} />
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">

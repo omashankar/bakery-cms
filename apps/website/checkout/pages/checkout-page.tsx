@@ -60,6 +60,7 @@ import {
 } from "@/apps/website/lib/product-details";
 import type { AppliedCoupon } from "@/features/orders/lib/coupons";
 import { applyCouponCode } from "@/features/orders/lib/coupons";
+import { formatAddress } from "@/features/orders/lib/address-format";
 import {
   hasBlockingCartIssues,
   validateCartAgainstCatalog,
@@ -98,6 +99,7 @@ import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCalendarDate, formatCurrency } from "@/utils/format";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { cn } from "@/lib/utils";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -119,7 +121,16 @@ const paymentOptions: {
   },
 ];
 
-/** Strip the address-book fields the checkout form does not carry. */
+/**
+ * Strip the address-book fields the checkout form does not carry.
+ *
+ * Written out key by key ON PURPOSE — a blanket spread would drag `id`,
+ * `label`, `isDefault` and the timestamps into the form. The cost is that a
+ * field added to `CheckoutAddress` and forgotten here compiles perfectly and
+ * blanks itself the moment a returning customer taps their saved address.
+ * Every optional one takes `?? ""` so an older saved record yields a string
+ * rather than flipping its input to uncontrolled.
+ */
 function toCheckoutAddress(saved: SavedAddress): CheckoutAddress {
   return {
     fullName: saved.fullName,
@@ -127,18 +138,34 @@ function toCheckoutAddress(saved: SavedAddress): CheckoutAddress {
     phone: saved.phone,
     addressLine1: saved.addressLine1,
     addressLine2: saved.addressLine2 ?? "",
+    landmark: saved.landmark ?? "",
     city: saved.city,
     state: saved.state,
     pincode: saved.pincode,
+    country: saved.country ?? "",
+    altPhone: saved.altPhone ?? "",
+    addressLabel: saved.addressLabel,
   };
 }
 
-/** Same delivery destination, ignoring formatting differences. */
+/**
+ * Same delivery destination, ignoring formatting differences.
+ *
+ * `landmark` counts: it is the line a rider navigates by, so two addresses
+ * that differ only there are not the same destination. Leaving it out made
+ * SAVE look broken — the book already held a "match", so nothing was written
+ * and nothing was said.
+ *
+ * `country`, `altPhone` and `addressLabel` do NOT count. None of them changes
+ * where the parcel goes, and treating a relabelled address as a new one would
+ * fill the book with duplicates.
+ */
 function isSameAddress(a: Partial<CheckoutAddress>, b: Partial<CheckoutAddress>): boolean {
   const norm = (value?: string) => (value ?? "").trim().toLowerCase();
   return (
     norm(a.addressLine1) === norm(b.addressLine1) &&
     norm(a.addressLine2) === norm(b.addressLine2) &&
+    norm(a.landmark) === norm(b.landmark) &&
     norm(a.city) === norm(b.city) &&
     norm(a.state) === norm(b.state) &&
     norm(a.pincode) === norm(b.pincode)
@@ -193,7 +220,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   /** A saved address id, or "new" while entering one by hand. */
   const [addressChoice, setAddressChoice] = useState<string>("new");
-  const [saveNewAddress, setSaveNewAddress] = useState(true);
   /** Set when editing an existing saved address rather than adding one. */
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   /** The form is only shown when adding or editing — otherwise the cards are enough. */
@@ -328,6 +354,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     control,
     handleSubmit,
     reset,
+    setValue,
     watch,
     formState,
   } = useForm<CheckoutAddress>({
@@ -387,15 +414,25 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     const draft = getCheckoutDraft();
     const session = getCustomerSession();
 
+    /**
+     * `reset` REPLACES the value set, so this literal is the whole form — a
+     * field left out of it is blank on the screen while the draft still holds
+     * it, and the next Continue writes that blank back over the good value.
+     * `defaultValues` does not save you here.
+     */
     reset({
       fullName: draft.address.fullName || session?.name || "",
       email: draft.address.email || session?.email || "",
       phone: draft.address.phone || session?.phone || "",
       addressLine1: draft.address.addressLine1,
       addressLine2: draft.address.addressLine2,
+      landmark: draft.address.landmark,
       city: draft.address.city,
       state: draft.address.state,
       pincode: draft.address.pincode,
+      country: draft.address.country,
+      altPhone: draft.address.altPhone,
+      addressLabel: draft.address.addressLabel,
     });
 
     const addresses = getSavedAddresses();
@@ -538,6 +575,9 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const watchedCity = watch("city");
   const watchedPincode = watch("pincode");
+  // The 3-up control is not an <input>, so its value is watched rather than
+  // registered; `setValue` is what writes the choice back into the form.
+  const watchedAddressLabel = watch("addressLabel");
 
   // The coupon was validated against whatever the cart held when it was
   // applied. Re-check it against the cart being paid for, so an edited cart
@@ -661,31 +701,57 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     });
   }
 
-  const onDeliverySubmit = (address: CheckoutAddress) => {
-    // Keeping the address book current is a convenience — it must never block
-    // the order, so every path here is best-effort.
+  /**
+   * Writes the destination to the address book, and goes nowhere.
+   *
+   * This used to be the first half of the step's submit, so the only way to
+   * keep an address was to leave the screen — and whether it was kept at all
+   * was decided by a checkbox the customer had to notice before pressing
+   * Continue. Now SAVE saves and Continue continues, which is what the two
+   * words mean.
+   *
+   * Still best-effort: keeping the book current is a convenience and must
+   * never be the reason an order cannot be placed.
+   */
+  const saveAddressToBook = (address: CheckoutAddress) => {
     try {
       if (editingAddressId) {
-        updateSavedAddress(editingAddressId, address);
+        updateSavedAddress(editingAddressId, {
+          ...address,
+          // Deliberate overwrite. Editing used to pass no `label` at all, so
+          // the old one survived — which meant re-labelling an address from
+          // Home to Office changed nothing anybody could see.
+          label: address.addressLabel ?? "Home",
+        });
         setSavedAddresses(getSavedAddresses());
         toast.success("Address updated");
-      } else {
-        const alreadySaved = savedAddresses.some((entry) => isSameAddress(entry, address));
-        if (saveNewAddress && !alreadySaved) {
-          const created = createSavedAddress({
-            ...address,
-            label: address.city?.trim() || "Address",
-            isDefault: savedAddresses.length === 0,
-          });
-          setSavedAddresses(getSavedAddresses());
-          setAddressChoice(created.id);
-          toast.success("Address saved for next time");
-        }
+        return;
       }
+
+      const alreadySaved = savedAddresses.some((entry) => isSameAddress(entry, address));
+      if (alreadySaved) {
+        // Silent before, and pressing a button that does nothing and says
+        // nothing reads as broken.
+        toast.info("That address is already in your address book");
+        return;
+      }
+
+      const created = createSavedAddress({
+        ...address,
+        // The customer's own word for it. This was `address.city`, so someone
+        // who chose Home got a card titled "Kota".
+        label: address.addressLabel ?? "Home",
+        isDefault: savedAddresses.length === 0,
+      });
+      setSavedAddresses(getSavedAddresses());
+      setAddressChoice(created.id);
+      toast.success("Address saved for next time");
     } catch {
       // Ignore — the order still goes through with the address as typed.
     }
+  };
 
+  const onDeliverySubmit = (address: CheckoutAddress) => {
     setShowAddressForm(false);
     setEditingAddressId(null);
 
@@ -1225,6 +1291,16 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
+                      <div className="space-y-2">
+                        {/*
+                          No validation beyond a length cap. A second number is
+                          a courtesy — refusing the order because the spare one
+                          is short would be the field costing more than it is
+                          worth.
+                        */}
+                        <Label htmlFor="altPhone">Alternate phone (optional)</Label>
+                        <Input id="altPhone" type="tel" {...register("altPhone")} />
+                      </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine1">Address line 1</Label>
                         <Input
@@ -1240,6 +1316,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine2">Address line 2 (optional)</Label>
                         <Input id="addressLine2" {...register("addressLine2")} />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        {/*
+                          Its own field, not a second address line. "Flat 4B"
+                          continues the address; "opposite the water tank" is
+                          how somebody finds the door. The rider's message
+                          carries this one.
+                        */}
+                        <Label htmlFor="landmark">Landmark (optional)</Label>
+                        <Input
+                          id="landmark"
+                          placeholder="A shop, a turning, anything easy to spot"
+                          {...register("landmark")}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="city">City</Label>
@@ -1288,19 +1378,115 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
+                      <div className="space-y-2">
+                        {/*
+                          A TYPED FIELD, not a dropdown.
+
+                          Nothing in this CMS records which country the shop is
+                          in — no setting, no list anywhere in the repo — so a
+                          select offering one country would be this code making
+                          a claim on the shop's behalf, and a select offering
+                          every country is a list nobody asked for.
+                        */}
+                        <Label htmlFor="country">Country (optional)</Label>
+                        <Input id="country" {...register("country")} />
+                      </div>
+
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label>Save this as</Label>
+                        {/*
+                          What the customer calls the place. It used to be the
+                          city name, stamped on without asking — so somebody
+                          who meant "Office" got a card headed "Kota", and the
+                          two addresses they keep at the same city were
+                          impossible to tell apart in the list.
+
+                          Radios, not buttons: this is one choice out of three,
+                          and a keyboard or a screen reader should be able to
+                          arrow through it.
+                        */}
+                        <div
+                          role="radiogroup"
+                          aria-label="Save this as"
+                          className="grid grid-cols-3 gap-2"
+                        >
+                          {(["Home", "Office", "Other"] as const).map((option) => {
+                            const active = watchedAddressLabel === option;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                onClick={() => setValue("addressLabel", option)}
+                                className={cn(
+                                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                                  active
+                                    ? "border-bakery-700 bg-bakery-700 text-white"
+                                    : "border-border bg-white text-foreground hover:border-bakery-700"
+                                )}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
-                        {/* Only offered for a genuinely new destination —
-                            editing an existing one already updates it. */}
-                        {!editingAddressId ? (
-                          <label className="flex cursor-pointer items-center gap-3 text-sm">
-                            <Checkbox
-                              checked={saveNewAddress}
-                              onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
-                            />
-                            Save this address for next time
-                          </label>
-                        ) : null}
+                        {/*
+                          "Save this address for next time" stood here, ticked
+                          by default, and it was the only thing deciding
+                          whether Continue also wrote to the address book. A
+                          button that says SAVE decides that now — a customer
+                          who wants to keep an address presses it, and one who
+                          does not, does not.
+
+                          CANCEL only appears when there is a card to fall back
+                          to. With an empty book the form IS the step, and a
+                          Cancel that can close it leads nowhere.
+                        */}
+                        <div className="flex flex-col-reverse gap-3 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                          {savedAddresses.length > 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="sm:min-w-32"
+                              onClick={() => {
+                                setShowAddressForm(false);
+                                setEditingAddressId(null);
+                                const fallback =
+                                  savedAddresses.find((entry) => entry.id === addressChoice) ??
+                                  savedAddresses[0];
+                                if (fallback) {
+                                  setAddressChoice(fallback.id);
+                                  reset(toCheckoutAddress(fallback));
+                                }
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                          {/*
+                            type="button", and validated by hand.
+
+                            The form's onSubmit carries the customer to
+                            Personalize, so a default <button> here would save
+                            the address AND leave the screen — the one thing
+                            splitting these two apart was meant to stop.
+                            `handleSubmit(fn)()` runs the same validation the
+                            step does, so SAVE cannot write a half-typed
+                            destination into the book.
+                          */}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="sm:min-w-32"
+                            onClick={() => void handleSubmit(saveAddressToBook)()}
+                          >
+                            {editingAddressId ? "Save changes" : "Save address"}
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
 
@@ -1465,15 +1651,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <p>{getCheckoutDraft().address.phone}</p>
                         <p>{getCheckoutDraft().address.email}</p>
                         <p className="text-muted-foreground">
-                          {[
-                            getCheckoutDraft().address.addressLine1,
-                            getCheckoutDraft().address.addressLine2,
-                            getCheckoutDraft().address.city,
-                            getCheckoutDraft().address.state,
-                            getCheckoutDraft().address.pincode,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
+                          {formatAddress(getCheckoutDraft().address)}
                         </p>
                       </ReviewBlock>
 

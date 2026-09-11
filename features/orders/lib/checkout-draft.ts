@@ -20,15 +20,37 @@ const CHECKOUT_FLOW_VERSION = 2;
 
 export type PaymentMethod = "cod" | "upi" | "card" | "razorpay";
 
+/** What the customer calls this destination. Set by the Home/Office/Other control. */
+export type AddressLabel = "Home" | "Office" | "Other";
+
 export interface CheckoutAddress {
   fullName: string;
   email: string;
   phone: string;
   addressLine1: string;
   addressLine2?: string;
+  /**
+   * The thing a rider actually navigates by.
+   *
+   * Kept apart from `addressLine2`, which is a continuation of the street
+   * address. Both can be present and they mean different things — "Flat 4B"
+   * is not "opposite the water tank".
+   */
+  landmark?: string;
   city: string;
   state: string;
   pincode: string;
+  /**
+   * Free text, and deliberately not a list.
+   *
+   * Nothing in this CMS records which country the shop is in — there is no
+   * setting for it and no country list anywhere in the repo — so a dropdown
+   * here would be this code asserting a country on the shop's behalf.
+   */
+  country?: string;
+  /** A second number to try. Optional everywhere, including on the order. */
+  altPhone?: string;
+  addressLabel?: AddressLabel;
 }
 
 /**
@@ -61,15 +83,26 @@ export interface CheckoutDraft {
   paymentReference?: string;
 }
 
+/**
+ * Every key present, every one a string.
+ *
+ * This is the floor `getCheckoutDraft` merges a stored address over. A key
+ * missing here comes back `undefined` from a draft written before the field
+ * existed, and React flips that input from controlled to uncontrolled — which
+ * the compiler cannot catch, because all of these are optional.
+ */
 export const EMPTY_CHECKOUT_ADDRESS: CheckoutAddress = {
   fullName: "",
   email: "",
   phone: "",
   addressLine1: "",
   addressLine2: "",
+  landmark: "",
   city: "",
   state: "",
   pincode: "",
+  country: "",
+  altPhone: "",
 };
 
 export const EMPTY_DELIVERY_SLOT: DeliverySlot = {

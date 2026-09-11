@@ -5,6 +5,7 @@ import { AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
 import { cartLineChoices } from "@/features/cart/lib/cart";
+import { formatAddress } from "@/features/orders/lib/address-format";
 import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { GatewayRefund, RefundRecord } from "@/types/refund";
@@ -831,13 +832,9 @@ async function notifyShopOfOrder(
     delivery_date: order.deliverySlot?.date
       ? `${order.deliverySlot.date}${order.deliverySlot.timeSlot ? `, ${order.deliverySlot.timeSlot}` : ""}`
       : new Date(order.estimatedDelivery).toDateString(),
-    delivery_address: [
-      order.address.addressLine1,
-      order.address.addressLine2,
-      `${order.address.city} ${order.address.pincode}`,
-    ]
-      .filter(Boolean)
-      .join(", "),
+    // Was a local join that dropped the state and had no landmark. Both are
+    // in `formatAddress` now, which every address surface shares.
+    delivery_address: formatAddress(order.address),
     order_items: items,
     admin_url: base
       ? `${base}${routes.admin.orders.detail(order.id)}`
@@ -1059,13 +1056,9 @@ async function notifyOrderCancelled(order: PlacedOrder, holdsPayment: boolean): 
 }
 
 async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
-  const address = [
-    order.address.addressLine1,
-    order.address.addressLine2,
-    `${order.address.city} ${order.address.pincode}`,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  // The COURIER-facing one. It dropped the state and carried no landmark,
+  // which is exactly the line a rider needs to find a door.
+  const address = formatAddress(order.address);
 
   const mail = await sendTemplatedEmail("order_shipped", order.address.email, {
     customer_name: order.address.fullName?.trim() || "there",

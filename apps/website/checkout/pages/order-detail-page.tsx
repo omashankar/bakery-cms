@@ -25,6 +25,7 @@ import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
+import { formatAddress } from "@/features/orders/lib/address-format";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -275,15 +276,7 @@ export function OrderDetailPage() {
                   <p>{order.address.phone}</p>
                   <p>{order.address.email}</p>
                   <p className="mt-2">
-                    {[
-                      order.address.addressLine1,
-                      order.address.addressLine2,
-                      order.address.city,
-                      order.address.state,
-                      order.address.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
+                    {formatAddress(order.address)}
                   </p>
                 </div>
               </div>

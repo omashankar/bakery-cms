@@ -9,6 +9,7 @@ import type { InvoiceSettings } from "@/types/invoice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { formatAddress } from "@/features/orders/lib/address-format";
 
 interface InvoiceDocumentProps {
   order: PlacedOrder;
@@ -51,13 +52,9 @@ export function InvoiceDocument({
   // yet paid out is not something to put on an invoice as settled.
   const refunded = settledRefundAmount(order);
 
-  const addressLine = [
-    order.address.addressLine1,
-    order.address.addressLine2,
-    `${order.address.city}, ${order.address.state} ${order.address.pincode}`,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  // One edit, six surfaces: this file backs the customer invoice, the admin
+  // invoice, the preview dialog, the design panel and the invoice list.
+  const addressLine = formatAddress(order.address);
 
   return (
     <article

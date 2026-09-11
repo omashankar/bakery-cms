@@ -72,7 +72,7 @@ export function DeliveryAddressPicker({
                   <p className="font-medium text-foreground">{address.fullName}</p>
                   <p className="text-muted-foreground">{address.phone}</p>
                   <p className="text-muted-foreground">
-                    {[address.addressLine1, address.addressLine2, address.city, address.state]
+                    {[address.addressLine1, address.addressLine2, address.landmark, address.city, address.state]
                       .filter(Boolean)
                       .join(", ")}
                   </p>

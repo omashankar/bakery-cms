@@ -42,6 +42,21 @@ export const quoteSchema = z.object({
    * server, and the server already holds everything it needs. Optional, because
    * a quote asked purely to show a running total has no address yet.
    */
+  /**
+   * NAMED, not passed through — and that is why every field has to be listed.
+   *
+   * This object takes Zod's default, which is strip. A field added to the form
+   * and to `CheckoutAddress` but not to this list crosses the wire, is deleted
+   * here, and the stripped copy is what gets written to the draft row. The
+   * request still answers 200; nothing logs; no test that parses a partial
+   * address notices.
+   *
+   * The cost lands on one customer in particular: the one who pays online and
+   * closes the tab before the confirmation comes back. Their order is built by
+   * the Razorpay webhook from this draft, without the browser — so whatever was
+   * stripped here is gone for good, while the customer beside them who waited
+   * two more seconds keeps it. Same shop, same form, two different records.
+   */
   address: z
     .object({
       fullName: z.string().trim().min(1),
@@ -49,9 +64,13 @@ export const quoteSchema = z.object({
       phone: z.string().trim().min(1),
       addressLine1: z.string().trim().min(1),
       addressLine2: z.string().trim().optional(),
+      landmark: z.string().trim().max(200).optional(),
       city: z.string().trim().min(1),
       state: z.string().trim().min(1),
       pincode: z.string().trim().min(1),
+      country: z.string().trim().max(80).optional(),
+      altPhone: z.string().trim().max(20).optional(),
+      addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
     })
     .optional(),
   /**

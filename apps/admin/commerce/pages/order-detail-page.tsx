@@ -41,6 +41,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
+import { addressLines } from "@/features/orders/lib/address-format";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -467,11 +468,18 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div className="mt-4 flex gap-2 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 size-4 shrink-0" />
               <div>
-                <p>{order.address.addressLine1}</p>
-                {order.address.addressLine2 ? <p>{order.address.addressLine2}</p> : null}
-                <p>
-                  {order.address.city}, {order.address.state} {order.address.pincode}
-                </p>
+                {/*
+                  The screen staff pack from, so it shows every line the
+                  customer gave — landmark included, which is the one a rider
+                  asks for. Field-by-field before, so each new field was a
+                  hand edit; the shared helper drops blanks itself.
+                */}
+                {addressLines(order.address).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+                {order.address.altPhone?.trim() ? (
+                  <p className="mt-2">Also on {order.address.altPhone}</p>
+                ) : null}
                 <p className="mt-2">Est. delivery: {formatDate(order.estimatedDelivery)}</p>
               </div>
             </div>

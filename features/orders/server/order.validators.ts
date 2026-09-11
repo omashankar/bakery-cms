@@ -31,9 +31,21 @@ const addressSchema = z
     phone: z.string().trim().min(1, "Phone is required"),
     addressLine1: z.string().trim().min(1, "Address is required"),
     addressLine2: z.string().optional(),
+    /**
+     * Bounded, because this object passes through.
+     *
+     * `.passthrough()` below means an unlisted key survives to Mongo unchecked
+     * — and these three are interpolated into the courier's WhatsApp message
+     * and the shop's own new-order alert. Naming them here is what puts a
+     * length on them, the same reason `timeSlot` carries a `.max(60)`.
+     */
+    landmark: z.string().trim().max(200).optional(),
     city: z.string().trim().min(1, "City is required"),
     state: z.string().trim().min(1, "State is required"),
     pincode: z.string().trim().min(1, "Pincode is required"),
+    country: z.string().trim().max(80).optional(),
+    altPhone: z.string().trim().max(20).optional(),
+    addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
   })
   .passthrough();
 
