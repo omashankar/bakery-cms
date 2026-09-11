@@ -430,7 +430,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           {
             description: `${freeSizes
               .map((tier) => tier.label.trim())
-              .join(", ")} would sell for nothing. Price & stock.`,
+              .join(", ")} would sell for nothing. Options, at the top.`,
           },
         );
         return;
@@ -585,10 +585,24 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     <AdminPage className="space-y-4 sm:space-y-5 pb-20 xl:pb-0">
       <AdminPageHeader
         title={title}
+        /*
+          THE FIRST LINE ANYBODY READS, and it named three sections that are
+          not on the screen. "Commerce" and "Classification" are the two tab
+          names this file deleted for being ours rather than the shop's — the
+          note at the tab strip says so — and the subtitle three inches above
+          it kept both. "Classification" is not a word a shop uses at all.
+
+          A list of sections is the wrong shape anyway: the six tabs are
+          rendered in full immediately below, so a list would be the same
+          words twice and would still not tell a first-timer what to do first.
+          The button names come from the variables, so an archived product
+          reads "Restore & publish" rather than naming a button that is not
+          there.
+        */
         description={
           mode === "add"
-            ? `Create a ${productLower} with pricing, commerce options, classification, and SEO.`
-            : `Update ${productLower} details, stock, customization options, and publishing status.`
+            ? `Name it, price it, add a photo, then ${publishLabel}. The other tabs can wait.`
+            : `Change anything in the tabs below, then ${saveLabel} or ${publishLabel}.`
         }
         actions={
           <div className="hidden flex-wrap items-center gap-2 xl:flex">
@@ -654,6 +668,104 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     placeholder="e.g. Chocolate Truffle Cake, 65W Type-C Charger"
                   />
                 </div>
+
+                {/*
+                  Category and occasions were a tab of their own called
+                  “Classification”. Where a product is filed is part of what it
+                  is, and a shop owner setting one up says the name and the
+                  category in the same breath.
+                */}
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <AdminSelect
+                    id="category"
+                    value={form.categoryId}
+                    onChange={(e) => patchForm({ categoryId: e.target.value })}
+                  >
+                    {/*
+                      AN UNANSWERED BOX LOOKS UNANSWERED.
+
+                      A new product used to open on whatever category happened
+                      to be first in this browser's list — the shipped demo's
+                      "Birthday Cakes" on a fresh install. The box looked
+                      filled in, so it was moved past, and four shops walked
+                      through this form all shipped: a phone charger, a Snake
+                      Plant and a Kanjivaram silk saree, every one of them
+                      filed under Birthday Cakes.
+
+                      A blank first row is what makes "not answered" visible.
+                      `saveProduct` refuses to publish over it and still lets a
+                      draft be parked, which is the same rule the price follows.
+                    */}
+                    <option value="">Choose a category…</option>
+                    {adminCategories().map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                  {adminCategories().length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No categories yet. Add them under Catalog, then come back —
+                      a {productLower} needs one before it can go on the shop.
+                    </p>
+                  ) : null}
+                </div>
+                {/*
+                  A “Flavour” dropdown stood here, picking one row out of a
+                  shop-wide Catalog list.
+
+                  It bought nothing. The list was a second place to keep in
+                  step, the id it wrote reached no customer and no order, and
+                  the box that actually decides what a customer is offered —
+                  “Flavour options”, further down this same form — was
+                  already free text this shop types for itself. A flavour is
+                  a word on a product, not a taxonomy.
+                */}
+                <div className="space-y-2">
+                  <Label>Occasions</Label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {adminOccasions().map((occasion) => (
+                      <label
+                        key={occasion.id}
+                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={form.occasionIds.includes(occasion.id)}
+                          onCheckedChange={(checked) =>
+                            toggleOccasion(occasion.id, checked === true)
+                          }
+                        />
+                        {occasion.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/*
+                  THE RULE SITS HERE NOW.
+
+                  It used to cut the name off from the category, which is the
+                  one pair a shop names in the same breath. It divides what the
+                  product IS — its name, where it is filed, what it is for —
+                  from where it LIVES, which is its address.
+                */}
+                <Separator />
+                {/*
+                  TWO BOXES STOOD HERE, and between them and the Description
+                  tab there were three things called a description.
+
+                  "Short description" was not one: nothing on the storefront
+                  rendered it, and its only destination was the meta
+                  description, as the middle step of a fallback whose first
+                  step is the SEO tab's own box. A second field for one job.
+
+                  "Full description" is real — it is the paragraph under the
+                  bullets on the product page — so it has moved to the
+                  Description tab, beside the blocks it prints with. What the
+                  page SAYS is now edited in one place.
+                */}
+
                 <div className="space-y-2">
                   <Label htmlFor="slug">Web address</Label>
                   <Input
@@ -680,97 +792,6 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     The end of this {productLower}&apos;s address on your shop. Filled in
                     from the name — change it only if you want a shorter or clearer link.
                   </p>
-                </div>
-                {/*
-                  TWO BOXES STOOD HERE, and between them and the Description
-                  tab there were three things called a description.
-
-                  "Short description" was not one: nothing on the storefront
-                  rendered it, and its only destination was the meta
-                  description, as the middle step of a fallback whose first
-                  step is the SEO tab's own box. A second field for one job.
-
-                  "Full description" is real — it is the paragraph under the
-                  bullets on the product page — so it has moved to the
-                  Description tab, beside the blocks it prints with. What the
-                  page SAYS is now edited in one place.
-                */}
-
-                <Separator />
-
-                {/*
-                  Category and occasions were a tab of their own called
-                  “Classification”. Where a product is filed is part of what it
-                  is, and a shop owner setting one up says the name and the
-                  category in the same breath.
-                */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <AdminSelect
-                      id="category"
-                      value={form.categoryId}
-                      onChange={(e) => patchForm({ categoryId: e.target.value })}
-                    >
-                      {/*
-                        AN UNANSWERED BOX LOOKS UNANSWERED.
-
-                        A new product used to open on whatever category happened
-                        to be first in this browser's list — the shipped demo's
-                        "Birthday Cakes" on a fresh install. The box looked
-                        filled in, so it was moved past, and four shops walked
-                        through this form all shipped: a phone charger, a Snake
-                        Plant and a Kanjivaram silk saree, every one of them
-                        filed under Birthday Cakes.
-
-                        A blank first row is what makes "not answered" visible.
-                        `saveProduct` refuses to publish over it and still lets a
-                        draft be parked, which is the same rule the price follows.
-                      */}
-                      <option value="">Choose a category…</option>
-                      {adminCategories().map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </AdminSelect>
-                    {adminCategories().length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        No categories yet. Add them under Catalog, then come back —
-                        a {productLower} needs one before it can go on the shop.
-                      </p>
-                    ) : null}
-                  </div>
-                  {/*
-                    A “Flavour” dropdown stood here, picking one row out of a
-                    shop-wide Catalog list.
-
-                    It bought nothing. The list was a second place to keep in
-                    step, the id it wrote reached no customer and no order, and
-                    the box that actually decides what a customer is offered —
-                    “Flavour options”, further down this same form — was
-                    already free text this shop types for itself. A flavour is
-                    a word on a product, not a taxonomy.
-                  */}
-                </div>
-                <div className="space-y-2">
-                  <Label>Occasions</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {adminOccasions().map((occasion) => (
-                      <label
-                        key={occasion.id}
-                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={form.occasionIds.includes(occasion.id)}
-                          onCheckedChange={(checked) =>
-                            toggleOccasion(occasion.id, checked === true)
-                          }
-                        />
-                        {occasion.name}
-                      </label>
-                    ))}
-                  </div>
                 </div>
               </TabsContent>
 
@@ -799,12 +820,18 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                         handlePriceChange(Math.max(0, Number(e.target.value) || 0))
                       }
                     />
+                    {/*
+                      "Add sizes below" pointed at nothing. The size rows moved to
+                      the Options tab and this line stayed, on a tab whose only
+                      remaining content below it is stock — and the publish
+                      refusal beside it named the same wrong place, at the one
+                      moment an owner is blocked and told where to go.
+                    */}
                     <p className="text-xs text-muted-foreground">
-                      What you charge for one, before the customer chooses anything.
+                      What you charge for one, before the customer chooses anything.{" "}
                       {modules.weight
-                        ? " Add sizes below and each one carries its own price instead of this."
-                        : ""}{" "}
-                      Options on the Options tab add to it or take off it.
+                        ? "On the Options tab, each size carries its own price instead of this one, and every other option adds to it or takes off it."
+                        : "Options on the Options tab add to it or take off it."}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -1060,24 +1087,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   with a price on each.
                 */}
 
-                {modules.flavour ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="flavourOptions">Flavour options (comma-separated)</Label>
-                    <Input
-                      id="flavourOptions"
-                      value={form.flavourOptions.join(", ")}
-                      onChange={(e) =>
-                        patchForm({
-                          flavourOptions: e.target.value
-                            .split(",")
-                            .map((item) => item.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      placeholder="Chocolate, Vanilla, Red Velvet"
-                    />
-                  </div>
-                ) : null}
+                {/*
+                  THE THIRD SECTION ON THIS TAB, and the only one that had no
+                  name. Two headings above it say what they hold; this run of
+                  ticks just began, so a shop reading down the tab met three
+                  unlabelled controls after two labelled sections.
+                */}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">What you ask the customer for</p>
+                  <p className="text-xs text-muted-foreground">
+                    Each tick adds a box to the {productLower} page for the customer
+                    to fill in.
+                  </p>
+                </div>
 
                 {/*
                   "PDP" is "product detail page", an abbreviation only a
@@ -1168,6 +1190,38 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       you receive is cut to it. Round, Square and Heart are printed
                       toppers. Upright and Wide are frame proportions. Long strip is
                       the band that goes round a mug or a bottle.
+                    </p>
+                  </div>
+                ) : null}
+                <Separator />
+
+                {/*
+                  LAST, because it is the only thing on this tab the customer
+                  never sees. It puts no picker on the page — it feeds the words
+                  a shopper can narrow the listing by — and it sat in the middle
+                  of the controls that DO put something there, with no help line
+                  of its own to say otherwise.
+                */}
+                {modules.flavour ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="flavourOptions">Flavour options (comma-separated)</Label>
+                    <Input
+                      id="flavourOptions"
+                      value={form.flavourOptions.join(", ")}
+                      onChange={(e) =>
+                        patchForm({
+                          flavourOptions: e.target.value
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="Chocolate, Vanilla, Red Velvet"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Words a customer can narrow the shop by on the listing pages.
+                      This puts no picker on the {productLower} page. For something
+                      the customer chooses, add an option above.
                     </p>
                   </div>
                 ) : null}
@@ -1399,7 +1453,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">{labels.productWord} summary</CardTitle>
-              <CardDescription>Stock, options and classification</CardDescription>
+              {/* It showed neither stock nor classification. */}
+              <CardDescription>Option blocks and review scores</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {/*
@@ -1408,7 +1463,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 on ProductDescriptionBlocksFields for what went and why.
               */}
               <p>
-                <span className="text-muted-foreground">Variant groups:</span>{" "}
+                <span className="text-muted-foreground">Option blocks:</span>{" "}
                 {form.variantGroups.length}
               </p>
               {/*

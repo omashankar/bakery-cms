@@ -241,7 +241,12 @@ export function ProductVariantManager({ groups, onChange }: ProductVariantManage
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Options</p>
+          {/*
+            Named apart from the TAB it sits on. Both were "Options", so the
+            section heading read as the tab heading repeated and the two other
+            sections beside it looked like they belonged to something else.
+          */}
+          <p className="text-sm font-medium">Extras and facts</p>
           <p className="text-xs text-muted-foreground">
             Extras the customer can tick — eggless, a heart shape, gift wrapping.
             Each one adds its price when ticked. Tick “Already on” yourself and
