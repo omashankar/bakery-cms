@@ -128,6 +128,36 @@ export interface ProductTrustCard {
   subtitle: string;
 }
 
+/**
+ * A speed of delivery the shop offers, and what it charges for it.
+ *
+ * Deliberately NOT a fixed Standard / Fixed Time / Midnight list. Those are
+ * three things one shop happens to sell; a florist delivering inside an hour
+ * and a furniture shop delivering inside a fortnight need their own words and
+ * their own prices, and this CMS is sold to both.
+ *
+ * A shop with none of these configured is where every shop starts, and that is
+ * the behaviour this software had before tiers existed: one delivery charge,
+ * one flat list of windows, no choice to make.
+ */
+export interface DeliveryTier {
+  id: string;
+  /** The shop's own word for it — "Standard", "Before noon", whatever it sells. */
+  label: string;
+  /** Shown under the label. Blank prints nothing. */
+  description: string;
+  /** Added to the delivery charge. 0 is a real answer, and prints as free. */
+  fee: number;
+  /**
+   * The windows this speed can be booked in.
+   *
+   * Empty means the tier takes no window at all — a next-day or a midnight
+   * delivery has nothing to choose. The shop-wide `deliveryTimeSlots` list is
+   * what a shop with no tiers uses, and it stays exactly as it was.
+   */
+  windows: string[];
+}
+
 export interface CommerceSettings {
   deliveryFee: number;
   freeDeliveryThreshold: number;
@@ -144,6 +174,8 @@ export interface CommerceSettings {
   deliveryLeadDays: number;
   estimatedDeliveryDays: number;
   deliveryTimeSlots: string[];
+  /** Empty on every shop that has not set any up. See `DeliveryTier`. */
+  deliveryTiers: DeliveryTier[];
   orderNumberPrefix: string;
   checkoutTerms: string;
   giftWrapEnabled: boolean;

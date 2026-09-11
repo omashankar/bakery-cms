@@ -10,6 +10,9 @@ export interface TaxBreakdownValues {
   platformChargeLabel?: string;
   giftWrapFee?: number;
   giftWrapLabel?: string;
+  deliveryTierFee?: number;
+  /** The shop's own word for the chosen speed. Absent when no tier is chosen. */
+  deliveryTierLabel?: string;
   taxableAmount?: number;
   total: number;
 }

@@ -31,6 +31,8 @@ export interface QuoteRequest {
   items: CartLineItem[];
   couponCode?: string;
   giftWrap?: boolean;
+  /** WHICH speed. The amount is the shop's to decide, not the browser's. */
+  deliveryTierId?: string;
   deliveryAddress?: { city?: string; pincode?: string };
   /**
    * The rest of the order intent. Sent so the SERVER can finish this order from
@@ -80,6 +82,7 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
         items,
         couponCode: input.couponCode,
         giftWrap: input.giftWrap,
+        deliveryTierId: input.deliveryTierId,
         deliveryAddress: input.deliveryAddress,
         address: input.address,
         deliverySlot: input.deliverySlot,

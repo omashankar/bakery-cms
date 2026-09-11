@@ -192,6 +192,18 @@ export const commerceSchema = z.object({
   deliveryLeadDays: z.number().int().min(0),
   estimatedDeliveryDays: z.number().int().min(0),
   deliveryTimeSlots: z.array(z.string()).default([]),
+  deliveryTiers: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(60),
+        label: z.string().trim().min(1).max(60),
+        description: z.string().trim().max(160).default(""),
+        fee: nonNegative,
+        windows: z.array(z.string().trim().max(60)).max(24).default([]),
+      }),
+    )
+    .max(8)
+    .default([]),
   orderNumberPrefix: z.string().trim().min(1).max(8),
   checkoutTerms: z.string().default(""),
   giftWrapEnabled: z.boolean(),

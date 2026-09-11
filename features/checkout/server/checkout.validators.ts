@@ -29,6 +29,9 @@ export const quoteSchema = z.object({
   // then appeared in the admin's coupon performance report as if it were real.
   couponCode: z.string().trim().max(40).optional(),
   giftWrap: z.boolean().optional(),
+  // The id only. Naming a price here would let a browser set its own
+  // surcharge; the shop's settings are the only place a fee comes from.
+  deliveryTierId: z.string().trim().max(60).optional(),
   deliveryAddress: z
     .object({ city: z.string().trim().optional(), pincode: z.string().trim().optional() })
     .optional(),
@@ -95,6 +98,8 @@ export const quoteSchema = z.object({
           );
         }, "That is not a real date"),
       timeSlot: z.string().trim().max(60),
+      tierId: z.string().trim().max(60).optional(),
+      tierLabel: z.string().trim().max(60).optional(),
     })
     .partial()
     .optional(),

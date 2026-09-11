@@ -86,6 +86,11 @@ const deliverySlotSchema = z.object({
   // Bounded because it is printed on an invoice and pushed into a WhatsApp
   // template. Blank is allowed: a shop may offer no timed slots at all.
   timeSlot: z.string().trim().max(60).default(""),
+  // The chosen speed. Bounded like `timeSlot`, and for the same reasons: both
+  // are printed on an invoice and pushed into a WhatsApp template. The FEE is
+  // never accepted from the caller — it is looked up in the shop's settings.
+  tierId: z.string().trim().max(60).optional(),
+  tierLabel: z.string().trim().max(60).optional(),
 });
 
 export const placeOrderSchema = z.object({

@@ -54,6 +54,18 @@ export function TaxBreakdown({
     showAllLines || (values.platformCharge !== undefined && values.platformCharge > 0);
   const showGiftWrap =
     showAllLines || (values.giftWrapFee !== undefined && values.giftWrapFee > 0);
+  /**
+   * Its own row, not folded into Delivery.
+   *
+   * A customer who picks a faster speed should see the faster speed charged,
+   * under the name the shop gave it. Folding it in produces one number that
+   * went up for a reason the page does not state.
+   *
+   * Only shown when it cost something: a free tier has nothing to say here,
+   * and the chosen speed is named on the Personalize screen either way.
+   */
+  const showDeliveryTier =
+    values.deliveryTierFee !== undefined && values.deliveryTierFee > 0;
 
   return (
     <dl className={cn("space-y-2", textClass, className)}>
@@ -81,6 +93,13 @@ export function TaxBreakdown({
         }
         tone="muted"
       />
+      {showDeliveryTier ? (
+        <Row
+          label={values.deliveryTierLabel ?? "Faster delivery"}
+          value={formatCurrency(values.deliveryTierFee ?? 0)}
+          tone="muted"
+        />
+      ) : null}
       {showTax ? (
         <Row
           label={values.taxLabel ?? "Tax"}
@@ -142,6 +161,8 @@ export function taxBreakdownFromCartTotals(
     platformChargeLabel: options?.platformChargeLabel,
     giftWrapFee: totals.giftWrapFee ?? 0,
     giftWrapLabel: options?.giftWrapLabel,
+    deliveryTierFee: totals.deliveryTierFee ?? 0,
+    deliveryTierLabel: totals.deliveryTierLabel,
     taxableAmount: totals.taxableAmount,
     total: totals.total,
   };

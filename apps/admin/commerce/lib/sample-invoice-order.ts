@@ -61,6 +61,8 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
     discount: 50,
     platformCharge: 0,
     giftWrapFee: 49,
+    // Zero, so the preview shows the row a shop with no tiers set up gets.
+    deliveryTierFee: 0,
     taxableAmount: 1220,
     total: 1431.5,
     itemCount: 2,

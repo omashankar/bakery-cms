@@ -56,6 +56,8 @@ export interface QuoteInput {
   items: QuoteLineInput[];
   couponCode?: string;
   giftWrap?: boolean;
+  /** WHICH speed, never its price. See `CartTotalsInput.deliveryTierId`. */
+  deliveryTierId?: string;
   deliveryAddress?: { city?: string; pincode?: string };
 }
 
@@ -356,6 +358,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     items: items as never,
     discount: applied?.discountAmount ?? 0,
     giftWrap: Boolean(input.giftWrap),
+    deliveryTierId: input.deliveryTierId,
     deliveryAddress: input.deliveryAddress,
     commerceOverride: commerce,
     zonesOverride: (await Promise.resolve(zones)) as DeliveryZone[],

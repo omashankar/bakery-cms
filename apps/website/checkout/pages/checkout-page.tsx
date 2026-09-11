@@ -231,6 +231,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(EMPTY_DELIVERY_SLOT);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [slotOptions, setSlotOptions] = useState<string[]>([]);
+  /**
+   * Held as an id, so the price is always the shop's.
+   *
+   * `deliverySlot.tierId` is where it ends up, but the slot is only written
+   * on the way out of Personalize — this drives the preview while the
+   * customer is still choosing.
+   */
+  const [deliveryTierId, setDeliveryTierId] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   /** A saved address id, or "new" while entering one by hand. */
@@ -473,6 +481,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     setItems(cartItems);
     setDeliverySlot(draft.deliverySlot ?? EMPTY_DELIVERY_SLOT);
+    setDeliveryTierId(draft.deliverySlot?.tierId ?? "");
     setSlotOptions(getDeliveryTimeSlots());
     setMinDeliveryDate(getMinDeliveryDate());
     setStep(draft.step);
@@ -616,6 +625,23 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    * nothing is asked nothing, because an empty row of buttons is worse than
    * no row at all.
    */
+  /**
+   * The speeds this shop sells, and the one chosen.
+   *
+   * A shop with none configured gets exactly what it had before tiers
+   * existed: the flat window list, one delivery charge, nothing to pick.
+   */
+  const deliveryTiers = commerce.deliveryTiers ?? [];
+  const chosenTier = deliveryTiers.find((tier) => tier.id === deliveryTierId);
+  /**
+   * Windows come from the chosen tier when it has any.
+   *
+   * A tier with none takes no window at all — a midnight or a next-day
+   * delivery has nothing to choose — and offering the shop-wide list there
+   * would let a customer book 4pm on a service that does not run at 4pm.
+   */
+  const windowsForTier = chosenTier ? chosenTier.windows : slotOptions;
+
   const occasionOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const product of catalog) {
@@ -678,13 +704,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         items,
         discount: validCoupon?.discountAmount ?? 0,
         giftWrap,
+        deliveryTierId,
         deliveryAddress: {
           city: watchedCity,
           pincode: watchedPincode,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, watchedCity, watchedPincode, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
@@ -727,7 +754,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   useEffect(() => {
     setServerTotals(null);
     setServerItems(null);
-  }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
+  }, [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode]);
 
   function persistDraft(
     patch: Partial<{
@@ -840,14 +867,46 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   /** Leaving Personalize: the slot is what this screen exists to collect. */
   const onPersonalizeContinue = () => {
-    if (!hasDeliverySlot(deliverySlot)) {
-      setSlotError("Choose a delivery date and time");
+    /**
+     * The LABEL is stamped here, beside the id.
+     *
+     * An id alone cannot name the service on an order the shop reads back
+     * next month, after the tier has been renamed or deleted. The fee is
+     * deliberately not stamped: that is looked up from settings every time
+     * the cart is priced, so a browser can never name its own surcharge.
+     */
+    const slotWithTier: DeliverySlot = {
+      ...deliverySlot,
+      tierId: chosenTier?.id,
+      tierLabel: chosenTier?.label,
+    };
+
+    if (!slotWithTier.date?.trim()) {
+      setSlotError("Choose a delivery date");
+      return;
+    }
+
+    /**
+     * The window is required only where one exists to pick.
+     *
+     * `hasDeliverySlot` cannot decide this: it is handed a stored slot with no
+     * settings in reach, so it answers the guard-level question — has a
+     * delivery been booked at all. Whether THIS speed needs a window is known
+     * here, where the tier is in hand.
+     */
+    const needsWindow = deliveryTiers.length > 0 ? windowsForTier.length > 0 : true;
+    if (needsWindow && !slotWithTier.timeSlot?.trim()) {
+      setSlotError(
+        deliveryTiers.length > 0
+          ? "Choose a delivery time for this option"
+          : "Choose a delivery date and time",
+      );
       return;
     }
     setSlotError(null);
     persistDraft({
       step: 3,
-      deliverySlot,
+      deliverySlot: slotWithTier,
       paymentMethod,
       personalisation: collectPersonalisation(),
     });
@@ -1034,6 +1093,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       items,
       couponCode: validCoupon?.code,
       giftWrap,
+      deliveryTierId: deliveryTierId || undefined,
       deliveryAddress: { city: address.city, pincode: address.pincode },
       // The whole order intent, so the webhook can finish this order from the
       // draft if the customer's browser never comes back from the gateway.
@@ -1593,6 +1653,63 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     <h2 className="font-heading text-lg font-semibold">Personalize your order</h2>
 
                     <div className="mt-5 space-y-4">
+                      {deliveryTiers.length > 0 ? (
+                        <div className="space-y-2">
+                          <Label>How fast</Label>
+                          {/*
+                            The shop's own speeds and the shop's own prices.
+                            A shop that has set none up never sees this block,
+                            and gets the one delivery charge it always had.
+                          */}
+                          <div role="radiogroup" aria-label="How fast" className="space-y-2">
+                            {deliveryTiers.map((tier) => {
+                              const active = tier.id === deliveryTierId;
+                              return (
+                                <button
+                                  key={tier.id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={active}
+                                  onClick={() => {
+                                    setSlotError(null);
+                                    setDeliveryTierId(tier.id);
+                                    // A window booked against the old tier
+                                    // may not exist on this one, and a select
+                                    // holding a value it has no option for
+                                    // shows blank while still submitting.
+                                    if (!tier.windows.includes(deliverySlot.timeSlot)) {
+                                      setDeliverySlot((prev) => ({ ...prev, timeSlot: "" }));
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                                    active
+                                      ? "border-bakery-700 bg-bakery-50"
+                                      : "border-border bg-white hover:border-bakery-700"
+                                  )}
+                                >
+                                  <span>
+                                    <span className="block text-sm font-medium">{tier.label}</span>
+                                    {tier.description ? (
+                                      <span className="block text-xs text-muted-foreground">
+                                        {tier.description}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {/*
+                                    A free tier says Free rather than a
+                                    zero-rupee amount, the same way the
+                                    Delivery row does.
+                                  */}
+                                  <span className="shrink-0 text-sm font-semibold">
+                                    {tier.fee > 0 ? `+${formatCurrency(tier.fee)}` : "Free"}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
                   {/* One slot for the whole order — an order is delivered
                       once, even when each cake was added separately. */}
                   <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
@@ -1617,6 +1734,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           }}
                         />
                       </div>
+                      {/*
+                        Hidden when the chosen speed has no windows — a
+                        midnight or a next-day delivery has nothing to pick,
+                        and an empty dropdown labelled "Delivery time" reads
+                        as a list that failed to load.
+                      */}
+                      {windowsForTier.length > 0 ? (
                       <div className="space-y-2">
                         <Label htmlFor="deliveryTime">Delivery time</Label>
                         <select
@@ -1640,7 +1764,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             select never renders a value it has no option for;
                             changing the date is what clears it.
                           */}
-                          {slotOptions
+                          {windowsForTier
                             .filter(
                               (slot) =>
                                 slot === deliverySlot.timeSlot ||
@@ -1653,6 +1777,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             ))}
                         </select>
                       </div>
+                      ) : null}
                     </div>
                     {slotError ? (
                       <p role="alert" className="text-xs text-destructive">

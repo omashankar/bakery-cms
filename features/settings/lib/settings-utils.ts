@@ -165,6 +165,14 @@ export const defaultCommerceSettings: CommerceSettings = {
     "4:00 PM – 6:00 PM",
     "6:00 PM – 8:00 PM",
   ],
+  /**
+   * EMPTY, and that is the whole point.
+   *
+   * Shipping a Standard / Fixed Time / Midnight list would be this software
+   * telling every shop what speeds it sells and what it charges for them. A
+   * shop with none set up behaves exactly as it did before tiers existed.
+   */
+  deliveryTiers: [],
   orderNumberPrefix: "BK",
   checkoutTerms:
     "By placing this order you agree to our delivery terms. Orders are prepared to order — cancellations within 2 hours of placement may be accepted.",
@@ -703,6 +711,9 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
       },
       deliveryTimeSlots:
         partial.commerce?.deliveryTimeSlots ?? defaultCommerceSettings.deliveryTimeSlots,
+      // Listed beside the slots for the same reason: a stored array must
+      // replace the default outright, never merge key-by-key with it.
+      deliveryTiers: partial.commerce?.deliveryTiers ?? defaultCommerceSettings.deliveryTiers,
     },
     modules: { ...defaultModuleSettings, ...partial.modules },
     labelOverrides: { ...defaultLabelOverrides, ...partial.labelOverrides },

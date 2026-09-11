@@ -65,6 +65,16 @@ export interface DeliverySlot {
   date: string;
   /** One of the commerce settings' configured windows, e.g. "2:00 PM – 4:00 PM". */
   timeSlot: string;
+  /**
+   * WHICH speed was bought, when the shop sells more than one.
+   *
+   * The id is what prices it — the amount is looked up in the shop's own
+   * settings, never sent by the browser. The label rides along so a stored
+   * order can still name the service after the shop renames or deletes the
+   * tier, which an id alone cannot do.
+   */
+  tierId?: string;
+  tierLabel?: string;
 }
 
 /** 1 Address · 2 Personalize · 3 Payment. The cart is a route, not a step. */
@@ -161,9 +171,20 @@ export const DEFAULT_CHECKOUT_DRAFT: CheckoutDraft = {
   paymentMethod: "cod",
 };
 
-/** True once the customer has chosen both a date and a window. */
+/**
+ * True once the customer has booked a delivery.
+ *
+ * A date and a window, as it always was — OR a date and a tier that takes no
+ * window. Not every speed has one: a midnight or a next-day delivery has
+ * nothing to choose, and requiring a window there left the customer on a
+ * screen whose Continue button could not be satisfied by anything on it.
+ *
+ * A shop with no tiers configured is unaffected, because no slot it writes
+ * carries a `tierId`.
+ */
 export function hasDeliverySlot(slot?: Partial<DeliverySlot>): boolean {
-  return Boolean(slot?.date?.trim() && slot?.timeSlot?.trim());
+  if (!slot?.date?.trim()) return false;
+  return Boolean(slot.timeSlot?.trim() || slot.tierId?.trim());
 }
 
 export function getCheckoutDraft(): CheckoutDraft {
