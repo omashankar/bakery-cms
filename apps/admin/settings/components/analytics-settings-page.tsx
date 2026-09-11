@@ -15,6 +15,10 @@ import {
   resetAnalyticsSettings,
   saveAnalyticsSettings,
 } from "@/features/settings/lib/settings-repository";
+import {
+  extractTrackingId,
+  type TrackingIdKind,
+} from "@/features/settings/lib/tracking-id";
 import { SettingsSectionShell } from "./settings-section-shell";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
@@ -25,6 +29,21 @@ const trackingIdProps = {
   autoCapitalize: "none",
   autoCorrect: "off",
 } as const;
+
+/**
+ * Pull the id out of whatever was pasted, once the box is left.
+ *
+ * On blur rather than on change: rewriting mid-keystroke would fight a shop
+ * typing "G-" by hand. By blur the value is finished.
+ */
+function settle(
+  kind: TrackingIdKind,
+  value: string,
+  apply: (next: string) => void,
+) {
+  const id = extractTrackingId(value, kind);
+  if (id !== value.trim()) apply(id);
+}
 
 export function AnalyticsSettingsPage() {
   // The shared section form. This page hand-rolled it and never resynced: a
@@ -108,8 +127,18 @@ export function AnalyticsSettingsPage() {
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Tracking IDs</CardTitle>
+          {/*
+            Google hands the shop a whole <script> block, not a bare id — so
+            pasting that block here is the obvious thing to do. It used to be
+            accepted, saved, echoed back and counted as configured on the
+            settings index, while the storefront rendered nothing: the server
+            drops any stored value that is not a bare id, correctly and in
+            silence, a server away from the person who pasted it.
+          */}
           <CardDescription>
-            Paste measurement IDs from Google Analytics, GTM, Meta Pixel, or Hotjar.
+            Paste what your provider gives you. If it is a whole script block, the
+            id is picked out of it when you leave the box. An empty box tracks
+            nothing.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -117,6 +146,11 @@ export function AnalyticsSettingsPage() {
             <Label htmlFor="ga">Google Analytics (GA4)</Label>
             <Input
               id="ga"
+              onBlur={(e) =>
+                settle("ga4", e.target.value, (next) =>
+                  edit((prev) => ({ ...prev, googleAnalyticsId: next })),
+                )
+              }
               value={settings.googleAnalyticsId}
               onChange={(e) =>
                 edit((prev) => ({ ...prev, googleAnalyticsId: e.target.value }))
@@ -129,6 +163,11 @@ export function AnalyticsSettingsPage() {
             <Label htmlFor="gtm">Google Tag Manager</Label>
             <Input
               id="gtm"
+              onBlur={(e) =>
+                settle("gtm", e.target.value, (next) =>
+                  edit((prev) => ({ ...prev, googleTagManagerId: next })),
+                )
+              }
               value={settings.googleTagManagerId}
               onChange={(e) =>
                 edit((prev) => ({ ...prev, googleTagManagerId: e.target.value }))
@@ -141,6 +180,11 @@ export function AnalyticsSettingsPage() {
             <Label htmlFor="pixel">Facebook Pixel</Label>
             <Input
               id="pixel"
+              onBlur={(e) =>
+                settle("pixel", e.target.value, (next) =>
+                  edit((prev) => ({ ...prev, facebookPixelId: next })),
+                )
+              }
               value={settings.facebookPixelId}
               onChange={(e) =>
                 edit((prev) => ({ ...prev, facebookPixelId: e.target.value }))
@@ -154,6 +198,11 @@ export function AnalyticsSettingsPage() {
             <Label htmlFor="hotjar">Hotjar Site ID</Label>
             <Input
               id="hotjar"
+              onBlur={(e) =>
+                settle("hotjar", e.target.value, (next) =>
+                  edit((prev) => ({ ...prev, hotjarId: next })),
+                )
+              }
               value={settings.hotjarId}
               onChange={(e) => edit((prev) => ({ ...prev, hotjarId: e.target.value }))}
               placeholder="1234567"
