@@ -117,10 +117,11 @@ export function ModulesSettingsPage() {
   return (
     <SettingsSectionShell
       title="Modules"
-      description={
+      description="Turn parts of the admin on or off. Switching one off only hides it — nothing already saved is deleted."
+      status={
         hydration === "ready"
           ? `${enabledCount} of ${MODULE_KEYS.length} modules enabled`
-          : "Turn optional bakery features on or off. Disabled modules hide from the UI only."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed: flipping a

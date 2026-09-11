@@ -104,10 +104,11 @@ export function AnalyticsSettingsPage() {
   return (
     <SettingsSectionShell
       title="Analytics"
-      description={
+      description="Where your visitor numbers come from. Paste the ID or the whole snippet your analytics or ads account gives you."
+      status={
         hydration === "ready"
           ? `${configuredCount} of 4 integrations configured`
-          : "Tracking IDs for analytics and marketing pixels."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Gating only the

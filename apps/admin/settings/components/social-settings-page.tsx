@@ -112,10 +112,11 @@ export function SocialSettingsPage() {
   return (
     <SettingsSectionShell
       title="Social Media"
-      description={
+      description="Links to your social profiles. These show in the footer of every page."
+      status={
         hydration === "ready"
           ? `${activeCount} active of ${links.length} link${links.length === 1 ? "" : "s"}`
-          : "Manage social profile links displayed in the site footer."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Editing the seed

@@ -122,10 +122,11 @@ export function MaintenanceSettingsPage({
   return (
     <SettingsSectionShell
       title="Maintenance Mode"
-      description={
+      description="Close the shop to visitors while you work on it, and list the addresses that can still get in."
+      status={
         hydration === "ready"
           ? `${liveEnabled ? "Store closed" : "Store open"} · ${allowedIpCount} allowed IP${allowedIpCount === 1 ? "" : "s"}`
-          : "Close the public storefront while you make updates."
+          : undefined
       }
       isDirty={isDirty}
       mounted={hydration !== "pending"}

@@ -100,10 +100,11 @@ export function CustomCodeSettingsPage() {
   return (
     <SettingsSectionShell
       title="Custom Code"
-      description={
+      description="CSS and JavaScript added to every page of your shop. For code you were given and trust the source of."
+      status={
         hydration === "ready"
           ? `${countLines(code.css)} CSS lines · ${countLines(code.js)} JS lines`
-          : "Inject custom CSS and JavaScript into the storefront."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Gating only

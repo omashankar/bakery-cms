@@ -147,14 +147,15 @@ export function CommerceSettingsPage() {
   return (
     <SettingsSectionShell
       title="Order Settings"
-      description={
+      description="What an order costs and how it can be paid for. These rules run the cart and the checkout."
+      status={
         hydration === "ready"
           ? `${
               saved.freeDeliveryThreshold > 0
                 ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
                 : "Delivery free on every order"
             } · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
-          : "Shipping, tax, payments, and delivery rules used across cart and checkout."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Letting the

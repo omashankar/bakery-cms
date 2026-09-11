@@ -164,10 +164,11 @@ export function GeneralSettingsPage() {
   return (
     <SettingsSectionShell
       title="General"
-      description={
+      description="Your shop's name and logo, what you call the things you sell, and the timezone and currency you sell in."
+      status={
         hydration === "ready"
           ? `${settings.siteName} · ${labels.productWordPlural} · ${settings.currency}`
-          : "Site identity, product wording, branding, timezone, and currency."
+          : undefined
       }
       isDirty={isDirty || wordingDirty}
       // Behind the skeleton until the SERVER's copy has landed: editing the seed

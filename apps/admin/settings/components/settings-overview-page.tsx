@@ -260,7 +260,10 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "Robots.txt & Sitemap",
-        description: "Search-engine crawling and indexing — coming soon.",
+        // Both files are served on every request. This row dims itself and
+        // wears a "Coming soon" badge, so the one line under the title has to
+        // say which half is pending — it is the editing, not the crawling.
+        description: "Live already. Editing them by hand is not built yet.",
         href: routes.admin.settings.seoFiles,
         icon: FileCode2,
         future: true,

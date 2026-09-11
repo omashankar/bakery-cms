@@ -122,10 +122,11 @@ export function SmtpSettingsPage() {
   return (
     <SettingsSectionShell
       title="SMTP"
-      description={
+      description="The email account your shop sends order confirmations and sign-in codes from."
+      status={
         hydration === "ready"
           ? `${saved.enabled ? "Enabled" : "Disabled"} · ${encryptionLabel}${hostSet ? ` · ${saved.host}` : ""}`
-          : "The account your shop sends order confirmations and sign-in codes from."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Gating only

@@ -255,7 +255,8 @@ export function SecuritySettingsPage() {
   return (
     <SettingsSectionShell
       title="Login Security"
-      description={
+      description="How long a sign-in lasts, how many failed attempts are allowed, and which devices are signed in right now."
+      status={
         // The SAVED policy, not the draft. This read the working copy, so
         // dragging the timeout slider or flipping 2FA restated the header as
         // though the change were already in effect — on the one screen where
@@ -277,7 +278,7 @@ export function SecuritySettingsPage() {
             `${saved.sessionTimeoutMinutes}m timeout · ${saved.maxLoginAttempts} login attempts/min · ${
               centerLoaded ? `${sessions.length} session${sessions.length === 1 ? "" : "s"}` : "— sessions"
             }`
-          : "Session policies, login history, active devices, and access controls."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Gating only the

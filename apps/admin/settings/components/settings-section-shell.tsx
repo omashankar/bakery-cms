@@ -16,7 +16,16 @@ import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/c
 
 interface SettingsSectionShellProps {
   title: string;
+  /** What this page is for. Always shown — see `status` for why that matters. */
   description: string;
+  /**
+   * The page's current values, in one line, once they have been read.
+   *
+   * This used to be passed AS the description, replacing it the moment the
+   * settings landed. Every one of these screens therefore explained itself
+   * for a few hundred milliseconds and then stopped.
+   */
+  status?: string;
   isDirty: boolean;
   onSave: () => void;
   onDiscard: () => void;
@@ -44,6 +53,7 @@ interface SettingsSectionShellProps {
 export function SettingsSectionShell({
   title,
   description,
+  status,
   isDirty,
   onSave,
   onDiscard,
@@ -98,6 +108,7 @@ export function SettingsSectionShell({
       <AdminPageHeader
         title={title}
         description={description}
+        status={status}
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">

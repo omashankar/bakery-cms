@@ -122,10 +122,11 @@ export function ContactSettingsPage() {
   return (
     <SettingsSectionShell
       title="Contact Information"
-      description={
+      description="The phone, email, address and opening hours customers see on your site."
+      status={
         hydration === "ready"
           ? `${emailSet ? settings.email : "No email"} · ${hoursCount} hour row${hoursCount === 1 ? "" : "s"}`
-          : "Business contact details shown on the contact page and footer."
+          : undefined
       }
       isDirty={isDirty}
       // The fields stay behind the skeleton until the SERVER's copy has landed.
