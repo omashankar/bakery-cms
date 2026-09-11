@@ -127,6 +127,29 @@ export const placeOrderSchema = z.object({
   paymentReference: z.string().optional(),
   coupon: z.record(z.string(), z.unknown()).optional(),
   orderNotes: z.string().optional(),
+  /**
+   * TOP-LEVEL, so it has to be named.
+   *
+   * This schema takes Zod's default, which is strip — the comment a few
+   * lines above says so, and says it deliberately, because the client is
+   * allowed to keep sending fields the server no longer wants. The other
+   * side of that is this: a field wired everywhere EXCEPT here is dropped
+   * on the way into the order, with a 200 and no message.
+   */
+  personalisation: z
+    .object({
+      occasion: z.string().trim().max(60).optional(),
+      message: z.string().trim().max(500).optional(),
+      sender: z
+        .object({
+          name: z.string().trim().max(120),
+          phone: z.string().trim().max(20),
+          hideFromRecipient: z.boolean().optional(),
+        })
+        .optional(),
+      termsAcceptedAt: z.string().trim().max(40).optional(),
+    })
+    .optional(),
   deliverySlot: deliverySlotSchema.optional(),
 });
 

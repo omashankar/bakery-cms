@@ -1,6 +1,9 @@
 import type { CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
-import type { CheckoutAddress } from "@/features/orders/lib/checkout-draft";
+import type {
+  CheckoutAddress,
+  OrderPersonalisation,
+} from "@/features/orders/lib/checkout-draft";
 
 /**
  * Asks the SERVER what this cart costs.
@@ -44,6 +47,8 @@ export interface QuoteRequest {
   address?: CheckoutAddress;
   deliverySlot?: { date?: string; timeSlot?: string };
   orderNotes?: string;
+  /** Sent so the webhook can finish this order without the browser. */
+  personalisation?: OrderPersonalisation;
 }
 
 export interface QuoteOutcome {
@@ -79,6 +84,7 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
         address: input.address,
         deliverySlot: input.deliverySlot,
         orderNotes: input.orderNotes,
+        personalisation: input.personalisation,
       }),
     });
 

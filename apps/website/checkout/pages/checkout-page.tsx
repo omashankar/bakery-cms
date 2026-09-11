@@ -52,6 +52,7 @@ import {
   type CheckoutAddress,
   type CheckoutStep,
   type DeliverySlot,
+  type OrderPersonalisation,
   type PaymentMethod,
 } from "@/features/orders/lib/checkout-draft";
 import {
@@ -212,6 +213,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const [coupon, setCoupon] = useState<AppliedCoupon | undefined>();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [orderNotes, setOrderNotes] = useState("");
+  /**
+   * What Personalize collects, held flat and assembled on the way out.
+   *
+   * One object reaches the server — see `OrderPersonalisation` — but six
+   * controls write to it, and a single state object would mean every
+   * keystroke replacing the whole thing.
+   */
+  const [occasion, setOccasion] = useState("");
+  const [giftMessage, setGiftMessage] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [editingSender, setEditingSender] = useState(false);
+  const [hideSender, setHideSender] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [giftWrap, setGiftWrap] = useState(false);
   const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(EMPTY_DELIVERY_SLOT);
   const [slotError, setSlotError] = useState<string | null>(null);
@@ -470,6 +485,19 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         ""
     );
 
+    /**
+     * The sender defaults to whoever is signed in, which is true often
+     * enough to save typing and never asserted as fact — the EDIT button
+     * is there because the person paying is not always the person named.
+     */
+    const saved = draft.personalisation;
+    setOccasion(saved?.occasion ?? "");
+    setGiftMessage(saved?.message ?? "");
+    setSenderName(saved?.sender?.name ?? session?.name ?? "");
+    setSenderPhone(saved?.sender?.phone ?? session?.phone ?? "");
+    setHideSender(Boolean(saved?.sender?.hideFromRecipient));
+    setTermsAccepted(Boolean(saved?.termsAcceptedAt));
+
     const enabledMethods = paymentOptions.filter(
       (option) => loadedCommerce.paymentMethods[option.value]
     );
@@ -579,6 +607,26 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   // registered; `setValue` is what writes the choice back into the form.
   const watchedAddressLabel = watch("addressLabel");
 
+  /**
+   * THE SHOP'S OWN WORDS, not Birthday / Anniversary / Other.
+   *
+   * A fixed list is a claim about what this shop sells and who for. These
+   * are the occasions the shop has actually tagged its products with, so a
+   * florist offers what a florist tagged — and a shop that has tagged
+   * nothing is asked nothing, because an empty row of buttons is worse than
+   * no row at all.
+   */
+  const occasionOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const product of catalog) {
+      for (const name of product.occasions ?? []) {
+        const clean = name.trim();
+        if (clean) seen.set(clean.toLowerCase(), clean);
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [catalog]);
+
   // The coupon was validated against whatever the cart held when it was
   // applied. Re-check it against the cart being paid for, so an edited cart
   // cannot keep a discount it no longer qualifies for.
@@ -685,6 +733,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     patch: Partial<{
       step: CheckoutStep;
       address: CheckoutAddress;
+      personalisation?: OrderPersonalisation;
       deliverySlot: DeliverySlot;
       paymentMethod: PaymentMethod;
       coupon?: AppliedCoupon;
@@ -762,6 +811,33 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     goToStep(2);
   };
 
+  /**
+   * What Personalize collected, or nothing at all.
+   *
+   * Undefined rather than an object of empty strings: a shop reading an
+   * order should be able to tell "they chose nothing" from "they chose
+   * blank", and every read-back downstream tests for presence.
+   */
+  function collectPersonalisation(): OrderPersonalisation | undefined {
+    const sender =
+      senderName.trim() || senderPhone.trim()
+        ? {
+            name: senderName.trim(),
+            phone: senderPhone.trim(),
+            hideFromRecipient: hideSender || undefined,
+          }
+        : undefined;
+
+    const value: OrderPersonalisation = {
+      occasion: occasion.trim() || undefined,
+      message: giftMessage.trim() || undefined,
+      sender,
+      termsAcceptedAt: termsAccepted ? new Date().toISOString() : undefined,
+    };
+
+    return Object.values(value).some(Boolean) ? value : undefined;
+  }
+
   /** Leaving Personalize: the slot is what this screen exists to collect. */
   const onPersonalizeContinue = () => {
     if (!hasDeliverySlot(deliverySlot)) {
@@ -769,7 +845,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       return;
     }
     setSlotError(null);
-    persistDraft({ step: 3, deliverySlot, paymentMethod });
+    persistDraft({
+      step: 3,
+      deliverySlot,
+      paymentMethod,
+      personalisation: collectPersonalisation(),
+    });
     goToStep(3);
   };
 
@@ -802,6 +883,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       coupon: validCoupon ?? undefined,
       deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
+      personalisation: collectPersonalisation(),
     });
 
     if (closed) {
@@ -958,6 +1040,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       address,
       deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
+      personalisation: collectPersonalisation(),
     });
 
     if (!quote) {
@@ -1577,6 +1660,128 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </p>
                     ) : null}
                   </div>
+                      {occasionOptions.length > 0 ? (
+                        <div className="space-y-2">
+                          <Label>Occasion (optional)</Label>
+                          {/*
+                            The shop's own words. A shop that has tagged no
+                            occasions is not asked — this whole block is gone,
+                            rather than showing an empty row of buttons.
+                          */}
+                          <div role="radiogroup" aria-label="Occasion" className="flex flex-wrap gap-2">
+                            {occasionOptions.map((option) => {
+                              const active = occasion === option;
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={active}
+                                  // Pressing the chosen one again clears it:
+                                  // the field is optional, and a control with
+                                  // no way back is not.
+                                  onClick={() => setOccasion(active ? "" : option)}
+                                  className={cn(
+                                    "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                                    active
+                                      ? "border-bakery-700 bg-bakery-700 text-white"
+                                      : "border-border bg-white text-foreground hover:border-bakery-700"
+                                  )}
+                                >
+                                  {option}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-2">
+                        {/*
+                          For whoever opens the parcel — NOT the same box as
+                          "Special instructions" on the payment step, which is
+                          for the shop, and not the per-item message, which is
+                          printed on the thing itself. Three messages sounds
+                          like two too many until you need to tell a rider
+                          about a gate code without it appearing on a gift.
+                        */}
+                        <Label htmlFor="giftMessage">Message for the recipient (optional)</Label>
+                        <Textarea
+                          id="giftMessage"
+                          rows={3}
+                          maxLength={500}
+                          value={giftMessage}
+                          onChange={(event) => setGiftMessage(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-3 rounded-xl border border-border bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Who it is from</p>
+                            <p className="text-xs text-muted-foreground">
+                              We will use these to reach you about this order.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingSender((open) => !open)}
+                          >
+                            {editingSender ? "Done" : "Edit"}
+                          </Button>
+                        </div>
+
+                        {/*
+                          Filled in from the signed-in account and shown as
+                          text until asked otherwise. The person paying is not
+                          always the person named, so EDIT exists — but a
+                          checkout that opens with two more empty boxes reads
+                          as two more things to do.
+                        */}
+                        {editingSender ? (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="senderName">Name</Label>
+                              <Input
+                                id="senderName"
+                                value={senderName}
+                                onChange={(event) => setSenderName(event.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="senderPhone">Phone</Label>
+                              <Input
+                                id="senderPhone"
+                                type="tel"
+                                value={senderPhone}
+                                onChange={(event) => setSenderPhone(event.target.value)}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm">
+                            {[senderName, senderPhone].filter(Boolean).join(" · ") || (
+                              <span className="text-muted-foreground">Not set</span>
+                            )}
+                          </p>
+                        )}
+
+                        <label className="flex cursor-pointer items-start gap-3 text-sm">
+                          <Checkbox
+                            checked={hideSender}
+                            onCheckedChange={(checked) => setHideSender(checked === true)}
+                          />
+                          <span>
+                            Keep it a surprise
+                            <span className="block text-xs text-muted-foreground">
+                              Your name and number stay off what the recipient sees. The
+                              shop still has them, because it has to be able to reach you.
+                            </span>
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -1696,6 +1901,41 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </p>
                     ) : null}
 
+                    {/*
+                      A CONTROL, not a caption.
+
+                      This was a centred grey sentence saying agreement had
+                      already happened by virtue of pressing the button beside it.
+                      Nothing was ticked and nothing was recorded, so the shop had
+                      no way to say when — or whether — its terms were accepted on
+                      any given order.
+
+                      It is unticked to begin with, deliberately. A pre-ticked
+                      consent box records the same nothing the sentence did, and
+                      the order stores the moment it was ticked rather than the
+                      fact that a page once contained the words.
+                    */}
+                    <label className="flex cursor-pointer items-start justify-center gap-3 text-xs text-muted-foreground">
+                      <Checkbox
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                      />
+                      <span>
+                        {commerce.checkoutTerms || (
+                          <>
+                            I agree to the{" "}
+                            <Link
+                              href={routes.store.terms}
+                              className="text-bakery-700 hover:underline"
+                            >
+                              Terms of Service
+                            </Link>
+                            .
+                          </>
+                        )}
+                      </span>
+                    </label>
+
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
                       <Button variant="outline" onClick={() => goToStep(2)}>
                         Back to payment
@@ -1706,8 +1946,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         disabled={
                           placing ||
                           cartBlocked ||
+                          // The tick above means something now, so it gates the
+                          // button. `title` because a disabled control that
+                          // does not say why is the worst kind.
+                          !termsAccepted ||
                           (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
                         }
+                        title={!termsAccepted ? "Accept the terms above to continue" : undefined}
                       >
                         {placing ? <Loader2 className="size-4 animate-spin" /> : null}
                         {placing ? (
@@ -1721,17 +1966,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     </div>
                   </div>
 
-                  <p className="text-center text-xs text-muted-foreground">
-                    {commerce.checkoutTerms || (
-                      <>
-                        By placing your order, you agree to our{" "}
-                        <Link href={routes.store.terms} className="text-bakery-700 hover:underline">
-                          Terms of Service
-                        </Link>
-                        .
-                      </>
-                    )}
-                  </p>
                 </div>
               ) : null}
             </div>

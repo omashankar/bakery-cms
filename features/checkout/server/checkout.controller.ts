@@ -166,6 +166,7 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       address: input.address,
       deliverySlot: input.deliverySlot,
       orderNotes: input.orderNotes,
+      personalisation: input.personalisation,
     });
 
     return ok(

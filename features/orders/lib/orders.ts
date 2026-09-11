@@ -4,7 +4,12 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
-import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
+import type {
+  CheckoutAddress,
+  DeliverySlot,
+  OrderPersonalisation,
+  PaymentMethod,
+} from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
 import {
   fetchOrder,
@@ -69,6 +74,8 @@ export interface PlacedOrder {
   paymentReference?: string;
   coupon?: AppliedCoupon;
   orderNotes?: string;
+  /** What the Personalize screen collected. Absent on orders placed before it existed. */
+  personalisation?: OrderPersonalisation;
   placedAt: string;
   status: OrderStatus;
   statusHistory: OrderStatusEvent[];
@@ -418,6 +425,7 @@ export async function placeOrder(input: {
   paymentReference?: string;
   coupon?: AppliedCoupon;
   orderNotes?: string;
+  personalisation?: OrderPersonalisation;
   deliverySlot?: DeliverySlot;
 }): Promise<PlaceOrderResult> {
   const placedAt = new Date().toISOString();
@@ -455,6 +463,7 @@ export async function placeOrder(input: {
     paymentReference: input.paymentReference,
     coupon: input.coupon,
     orderNotes: input.orderNotes,
+    personalisation: input.personalisation,
     deliverySlot: input.deliverySlot,
     placedAt,
     status: "confirmed",

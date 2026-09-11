@@ -553,6 +553,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     // the admin's coupon performance report as if it were real.
     coupon: priced.coupon as unknown as PlacedOrder["coupon"],
     orderNotes: input.orderNotes,
+    personalisation: input.personalisation as unknown as PlacedOrder["personalisation"],
     deliverySlot: input.deliverySlot as unknown as PlacedOrder["deliverySlot"],
     placedAt,
     status,

@@ -99,6 +99,29 @@ export const quoteSchema = z.object({
     .partial()
     .optional(),
   orderNotes: z.string().trim().max(1000).optional(),
+  /**
+   * Named here for the same reason the address fields are: this object
+   * strips what it does not know, and the draft is what the webhook rebuilds
+   * an order from when the customer closes the tab after paying.
+   *
+   * Every string is bounded. `occasion` is free text because it is the
+   * shop's own word, taken from its catalogue rather than from a list this
+   * code invented — so it cannot be an enum here.
+   */
+  personalisation: z
+    .object({
+      occasion: z.string().trim().max(60).optional(),
+      message: z.string().trim().max(500).optional(),
+      sender: z
+        .object({
+          name: z.string().trim().max(120),
+          phone: z.string().trim().max(20),
+          hideFromRecipient: z.boolean().optional(),
+        })
+        .optional(),
+      termsAcceptedAt: z.string().trim().max(40).optional(),
+    })
+    .optional(),
 });
 
 export type QuoteRequest = z.infer<typeof quoteSchema>;

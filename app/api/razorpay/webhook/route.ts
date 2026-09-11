@@ -212,6 +212,9 @@ async function handlePaidEvent(event: WebhookEvent) {
         paymentReference: paymentId,
         deliverySlot: draft.deliverySlot as never,
         orderNotes: draft.orderNotes ?? undefined,
+        // The tab-closed path. Everything the Personalize screen collected
+        // has to come from the draft here, because the browser is gone.
+        personalisation: (draft.personalisation ?? undefined) as never,
       },
       { ip: "razorpay-webhook", userAgent: "razorpay-webhook" },
     );

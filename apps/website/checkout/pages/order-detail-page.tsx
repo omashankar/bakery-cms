@@ -287,6 +287,27 @@ export function OrderDetailPage() {
                   <p className="mt-2 text-muted-foreground">{order.orderNotes}</p>
                 </div>
               ) : null}
+
+              {/*
+                The customer's own copy of what they asked for. The sender block
+                is deliberately not repeated here — this page is shown to the
+                person who placed the order, who knows who they are.
+              */}
+              {order.personalisation?.occasion || order.personalisation?.message ? (
+                <div className="rounded-xl border border-border bg-cream-50 p-5 text-sm">
+                  <p className="font-medium text-foreground">Personalisation</p>
+                  {order.personalisation.occasion ? (
+                    <p className="mt-2 text-muted-foreground">
+                      Occasion: {order.personalisation.occasion}
+                    </p>
+                  ) : null}
+                  {order.personalisation.message ? (
+                    <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                      &ldquo;{order.personalisation.message}&rdquo;
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4">

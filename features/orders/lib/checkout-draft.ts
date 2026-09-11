@@ -70,10 +70,53 @@ export interface DeliverySlot {
 /** 1 Address · 2 Personalize · 3 Payment. The cart is a route, not a step. */
 export type CheckoutStep = 1 | 2 | 3;
 
+/** Whoever is sending the order, when that is not whoever receives it. */
+export interface OrderSender {
+  name: string;
+  phone: string;
+  /**
+   * Keep the sender's name and number off what the recipient is shown.
+   *
+   * The shop still has both — it has to, to reach the person who paid. This
+   * only governs what is printed on the parcel and put in the recipient's
+   * messages.
+   */
+  hideFromRecipient?: boolean;
+}
+
+/**
+ * Everything the Personalize screen collects, as ONE field.
+ *
+ * `orderNotes` is a single optional string and it passes through twelve
+ * hand-written places — the draft type, the quote request, the quote schema,
+ * the controller, the draft repository and its Mongoose model, the placed-order
+ * type, the placement schema, the order service, the order model, the webhook's
+ * rebuild, and four read-backs. Four more scalars would have been four more
+ * trips through all of that, and this repo already has a note recording what
+ * happens next: one of the twelve gets missed and the field vanishes in silence.
+ *
+ * So the screen gets one object. The twelve edits happen once, and the next
+ * thing Personalize asks for costs none of them.
+ */
+export interface OrderPersonalisation {
+  /**
+   * The shop's own word, taken from what it has tagged its products with —
+   * never a fixed Birthday/Anniversary list, which is a claim about what this
+   * shop sells and for whom.
+   */
+  occasion?: string;
+  /** For whoever opens the parcel. Not the same as `orderNotes`, which is for the shop. */
+  message?: string;
+  sender?: OrderSender;
+  /** When the shop's terms were accepted, ISO. Absent means they were not. */
+  termsAcceptedAt?: string;
+}
+
 export interface CheckoutDraft {
   /** See `CHECKOUT_FLOW_VERSION` — stamped on write, checked on read. */
   version: number;
   step: CheckoutStep;
+  personalisation?: OrderPersonalisation;
   address: CheckoutAddress;
   deliverySlot: DeliverySlot;
   paymentMethod: PaymentMethod;

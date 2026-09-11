@@ -374,6 +374,55 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           ) : null}
 
           {/*
+            What the customer asked for on the Personalize screen.
+
+            A separate card from "Customer instructions" on purpose: those are
+            for the shop, and this is what goes to whoever opens the parcel.
+            Absent entirely on orders placed before the screen existed, and on
+            orders where the customer filled none of it in.
+          */}
+          {order.personalisation ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-lg font-semibold">Personalisation</h2>
+              <dl className="mt-3 space-y-3 text-sm">
+                {order.personalisation.occasion ? (
+                  <div>
+                    <dt className="text-muted-foreground">Occasion</dt>
+                    <dd className="font-medium">{order.personalisation.occasion}</dd>
+                  </div>
+                ) : null}
+                {order.personalisation.message ? (
+                  <div>
+                    <dt className="text-muted-foreground">Message for the recipient</dt>
+                    <dd className="whitespace-pre-wrap">{order.personalisation.message}</dd>
+                  </div>
+                ) : null}
+                {order.personalisation.sender ? (
+                  <div>
+                    <dt className="text-muted-foreground">From</dt>
+                    <dd>
+                      {[order.personalisation.sender.name, order.personalisation.sender.phone]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {/*
+                        Said plainly, because it changes what staff may write on
+                        the parcel. The shop still holds the sender's details —
+                        it has to, to reach whoever paid — so this is an
+                        instruction, not a redaction.
+                      */}
+                      {order.personalisation.sender.hideFromRecipient ? (
+                        <span className="mt-1 block text-xs font-medium text-amber-700">
+                          Keep this off anything the recipient sees
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
+
+          {/*
             Who is taking it out.
 
             The customer's tracking page showed a delivery partner on every

@@ -27,6 +27,7 @@ export interface CheckoutDraft {
   address: Record<string, string> | null;
   deliverySlot: { date?: string; timeSlot?: string } | null;
   orderNotes: string | null;
+  personalisation: Record<string, unknown> | null;
   razorpayOrderId: string | null;
   consumedByOrderId: string | null;
 }
@@ -42,6 +43,7 @@ function toDraft(doc: Record<string, unknown>): CheckoutDraft {
     address: (doc.address ?? null) as CheckoutDraft["address"],
     deliverySlot: (doc.deliverySlot ?? null) as CheckoutDraft["deliverySlot"],
     orderNotes: (doc.orderNotes ?? null) as string | null,
+    personalisation: (doc.personalisation ?? null) as Record<string, unknown> | null,
     razorpayOrderId: (doc.razorpayOrderId ?? null) as string | null,
     consumedByOrderId: (doc.consumedByOrderId ?? null) as string | null,
   };
@@ -55,6 +57,7 @@ export async function createDraft(
     address?: Record<string, string>;
     deliverySlot?: { date?: string; timeSlot?: string };
     orderNotes?: string;
+    personalisation?: Record<string, unknown>;
   },
 ): Promise<CheckoutDraft> {
   await connectDB();
@@ -68,6 +71,7 @@ export async function createDraft(
     address: context.address ?? null,
     deliverySlot: context.deliverySlot ?? null,
     orderNotes: context.orderNotes ?? null,
+    personalisation: context.personalisation ?? null,
     expiresAt: new Date(Date.now() + DRAFT_TTL_MINUTES * 60_000),
   });
   return toDraft(doc.toObject());
