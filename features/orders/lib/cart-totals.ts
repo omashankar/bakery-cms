@@ -5,6 +5,29 @@ import { computeTaxAmount } from "@/features/commerce/lib/tax-utils";
 import { calculateDeliveryQuote } from "@/features/orders/lib/delivery-pricing";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 
+/**
+ * What the shop says these lines used to cost, minus what they cost now.
+ *
+ * ONLY from compare-at prices the shop actually typed. A saving computed
+ * from anything else is a claim about the past nobody made — the rule that
+ * had an invented MRP (`price > 1000 ? price * 1.1 : undefined`) taken out
+ * of the product repository, where it wore a permanent "9% OFF" against a
+ * price no customer had ever been charged.
+ *
+ * Lived in the cart page and was about to be copied into the summary panel.
+ * One copy, so the two can never disagree about what a customer saved.
+ */
+export function compareAtSavings(items: CartLineItem[]): number {
+  return items.reduce(
+    (sum, item) =>
+      sum +
+      (item.compareAtPrice && item.compareAtPrice > item.price
+        ? (item.compareAtPrice - item.price) * item.quantity
+        : 0),
+    0,
+  );
+}
+
 export interface CartTotalsInput {
   items: CartLineItem[];
   discount?: number;

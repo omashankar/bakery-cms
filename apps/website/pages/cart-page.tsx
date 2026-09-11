@@ -32,7 +32,7 @@ import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getDeliveryPromise } from "@/apps/website/lib/product-details";
 import { getCheckoutDraft, saveCheckoutDraft } from "@/features/orders/lib/checkout-draft";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
+import { calculateCartTotals, compareAtSavings } from "@/features/orders/lib/cart-totals";
 import {
   validateCartAgainstCatalog,
   type CartIssue,
@@ -177,14 +177,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * figure computed from anything else is a claim about the past that nobody
    * made.
    */
-  const savings = items.reduce(
-    (sum, item) =>
-      sum +
-      (item.compareAtPrice && item.compareAtPrice > item.price
-        ? (item.compareAtPrice - item.price) * item.quantity
-        : 0),
-    0,
-  );
+  const savings = compareAtSavings(items);
 
   /**
    * Re-checked on every render, never trusted as stored.
@@ -392,11 +385,38 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                           >
                             {item.name}
                           </Link>
-                          {/* One list, so this cannot drift from the invoice again. */}
+                          {/*
+                            One list, so this cannot drift from the invoice
+                            again — laid out as a grid rather than joined
+                            with dots. Four choices on one line wrap into a
+                            sentence nobody reads; in columns each is a
+                            label and an answer, which is what they are.
+                          */}
                           {cartLineChoices(item).length > 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              {cartLineChoices(item).join(" · ")}
-                            </p>
+                            <dl className="mt-1 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                              {cartLineChoices(item).map((choice) => {
+                                // Already "Label: Value" where there is a
+                                // label, and a bare stated fact where there
+                                // is not — a tick the shop set, which reads
+                                // as one thing and must not be split.
+                                const at = choice.indexOf(": ");
+                                if (at === -1) {
+                                  return (
+                                    <div key={choice} className="text-muted-foreground">
+                                      {choice}
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div key={choice} className="flex gap-2">
+                                    <dt className="text-muted-foreground">
+                                      {choice.slice(0, at)}
+                                    </dt>
+                                    <dd className="font-medium">{choice.slice(at + 2)}</dd>
+                                  </div>
+                                );
+                              })}
+                            </dl>
                           ) : null}
                           {item.message ? (
                             <p className="text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cartLineChoices, type CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
-import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { compareAtSavings, getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
@@ -60,7 +60,12 @@ export function OrderSummaryPanel({
 }: OrderSummaryPanelProps) {
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const labels = getCommerceLabels();
+  // From the lines on screen, not from `totals.itemCount`, so the heading and
+  // the list under it can never disagree about how many things there are.
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const savings = compareAtSavings(items);
   const breakdown = taxBreakdownFromCartTotals(totals, {
+    compareAtSavings: savings,
     taxLabel: labels.taxLabel,
     platformChargeLabel: labels.platformChargeLabel,
     giftWrapLabel: giftWrapLabel ?? labels.giftWrapLabel,
@@ -71,7 +76,14 @@ export function OrderSummaryPanel({
   return (
     <aside className={cn("h-fit rounded-xl border border-border bg-cream-50 p-6", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-heading text-lg font-semibold">Order Summary</h2>
+        {/*
+          Counted, because "Order Summary" left a customer to count the rows
+          themselves to check nothing had been dropped. The number is items,
+          not lines: two of the same thing is two.
+        */}
+        <h2 className="font-heading text-lg font-semibold">
+          Price details ({itemCount} item{itemCount === 1 ? "" : "s"})
+        </h2>
         {showEditLink ? (
           <Link href={routes.store.cart} className="text-xs font-medium text-bakery-700 hover:underline">
             Edit cart

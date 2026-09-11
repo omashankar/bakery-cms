@@ -717,6 +717,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const totals = serverTotals ?? localTotals;
 
   /**
+   * The sender, as the payment screen reads it back.
+   *
+   * Derived rather than taken from `collectPersonalisation()`, which stamps
+   * `new Date()` when the terms are ticked — calling that during a render
+   * would mint a fresh timestamp on every keystroke anywhere on the page.
+   * The condition matches the one in there, so the screen shows exactly what
+   * the order will carry, including nothing when both boxes are empty.
+   */
+  const personalisationSender =
+    senderName.trim() || senderPhone.trim()
+      ? { name: senderName.trim(), phone: senderPhone.trim(), hideFromRecipient: hideSender }
+      : undefined;
+
+  /**
    * The earliest date this address can actually be delivered on.
    *
    * The picker floored on the shop-wide `deliveryLeadDays` alone, so a zone the
@@ -1976,7 +1990,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     </p>
 
                     <div className="mt-6 space-y-4 text-sm">
-                      <ReviewBlock title="Delivery to">
+                      <ReviewBlock title="Delivery to" onChange={() => goToStep(1)}>
                         <p className="font-medium">{getCheckoutDraft().address.fullName}</p>
                         <p>{getCheckoutDraft().address.phone}</p>
                         <p>{getCheckoutDraft().address.email}</p>
@@ -1986,7 +2000,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </ReviewBlock>
 
                       {hasDeliverySlot(deliverySlot) ? (
-                        <ReviewBlock title="Delivery slot">
+                        <ReviewBlock title="Delivery slot" onChange={() => goToStep(2)}>
                           {/*
                             The calendar day the customer picked, not an
                             instant. `new Date("2026-08-16")` is midnight UTC,
@@ -1996,7 +2010,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             order stored Sunday.
                           */}
                           <p className="font-medium">{formatCalendarDate(deliverySlot.date)}</p>
-                          <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
+                          {/* The speed bought, named. A slot with no window
+                              prints nothing rather than an empty line. */}
+                          {deliverySlot.tierLabel ? (
+                            <p className="text-muted-foreground">{deliverySlot.tierLabel}</p>
+                          ) : null}
+                          {deliverySlot.timeSlot ? (
+                            <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
+                          ) : null}
                         </ReviewBlock>
                       ) : null}
 
@@ -2006,6 +2027,18 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             paymentOptions.find((option) => option.value === paymentMethod)?.label}
                         </p>
                       </ReviewBlock>
+
+                      {personalisationSender ? (
+                        <ReviewBlock title="Sent by" onChange={() => goToStep(2)}>
+                          <p className="font-medium">{personalisationSender.name}</p>
+                          <p className="text-muted-foreground">{personalisationSender.phone}</p>
+                          {personalisationSender.hideFromRecipient ? (
+                            <p className="text-xs text-muted-foreground">
+                              Kept off what the recipient sees
+                            </p>
+                          ) : null}
+                        </ReviewBlock>
+                      ) : null}
 
                       {orderNotes ? (
                         <ReviewBlock title="Notes">
@@ -2157,16 +2190,42 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   );
 }
 
+/**
+ * A read-back, and the way back to change it.
+ *
+ * This rendered a title and its children and nothing else, so the screen that
+ * takes the money showed a customer their address, their delivery date and
+ * their payment method with no way to correct any of them — the only route
+ * back was the browser's own button, or a stepper circle two screens up.
+ *
+ * `onChange` is optional because not every block has somewhere to go: the
+ * notes are typed on this screen already.
+ */
 function ReviewBlock({
   title,
+  onChange,
   children,
 }: {
   title: string;
+  onChange?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-cream-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+        {onChange ? (
+          <button
+            type="button"
+            onClick={onChange}
+            className="text-xs font-medium text-bakery-700 underline-offset-2 hover:underline"
+          >
+            {/* Named for what it changes, so three of these on one screen do
+                not all read "Change". */}
+            Change {title.toLowerCase()}
+          </button>
+        ) : null}
+      </div>
       <div className="mt-2 space-y-1">{children}</div>
     </div>
   );
