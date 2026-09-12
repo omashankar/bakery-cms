@@ -237,6 +237,10 @@ describe("the filter panel, which spans the whole catalogue", () => {
         createElement(CollectionFiltersPanel, {
           filters: DEFAULT_COLLECTION_FILTERS,
           onChange: () => undefined,
+          // Handed a size, because the box is hidden without one now — the
+          // panel stopped heading an empty list. This case is about the WORD
+          // over the box, so it needs the box to be drawn.
+          sizeOptions: ["1 kg"],
         }),
       );
     });

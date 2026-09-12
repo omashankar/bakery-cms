@@ -357,6 +357,19 @@ describe("both filter panels get the list", () => {
     );
 
     expect(page.split("flavourOptions={flavourOptions}").length - 1).toBe(2);
-    expect(page).toContain("getFilterFlavourOptions(catalog)");
+    /**
+     * `inCategory`, not `catalog` — the products ON THE PAGE.
+     *
+     * This line read `getFilterFlavourOptions(catalog)` and so pinned the
+     * shop-wide scope, against this file's own argument twenty lines up: a
+     * shop-wide list "paints all six, every one a tick that empties the
+     * grid". Anyone narrowing it — the right fix by that reasoning — hit a
+     * red test that read as if it were defending the old behaviour
+     * deliberately. It was not; it had simply not been revisited.
+     */
+    expect(page).toContain("getFilterFlavourOptions(inCategory)");
+    expect(page, "the flavour box reads the whole shop again").not.toContain(
+      "getFilterFlavourOptions(catalog)",
+    );
   });
 });

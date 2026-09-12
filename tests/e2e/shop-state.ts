@@ -23,6 +23,14 @@ const SNAPSHOT_PATH = path.join(process.cwd(), "node_modules", ".cache", "e2e-sh
 export interface ShopSnapshot {
   orderIds: string[];
   auditIds: string[];
+  /**
+   * The checkout drafts the shop ALREADY had.
+   *
+   * Optional so an older snapshot file still loads — and when it is absent,
+   * teardown deletes no drafts at all. That is the safe direction: a leftover
+   * test draft is rubbish, a deleted customer draft is a lost order.
+   */
+  draftIds?: string[];
   stock: Record<string, number>;
   /**
    * Whether each product is marked out of stock.
@@ -61,6 +69,19 @@ export async function snapshotShop(): Promise<ShopSnapshot> {
   const db = await connect();
 
   const orders = await db.collection("orders").find({}, { projection: { _id: 1 } }).toArray();
+  /**
+   * Drafts the shop ALREADY had, so teardown can leave them alone.
+   *
+   * Teardown used to delete every draft created in the last six hours,
+   * whoever created it — against a live shop that is up to six hours of real
+   * customers' half-finished checkouts, destroyed by the test harness. This
+   * file's own header states the opposite rule: remove what the run created,
+   * never what a query matches.
+   */
+  const drafts = await db
+    .collection("checkoutdrafts")
+    .find({}, { projection: { _id: 1 } })
+    .toArray();
   const audit = await db.collection("auditlogs").find({}, { projection: { _id: 1 } }).toArray();
   const products = await db
     .collection("products")
@@ -70,6 +91,7 @@ export async function snapshotShop(): Promise<ShopSnapshot> {
   const snapshot: ShopSnapshot = {
     orderIds: orders.map((o) => String(o._id)),
     auditIds: audit.map((a) => String(a._id)),
+    draftIds: drafts.map((d) => String(d._id)),
     stock: Object.fromEntries(
       products.map((p) => [String(p._id), Number(p.stockQuantity ?? 0)]),
     ),
@@ -124,13 +146,35 @@ export async function restoreShop(): Promise<string> {
     restatused += result.modifiedCount;
   }
 
-  // The customer drafts a checkout creates are short-lived and keyed to the
-  // cart, but they are still rows this run made.
-  const draftsRemoved = await db
-    .collection("checkoutdrafts")
-    .deleteMany({ createdAt: { $gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } })
-    .then((r) => r.deletedCount)
-    .catch(() => 0);
+  /**
+   * The drafts THIS RUN created — by id, against the snapshot.
+   *
+   * This was `createdAt: { $gte: six hours ago }`, which on a live shop
+   * deletes real customers' half-finished checkouts that have nothing to do
+   * with the run. Probe cleanup deletes what the probe created; a query is
+   * not a record of that.
+   *
+   * No snapshot key at all (an older snapshot file) deletes NOTHING, which
+   * is the safe direction: a leftover test draft is rubbish, a deleted
+   * customer draft is a lost order.
+   */
+  const knownDrafts = new Set(before.draftIds ?? []);
+  const draftsRemoved = before.draftIds
+    ? await db
+        .collection("checkoutdrafts")
+        .find({}, { projection: { _id: 1 } })
+        .toArray()
+        .then((rows) => rows.map((r) => r._id).filter((id) => !knownDrafts.has(String(id))))
+        .then((ids) =>
+          ids.length
+            ? db
+                .collection("checkoutdrafts")
+                .deleteMany({ _id: { $in: ids } })
+                .then((r) => r.deletedCount)
+            : 0,
+        )
+        .catch(() => 0)
+    : 0;
 
   /**
    * The session the fixture planted, taken back out.

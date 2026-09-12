@@ -47,4 +47,33 @@ test("the shop menu links each category once, with no React key collision", asyn
   );
 
   expect(repeated, `a list links the same category twice: ${repeated.join(", ")}`).toEqual([]);
+
+  /**
+   * AND NO TWO COLUMNS OF THE SAME MENU OFFER THE SAME PAGE.
+   *
+   * The per-<ul> check above passed over a real defect for as long as it
+   * existed: the Shop menu grew a second column reading the shop's occasions,
+   * and this catalogue has a category AND an occasion at `birthday`, at
+   * `wedding` and at `anniversary`. Three pages appeared twice, side by side,
+   * under two different names — and because the two columns are two separate
+   * <ul> elements with two separate key spaces, neither React nor the loop
+   * above had anything to complain about.
+   *
+   * A category and an occasion at one slug resolve to the SAME page. The second
+   * row is not another destination; it is the same link with a different word
+   * on it. So the scope that matters is the MENU, not the list.
+   */
+  const menu = page.locator('[class*="w-[640px]"]').first();
+  const menuRepeats = await menu
+    .locator('a[href^="/store/collections/"]')
+    .evaluateAll((links) => {
+      const hrefs = links.map((link) => link.getAttribute("href") ?? "");
+      return [...new Set(hrefs.filter((href, index) => href && hrefs.indexOf(href) !== index))];
+    })
+    .catch(() => [] as string[]);
+
+  expect(
+    menuRepeats,
+    `the Shop menu offers the same page from two columns: ${menuRepeats.join(", ")}`,
+  ).toEqual([]);
 });

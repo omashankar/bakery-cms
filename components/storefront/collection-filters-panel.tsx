@@ -8,12 +8,10 @@ import { Label } from "@/components/ui/label";
 import {
   COLLECTION_PRICE_FLOOR,
   defaultCollectionFilters,
-  DEFAULT_FILTER_OCCASION_OPTIONS,
   optionFacetKey,
   tickedOptions,
   type CollectionFilterFacet,
   type CollectionFilters,
-  getFilterOccasionOptions,
 } from "@/apps/website/lib/collection-filters";
 import { formatCurrency } from "@/utils/format";
 import { DEFAULT_SIZE_AXIS_LABEL } from "@/features/products/lib/product-pricing";
@@ -52,6 +50,15 @@ interface CollectionFiltersPanelProps {
    */
   flavourOptions?: string[];
   /**
+   * The occasions to offer, read off the products being filtered.
+   *
+   * Passed in rather than looked up, for the reason above and one more: the
+   * lookup it replaces read the catalog taxonomy out of localStorage, so a
+   * first visit was offered the shipped demo occasions whatever the shop
+   * actually keeps.
+   */
+  occasionOptions?: string[];
+  /**
    * One box per question the shop's products ask, in the shop's own words.
    *
    * This panel used to print `<FilterGroup title="Flavour">` and pour every
@@ -84,12 +91,14 @@ export function CollectionFiltersPanel({
   priceCeiling = COLLECTION_PRICE_FLOOR,
   sizeOptions = [],
   flavourOptions = [],
+  occasionOptions = [],
   optionFacets = [],
   idPrefix = "",
   className,
 }: CollectionFiltersPanelProps) {
   const weights = sizeOptions;
   const flavours = flavourOptions;
+  const occasions = occasionOptions;
   /**
    * Which boxes the customer asked to see in full.
    *
@@ -98,18 +107,23 @@ export function CollectionFiltersPanel({
    * watches every time somebody expanded a list.
    */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  // Occasions still live in the catalog store (localStorage on the client).
-  // Seed with the SAME defaults the server renders, then refresh after mount —
-  // otherwise a customized catalog would mismatch the SSR HTML.
-  const [occasions, setOccasions] = useState<string[]>(DEFAULT_FILTER_OCCASION_OPTIONS);
+  /*
+    An `occasions` state stood here, seeded with the shipped demo list and
+    refreshed after mount from `getFilterOccasionOptions()` — which read the
+    catalog TAXONOMY out of localStorage. On a browser with no cached
+    catalogue that is the demo list, so a charger shop's first visitor was
+    offered Birthday, Wedding, Anniversary and Corporate, four ticks that
+    empty the grid, and the effect had already run so nothing corrected it.
+
+    It is a prop now, derived from the products on the page like every other
+    box — which also makes the SSR/hydration seeding unnecessary: the server
+    and the browser compute it from the same list.
+  */
   // Flavour / weight / eggless filters are bakery modules — hide when off.
   // Default ON so SSR / bakery render exactly as before.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   useEffect(() => {
-    const sync = () => {
-      setModules(getModuleSettings());
-      setOccasions(getFilterOccasionOptions());
-    };
+    const sync = () => setModules(getModuleSettings());
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
@@ -175,6 +189,10 @@ export function CollectionFiltersPanel({
         </Button>
       </div>
 
+      {/* Hidden when nothing on the page carries one — a heading over an
+          empty list reads as something that failed to load, and this box was
+          the only one still drawn unconditionally. */}
+      {occasions.length > 0 ? (
       <FilterGroup title="Occasion">
         {occasions.map((occasion) => (
           <FilterCheckbox
@@ -186,6 +204,7 @@ export function CollectionFiltersPanel({
           />
         ))}
       </FilterGroup>
+      ) : null}
 
       {/*
         The shop's own questions, each under its own name. No heading in this
@@ -273,7 +292,11 @@ export function CollectionFiltersPanel({
         for this axis is a later step; the generic one is never wrong in the
         meantime.
       */}
-      {modules.weight ? (
+      {/* `weights.length > 0` as well as the module — the lesson the Flavour
+          box above already learned. `modules.weight` defaults to ON, so every
+          shop selling nothing with size tiers rendered a bare SIZE heading
+          until somebody found and switched the module off. */}
+      {modules.weight && weights.length > 0 ? (
         <FilterGroup title={DEFAULT_SIZE_AXIS_LABEL} noDivider data-gate-weight="">
           {weights.map((weight) => (
             <FilterCheckbox

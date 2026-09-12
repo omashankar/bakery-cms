@@ -19,6 +19,7 @@ import {
   countActiveFilters,
   defaultCollectionFilters,
   getFilterFlavourOptions,
+  getFilterOccasionOptions,
   getFilterOptionFacets,
   getFilterWeightOptions,
   pruneOptionSelections,
@@ -133,14 +134,22 @@ export function CollectionsPage({
    */
   const priceCeiling = useMemo(() => collectionPriceCeiling(catalog), [catalog]);
   /**
-   * The sizes to offer as filters, read off the products on the page.
+   * Every filter box is built from THIS CATEGORY, never from the whole shop.
    *
-   * Not a shop-wide list: a size is offered exactly when something here is sold
-   * in it, so a tick can never hide everything.  rather than the
-   * filtered result, or the options would vanish as the customer used them.
+   * A size, a flavour or an occasion is offered exactly when something in
+   * front of the customer has it, so a tick can never hide everything. These
+   * three read `catalog` — the whole published catalogue — while the option
+   * facets below already read `inCategory`, and the comment above them
+   * explained why: on a mixed shop the one Size box listed 0.5 kg, 1 kg,
+   * Small, Large and 65W together, and ticking a cake size on the Plants page
+   * emptied the grid with nothing on screen to say why.
+   *
+   * `inCategory` and not the FILTERED result: it moves with the route, never
+   * with a tick, so the boxes do not vanish as the customer uses them.
    */
-  const sizeOptions = useMemo(() => getFilterWeightOptions(catalog), [catalog]);
-  const flavourOptions = useMemo(() => getFilterFlavourOptions(catalog), [catalog]);
+  const sizeOptions = useMemo(() => getFilterWeightOptions(inCategory), [inCategory]);
+  const flavourOptions = useMemo(() => getFilterFlavourOptions(inCategory), [inCategory]);
+  const occasionOptions = useMemo(() => getFilterOccasionOptions(inCategory), [inCategory]);
   /**
    * The filter boxes, built from THIS CATEGORY rather than the whole shop.
    *
@@ -200,8 +209,16 @@ export function CollectionsPage({
    * is what keeps the `setPage(1)` effect below from firing every render.
    */
   const shownFilters = useMemo(
-    () => pruneOptionSelections(filters, optionFacets),
-    [filters, optionFacets],
+    () =>
+      pruneOptionSelections(filters, optionFacets, {
+        // The other three list axes, each exactly as the boxes offer it. They
+        // were not pruned at all: a size ticked on Cakes was carried into
+        // Plants, where no box shows it and every plant is hidden by it.
+        weights: sizeOptions,
+        flavours: flavourOptions,
+        occasions: occasionOptions,
+      }),
+    [filters, optionFacets, sizeOptions, flavourOptions, occasionOptions],
   );
 
   const filtered = useMemo(
@@ -255,6 +272,7 @@ export function CollectionsPage({
               priceCeiling={priceCeiling}
               sizeOptions={sizeOptions}
               flavourOptions={flavourOptions}
+              occasionOptions={occasionOptions}
               optionFacets={optionFacets}
               idPrefix="side-"
               onChange={updateFilters}
@@ -294,6 +312,7 @@ export function CollectionsPage({
                         priceCeiling={priceCeiling}
                         sizeOptions={sizeOptions}
                         flavourOptions={flavourOptions}
+                        occasionOptions={occasionOptions}
                         optionFacets={optionFacets}
                         idPrefix="sheet-"
                         onChange={(next) => {

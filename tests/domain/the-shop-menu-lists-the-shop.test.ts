@@ -17,7 +17,7 @@
  * function of what the shop has, and must say nothing when the shop has
  * nothing.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -129,5 +129,73 @@ describe("a shop with nothing of its own is shown nothing of anyone else's", () 
 
     expect(fallback).toMatch(/categories:\s*\[\]/);
     expect(fallback).toMatch(/occasions:\s*\[\]/);
+  });
+});
+
+describe("one address is offered once, whichever list it came from", () => {
+  /**
+   * THE DEFECT THIS FILE'S FIRST VERSION SHIPPED.
+   *
+   * Categories, occasions and collections share ONE address space:
+   * /store/collections/<slug> resolves against all three. This shop's catalogue
+   * has a category AND an occasion at `birthday`, at `wedding` and at
+   * `anniversary` — so the moment the occasion column started reading real
+   * data, the Shop menu offered the same three pages twice, side by side in
+   * adjacent columns under two different names.
+   *
+   * Nothing caught it. React keys are scoped per array and the two columns are
+   * two arrays, so there was no warning; the e2e guard literally named "the
+   * shop menu links each category once" checked per `<ul>`, and the two columns
+   * are two `<ul>`s; and the domain test that shipped with the change asserted
+   * only that occasions ARRIVE.
+   *
+   * A category and an occasion at one slug resolve to the same page. The second
+   * row is not another destination — it is the same link with a different word
+   * on it.
+   */
+  const catalog = {
+    categories: [
+      { id: "1", name: "Birthday Cakes", slug: "birthday" },
+      { id: "2", name: "Celebration Cakes", slug: "cakes" },
+    ],
+    occasions: [
+      { id: "oc-1", name: "Birthday", slug: "birthday" },
+      { id: "oc-2", name: "Corporate", slug: "corporate" },
+      // A second row at one slug, to pin the within-list rule as well.
+      { id: "oc-3", name: "Corporate Gifting", slug: "corporate" },
+    ],
+  };
+
+  async function occasions() {
+    vi.resetModules();
+    vi.doMock("@/features/catalog/server/catalog.service", () => ({
+      getCatalog: async () => catalog,
+    }));
+    const mod = await import("@/apps/website/lib/storefront-categories.server");
+    return mod.getStorefrontOccasions();
+  }
+
+  it("drops an occasion whose page a category already offers", async () => {
+    const rows = await occasions();
+
+    expect(rows.map((row) => row.slug)).not.toContain("birthday");
+  });
+
+  it("and keeps the ones that are a page of their own", async () => {
+    const rows = await occasions();
+
+    expect(rows.map((row) => row.slug)).toEqual(["corporate"]);
+  });
+
+  it("and still drops a second row at the same slug within its own list", async () => {
+    /**
+     * The older rule, kept: a second row at one slug is unreachable — the
+     * resolver takes the first — so offering it is offering a link that does
+     * not go where its label says.
+     */
+    const rows = await occasions();
+
+    expect(rows.filter((row) => row.slug === "corporate")).toHaveLength(1);
+    expect(rows[0]?.name).toBe("Corporate");
   });
 });

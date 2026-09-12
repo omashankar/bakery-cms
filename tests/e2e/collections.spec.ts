@@ -3,6 +3,32 @@ import { expect, test } from "@playwright/test";
 import { connect } from "./shop-state";
 
 /**
+ * The shop's OWN plural noun, read from its settings.
+ *
+ * Two assertions in this file were written as /no cakes found/i and
+ * /no cakes in/i. The page renders the shop's configured plural, and this
+ * shop's override is "products" — so one failed outright and reported that an
+ * emptied page has no empty state when it has one, and the other asserted the
+ * ABSENCE of a phrase that can never appear, passing whether or not the bug it
+ * guards was present.
+ *
+ * Hardcoding a trade noun in a CMS that sells anything is the defect this whole
+ * project has been removing. A test may not do it either.
+ */
+async function shopProductsWord(): Promise<string> {
+  try {
+    const db = await connect();
+    const settings = await db.collection("settings").findOne({});
+    const override = (
+      settings as { labelOverrides?: { productWordPlural?: string } } | null
+    )?.labelOverrides?.productWordPlural;
+    return (override ?? "products").trim().toLowerCase() || "products";
+  } catch {
+    return "products";
+  }
+}
+
+/**
  * The category pages, in a browser.
  *
  * This shop's three wedding cakes cost ₹12,499, ₹15,999 and ₹18,999, and the
@@ -75,6 +101,7 @@ test.describe("browsing a category", () => {
   });
 
   test("still filters when the slider is moved down", async ({ page }) => {
+    const productsWord = await shopProductsWord();
     await page.goto("/store/collections/wedding");
     await expect(page.locator('a[href^="/store/cakes/"]').first()).toBeVisible();
 
@@ -88,7 +115,13 @@ test.describe("browsing a category", () => {
 
     // Nothing costs nothing, so this genuinely empties the page — and the page
     // must say so, rather than falling back to showing the whole catalogue.
-    await expect(page.getByText(/no cakes found/i)).toBeVisible();
+    //
+    // The SHOP's plural noun. This read /no cakes found/i, and the page has
+    // rendered `No ${labels.productWordPlural.toLowerCase()} found` for as
+    // long as labels have existed — so on this shop, whose override is
+    // "products", the assertion failed and reported that an emptied page has
+    // no empty state when it has one.
+    await expect(page.getByText(new RegExp(`no ${productsWord} found`, "i"))).toBeVisible();
     await expect(page.getByRole("button", { name: /clear filters/i })).toBeVisible();
   });
 });
@@ -109,6 +142,7 @@ test.describe("a category page", () => {
    * this MORE visible, not less: it is the untouched half of that change.
    */
   test("shows the cakes the shop put in it, for a multi-word category", async ({ page }) => {
+    const productsWord = await shopProductsWord();
     const db = await connect();
     const catalog = await db.collection("catalogs").findOne({});
     const categories = ((catalog?.categories ?? []) as { name: string; slug: string }[]).filter(
@@ -130,13 +164,24 @@ test.describe("a category page", () => {
       const id = (catalog?.categories as { name: string; slug: string; id: string }[]).find(
         (item) => item.slug === category.slug,
       )?.id;
-      const count = products.filter((product) => String(product.categoryId) === String(id)).length;
+      // MEMBERSHIP, like the storefront it is checking. Counting the primary
+      // alone drops a category holding only secondary members out of coverage
+      // entirely — silently, via the `continue` below.
+      const count = products.filter((product) =>
+        ((product.categoryIds as string[] | undefined) ?? [String(product.categoryId)]).includes(
+          String(id),
+        ),
+      ).length;
       if (count === 0) continue;
 
       await page.goto(`/store/collections/${category.slug}`);
       await expect(
-        page.getByText(/no cakes in/i),
-        `"${category.name}" (/${category.slug}) holds ${count} cakes and rendered empty`,
+        // Was /no cakes in/i — a phrase this page cannot produce for a shop
+        // that calls its goods anything else, so the guard asserted the
+        // absence of something that could never appear and passed whether or
+        // not the bug was present.
+        page.getByText(new RegExp(`no ${productsWord} in`, "i")),
+        `"${category.name}" (/${category.slug}) holds ${count} products and rendered empty`,
       ).toHaveCount(0);
       tested += 1;
     }

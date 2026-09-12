@@ -343,6 +343,50 @@ describe("the state a customer builds up", () => {
     const untouched = filters({});
     expect(pruneOptionSelections(untouched, offered)).toBe(untouched);
   });
+
+  it("drops a size, a flavour and an occasion the new page cannot show", () => {
+    /**
+     * The other three list axes, which were not pruned AT ALL.
+     *
+     * This function covered `options` alone, and the two cases above cover only
+     * that — so the docblock describing the failure it prevents was accurate
+     * for one axis out of four. A size ticked on Cakes, a flavour ticked on
+     * Pastries and an occasion ticked anywhere were each carried into a
+     * category that offers none of them, hiding everything on it.
+     */
+    const carried = filters({
+      weights: ["1 kg", "Small"],
+      flavours: ["Vanilla"],
+      occasions: ["Diwali"],
+    });
+
+    const pruned = pruneOptionSelections(carried, [], {
+      weights: ["Small"],
+      flavours: [],
+      occasions: ["Diwali", "Rakhi"],
+    });
+
+    expect(pruned.weights).toEqual(["Small"]);
+    expect(pruned.flavours).toEqual([]);
+    expect(pruned.occasions).toEqual(["Diwali"]);
+  });
+
+  it("leaves an axis alone when the caller offers no list for it", () => {
+    /**
+     * `undefined` means "I have no list for this axis"; an empty array means
+     * "this page offers none". Treating the two alike would silently wipe every
+     * tick for any caller that passes one axis and not the others — and the
+     * mutation that did exactly that survived the first run of this file.
+     */
+    const carried = filters({ weights: ["1 kg"], flavours: ["Vanilla"], occasions: ["Diwali"] });
+
+    const pruned = pruneOptionSelections(carried, [], { weights: ["1 kg"] });
+
+    expect(pruned.flavours).toEqual(["Vanilla"]);
+    expect(pruned.occasions).toEqual(["Diwali"]);
+    // Nothing was dropped, so the identity contract still holds.
+    expect(pruneOptionSelections(carried, [], {})).toBe(carried);
+  });
 });
 
 describe("the panel prints what it is handed", () => {
@@ -387,13 +431,36 @@ describe("the panel prints what it is handed", () => {
      * A shop with no variant groups and no legacy flavours gets no option boxes
      * at all — and, in particular, never the word this panel used to hard-code
      * over whatever it had.
+     *
+     * The two lines below used to assert that Occasion and Size print ANYWAY.
+     * They did, and that was the bug: `modules.weight` defaults on, so every
+     * shop selling nothing with size tiers rendered a bare SIZE heading over
+     * an empty box, and the Occasion box was drawn unconditionally from a
+     * fixed taxonomy. Handed nothing, a box now prints nothing — the rule
+     * this whole file is named for, applied to the two axes it had exempted.
      */
     const text = draw({ optionFacets: [], flavourOptions: [] }).textContent ?? "";
 
     expect(text).not.toContain("Flavour");
-    // …and the axes that are not part of this change still print.
+    expect(text, "a heading over an empty Occasion box").not.toContain("Occasion");
+    expect(text, "a heading over an empty Size box").not.toContain("Size");
+  });
+
+  it("and prints them the moment the page has something to offer", () => {
+    /**
+     * The other direction, so the case above cannot be satisfied by a panel
+     * that has stopped rendering these axes at all.
+     */
+    const text =
+      draw({
+        sizeOptions: ["1 kg"],
+        occasionOptions: ["Diwali"],
+      }).textContent ?? "";
+
     expect(text).toContain("Occasion");
+    expect(text).toContain("Diwali");
     expect(text).toContain("Size");
+    expect(text).toContain("1 kg");
   });
 
   it("gives every checkbox its own id, in one panel and across two", () => {
@@ -523,6 +590,24 @@ describe("both panels are wired, and to the category being shown", () => {
      */
     expect(page).toContain("getFilterOptionFacets(inCategory)");
     expect(page).not.toContain("getFilterOptionFacets(catalog)");
+
+    /**
+     * EVERY box, not just this one.
+     *
+     * Only the option facets were asserted here, and only the flavour box was
+     * asserted elsewhere — so Size and Occasion could read the whole catalogue
+     * with the whole suite green, and Size did. On a mixed shop that puts
+     * 0.5 kg, 1 kg, Small, Large and 65W in one box, and ticking a cake size on
+     * the Plants page hides every plant.
+     */
+    expect(page).toContain("getFilterWeightOptions(inCategory)");
+    expect(page, "the Size box reads the whole shop").not.toContain(
+      "getFilterWeightOptions(catalog)",
+    );
+    expect(page).toContain("getFilterOccasionOptions(inCategory)");
+    expect(page, "the Occasion box reads the whole shop").not.toContain(
+      "getFilterOccasionOptions(catalog)",
+    );
   });
 
   it("filters and counts on the ticks this page can show", () => {
@@ -534,7 +619,19 @@ describe("both panels are wired, and to the category being shown", () => {
      * them left on the raw state is a badge counting a filter that is not
      * applied, or a panel showing a tick the grid ignores.
      */
-    expect(page).toContain("pruneOptionSelections(filters, optionFacets)");
+    expect(page).toContain("pruneOptionSelections(filters, optionFacets");
+    /**
+     * And the OTHER three list axes, which were not pruned at all.
+     *
+     * The function covered `options` alone, so a size ticked on Cakes, a
+     * flavour ticked on Pastries or an occasion ticked anywhere was carried
+     * into a category that offers none of them — emptying the grid with nothing
+     * on screen to explain why, which is the exact failure the docblock on
+     * `pruneOptionSelections` describes and prevented for one axis out of four.
+     */
+    expect(page).toContain("weights: sizeOptions");
+    expect(page).toContain("flavours: flavourOptions");
+    expect(page).toContain("occasions: occasionOptions");
     expect(page).toContain("applyCollectionFilters(inCategory, shownFilters)");
     expect(page).toContain("countActiveFilters(shownFilters, priceCeiling)");
     expect(page.split("filters={shownFilters}").length - 1).toBe(2);

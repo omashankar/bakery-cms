@@ -1,6 +1,5 @@
 import type { LandingProduct } from "@/constants/landing-data";
-import { getOccasions } from "@/features/catalog/lib/catalog-repository";
-import { defaultOccasions } from "@/features/catalog/lib/catalog-utils";
+
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
@@ -118,8 +117,37 @@ export const DEFAULT_COLLECTION_FILTERS: CollectionFilters = {
   inStockOnly: false,
 };
 
-export function getFilterOccasionOptions(): string[] {
-  return getOccasions().map((item) => item.name);
+/**
+ * The occasions to offer, READ OFF THE PRODUCTS IN VIEW.
+ *
+ * This was `getOccasions()` — the catalog TAXONOMY, reached through
+ * `loadCatalogStore()`, which on a browser with no cached catalogue returns
+ * the shipped demo list. So a charger shop's first visitor got an Occasion
+ * box holding Birthday, Wedding, Anniversary and Corporate: four ticks the
+ * shop had deleted, each of which empties the grid. It never corrected
+ * itself during that visit, because the mount effect had already run.
+ *
+ * It was also the only facet still built from a fixed list. Size, Flavour
+ * and every option box were moved onto the products precisely so "the panel
+ * can no longer offer a tick that matches nothing", and this one was left
+ * behind.
+ *
+ * Ordered by how many products carry it, like the sizes below.
+ */
+export function getFilterOccasionOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const product of products) {
+    for (const occasion of product.occasions ?? []) {
+      const label = occasion?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
 }
 
 /**
@@ -226,6 +254,16 @@ export function tickedOptions(filters: CollectionFilters, key: string): string[]
 export function pruneOptionSelections(
   filters: CollectionFilters,
   offered: CollectionFilterFacet[],
+  /**
+   * The OTHER three list axes, each as the page currently offers it.
+   *
+   * This function covered `options` alone, and the docblock above described
+   * — accurately — a failure it prevented for one axis out of four. A size
+   * ticked on Cakes, a flavour ticked on Pastries and an occasion ticked
+   * anywhere were all carried into a category that does not offer them, and
+   * each empties the grid the same way and for the same reason.
+   */
+  lists?: { weights?: string[]; flavours?: string[]; occasions?: string[] },
 ): CollectionFilters {
   const available = new Map(offered.map((facet) => [facet.key, new Set(facet.options.map(optionFacetKey))]));
   const kept: Record<string, string[]> = {};
@@ -240,7 +278,24 @@ export function pruneOptionSelections(
     if (surviving.length > 0) kept[key] = surviving;
   }
 
-  return changed ? { ...filters, options: kept } : filters;
+  /**
+   * An axis the caller says nothing about is NOT pruned.
+   *
+   * `undefined` means "I have no list for this", which is different from an
+   * empty list meaning "this page offers none" — and treating the two alike
+   * would silently drop every tick for a caller that only passes one axis.
+   */
+  const next: CollectionFilters = { ...filters, options: kept };
+  for (const axis of ["weights", "flavours", "occasions"] as const) {
+    const offeredValues = lists?.[axis];
+    if (!offeredValues) continue;
+    const allowed = new Set(offeredValues.map(optionFacetKey));
+    const surviving = filters[axis].filter((value) => allowed.has(optionFacetKey(value)));
+    if (surviving.length !== filters[axis].length) changed = true;
+    next[axis] = surviving;
+  }
+
+  return changed ? next : filters;
 }
 
 /**
@@ -321,8 +376,16 @@ export function getFilterWeightOptions(products: LandingProduct[]): string[] {
  * There is no flavour twin any more, and there does not need to be: flavours
  * come from the products the page was handed, which the server and the client
  * both have before they paint.
+ *
+ * AND NOW THERE IS NO OCCASION TWIN EITHER. This existed to seed the panel
+ * with the shipped demo occasions so SSR and hydration agreed, back when the
+ * panel read the catalog taxonomy out of localStorage after mount. It does
+ * not: occasions come from the products the page was handed, exactly like
+ * flavours and sizes, so both passes compute the same list from the same data
+ * and there is nothing to seed. The demo list it held was itself the bug —
+ * a charger shop's first visitor was offered Birthday, Wedding, Anniversary
+ * and Corporate, four ticks that empty the grid.
  */
-export const DEFAULT_FILTER_OCCASION_OPTIONS: string[] = defaultOccasions.map((item) => item.name);
 
 /**
  * Match the occasions the cake is TAGGED with.
