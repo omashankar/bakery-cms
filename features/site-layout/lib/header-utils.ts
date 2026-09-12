@@ -21,6 +21,16 @@ export const defaultHeaderSettings: HeaderSettings = {
   showCta: true,
   ctaLabel: "Order Inquiry",
   ctaHref: routes.store.contact,
+  /**
+   * EMPTY. A shop that has not written a utility row does not get one.
+   *
+   * Unlike `nav`, which is seeded from `storefrontNav` because a shop cannot
+   * have no navigation at all, a second row is a thing a shop chooses to
+   * have. Seeding it would put Help and Corporate Gifts links on every
+   * storefront pointing at pages nobody has written.
+   */
+  utilityNav: [],
+  showCurrencyNote: false,
   nav: storefrontNav.map((item, index) => ({
     id: `nav-${index + 1}`,
     label: item.label,

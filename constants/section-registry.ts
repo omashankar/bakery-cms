@@ -335,6 +335,97 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      THE COLLAGE. One band, several cards, each with its own everything.
+
+      `promo-banner` next door pulls its pictures from the shared hero-banner
+      pool, so two promo bands on one page show the same images and neither
+      can carry a per-card subtitle or a per-card link. Every promo band in
+      the reference is the opposite of that: the shop wrote each card.
+
+      Ships EMPTY. A default card would be a claim about a shop nobody has
+      made yet, and an empty list renders no band at all.
+    */
+    type: "promo-collage",
+    label: "Promo cards",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      cards: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      {
+        key: "cards",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Picture", type: "url", isImage: true },
+          { key: "title", label: "Heading", type: "text" },
+          { key: "subtitle", label: "Line under it", type: "text" },
+          { key: "ctaLabel", label: "Button label", type: "text", placeholder: "Shop Now" },
+          { key: "href", label: "Link", type: "url" },
+          {
+            /*
+              The reference's Must Have band is three WIDE cards over a row
+              of five small ones. Without this every card is the same size
+              and the band is a plain grid.
+            */
+            key: "wide",
+            label: "Full-width card",
+            type: "boolean",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    /*
+      A GRID OF PICTURE TILES the shop writes itself.
+
+      The reference uses this shape twice — sixteen "Gift Categories" tiles
+      and six country tiles under "International Gifts Delivery" — and
+      neither is a catalogue category, so `categories` cannot express them:
+      it is driven by the taxonomy and can only point at a category page.
+
+      Ships empty, for the same reason the collage does.
+    */
+    type: "tile-grid",
+    label: "Picture tiles",
+    icon: "Grid3x3",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      columns: 4,
+      tiles: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "columns", label: "Tiles per row", type: "number" },
+      {
+        key: "tiles",
+        label: "Tiles",
+        type: "list",
+        emptyHint: "No tiles — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Picture", type: "url", isImage: true },
+          { key: "label", label: "Label", type: "text" },
+          { key: "href", label: "Link", type: "url" },
+        ],
+      },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

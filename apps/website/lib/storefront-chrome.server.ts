@@ -38,6 +38,8 @@ export interface StorefrontChrome {
   logo: string;
   logoLetter: string;
   showSearch: boolean;
+  /** The shop's own line for the search box; blank means the generic one. */
+  searchPlaceholder: string;
   /**
    * The header's call-to-action button.
    *
@@ -49,6 +51,10 @@ export interface StorefrontChrome {
    */
   cta: { show: boolean; label: string; href: string };
   navItems: HeaderNavItem[];
+  /** The thin row above the main bar; empty renders no row at all. */
+  utilityNav: HeaderNavItem[];
+  /** Print "Currency · INR" in that row — a readout, never a switcher. */
+  currencyNote: string;
   brand: { name: string; tagline: string; description: string };
   contact: { address: string; phone: string; email: string };
   businessHours: { day: string; hours: string }[];
@@ -86,12 +92,15 @@ function fallbackChrome(): StorefrontChrome {
     logo: "",
     logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
+    searchPlaceholder: "",
     cta: {
       show: defaultHeaderSettings.showCta,
       label: defaultHeaderSettings.ctaLabel,
       href: defaultHeaderSettings.ctaHref,
     },
     navItems: selectVisibleNavItems(defaultHeaderSettings.nav),
+    utilityNav: [],
+    currencyNote: "",
     brand: { name: brandInfo.name, tagline: brandInfo.tagline, description: brandInfo.description },
     contact: {
       address: defaultContact.address,
@@ -186,6 +195,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       // precisely so this falls through to the name.
       logoLetter: header.logoLetter?.trim() || firstLetterOf(name),
       showSearch: header.showSearch ?? defaultHeaderSettings.showSearch,
+      searchPlaceholder: (header.searchPlaceholder ?? "").trim(),
       cta: {
         show: header.showCta ?? defaultHeaderSettings.showCta,
         // An empty label would render a button with no accessible name.
@@ -193,6 +203,12 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
       },
       navItems: selectVisibleNavItems(header.nav ?? []),
+      // The same filter and sort the main row gets: a hidden utility link is
+      // hidden, and the order the shop set is the order it renders in.
+      utilityNav: selectVisibleNavItems(header.utilityNav ?? []),
+      currencyNote: header.showCurrencyNote
+        ? (general.currency ?? "").trim().toUpperCase()
+        : "",
       /**
        * The shop's own categories, for the header's Shop menu.
        *

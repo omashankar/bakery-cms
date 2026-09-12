@@ -28,6 +28,7 @@ import {
   syncCustomerSession,
 } from "@/apps/website/account/lib/customer-session";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,11 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [logo] = useState(chrome.logo);
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
+  const [utilityNav] = useState(chrome.utilityNav);
+  const [currencyNote] = useState(chrome.currencyNote);
+  const labels = useBusinessLabels();
   const [showSearch] = useState(chrome.showSearch);
+  const [searchPlaceholder] = useState(chrome.searchPlaceholder);
   const [cta] = useState(chrome.cta);
 
   /**
@@ -177,84 +182,95 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         scrolled ? "border-border" : "border-transparent"
       )}
     >
+      {/*
+        THE UTILITY ROW.
+
+        Right-aligned, quiet, and hidden on phones — it is the row a customer
+        goes looking for rather than reads. Renders NOTHING when the shop has
+        written no links and asked for no currency note, which is every shop
+        until somebody opens the Header screen.
+      */}
+      {utilityNav.length > 0 || currencyNote ? (
+        <div className="hidden border-b border-border/60 bg-cream-50/40 lg:block">
+          <div className="mx-auto flex max-w-7xl items-center justify-end gap-0 px-4 py-1.5 text-xs text-muted-foreground sm:px-6 lg:px-8">
+            {currencyNote ? (
+              <>
+                {/*
+                  A READOUT. Currency is one shop-wide setting published into
+                  a process-global locale and the gateway takes rupees only,
+                  so a control that looked like a switcher would charge in INR
+                  regardless. Saying which currency the prices are in is true.
+                */}
+                <span className="px-3">
+                  Currency · <span className="font-medium text-foreground">{currencyNote}</span>
+                </span>
+                {utilityNav.length > 0 ? (
+                  <span className="h-3 w-px bg-border" aria-hidden="true" />
+                ) : null}
+              </>
+            ) : null}
+            {utilityNav.map((item, index) => (
+              <span key={item.id} className="flex items-center">
+                {index > 0 ? (
+                  <span className="h-3 w-px bg-border" aria-hidden="true" />
+                ) : null}
+                <Link
+                  href={item.href}
+                  className="px-3 transition-premium hover:text-bakery-700"
+                >
+                  {item.label}
+                </Link>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href={routes.store.home} className="flex items-center gap-2.5">
           <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
-          {collectionsRow ? (
-            <MegaMenu
-              label={collectionsRow.label}
-              categories={chrome.categories}
-              occasions={chrome.occasions}
-              isActive={
-                pathname === routes.store.collections ||
-                pathname.startsWith(`${routes.store.collections}/`)
-              }
-            />
-          ) : null}
-          {navItems
-            .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
-            .map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== routes.store.home && pathname.startsWith(item.href));
-            /**
-             * A ROW WITH ITS OWN MENU IS A MENU, NOT A LINK.
-             *
-             * Only the Collections row could have a mega menu, and its two
-             * columns were headed in the component. A shop wanting CAKES with
-             * "By Flavour" and "By Theme" beside GIFTS with its own columns
-             * had nowhere to put that. Any row can carry one now; a row with
-             * none stays exactly the plain link it was.
-             */
-            const authored = drawableGroups(item.menu);
-            if (authored.length > 0) {
-              return (
-                <MegaMenu
-                  key={item.id}
-                  label={item.label}
-                  href={item.href}
-                  groups={item.menu}
-                  isActive={isActive}
-                />
-              );
-            }
-            const RowIcon = navIcon(item.icon);
-            return (
-              <div key={item.id} className="flex items-center gap-1">
-                {/* A divider that belongs to the ROW, so hiding or reordering
-                    the promoted item takes its separator with it. */}
-                {item.dividerBefore ? (
-                  <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-                ) : null}
-                <Link
-                  href={item.href}
-                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
-                    // The shop's emphasis beats the route's. A promoted row
-                    // reads as promoted whether or not you are standing on it.
-                    item.highlight
-                      ? "text-bakery-700 hover:bg-cream-100"
-                      : isActive
-                        ? "bg-cream-100 text-bakery-700"
-                        : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
-                  )}
-                >
-                  {RowIcon ? <RowIcon className="size-4" /> : null}
-                  {item.label}
-                  {item.badge ? (
-                    <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </Link>
-              </div>
-            );
-          })}
-        </nav>
+
+        {/*
+          THE SEARCH BOX.
+
+          It was an icon that linked to /store/search — a whole navigation
+          away from the control the reference header puts in front of every
+          visitor. A plain form, so it works before hydration and with
+          JavaScript off: the search page already reads `q` from the query
+          string, which is what makes this a GET to the page that exists
+          rather than a second search implementation.
+
+          The icon below stays for phones, where there is no room for a box.
+        */}
+        {showSearch ? (
+          <form
+            action={routes.store.search}
+            className="mx-6 hidden max-w-xl flex-1 items-center lg:flex"
+            role="search"
+          >
+            <div className="relative w-full">
+              <input
+                type="search"
+                name="q"
+                placeholder={
+                  searchPlaceholder ||
+                  `Search ${labels.productWordPlural.toLowerCase()}…`
+                }
+                aria-label="Search"
+                className="h-10 w-full rounded-full border border-input bg-cream-50 pl-4 pr-11 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+              <button
+                type="submit"
+                aria-label="Search"
+                className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-cream-100 hover:text-bakery-700"
+              >
+                <Search className="size-4" />
+              </button>
+            </div>
+          </form>
+        ) : null}
 
         <div className="flex items-center gap-1 sm:gap-1.5">
           {/*
@@ -277,7 +293,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             <Button
               variant="ghost"
               size="icon-lg"
-              className="hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex"
+              // Phones only — the box above covers every wider screen.
+              className="hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:hidden"
               render={<Link href={routes.store.search} aria-label="Search" />}
             >
               <Search className="size-5" />
@@ -340,6 +357,96 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </div>
       </div>
 
+      {/*
+        THE NAV, IN ITS OWN BAND.
+
+        It rendered inline inside the 64px main bar, beside the logo and the
+        icon cluster — which fits four rows and not eleven plus a promoted
+        item. The reference header puts the categories on their own full-width
+        strip under the logo row, and that layout is what makes the whole list
+        fit at all, so the per-row emphasis added alongside it is worth
+        anything.
+
+        Hidden on a phone, where the same rows are in the drawer.
+      */}
+      <div className="hidden border-t border-border bg-cream-50/60 lg:block">
+        <nav
+          className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-1.5 sm:px-6 lg:px-8"
+          aria-label="Shop categories"
+        >
+        {collectionsRow ? (
+          <MegaMenu
+            label={collectionsRow.label}
+            categories={chrome.categories}
+            occasions={chrome.occasions}
+            isActive={
+              pathname === routes.store.collections ||
+              pathname.startsWith(`${routes.store.collections}/`)
+            }
+          />
+        ) : null}
+        {navItems
+          .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
+          .map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== routes.store.home && pathname.startsWith(item.href));
+          /**
+           * A ROW WITH ITS OWN MENU IS A MENU, NOT A LINK.
+           *
+           * Only the Collections row could have a mega menu, and its two
+           * columns were headed in the component. A shop wanting CAKES with
+           * "By Flavour" and "By Theme" beside GIFTS with its own columns
+           * had nowhere to put that. Any row can carry one now; a row with
+           * none stays exactly the plain link it was.
+           */
+          const authored = drawableGroups(item.menu);
+          if (authored.length > 0) {
+            return (
+              <MegaMenu
+                key={item.id}
+                label={item.label}
+                href={item.href}
+                groups={item.menu}
+                isActive={isActive}
+              />
+            );
+          }
+          const RowIcon = navIcon(item.icon);
+          return (
+            <div key={item.id} className="flex items-center gap-1">
+              {/* A divider that belongs to the ROW, so hiding or reordering
+                  the promoted item takes its separator with it. */}
+              {item.dividerBefore ? (
+                <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+              ) : null}
+              <Link
+                href={item.href}
+                data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
+                  // The shop's emphasis beats the route's. A promoted row
+                  // reads as promoted whether or not you are standing on it.
+                  item.highlight
+                    ? "text-bakery-700 hover:bg-cream-100"
+                    : isActive
+                      ? "bg-cream-100 text-bakery-700"
+                      : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
+                )}
+              >
+                {RowIcon ? <RowIcon className="size-4" /> : null}
+                {item.label}
+                {item.badge ? (
+                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
+          );
+        })}
+        </nav>
+      </div>
       {mobileOpen ? (
         <div
           id="storefront-mobile-nav"

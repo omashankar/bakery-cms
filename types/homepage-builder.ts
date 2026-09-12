@@ -17,6 +17,25 @@ export type HomepageSectionType =
    * The three below it are bakery category slugs frozen into this union. They
    * stay for layouts already published; this is the one a shop reaches for.
    */
+  /**
+   * A band of the shop's OWN promo cards — image, words, its own button.
+   *
+   * `promo-banner` draws from the shared hero-banner pool, so two promo
+   * bands on one page cannot differ and none of them can carry a card's own
+   * subtext or its own link. This is the section's own content, which is
+   * what the reference's "Must Have" collage, its Personalised band, its
+   * Him/Her split and its city banner all are.
+   */
+  | "promo-collage"
+  /**
+   * A grid of labelled, linked picture tiles.
+   *
+   * The reference's "Gift Categories" (sixteen tiles) and "International
+   * Gifts Delivery" (six country tiles) are the same band with different
+   * rows. Not `categories`, which is driven by the catalogue and can only
+   * point at a category page.
+   */
+  | "tile-grid"
   | "category-rail"
   | "photo-cakes"
   | "eggless"

@@ -92,6 +92,47 @@ export function HeaderAdminPage() {
     }));
   }
 
+  /**
+   * The thin row above the main bar.
+   *
+   * Its own small writer set rather than a shared one parameterised by which
+   * list to touch: three short functions read more plainly than one that
+   * takes a key, and this screen already has that shape for `nav`.
+   */
+  function addUtilityItem() {
+    setSettings((prev) => ({
+      ...prev,
+      utilityNav: [
+        ...(prev.utilityNav ?? []),
+        {
+          id: `util-${Date.now()}`,
+          label: "New link",
+          href: "/store",
+          isVisible: true,
+          sortOrder: (prev.utilityNav ?? []).length + 1,
+        },
+      ],
+    }));
+  }
+
+  function updateUtility(id: string, patch: Partial<HeaderNavItem>) {
+    setSettings((prev) => ({
+      ...prev,
+      utilityNav: (prev.utilityNav ?? []).map((item) =>
+        item.id === id ? { ...item, ...patch } : item,
+      ),
+    }));
+  }
+
+  function removeUtility(id: string) {
+    setSettings((prev) => ({
+      ...prev,
+      utilityNav: (prev.utilityNav ?? [])
+        .filter((item) => item.id !== id)
+        .map((item, index) => ({ ...item, sortOrder: index + 1 })),
+    }));
+  }
+
   function addNavItem() {
     setSettings((prev) => ({
       ...prev,
@@ -330,6 +371,79 @@ export function HeaderAdminPage() {
                 placeholder="/store/contact"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/*
+          THE TOP ROW — Help, Track Order, whatever the shop keeps within
+          reach. Empty by default, and an empty list renders no row at all.
+        */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Top row</CardTitle>
+              <CardDescription>
+                The thin row above your logo. Leave it empty and it does not appear.
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={addUtilityItem}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="size-4" />
+              Add link
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={Boolean(settings.showCurrencyNote)}
+                onCheckedChange={(checked) =>
+                  setSettings((prev) => ({ ...prev, showCurrencyNote: checked }))
+                }
+                aria-label="Show the currency"
+              />
+              Show which currency your prices are in
+            </label>
+            {(settings.utilityNav ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No links yet — the row is hidden.
+              </p>
+            ) : (
+              (settings.utilityNav ?? []).map((item, index) => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <Input
+                    value={item.label}
+                    onChange={(e) => updateUtility(item.id, { label: e.target.value })}
+                    placeholder="Label"
+                    aria-label={`Top row link ${index + 1} label`}
+                  />
+                  <Input
+                    value={item.href}
+                    onChange={(e) => updateUtility(item.id, { href: e.target.value })}
+                    placeholder="/store/..."
+                    aria-label={`Top row link ${index + 1} URL`}
+                  />
+                  <Switch
+                    checked={item.isVisible}
+                    onCheckedChange={(checked) =>
+                      updateUtility(item.id, { isVisible: checked })
+                    }
+                    aria-label={`Show ${item.label || "link"}`}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeUtility(item.id)}
+                    aria-label={`Remove ${item.label || "link"}`}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 

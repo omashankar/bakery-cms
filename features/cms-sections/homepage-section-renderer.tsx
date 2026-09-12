@@ -2,6 +2,7 @@
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
+import { SafeImage } from "@/components/shared/safe-image";
 import {
   ArrowRight,
   Award,
@@ -331,7 +332,16 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
             href={routes.store.collection(category.slug)}
             className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2.5 sm:w-auto"
           >
-            <div className="relative aspect-square w-20 overflow-hidden rounded-full border border-border bg-cream-100 transition-premium group-hover:border-bakery-300 group-hover:shadow-sm sm:w-full">
+            {/*
+              A ROUNDED SQUARE, not a circle.
+
+              A circle crops a product photograph to its middle — a bouquet
+              loses its stems, a boxed gift loses its corners — and the
+              reference strip is squares for exactly that reason. Same size,
+              same spacing, a soft tint behind the picture so a cut-out on
+              white still reads as a tile.
+            */}
+            <div className="relative aspect-square w-20 overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white transition-premium group-hover:border-bakery-300 group-hover:shadow-sm sm:w-full">
               {category.image ? (
                 <OptimizedImage
                   src={category.image}
@@ -342,7 +352,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 text-center text-xs font-medium text-foreground group-hover:text-bakery-700">
+            <p className="line-clamp-2 text-center text-sm font-semibold text-foreground group-hover:text-bakery-700">
               {category.name}
             </p>
           </Link>
@@ -713,6 +723,157 @@ function WeddingSection(props: HomepageSectionRendererProps) {
 }
 
 const whyIcons = { Award, Leaf, Truck, Palette } as const;
+
+/**
+ * The shop's own promo cards — image, words, its own button.
+ *
+ * Every card is the SECTION's content, not the shared hero-banner pool, so
+ * two promo bands on one page can differ and each card can carry its own
+ * line and its own link. That is what the reference's Must Have collage, its
+ * Personalised band, its Him/Her split and its city banner all are.
+ *
+ * An empty list renders NOTHING — a heading over no cards is worse than no
+ * band, the same rule every other list-driven section here follows.
+ */
+function PromoCollageSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const cards = renderableRows(parseListField(c, "cards"));
+
+  if (cards.length === 0) return null;
+
+  return (
+    <SectionShell {...props}>
+      <SectionHeader
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        description={contentString(c, "description")}
+      />
+      {/*
+        `auto-rows-fr` so a wide card and the small ones beside it line up,
+        and a wide card spans two columns rather than being a different
+        component — the reference's three-wide-then-five-small band is one
+        grid, not two.
+      */}
+      <div className="mt-8 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card, index) => {
+          const body = (
+            <>
+              {card.image ? (
+                <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+                  {/*
+                    SafeImage, not next/image: these URLs are admin-typed on
+                    any host, and an un-listed host throws the render of the
+                    whole homepage.
+                  */}
+                  <SafeImage src={card.image} alt={card.title ?? ""} />
+                </div>
+              ) : null}
+              <div className="p-4">
+                {card.title ? (
+                  <p className="font-heading font-semibold">{card.title}</p>
+                ) : null}
+                {card.subtitle ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{card.subtitle}</p>
+                ) : null}
+                {card.ctaLabel ? (
+                  <span className="mt-3 inline-flex text-sm font-medium text-bakery-700">
+                    {card.ctaLabel}
+                  </span>
+                ) : null}
+              </div>
+            </>
+          );
+
+          const className = cn(
+            "overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:border-bakery-300 hover:shadow-md",
+            // A card with no link is still a card. The reference's SALE
+            // banner is artwork, not a destination.
+            card.wide ? "sm:col-span-2" : "",
+          );
+
+          return card.href ? (
+            <Link key={`${card.title}-${index}`} href={card.href} className={className}>
+              {body}
+            </Link>
+          ) : (
+            <div key={`${card.title}-${index}`} className={className}>
+              {body}
+            </div>
+          );
+        })}
+      </div>
+    </SectionShell>
+  );
+}
+
+/**
+ * A grid of labelled, linked picture tiles the shop writes itself.
+ *
+ * The reference uses this shape twice — sixteen "Gift Categories" tiles and
+ * six country tiles under "International Gifts Delivery". Neither is a
+ * catalogue category, which is why `CategoriesSection` cannot express them:
+ * that one is driven by the taxonomy and can only point at a category page.
+ */
+function TileGridSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const tiles = renderableRows(parseListField(c, "tiles"));
+
+  if (tiles.length === 0) return null;
+
+  /**
+   * Two to six per row, clamped.
+   *
+   * A number typed into a box reaches this, and one column is a list while
+   * twelve is unreadable — so the shop's choice is honoured within bounds
+   * rather than obeyed off a cliff. The classes are WRITTEN OUT because
+   * Tailwind cannot see a class name built at runtime.
+   */
+  const columns = Math.min(6, Math.max(2, contentNumber(c, "columns", 4)));
+  const columnClass =
+    {
+      2: "grid-cols-2",
+      3: "grid-cols-2 sm:grid-cols-3",
+      4: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+      5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5",
+      6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
+    }[columns] ?? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+
+  return (
+    <SectionShell {...props}>
+      <SectionHeader
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        description={contentString(c, "description")}
+      />
+      <div className={cn("mt-8 grid gap-4", columnClass)}>
+        {tiles.map((tile, index) => {
+          const body = (
+            <>
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                <SafeImage src={tile.image ?? ""} alt={tile.label ?? ""} />
+              </div>
+              {tile.label ? (
+                <p className="mt-2 text-center text-sm font-medium">{tile.label}</p>
+              ) : null}
+            </>
+          );
+
+          return tile.href ? (
+            <Link
+              key={`${tile.label}-${index}`}
+              href={tile.href}
+              className="group/tile transition-premium hover:opacity-90"
+            >
+              {body}
+            </Link>
+          ) : (
+            <div key={`${tile.label}-${index}`}>{body}</div>
+          );
+        })}
+      </div>
+    </SectionShell>
+  );
+}
 
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
@@ -1331,6 +1492,10 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
           showCta
         />
       );
+    case "promo-collage":
+      return <PromoCollageSection {...props} />;
+    case "tile-grid":
+      return <TileGridSection {...props} />;
     case "offers":
       return <OffersSection {...props} />;
     case "wedding":

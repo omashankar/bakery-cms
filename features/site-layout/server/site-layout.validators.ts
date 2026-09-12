@@ -152,7 +152,12 @@ const headerNavSchema = z
 export const headerSchema = z
   .object({
     logoLetter: z.string().default(""),
+    // Optional: blank and absent both mean "use the shop's own plural".
+    searchPlaceholder: z.string().optional(),
     nav: z.array(headerNavSchema),
+    // The same row shape, so the same validator — see HeaderSettings.
+    utilityNav: z.array(headerNavSchema).optional(),
+    showCurrencyNote: z.boolean().optional(),
   })
   .passthrough();
 
