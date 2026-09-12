@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { SettingsModel } from "@/lib/server/db/models/settings.model";
+import { ProductModel } from "@/lib/server/db/models/product.model";
+import { productFormSchema } from "@/features/products/server/product.validators";
 import {
   defaultCommerceSettings,
   defaultGeneralSettings,
@@ -67,6 +69,38 @@ describe("every commerce setting has somewhere to be stored", () => {
       expect(key in defaultCommerceSettings, `${key} left CommerceSettings`).toBe(true);
       expect(declared.has(key), `${key} has no Mongoose path`).toBe(true);
     }
+  });
+});
+
+describe("and so does every field a product can be sent with", () => {
+  /**
+   * THE SAME TRAP, A DIFFERENT MODEL.
+   *
+   * `product.model.ts` carries its own note about this — "Load-bearing line" —
+   * written the day `descriptionBlocks` was found to be accepted by the API,
+   * answered 201, re-rendered by the admin form as though saved, and dropped by
+   * Mongoose because it had no path. `productFormSchema` ends in
+   * `.passthrough()`, which looks like the escape hatch and is not: it governs
+   * validation, not persistence.
+   *
+   * Nothing was guarding it. Checked here against the Zod schema rather than a
+   * defaults object, because for a product the question is exactly "can the API
+   * be sent a field that has nowhere to go".
+   */
+  it("declares a Mongoose path for each key the API accepts", () => {
+    const declared = new Set(
+      Object.keys(ProductModel.schema.paths).map((path) => path.split(".")[0]!),
+    );
+    const accepted = Object.keys(productFormSchema.shape);
+    const missing = accepted.filter((key) => !declared.has(key));
+
+    expect(
+      missing,
+      `the product API accepts these and Mongoose drops them on save: ${missing.join(", ")}`,
+    ).toEqual([]);
+    // A schema that somehow resolved to no keys would pass the check above
+    // while asserting nothing at all.
+    expect(accepted.length).toBeGreaterThan(20);
   });
 });
 
