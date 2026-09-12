@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { navIcon } from "@/config/nav-icons";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-mark";
 import {
@@ -220,20 +221,37 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 />
               );
             }
+            const RowIcon = navIcon(item.icon);
             return (
-              <Link
-                key={item.id}
-                href={item.href}
-                data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition-premium",
-                  isActive
-                    ? "bg-cream-100 text-bakery-700"
-                    : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
-                )}
-              >
-                {item.label}
-              </Link>
+              <div key={item.id} className="flex items-center gap-1">
+                {/* A divider that belongs to the ROW, so hiding or reordering
+                    the promoted item takes its separator with it. */}
+                {item.dividerBefore ? (
+                  <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+                ) : null}
+                <Link
+                  href={item.href}
+                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
+                    // The shop's emphasis beats the route's. A promoted row
+                    // reads as promoted whether or not you are standing on it.
+                    item.highlight
+                      ? "text-bakery-700 hover:bg-cream-100"
+                      : isActive
+                        ? "bg-cream-100 text-bakery-700"
+                        : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
+                  )}
+                >
+                  {RowIcon ? <RowIcon className="size-4" /> : null}
+                  {item.label}
+                  {item.badge ? (
+                    <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </Link>
+              </div>
             );
           })}
         </nav>
@@ -370,19 +388,36 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   );
                 }
               const isActive = pathname === item.href;
+              // Same four, on the phone. A header that differs by screen size
+              // is two headers, and this is the one a customer uses.
+              const RowIcon = navIcon(item.icon);
               return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
-                  className={cn(
-                    "rounded-lg px-3 py-2.5 text-sm font-medium",
-                    isActive ? "bg-cream-100 text-bakery-700" : "hover:bg-cream-100"
-                  )}
-                >
-                  {item.label}
-                </Link>
+                <div key={item.id}>
+                  {item.dividerBefore ? (
+                    <div className="my-2 h-px bg-border" aria-hidden="true" />
+                  ) : null}
+                  <Link
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium",
+                      item.highlight
+                        ? "text-bakery-700 hover:bg-cream-100"
+                        : isActive
+                          ? "bg-cream-100 text-bakery-700"
+                          : "hover:bg-cream-100"
+                    )}
+                  >
+                    {RowIcon ? <RowIcon className="size-4" /> : null}
+                    {item.label}
+                    {item.badge ? (
+                      <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </Link>
+                </div>
               );
             })}
             <div className="mt-2 grid grid-cols-3 gap-2 border-t border-border pt-3">

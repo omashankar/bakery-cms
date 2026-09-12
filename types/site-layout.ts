@@ -43,6 +43,35 @@ export interface HeaderNavItem {
    * menu with nothing in it", which is a thing a shop can deliberately have.
    */
   menu?: MegaMenuGroup[];
+  /**
+   * Drawn in the brand colour rather than as ordinary nav text.
+   *
+   * The reference header leads with EXPRESS in the brand's own red. A shop
+   * gets one or two of these at most — it is emphasis, and emphasis on
+   * everything is emphasis on nothing — but which one is the shop's call,
+   * not a developer's.
+   */
+  highlight?: boolean;
+  /**
+   * An icon beside the label, by NAME from a small allowlist.
+   *
+   * A name and not a component, because this crosses the wire from MongoDB
+   * and is typed by an admin. An unknown name renders no icon rather than
+   * throwing the header of every storefront page.
+   */
+  icon?: string;
+  /** A short word beside the label — "New", "2 Hour". */
+  badge?: string;
+  /**
+   * A separator drawn BEFORE this row.
+   *
+   * The reference puts the promoted "2 Hour Delivery Gifts" item behind a
+   * divider, apart from the eleven category rows. It is a property of the
+   * row rather than a row of its own so that hiding or reordering the item
+   * takes its divider with it — a separate "divider" row would be left
+   * floating.
+   */
+  dividerBefore?: boolean;
 }
 
 export interface HeaderSettings {

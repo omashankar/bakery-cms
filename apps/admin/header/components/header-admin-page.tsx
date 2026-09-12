@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { NAV_ICONS } from "@/config/nav-icons";
 import type {
   HeaderNavItem,
   HeaderSettings,
@@ -429,6 +430,67 @@ export function HeaderAdminPage() {
                     placeholder="/store/..."
                     aria-label={`Nav link ${index + 1} URL`}
                   />
+
+                  {/*
+                    WHAT MAKES ONE ROW STAND OUT FROM THE OTHERS.
+
+                    The reference header leads with EXPRESS in the brand
+                    colour and ends with a promoted "2 Hour Delivery Gifts"
+                    behind a divider, with a van icon. All four are the
+                    shop's call — emphasis on everything is emphasis on
+                    nothing, so which row gets it is not a developer's
+                    decision.
+
+                    Every field is optional and inert when unset, so a row
+                    nobody touches renders exactly as it always has.
+                  */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      value={item.badge ?? ""}
+                      onChange={(e) =>
+                        updateNav(item.id, { badge: e.target.value || undefined })
+                      }
+                      placeholder="Badge (optional) — New, 2 Hour"
+                      aria-label={`Nav link ${index + 1} badge`}
+                    />
+                    <select
+                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
+                      value={item.icon ?? ""}
+                      onChange={(e) =>
+                        updateNav(item.id, { icon: e.target.value || undefined })
+                      }
+                      aria-label={`Nav link ${index + 1} icon`}
+                    >
+                      <option value="">No icon</option>
+                      {Object.keys(NAV_ICONS).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        checked={Boolean(item.highlight)}
+                        onCheckedChange={(checked) =>
+                          updateNav(item.id, { highlight: checked || undefined })
+                        }
+                        aria-label={`Highlight ${item.label || "link"}`}
+                      />
+                      Highlight in your brand colour
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        checked={Boolean(item.dividerBefore)}
+                        onCheckedChange={(checked) =>
+                          updateNav(item.id, { dividerBefore: checked || undefined })
+                        }
+                        aria-label={`Divider before ${item.label || "link"}`}
+                      />
+                      Separate it from the row before
+                    </label>
+                  </div>
 
                   {/*
                     THIS ROW'S OWN MEGA MENU.

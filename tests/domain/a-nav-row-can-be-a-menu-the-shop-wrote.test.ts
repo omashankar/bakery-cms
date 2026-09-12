@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { drawableGroups } from "@/components/storefront/mega-menu";
+import { NAV_ICONS, navIcon } from "@/config/nav-icons";
 import { headerSchema } from "@/features/site-layout/server/site-layout.validators";
 import type { MegaMenuGroup } from "@/types/site-layout";
 
@@ -194,5 +195,111 @@ describe("both menus draw it, and the shop that wrote none is untouched", () => 
     const menu = code("components/storefront/mega-menu.tsx").replace(/bakery-\d+/g, "");
 
     expect(menu).not.toMatch(/\bcakes?\b|\beggless\b|\bphoto-cakes\b/i);
+  });
+});
+
+describe("a row the shop wants noticed", () => {
+  /**
+   * The reference header leads with EXPRESS in the brand colour and ends with a
+   * promoted "2 Hour Delivery Gifts" behind a divider, carrying a van icon.
+   *
+   * A nav row could express label, href, visibility and order. None of the four
+   * things that make one row stand out from the other eleven existed, so the
+   * only way to build that header was to write it into the component — which is
+   * what the design rule this whole project is about forbids.
+   *
+   * All four are OPTIONAL and inert when unset: a row nobody has touched renders
+   * exactly as it did, which is every row in every shop today.
+   */
+  const promoted = {
+    logoLetter: "",
+    nav: [
+      {
+        id: "nav-express",
+        label: "EXPRESS",
+        href: "/store/collections",
+        isVisible: true,
+        sortOrder: 1,
+        highlight: true,
+        icon: "Truck",
+        badge: "2 Hour",
+        dividerBefore: true,
+      },
+    ],
+  };
+
+  it("keeps all four through the schema", () => {
+    const parsed = headerSchema.parse(promoted) as typeof promoted;
+
+    expect(parsed.nav[0].highlight).toBe(true);
+    expect(parsed.nav[0].icon).toBe("Truck");
+    expect(parsed.nav[0].badge).toBe("2 Hour");
+    expect(parsed.nav[0].dividerBefore).toBe(true);
+  });
+
+  it("and gives a row that sets none of them none of them", () => {
+    /**
+     * Not `false`, not `""` — ABSENT. A default would write emphasis onto every
+     * row in every shop on the day this shipped, and "highlighted" on all twelve
+     * rows is the same as highlighted on none.
+     */
+    const parsed = headerSchema.parse({
+      logoLetter: "",
+      nav: [{ id: "n", label: "CAKES", href: "/store", isVisible: true, sortOrder: 1 }],
+    }) as { nav: Record<string, unknown>[] };
+
+    for (const key of ["highlight", "icon", "badge", "dividerBefore"]) {
+      expect(parsed.nav[0][key], `${key} was defaulted onto an untouched row`).toBeUndefined();
+    }
+  });
+
+  it("renders an icon the build knows and nothing for one it does not", () => {
+    /**
+     * The value crosses the wire from MongoDB and is typed by an admin. This is
+     * the header of every storefront page, outside the try/catch that guards the
+     * chrome read — an unknown name must render no icon, never throw.
+     */
+    expect(navIcon("Truck")).toBeTruthy();
+    expect(navIcon("DefinitelyNotAnIcon")).toBeNull();
+    expect(navIcon(undefined)).toBeNull();
+  });
+
+  it("offers only icons that mean something in any trade", () => {
+    /**
+     * Six, deliberately. A picker of four hundred lucide icons is a worse
+     * control than six that fit a header — and every one of these is generic:
+     * a van, a clock, a gift, a spark, a flame, a tag. None names a trade.
+     */
+    const names = Object.keys(NAV_ICONS);
+
+    expect(names.length).toBeLessThanOrEqual(8);
+    expect(names.join(" ")).not.toMatch(/cake|bakery|flower|plant/i);
+  });
+
+  it("draws all four on the phone as well as on the desktop", () => {
+    /**
+     * A header that differs by screen size is two headers, and the phone is the
+     * one an Indian shop's customers actually use.
+     */
+    const navbar = code("apps/website/components/storefront-navbar.tsx");
+
+    for (const field of ["item.highlight", "item.badge", "item.dividerBefore"]) {
+      expect(
+        (navbar.match(new RegExp(field.replace(".", "\."), "g")) ?? []).length,
+        `${field} is drawn in only one of the two menus`,
+      ).toBeGreaterThanOrEqual(2);
+    }
+    expect((navbar.match(/navIcon\(item\.icon\)/g) ?? []).length).toBe(2);
+  });
+
+  it("and the admin can set every one of them", () => {
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+
+    expect(admin).toContain("highlight: checked || undefined");
+    expect(admin).toContain("dividerBefore: checked || undefined");
+    expect(admin).toContain("badge: e.target.value || undefined");
+    expect(admin).toContain("icon: e.target.value || undefined");
+    // The icon list is the render's own allowlist, so the two cannot drift.
+    expect(admin).toContain("Object.keys(NAV_ICONS)");
   });
 });

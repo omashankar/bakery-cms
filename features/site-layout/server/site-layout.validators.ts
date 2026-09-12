@@ -134,6 +134,18 @@ const headerNavSchema = z
      * Collections row has always shown.
      */
     menu: z.array(megaMenuGroupSchema).optional(),
+    /**
+     * The four that make a row a PROMOTED row rather than a plain link.
+     *
+     * All optional, all absent on every row in every shop today, and all
+     * inert when absent — the row renders exactly as it does now. `icon` is a
+     * free string here and resolved against an allowlist at render, so a name
+     * this build does not know is no icon rather than a crash.
+     */
+    highlight: z.boolean().optional(),
+    icon: z.string().optional(),
+    badge: z.string().optional(),
+    dividerBefore: z.boolean().optional(),
   })
   .passthrough();
 
