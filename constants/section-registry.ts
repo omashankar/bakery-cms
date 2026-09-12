@@ -455,12 +455,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       description:
         "Our most loved creations, crafted with premium ingredients and decades of expertise.",
       maxCount: 4,
+      ctaLabel: "",
+      ctaHref: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
+      /*
+        The way IN to more of this row.
+
+        These three were the only product rows without one, so a customer who
+        read "Best Sellers" and wanted more of exactly that had nowhere to go
+        — while every category row beside them offered a link. Blank renders
+        no button, so a shop that does not want one does not get one.
+      */
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -473,12 +485,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Trending Now",
       description: "The cakes everyone is talking about this season.",
       maxCount: 4,
+      ctaLabel: "",
+      ctaHref: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
+      // Same two the other rows carry — blank renders no button.
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -491,12 +508,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Best Sellers",
       description: "Tried, tested, and loved by thousands of happy customers.",
       maxCount: 4,
+      ctaLabel: "",
+      ctaHref: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
+      // Same two the other rows carry — blank renders no button.
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {

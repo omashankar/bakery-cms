@@ -238,3 +238,67 @@ describe("the row reaches the page", () => {
     expect(renderer).toMatch(/categoryRailFor[\s\S]{0,200}\?\?\s*\[\]/);
   });
 });
+
+describe("every product row offers a way in to more of itself", () => {
+  /**
+   * The reference puts VIEW ALL on the heading line of every product row, at
+   * the right-hand edge. This repo had it in two different states at once:
+   * the category rows rendered a button CENTRED UNDER THE GRID, and
+   * featured-cakes, trending and best-sellers had no view-all fields at all —
+   * so a customer who read "Best Sellers" and wanted more of exactly that had
+   * nowhere to go, while the row beside it offered a link.
+   *
+   * Blank still renders nothing. A shop that does not want the link does not
+   * get one, which is why the fields ship empty rather than pointing somewhere
+   * by default.
+   */
+  it("gives the three flag rows the same two fields the category rows have", () => {
+    for (const type of ["featured-cakes", "trending", "best-sellers"] as const) {
+      const entry = getRegistryEntry(type);
+      const keys = (entry?.fields ?? []).map((field) => field.key);
+
+      expect(keys, `${type} cannot be given a view-all`).toContain("ctaLabel");
+      expect(keys, `${type} cannot be given a view-all`).toContain("ctaHref");
+      // Empty, so nothing appears until a shop asks for it.
+      expect(entry?.defaultContent.ctaLabel).toBe("");
+      expect(entry?.defaultContent.ctaHref).toBe("");
+    }
+  });
+
+  it("and the renderer actually draws it for them", () => {
+    /**
+     * The fields alone are a control that changes nothing — this repo's most
+     * recorded defect. `showCta` is what puts the button on screen, and it was
+     * passed for the category rows only.
+     */
+    const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
+
+    for (const source of ["featured", "trending", "best-sellers"]) {
+      const at = renderer.indexOf(`railFor("${source}"`);
+      expect(at, `${source} row is gone`).toBeGreaterThan(-1);
+      expect(
+        renderer.slice(at, at + 200),
+        `the ${source} row still cannot show a view-all`,
+      ).toContain("showCta");
+    }
+  });
+
+  it("puts the link on the heading row, not under the grid", () => {
+    /**
+     * Under the grid, a customer who had already decided they wanted more of
+     * this row had to scroll past four products to find the way in. On the
+     * heading line it is where they are looking.
+     *
+     * The phone keeps it below — there is no room beside a centred heading at
+     * that width, and a link nobody can reach is worse than one below the fold.
+     */
+    const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
+    const grid = renderer.indexOf('<StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2');
+    const heading = renderer.lastIndexOf("props.showCta && ctaHref && ctaLabel", grid);
+
+    expect(heading, "the view-all is no longer on the heading row").toBeGreaterThan(-1);
+    expect(heading).toBeLessThan(grid);
+    // And the one that remains below the grid is phone-only.
+    expect(renderer).toContain('className="mt-8 text-center sm:hidden"');
+  });
+});

@@ -583,20 +583,48 @@ function ProductGridSection(
 
   return (
     <SectionShell {...props} noReveal>
+      {/*
+        THE ROW'S LINK SITS BESIDE ITS TITLE, not under its grid.
+
+        It was a centred button below the cards, so a customer who had read
+        the heading and decided they wanted more of THAT had to scroll past
+        four products to find the way in. Every row in the reference puts
+        VIEW ALL on the heading line, at the right-hand edge.
+
+        The spacer opposite keeps the heading centred against the button
+        rather than centred in the space left beside it — without it, a row
+        with a link and a row without one sit their titles in different
+        places, which reads as a mistake down a long page.
+      */}
       <ScrollReveal>
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          description={contentString(c, "description")}
-        />
+        <div className="flex items-end justify-between gap-4">
+          <div className="hidden flex-1 sm:block" aria-hidden="true" />
+          <SectionHeader
+            overline={contentString(c, "overline")}
+            title={contentString(c, "title")}
+            description={contentString(c, "description")}
+            className="mb-0"
+          />
+          <div className="hidden flex-1 justify-end sm:flex">
+            {props.showCta && ctaHref && ctaLabel ? (
+              <Button variant="outline" size="sm" render={<Link href={ctaHref} />}>
+                {ctaLabel}
+                <ArrowRight className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {cakes.map((cake) => (
           <ProductCard key={cake.id} cake={cake} className="h-full" />
         ))}
       </StaggerReveal>
+      {/* The phone keeps it under the grid: there is no room beside a
+          centred heading at that width, and a link nobody can reach is
+          worse than one below the fold. */}
       {props.showCta && ctaHref && ctaLabel ? (
-        <ScrollReveal className="mt-8 text-center">
+        <ScrollReveal className="mt-8 text-center sm:hidden">
           <Button variant="outline" render={<Link href={ctaHref} />}>
             {ctaLabel}
             <ArrowRight className="size-4" />
@@ -1457,6 +1485,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
         <ProductGridSection
           {...props}
           cakes={railFor("featured", contentNumber(section.content, "maxCount", 4))}
+          showCta
         />
       );
     case "trending":
@@ -1464,6 +1493,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
         <ProductGridSection
           {...props}
           cakes={railFor("trending", contentNumber(section.content, "maxCount", 4))}
+          showCta
         />
       );
     case "best-sellers":
@@ -1471,6 +1501,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
         <ProductGridSection
           {...props}
           cakes={railFor("best-sellers", contentNumber(section.content, "maxCount", 4))}
+          showCta
         />
       );
     /**
