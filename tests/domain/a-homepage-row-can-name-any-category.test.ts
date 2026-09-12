@@ -302,3 +302,98 @@ describe("every product row offers a way in to more of itself", () => {
     expect(renderer).toContain('className="mt-8 text-center sm:hidden"');
   });
 });
+
+describe("one heading, several tabs, one grid", () => {
+  /**
+   * Three product rows down a long page are three scrolls apart. Tabbed, they
+   * are one band and a click — which is why the reference uses this shape more
+   * than once on the same page, and why it was the one genuinely missing
+   * section type once the open category row existed.
+   *
+   * The tabs name CATEGORIES the shop has, drawn from the same `categoryRails`
+   * the open row uses. One answer to "what is in this category", not a second
+   * that can drift from it.
+   */
+  it("is a section a shop can add", () => {
+    const entry = getRegistryEntry("tabbed-rail");
+
+    expect(entry, "the tabbed row is not in the registry").toBeDefined();
+    expect(entry?.fields.map((f) => f.key)).toContain("tabs");
+  });
+
+  it("ships with no tabs, so it renders nothing until a shop writes one", () => {
+    /**
+     * A default tab would name a category nobody has chosen — and on a plant
+     * shop it would name a cake one. The three frozen rows in this registry got
+     * there exactly that way.
+     */
+    const entry = getRegistryEntry("tabbed-rail")!;
+
+    expect(entry.defaultContent.tabs).toBe("[]");
+    expect(entry.defaultContent.title).toBe("");
+    expect(JSON.stringify(entry.defaultContent)).not.toMatch(/cake|bakery|flower/i);
+  });
+
+  it("its label is the shop's own word", () => {
+    const entry = getRegistryEntry("tabbed-rail")!;
+    const resolved = resolveRegistryEntry(entry, {
+      productWord: "Plant",
+      productWordPlural: "Plants",
+    });
+
+    expect(resolved.label).toBe("Tabbed plants");
+  });
+
+  it("fills each tab's category picker from the shop's own list", () => {
+    /**
+     * THE NESTED CASE, which is the whole reason this test exists.
+     *
+     * `resolveRegistryEntry` mapped the top-level fields only, so a select
+     * inside a LIST — which is what a tab's category picker is — resolved to an
+     * empty dropdown with nothing anywhere to say why. A shop would open the
+     * editor, find no categories offered, and conclude the section was broken.
+     */
+    const entry = getRegistryEntry("tabbed-rail")!;
+    const resolved = resolveRegistryEntry(
+      entry,
+      { productWord: "Product", productWordPlural: "Products" },
+      { categories: [{ id: "c1", name: "Money Plants", slug: "succulents" }] },
+    );
+
+    const tabsField = resolved.fields.find((f) => f.key === "tabs");
+    const picker = tabsField?.itemFields?.find((f) => f.key === "categorySlug");
+
+    expect(picker?.options).toEqual([{ label: "Money Plants", value: "succulents" }]);
+  });
+
+  it("and the renderer draws it, keyed by tab position rather than by slug", () => {
+    /**
+     * By INDEX, because a shop can legitimately point two tabs at one category
+     * — "Under ₹500" and "Gifts" can both be Gifts while the labels differ —
+     * and keying by slug would make clicking one light up the other.
+     */
+    const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
+
+    expect(renderer).toContain('case "tabbed-rail":');
+    expect(renderer).toContain("function TabbedRailSection");
+    expect(renderer).toMatch(/const \[active, setActive\] = useState\(0\)/);
+    expect(renderer).toContain("onClick={() => setActive(index)}");
+  });
+
+  it("and an empty tab says so rather than collapsing the band", () => {
+    /**
+     * The tabs beside it still work, and a customer who pressed this one needs
+     * to know the press landed. A band that vanishes mid-click reads as broken.
+     */
+    const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
+    const section = renderer.slice(
+      renderer.indexOf("function TabbedRailSection"),
+      renderer.indexOf("function PromoCollageSection"),
+    );
+
+    expect(section).toContain("cakes.length === 0");
+    expect(section).toContain("Nothing here yet.");
+    // But no tabs at all IS nothing to draw.
+    expect(section).toContain("tabs.length === 0) return null");
+  });
+});

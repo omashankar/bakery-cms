@@ -52,6 +52,48 @@ export interface RegistryOptionSources {
   categories?: { id: string; name: string; slug: string }[];
 }
 
+/**
+ * One field, with its tokens filled and its dynamic options resolved.
+ *
+ * Recursive because a LIST field's `itemFields` need the same treatment: a
+ * tab's category picker is a select inside a list, and mapping only the top
+ * level left it an empty dropdown with nothing anywhere to say why.
+ *
+ * A field keeps its own `options` if it has them, so this can never blank a
+ * list somebody wrote by hand. With no source to draw on it resolves to an
+ * empty dropdown, which is the honest answer for a shop with no categories.
+ */
+function withResolvedOptions(
+  field: SectionFieldDef,
+  labels: RegistryLabels,
+  sources?: RegistryOptionSources,
+): SectionFieldDef {
+  return {
+    ...field,
+    label: fillTokens(field.label, labels),
+    ...(field.itemFields
+      ? {
+          itemFields: field.itemFields.map((item) =>
+            withResolvedOptions(item, labels, sources),
+          ),
+        }
+      : {}),
+    ...(field.optionsFrom === "categories"
+      ? {
+          options:
+            field.options ??
+            (sources?.categories ?? []).map((category) => ({
+              label: category.name,
+              // The SLUG, because that is what the rail is keyed by and what
+              // the collection page resolves. An id would key a rail nothing
+              // could look up.
+              value: category.slug,
+            })),
+        }
+      : {}),
+  };
+}
+
 export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
   entry: T,
   labels: RegistryLabels,
@@ -60,29 +102,7 @@ export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
   return {
     ...entry,
     label: fillTokens(entry.label, labels),
-    fields: entry.fields.map((field) => ({
-      ...field,
-      label: fillTokens(field.label, labels),
-      /**
-       * A dynamic field keeps its own `options` if it somehow has them, so
-       * this can never blank a list somebody wrote by hand. With no source
-       * to draw on it renders an empty dropdown, which is the honest answer
-       * for a shop that has no categories yet.
-       */
-      ...(field.optionsFrom === "categories"
-        ? {
-            options:
-              field.options ??
-              (sources?.categories ?? []).map((category) => ({
-                label: category.name,
-                // The SLUG, because that is what the rail is keyed by and
-                // what the collection page resolves. An id would key a
-                // rail nothing could look up.
-                value: category.slug,
-              })),
-          }
-        : {}),
-    })),
+    fields: entry.fields.map((field) => withResolvedOptions(field, labels, sources)),
   };
 }
 
@@ -332,6 +352,52 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "maxCount", label: "Max banners shown", type: "number" },
+    ],
+  },
+  {
+    /*
+      ONE HEADING, SEVERAL TABS, ONE GRID.
+
+      Three product rows down a long page are three scrolls apart. Tabbed,
+      they are one band and a click, which is why the reference uses this
+      shape more than once on the same page.
+
+      Each tab names a CATEGORY the shop has, picked from its own list — so
+      a plant shop's tabs are its own, not three cake words.
+
+      Ships with no tabs. An empty band renders nothing.
+    */
+    type: "tabbed-rail",
+    label: "Tabbed {products}",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      maxCount: 4,
+      tabs: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "maxCount", label: "Max {products} per tab", type: "number" },
+      {
+        key: "tabs",
+        label: "Tabs",
+        type: "list",
+        emptyHint: "No tabs — this section will not appear on the page.",
+        itemFields: [
+          { key: "label", label: "Tab label", type: "text" },
+          {
+            key: "categorySlug",
+            label: "Shows",
+            type: "select",
+            optionsFrom: "categories",
+          },
+        ],
+      },
     ],
   },
   {

@@ -26,6 +26,14 @@ export type HomepageSectionType =
    * what the reference's "Must Have" collage, its Personalised band, its
    * Him/Her split and its city banner all are.
    */
+  /**
+   * One heading, several tabs, one grid.
+   *
+   * Three product rows down a long page are three scrolls apart. Tabbed,
+   * they are one band and a click — which is why the reference uses this
+   * shape more than once on the same page.
+   */
+  | "tabbed-rail"
   | "promo-collage"
   /**
    * A grid of labelled, linked picture tiles.

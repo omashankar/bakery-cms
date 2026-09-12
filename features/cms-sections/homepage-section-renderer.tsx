@@ -763,6 +763,95 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
  * An empty list renders NOTHING — a heading over no cards is worse than no
  * band, the same rule every other list-driven section here follows.
  */
+/**
+ * ONE HEADING, SEVERAL TABS, ONE GRID.
+ *
+ * Three product rows down a long page are three scrolls apart. Tabbed, they
+ * are one band and a click.
+ *
+ * Each tab names a CATEGORY the shop has, so the rows come from the same
+ * `categoryRails` the open category row uses — one answer to "what is in
+ * this category", not a second one that can drift.
+ */
+function TabbedRailSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const tabs = renderableRows(parseListField(c, "tabs")).filter((tab) =>
+    Boolean(tab.categorySlug),
+  );
+  const maxCount = contentNumber(c, "maxCount", 4);
+  /**
+   * The tab INDEX, not its slug.
+   *
+   * A shop can legitimately point two tabs at one category — "Under ₹500"
+   * and "Gifts" can both be Gifts while the labels differ — and keying by
+   * slug would make clicking one light up the other.
+   */
+  const [active, setActive] = useState(0);
+
+  if (tabs.length === 0) return null;
+
+  const current = tabs[Math.min(active, tabs.length - 1)];
+  const cakes = (props.categoryRails?.[current.categorySlug ?? ""] ?? []).slice(
+    0,
+    maxCount,
+  );
+
+  return (
+    <SectionShell {...props} noReveal>
+      <ScrollReveal>
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+          className="mb-0"
+        />
+        {/*
+          The tabs sit under the heading and scroll sideways rather than
+          wrapping: four tabs on a phone wrap to two lines and move the grid
+          down the page every time one is pressed.
+        */}
+        <div className="mt-6 flex justify-center">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-border bg-cream-50 p-1">
+            {tabs.map((tab, index) => (
+              <button
+                key={`${tab.label}-${index}`}
+                type="button"
+                onClick={() => setActive(index)}
+                aria-pressed={index === active}
+                className={cn(
+                  "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-premium",
+                  index === active
+                    ? "bg-white text-bakery-700 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label || tab.categorySlug}
+              </button>
+            ))}
+          </div>
+        </div>
+      </ScrollReveal>
+
+      {cakes.length === 0 ? (
+        /*
+          A tab whose category holds nothing says so, rather than collapsing
+          the band — the tabs beside it still work, and a customer who
+          pressed this one needs to know the press landed.
+        */
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          Nothing here yet.
+        </p>
+      ) : (
+        <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {cakes.map((cake) => (
+            <ProductCard key={cake.id} cake={cake} className="h-full" />
+          ))}
+        </StaggerReveal>
+      )}
+    </SectionShell>
+  );
+}
+
 function PromoCollageSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const cards = renderableRows(parseListField(c, "cards"));
@@ -1523,6 +1612,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
           showCta
         />
       );
+    case "tabbed-rail":
+      return <TabbedRailSection {...props} />;
     case "promo-collage":
       return <PromoCollageSection {...props} />;
     case "tile-grid":
