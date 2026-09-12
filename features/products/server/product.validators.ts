@@ -98,6 +98,17 @@ export const productFormSchema = z
       )
       .default([]),
     categoryId: z.string().default(""),
+    /**
+     * `.optional()`, NOT `.default([])` — one deliberate deviation from the
+     * `occasionIds` line below.
+     *
+     * A product update is a whole-document replace (`findOneAndReplace`), and
+     * the service merges `{ ...existing, ...data }` with `data` last. With a
+     * default, a browser still holding the pre-deploy admin bundle sends `[]`
+     * while saving a price, and silently erases every membership the owner
+     * set. Absent leaves `...existing` standing.
+     */
+    categoryIds: z.array(z.string()).optional(),
     occasionIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),
     weightLabel: z.string().optional(),

@@ -126,10 +126,26 @@ export function filterProductsByCategory(
    * is right whenever a shop has not renamed a category away from its slug.
    */
   const named = categories?.find((category) => slugify(category.slug) === slug);
+  /**
+   * EVERY category the product is filed under, not just the one on its badge.
+   *
+   * `categories` is the full membership by name and `category` is the primary,
+   * which is always its first element — but the primary is kept in this list
+   * anyway, because a demo literal in `landing-data.ts` sets `category` alone
+   * and would otherwise match nothing at all.
+   *
+   * Both branches keep the fold they had. `.some()` over one name behaves
+   * exactly as the equality did, so a shop with no product in more than one
+   * category sees no change.
+   */
+  const membership = (cake: LandingProduct) =>
+    [cake.category, ...(cake.categories ?? [])].filter(Boolean);
   const byCategory = (cake: LandingProduct) =>
     named
-      ? cake.category.trim().toLowerCase() === named.name.trim().toLowerCase()
-      : slugify(cake.category) === slug;
+      ? membership(cake).some(
+          (name) => name.trim().toLowerCase() === named.name.trim().toLowerCase(),
+        )
+      : membership(cake).some((name) => slugify(name) === slug);
 
   /**
    * Occasion categories match the cake's OCCASION TAGS.

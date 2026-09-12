@@ -299,6 +299,11 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
      * apart later — silently, because both halves still return results.
      */
     optionLabels: optionGroups.flatMap((group) => group.labels),
+    // Carried across the RSC wire, or every client-side filter decides with
+    // one category while the server decided with four — the exact class this
+    // file already records, where a dropped field sent the occasion filter
+    // searching the prose instead.
+    categories: product.categories,
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),

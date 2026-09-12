@@ -18,7 +18,16 @@ import { normalizeVariantGroups } from "./variant-utils";
 const STORAGE_KEY = "bakery-cms-admin-cakes";
 const STORAGE_VERSION_KEY = "bakery-cms-admin-cakes-version";
 /** v6: variant options carry an explicit `semantic`, backfilled from legacy labels. */
-const CAKES_STORAGE_VERSION = 6;
+/**
+ * v7: products carry `categoryIds` — every category they are filed under.
+ *
+ * Bumped rather than left alone because this cache is a SECOND live store.
+ * Every admin browser holds a full copy, and the Catalog counts, the Products
+ * filter, Inventory and global search all read it rather than the database. A
+ * copy written before this ships has no memberships, so those four screens
+ * would disagree with the storefront until the browser happened to refetch.
+ */
+const CAKES_STORAGE_VERSION = 7;
 
 /**
  * Fired whenever the product cache changes — including when `useProductCacheSync`
@@ -80,6 +89,23 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     compareAtPrice: cake.compareAtPrice,
     images: [cake.image],
     categoryId: category.id,
+    /**
+     * The demo product's own memberships, resolved through the shop's list.
+     *
+     * Read from `cake.categories` where a demo product names extra ones, and
+     * never GUESSED from the category text the way `occasionIds` is two
+     * blocks up. That guess is the last of a pattern this repo removed
+     * elsewhere — a "birthday" page that showed every chocolate cake in the
+     * shop — and copying it here would file products the owner never filed.
+     */
+    categoryIds: [
+      ...new Set([
+        category.id,
+        ...(cake.categories ?? [])
+          .map((name) => getCategoryByName(name)?.id)
+          .filter((id): id is string => Boolean(id)),
+      ]),
+    ],
     occasionIds,
     /**
      * The demo cakes' own sizes, named here rather than derived.
@@ -186,6 +212,23 @@ export function normalizeCommerceFields(cake: Product): Product {
     allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
 
     variantGroups,
+    /**
+     * THE FULL MEMBERSHIP, PRIMARY FIRST — established here and nowhere else.
+     *
+     * Every document written before this field existed reads back
+     * `categoryIds === undefined`: `.lean()` does not apply schema defaults, so
+     * the `default: []` on the model never fires for them. Left to the callers,
+     * the careful ones would write `?.includes()` and quietly answer false for
+     * the entire existing catalogue, with no line logged anywhere.
+     *
+     * This function is the one chokepoint every product passes through — every
+     * server read via `toProduct`, and every browser-cache read via
+     * `normalizeProductImages`. Normalising here is why no reader downstream
+     * needs a fallback, and why no backfill is required for correctness.
+     */
+    categoryIds: [
+      ...new Set([cake.categoryId, ...(cake.categoryIds ?? [])].filter(Boolean)),
+    ],
     // Owner-defined facts. Absent means the shop has stated none, not that it
     // needs some invented for it — the mistake this function made with shapes.
     descriptionBlocks: cake.descriptionBlocks ?? [],
@@ -459,6 +502,9 @@ export function createEmptyProductForm(): ProductFormData {
      * one while still letting a draft be parked.
      */
     categoryId: "",
+    // Empty, never `[categoryId]`: the primary is blank on a new product, and
+    // an array holding "" files it under a category that does not exist.
+    categoryIds: [],
     occasionIds: [],
     /**
      * A NEW PRODUCT IS BORN EMPTY.

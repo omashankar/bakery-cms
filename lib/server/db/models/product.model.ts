@@ -26,6 +26,12 @@ const productSchema = new mongoose.Schema(
     compareAtPrice: { type: Number },
     images: { type: [String], default: [] },
     categoryId: { type: String, default: "" },
+    // Declared, or every membership the owner ticks is dropped on write while
+    // the API answers 201 — see the note further down this file. `default: []`
+    // protects new writes only: `.lean()` does not apply schema defaults, so a
+    // document written before this line reads back `undefined` and is
+    // normalised on the way out instead.
+    categoryIds: { type: [String], default: [] },
     occasionIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
     weightLabel: { type: String },

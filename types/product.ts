@@ -219,6 +219,20 @@ export interface Product extends BaseEntity {
   compareAtPrice?: number;
   images: string[];
   categoryId: string;
+  /**
+   * EVERY category this product is filed under, primary first.
+   *
+   * `categoryIds[0] === categoryId` always. The full membership rather than
+   * "the extra ones" is deliberate: with seven admin reads and six storefront
+   * matchers and no shared predicate, "remember to union with the primary" is
+   * a rule that gets forgotten at one site — and that site fails silently, a
+   * product quietly missing from a page nobody is looking at.
+   *
+   * Established in exactly two places: `normalizeCommerceFields` on every
+   * read, and the admin payload builder on every write. Nothing downstream
+   * has to check two fields.
+   */
+  categoryIds: string[];
   occasionIds: string[];
   weights: ProductWeight[];
   /** What this product's size tiers are CALLED. Blank means the generic word. */

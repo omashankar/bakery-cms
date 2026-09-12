@@ -41,6 +41,15 @@ export interface LandingProduct {
    */
   images?: string[];
   category: string;
+  /**
+   * Every category this product is filed under, by NAME.
+   *
+   * Optional because the demo literals in this file set only `category`, and
+   * `category` stays required because `slugify` and `.toLowerCase()` read it
+   * bare. Names rather than ids: the storefront has no concept of a category
+   * id, and every matcher compares names.
+   */
+  categories?: string[];
   badge?: string;
   rating?: number;
   reviewCount?: number;

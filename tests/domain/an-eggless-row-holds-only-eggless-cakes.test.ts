@@ -75,7 +75,12 @@ const names = {
   ]),
 };
 
-const product = (slug: string, categoryId: string): Product =>
+/**
+ * `extra` is the SECONDARY memberships — a product filed in more than one
+ * place. Without one of these in the fixtures, every case below passes
+ * identically whether the multi-category work is done or undone.
+ */
+const product = (slug: string, categoryId: string, extra: string[] = []): Product =>
   ({
     id: slug,
     name: slug,
@@ -84,6 +89,7 @@ const product = (slug: string, categoryId: string): Product =>
     price: 999,
     images: ["/cake.jpg"],
     categoryId,
+    categoryIds: [categoryId, ...extra],
     occasionIds: [],
     weights: [],
     shapes: [],
@@ -119,6 +125,41 @@ describe("the eggless row", () => {
     ]);
   });
 
+  it("and one a shop filed under Eggless as well as somewhere else", () => {
+    /**
+     * A cake whose PRIMARY is Seasonal and which the shop also filed under
+     * Eggless. Before a product could be filed twice, the shop had to choose —
+     * so this cake was either missing from the eggless row or missing its
+     * seasonal badge, and the only way to have both was to create it twice.
+     *
+     * It is here rather than in the multi-category test file because this row
+     * is what a customer actually sees, and because a case that passes
+     * identically before and after the change protects nothing.
+     */
+    const both = product("seasonal-eggless-sponge", "cat-seasonal", ["cat-eggless"]);
+    const shopWithBoth = [...shop, both];
+
+    const row = buildHomepageProducts(
+      "eggless",
+      4,
+      shopWithBoth,
+      pool(shopWithBoth),
+      names,
+      CATEGORIES,
+    );
+
+    expect(row.map((cake) => cake.slug)).toContain("seasonal-eggless-sponge");
+    // And it has not left the row its primary owns.
+    const seasonalRow = buildHomepageProducts(
+      "seasonal",
+      4,
+      shopWithBoth,
+      pool(shopWithBoth),
+      names,
+      CATEGORIES,
+    );
+    expect(seasonalRow.map((cake) => cake.slug)).toContain("seasonal-eggless-sponge");
+  });
   it("finds them even though the category is not named after its slug", () => {
     /**
      * The whole reason the category list has to be passed. Without it the

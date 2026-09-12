@@ -36,6 +36,7 @@ const ARCHIVED: Product = {
   price: 400,
   images: [],
   categoryId: "cat-cakes",
+  categoryIds: [],
   occasionIds: [],
   weights: [],
   status: "archived",

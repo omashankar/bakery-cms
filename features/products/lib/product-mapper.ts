@@ -43,6 +43,20 @@ export function mapAdminProductToStorefront(
   const category =
     names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "";
 
+  /**
+   * Every category, resolved the same way, with the same asymmetry.
+   *
+   * An id the shop has since deleted is DROPPED from this array, while an
+   * unresolvable primary collapses to `""` above — because the primary drives
+   * a badge that must not render, and these drive matchers that must not
+   * match a raw id.
+   */
+  const categories = names?.categories
+    ? cake.categoryIds
+        .map((id) => names.categories?.get(id))
+        .filter((name): name is string => Boolean(name))
+    : undefined;
+
   // The occasions this cake is actually tagged with. The storefront filter used
   // to search the name, category and description for the word "Wedding" instead,
   // so a cake tagged Wedding was missed unless it happened to say so in prose,
@@ -67,6 +81,7 @@ export function mapAdminProductToStorefront(
     // form, that capped every shop at a single photo.
     images: cake.images,
     category,
+    categories,
     occasions,
     badge: cake.isFeatured
       ? "Featured"

@@ -52,7 +52,14 @@ const names = {
   ]),
 };
 
-const product = (slug: string, categoryId: string, status = "published"): Product =>
+const product = (
+  slug: string,
+  categoryId: string,
+  status = "published",
+  // Secondary memberships, so these cases can tell a filed-in-two-places
+  // product from one that is only in its primary.
+  extra: string[] = [],
+): Product =>
   ({
     id: slug,
     name: slug,
@@ -61,6 +68,7 @@ const product = (slug: string, categoryId: string, status = "published"): Produc
     price: 999,
     images: ["/cake.jpg"],
     categoryId,
+    categoryIds: [categoryId, ...extra],
     occasionIds: [],
     weights: [],
     shapes: [],

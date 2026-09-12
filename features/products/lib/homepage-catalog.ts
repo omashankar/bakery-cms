@@ -59,7 +59,7 @@ export function getHomepageProducts(
  * re-reading its local stores, which keeps the homepage hydration-safe.
  */
 export function selectHomepageCategories(
-  products: readonly { status: string; categoryId: string }[],
+  products: readonly { status: string; categoryId: string; categoryIds?: string[] }[],
   categories: readonly {
     id: string;
     name: string;

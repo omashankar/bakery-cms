@@ -295,7 +295,10 @@ describe("collection filters use the product's real data", () => {
     const start = source.indexOf("function toCard(");
     const fn = source.slice(start, source.indexOf("\n}", start));
 
-    for (const field of ["occasions", "flavours", "weights"]) {
+    // `categories` joined them the day a product could be filed in more
+    // than one: without it the server picks a category page's products with
+    // four memberships and every client-side filter re-decides with one.
+    for (const field of ["categories", "occasions", "flavours", "weights"]) {
       expect(fn, `toCard must carry ${field} or the filter that reads it is dead`).toContain(
         `${field}: product.${field}`,
       );
