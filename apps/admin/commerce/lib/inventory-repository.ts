@@ -9,6 +9,7 @@ import type {
   StockHistoryReason,
 } from "@/types/inventory";
 import {
+  categoriesOf,
   getProductById,
   loadProducts,
   updateProduct,
@@ -117,17 +118,30 @@ function appendStockHistory(entry: StockHistoryEntry): void {
 
 export function getInventoryItems(): InventoryItem[] {
   const categories = adminCategories();
+  const namesById = new Map(categories.map((category) => [category.id, category.name]));
 
   return loadProducts().map((cake) => {
     const stockStatus = deriveStockStatus(cake, getInventorySettings());
-    const categoryName =
-      categories.find((category) => category.id === cake.categoryId)?.name ?? "—";
+    /**
+     * One name to show, every name to search.
+     *
+     * Inventory is a stock screen, not a catalogue one: it prints the primary
+     * category and nothing else, because the row is a single line on a phone
+     * and the count belongs to the product, not to any one category it sits
+     * in. But the shop can now file a product in several places, so the
+     * search has to know all of them or a cake filed under Plants cannot be
+     * found by typing "plants" here.
+     */
+    const categoryNames = categoriesOf(cake)
+      .map((id) => namesById.get(id))
+      .filter((name): name is string => Boolean(name));
 
     return {
       cakeId: cake.id,
       name: cake.name,
       slug: cake.slug,
-      categoryName,
+      categoryName: categoryNames[0] ?? "—",
+      categoryNames,
       image: cake.images[0],
       status: cake.status,
       stockStatus,
@@ -337,7 +351,8 @@ export function filterInventoryItems(
     }
 
     if (!query) return true;
-    const haystack = `${item.name} ${item.slug} ${item.categoryName}`.toLowerCase();
+    // Every category, not just the printed one — see `getInventoryItems`.
+    const haystack = `${item.name} ${item.slug} ${item.categoryNames.join(" ")}`.toLowerCase();
     return haystack.includes(query);
   });
 }

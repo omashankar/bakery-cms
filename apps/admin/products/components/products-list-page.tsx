@@ -40,6 +40,7 @@ import { routes } from "@/constants/routes";
 import type { Product as CakeEntity, EntityStatus } from "@/types";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { adminCategories } from "@/features/products/lib/catalog-options";
+import { categoriesOf } from "@/features/products/lib/products-repository";
 import {
   deleteProductRequest,
   fetchProducts,
@@ -75,19 +76,35 @@ function getStatusVariant(status: EntityStatus): "success" | "outline" | "second
   return "secondary";
 }
 
-function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeEntity[] {
+export function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeEntity[] {
   const query = filters.search.trim().toLowerCase();
   const settings = getInventorySettings();
 
+  /**
+   * Built ONCE, outside the filter.
+   *
+   * This was a `.find()` over the category list per product per keystroke.
+   * A product can now be filed under several categories, which would have
+   * turned that into a nested loop; a Map turns the whole thing into a
+   * lookup instead.
+   */
+  const namesById = new Map(adminCategories().map((item) => [item.id, item.name]));
+
   return cakes
     .filter((cake) => {
+      const filed = categoriesOf(cake);
       if (query) {
-        const categoryName =
-          adminCategories().find((c) => c.id === cake.categoryId)?.name ?? "";
-        const haystack = `${cake.name} ${cake.slug} ${categoryName}`.toLowerCase();
+        // EVERY category it is filed under. Matching the primary alone hides
+        // a product from a search for the very category the owner just put
+        // it in.
+        const names = filed.map((id) => namesById.get(id) ?? "").join(" ");
+        const haystack = `${cake.name} ${cake.slug} ${names}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
-      if (filters.categoryId !== "all" && cake.categoryId !== filters.categoryId) {
+      // Membership, not equality. Filtering by Plants has to find a cake the
+      // shop ALSO filed under Plants — that is the whole point of the box
+      // that let them file it there, and an equality test silently drops it.
+      if (filters.categoryId !== "all" && !filed.includes(filters.categoryId)) {
         return false;
       }
       if (filters.status !== "all" && cake.status !== filters.status) return false;
@@ -264,6 +281,22 @@ export function ProductsListPage() {
 
   function categoryName(categoryId: string) {
     return adminCategories().find((item) => item.id === categoryId)?.name ?? "—";
+  }
+
+  /**
+   * The primary, and how many more — never the whole list.
+   *
+   * This table is already `min-w-[760px]` across seven columns and the phone
+   * card gives the same line one row, so joining four names wraps badly in
+   * both. The primary is the one whose page a customer lands on from the
+   * badge, so it is the one that reads; the count says there is more without
+   * costing a column. The full list is on the preview screen.
+   */
+  function categoryLabel(cake: { categoryId: string; categoryIds?: string[] }) {
+    const more = categoriesOf(cake).length - 1;
+    return more > 0
+      ? `${categoryName(cake.categoryId)} +${more}`
+      : categoryName(cake.categoryId);
   }
 
   return (
@@ -570,7 +603,7 @@ export function ProductsListPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {categoryName(cake.categoryId)}
+                      {categoryLabel(cake)}
                     </td>
                     <td className="px-4 py-3 font-semibold">{formatCurrency(cake.price)}</td>
                     <td className="px-4 py-3">
@@ -656,7 +689,7 @@ export function ProductsListPage() {
                           {cake.name}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {categoryName(cake.categoryId)} · {formatCurrency(cake.price)}
+                          {categoryLabel(cake)} · {formatCurrency(cake.price)}
                         </p>
                       </div>
                       <Badge variant={getStatusVariant(cake.status)}>

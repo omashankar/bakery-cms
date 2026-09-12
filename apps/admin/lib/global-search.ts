@@ -575,7 +575,18 @@ function searchInquiries(text: string, limit: number): GlobalSearchResult[] {
 
 function searchInventory(text: string, limit: number): GlobalSearchResult[] {
   return getInventoryItems()
-    .filter((item) => matchesQuery({ title: item.name, subtitle: `${item.slug} ${item.categoryName}` }, text))
+    .filter((item) =>
+      // Every category it is filed under. The palette is how an owner reaches
+      // a product by name from anywhere in the admin, and matching only the
+      // primary makes a search for a secondary category come back empty.
+      matchesQuery(
+        {
+          title: item.name,
+          subtitle: `${item.slug} ${item.categoryNames.join(" ")}`,
+        },
+        text,
+      ),
+    )
     .slice(0, limit)
     .map((item) => ({
       id: `inventory-${item.cakeId}`,

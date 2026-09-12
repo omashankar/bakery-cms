@@ -13,7 +13,10 @@ import type { Product } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { adminCategories, adminOccasions } from "@/features/products/lib/catalog-options";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
-import { getProductById } from "@/features/products/lib/products-repository";
+import {
+  categoriesOf,
+  getProductById,
+} from "@/features/products/lib/products-repository";
 import { fetchProduct } from "@/features/products/data/products-client";
 
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
@@ -65,6 +68,22 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   }
 
   const category = adminCategories().find((item) => item.id === cake.categoryId)?.name ?? "—";
+
+  /**
+   * The other pages this same product appears on.
+   *
+   * Kept SEPARATE from the primary rather than joined into one line: the
+   * primary is the category whose page the storefront badge links to and the
+   * one the owner chose first, and running four names together would leave
+   * this screen unable to say which of them that is. Same shape as
+   * `occasions` below, for the same reason — an unresolvable id is dropped
+   * rather than printed raw.
+   */
+  const alsoUnder = categoriesOf(cake)
+    .slice(1)
+    .map((id) => adminCategories().find((item) => item.id === id)?.name)
+    .filter(Boolean)
+    .join(", ");
 
   const occasions = adminOccasions()
     .filter((item) => cake.occasionIds.includes(item.id))
@@ -133,6 +152,12 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
                 <dt className="text-muted-foreground">Category</dt>
                 <dd className="font-medium">{category}</dd>
               </div>
+              {alsoUnder ? (
+                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <dt className="text-muted-foreground">Also under</dt>
+                  <dd className="text-right font-medium">{alsoUnder}</dd>
+                </div>
+              ) : null}
               {occasions ? (
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
                   <dt className="text-muted-foreground">Occasions</dt>
