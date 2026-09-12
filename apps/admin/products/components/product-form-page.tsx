@@ -32,6 +32,7 @@ import {
   sizeLabelsInUse,
   usualPriceForSize,
   fileUnderCategories,
+  refileUnder,
 } from "@/features/products/lib/products-repository";
 import {
   createProductRequest,
@@ -298,6 +299,23 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   }
 
   /**
+   * The PRIMARY category, and what ticking a new one does to the rest.
+   *
+   * Not `patchForm({ categoryId })`. `form.categoryIds` is the product as the
+   * server returned it, and that array already holds the primary — so a plain
+   * merge left the outgoing category sitting in the list and saved it as a
+   * secondary. `refileUnder` is the rule, written once beside
+   * `fileUnderCategories` so the two halves of the invariant cannot drift.
+   */
+  function chooseCategory(id: string) {
+    setForm((prev) => ({
+      ...prev,
+      categoryId: id,
+      categoryIds: refileUnder(prev, id),
+    }));
+  }
+
+  /**
    * The categories BESIDE the primary one.
    *
    * Functional `setForm`, copied from `toggleOccasion` below rather than
@@ -480,12 +498,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       images: form.images.filter(Boolean),
       /**
        * REBUILT, never accumulated — this is the write half of the invariant
-       * that `categoryIds[0]` is always the primary.
+       * that `categoryIds[0]` is always the primary. The blank is dropped for
+       * the same reason the sizes below are: an unchosen category is not a
+       * category.
        *
-       * Built from the two controls each time rather than patched, so moving
-       * a product to a different primary cannot leave the old one filed in the
-       * array behind it. The blank is dropped for the same reason the sizes
-       * below are: an unchosen category is not a category.
+       * This used to claim that rebuilding here was what stopped a move
+       * leaving the old primary behind. It is not, and it never was: this
+       * rebuilds from `form.categoryIds`, which starts life as the product the
+       * server returned — an array that already CONTAINS the primary. So
+       * changing the dropdown from Cakes to Plants built
+       * `["cat-plants", "cat-cakes"]` and the cake stayed on the Birthday
+       * page. What actually holds the line is `refileUnder`, in
+       * `chooseCategory` above, which takes the outgoing category out of the
+       * state this reads.
        */
       categoryIds: fileUnderCategories(form.categoryId, form.categoryIds),
       /**
@@ -707,7 +732,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   <AdminSelect
                     id="category"
                     value={form.categoryId}
-                    onChange={(e) => patchForm({ categoryId: e.target.value })}
+                    onChange={(e) => chooseCategory(e.target.value)}
                   >
                     {/*
                       AN UNANSWERED BOX LOOKS UNANSWERED.

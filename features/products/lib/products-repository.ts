@@ -211,6 +211,39 @@ export function fileUnderCategories(primary: string, also: readonly string[] = [
 }
 
 /**
+ * WHAT IS STILL TICKED AFTER THE PRIMARY CATEGORY CHANGES.
+ *
+ * Rebuilding the array on save is not enough on its own, because the form
+ * rebuilds it FROM its own state — and that state is the product as the server
+ * returned it, where `categoryIds` already contains the primary. So changing
+ * the Category dropdown from Cakes to Plants left `cat-cakes` sitting in the
+ * list, and the payload came out `["cat-plants", "cat-cakes"]`: the owner
+ * moved a cake out of Birthday, saved, and it was still on the Birthday page.
+ * The "Also show it under" grid even re-drew with Birthday freshly ticked,
+ * which is honest about what would be saved and not what anyone asked for.
+ *
+ * The category being LEFT is dropped, and so is the one being taken up — it is
+ * about to be the primary, and a row cannot be both. A category the owner
+ * ticked themselves is never touched: filed under Cakes + Chocolate with Cakes
+ * primary, promoting Chocolate keeps nothing extra, while promoting Plants
+ * keeps Chocolate.
+ *
+ * Clearing the box empties the list outright. `categoryId: ""` means the
+ * product is filed nowhere, and leaving memberships behind it would both break
+ * `categoryIds[0] === categoryId` and strand them: the grid is hidden while
+ * there is no primary, so nothing on screen could untick them.
+ */
+export function refileUnder(
+  previous: { categoryId: string; categoryIds?: readonly string[] },
+  chosen: string,
+): string[] {
+  if (!chosen) return [];
+  return (previous.categoryIds ?? []).filter(
+    (id) => id !== previous.categoryId && id !== chosen,
+  );
+}
+
+/**
  * Every category a product is filed under, whatever shape it is in.
  *
  * `normalizeCommerceFields` guarantees `categoryIds` on anything that came
