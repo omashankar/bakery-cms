@@ -13,9 +13,10 @@ import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { GeneralSettings, LabelOverrides } from "@/types/settings";
+import type { BusinessType, GeneralSettings, LabelOverrides } from "@/types/settings";
 import { describeWordingProblems, guessPlural } from "@/config/business-labels";
 import {
+  businessTypeOptions,
   currencyOptions,
   defaultGeneralSettings,
   isSafeAssetUrl,
@@ -249,21 +250,48 @@ export function GeneralSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/*
-              A "Business type" select sat here — ten trades, one of which every
-              shop had to be. It restricted nothing (audited: the only thing it
-              gated was the Wedding Builder), it had to grow a row every time a
-              shop was a trade nobody had listed, and a shop selling cakes AND
-              chargers AND flowers had no honest answer to give it.
+              THE BUSINESS TYPE, AND WHAT IT IS AND IS NOT.
 
-              What it really did is now said directly: the two boxes below name
-              what this shop sells, and Settings → Modules turns the Wedding
-              Builder on.
+              This select was deleted once. It restricted nothing — audited: the
+              only thing it gated was the Wedding Builder — it had to grow a row
+              every time a shop was a trade nobody had listed, and a shop
+              selling cakes AND chargers AND flowers had no honest answer to
+              give it. The wording boxes below replaced it.
 
-              `labelOverrides` has existed on the server for as long as business
-              types have — `resolveLabels` layers it over the default — and
-              nothing read it, so a flower shop that wanted "Bouquet" was told
-              "Cake" whatever it typed, because there was nowhere to type it.
+              It is back because a shop has an identity and a new owner should
+              not start from a blank page. The condition it came back on is the
+              one that made it worth deleting: IT SETS DEFAULTS AND RESTRICTS
+              NOTHING. Nothing gates a product, a category, a page or a feature
+              on this value, and the Wedding gate deliberately did not come back
+              with it.
+
+              Which is why it sits directly above the wording boxes rather than
+              anywhere else on this screen: the type fills them in, and the shop
+              overrules it by typing. A florist that sells cakes at Christmas
+              picks "Flower shop" and types whatever it likes underneath.
             */}
+            <div className="space-y-2">
+              <Label htmlFor="businessType">What kind of shop is this?</Label>
+              <AdminSelect
+                id="businessType"
+                value={settings.businessType}
+                onChange={(e) =>
+                  edit((prev) => ({ ...prev, businessType: e.target.value as BusinessType }))
+                }
+              >
+                {businessTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </AdminSelect>
+              <p className="text-xs text-muted-foreground">
+                Sets the starting wording below. It does not limit what you can sell — every
+                shop can list anything, whichever type it picks.
+              </p>
+            </div>
+
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="productWord">What do you call one product?</Label>

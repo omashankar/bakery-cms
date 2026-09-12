@@ -7,6 +7,7 @@ import {
   socialLinks,
 } from "@/constants/landing-data";
 import type {
+  BusinessType,
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
@@ -26,6 +27,27 @@ function nowIso(): string {
 }
 
 
+/**
+ * The trades offered in Settings → General, and the ONLY list of them.
+ *
+ * Ordered as a shop owner would scan it, with `other` last because it is the
+ * default and the honest answer for anyone selling a mix. Adding a row here is
+ * adding a wording preset in `BUSINESS_TYPE_LABELS` and nothing else — if a row
+ * ever starts deciding behaviour, the field has become the thing it was deleted
+ * for being.
+ */
+export const businessTypeOptions: { value: BusinessType; label: string }[] = [
+  { value: "bakery", label: "Bakery" },
+  { value: "sweet-shop", label: "Sweet shop" },
+  { value: "flower-shop", label: "Flower shop" },
+  { value: "gift-shop", label: "Gift shop" },
+  { value: "restaurant", label: "Restaurant" },
+  { value: "grocery", label: "Grocery" },
+  { value: "fashion", label: "Fashion" },
+  { value: "electronics", label: "Electronics" },
+  { value: "pharmacy", label: "Pharmacy" },
+  { value: "other", label: "Something else" },
+];
 export const defaultGeneralSettings: GeneralSettings = {
   siteName: brandInfo.name,
   siteTagline: brandInfo.tagline,
@@ -37,6 +59,16 @@ export const defaultGeneralSettings: GeneralSettings = {
   favicon: "/favicon.ico",
   timezone: "Asia/Kolkata",
   currency: "INR",
+  /**
+   * NEUTRAL, not bakery.
+   *
+   * The field is required, so a value has to stand here — and `"other"`
+   * resolves to the same wording the neutral defaults already gave, which
+   * means re-introducing the type changed nothing for any existing shop.
+   * Defaulting to `"bakery"` would have this software decide what every new
+   * shop sells, which is the reason the enum was deleted the first time.
+   */
+  businessType: "other",
 };
 
 /**
@@ -437,85 +469,19 @@ export interface SettingsRepair {
   reason: string;
 }
 
-/**
- * The wording each business type used to produce, kept ONLY to preserve it.
- *
- * `BUSINESS_LABELS` held these as live presets keyed off a closed enum in
- * Settings. Deleting the enum without writing its answer down would have changed
- * what a running shop calls its own products on the day the change deployed —
- * "Cakes" to "Products" in the admin, and "Browse premium cakes by category,
- * flavour, and occasion." to a generic line on the storefront — with no
- * announcement and, for two of the four fields, no admin input to type it back.
- *
- * A one-way migration, not a feature. It fires only where the document still
- * carries the legacy `general.businessType`, only writes wording where the shop
- * has stated none of its own — and clears that field as it goes, so it fires
- * ONCE and the claim in this sentence is something the code enforces rather
- * than something it hopes for. Delete this table once no stored document
- * carries a business type; the clearing above is what lets you find that out.
- */
-const LEGACY_BUSINESS_TYPE_LABELS: Record<string, LabelOverrides> = {
-  bakery: {
-    collectionsTitle: "Our Collections",
-    collectionsSubtitle: "Browse premium cakes by category, flavour, and occasion.",
-    productWord: "Cake",
-    productWordPlural: "Cakes",
-  },
-  "sweet-shop": {
-    collectionsTitle: "Our Sweets",
-    collectionsSubtitle: "Browse our sweets and confections by category and occasion.",
-    productWord: "Sweet",
-    productWordPlural: "Sweets",
-  },
-  "flower-shop": {
-    collectionsTitle: "Our Flowers",
-    collectionsSubtitle: "Browse fresh flowers and arrangements by category and occasion.",
-    productWord: "Bouquet",
-    productWordPlural: "Flowers",
-  },
-  restaurant: {
-    collectionsTitle: "Our Menu",
-    collectionsSubtitle: "Browse our menu by category.",
-    productWord: "Dish",
-    productWordPlural: "Dishes",
-  },
-  "gift-shop": {
-    collectionsTitle: "Our Gifts",
-    collectionsSubtitle: "Browse gifts by category and occasion.",
-    productWord: "Gift",
-    productWordPlural: "Gifts",
-  },
-  grocery: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse groceries and essentials by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  fashion: {
-    collectionsTitle: "Our Collection",
-    collectionsSubtitle: "Browse the latest styles by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  electronics: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse electronics and gadgets by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  pharmacy: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse health and wellness products by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  other: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse our products by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-};
+/*
+  THE LEGACY PRESET TABLE STOOD HERE.
+
+  Ten trades of wording, kept as migration input after the business-type enum
+  was deleted, with a note asking for its own removal once no stored document
+  carried a type. The type is a live setting again, so these are live presets
+  again — and they belong beside the rest of the wording, in
+  `config/business-labels.ts` as `BUSINESS_TYPE_LABELS`. Moved verbatim: not a
+  word of any shop's wording changed in the move.
+
+  Two copies of the same ten strings is how the admin and the storefront come
+  to disagree about what a shop calls its own products, so there is one.
+*/
 
 /**
  * Decides what to repair in a settings document written before the current
@@ -549,59 +515,24 @@ export function planSettingsRepairs(settings: {
   const repairs: SettingsRepair[] = [];
 
   /**
-   * Keep the wording a shop was already showing.
+   * THE LEGACY BUSINESS-TYPE REPAIR STOOD HERE, AND HAD TO GO.
    *
-   * Only where the document still names a business type AND the shop has said
-   * nothing of its own — so it fires once, never overwrites a merchant's choice,
-   * and does nothing at all for a shop created after the enum was removed. A
-   * repair that could fire twice would churn the document on every read.
+   * It read `general.businessType`, copied that trade's wording into
+   * `labelOverrides` where the shop had stated none, and `$unset` the field in
+   * the same save so it could fire only once. All of that was right while the
+   * field was deleted.
+   *
+   * The field is a live setting again. Left in place, this ran on the singleton
+   * READ that every server render funnels through — so the owner would pick
+   * their business type, be told it saved, and find it gone on the next page
+   * load, deleted by a repair rule written to clean it up.
+   *
+   * Nothing is lost by removing it. A document that still carries a type now
+   * simply has one, and `resolveLabels` layers that trade's wording under
+   * whatever the shop typed — which is what the copy was for. A document the
+   * repair already migrated keeps its explicit `labelOverrides`, and those win
+   * over any preset, so its wording does not move either.
    */
-  const legacyType = settings.general?.businessType;
-  if (legacyType) {
-    /**
-     * `.trim()` on whatever is at rest, and a bracket lookup keyed by database
-     * text. Both are guarded because this runs on the SINGLETON READ that every
-     * server render funnels through, OUTSIDE the try/catch below, which wraps
-     * only the save: one non-string in `labelOverrides` would throw a TypeError
-     * out of every page. `labelOverrides` is a Mixed path, so the Zod schema
-     * that has always constrained it governs writes through the API and not
-     * what a direct database edit can leave there. Without `Object.hasOwn`,
-     * `businessType: "constructor"` resolves to a truthy inherited member and
-     * gets written as the shop's wording.
-     */
-    const stated = Object.values(settings.labelOverrides ?? {}).some(
-      (value) => typeof value === "string" && value.trim(),
-    );
-    const preserved = Object.hasOwn(LEGACY_BUSINESS_TYPE_LABELS, legacyType)
-      ? LEGACY_BUSINESS_TYPE_LABELS[legacyType]
-      : undefined;
-
-    if (preserved && !stated) {
-      repairs.push({
-        path: "labelOverrides",
-        value: preserved,
-        reason: `kept the ${legacyType} wording`,
-      });
-    }
-
-    /**
-     * And drop the legacy field, in the SAME save, whether or not there was
-     * wording to keep.
-     *
-     * Without this the condition above is a recurring state rather than a
-     * one-shot marker: nothing else clears `businessType` deliberately, so any
-     * path that empties `labelOverrides` — `POST /api/settings/labelOverrides/
-     * reset` is live and audit-logged — would have the preset re-imposed on the
-     * very next read, an endpoint reporting a reset that is undone before the
-     * page repaints. Dropping the field is also the only thing that can ever
-     * make this table's delete condition observable.
-     */
-    repairs.push({
-      path: "general.businessType",
-      value: undefined,
-      reason: `dropped the legacy ${legacyType} business type`,
-    });
-  }
 
   const storedMap = settings.contact?.mapEmbedUrl ?? "";
   if (storedMap) {

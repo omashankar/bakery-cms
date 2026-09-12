@@ -49,6 +49,26 @@ export const generalSchema = z.object({
   favicon: assetUrl,
   timezone: z.enum(timezoneValues, "Unknown timezone"),
   currency: z.enum(currencyValues, "Unknown currency"),
+  /**
+   * A closed list, because it keys a preset table — an unknown value would
+   * resolve to no preset and silently fall back to neutral wording.
+   * `.catch` rather than a hard refusal so a document written before the
+   * field returned still reads, rather than failing the whole settings load.
+   */
+  businessType: z
+    .enum([
+      "bakery",
+      "sweet-shop",
+      "flower-shop",
+      "restaurant",
+      "gift-shop",
+      "grocery",
+      "fashion",
+      "electronics",
+      "pharmacy",
+      "other",
+    ])
+    .catch("other"),
 });
 
 export const contactSchema = z.object({

@@ -112,8 +112,11 @@ vi.mock("@/features/settings/lib/settings-repository", () => ({
     favicon: "",
     timezone: "Asia/Kolkata",
     currency: "INR",
+    businessType: "other",
   }),
   getLabelSettings: () => repo.stored,
+  // Neutral, so this file keeps testing the plural GUESS and not a preset.
+  getBusinessType: () => "other",
   saveGeneralSettings: async (value: unknown) => ({ value, persisted: true }),
   saveLabelSettings: async (value: Record<string, string>) => {
     repo.saved = value;

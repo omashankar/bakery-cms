@@ -38,10 +38,11 @@ async function migrate(doc: SettingsDoc): Promise<SettingsDoc> {
   const repairs = planSettingsRepairs({
     contact: { mapEmbedUrl: doc.get("contact.mapEmbedUrl") as string | undefined },
     social: doc.get("social") as { href?: string; isActive?: boolean }[] | undefined,
-    // Legacy, and read straight off the document rather than through the type:
-    // `businessType` is gone from `GeneralSettings`, but a shop written before
-    // it was deleted still stores one, and its wording is what this preserves.
-    general: { businessType: doc.get("general.businessType") as string | undefined },
+    // `general.businessType` was read here to feed a repair that copied its
+    // trade's wording across and then deleted the field. The field is a live
+    // setting again and that repair is gone, so this read is gone with it —
+    // leaving it would hand `planSettingsRepairs` a value nothing consumes and
+    // invite the rule back.
     labelOverrides: doc.get("labelOverrides") as LabelOverrides | undefined,
   });
 

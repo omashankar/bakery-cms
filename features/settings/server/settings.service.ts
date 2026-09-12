@@ -18,7 +18,7 @@ import {
 
 import * as repo from "./settings.repository";
 import { resolveLabels } from "@/config/business-labels";
-import type { LabelOverrides } from "@/types/settings";
+import type { BusinessType, LabelOverrides } from "@/types/settings";
 
 interface RequestCtx {
   ip: string;
@@ -42,7 +42,12 @@ const SECTION_DEFAULTS: Record<string, unknown> = {
 };
 
 type SettingsJson = Record<string, unknown> & {
-  general?: Record<string, unknown>;
+  /**
+   * `businessType` is named rather than left in the index signature, because it
+   * is read here to layer that trade's default wording under the shop's own.
+   * The rest of `general` stays `unknown` — nothing in this file needs it.
+   */
+  general?: Record<string, unknown> & { businessType?: BusinessType };
   labelOverrides?: LabelOverrides;
 };
 
@@ -50,7 +55,7 @@ function withLabels(json: SettingsJson) {
   return {
     ...json,
     activity: [], // server keeps audit_logs separately; kept for client shape parity
-    labels: resolveLabels(json.labelOverrides ?? {}),
+    labels: resolveLabels(json.labelOverrides ?? {}, json.general?.businessType),
   };
 }
 
@@ -98,6 +103,17 @@ export async function getPublicSettings() {
       // Not a secret, and the storefront needs it: every date it renders is
       // formatted in the store's timezone, not the visitor's machine zone.
       timezone: json.general?.timezone,
+      /**
+       * Shipped for the same reason `labelOverrides` is, one field below.
+       *
+       * This list is cherry-picked by hand, so a field left out of it is simply
+       * absent on the client. The storefront re-resolves its wording in the
+       * browser from the shop's overrides AND its trade — so without this the
+       * client would fall back to `"other"` and render neutral wording under a
+       * server that had just rendered the shop's own, which is a hydration
+       * mismatch as well as a wrong word.
+       */
+      businessType: json.general?.businessType,
     },
     // The shop's own wording, so a storefront that hydrates from this subset
     // resolves the same labels the server just did rather than the defaults.
@@ -116,7 +132,7 @@ export async function getPublicSettings() {
       message: json.maintenance?.message ?? "",
     },
     modules: json.modules,
-    labels: resolveLabels(json.labelOverrides ?? {}),
+    labels: resolveLabels(json.labelOverrides ?? {}, json.general?.businessType),
   };
 }
 
@@ -124,7 +140,7 @@ export async function getPublicSettings() {
 export async function getLabels() {
   const doc = await readSettingsDoc();
   const json = doc.toJSON() as SettingsJson;
-  return resolveLabels(json.labelOverrides ?? {});
+  return resolveLabels(json.labelOverrides ?? {}, json.general?.businessType);
 }
 
 /**

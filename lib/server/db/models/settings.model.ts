@@ -24,6 +24,9 @@ const generalSchema = new mongoose.Schema(
     favicon: String,
     timezone: String,
     currency: String,
+    // Declared, or Mongoose drops it on write and the select reverts on
+    // every load. See the note on `deliveryTiers` below.
+    businessType: { type: String, default: "other" },
   },
   sub,
 );

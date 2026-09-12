@@ -6,6 +6,7 @@ import {
   newShopModuleSettings,
   planSettingsRepairs,
 } from "@/features/settings/lib/settings-utils";
+import { resolveLabels } from "@/config/business-labels";
 import { applyBusinessAttributes } from "@/components/business-blocking-script";
 import { BUSINESS_BLOCKING_SCRIPT } from "@/lib/business-blocking";
 
@@ -136,24 +137,26 @@ describe("the pre-paint script", () => {
   });
 });
 
-describe("the wording a shop was already showing survives the presets being deleted", () => {
-  it("backfills labelOverrides from a legacy businessType", () => {
-    /**
-     * `BUSINESS_LABELS` held ten trade presets and this shop's document says
-     * `businessType: "bakery"`, so its admin read "Cakes" and its storefront
-     * "Browse premium cakes by category, flavour, and occasion." Deleting the
-     * presets with nothing written in their place changes that copy on merge
-     * day, with no announcement — and `collectionsTitle`/`collectionsSubtitle`
-     * have no input in the admin, so two of the four could not be typed back.
-     */
-    const repairs = planSettingsRepairs({
-      general: { businessType: "bakery" },
-      labelOverrides: undefined,
-    });
+describe("a shop keeps the wording its trade gave it", () => {
+  /**
+   * This block used to pin a MIGRATION.
+   *
+   * When the business-type enum was deleted, a repair rule read the stored
+   * `general.businessType`, copied that trade's wording into `labelOverrides`,
+   * and dropped the field — so a bakery kept reading "Cakes" on merge day
+   * rather than silently becoming "Products". These cases held it to that.
+   *
+   * The field is a live setting again, so the repair had to go: running on the
+   * singleton read, it would have deleted the owner's choice moments after
+   * they made it. The PROPERTY it protected is unchanged and is what these
+   * cases check now — only the mechanism moved, from a one-shot copy into
+   * `resolveLabels`, which layers the trade's preset under whatever the shop
+   * has typed.
+   */
+  it("reads its trade's wording with nothing of its own typed", () => {
+    const labels = resolveLabels({}, "bakery");
 
-    const write = repairs.find((repair) => repair.path === "labelOverrides");
-    expect(write, "nothing preserved the wording the shop was showing").toBeDefined();
-    expect(write?.value).toMatchObject({
+    expect(labels).toMatchObject({
       productWord: "Cake",
       productWordPlural: "Cakes",
       collectionsTitle: "Our Collections",
@@ -162,30 +165,40 @@ describe("the wording a shop was already showing survives the presets being dele
   });
 
   it("uses the wording that business type actually had, not the bakery's", () => {
-    const repairs = planSettingsRepairs({
-      general: { businessType: "flower-shop" },
-      labelOverrides: undefined,
-    });
-
-    expect(repairs.find((r) => r.path === "labelOverrides")?.value).toMatchObject({
+    expect(resolveLabels({}, "flower-shop")).toMatchObject({
       productWord: "Bouquet",
       productWordPlural: "Flowers",
     });
   });
 
-  it("never overwrites wording the shop has already chosen", () => {
-    const repairs = planSettingsRepairs({
-      general: { businessType: "bakery" },
-      labelOverrides: { productWord: "Gateau" },
+  it("never overrules wording the shop has already chosen", () => {
+    // The whole point of the layering: a bakery that sells gateaux says so.
+    expect(resolveLabels({ productWord: "Gateau" }, "bakery")).toMatchObject({
+      productWord: "Gateau",
+      // and the rest of the trade's wording still stands underneath
+      productWordPlural: "Cakes",
     });
-
-    expect(repairs.find((r) => r.path === "labelOverrides")).toBeUndefined();
   });
 
-  it("writes nothing for a shop that never had a business type", () => {
-    // A shop created after the enum was deleted has nothing to preserve, and a
-    // migration that fires on every read would churn the document forever.
-    expect(planSettingsRepairs({ labelOverrides: undefined })).toEqual([]);
-    expect(planSettingsRepairs({ general: {}, labelOverrides: undefined })).toEqual([]);
+  it("falls back to neutral for a shop that has not said", () => {
+    // `"other"` and "no type at all" must agree, or a shop that has not
+    // chosen reads differently on the server than in the browser.
+    expect(resolveLabels({}, "other")).toMatchObject({ productWord: "Product" });
+    expect(resolveLabels({})).toMatchObject({ productWord: "Product" });
+  });
+
+  it("and NOTHING deletes the business type on a read", () => {
+    /**
+     * The repair that used to `$unset` this field ran on the singleton read
+     * that every server render funnels through. Left in place once the field
+     * went live, an owner would pick their shop type, be told it saved, and
+     * find it gone on the very next page load.
+     */
+    const repairs = planSettingsRepairs({
+      general: { businessType: "bakery" },
+      labelOverrides: undefined,
+    });
+
+    expect(repairs).toEqual([]);
   });
 });

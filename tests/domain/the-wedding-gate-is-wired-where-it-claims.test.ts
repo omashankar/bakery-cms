@@ -148,8 +148,22 @@ describe("a shop that has never existed", () => {
   });
 });
 
-describe("a shop that stored a business type before the enum was deleted", () => {
-  it("keeps the wording it was showing, and drops the legacy field in the same save", async () => {
+describe("a shop that stored a business type keeps it", () => {
+  /**
+   * These two cases used to pin the opposite.
+   *
+   * While the enum was deleted, the repository read a stored
+   * `general.businessType`, copied that trade's wording into `labelOverrides`
+   * and `$unset` the field in the same save — with `strict: false`, because
+   * the schema no longer declared the path.
+   *
+   * The field is a live setting again. That repair had to go, and this is the
+   * case that says why: it ran on the singleton read that every server render
+   * funnels through, so an owner would choose their shop type, be told it
+   * saved, and find it gone on the next page load — deleted by a rule written
+   * to tidy it away.
+   */
+  it("is left completely alone on a read", async () => {
     const doc = fakeDoc({
       key: "singleton",
       general: { siteName: "Real Bakery", businessType: "bakery" },
@@ -159,25 +173,16 @@ describe("a shop that stored a business type before the enum was deleted", () =>
 
     await repo.getOrCreateSettings();
 
-    const wording = doc.sets.find((entry) => entry.path === "labelOverrides");
-    expect(wording?.value).toMatchObject({ productWord: "Cake", productWordPlural: "Cakes" });
-
-    /**
-     * And the legacy field goes, on the same document, before the one save.
-     *
-     * `strict: false` is not a detail. `generalSchema` no longer declares
-     * `businessType`, and under the default strict mode `doc.set(path, undefined)`
-     * is a silent no-op — save() resolves, the field is still there on the next
-     * read, and the repair re-fires for any shop that ever blanks its wording.
-     */
-    const dropped = doc.sets.find((entry) => entry.path === "general.businessType");
-    expect(dropped, "the legacy business type was left on the document").toBeDefined();
-    expect(dropped?.value).toBeUndefined();
-    expect(dropped?.options).toMatchObject({ strict: false });
-    expect(doc.saved).toBe(1);
+    expect(
+      doc.sets.map((entry) => entry.path),
+      "a read wrote to the settings document",
+    ).toEqual([]);
+    expect(doc.saved, "a read saved the settings document").toBe(0);
   });
 
-  it("does not touch a shop that has already stated its own wording", async () => {
+  it("and neither is a shop that has stated its own wording", async () => {
+    // Its overrides win over the trade preset in `resolveLabels`, so there is
+    // nothing to copy and nothing to clear.
     const doc = fakeDoc({
       key: "singleton",
       general: { siteName: "Real Bakery", businessType: "bakery" },
@@ -187,12 +192,9 @@ describe("a shop that stored a business type before the enum was deleted", () =>
 
     await repo.getOrCreateSettings();
 
-    expect(doc.sets.find((entry) => entry.path === "labelOverrides")).toBeUndefined();
-    // The legacy field still goes: there is nothing to preserve, and leaving it
-    // behind is exactly what would let this fire again the day the shop clears
-    // those boxes.
-    expect(doc.sets.map((entry) => entry.path)).toContain("general.businessType");
+    expect(doc.sets.map((entry) => entry.path)).toEqual([]);
   });
+
 
   it("writes nothing at all for a shop that never had a business type", async () => {
     const doc = fakeDoc({

@@ -3,6 +3,7 @@ import type {
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
+  BusinessType,
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
@@ -412,13 +413,32 @@ export function getLabelSettings(): LabelOverrides {
 }
 
 /**
+ * The shop's trade, for wording only.
+ *
+ * Read beside `getLabelSettings` because `resolveLabels` layers the two: what
+ * the shop typed, over what its trade suggests, over neutral. Falls back to
+ * `"other"` — which resolves to exactly the neutral wording — so a settings
+ * document written while the field did not exist needs no special case.
+ *
+ * NOTHING ELSE MAY READ THIS. It picks default words. It does not decide what a
+ * shop is allowed to sell, list, show or switch on — that restriction is the
+ * reason the field was deleted once, and it is not coming back with it.
+ */
+export function getBusinessType(): BusinessType {
+  return loadSettings().general?.businessType ?? "other";
+}
+
+/**
  * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
  * gated by the wedding module alone. Shared by admin + storefront so every
  * surface hides wedding consistently.
  */
 export function isWeddingEnabled(): boolean {
   // The switch is the whole gate. This also required
-  // `businessType === "bakery"`, which is gone. A shop that never asked for a
+  // `businessType === "bakery"`. The field is BACK — as wording only — and this
+  // gate deliberately did NOT come back with it: a shop that sells cakes and
+  // flowers should not lose its Wedding Builder for calling itself a florist.
+  // A shop that never asked for a
   // Wedding Builder is not given one by `newShopModuleSettings` when it is
   // created; the copy READ here fails open, because an unknown value in a cold
   // browser must not hide a page a running shop is selling from.

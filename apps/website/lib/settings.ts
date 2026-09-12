@@ -4,6 +4,7 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
+  getBusinessType,
   getLabelSettings,
   isWeddingEnabled,
 } from "@/features/settings/lib/settings-repository";
@@ -81,7 +82,7 @@ export function getStorefrontBusinessLabels(): BusinessLabels {
   // The shop's own words over the preset — the same resolution the server does
   // and the admin hook does. This read the preset alone, so the collections
   // heading a shop had renamed still said "Our Collections".
-  return { ...getBusinessLabels(), ...resolveLabels(getLabelSettings()) };
+  return { ...getBusinessLabels(), ...resolveLabels(getLabelSettings(), getBusinessType()) };
 }
 
 /** Wedding cakes are bakery-only and gated by the wedding module. */

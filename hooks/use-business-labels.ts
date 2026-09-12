@@ -8,6 +8,7 @@ import {
   type BusinessLabels,
 } from "@/config/business-labels";
 import {
+  getBusinessType,
   getLabelSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
@@ -49,7 +50,10 @@ export function useBusinessLabels(): ShopLabels {
      * `resolveLabels` is the single place a blank means "use the default".
      */
     const sync = () => {
-      setLabels({ ...getBusinessLabels(), ...resolveLabels(getLabelSettings()) });
+      setLabels({
+        ...getBusinessLabels(),
+        ...resolveLabels(getLabelSettings(), getBusinessType()),
+      });
     };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
