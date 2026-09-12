@@ -33,6 +33,13 @@ const productSchema = new mongoose.Schema(
     // normalised on the way out instead.
     categoryIds: { type: [String], default: [] },
     occasionIds: { type: [String], default: [] },
+    /**
+     * Declared, or every speed an owner unticks is dropped on write while the
+     * API answers 200 — the failure this repo has hit four times. `default: []`
+     * is also the CORRECT default here: empty means every speed, which is what
+     * every existing product means.
+     */
+    deliveryTierIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
     weightLabel: { type: String },
     /**

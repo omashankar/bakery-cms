@@ -244,6 +244,27 @@ export function refileUnder(
 }
 
 /**
+ * CAN THIS PRODUCT GO OUT AT THIS SPEED?
+ *
+ * Empty or absent means yes, to everything. That is what every product in
+ * every shop means today, and reading it any other way would make a whole
+ * catalogue undeliverable the moment this field existed.
+ *
+ * A tier the shop has since DELETED is not special-cased: a product listing
+ * only dead tiers can be sent by none of the live ones, which is the honest
+ * answer and the one a shop notices — the alternative, treating an
+ * unresolvable list as "all", quietly re-enables two-hour delivery on a
+ * wedding cake because somebody tidied the settings.
+ */
+export function deliverableBy(
+  product: { deliveryTierIds?: string[] },
+  tierId: string,
+): boolean {
+  const allowed = product.deliveryTierIds ?? [];
+  return allowed.length === 0 || allowed.includes(tierId);
+}
+
+/**
  * Every category a product is filed under, whatever shape it is in.
  *
  * `normalizeCommerceFields` guarantees `categoryIds` on anything that came
@@ -609,6 +630,8 @@ export function createEmptyProductForm(): ProductFormData {
     // an array holding "" files it under a category that does not exist.
     categoryIds: [],
     occasionIds: [],
+    // Empty means every speed the shop offers — see `deliverableBy`.
+    deliveryTierIds: [],
     /**
      * A NEW PRODUCT IS BORN EMPTY.
      *

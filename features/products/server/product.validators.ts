@@ -110,6 +110,16 @@ export const productFormSchema = z
      */
     categoryIds: z.array(z.string()).optional(),
     occasionIds: z.array(z.string()).default([]),
+    /**
+     * The delivery speeds this product can go out by.
+     *
+     * `.default([])` because empty MEANS every speed — the same reading the
+     * type, the Mongoose path and `deliverableBy` all take. There is no
+     * distinction here between absent and empty worth keeping: a shop that has
+     * never opened the control and one that ticked nothing both mean "send it
+     * however you send anything".
+     */
+    deliveryTierIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),
     weightLabel: z.string().optional(),
     status: z.enum(["draft", "published", "archived"]),

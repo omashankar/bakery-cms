@@ -18,7 +18,10 @@ import {
   resolveCouponDiscount,
   type CouponCartLine,
 } from "@/features/orders/lib/coupons";
-import { categoriesOf } from "@/features/products/lib/products-repository";
+import {
+  categoriesOf,
+  deliverableBy,
+} from "@/features/products/lib/products-repository";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -97,6 +100,28 @@ export interface CartQuote {
    * to read the active locale from and silently falls back to rupees.
    */
   currency: string;
+}
+
+/**
+ * The cart asked for a delivery speed one of its products cannot go out by.
+ *
+ * Refused rather than priced, the same way an unknown slug and an unknown
+ * size are — the cart and the shop disagree about what is on offer, and
+ * charging for the faster tier and sending it late is the one outcome worse
+ * than a refusal.
+ *
+ * It carries BOTH names because the customer needs to know which product is
+ * the problem: "your order cannot go out today" over a six-line cart is an
+ * error nobody can act on.
+ */
+export class UndeliverableAtSpeedError extends Error {
+  constructor(
+    readonly productName: string,
+    readonly tierLabel: string,
+  ) {
+    super(`${productName} cannot be delivered by ${tierLabel}`);
+    this.name = "UndeliverableAtSpeedError";
+  }
 }
 
 export class UnknownProductError extends Error {
@@ -312,6 +337,17 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     ...((settings.modules ?? {}) as Partial<ModuleSettings>),
   };
 
+  /**
+   * The speed the customer chose, resolved against the shop's own list.
+   *
+   * `undefined` for no choice AND for an id the shop no longer offers — the
+   * same fall-through `calculateCartTotals` already takes, so the eligibility
+   * check below and the CHARGE agree about which tier is in play.
+   */
+  const chosenTier = input.deliveryTierId
+    ? (commerce.deliveryTiers ?? []).find((tier) => tier.id === input.deliveryTierId)
+    : undefined;
+
   const items: QuotedLine[] = [];
   /**
    * The same lines again, as much of them as a COUPON needs.
@@ -340,6 +376,24 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     // catalogue disagree, and guessing which is right is how a shop gives away
     // a cake it has deleted.
     if (!product) throw new UnknownProductError(line.productSlug);
+
+    /**
+     * THE SPEED, CHECKED AGAINST THE PRODUCT — server-side, or not at all.
+     *
+     * Delivery used to be shop-wide, so every product could go out at every
+     * speed by definition. It cannot now: a two-tier wedding cake is not a
+     * two-hour delivery, and a shop that says so on the product must be held
+     * to it where the money is decided. A browser-only check is a check the
+     * customer can skip by editing a request.
+     *
+     * Only when a tier was actually CHOSEN, and only against a tier the shop
+     * still offers: an id naming a deleted tier is already ignored by
+     * `calculateCartTotals`, which charges the base fee, so refusing here
+     * would reject an order the shop is perfectly able to fulfil.
+     */
+    if (chosenTier && !deliverableBy(product, chosenTier.id)) {
+      throw new UndeliverableAtSpeedError(product.name, chosenTier.label);
+    }
 
     // Priced ONCE. `priceLine` is the shop’s own arithmetic over weights,
     // variants and modules; calling it twice to fill two lists is how the

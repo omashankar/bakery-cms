@@ -3,6 +3,28 @@ import type { LandingProduct } from "@/constants/landing-data";
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
 
+/**
+ * The delivery speeds worth offering on THIS page.
+ *
+ * The shop's own tiers, narrowed to the ones something here can actually be
+ * sent by — the same rule every other box now follows, and the one that makes
+ * an "Express" page mean something. A product with no speeds listed can go
+ * out at any of them, which is every product until an owner says otherwise,
+ * so on an untouched shop this offers every tier and filters nothing out.
+ */
+export function getFilterDeliveryOptions(
+  products: readonly { deliveryTierIds?: string[] }[],
+  tiers: readonly { id: string; label: string }[],
+): { id: string; label: string }[] {
+  return tiers.filter((tier) =>
+    products.some(
+      (product) =>
+        (product.deliveryTierIds ?? []).length === 0 ||
+        (product.deliveryTierIds ?? []).includes(tier.id),
+    ),
+  );
+}
+
 export interface CollectionFilters {
   search: string;
   sort: CollectionSort;

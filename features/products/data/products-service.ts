@@ -309,6 +309,9 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     // narrow projection the cart and checkout actually receive, so a field
     // missing here is a field the browser can never see.
     categoryIds: product.categoryIds,
+    // The speeds, for the listing page's delivery filter. Without this the
+    // browser cannot tell an express-eligible product from any other.
+    deliveryTierIds: product.deliveryTierIds,
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),

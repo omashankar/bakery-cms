@@ -5,7 +5,12 @@ import { withErrorHandler, AppError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 
-import { priceCart, UnknownProductError, UnknownWeightError } from "./pricing.server";
+import {
+  priceCart,
+  UndeliverableAtSpeedError,
+  UnknownProductError,
+  UnknownWeightError,
+} from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
 import {
@@ -195,6 +200,21 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       throw new AppError("One of the items is no longer available in that size.", 409, [
         { field: "items", message: `Unknown weight on ${error.slug}: ${error.weight}` },
       ]);
+    }
+    /**
+     * A 409 like the two above, and for the same reason: the cart and the
+     * shop disagree about what is on offer.
+     *
+     * NAMED, both sides. "Your order cannot go out at that speed" over a
+     * six-line cart is an error nobody can act on — the customer has to know
+     * which product to remove or which speed to drop to.
+     */
+    if (error instanceof UndeliverableAtSpeedError) {
+      throw new AppError(
+        `${error.productName} cannot be delivered by ${error.tierLabel}.`,
+        409,
+        [{ field: "deliveryTierId", message: error.message }],
+      );
     }
     throw error;
   }

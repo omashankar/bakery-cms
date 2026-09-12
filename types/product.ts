@@ -234,6 +234,21 @@ export interface Product extends BaseEntity {
    */
   categoryIds: string[];
   occasionIds: string[];
+  /**
+   * The delivery speeds this product can actually be sent by.
+   *
+   * EMPTY OR ABSENT MEANS EVERY SPEED THE SHOP OFFERS, and that is not a
+   * convenience — it is what every product in every shop means today, so any
+   * other reading would make the whole catalogue undeliverable on the day
+   * this shipped.
+   *
+   * It exists because "Express" cannot otherwise be honest. Delivery was
+   * shop-wide — one cutoff, one set of tiers — so a page of express-eligible
+   * products would have been the entire catalogue, which is the static
+   * category the requirement explicitly refuses. A two-tier wedding cake
+   * cannot go out in two hours; a box of chocolates can.
+   */
+  deliveryTierIds?: string[];
   weights: ProductWeight[];
   /** What this product's size tiers are CALLED. Blank means the generic word. */
   weightLabel?: string;

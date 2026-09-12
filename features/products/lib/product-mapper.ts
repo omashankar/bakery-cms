@@ -92,6 +92,7 @@ export function mapAdminProductToStorefront(
      * scope test, reads the same as "no scope" a line later.
      */
     categoryIds: cake.categoryIds,
+    deliveryTierIds: cake.deliveryTierIds,
     occasions,
     badge: cake.isFeatured
       ? "Featured"

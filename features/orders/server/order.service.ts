@@ -32,6 +32,7 @@ import {
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
   priceCart,
+  UndeliverableAtSpeedError,
   UnknownProductError,
   UnknownWeightError,
 } from "@/features/checkout/server/pricing.server";
@@ -179,6 +180,14 @@ async function repriceForPlacement(input: PlaceOrderInput) {
     // size the line still says, and then baking that size.
     if (error instanceof UnknownWeightError) {
       throw new AppError("One of the items is no longer available in that size.", 409);
+    }
+    // The draft-less COD path reaches the same pricing, so it has to refuse
+    // the same things — otherwise the speed check is one endpoint deep.
+    if (error instanceof UndeliverableAtSpeedError) {
+      throw new AppError(
+        `${error.productName} cannot be delivered by ${error.tierLabel}.`,
+        409,
+      );
     }
     throw error;
   }

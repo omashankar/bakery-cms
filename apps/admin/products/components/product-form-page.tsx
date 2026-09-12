@@ -162,6 +162,13 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
+  /**
+   * The speeds this shop offers, read once.
+   *
+   * Empty for a shop that has not set any up, and the control below hides
+   * itself rather than printing a heading over nothing.
+   */
+  const deliveryTiers = getCommerceSettings().deliveryTiers ?? [];
   const productsLower = labels.productWordPlural.toLowerCase();
 
   /**
@@ -329,6 +336,24 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         ? [...prev.categoryIds, id]
         : prev.categoryIds.filter((item) => item !== id),
     }));
+  }
+
+  /**
+   * WHICH SPEEDS THIS PRODUCT CAN GO OUT BY.
+   *
+   * Functional `setForm`, like the two toggles above and below, so ticking
+   * two boxes quickly cannot capture a stale array and drop the first.
+   */
+  function toggleDeliveryTier(id: string, checked: boolean) {
+    setForm((prev) => {
+      const current = prev.deliveryTierIds ?? [];
+      return {
+        ...prev,
+        deliveryTierIds: checked
+          ? [...current, id]
+          : current.filter((item) => item !== id),
+      };
+    });
   }
 
   function toggleOccasion(id: string, checked: boolean) {
@@ -814,6 +839,51 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   already free text this shop types for itself. A flavour is
                   a word on a product, not a taxonomy.
                 */}
+                {/*
+                  HOW FAST THIS ONE CAN ACTUALLY GO OUT.
+
+                  Delivery was shop-wide — one cutoff, one set of speeds — so
+                  every product was express-eligible by definition and an
+                  "Express" page would have been the whole catalogue. A
+                  two-tier wedding cake is not a two-hour delivery.
+
+                  Nothing ticked means EVERY speed, which is what every
+                  product means today, so the heading says so rather than
+                  leaving an owner to infer it from an empty grid. Hidden
+                  entirely when the shop offers no speeds of its own — there
+                  is nothing to choose between.
+                */}
+                {deliveryTiers.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Can be delivered by</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Leave everything unticked and it can go out at any speed you
+                      offer.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {deliveryTiers.map((tier) => (
+                        <label
+                          key={tier.id}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={(form.deliveryTierIds ?? []).includes(tier.id)}
+                            onCheckedChange={(checked) =>
+                              toggleDeliveryTier(tier.id, checked === true)
+                            }
+                          />
+                          {tier.label}
+                        </label>
+                      ))}
+                    </div>
+                    {(form.deliveryTierIds ?? []).length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Checkout refuses any other speed for this {productLower}.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="space-y-2">
                   <Label>Occasions</Label>
                   <div className="grid gap-2 sm:grid-cols-2">

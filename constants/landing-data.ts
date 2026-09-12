@@ -59,6 +59,14 @@ export interface LandingProduct {
    * the demo literals in this file set neither.
    */
   categoryIds?: string[];
+  /**
+   * The delivery speeds this product can go out by; empty means all of them.
+   *
+   * Carried so the listing page can offer a speed filter — the only way an
+   * "Express" page can show what is actually express rather than the whole
+   * catalogue.
+   */
+  deliveryTierIds?: string[];
   badge?: string;
   rating?: number;
   reviewCount?: number;
