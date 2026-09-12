@@ -277,16 +277,33 @@ describe("the section the shop already has stored", () => {
      * source, and the renderer reads `props.rails?.[source]`.
      */
     const service = code("features/products/data/products-service.ts");
-    // Bounded at the function's closing brace, not run to EOF — this is the
-    // last export in the file today, and a slice that relies on that stops
-    // meaning "inside getHomepageRails" the moment somebody appends one.
+    /**
+     * Bounded at the function's BODY, not at the first `\n}` after its name.
+     *
+     * It was the latter, and that held only while the return type fitted on
+     * one line: `getHomepageRails` now returns an object type written across
+     * several, and `\n}> {` matched first — so the slice became the type
+     * annotation and every assertion below failed on a function that was
+     * perfectly correct. Anchored on the body's opening instead.
+     */
     const start = service.indexOf("export async function getHomepageRails");
-    const rails = service.slice(start, service.indexOf("\n}", start));
+    const bodyStart = service.indexOf("{", service.indexOf("}> {", start));
+    const rails = service.slice(bodyStart, service.indexOf("\n}", bodyStart));
 
     expect(rails.length).toBeGreaterThan(200);
     expect(rails).toContain('"eggless"');
     expect(rails).toContain("categorySlugs()");
     expect(rails).toContain("buildHomepageProducts(source, maxCount, products, all, names, categories)");
+    /**
+     * And the open sibling, built in the same place from the same list.
+     *
+     * A shop can name a row after any category it has now. If that were built
+     * anywhere else it could disagree with this one about what is in a
+     * category — which is the two-answers-to-one-question shape the eggless
+     * flag had in the first place.
+     */
+    expect(rails).toContain("categoryRails");
+    expect(rails).toContain("buildCategoryRail(category.slug");
   });
 
   it("tells the admin to file a product, not to set a flag that is gone", () => {

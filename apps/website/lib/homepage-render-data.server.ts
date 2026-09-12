@@ -25,7 +25,15 @@ import type { Banner } from "@/types/media";
 const ROW_CAP = 12;
 
 export interface HomepageRenderData {
-  rails: Awaited<ReturnType<typeof getHomepageRails>>;
+  rails: Awaited<ReturnType<typeof getHomepageRails>>["rails"];
+  /**
+   * A row per category the shop has, keyed by slug.
+   *
+   * Separate from `rails` rather than merged into it: `rails` is keyed by a
+   * CLOSED union of six known sources and every reader of it is exhaustive,
+   * while this is open and keyed by whatever the shop called its categories.
+   */
+  categoryRails: Awaited<ReturnType<typeof getHomepageRails>>["categoryRails"];
   banners: Banner[];
   categories: ReturnType<typeof selectHomepageCategories>;
   testimonials: Testimonial[];
@@ -112,7 +120,8 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
   ]);
 
   return {
-    rails,
+    rails: rails.rails,
+    categoryRails: rails.categoryRails,
     // "homepage", not "all" — `"all"` is the WILDCARD in this selector, meaning
     // "apply no visibility filter", not the visibility value "all". Passing it
     // here made the admin's Visibility field inert: a banner scoped to

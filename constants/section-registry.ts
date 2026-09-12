@@ -41,9 +41,21 @@ function fillTokens(text: string, labels: RegistryLabels): string {
 }
 
 /** A registry entry with the shop’s own words in its CHROME. */
+/**
+ * The shop's live lists, for fields that ask to be filled from one.
+ *
+ * This module is plain data and cannot read a catalogue — which is exactly
+ * why every category row in it is a hardcoded bakery slug. The caller that
+ * CAN read one passes it in.
+ */
+export interface RegistryOptionSources {
+  categories?: { id: string; name: string; slug: string }[];
+}
+
 export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
   entry: T,
   labels: RegistryLabels,
+  sources?: RegistryOptionSources,
 ): T {
   return {
     ...entry,
@@ -51,6 +63,25 @@ export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
     fields: entry.fields.map((field) => ({
       ...field,
       label: fillTokens(field.label, labels),
+      /**
+       * A dynamic field keeps its own `options` if it somehow has them, so
+       * this can never blank a list somebody wrote by hand. With no source
+       * to draw on it renders an empty dropdown, which is the honest answer
+       * for a shop that has no categories yet.
+       */
+      ...(field.optionsFrom === "categories"
+        ? {
+            options:
+              field.options ??
+              (sources?.categories ?? []).map((category) => ({
+                label: category.name,
+                // The SLUG, because that is what the rail is keyed by and
+                // what the collection page resolves. An id would key a
+                // rail nothing could look up.
+                value: category.slug,
+              })),
+          }
+        : {}),
     })),
   };
 }
@@ -417,6 +448,48 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "imageUrl", label: "Image URL", type: "url", isImage: true },
+    ],
+  },
+  {
+    /*
+      THE OPEN ROW. Every other product row in this registry is named after
+      a bakery category — Photo Cakes, Eggless Cakes, Seasonal — so a plant
+      shop opening Add Section was offered three rows it could never fill
+      and none it could. Those stay for layouts already published; this is
+      the one to reach for.
+
+      Its copy ships EMPTY on purpose. A default title would be a claim
+      about a category nobody has chosen yet, and `{Products}` would read
+      as a heading rather than as the placeholder it is. The shop picks a
+      category and writes its own line.
+    */
+    type: "category-rail",
+    label: "{Products} by category",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      maxCount: 4,
+      categorySlug: "",
+      ctaLabel: "",
+      ctaHref: "",
+    },
+    fields: [
+      {
+        key: "categorySlug",
+        label: "Category",
+        type: "select",
+        // Filled from the shop's own catalogue when the editor renders.
+        optionsFrom: "categories",
+      },
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "maxCount", label: "Max {products} shown", type: "number" },
+      { key: "ctaLabel", label: "CTA label", type: "text" },
+      { key: "ctaHref", label: "CTA link", type: "url" },
     ],
   },
   {

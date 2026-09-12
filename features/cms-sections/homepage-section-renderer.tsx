@@ -85,6 +85,16 @@ export interface HomepageSectionRendererProps {
    */
   rails?: Partial<Record<HomepageProductSource, LandingProduct[]>>;
   /**
+   * A row per category the shop has, keyed by SLUG.
+   *
+   * Absent in the builder preview for the same reason `rails` is, and with
+   * the same consequence: an empty row rather than a wrong one. There is no
+   * browser-side fallback here because there is nothing generic to fall back
+   * to — the slug is whatever the shop named a category, and guessing at it
+   * from the demo catalogue is what this whole prop exists to stop.
+   */
+  categoryRails?: Record<string, LandingProduct[]>;
+  /**
    * Active hero banners read on the server. When absent (admin builder preview)
    * the promo section falls back to the browser banner store.
    */
@@ -1257,6 +1267,16 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
 export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
   const railFor = (source: HomepageProductSource, maxCount: number) =>
     props.rails?.[source]?.slice(0, maxCount) ?? getHomepageProducts(source, maxCount);
+  /**
+   * The open sibling of `railFor`.
+   *
+   * No `getHomepageProducts` fallback: that function takes one of the six
+   * fixed sources, and a category slug is not one of them. A row whose
+   * category has been deleted, or whose slug was never filled in, renders
+   * empty — which is what it is.
+   */
+  const categoryRailFor = (slug: string, maxCount: number) =>
+    props.categoryRails?.[slug]?.slice(0, maxCount) ?? [];
 
   const { section } = props;
 
@@ -1290,6 +1310,25 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
         <ProductGridSection
           {...props}
           cakes={railFor("best-sellers", contentNumber(section.content, "maxCount", 4))}
+        />
+      );
+    /**
+     * A ROW OF ANY CATEGORY THE SHOP HAS.
+     *
+     * The three category rows below this — photo-cakes, eggless, seasonal —
+     * are bakery slugs frozen into the section type. They stay, because
+     * layouts already published carry them, but a shop adds THIS one and
+     * picks the category from its own list.
+     */
+    case "category-rail":
+      return (
+        <ProductGridSection
+          {...props}
+          cakes={categoryRailFor(
+            contentString(section.content, "categorySlug"),
+            contentNumber(section.content, "maxCount", 4),
+          )}
+          showCta
         />
       );
     case "offers":

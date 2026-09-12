@@ -31,6 +31,39 @@ const UNPADDED_SOURCES: ReadonlySet<HomepageProductSource> = new Set([
   "photo-cakes",
 ]);
 
+/**
+ * A ROW OF ANY CATEGORY THE SHOP HAS — the open path beside the closed one.
+ *
+ * `HomepageProductSource` is six fixed values, and three of them are bakery
+ * category slugs written as literals: photo-cakes, eggless, seasonal. A plant
+ * shop was offered "Eggless Cakes" in Add Section and had no way to add
+ * "Succulents" — the builder could arrange rows but not name one after a
+ * category the shop invented.
+ *
+ * The union stays, because layouts already stored carry those values and a
+ * shop that published an Eggless row keeps it. `eggless` and `seasonal` now
+ * call THIS, so there is one implementation rather than two that can drift.
+ *
+ * Never padded. Every category rail is a row that says what its products
+ * ARE — "Succulents" topped up with a cake is a false statement about the
+ * row, the same reason the three named sources are exempt from the top-up
+ * below.
+ */
+export function buildCategoryRail(
+  slug: string,
+  maxCount: number,
+  adminMapped: LandingProduct[],
+  all: LandingProduct[],
+  categories?: { name: string; slug: string }[],
+): LandingProduct[] {
+  const admin = filterProductsByCategory(adminMapped, slug, categories);
+  const merged = mergeWithCatalog(
+    admin,
+    filterProductsByCategory(all, slug, categories),
+  );
+  return merged.slice(0, maxCount);
+}
+
 function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
   if (adminCakes.length === 0) return fallback;
   const slugs = new Set(adminCakes.map((cake) => cake.slug));
@@ -124,21 +157,12 @@ export function buildHomepageProducts(
      * the shop saying so in its own catalogue, which is the same answer the
      * nav link and /collections/eggless already give.
      */
-    eggless: () => {
-      const admin = filterProductsByCategory(adminMapped, "eggless", categories);
-      return mergeWithCatalog(
-        admin,
-        filterProductsByCategory(all, "eggless", categories),
-      );
-    },
-
-    seasonal: () => {
-      const admin = filterProductsByCategory(adminMapped, "seasonal", categories);
-      return mergeWithCatalog(
-        admin,
-        filterProductsByCategory(all, "seasonal", categories),
-      );
-    },
+    // Both go through `buildCategoryRail`, so the legacy rows and any row a
+    // shop adds are one implementation. `maxCount` is applied again by the
+    // caller below; passing it here changes nothing and keeps the helper
+    // honest about its own contract.
+    eggless: () => buildCategoryRail("eggless", maxCount, adminMapped, all, categories),
+    seasonal: () => buildCategoryRail("seasonal", maxCount, adminMapped, all, categories),
   };
 
   const matched = sourceMatchers[source]();

@@ -212,7 +212,22 @@ describe("what the shop loses, stated rather than discovered", () => {
     const declared = rails.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
     expect(declared).not.toContain("isEggless");
-    expect(rails).toContain('filterProductsByCategory(adminMapped, "eggless", categories)');
+    /**
+     * Through `buildCategoryRail`, which is where a CATEGORY row is built.
+     *
+     * This used to pin the inline `filterProductsByCategory(adminMapped,
+     * "eggless", categories)` that stood here. That call still happens — it
+     * moved inside the helper, so the eggless row and a row a shop names
+     * after its own category are one implementation rather than two that can
+     * drift. What the test is about is unchanged: this row selects on the
+     * CATEGORY and never on a flag.
+     */
+    expect(declared).toContain('buildCategoryRail("eggless"');
+    // And the helper it now calls really does select by category — asserted on
+    // the comment-stripped source, so the docblock above it cannot satisfy this.
+    expect(declared, "buildCategoryRail no longer selects by category").toMatch(
+      /export function buildCategoryRail[\s\S]{0,600}filterProductsByCategory/,
+    );
     expect(rails).toContain('"eggless",');
   });
 

@@ -68,6 +68,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { adminCategories } from "@/features/products/lib/catalog-options";
 import { cn } from "@/lib/utils";
 
 type ConfirmAction =
@@ -98,16 +99,27 @@ export function HomepageBuilderPage() {
    * they are filled HERE — in the one place this page resolves an entry, rather
    * than in each of the three components that render one.
    */
+  /**
+   * The shop's own categories, so the category-rail row can offer them.
+   *
+   * Read here rather than in the registry, which is plain data — and this is
+   * the one choke point where an entry is resolved, so both the Add Section
+   * list and the editor panel get the same filled options.
+   */
+  const optionSources = useMemo(() => ({ categories: adminCategories() }), []);
   const resolveEntry = useCallback(
     (type: HomepageSectionType) => {
       const entry = getRegistryEntry(type);
-      return entry ? resolveRegistryEntry(entry, labels) : undefined;
+      return entry ? resolveRegistryEntry(entry, labels, optionSources) : undefined;
     },
-    [labels],
+    [labels, optionSources],
   );
   const registry = useMemo(
-    () => HOMEPAGE_SECTION_REGISTRY.map((entry) => resolveRegistryEntry(entry, labels)),
-    [labels],
+    () =>
+      HOMEPAGE_SECTION_REGISTRY.map((entry) =>
+        resolveRegistryEntry(entry, labels, optionSources),
+      ),
+    [labels, optionSources],
   );
   const [mounted, setMounted] = useState(false);
   /**

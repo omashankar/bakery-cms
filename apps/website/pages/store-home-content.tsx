@@ -25,6 +25,8 @@ import type { StorefrontTrust } from "@/apps/website/lib/storefront-trust.server
 interface HomepageSectionData {
   /** Product rails built on the server, so both passes render the same cakes. */
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
+  /** The same, for rows named after one of the shop's own categories. */
+  categoryRails?: Record<string, LandingProduct[]>;
   /** Active hero banners read from the server, so both passes render the same banners. */
   banners: Banner[];
   /** Categories read from the server, so both passes render the same category cards. */

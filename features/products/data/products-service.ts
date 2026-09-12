@@ -23,6 +23,7 @@ import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { ModuleSettings } from "@/types/settings";
 import {
+  buildCategoryRail,
   buildHomepageProducts,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
@@ -448,9 +449,18 @@ export async function setProductStatus(
  * render, so the server pass produced seed data and the client swapped it after
  * hydration. Building the rails here keeps both passes identical.
  */
-export async function getHomepageRails(
-  maxCount = 8
-): Promise<Record<HomepageProductSource, LandingProduct[]>> {
+export async function getHomepageRails(maxCount = 8): Promise<{
+  rails: Record<HomepageProductSource, LandingProduct[]>;
+  /**
+   * One rail per category the shop has, keyed by slug.
+   *
+   * This is what makes a homepage row nameable after something the shop
+   * invented. Built here rather than on demand because the section renderer
+   * runs in both passes and must not read a catalogue itself — that is the
+   * bug this whole function exists to have fixed.
+   */
+  categoryRails: Record<string, LandingProduct[]>;
+}> {
   const [products, names, categories, modules] = await Promise.all([
     readProductsOnce(),
     categoryNames(),
@@ -470,7 +480,7 @@ export async function getHomepageRails(
     "seasonal",
   ];
 
-  return Object.fromEntries(
+  const rails = Object.fromEntries(
     sources.map((source) => [
       source,
       buildHomepageProducts(source, maxCount, products, all, names, categories).map((product) =>
@@ -478,4 +488,18 @@ export async function getHomepageRails(
       ),
     ])
   ) as Record<HomepageProductSource, LandingProduct[]>;
+
+  // Every category, including ones with nothing in them: an empty rail is
+  // what tells the builder the row it is previewing has no products, rather
+  // than leaving the section to look like it failed to load.
+  const categoryRails = Object.fromEntries(
+    (categories ?? []).map((category) => [
+      category.slug,
+      buildCategoryRail(category.slug, maxCount, all, all, categories).map((product) =>
+        toCard(product, modules),
+      ),
+    ]),
+  ) as Record<string, LandingProduct[]>;
+
+  return { rails, categoryRails };
 }

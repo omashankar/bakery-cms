@@ -11,6 +11,13 @@ export type HomepageSectionType =
   | "best-sellers"
   | "offers"
   | "wedding"
+  /**
+   * A product row named after one of the shop's OWN categories.
+   *
+   * The three below it are bakery category slugs frozen into this union. They
+   * stay for layouts already published; this is the one a shop reaches for.
+   */
+  | "category-rail"
   | "photo-cakes"
   | "eggless"
   | "seasonal"
@@ -39,6 +46,16 @@ export interface SectionFieldDef {
   placeholder?: string;
   isImage?: boolean;
   options?: { label: string; value: string }[];
+  /**
+   * Fill `options` from the shop's live data instead of writing them here.
+   *
+   * This registry is plain data with no way to reach the catalogue — which
+   * is why every category row in it is a hardcoded bakery slug. A field that
+   * names a category cannot have its choices written in advance, because the
+   * whole point is that the shop invented them. The builder resolves this
+   * when it renders the editor.
+   */
+  optionsFrom?: "categories";
   /**
    * For `type: "list"` — the columns of one row.
    *
