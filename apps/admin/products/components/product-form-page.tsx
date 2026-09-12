@@ -31,6 +31,7 @@ import {
   createEmptyProductForm,
   sizeLabelsInUse,
   usualPriceForSize,
+  fileUnderCategories,
 } from "@/features/products/lib/products-repository";
 import {
   createProductRequest,
@@ -296,6 +297,22 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
+  /**
+   * The categories BESIDE the primary one.
+   *
+   * Functional `setForm`, copied from `toggleOccasion` below rather than
+   * written fresh, so ticking two boxes quickly cannot capture a stale array
+   * and drop the first.
+   */
+  function toggleCategory(id: string, checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: checked
+        ? [...prev.categoryIds, id]
+        : prev.categoryIds.filter((item) => item !== id),
+    }));
+  }
+
   function toggleOccasion(id: string, checked: boolean) {
     setForm((prev) => ({
       ...prev,
@@ -461,6 +478,16 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugify(form.slug),
       status,
       images: form.images.filter(Boolean),
+      /**
+       * REBUILT, never accumulated — this is the write half of the invariant
+       * that `categoryIds[0]` is always the primary.
+       *
+       * Built from the two controls each time rather than patched, so moving
+       * a product to a different primary cannot leave the old one filed in the
+       * array behind it. The blank is dropped for the same reason the sizes
+       * below are: an unchosen category is not a category.
+       */
+      categoryIds: fileUnderCategories(form.categoryId, form.categoryIds),
       /**
        * A size with no name is dropped, and dropped SILENTLY on purpose.
        *
@@ -711,6 +738,46 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     </p>
                   ) : null}
                 </div>
+
+                {/*
+                  ALSO FILE IT HERE — the box that lets one thing be two things.
+
+                  A product belonged to exactly one category, so a shop selling a
+                  cake-and-plant combo had to choose which page it lived on, or
+                  create it twice and keep two stock counts in step by hand.
+
+                  The category chosen above is EXCLUDED from this list, so the two
+                  controls cannot disagree about the same row — and the list is
+                  hidden entirely until a category is chosen, because "also" has
+                  no meaning before there is a first one.
+                */}
+                {form.categoryId && adminCategories().length > 1 ? (
+                  <div className="space-y-2">
+                    <Label>Also show it under (optional)</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {adminCategories()
+                        .filter((category) => category.id !== form.categoryId)
+                        .map((category) => (
+                          <label
+                            key={category.id}
+                            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                          >
+                            <Checkbox
+                              checked={form.categoryIds.includes(category.id)}
+                              onCheckedChange={(checked) =>
+                                toggleCategory(category.id, checked === true)
+                              }
+                            />
+                            {category.name}
+                          </label>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      It appears on each of these pages. One {productLower}, one stock
+                      count, one price.
+                    </p>
+                  </div>
+                ) : null}
                 {/*
                   A “Flavour” dropdown stood here, picking one row out of a
                   shop-wide Catalog list.

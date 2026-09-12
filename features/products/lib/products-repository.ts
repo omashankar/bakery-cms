@@ -193,6 +193,23 @@ export function seedProducts(): Product[] {
   return getSeedLandingProducts().map(mapLandingProductToAdmin);
 }
 
+/**
+ * THE FULL MEMBERSHIP, PRIMARY FIRST — the one definition of it.
+ *
+ * `categoryIds[0] === categoryId`, always, with no blanks and no repeats. It
+ * is established on every READ (`normalizeCommerceFields`, just below) and on
+ * every WRITE (the admin form's payload builder), and those were two copies of
+ * the same expression until they were not — which is how a product ends up
+ * filed one way in the database and another way on the screen that wrote it.
+ *
+ * Rebuilding rather than patching is the point on the write side: moving a
+ * product to a different primary must not leave the old one in the array
+ * behind it, still holding the page the owner was tidying.
+ */
+export function fileUnderCategories(primary: string, also: readonly string[] = []): string[] {
+  return [...new Set([primary, ...also].filter(Boolean))];
+}
+
 export function normalizeCommerceFields(cake: Product): Product {
   const variantGroups = normalizeVariantGroups(cake);
 
@@ -226,9 +243,7 @@ export function normalizeCommerceFields(cake: Product): Product {
      * `normalizeProductImages`. Normalising here is why no reader downstream
      * needs a fallback, and why no backfill is required for correctness.
      */
-    categoryIds: [
-      ...new Set([cake.categoryId, ...(cake.categoryIds ?? [])].filter(Boolean)),
-    ],
+    categoryIds: fileUnderCategories(cake.categoryId, cake.categoryIds ?? []),
     // Owner-defined facts. Absent means the shop has stated none, not that it
     // needs some invented for it — the mistake this function made with shapes.
     descriptionBlocks: cake.descriptionBlocks ?? [],
