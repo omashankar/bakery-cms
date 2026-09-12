@@ -46,8 +46,20 @@ const product = (over: Partial<LandingProduct>): LandingProduct =>
   }) as LandingProduct;
 
 describe("the Catalog no longer keeps a list of flavours", () => {
-  it("offers the shop two sections to manage, not three", () => {
-    expect([...CATALOG_SECTIONS]).toEqual(["categories", "occasions"]);
+  it("offers the shop the sections it actually keeps, and flavours is not one", () => {
+    /**
+     * Pinned as an exact list on purpose. The point of this case is not the
+     * COUNT — Collections joined the list later, and this had to be updated
+     * to say so — it is that `flavours` cannot creep back in beside them.
+     * An assertion on the length alone would have gone green the moment any
+     * section was added.
+     */
+    expect([...CATALOG_SECTIONS]).toEqual([
+      "categories",
+      "occasions",
+      "collections",
+    ]);
+    expect(CATALOG_SECTIONS).not.toContain("flavours");
   });
 
   it("refuses a write naming the section that is gone", async () => {
@@ -61,7 +73,11 @@ describe("the Catalog no longer keeps a list of flavours", () => {
       "@/features/catalog/server/catalog.validators"
     );
 
-    expect(Object.keys(catalogSectionSchemas).sort()).toEqual(["categories", "occasions"]);
+    expect(Object.keys(catalogSectionSchemas).sort()).toEqual([
+      "categories",
+      "collections",
+      "occasions",
+    ]);
     expect(Object.hasOwn(catalogSectionSchemas, "flavours")).toBe(false);
   });
 
@@ -71,7 +87,12 @@ describe("the Catalog no longer keeps a list of flavours", () => {
     const utils = await import("@/features/catalog/lib/catalog-utils");
     const store = utils.defaultCatalogStore as unknown as Record<string, unknown>;
 
-    expect(Object.keys(store).sort()).toEqual(["categories", "occasions", "updatedAt"]);
+    expect(Object.keys(store).sort()).toEqual([
+      "categories",
+      "collections",
+      "occasions",
+      "updatedAt",
+    ]);
     expect("defaultFlavours" in utils).toBe(false);
   });
 
@@ -81,9 +102,10 @@ describe("the Catalog no longer keeps a list of flavours", () => {
     for (const gone of ["getFlavours", "createFlavour", "updateFlavour", "deleteFlavours", "getFlavourByName"]) {
       expect(gone in repository, `${gone} is still exported`).toBe(false);
     }
-    // …and the two that remain are untouched.
+    // …and the writers that remain are untouched.
     expect("createCategory" in repository).toBe(true);
     expect("createOccasion" in repository).toBe(true);
+    expect("createCollection" in repository).toBe(true);
   });
 });
 

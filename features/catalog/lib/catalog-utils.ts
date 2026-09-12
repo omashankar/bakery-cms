@@ -1,6 +1,7 @@
 import { categories } from "@/constants/landing-data";
 import type {
   ProductCategory,
+  ProductCollection,
   ProductOccasion,
 } from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
@@ -62,9 +63,39 @@ export const defaultOccasions: ProductOccasion[] = [
   { id: "oc-corporate", name: "Corporate", slug: "corporate", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
 ];
 
+/**
+ * EMPTY, deliberately, unlike the two lists above.
+ *
+ * Categories and occasions ship with a starter list because a shop cannot
+ * file a product without at least one category, and an empty Catalog screen
+ * reads as broken. A collection is the opposite: it is a curation, and a
+ * shipped one would put a group on the storefront that the owner never made
+ * and cannot explain — with products in it chosen by nobody.
+ *
+ * This is also what `Reset defaults` restores, which is the other reason it
+ * must be empty: resetting collections should clear them, not conjure some.
+ */
+export const defaultCollections: ProductCollection[] = [];
+
+/**
+ * What `Reset defaults` restores, PER SECTION.
+ *
+ * Lives here rather than inside the service so it can be checked against the
+ * section schemas without importing Mongoose. A section with a schema but no
+ * entry in this map accepts writes and then 404s on its own Reset button —
+ * one enumerated list silently excluding a member, which is a shape this
+ * repo has been bitten by more than once.
+ */
+export const catalogSectionDefaults: Record<string, unknown> = {
+  categories: defaultCategories,
+  occasions: defaultOccasions,
+  collections: defaultCollections,
+};
+
 export const defaultCatalogStore: CatalogStore = {
   categories: defaultCategories,
   occasions: defaultOccasions,
+  collections: defaultCollections,
   updatedAt: nowIso(),
 };
 

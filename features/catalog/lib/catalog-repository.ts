@@ -1,10 +1,15 @@
 import { safeSetItem } from "@/lib/safe-storage";
-import type { ProductCategory, ProductOccasion } from "@/types/product";
+import type {
+  ProductCategory,
+  ProductCollection,
+  ProductOccasion,
+} from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
   defaultCatalogStore,
   defaultCategories,
+  defaultCollections,
   defaultOccasions,
 } from "./catalog-utils";
 import {
@@ -59,6 +64,7 @@ function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
   return {
     categories: partial.categories ?? defaultCategories,
     occasions: partial.occasions ?? defaultOccasions,
+    collections: partial.collections ?? defaultCollections,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
 }
@@ -122,6 +128,10 @@ export function getCategories(): ProductCategory[] {
 
 export function getOccasions(): ProductOccasion[] {
   return loadCatalogStore().occasions;
+}
+
+export function getCollections(): ProductCollection[] {
+  return loadCatalogStore().collections;
 }
 
 /*
@@ -272,6 +282,59 @@ export async function deleteOccasions(ids: string[]): Promise<WriteResult<number
   const next = store.occasions.filter((item) => !ids.includes(item.id));
   const { persisted } = await updateStore(store, { occasions: next });
   return { value: persisted ? store.occasions.length - next.length : 0, persisted };
+}
+
+/*
+  The collection quartet, copied from the occasion one above rather than
+  written fresh — same `hydratedStore()` gate, same `updateStore` replace-all,
+  same WriteResult shape. The gate is the part that matters: without it a
+  write composed from a cold browser cache publishes an empty list over the
+  shop's real one.
+*/
+export async function createCollection(
+  data: Omit<ProductCollection, "id" | "createdAt" | "updatedAt">,
+): Promise<WriteResult<ProductCollection | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const item: ProductCollection = {
+    ...data,
+    id: newId("col"),
+    slug: data.slug || slugify(data.name),
+    // Never undefined. The storefront resolver maps over this, and an absent
+    // array would throw on a collection created and not yet filled.
+    productIds: data.productIds ?? [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  const { persisted } = await updateStore(store, {
+    collections: [...store.collections, item],
+  });
+  return { value: item, persisted };
+}
+
+export async function updateCollection(
+  id: string,
+  patch: Partial<ProductCollection>,
+): Promise<WriteResult<ProductCollection | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const index = store.collections.findIndex((item) => item.id === id);
+  if (index < 0) return { value: null, persisted: false };
+  const next = [...store.collections];
+  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
+  const { persisted } = await updateStore(store, { collections: next });
+  return { value: next[index], persisted };
+}
+
+export async function deleteCollections(ids: string[]): Promise<WriteResult<number>> {
+  const store = await hydratedStore();
+  if (!store) return { value: 0, persisted: false };
+
+  const next = store.collections.filter((item) => !ids.includes(item.id));
+  const { persisted } = await updateStore(store, { collections: next });
+  return { value: persisted ? store.collections.length - next.length : 0, persisted };
 }
 
 export function getCategoryById(id: string): ProductCategory | undefined {

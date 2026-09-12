@@ -13,6 +13,13 @@ const catalogSchema = new mongoose.Schema({
   categories: { type: [mongoose.Schema.Types.Mixed], default: [] },
   flavours: { type: [mongoose.Schema.Types.Mixed], default: [] },
   occasions: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  /**
+   * Declared, or every collection a shop creates is dropped on write while
+   * the API answers 200 and the admin re-renders its own state as though it
+   * had saved. This schema is built with no options, so Mongoose `strict` is
+   * on — the failure this repo has hit four times.
+   */
+  collections: { type: [mongoose.Schema.Types.Mixed], default: [] },
   weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
 });
 

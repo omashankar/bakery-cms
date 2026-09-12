@@ -8,7 +8,10 @@ import { CollectionFiltersPanel } from "@/components/storefront/collection-filte
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
-import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
+import {
+  filterProductsByCategory,
+  productsInCollection,
+} from "@/features/products/lib/product-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   applyCollectionFilters,
@@ -59,12 +62,27 @@ interface CollectionsPageProps {
    * the hardcoded list has 9.
    */
   categories?: { id: string; name: string; slug: string }[];
+  /**
+   * The CURATED group this URL resolved to, when it resolved to one.
+   *
+   * Present and the grid is the owner's own list, in their own order.
+   * Absent and every line below behaves exactly as it did before
+   * collections existed — this page has one listing engine and one set of
+   * filters, and a collection is a different SOURCE for it, not a second
+   * page.
+   */
+  collection?: {
+    name: string;
+    description?: string;
+    productIds: string[];
+  };
 }
 
 export function CollectionsPage({
   categorySlug: categorySlugProp,
   catalog,
   categories: categoriesFromShop,
+  collection,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
   /**
@@ -87,11 +105,25 @@ export function CollectionsPage({
   // independently, so only this list can say which product belongs to which
   // route — "Birthday Cakes" lives at /birthday here.
   const inCategory = useMemo(
-    () => filterProductsByCategory(catalog, categorySlug || undefined, categoryPills),
-    [catalog, categorySlug, categoryPills],
+    () =>
+      collection
+        ? // A collection is a LIST, not a match. `productsInCollection`
+          // walks the ids so the owner's order survives and a product that
+          // merely shares the name is not swept in.
+          productsInCollection(catalog, collection.productIds)
+        : filterProductsByCategory(catalog, categorySlug || undefined, categoryPills),
+    [catalog, categorySlug, categoryPills, collection],
   );
 
   const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
+  /**
+   * One resolved source for every heading on this page.
+   *
+   * The title, the subtitle, the breadcrumb tail and the empty state each
+   * used to key off `activeCategory` independently — four places to forget.
+   * A collection comes first because the route resolves it first.
+   */
+  const heading = collection ?? activeCategory;
   /**
    * The top of the price slider, from the shop's OWN catalogue.
    *
@@ -195,17 +227,23 @@ export function CollectionsPage({
   return (
     <>
       <StorePageHeader
-        title={activeCategory ? activeCategory.name : labels.collectionsTitle}
+        title={heading ? heading.name : labels.collectionsTitle}
         description={
-          activeCategory
-            ? // “freshly baked”, under a category heading, in a shop that may
-              // sell chargers. The category name is the shop’s own already.
-              `Browse our ${activeCategory.name.toLowerCase()}.`
-            : labels.collectionsSubtitle
+          // The owner's OWN words when they wrote some. A collection is a
+          // pitch — "Everything you need for Diwali, under one roof" — and
+          // replacing it with a generated "Browse our …" throws away the one
+          // sentence they came to this screen to write.
+          collection?.description?.trim()
+            ? collection.description
+            : heading
+              ? // “freshly baked”, under a category heading, in a shop that
+                // may sell chargers. The name is the shop’s own already.
+                `Browse our ${heading.name.toLowerCase()}.`
+              : labels.collectionsSubtitle
         }
         breadcrumbs={[
           { label: "Collections", href: routes.store.collections },
-          ...(activeCategory ? [{ label: activeCategory.name }] : []),
+          ...(heading ? [{ label: heading.name }] : []),
         ]}
       />
 
@@ -314,8 +352,11 @@ export function CollectionsPage({
                     <SearchX className="size-6" />
                   </div>
                   <p className="font-medium">
-                    {categoryIsEmpty && activeCategory
-                      ? `No ${labels.productWordPlural.toLowerCase()} in ${activeCategory.name} yet`
+                    {/* `heading`, not `activeCategory` — an empty COLLECTION
+                        would otherwise fall to the generic line and lose the
+                        name the owner is looking at. */}
+                    {categoryIsEmpty && heading
+                      ? `No ${labels.productWordPlural.toLowerCase()} in ${heading.name} yet`
                       : `No ${labels.productWordPlural.toLowerCase()} found`}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">

@@ -1,4 +1,8 @@
-import type { ProductCategory, ProductOccasion } from "./product";
+import type {
+  ProductCategory,
+  ProductCollection,
+  ProductOccasion,
+} from "./product";
 
 /*
   `CatalogWeightOption` used to sit here: a shop-wide list of sizes with a
@@ -23,7 +27,8 @@ import type { ProductCategory, ProductOccasion } from "./product";
 export interface CatalogStore {
   categories: ProductCategory[];
   occasions: ProductOccasion[];
+  collections: ProductCollection[];
   updatedAt: string;
 }
 
-export type CatalogTab = "categories" | "occasions";
+export type CatalogTab = "categories" | "occasions" | "collections";

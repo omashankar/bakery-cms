@@ -17,10 +17,26 @@ const taxonomyItem = z
 export const categoriesSchema = z.array(taxonomyItem);
 export const occasionsSchema = z.array(taxonomyItem);
 
+/**
+ * A collection carries what it is FOR as well as what it is called.
+ *
+ * `productIds` defaults to `[]` rather than being required, because an owner
+ * legitimately creates the group first and fills it second — and a write that
+ * 400s on an empty group would make the admin unable to save the row it just
+ * asked the owner to name.
+ */
+export const collectionsSchema = z.array(
+  taxonomyItem.extend({
+    description: z.string().optional(),
+    image: z.string().optional(),
+    productIds: z.array(z.string()).default([]),
+  }),
+);
 
 export const catalogSectionSchemas = {
   categories: categoriesSchema,
   occasions: occasionsSchema,
+  collections: collectionsSchema,
 } as const;
 
 export type CatalogSection = keyof typeof catalogSectionSchemas;

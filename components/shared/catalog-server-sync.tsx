@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import {
   catalogHydration,
+  CATALOG_SECTIONS,
   fetchCatalog,
   setCatalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
@@ -11,10 +12,11 @@ import {
   loadCatalogStore,
   saveCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
+import type { CatalogStore } from "@/types/catalog";
 
 /**
  * Hydrates the local catalog from the server once on mount, so the taxonomy
- * (categories, occasions) the admin and storefront read
+ * (categories, occasions, collections) the admin and storefront read
  * reflects the durable server state, not a stale per-browser copy.
  *
  * The catalog read is public, so this runs for everyone. Server values replace
@@ -37,11 +39,7 @@ export function CatalogServerSync() {
       }
 
       const current = loadCatalogStore();
-      saveCatalogStore({
-        ...current,
-        categories: server.categories ?? current.categories,
-        occasions: server.occasions ?? current.occasions,
-      });
+      saveCatalogStore(overlayServerSections(current, server));
 
       // Only NOW may a replace-all mutation send the local taxonomy — before
       // this, it is whatever this browser happened to hold.
@@ -55,4 +53,32 @@ export function CatalogServerSync() {
   }, []);
 
   return null;
+}
+
+/**
+ * The server's copy of EVERY section, over the browser's.
+ *
+ * This was two hand-written lines — `categories: server.categories ??
+ * current.categories` and the same for occasions — so adding a section to
+ * `CATALOG_SECTIONS` left it out of the overlay. The browser would keep its
+ * empty local array, the gate would still mark itself settled, and the next
+ * replace-all would publish that emptiness over the shop's real collections.
+ * Nothing would log; the section would simply be gone.
+ *
+ * `?? current[section]` and not `?? []`: a server that omits a section is
+ * saying nothing about it, not saying it is empty.
+ *
+ * Exported and pure so the rule can be tested without a browser.
+ */
+export function overlayServerSections(
+  current: CatalogStore,
+  server: Partial<CatalogStore>,
+): CatalogStore {
+  const merged: Record<string, unknown> = { ...current };
+  const from = server as unknown as Record<string, unknown>;
+  const fallback = current as unknown as Record<string, unknown>;
+  for (const section of CATALOG_SECTIONS) {
+    merged[section] = from[section] ?? fallback[section];
+  }
+  return merged as unknown as CatalogStore;
 }

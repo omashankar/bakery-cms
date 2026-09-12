@@ -45,6 +45,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 const EMPTY_STORE: CatalogStore = {
   categories: [],
   occasions: [],
+  collections: [],
   updatedAt: "",
 };
 
@@ -55,12 +56,14 @@ const tabs: Array<{
 }> = [
   { id: "categories", label: "Categories", singular: "Category" },
   { id: "occasions", label: "Occasions", singular: "Occasion" },
+  { id: "collections", label: "Collections", singular: "Collection" },
 ];
 
 // Tab bar order — includes a Themes placeholder (design-theme data model comes later).
 const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> = [
   { id: "categories", label: "Categories" },
   { id: "occasions", label: "Occasions" },
+  { id: "collections", label: "Collections" },
   { id: "themes", label: "Themes", soon: true },
   /*
     A Weights tab stood here. Sizes are typed on the product now — a shop-wide
@@ -129,7 +132,18 @@ export function CatalogAdminPage() {
 
   const items = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const list = activeTab === "categories" ? store.categories : store.occasions;
+    /**
+     * A LOOKUP, not a growing ternary.
+     *
+     * Two sections fitted in a ternary; three do not, and the third would
+     * have fallen into the else — so the Collections tab would have listed
+     * occasions, searched them, and offered to delete them.
+     */
+    const list: { id: string; name: string; slug: string }[] = {
+      categories: store.categories,
+      occasions: store.occasions,
+      collections: store.collections,
+    }[activeTab];
 
     if (!query) return list;
     return list.filter(
@@ -161,12 +175,13 @@ export function CatalogAdminPage() {
     [publishedProducts],
   );
 
-  const counts = {
+  const counts: Record<CatalogTab, number> = {
     categories: store.categories.length,
     occasions: store.occasions.length,
+    collections: store.collections.length,
   };
 
-  const totalItems = counts.categories + counts.occasions;
+  const totalItems = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const allSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(item.id));

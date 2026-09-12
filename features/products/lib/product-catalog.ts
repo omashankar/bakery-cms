@@ -101,6 +101,38 @@ export function searchProducts(query: string, catalog?: LandingProduct[]): Landi
   return source.filter((cake) => searchHaystack(cake).includes(normalized));
 }
 
+/**
+ * THE PRODUCTS AN OWNER PICKED, IN THE ORDER THEY PICKED THEM.
+ *
+ * Nothing like `filterProductsByCategory` below: that one MATCHES — it asks
+ * every product whether it belongs, by name, and returns them in catalogue
+ * order. A collection is the other thing entirely. It is a list somebody
+ * wrote, and the order is the content: a shop puts its best seller first,
+ * and no property of the products themselves can recover that afterwards.
+ *
+ * So this walks the IDS and looks each one up, rather than walking the
+ * catalogue and testing each product. Two consequences, both deliberate:
+ *
+  - A product whose NAME matches the collection is not swept in. "Diwali
+ *   Gifts" the collection and "Diwali Gifts" the category are different
+ *   things, and a collection that quietly grew by name would stop being a
+ *   curation the moment somebody added a category with the same words.
+  - A deleted product leaves a SHORTER list, not a hole. The cost of storing
+ *   ids on the collection is that they outlive what they point at; the
+ *   filter is what keeps that from reaching `ProductCard` as `undefined`,
+ *   which is the same tolerance `product-mapper` already applies to a
+ *   deleted category id.
+ */
+export function productsInCollection(
+  catalog: readonly LandingProduct[],
+  productIds: readonly string[],
+): LandingProduct[] {
+  const byId = new Map(catalog.map((product) => [product.id, product]));
+  return productIds
+    .map((id) => byId.get(id))
+    .filter((product): product is LandingProduct => Boolean(product));
+}
+
 export function filterProductsByCategory(
   cakes: LandingProduct[],
   categorySlug?: string,

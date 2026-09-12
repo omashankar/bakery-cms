@@ -294,5 +294,31 @@ export interface ProductOccasion extends BaseEntity {
   slug: string;
 }
 
+/**
+ * A CURATED group — "Diwali Gifts", "Under ₹500", "Best for Him".
+ *
+ * A category says what a thing IS; a collection says why you would buy it
+ * now. The difference that matters here is where membership lives: a category
+ * is chosen on the product (`categoryIds`), a collection is filled from its
+ * own side. That is the whole point — a shop building a Diwali row should not
+ * have to open forty product forms.
+ *
+ * `productIds` is REQUIRED and ORDERED. Required so the compiler forces every
+ * writer to say what is in it rather than leaving an accidental empty group
+ * live on the storefront; ordered because the order IS the curation — a shop
+ * puts its best seller first, and re-deriving that later is impossible.
+ *
+ * The cost of storing ids here rather than on the product is a dangling id
+ * when a product is deleted. That is tolerated and filtered on read, the same
+ * way `product-mapper` already tolerates a deleted category id.
+ */
+export interface ProductCollection extends BaseEntity {
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  productIds: string[];
+}
+
 export type ProductFormData = Omit<Product, "id" | "createdAt" | "updatedAt">;
 

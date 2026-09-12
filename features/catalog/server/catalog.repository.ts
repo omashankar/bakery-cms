@@ -19,6 +19,9 @@ export async function getOrCreateCatalog() {
     key: SINGLETON,
     categories: defaultCatalogStore.categories,
     occasions: defaultCatalogStore.occasions,
+    // Empty, but SEEDED — so the path exists on a fresh singleton and a first
+    // write does not have to create it.
+    collections: defaultCatalogStore.collections,
   });
 }
 

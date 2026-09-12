@@ -35,6 +35,48 @@ export async function getStorefrontCategories(): Promise<
   }
 }
 
+/**
+ * The shop's CURATED groups. Empty is a real and common answer.
+ *
+ * No demo fallback, unlike `getStorefrontCategories` above — and that
+ * asymmetry is the point. A shop with no categories has a broken catalogue
+ * and the shipped list at least renders something; a shop with no
+ * collections has simply not made any, and inventing some would put groups
+ * on the storefront the owner never created and cannot explain.
+ *
+ * A throw returns `[]` for the same reason: the collection route falls
+ * through to the category path when nothing matches, so an unreachable
+ * catalogue degrades to the behaviour this route had before collections
+ * existed rather than to a 500.
+ */
+export async function getStorefrontCollections(): Promise<
+  { id: string; name: string; slug: string; description?: string; image?: string; productIds: string[] }[]
+> {
+  try {
+    const catalog = await getCatalog();
+    const rows = (catalog.collections ?? []) as {
+      id: string;
+      name: string;
+      slug: string;
+      description?: string;
+      image?: string;
+      productIds?: string[];
+    }[];
+    const bySlug = new Map<string, (typeof rows)[number] & { productIds: string[] }>();
+    for (const row of rows) {
+      // Same first-row-wins rule as the categories above: a second row with
+      // the same slug is simply unreachable, so it must not be returned as
+      // though it were.
+      if (row.slug && !bySlug.has(row.slug)) {
+        bySlug.set(row.slug, { ...row, productIds: row.productIds ?? [] });
+      }
+    }
+    return [...bySlug.values()];
+  } catch {
+    return [];
+  }
+}
+
 /** First row wins, and a row with no slug is not a category anyone can reach. */
 function dedupeBySlug(
   rows: { id: string; name: string; slug: string; image?: string }[],

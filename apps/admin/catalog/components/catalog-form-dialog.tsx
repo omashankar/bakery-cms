@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
@@ -16,25 +16,41 @@ import {
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ProductCategory, ProductOccasion } from "@/types/product";
+import type {
+  ProductCategory,
+  ProductCollection,
+  ProductOccasion,
+} from "@/types/product";
 import type { CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import { findSlugClash } from "@/features/catalog/lib/catalog-utils";
 import {
   createCategory,
+  createCollection,
   createOccasion,
   getCategories,
+  getCollections,
   getOccasions,
   updateCategory,
+  updateCollection,
   updateOccasion,
 } from "@/features/catalog/lib/catalog-repository";
+import { loadProducts } from "@/features/products/lib/products-repository";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
-/** The rows a new slug has to be unique against, for the section being edited. */
-function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
-  if (tab === "categories") return getCategories();
-  if (tab === "occasions") return getOccasions();
-  return [];
+/**
+ * EVERY row a new slug has to be unique against — not just this tab's.
+ *
+ * These three lists share one web address space:
+ * `filterProductsByCategory` resolves /store/collections/<slug> against
+ * categories OR occasions, and now collections too. This was per-section, so
+ * an occasion could take a category's slug — and three of the four shipped
+ * occasions did exactly that. The page then shows the union of both, and
+ * nothing anywhere says why.
+ */
+function existingSlugs(): { id: string; name: string; slug: string }[] {
+  return [...getCategories(), ...getOccasions(), ...getCollections()];
 }
 
 interface CatalogFormDialogProps {
@@ -58,6 +74,9 @@ export function CatalogFormDialog({
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  /** Collections only — ORDERED, because the order is the curation. */
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -66,6 +85,8 @@ export function CatalogFormDialog({
       setSlug("");
       setDescription("");
       setImage("");
+      setProductIds([]);
+      setProductSearch("");
       return;
     }
 
@@ -83,6 +104,15 @@ export function CatalogFormDialog({
       if (item) {
         setName(item.name);
         setSlug(item.slug);
+      }
+    } else if (tab === "collections") {
+      const item = getCollections().find((entry) => entry.id === itemId);
+      if (item) {
+        setName(item.name);
+        setSlug(item.slug);
+        setDescription(item.description ?? "");
+        setImage(item.image ?? "");
+        setProductIds(item.productIds ?? []);
       }
     }
   }, [open, itemId, tab]);
@@ -122,7 +152,7 @@ export function CatalogFormDialog({
      * The row being edited is excluded, or saving it without touching the slug
      * would refuse itself.
      */
-    const clash = findSlugClash(existingSlugs(tab), finalSlug, itemId);
+    const clash = findSlugClash(existingSlugs(), finalSlug, itemId);
     if (clash) {
       toast.error(`"${finalSlug}" is already used by ${clash.name}`, {
         description:
@@ -146,6 +176,23 @@ export function CatalogFormDialog({
         reportWrite(persisted, "Category created");
       }
 
+    } else if (tab === "collections") {
+      const payload: Omit<ProductCollection, "id" | "createdAt" | "updatedAt"> = {
+        name: name.trim(),
+        slug: finalSlug,
+        description: description.trim() || undefined,
+        image: image.trim() || undefined,
+        // Sent whatever it holds, including empty — a shop legitimately
+        // names the group first and fills it second.
+        productIds,
+      };
+      if (isEdit && itemId) {
+        const { persisted } = await updateCollection(itemId, payload);
+        reportWrite(persisted, "Collection updated");
+      } else {
+        const { persisted } = await createCollection(payload);
+        reportWrite(persisted, "Collection created");
+      }
     } else {
       const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
@@ -167,7 +214,38 @@ export function CatalogFormDialog({
   const titles: Record<CatalogTab, string> = {
     categories: "Category",
     occasions: "Occasion",
+    collections: "Collection",
   };
+
+  /**
+   * Published first, then the rest — an owner curating a row is picking from
+   * what is on the shop, and a draft in the list is a product the collection
+   * would silently not show.
+   */
+  const pickable = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    return loadProducts()
+      .filter(
+        (product) =>
+          !query ||
+          product.name.toLowerCase().includes(query) ||
+          product.slug.toLowerCase().includes(query),
+      )
+      .sort((a, b) => Number(b.status === "published") - Number(a.status === "published"));
+  }, [productSearch]);
+
+  /**
+   * Ticking APPENDS, so the order of the list is the order they were chosen.
+   *
+   * That order is what the collection page renders in — it is the curation,
+   * and it is the one thing about a collection that cannot be re-derived
+   * later from anything else.
+   */
+  function toggleProduct(id: string, checked: boolean) {
+    setProductIds((prev) =>
+      checked ? [...prev, id] : prev.filter((item) => item !== id),
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,7 +277,13 @@ export function CatalogFormDialog({
             <Input id="catalog-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
           </div>
 
-          {tab === "categories" ? (
+          {/*
+            Description and picture belong to anything a customer LANDS on.
+            An occasion is a tag; a category and a collection are both pages
+            with a heading, so the gate is "not occasions" rather than a list
+            that has to grow every time a section is added.
+          */}
+          {tab !== "occasions" ? (
             <>
               <div className="space-y-2">
                 <Label htmlFor="catalog-description">Description</Label>
@@ -236,6 +320,68 @@ export function CatalogFormDialog({
                 the input goes, the stored field stays.
               */}
             </>
+          ) : null}
+
+          {/*
+            THE ONE GENUINELY NEW CONTROL — filling a group from its own side.
+
+            A category is chosen forty times, on forty product forms. A
+            collection is the opposite: a shop putting together a Diwali row
+            wants to sit here and tick. That is the whole reason a collection
+            exists as a separate thing rather than being another category.
+
+            The list is unpaginated on purpose. It is filtered by the search box
+            above it, and a shop with enough products to make that a problem has
+            a search box; a shop with twelve would have to page through three
+            screens to build one row.
+          */}
+          {tab === "collections" ? (
+            <div className="space-y-2">
+              <Label htmlFor="collection-products">
+                {labels.productWordPlural} in this collection
+              </Label>
+              <Input
+                id="collection-products"
+                placeholder={`Search ${labels.productWordPlural.toLowerCase()}…`}
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {productIds.length === 0
+                  ? "Nothing picked yet — the collection page will be empty."
+                  : `${productIds.length} picked. They appear in the order you tick them.`}
+              </p>
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                {pickable.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    Nothing matches that search.
+                  </p>
+                ) : (
+                  pickable.map((product) => (
+                    <label
+                      key={product.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    >
+                      <Checkbox
+                        checked={productIds.includes(product.id)}
+                        onCheckedChange={(checked) =>
+                          toggleProduct(product.id, checked === true)
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">{product.name}</span>
+                      {/* A draft in a collection is a product the page would
+                          silently not show, so the row says so rather than
+                          being hidden — hiding it makes the tick look lost. */}
+                      {product.status !== "published" ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {product.status}
+                        </span>
+                      ) : null}
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
           ) : null}
 
         </div>
