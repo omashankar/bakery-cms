@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { MegaMenuLink } from "@/constants/storefront-nav";
+import type { MegaMenuGroup } from "@/types/site-layout";
 import { routes } from "@/constants/routes";
 import { SafeImage } from "@/components/shared/safe-image";
 import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
@@ -70,6 +71,8 @@ export interface ShopOccasion {
 
 interface MegaMenuProps {
   isActive?: boolean;
+  /** Where the menu's own trigger goes — this nav row's href. */
+  href?: string;
   /** The shop's real categories. Falls back to the two generic rows if absent. */
   categories?: ShopCategory[];
   /**
@@ -82,6 +85,19 @@ interface MegaMenuProps {
    */
   occasions?: ShopOccasion[];
   /**
+   * THE SHOP'S OWN COLUMNS, when it has written any.
+   *
+   * The menu was two fixed columns headed "Shop by Category" and "Shop by
+   * Occasion". A shop could change what was IN them and nothing else — not
+   * what they were called, not how many there were, not which nav item they
+   * hung from. So a shop wanting "Cakes By Flavour" beside "Cakes By Theme"
+   * under a CAKES item, and a different set under GIFTS, had no way to say so.
+   *
+   * Absent — the common case, and every shop on the day this shipped — falls
+   * back to the taxonomy columns below, unchanged.
+   */
+  groups?: MegaMenuGroup[];
+  /**
    * The label from the admin's Collections nav row. It read "Shop",
    * hardcoded, while the editor offered a label field for that row and a
    * visibility switch — neither of which reached this component.
@@ -89,12 +105,27 @@ interface MegaMenuProps {
   label?: string;
 }
 
+/**
+ * The groups worth drawing: visible, in order, and holding something.
+ *
+ * A heading over an empty list reads as something that failed to load — the
+ * same rule the Occasion column and every filter box now follow.
+ */
+export function drawableGroups(groups?: MegaMenuGroup[]): MegaMenuGroup[] {
+  return [...(groups ?? [])]
+    .filter((group) => group.isVisible !== false && group.links.length > 0)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
 export function MegaMenu({
   isActive,
   label = "Shop",
   categories: shopCategories,
   occasions: shopOccasions,
+  groups,
+  href = routes.store.collections,
 }: MegaMenuProps) {
+  const authored = drawableGroups(groups);
   const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
   const categories = filterWedding(
@@ -120,7 +151,10 @@ export function MegaMenu({
   return (
     <div className="group relative">
       <Link
-        href={routes.store.collections}
+        // The ROW's own destination. This was always the collections page,
+        // so a CAKES item and a GIFTS item would both have opened the same
+        // page — the menu is per nav row now, and each row has its own.
+        href={href}
         className={cn(
           "inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
           isActive
@@ -134,6 +168,43 @@ export function MegaMenu({
 
       <div className="pointer-events-none invisible absolute top-full left-0 z-50 w-[640px] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100">
         <div className="overflow-hidden rounded-xl border border-border bg-white p-6 shadow-sm">
+          {authored.length > 0 ? (
+            /*
+              THE SHOP'S OWN COLUMNS.
+
+              `auto-fit` rather than a fixed column count: a shop writes two
+              groups or six, and a grid that assumes three leaves a hole or
+              squeezes. The panel is a fixed 640px wide, so a minimum column
+              keeps four groups from becoming four unreadable slivers — they
+              wrap onto a second row instead.
+            */
+            <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+              {authored.map((group) => (
+                <div key={group.id}>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.heading}
+                  </p>
+                  <ul className="space-y-2">
+                    {group.links.map((link) => (
+                      <li key={link.id}>
+                        <Link
+                          href={link.href}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
+                        >
+                          {link.label}
+                          {link.badge ? (
+                            <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                              {link.badge}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_1fr_200px]">
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -212,6 +283,7 @@ export function MegaMenu({
               </Link>
             ) : null}
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -225,12 +297,16 @@ export function MobileShopLinks({
   label = "Shop",
   categories: shopCategories,
   occasions: shopOccasions,
+  groups,
 }: {
   onNavigate?: () => void;
   label?: string;
   categories?: ShopCategory[];
   occasions?: ShopOccasion[];
+  /** The shop's own columns, when it wrote any — see MegaMenu. */
+  groups?: MegaMenuGroup[];
 }) {
+  const authored = drawableGroups(groups);
   const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
   const categories = filterWedding(
@@ -255,6 +331,45 @@ export function MobileShopLinks({
       href: routes.store.collection(occasion.slug),
     })),
   );
+  /**
+   * The shop's own columns become the shop's own SECTIONS here.
+   *
+   * A phone has one column, so a group is a sub-heading with its links under
+   * it — the same content, laid out the way a phone reads. Rendered ahead of
+   * the taxonomy fallback below and instead of it, exactly as on desktop.
+   */
+  if (authored.length > 0) {
+    return (
+      <div className="space-y-1 border-t border-border pt-3">
+        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        {authored.map((group) => (
+          <div key={group.id}>
+            <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              {group.heading}
+            </p>
+            {group.links.map((link) => (
+              <Link
+                key={link.id}
+                href={link.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
+              >
+                {link.label}
+                {link.badge ? (
+                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                    {link.badge}
+                  </span>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1 border-t border-border pt-3">
       <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

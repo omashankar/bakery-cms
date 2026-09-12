@@ -88,6 +88,35 @@ const seoSchema = z
  * sort rather than an error. Reachable through backup restore, which posts a
  * hand-editable file straight to this endpoint.
  */
+/**
+ * One link inside a mega-menu group.
+ *
+ * Validated for the same reason the nav row above it is: this endpoint takes a
+ * hand-editable file through backup restore, and `links.map(...)` renders into
+ * the storefront shell with no guard of its own.
+ */
+const megaMenuLinkSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string(),
+    href: z.string(),
+    badge: z.string().optional(),
+  })
+  .passthrough();
+
+const megaMenuGroupSchema = z
+  .object({
+    id: z.string().min(1),
+    heading: z.string(),
+    sortOrder: z.number().int().default(0),
+    isVisible: z.boolean().default(true),
+    // `.default([])` here and NOT on `menu` below — a group with no links is a
+    // heading over nothing, which the renderer drops; a nav row with no `menu`
+    // is a plain link, which is different and must stay distinguishable.
+    links: z.array(megaMenuLinkSchema).default([]),
+  })
+  .passthrough();
+
 const headerNavSchema = z
   .object({
     id: z.string().min(1),
@@ -95,10 +124,20 @@ const headerNavSchema = z
     href: z.string(),
     isVisible: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
+    /**
+     * OPTIONAL, never defaulted.
+     *
+     * `absent` means "this row is a plain link" and `[]` means "this row has a
+     * menu the shop emptied". Defaulting would erase that distinction on every
+     * save — and, more to the point, would give every existing row a menu,
+     * which the renderer would then draw INSTEAD of the taxonomy columns the
+     * Collections row has always shown.
+     */
+    menu: z.array(megaMenuGroupSchema).optional(),
   })
   .passthrough();
 
-const headerSchema = z
+export const headerSchema = z
   .object({
     logoLetter: z.string().default(""),
     nav: z.array(headerNavSchema),

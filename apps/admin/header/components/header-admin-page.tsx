@@ -18,7 +18,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
+import type {
+  HeaderNavItem,
+  HeaderSettings,
+  MegaMenuGroup,
+  MegaMenuLinkItem,
+} from "@/types/site-layout";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
@@ -100,6 +105,72 @@ export function HeaderAdminPage() {
         },
       ],
     }));
+  }
+
+  /**
+   * Every mega-menu write goes through here.
+   *
+   * One helper rather than six, because each one is the same shape: replace
+   * this row's `menu` with a new array. Written functionally so two quick
+   * edits cannot capture a stale copy and drop the first — the same reason
+   * the product form's category toggles are.
+   */
+  function updateMenu(
+    navId: string,
+    change: (groups: MegaMenuGroup[]) => MegaMenuGroup[],
+  ) {
+    setSettings((prev) => ({
+      ...prev,
+      nav: prev.nav.map((item) =>
+        item.id === navId ? { ...item, menu: change(item.menu ?? []) } : item,
+      ),
+    }));
+  }
+
+  function addGroup(navId: string) {
+    updateMenu(navId, (groups) => [
+      ...groups,
+      {
+        id: `grp-${Date.now()}`,
+        heading: "New group",
+        sortOrder: groups.length + 1,
+        isVisible: true,
+        links: [],
+      },
+    ]);
+  }
+
+  function patchGroup(navId: string, groupId: string, patch: Partial<MegaMenuGroup>) {
+    updateMenu(navId, (groups) =>
+      groups.map((group) => (group.id === groupId ? { ...group, ...patch } : group)),
+    );
+  }
+
+  function removeGroup(navId: string, groupId: string) {
+    updateMenu(navId, (groups) =>
+      groups
+        .filter((group) => group.id !== groupId)
+        .map((group, index) => ({ ...group, sortOrder: index + 1 })),
+    );
+  }
+
+  function addLink(navId: string, groupId: string) {
+    patchGroupLinks(navId, groupId, (links) => [
+      ...links,
+      { id: `lnk-${Date.now()}`, label: "New link", href: "/store/collections" },
+    ]);
+  }
+
+  function patchGroupLinks(
+    navId: string,
+    groupId: string,
+    change: (links: MegaMenuLinkItem[]) => MegaMenuLinkItem[],
+  ) {
+    updateMenu(navId, (groups) =>
+      groups.map((group) =>
+        group.id === groupId ? { ...group, links: change(group.links) } : group,
+      ),
+    );
   }
 
   function moveNav(id: string, direction: "up" | "down") {
@@ -358,6 +429,117 @@ export function HeaderAdminPage() {
                     placeholder="/store/..."
                     aria-label={`Nav link ${index + 1} URL`}
                   />
+
+                  {/*
+                    THIS ROW'S OWN MEGA MENU.
+
+                    A row with no groups stays a plain link — which is every
+                    row today, and is why nothing changes for a shop that
+                    never opens this. Add one group and the row becomes a
+                    menu: its own headings, its own links, its own order.
+
+                    The Collections row is the exception worth knowing: left
+                    with no groups it keeps drawing the shop's categories and
+                    occasions, as it always has. Adding groups here replaces
+                    that with what you write.
+                  */}
+                  <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {(item.menu ?? []).length === 0
+                          ? "Drop-down menu — none yet, so this is a plain link"
+                          : `Drop-down menu — ${(item.menu ?? []).length} group${(item.menu ?? []).length === 1 ? "" : "s"}`}
+                      </p>
+                      <Button size="sm" variant="outline" onClick={() => addGroup(item.id)}>
+                        <Plus className="size-3.5" />
+                        Add group
+                      </Button>
+                    </div>
+
+                    {(item.menu ?? []).map((group) => (
+                      <div key={group.id} className="space-y-2 rounded-lg bg-muted/40 p-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={group.heading}
+                            onChange={(e) =>
+                              patchGroup(item.id, group.id, { heading: e.target.value })
+                            }
+                            placeholder="Group heading"
+                            aria-label={`${item.label} group heading`}
+                          />
+                          <Switch
+                            checked={group.isVisible}
+                            onCheckedChange={(checked) =>
+                              patchGroup(item.id, group.id, { isVisible: checked })
+                            }
+                            aria-label={`Show ${group.heading || "group"}`}
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeGroup(item.id, group.id)}
+                            aria-label={`Remove ${group.heading || "group"}`}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+
+                        {group.links.map((link, linkIndex) => (
+                          <div key={link.id} className="flex items-center gap-2">
+                            <Input
+                              value={link.label}
+                              onChange={(e) =>
+                                patchGroupLinks(item.id, group.id, (links) =>
+                                  links.map((entry) =>
+                                    entry.id === link.id
+                                      ? { ...entry, label: e.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              placeholder="Label"
+                              aria-label={`${group.heading} link ${linkIndex + 1} label`}
+                            />
+                            <Input
+                              value={link.href}
+                              onChange={(e) =>
+                                patchGroupLinks(item.id, group.id, (links) =>
+                                  links.map((entry) =>
+                                    entry.id === link.id
+                                      ? { ...entry, href: e.target.value }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              placeholder="/store/collections/..."
+                              aria-label={`${group.heading} link ${linkIndex + 1} URL`}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() =>
+                                patchGroupLinks(item.id, group.id, (links) =>
+                                  links.filter((entry) => entry.id !== link.id),
+                                )
+                              }
+                              aria-label={`Remove ${link.label || "link"}`}
+                            >
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => addLink(item.id, group.id)}
+                        >
+                          <Plus className="size-3.5" />
+                          Add link
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))
             )}

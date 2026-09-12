@@ -6,7 +6,11 @@ import { useEffect, useState } from "react";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-mark";
-import { MegaMenu, MobileShopLinks } from "@/components/storefront/mega-menu";
+import {
+  drawableGroups,
+  MegaMenu,
+  MobileShopLinks,
+} from "@/components/storefront/mega-menu";
 import {
   CustomerAuthModal,
   OPEN_AUTH_MODAL_EVENT,
@@ -195,6 +199,27 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             const isActive =
               pathname === item.href ||
               (item.href !== routes.store.home && pathname.startsWith(item.href));
+            /**
+             * A ROW WITH ITS OWN MENU IS A MENU, NOT A LINK.
+             *
+             * Only the Collections row could have a mega menu, and its two
+             * columns were headed in the component. A shop wanting CAKES with
+             * "By Flavour" and "By Theme" beside GIFTS with its own columns
+             * had nowhere to put that. Any row can carry one now; a row with
+             * none stays exactly the plain link it was.
+             */
+            const authored = drawableGroups(item.menu);
+            if (authored.length > 0) {
+              return (
+                <MegaMenu
+                  key={item.id}
+                  label={item.label}
+                  href={item.href}
+                  groups={item.menu}
+                  isActive={isActive}
+                />
+              );
+            }
             return (
               <Link
                 key={item.id}
@@ -328,6 +353,22 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             {navItems
               .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
               .map((item) => {
+                /*
+                  The phone gets the same groups, for the reason this repo
+                  keeps relearning: a menu that differs by screen size is two
+                  menus, and the phone is the one an Indian shop's customers
+                  actually use.
+                */
+                if (drawableGroups(item.menu).length > 0) {
+                  return (
+                    <MobileShopLinks
+                      key={item.id}
+                      label={item.label}
+                      groups={item.menu}
+                      onNavigate={() => setMobileOpen(false)}
+                    />
+                  );
+                }
               const isActive = pathname === item.href;
               return (
                 <Link
