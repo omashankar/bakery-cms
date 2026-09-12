@@ -143,11 +143,26 @@ export function TrackOrderPage() {
                   <Truck className="size-4" />
                   <p className="text-sm font-medium">What you can track</p>
                 </div>
+                {/*
+                  Each bullet below is backed by a real field on the delivery
+                  tracking snapshot. A fourth one advertised the fake map in
+                  advance — before the customer even had an order number to type
+                  in — so removing the panel without removing that line would
+                  have left the shop promising a feature it had just stopped
+                  pretending to have.
+
+                  The note sits OUTSIDE the list on purpose:
+                  `the-track-screen-promises-only-what-the-order-screen-delivers`
+                  scans the list element below for the vocabulary of that
+                  promise, and comments are not stripped — so naming the removed
+                  bullet in here would fail the guard that exists to keep it
+                  removed. It also avoids writing a list tag in this comment,
+                  which the guard anchors on to find the list at all.
+                */}
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                   <li>• Estimated delivery date and time window</li>
-                  <li>• Step-by-step bakery fulfillment timeline</li>
+                  <li>• Step-by-step fulfilment timeline</li>
                   <li>• Delivery partner details when dispatched</li>
-                  <li>• Route map preview while out for delivery</li>
                 </ul>
               </div>
 

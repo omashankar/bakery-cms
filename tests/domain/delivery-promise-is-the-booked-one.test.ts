@@ -138,3 +138,89 @@ describe("the delivery date", () => {
     ).toBe("Date to be confirmed");
   });
 });
+
+describe("a terminal order is not still promised a delivery date", () => {
+  /**
+   * The order page printed "Estimated delivery: 16 Aug 2026" with NO status
+   * guard, so a cancelled order read:
+   *
+   *     Order cancelled
+   *     Estimated delivery: 16 Aug 2026
+   *
+   * one line under the other. A customer who has just had their order
+   * cancelled — or refunded — is told the shop still intends to deliver it.
+   *
+   * The decision lives on the snapshot rather than in the page's JSX because
+   * every other terminal-status decision on that screen already does:
+   * `etaWindow` has been "—" for a cancelled order since the window fix above.
+   * A page-level ternary would have been a fourth place to keep in step.
+   */
+  it("says nothing about a delivery day once an order is cancelled", () => {
+    expect(getDeliveryTrackingSnapshot(order({ status: "cancelled" })).deliveryDateLine).toBeNull();
+  });
+
+  it("nor once it is refunded", () => {
+    expect(getDeliveryTrackingSnapshot(order({ status: "refunded" })).deliveryDateLine).toBeNull();
+  });
+
+  it("nor once it has already arrived", () => {
+    /**
+     * Delivered is terminal too, and the headline above it already says
+     * "Your order arrived on …". A second, ESTIMATED date beside it is the
+     * page predicting the past.
+     */
+    expect(getDeliveryTrackingSnapshot(order({ status: "delivered" })).deliveryDateLine).toBeNull();
+  });
+
+  it("but an order still coming keeps its date", () => {
+    // The other direction. Returning null everywhere would pass all three
+    // cases above and silently remove the line from every order.
+    for (const status of ["confirmed", "preparing", "ready", "out_for_delivery"] as const) {
+      expect(
+        getDeliveryTrackingSnapshot(order({ status })).deliveryDateLine,
+        `${status} lost its delivery date`,
+      ).toContain("16");
+    }
+  });
+
+  it("and it is the booked day, not the midnight-UTC one", () => {
+    setActiveLocale("INR", "Asia/Kolkata");
+
+    // Same rule as the rest of this file: the day the customer booked, in the
+    // shop's own zone — never `new Date(estimatedDelivery)` rendered raw.
+    expect(getDeliveryTrackingSnapshot(order({ status: "preparing" })).deliveryDateLine).toBe(
+      formatCalendarDate("2026-08-16", { day: "numeric", month: "short", year: "numeric" }),
+    );
+  });
+});
+
+describe("there is no map, and no slot for one", () => {
+  /**
+   * `DeliveryMapPlaceholder` rendered on every order in every status: CSS
+   * gridlines, a pill reading "Demo map", two pins joined by a dashed line, and
+   * the sentence "Your delivery partner is en route. Real-time GPS will be
+   * available with a live backend." A developer's note, on the order screen of
+   * a customer who had just paid.
+   *
+   * The repo holds no courier position, no route and no tracking provider, so
+   * there was nothing honest to put in its place — and the address it was
+   * captioned with is already printed twice on the same screen. The panel is
+   * gone and so is the field that drove it.
+   *
+   * Asserted on the SNAPSHOT rather than on the page's source, so it cannot
+   * pass by the component merely being renamed.
+   */
+  it("the snapshot no longer carries a flag for one", () => {
+    for (const status of ["confirmed", "out_for_delivery", "delivered", "cancelled"] as const) {
+      const snapshot = getDeliveryTrackingSnapshot(order({ status }));
+      expect(snapshot, `${status} still has a live-map flag`).not.toHaveProperty("showLiveMap");
+      expect(snapshot).not.toHaveProperty("mapLabel");
+    }
+  });
+
+  it("and the address it was captioned with is still there, named for what it is", () => {
+    // The DATA was never the problem — a city and a pincode off the order's own
+    // address. `DeliveryEstimatedCard` prints it under "Delivering to".
+    expect(getDeliveryTrackingSnapshot(order()).destinationLabel).toBe("Mumbai, 400001");
+  });
+});

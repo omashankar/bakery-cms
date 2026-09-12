@@ -7,7 +7,6 @@ export { CouponInput } from "./components/coupon-input";
 export { OrderSummaryPanel } from "./components/order-summary-panel";
 export { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 export { DeliveryEstimatedCard } from "./components/delivery-estimated-card";
-export { DeliveryMapPlaceholder } from "./components/delivery-map-placeholder";
 export { DeliveryPartnerCard } from "./components/delivery-partner-card";
 export { PaymentDemoNotice } from "./components/payment-demo-notice";
 export { calculateCartTotals, FREE_DELIVERY_THRESHOLD } from "@/features/orders/lib/cart-totals";

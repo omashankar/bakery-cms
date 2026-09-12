@@ -199,7 +199,20 @@ export function readableStrings(line: string): string[] {
    * Bounded the same way the bare-prose branch is: text carrying the
    * punctuation an expression needs is code, not words.
    */
-  for (const inline of line.matchAll(/>([A-Za-z][^<>{}"`=$]{5,160})</g)) {
+  /**
+   * Up to three leading non-letters, so a BULLETED line is visible.
+   *
+   * This required the first character after `>` to be a letter, which made
+   * every `<li>• …</li>` in the repo invisible to the entire ratchet — and a
+   * bulleted list is exactly where a screen enumerates what it does.
+   * "Step-by-step bakery fulfillment timeline" sat on a customer-facing
+   * tracking page through every run of this guard.
+   *
+   * Replayed over all the files this walks, the widened form finds that one
+   * line and nothing else — the bound stays tight enough not to start
+   * matching attribute values and template fragments.
+   */
+  for (const inline of line.matchAll(/>[^A-Za-z<>{}"`=$]{0,3}([A-Za-z][^<>{}"`=$]{5,160})</g)) {
     found.push(inline[1]!);
   }
 
@@ -319,8 +332,29 @@ describe("no new bakery wording on a shop surface", () => {
       "Freshly baked every morning",
     ]);
 
+    /**
+     * A BULLETED line, which this could not see at all.
+     *
+     * The matcher required a letter immediately after `>`, so every
+     * `<li>• …</li>` in the repo was invisible to the whole ratchet — and a
+     * bulleted list is exactly where a screen enumerates what it does. This
+     * exact string sat on the customer's own order-tracking page, under "What
+     * you can track", through every green run of this guard.
+     */
+    expect(readableStrings("      <li>• Step-by-step bakery fulfillment timeline</li>")).toEqual([
+      "Step-by-step bakery fulfillment timeline",
+    ]);
+    // Other list markers a designer might reach for, so the fix is not
+    // bullet-shaped by accident.
+    expect(readableStrings("  <li>— Freshly baked every morning</li>")).toEqual([
+      "Freshly baked every morning",
+    ]);
+
     // And the kinds of false positive it must keep ignoring.
     expect(readableStrings('  <p className="text-bakery-700">Hi</p>')).toEqual([]);
+    // The widening is THREE characters, not a wildcard — a bound, so it stays
+    // a fix for list markers rather than becoming "skip anything up front".
+    expect(readableStrings("  <li>—— • Freshly baked cakes</li>")).toEqual([]);
     expect(readableStrings("  // a comment about cakes")).toEqual([]);
     expect(readableStrings('  const w = "Wedding Cakes";')).toEqual([]);
     expect(readableStrings("      cakeId: cake.id,")).toEqual([]);

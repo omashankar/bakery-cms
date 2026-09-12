@@ -283,3 +283,60 @@ describe("assigning a rider", () => {
     expect(fn.slice(0, fn.indexOf("});"))).toContain("requireRole(...ORDER_ROLES)");
   });
 });
+
+describe("the track screen promises only what the order screen delivers", () => {
+  /**
+   * "What you can track" listed four things. Three were backed by a real field
+   * on the tracking snapshot; the fourth, "Route map preview while out for
+   * delivery", advertised the fake map IN ADVANCE — before the customer even
+   * had an order number to type in.
+   *
+   * So removing the panel was not enough on its own: the shop would have gone
+   * on promising a feature it had just stopped pretending to have, on the page
+   * a customer reaches it from.
+   *
+   * Scoped to the list rather than the file. A whole-file `not.toContain("map")`
+   * would pass or fail on any word in a 300-line page, and this repo has
+   * recorded more than once that a file-wide assertion passes for the very
+   * regression it names.
+   */
+  const listedPromises = () => {
+    const source = read("apps/website/checkout/pages/track-order-page.tsx");
+    const heading = source.indexOf("What you can track");
+    expect(heading, "the 'What you can track' card is gone — re-point this test").toBeGreaterThan(
+      -1,
+    );
+    /**
+     * From the `<ul>`, not from the heading.
+     *
+     * Anchoring on the heading swept in the note ABOVE the list, which
+     * necessarily describes the promise that was removed — so the guard failed
+     * on the very comment explaining why it exists. Comments are not stripped
+     * here, and the narrowest honest scope is the list element itself.
+     */
+    const listStart = source.indexOf("<ul", heading);
+    expect(listStart, "no list under that heading any more").toBeGreaterThan(-1);
+    return source.slice(listStart, source.indexOf("</ul>", listStart));
+  };
+
+  it("does not offer a map", () => {
+    expect(listedPromises()).not.toMatch(/\bmap\b/i);
+  });
+
+  it("does not offer live GPS, a route, or a courier's position", () => {
+    // The words the deleted panel used, so the promise cannot come back in the
+    // panel's own vocabulary.
+    expect(listedPromises()).not.toMatch(/\bgps\b|\broute\b|\ben route\b|live location/i);
+  });
+
+  it("and each thing it does offer is a real field on the snapshot", () => {
+    /**
+     * The other direction, so the test above cannot be satisfied by emptying
+     * the list. Three bullets, and the snapshot that has to back them.
+     */
+    const list = listedPromises();
+    expect(list).toContain("Estimated delivery date and time window");
+    expect(list).toContain("timeline");
+    expect(list).toContain("Delivery partner details");
+  });
+});

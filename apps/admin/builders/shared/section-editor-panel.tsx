@@ -27,7 +27,15 @@ interface SectionEditorPanelProps<T extends BuilderEditableSection> {
   section: T | null;
   onChange: (section: T) => void;
   resolveEntry: (type: T["type"]) => { label: string; fields: SectionFieldDef[] } | undefined;
-  settingsNote?: string;
+  /**
+   * REQUIRED, so nobody inherits a sentence about somebody else's screen.
+   *
+   * The default here read "Product and catalog data still comes from the mock
+   * store until the CMS content layer is fully connected" — untrue since the
+   * builders were wired to the real catalogue, and it would have rendered on
+   * any third builder added later. Both existing callers pass a real one.
+   */
+  settingsNote: string;
 }
 
 /** Repeatable editor for the hero carousel's slides (stored as JSON in content). */
@@ -450,7 +458,7 @@ export function SectionEditorPanel<T extends BuilderEditableSection>({
   section,
   onChange,
   resolveEntry,
-  settingsNote = "Product and catalog data still comes from the mock store until the CMS content layer is fully connected.",
+  settingsNote,
 }: SectionEditorPanelProps<T>) {
   if (!section) {
     return (

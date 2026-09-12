@@ -49,7 +49,7 @@ export function DeliveryEstimatedCard({
               <MapPin className="size-4" />
               <span className="text-xs font-medium tracking-wide uppercase">Delivering to</span>
             </div>
-            <p className="mt-2 text-sm font-semibold">{snapshot.mapLabel}</p>
+            <p className="mt-2 text-sm font-semibold">{snapshot.destinationLabel}</p>
           </div>
         </div>
       </div>

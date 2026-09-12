@@ -22,10 +22,34 @@ export interface DeliveryTrackingSnapshot {
   etaHeadline: string;
   etaDetail: string;
   etaWindow: string;
-  showLiveMap: boolean;
   showPartner: boolean;
   partner: DeliveryPartner | null;
-  mapLabel: string;
+  /**
+   * Where the order is going — a city and a pincode from the order's own
+   * address.
+   *
+   * Called `mapLabel` while a fake map was the thing that displayed it. There
+   * is no map now, and there never was one: the panel showed CSS gridlines, a
+   * pill reading "Demo map", two pins joined by a dashed line, and the
+   * sentence "Real-time GPS will be available with a live backend" — a
+   * developer's note, shipped to a paying customer on the order they had just
+   * paid for. `showLiveMap` sat beside this field to decide when to animate it.
+   *
+   * The repo holds no courier position, no route and no tracking provider, so
+   * there was nothing honest to put in its place. The address itself is real,
+   * and `DeliveryEstimatedCard` already prints it under "Delivering to".
+   */
+  destinationLabel: string;
+  /**
+   * The delivery date to show, or null when promising one would be a lie.
+   *
+   * The order page printed "Estimated delivery: 16 Aug 2026" with no status
+   * guard at all, so a CANCELLED order read "Order cancelled" and a delivery
+   * date one line below it. The decision lives here because every other
+   * terminal-status decision on that screen already does — `etaWindow` is
+   * already "—" for a cancelled order, eight lines down.
+   */
+  deliveryDateLine: string | null;
   statusMessage: string;
 }
 
@@ -97,7 +121,20 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
   const partner = order.deliveryPartner ?? null;
   const etaWindow = resolveEtaWindow(order);
   const deliveryDate = formatOrderDeliveryDay(order);
-  const mapLabel = `${order.address.city}, ${order.address.pincode}`;
+  /**
+   * The same day, in the short form the order page has always printed.
+   *
+   * `deliveryDate` above reads inside a sentence ("Expected on Sunday, 16
+   * August"); this one stands alone on its own line as "16 Aug 2026". Computed
+   * here rather than at the call site only so the null-on-a-cancelled-order
+   * decision and the formatting live together.
+   */
+  const deliveryDateShort = formatOrderDeliveryDay(order, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const destinationLabel = `${order.address.city}, ${order.address.pincode}`;
 
   if (order.status === "delivered") {
     return {
@@ -105,10 +142,12 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaHeadline: "Delivered",
       etaDetail: `Your order arrived on ${deliveryDate}.`,
       etaWindow,
-      showLiveMap: false,
+      // It arrived. The line above says when; a second 'estimated' one
+      // beside it would be predicting the past.
+      deliveryDateLine: null,
       showPartner: Boolean(partner),
       partner,
-      mapLabel,
+      destinationLabel,
       statusMessage: "We hope everything arrived just right.",
     };
   }
@@ -119,10 +158,10 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaHeadline: "Order cancelled",
       etaDetail: order.cancellationReason ?? "This delivery will not be completed.",
       etaWindow: "—",
-      showLiveMap: false,
+      deliveryDateLine: null,
       showPartner: false,
       partner: null,
-      mapLabel,
+      destinationLabel,
       statusMessage: "Contact support if you need help with a refund.",
     };
   }
@@ -133,10 +172,10 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaHeadline: "Refund processed",
       etaDetail: "A refund has been issued for this order.",
       etaWindow: "—",
-      showLiveMap: false,
+      deliveryDateLine: null,
       showPartner: false,
       partner: null,
-      mapLabel,
+      destinationLabel,
       statusMessage: order.refundReference
         ? `Reference: ${order.refundReference}`
         : "Check your email for refund confirmation.",
@@ -154,10 +193,10 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
         ? `${partner.name} is on the way with your order.`
         : "Your order is on its way.",
       etaWindow,
-      showLiveMap: true,
+      deliveryDateLine: deliveryDateShort,
       showPartner: Boolean(partner),
       partner,
-      mapLabel,
+      destinationLabel,
       statusMessage: "Keep your phone nearby — we may call before arrival.",
     };
   }
@@ -168,10 +207,10 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
       etaHeadline: "Ready to dispatch",
       etaDetail: `Scheduled for ${deliveryDate}.`,
       etaWindow,
-      showLiveMap: false,
+      deliveryDateLine: deliveryDateShort,
       showPartner: Boolean(partner),
       partner,
-      mapLabel,
+      destinationLabel,
       statusMessage: "Your order is packed and will be handed to our delivery partner soon.",
     };
   }
@@ -181,10 +220,10 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
     etaHeadline: "Estimated delivery",
     etaDetail: `Expected on ${deliveryDate}.`,
     etaWindow,
-    showLiveMap: false,
+    deliveryDateLine: deliveryDateShort,
     showPartner: false,
     partner: null,
-    mapLabel,
+    destinationLabel,
     statusMessage:
       order.status === "preparing"
         ? "We are preparing your order now."
