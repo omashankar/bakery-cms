@@ -126,7 +126,17 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     testimonials: publishedOnly(testimonialsRaw as Testimonial[] | null),
     faqs: publishedOnly(faqsRaw as FaqItem[] | null),
     instagram,
-    offers: selectStorefrontOffers(coupons, ROW_CAP, { currency: settings.general?.currency }),
+    offers: selectStorefrontOffers(coupons, ROW_CAP, {
+      currency: settings.general?.currency,
+      // So a scoped card reads "On Plants" rather than "On selected items".
+      // The catalogue is already in hand three lines above.
+      categoryNames: new Map(
+        ((catalog.categories ?? []) as { id: string; name: string }[]).map((category) => [
+          category.id,
+          category.name,
+        ]),
+      ),
+    }),
     storeLocation,
     trust,
   };

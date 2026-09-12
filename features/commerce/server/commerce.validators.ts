@@ -32,6 +32,16 @@ const couponSchema = z
         message: "Expiry must be a valid date",
       })
       .optional(),
+    /**
+     * The categories this code applies to; absent or empty is the whole shop.
+     *
+     * `.optional()` and NOT `.default([])`: this endpoint takes the whole
+     * coupon collection, and a default would rewrite every coupon an older
+     * admin tab sends back — turning absent into `[]` is harmless here only
+     * because the two mean the same thing, and relying on that twice is how
+     * they stop meaning the same thing.
+     */
+    categoryIds: z.array(z.string().trim().min(1)).max(50).optional(),
   })
   .passthrough();
 

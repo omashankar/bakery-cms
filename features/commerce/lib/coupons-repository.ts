@@ -24,6 +24,8 @@ export interface StoredCoupon {
   usageCount: number;
   createdAt: string;
   expiresAt?: string;
+  /** The categories it applies to; empty or absent means the whole shop. */
+  categoryIds?: string[];
 }
 
 export function buildDefaultCoupons(): StoredCoupon[] {

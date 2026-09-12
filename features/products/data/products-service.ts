@@ -304,6 +304,10 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     // file already records, where a dropped field sent the occasion filter
     // searching the prose instead.
     categories: product.categories,
+    // The ids too, because a coupon scope matches on those. This is the
+    // narrow projection the cart and checkout actually receive, so a field
+    // missing here is a field the browser can never see.
+    categoryIds: product.categoryIds,
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),

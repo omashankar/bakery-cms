@@ -3,6 +3,10 @@ import type { LandingOffer } from "@/constants/landing-data";
 import { hasExpired } from "@/lib/expiry-date";
 import { formatCurrency } from "@/utils/format";
 import type { StoredCoupon } from "./coupons-repository";
+import {
+  couponEligibleSubtotal,
+  type CouponCart,
+} from "@/features/orders/lib/coupons";
 
 /**
  * Turns the shop's real coupons into the offer cards the storefront advertises.
@@ -128,10 +132,26 @@ export interface CartOffer {
  */
 export function offersForCart(
   coupons: StoredCoupon[],
-  subtotal: number,
+  /**
+   * The cart, by line where the caller has them.
+   *
+   * A SCOPED coupon’s shortfall is measured against the money it can actually
+   * touch: "₹2,000 off plants" over ₹300 of plants and ₹5,000 of cake still
+   * needs ₹1,700 more of plants, and reading the cart total would have shown
+   * the card as already earned and sent the customer to a checkout that
+   * refuses the code. A bare number is still accepted for callers with no
+   * lines; scoped coupons then fall back to the total, which is the same
+   * answer they gave before scoping existed.
+   */
+  cart: CouponCart,
   options: { exclude?: string; currency?: string; now?: number } = {},
 ): CartOffer[] {
   const skip = options.exclude?.trim().toUpperCase();
+  const lines = typeof cart === "number" ? null : cart;
+  const cartSubtotal =
+    typeof cart === "number"
+      ? cart
+      : cart.reduce((sum, line) => sum + line.price * line.quantity, 0);
   return coupons
     .filter((coupon) => isLiveCoupon(coupon, options.now ?? Date.now()))
     // The one already applied is not an offer, it is the current state, and
@@ -140,14 +160,62 @@ export function offersForCart(
     .map((coupon) => ({
       code: coupon.code,
       label: couponDiscountLabel(coupon, options.currency),
-      shortfall: Math.max(0, (coupon.minSubtotal ?? 0) - subtotal),
+      shortfall: Math.max(
+        0,
+        (coupon.minSubtotal ?? 0) -
+          (lines ? couponEligibleSubtotal(coupon, lines) : cartSubtotal),
+      ),
     }));
+}
+
+/**
+ * The CONDITIONS a card must state, in one line.
+ *
+ * The module has always insisted a card say its condition, because one that
+ * hides it sends somebody to a checkout that refuses the code. A SCOPE is such
+ * a condition — "20% off" on a card that quietly means "off plants only" is the
+ * same broken promise as a hidden minimum, and worse, because the customer
+ * cannot see it in their total until the code is refused.
+ *
+ * Named when the caller supplies the taxonomy, generic when it cannot. Never
+ * omitted: "On selected items" says less than "On Plants" and is still true,
+ * while saying nothing is not.
+ */
+function offerCondition(
+  coupon: StoredCoupon,
+  currency?: string,
+  categoryNames?: ReadonlyMap<string, string>,
+): string | undefined {
+  const scoped = coupon.categoryIds?.length ? coupon.categoryIds : null;
+  const named = scoped
+    ? scoped.map((id) => categoryNames?.get(id)).filter(Boolean)
+    : [];
+  /**
+   * A scope whose categories cannot be NAMED still has to be disclosed.
+   *
+   * The names go missing two ways: a caller with no taxonomy to hand, and a
+   * category the shop has since deleted. Falling back to "On selected items"
+   * covers both — and a deleted category matches no product, so the code will
+   * be refused; the card must not read as unconditional on the way there.
+   */
+  const where = scoped
+    ? named.length === scoped.length
+      ? named.join(", ")
+      : "selected items"
+    : null;
+  const over = coupon.minSubtotal ? money(coupon.minSubtotal, currency) : null;
+
+  if (where && over) return `On ${where}, over ${over}`;
+  if (where) return `On ${where}`;
+  if (over) return `On orders over ${over}`;
+  return undefined;
 }
 
 export function couponToOffer(
   coupon: StoredCoupon,
   index = 0,
-  currency?: string
+  currency?: string,
+  categoryNames?: ReadonlyMap<string, string>,
 ): LandingOffer {
   const discount = couponDiscountLabel(coupon, currency);
   return {
@@ -157,9 +225,9 @@ export function couponToOffer(
     discount,
     code: coupon.code,
     // The condition checkout will hold them to, in the words the card shows.
-    minSpend: coupon.minSubtotal
-      ? `On orders over ${money(coupon.minSubtotal, currency)}`
-      : undefined,
+    // Named `minSpend` for the field it has always been; it now carries the
+    // scope as well, so the two renderers reading it need no change.
+    minSpend: offerCondition(coupon, currency, categoryNames),
     image: unsplash(OFFER_PHOTOS[index % OFFER_PHOTOS.length], 600, 400),
     // Only a real end date. The previous mapper substituted "2026-12-31" for a
     // coupon with no expiry, putting an invented deadline on an open offer.
@@ -174,13 +242,20 @@ export function couponToOffer(
 export function selectStorefrontOffers(
   coupons: StoredCoupon[],
   maxCount = 3,
-  options?: { currency?: string; now?: number },
+  options?: {
+    currency?: string;
+    now?: number;
+    /** id -> name, so a scoped card can say "On Plants" rather than "On selected items". */
+    categoryNames?: ReadonlyMap<string, string>;
+  },
 ): LandingOffer[] {
   const now = options?.now ?? Date.now();
   return coupons
     .filter((coupon) => isLiveCoupon(coupon, now))
     .slice(0, Math.max(0, maxCount))
-    .map((coupon, index) => couponToOffer(coupon, index, options?.currency));
+    .map((coupon, index) =>
+      couponToOffer(coupon, index, options?.currency, options?.categoryNames),
+    );
 }
 
 /**
@@ -207,7 +282,11 @@ export function isWeddingCoupon(coupon: StoredCoupon): boolean {
 export function selectWeddingCouponOffers(
   coupons: StoredCoupon[],
   maxCount = 3,
-  options?: { currency?: string; now?: number },
+  options?: {
+    currency?: string;
+    now?: number;
+    categoryNames?: ReadonlyMap<string, string>;
+  },
 ): LandingOffer[] {
   const now = options?.now ?? Date.now();
   const live = coupons.filter((coupon) => isLiveCoupon(coupon, now));
@@ -216,5 +295,7 @@ export function selectWeddingCouponOffers(
   const rest = live.filter((coupon) => !weddingIds.has(coupon.id));
   return [...wedding, ...rest]
     .slice(0, Math.max(0, maxCount))
-    .map((coupon, index) => couponToOffer(coupon, index, options?.currency));
+    .map((coupon, index) =>
+      couponToOffer(coupon, index, options?.currency, options?.categoryNames),
+    );
 }

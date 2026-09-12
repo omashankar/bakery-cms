@@ -1,7 +1,7 @@
 "use client";
 
 import { hasExpired } from "@/lib/expiry-date";
-import { formatDate } from "@/utils/format";
+import { formatCurrency, formatDate } from "@/utils/format";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -23,8 +23,24 @@ import {
 } from "@/features/commerce/lib/coupons-repository";
 import { CouponFormDialog } from "../components/coupon-form-dialog";
 import { COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
+import { adminCategories } from "@/features/products/lib/catalog-options";
 
 const PAGE_SIZE = 10;
+
+/**
+ * The categories a coupon is limited to, by name — or nothing when it is not.
+ *
+ * An id the shop has since DELETED is shown as "a deleted category" rather
+ * than dropped. Dropping it would make a coupon that can no longer discount
+ * anything look unscoped, which is the opposite of what it now does.
+ */
+function scopeOf(coupon: StoredCoupon): string {
+  const ids = coupon.categoryIds ?? [];
+  if (ids.length === 0) return "";
+
+  const names = new Map(adminCategories().map((category) => [category.id, category.name]));
+  return ids.map((id) => names.get(id) ?? "a deleted category").join(", ");
+}
 
 export function CouponsAdminPage() {
   const [mounted, setMounted] = useState(false);
@@ -200,9 +216,12 @@ export function CouponsAdminPage() {
                         {coupon.percentOff
                           ? `${coupon.percentOff}% off`
                           : coupon.flatOff
-                            ? `₹${coupon.flatOff} off`
+                            ? // The SHOP's money. A hardcoded ₹ priced every
+                              // non-Indian shop's coupons in rupees on the one
+                              // screen where an owner checks them.
+                              `${formatCurrency(coupon.flatOff)} off`
                             : "No discount configured"}
-                        {coupon.minSubtotal ? ` · Min ${coupon.minSubtotal.toLocaleString("en-IN")}` : ""}
+                        {coupon.minSubtotal ? ` · Min ${formatCurrency(coupon.minSubtotal)}` : ""}
                         {` · Used ${coupon.usageCount} times`}
                         {coupon.expiresAt
                           ? ` · ${hasExpired(coupon.expiresAt) ? "Expired" : "Expires"} ${formatDate(
@@ -210,6 +229,18 @@ export function CouponsAdminPage() {
                             )}`
                           : ""}
                       </p>
+                      {/*
+                        Only when it is SCOPED.
+
+                        Empty means the whole shop, which is what almost every
+                        coupon is — printing "Applies to everything" on every row
+                        would be noise hiding the rows where it matters.
+                      */}
+                      {scopeOf(coupon) ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Applies to {scopeOf(coupon)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 

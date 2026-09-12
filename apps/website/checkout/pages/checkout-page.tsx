@@ -682,13 +682,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     return [...seen.values()].sort((a, b) => a.localeCompare(b));
   }, [catalog]);
 
-  // The coupon was validated against whatever the cart held when it was
-  // applied. Re-check it against the cart being paid for, so an edited cart
-  // cannot keep a discount it no longer qualifies for.
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [items]
-  );
+  /*
+    A `subtotal` memo stood here and was the coupon's only view of the cart.
+    The coupon takes the LINES now — a scoped code cannot tell plants from cake
+    given one number — and the minimum-order checks further down read
+    `totals.subtotal`, the SHOP's number, not this one. So nothing was left
+    reading it, and leaving it would have been the obvious wrong argument for
+    the next person to pass to `applyCouponCode`.
+  */
   /**
    * The coupon re-checked against the cart being paid for, and WHY when it no
    * longer holds.
@@ -699,9 +700,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    * discount line in them. Nothing said the coupon had stopped applying, and
    * nothing said what would bring it back.
    */
+  /**
+   * The cart as a COUPON sees it — one entry per line, carrying every category
+   * the product is filed under.
+   *
+   * A scoped coupon ("20% off plants") takes 20% of the plants in this basket
+   * and nothing off the cake beside them, and a subtotal cannot say which line
+   * is which. Built from the same server-sent `catalog` the stock check above
+   * uses, so this page and the server are reading one catalogue.
+   *
+   * This is a PREVIEW. The server re-derives the discount from its own
+   * products in `quoteCart`, and the guard further down blocks the order on
+   * any disagreement — so a browser that got this wrong cannot pay less.
+   */
+  const couponLines = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.categoryIds ?? []]));
+    return items.map((item) => ({
+      productSlug: item.productSlug,
+      categoryIds: bySlug.get(item.productSlug) ?? [],
+      price: item.price,
+      quantity: item.quantity,
+    }));
+  }, [items, catalog]);
   const couponCheck = useMemo(
-    () => (coupon ? applyCouponCode(coupon.code, subtotal) : null),
-    [coupon, subtotal],
+    () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
+    [coupon, couponLines],
   );
   const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
   const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
@@ -2193,7 +2216,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               <div className="rounded-xl border border-border bg-white p-4">
                   <p className="mb-3 text-sm font-medium">Have a coupon?</p>
                   <CouponInput
-                    subtotal={totals.subtotal}
+                    cart={couponLines}
                     applied={coupon}
                     lapsedReason={couponLapsedReason}
                     onApply={(next) => {

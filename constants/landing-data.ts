@@ -50,6 +50,15 @@ export interface LandingProduct {
    * id, and every matcher compares names.
    */
   categories?: string[];
+  /**
+   * The same memberships, by ID rather than name.
+   *
+   * Carried alongside the names because a COUPON scope matches on ids and
+   * names are not unique — this shop already holds two categories called
+   * "Seasonal" sharing a slug. Optional for the same reason `categories` is:
+   * the demo literals in this file set neither.
+   */
+  categoryIds?: string[];
   badge?: string;
   rating?: number;
   reviewCount?: number;

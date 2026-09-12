@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toExpiryInputValue, toExpiryInstant } from "@/lib/expiry-date";
 import { createCoupon, loadCoupons, updateCoupon } from "@/features/commerce/lib/coupons-repository";
+import { adminCategories } from "@/features/products/lib/catalog-options";
 
 type CouponFormValues = {
   code: string;
@@ -31,6 +32,8 @@ type CouponFormValues = {
   minSubtotal: string;
   expiresAt: string;
   isActive: boolean;
+  /** Empty means the whole shop, which is what every coupon was until now. */
+  categoryIds: string[];
 };
 
 const emptyValues: CouponFormValues = {
@@ -43,6 +46,7 @@ const emptyValues: CouponFormValues = {
   minSubtotal: "",
   expiresAt: "",
   isActive: true,
+  categoryIds: [],
 };
 
 interface CouponFormDialogProps {
@@ -83,6 +87,10 @@ export function CouponFormDialog({
         minSubtotal: editingCoupon.minSubtotal?.toString() ?? "",
         expiresAt: toExpiryInputValue(editingCoupon.expiresAt),
         isActive: editingCoupon.isActive,
+        // `?? []` is not a default being invented: absent and empty both
+        // mean the whole shop, and every coupon stored before scoping
+        // existed reads back absent.
+        categoryIds: editingCoupon.categoryIds ?? [],
       });
       return;
     }
@@ -101,6 +109,7 @@ export function CouponFormDialog({
       // End of the chosen day, in the shop's timezone — see lib/expiry-date.ts.
       expiresAt: toExpiryInstant(values.expiresAt),
       isActive: values.isActive,
+      categoryIds: values.categoryIds,
     };
 
     try {
@@ -179,6 +188,60 @@ export function CouponFormDialog({
               <Input id="expires-at" type="date" {...register("expiresAt")} />
             </div>
           </div>
+
+          {/*
+            WHAT THIS CODE IS FOR — the control that stops a coupon being
+            shop-wide.
+
+            A shop selling cakes AND plants AND chargers could not run "20% off
+            plants": the discount hit everything in the basket. Ticking nothing
+            keeps the old behaviour exactly, which is why the heading says so
+            rather than leaving an owner to infer it from an empty grid.
+
+            Same control and same shape as the product form's "Also show it
+            under", because it is the same question asked of the same list.
+          */}
+          {adminCategories().length > 0 ? (
+            <Controller
+              control={control}
+              name="categoryIds"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label>Applies to</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Leave everything unticked and the code works on the whole shop.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {adminCategories().map((category) => (
+                      <label
+                        key={category.id}
+                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={field.value.includes(category.id)}
+                          onCheckedChange={(checked) =>
+                            field.onChange(
+                              checked === true
+                                ? [...field.value, category.id]
+                                : field.value.filter((id: string) => id !== category.id),
+                            )
+                          }
+                        />
+                        {category.name}
+                      </label>
+                    ))}
+                  </div>
+                  {field.value.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      The discount applies to these items only — anything else in the
+                      basket is charged in full, and a minimum subtotal is measured
+                      against these items too.
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            />
+          ) : null}
 
           <Controller
             control={control}

@@ -188,10 +188,34 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * to, and `Math.max(total, 0)` would quietly floor the damage at zero
    * instead of showing it.
    */
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  /*
+    A `subtotal` stood here and fed the coupon check and the offer list. Both
+    take the LINES now — a scoped coupon cannot tell plants from cake given one
+    number — and nothing else on this page read it, so it is gone rather than
+    left as the obvious wrong argument for the next person to pass.
+  */
+  /**
+   * The cart as a COUPON sees it: one entry per line, carrying every category
+   * the product is filed under.
+   *
+   * A coupon can be scoped now — "20% off plants" takes 20% of the plants in
+   * this basket and nothing off the cake beside them — and a bare subtotal
+   * cannot express which line is which. The ids come off the catalogue the
+   * server already sent for the stock check above; a line whose product is not
+   * in it gets no categories, so a scoped coupon simply will not match it.
+   */
+  const couponLines = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.categoryIds ?? []]));
+    return items.map((item) => ({
+      productSlug: item.productSlug,
+      categoryIds: bySlug.get(item.productSlug) ?? [],
+      price: item.price,
+      quantity: item.quantity,
+    }));
+  }, [items, catalog]);
   const couponCheck = useMemo(
-    () => (coupon ? applyCouponCode(coupon.code, subtotal) : null),
-    [coupon, subtotal],
+    () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
+    [coupon, couponLines],
   );
   const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
   const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
@@ -210,8 +234,8 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * it on — and an empty list renders nothing at all.
    */
   const offers = useMemo(
-    () => offersForCart(liveCoupons, subtotal, { exclude: coupon?.code }),
-    [liveCoupons, subtotal, coupon?.code],
+    () => offersForCart(liveCoupons, couponLines, { exclude: coupon?.code }),
+    [liveCoupons, couponLines, coupon?.code],
   );
 
   /**
@@ -637,7 +661,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 <div className="rounded-xl border border-border bg-white p-4">
                   <p className="mb-3 text-sm font-medium">Have a coupon?</p>
                   <CouponInput
-                    subtotal={subtotal}
+                    cart={couponLines}
                     applied={coupon}
                     lapsedReason={couponLapsedReason}
                     onApply={applyCoupon}

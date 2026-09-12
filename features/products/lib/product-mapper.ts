@@ -82,6 +82,16 @@ export function mapAdminProductToStorefront(
     images: cake.images,
     category,
     categories,
+    /**
+     * The ids, UNFILTERED — deliberately unlike `categories` above.
+     *
+     * `categories` drops an id the shop has since deleted, because a name it
+     * cannot resolve is not a name. These are not resolved against anything:
+     * a coupon scoped to a deleted category must match NOTHING, and dropping
+     * the id here would leave the product looking unfiled — which, for a
+     * scope test, reads the same as "no scope" a line later.
+     */
+    categoryIds: cake.categoryIds,
     occasions,
     badge: cake.isFeatured
       ? "Featured"

@@ -14,7 +14,11 @@ import {
   mapLegacyChoice,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
-import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
+import {
+  resolveCouponDiscount,
+  type CouponCartLine,
+} from "@/features/orders/lib/coupons";
+import { categoriesOf } from "@/features/products/lib/products-repository";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -309,6 +313,15 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
   };
 
   const items: QuotedLine[] = [];
+  /**
+   * The same lines again, as much of them as a COUPON needs.
+   *
+   * Built inside the loop because that is the only place a line and its
+   * product are both in hand — `product` is fetched per iteration and dropped
+   * at the end of it. A coupon scoped to Plants has to know which of these
+   * lines are plants, and `QuotedLine` carries no category at all.
+   */
+  const couponLines: CouponCartLine[] = [];
   for (const line of input.items) {
     const quantity = Math.max(1, Math.floor(line.quantity));
     /**
@@ -328,6 +341,20 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     // a cake it has deleted.
     if (!product) throw new UnknownProductError(line.productSlug);
 
+    // Priced ONCE. `priceLine` is the shop’s own arithmetic over weights,
+    // variants and modules; calling it twice to fill two lists is how the
+    // coupon comes to be measured against a different number from the one the
+    // customer is charged.
+    const priced = priceLine(product as unknown as LandingProduct, line, modules);
+    couponLines.push({
+      productSlug: line.productSlug,
+      // EVERY category it is filed under, so a cake the shop also filed under
+      // Plants is discounted by a plants coupon.
+      categoryIds: categoriesOf(product),
+      price: priced.price,
+      quantity,
+    });
+
     items.push({
       ...line,
       id: cartLineId(line),
@@ -338,20 +365,29 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       // made the admin order page crash on `src.trim()`.
       image: product.images?.[0] ?? "",
       // The two shapes DO agree on everything the pricing reads — price,
-      // weights, variant groups — so this cast is narrow and deliberate, unlike
-      // the one above it replaced.
-      ...priceLine(product as unknown as LandingProduct, line, modules),
+      // weights, variant groups — so the cast above is narrow and deliberate,
+      // unlike the one it replaced.
+      ...priced,
     });
   }
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  /*
+    A `subtotal` was computed here and passed to the coupon. It has no other
+    reader — `calculateCartTotals` sums the lines itself — so once the coupon
+    took the lines instead, this was a number nobody used. Left in place it
+    would have been the obvious thing for the next person to hand back to
+    `resolveCouponDiscount`, which is exactly the regression
+    `the-SERVER-decides-what-a-scoped-coupon-may-discount` exists to catch.
+  */
 
   // The coupon is RESOLVED here, not accepted. It used to arrive as
   // `z.record(z.string(), z.unknown())` — an object the caller invented, whose
   // discount bore no relation to anything, and which then appeared in the
   // admin's coupon performance report as if it were real.
   const applied = input.couponCode
-    ? resolveCouponDiscount(await Promise.resolve(coupons), input.couponCode, subtotal)
+    // The LINES, not the subtotal. Given only a number, a scoped coupon has no
+    // way to tell plants from cake and refuses rather than guessing.
+    ? resolveCouponDiscount(await Promise.resolve(coupons), input.couponCode, couponLines)
     : null;
 
   const totals = calculateCartTotals({

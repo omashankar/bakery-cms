@@ -308,10 +308,19 @@ describe("an admin screen does not call its own live output a demo", () => {
    * nothing about the sentence it is named for.
    */
   const jsonLdCaption = () => {
-    const page = code("apps/admin/seo/components/seo-admin-page.tsx");
-    const marker = 'isValidJson(global.organizationSchemaJson ?? "")\n                ?';
-    const at = page.indexOf(marker);
-    expect(at, "the Organization JSON-LD caption is gone — re-point this test").toBeGreaterThan(-1);
+    /**
+     * Line endings NORMALISED before anything is matched.
+     *
+     * The repo stores LF and checks out CRLF, so an anchor containing a literal
+     * "\n" finds the caption in a file a script just wrote and stops finding it
+     * the moment git touches the same file. This passed, then failed with
+     * nothing changed but a `git stash` round trip.
+     */
+    const page = code("apps/admin/seo/components/seo-admin-page.tsx").replace(/\r\n/g, "\n");
+    const marker = /isValidJson\(global\.organizationSchemaJson \?\? ""\)\s*\n\s*\?/;
+    const found = marker.exec(page);
+    expect(found, "the Organization JSON-LD caption is gone — re-point this test").not.toBeNull();
+    const at = found!.index;
     return page.slice(at, page.indexOf("</p>", at));
   };
 

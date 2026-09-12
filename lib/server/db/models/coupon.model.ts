@@ -20,6 +20,17 @@ const couponSchema = new mongoose.Schema(
     usageCount: { type: Number, default: 0 },
     createdAt: { type: String },
     expiresAt: { type: String },
+    /**
+     * The categories this code applies to. EMPTY MEANS THE WHOLE SHOP.
+     *
+     * Declared, or every scope an owner ticks is dropped on write while the
+     * API answers 200 and the form re-renders its own state as though it had
+     * saved — this schema is built with only `{ minimize: false }`, so strict
+     * is on. `default: []` covers new writes; a coupon written before this
+     * line reads back `undefined` through `.lean()`, which `CouponRule`
+     * documents as meaning exactly the same thing.
+     */
+    categoryIds: { type: [String], default: [] },
   },
   { minimize: false },
 );

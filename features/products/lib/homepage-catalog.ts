@@ -114,5 +114,8 @@ export function getHomepageCategories(maxCount = 6): LandingCategory[] {
  * and `getHomepageCategories` above are.
  */
 export function getHomepageOffers(maxCount = 3): LandingOffer[] {
-  return selectStorefrontOffers(getActiveCoupons(), maxCount);
+  return selectStorefrontOffers(getActiveCoupons(), maxCount, {
+    // Same as the server path: a scoped card names its categories.
+    categoryNames: new Map(getCategories().map((category) => [category.id, category.name])),
+  });
 }
