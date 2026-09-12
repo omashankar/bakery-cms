@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { mapAdminProductToStorefront } from "@/features/products/lib/product-mapper";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
-import { normalizeCommerceFields } from "@/features/products/lib/products-repository";
+import { selectHomepageCategories } from "@/features/products/lib/homepage-catalog";
+import {
+  categoriesOf,
+  countByCategory,
+  normalizeCommerceFields,
+  productsLeftUnfiled,
+} from "@/features/products/lib/products-repository";
 import type { Product } from "@/types/product";
 
 /**
@@ -188,5 +194,103 @@ describe("the matcher folds case and space, on both sides", () => {
     );
 
     expect(filterProductsByCategory([scruffy], "plants", CATEGORIES)).toEqual([scruffy]);
+  });
+});
+describe("deleting a category only orphans what it leaves filed nowhere", () => {
+  /**
+   * The only warning attached to a destructive action, and it used to be wrong
+   * in the direction that gets warnings ignored.
+   *
+   * It summed the per-category tallies. Once a product can hold several, that
+   * counts a product filed in two of the doomed categories TWICE, and counts a
+   * product keeping a category outside the selection as orphaned when it is
+   * not. An owner who checks the number once, finds it overstated, and stops
+   * reading it is worse off than one who was never warned.
+   */
+  const cakesOnly = { categoryId: "cat-cakes", categoryIds: ["cat-cakes"] };
+  const cakeAndPlant = { categoryId: "cat-cakes", categoryIds: ["cat-cakes", "cat-plants"] };
+  const plantOnly = { categoryId: "cat-plants", categoryIds: ["cat-plants"] };
+  const shop = [cakesOnly, cakeAndPlant, plantOnly];
+
+  it("spares a product that keeps a category outside the selection", () => {
+    // Deleting Cakes leaves the combo filed under Plants. It is not orphaned,
+    // and the old sum counted it.
+    expect(productsLeftUnfiled(shop, ["cat-cakes"])).toEqual([cakesOnly]);
+  });
+
+  it("counts a product filed in two doomed categories once", () => {
+    expect(productsLeftUnfiled(shop, ["cat-cakes", "cat-plants"])).toEqual([
+      cakesOnly,
+      cakeAndPlant,
+      plantOnly,
+    ]);
+  });
+
+  it("leaves a product that was already filed nowhere out of it", () => {
+    /**
+     * It is in that state whatever happens next, so reporting it as NEWLY
+     * orphaned is the same overstatement in a different place.
+     */
+    const unfiled = { categoryId: "", categoryIds: [] };
+
+    expect(productsLeftUnfiled([...shop, unfiled], ["cat-cakes"])).toEqual([cakesOnly]);
+  });
+
+  it("and a product written before memberships existed is read by its primary", () => {
+    const legacy = { categoryId: "cat-cakes" };
+
+    expect(categoriesOf(legacy)).toEqual(["cat-cakes"]);
+    expect(productsLeftUnfiled([legacy], ["cat-cakes"])).toEqual([legacy]);
+  });
+});
+
+describe("a category's count matches the page it links to", () => {
+  /**
+   * Counted over every membership, in both places that show a number.
+   *
+   * The homepage tile and the admin Catalog row are the two, and they were
+   * separate expressions until a product could be in more than one category —
+   * at which point counting the primary alone would have put back the lie this
+   * repo already fixed once, the other way round. The homepage advertised "48
+   * cakes" under Birthday in a shop with 25; the version to avoid now says
+   * "Plants · 3" over a page that lists seven, and a customer reads the small
+   * number and does not click.
+   */
+  const shop = [
+    { categoryId: "cat-cakes", categoryIds: ["cat-cakes"] },
+    { categoryId: "cat-cakes", categoryIds: ["cat-cakes", "cat-plants"] },
+    { categoryId: "cat-plants", categoryIds: ["cat-plants"] },
+  ];
+
+  it("counts a product in every category it is filed under", () => {
+    const tally = countByCategory(shop);
+
+    expect(tally.get("cat-cakes")).toBe(2);
+    expect(tally.get("cat-plants")).toBe(2);
+  });
+
+  it("so the buckets sum to more than the shop holds, deliberately", () => {
+    // Three products, four memberships. Restoring single-counting to "fix"
+    // this is the regression.
+    const total = [...countByCategory(shop).values()].reduce((a, b) => a + b, 0);
+
+    expect(total).toBe(4);
+    expect(shop.length).toBe(3);
+  });
+
+  it("and the homepage tile agrees with it", () => {
+    /**
+     * The customer-visible one. `selectHomepageCategories` builds the tile, and
+     * it renders the number beside the category name.
+     */
+    const tiles = selectHomepageCategories(
+      shop.map((cake) => ({ ...cake, status: "published" })),
+      [
+        { id: "cat-plants", name: "Money Plants", slug: "plants", image: "/p.jpg" },
+        { id: "cat-cakes", name: "Celebration Cakes", slug: "cakes", image: "/c.jpg" },
+      ],
+    );
+
+    expect(tiles.find((tile) => tile.id === "cat-plants")?.count).toBe(2);
   });
 });

@@ -1,5 +1,5 @@
 import type { LandingProduct, LandingCategory, LandingOffer } from "@/constants/landing-data";
-import { loadProducts } from "@/features/products/lib/products-repository";
+import { categoriesOf, loadProducts } from "@/features/products/lib/products-repository";
 import { getCategories } from "@/features/catalog/lib/catalog-repository";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
@@ -78,14 +78,24 @@ export function selectHomepageCategories(
           name: category.name,
           slug: category.slug,
           image: category.image ?? "",
-          // Counted, never declared.
-          //
-          // This was `category.cakeCount ?? <the real count>`, so a number typed
-          // into the category form OVERRODE the shop's actual catalogue — and
-          // the seed had typed one for nine of them. Measured on a real shop:
-          // the homepage advertised "48 cakes" under Birthday and 271 across all
-          // categories, while the whole shop held 25 products.
-          count: published.filter((cake) => cake.categoryId === category.id).length,
+          /**
+           * Counted, never declared — and counted over EVERY membership.
+           *
+           * This was `category.cakeCount ?? <the real count>`, so a number typed
+           * into the category form OVERRODE the shop's actual catalogue — and
+           * the seed had typed one for nine of them. Measured on a real shop:
+           * the homepage advertised "48 cakes" under Birthday and 271 across all
+           * categories, while the whole shop held 25 products.
+           *
+           * Counting the primary alone would put the same lie back the other way
+           * round, once a product can be filed in more than one place: the tile
+           * says "Plants · 3" and the page it links to lists seven. A customer
+           * reads the small number, decides the shop has little to offer, and
+           * never clicks.
+           */
+          count: published.filter((cake) =>
+            categoriesOf(cake).includes(category.id),
+          ).length,
         }) satisfies LandingCategory
     )
     .filter((category) => category.image)

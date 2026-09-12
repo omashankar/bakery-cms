@@ -34,7 +34,11 @@ import {
   CATALOG_HYDRATION_EVENT,
   catalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
-import { loadProducts } from "@/features/products/lib/products-repository";
+import {
+  countByCategory,
+  loadProducts,
+  productsLeftUnfiled,
+} from "@/features/products/lib/products-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
@@ -134,18 +138,28 @@ export function CatalogAdminPage() {
     );
   }, [activeTab, search, store]);
 
+  /**
+   * Read once, shared by the counts and by the orphan check.
+   *
+   * The orphan check needs the PRODUCTS rather than a tally: whether deleting
+   * a category leaves something filed nowhere depends on what else that
+   * product holds, which a count per category cannot answer.
+   */
+  const publishedProducts = useMemo(
+    () => (mounted ? loadProducts().filter((cake) => cake.status === "published") : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mounted, refreshKey],
+  );
+
   // How many published products are really in each category. `cakeCount` on the
   // category is a hand-typed number that agreed with nothing: the seed claimed
   // 48 cakes under Birthday and 271 across all categories, in a shop with 25.
-  const productsByCategory = useMemo(() => {
-    if (!mounted) return new Map<string, number>();
-    const tally = new Map<string, number>();
-    for (const cake of loadProducts()) {
-      if (cake.status !== "published") continue;
-      tally.set(cake.categoryId, (tally.get(cake.categoryId) ?? 0) + 1);
-    }
-    return tally;
-  }, [mounted, refreshKey]);
+  // One increment per MEMBERSHIP — see `countByCategory`, which is shared with
+  // the homepage tiles so the two screens cannot disagree about a number.
+  const productsByCategory = useMemo(
+    () => countByCategory(publishedProducts),
+    [publishedProducts],
+  );
 
   const counts = {
     categories: store.categories.length,
@@ -193,10 +207,21 @@ export function CatalogAdminPage() {
     setSelectedIds(items.map((item) => item.id));
   }
 
-  /** Products that would be orphaned by deleting the current selection. */
+  /**
+   * Products left filed NOWHERE by deleting the current selection.
+   *
+   * This summed the per-category tallies, which was right while a product had
+   * exactly one category and is wrong twice over now: it counts a product filed
+   * in two of the doomed categories TWICE, and it counts a product that keeps a
+   * category outside the selection as orphaned when it is not.
+   *
+   * Both errors point the same way — the only warning attached to a destructive
+   * action over-reports — and an owner who checks it once, finds it wrong, and
+   * stops reading it is worse off than one who was never warned.
+   */
   function orphanCount(): number {
     if (activeTab !== "categories") return 0;
-    return selectedIds.reduce((n, id) => n + (productsByCategory.get(id) ?? 0), 0);
+    return productsLeftUnfiled(publishedProducts, selectedIds).length;
   }
 
   async function handleDelete() {
@@ -212,9 +237,11 @@ export function CatalogAdminPage() {
       const which = selectedIds.length === 1 ? "category" : "categories";
       const ok = window.confirm(
         `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
-          "They will keep pointing at a category that no longer exists: the shop " +
-          "will show them as uncategorised, and the category filter here will " +
-          "never find them again.\n\nDelete anyway?"
+          "That is every category they are filed under, so they will be left " +
+          "pointing at nothing: the shop will show them as uncategorised, and " +
+          "the category filter here will never find them again.\n\n" +
+          "Anything filed somewhere else as well is not counted here and keeps " +
+          "its other categories.\n\nDelete anyway?"
       );
       if (!ok) return;
     }

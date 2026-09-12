@@ -210,6 +210,61 @@ export function fileUnderCategories(primary: string, also: readonly string[] = [
   return [...new Set([primary, ...also].filter(Boolean))];
 }
 
+/**
+ * Every category a product is filed under, whatever shape it is in.
+ *
+ * `normalizeCommerceFields` guarantees `categoryIds` on anything that came
+ * through a repository read — but the homepage counts, the admin catalog and
+ * the orphan check all take products from callers that may not have, and each
+ * had started writing its own `?? [categoryId]`. Three copies of a fallback is
+ * how two screens come to disagree about where a product is filed.
+ */
+export function categoriesOf(cake: { categoryId: string; categoryIds?: string[] }): string[] {
+  return fileUnderCategories(cake.categoryId, cake.categoryIds ?? []);
+}
+
+/**
+ * How many products sit in each category — ONE INCREMENT PER MEMBERSHIP.
+ *
+ * These buckets legitimately sum to MORE than the number of products, because
+ * a product filed in three categories is in three of them. That is not a
+ * double-count waiting to be fixed; it is what each row means, and restoring
+ * single-counting makes every category under-report the page it links to.
+ */
+export function countByCategory(
+  products: readonly { categoryId: string; categoryIds?: string[] }[],
+): Map<string, number> {
+  const tally = new Map<string, number>();
+  for (const cake of products) {
+    for (const id of categoriesOf(cake)) {
+      tally.set(id, (tally.get(id) ?? 0) + 1);
+    }
+  }
+  return tally;
+}
+
+/**
+ * The products that deleting these categories would leave filed nowhere.
+ *
+ * A product is orphaned only when EVERY category it holds is being deleted —
+ * which is a question about the product, not about any one category, and is
+ * why this cannot be answered by summing per-category counts.
+ *
+ * A product already filed nowhere is not counted: it is in that state
+ * whatever happens next, and reporting it as newly orphaned would make the
+ * warning wrong in the direction that gets warnings ignored.
+ */
+export function productsLeftUnfiled<T extends { categoryId: string; categoryIds?: string[] }>(
+  products: readonly T[],
+  deleting: readonly string[],
+): T[] {
+  const doomed = new Set(deleting);
+  return products.filter((cake) => {
+    const filed = categoriesOf(cake);
+    return filed.length > 0 && filed.every((id) => doomed.has(id));
+  });
+}
+
 export function normalizeCommerceFields(cake: Product): Product {
   const variantGroups = normalizeVariantGroups(cake);
 
@@ -243,7 +298,7 @@ export function normalizeCommerceFields(cake: Product): Product {
      * `normalizeProductImages`. Normalising here is why no reader downstream
      * needs a fallback, and why no backfill is required for correctness.
      */
-    categoryIds: fileUnderCategories(cake.categoryId, cake.categoryIds ?? []),
+    categoryIds: categoriesOf(cake),
     // Owner-defined facts. Absent means the shop has stated none, not that it
     // needs some invented for it — the mistake this function made with shapes.
     descriptionBlocks: cake.descriptionBlocks ?? [],
