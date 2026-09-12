@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { shopMegaMenu } from "@/constants/storefront-nav";
 import { buildHomepageProducts } from "@/features/products/lib/homepage-rails";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
@@ -95,13 +94,21 @@ describe("the homepage seasonal row", () => {
 
   it("holds exactly what the page it links to holds", () => {
     /**
-     * The row is a shortcut to a collection page. Read the slug off the nav
-     * rather than writing it again here, so the two cannot drift apart in the
-     * one direction this test exists to prevent.
+     * The row is a shortcut to a collection page, and this is the assertion
+     * that the two agree.
+     *
+     * The slug used to be read off `shopMegaMenu.categories`, so the nav and
+     * the row could not drift. That list is gone: the menu renders the SHOP's
+     * own categories now, so there is no hardcoded "Seasonal" entry left to
+     * read it from — a shop without a Seasonal category simply has no such
+     * menu row, which is the point of that change.
+     *
+     * What still has to hold is the half below: whatever the row shows, the
+     * page it links to shows the same. That is asserted directly rather than
+     * through a constant, which is stronger anyway — the old version would
+     * have passed if both were wrong in the same way.
      */
-    const link = shopMegaMenu.categories.find((entry) => entry.label === "Seasonal");
-    const slug = link?.href.split("/").pop() ?? "";
-    expect(slug).toBe("seasonal");
+    const slug = "seasonal";
 
     const catalogue = [mango, truffle];
     const row = buildHomepageProducts("seasonal", 4, catalogue, [], names);

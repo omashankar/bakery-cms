@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { shopMegaMenu, type MegaMenuLink } from "@/constants/storefront-nav";
+import type { MegaMenuLink } from "@/constants/storefront-nav";
 import { routes } from "@/constants/routes";
 import { SafeImage } from "@/components/shared/safe-image";
 import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
@@ -17,21 +17,27 @@ import { cn } from "@/lib/utils";
  * types (settings live in client localStorage).
  */
 /**
- * The demo category list, with the one entry that names the SHOP’S GOODS
- * rather than a category renamed to whatever the shop calls them.
+ * What a shop with NO categories of its own gets.
  *
- * This fallback renders only while a shop has no categories of its own — which
- * is exactly a brand-new non-bakery shop, the one that must not be shown a menu
- * reading “All Cakes”. Matched by href, like the admin nav, rather than by
- * position: the rest of the list is demo CATEGORY names and stays as written.
+ * It used to be the demo bakery list — Birthday Cakes, Photo Cakes, Eggless
+ * Cakes, Seasonal — with only the first row relabelled. Every one of those
+ * is a promise this file cannot keep: the slug has to exist in the shop's
+ * catalogue or the row opens an empty grid, and a florist with no categories
+ * yet was offered five cake pages.
+ *
+ * Now only the two rows that are true for ANY shop: everything, and the
+ * best-selling of it. Both point at the collections page itself, which
+ * renders whatever the shop has.
  */
 function useFallbackCategories(): MegaMenuLink[] {
   const labels = useBusinessLabels();
-  return shopMegaMenu.categories.map((category) =>
-    category.href === routes.store.collections
-      ? { ...category, label: `All ${labels.productWordPlural}` }
-      : category,
-  );
+  return [
+    { label: `All ${labels.productWordPlural}`, href: routes.store.collections },
+    {
+      label: "Best Sellers",
+      href: `${routes.store.collections}?sort=popular`,
+    },
+  ];
 }
 
 function useWeddingLinkFilter() {
@@ -55,10 +61,26 @@ export interface ShopCategory {
   image?: string;
 }
 
+/** One entry in the shop's own occasion list, as the server resolved it. */
+export interface ShopOccasion {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface MegaMenuProps {
   isActive?: boolean;
-  /** The shop's real categories. Falls back to the demo list only if absent. */
+  /** The shop's real categories. Falls back to the two generic rows if absent. */
   categories?: ShopCategory[];
+  /**
+   * The shop's real occasions.
+   *
+   * This column was three hardcoded bakery entries. Absent or empty now hides
+   * the column outright rather than substituting a guess — a shop that keeps
+   * no occasions has nothing to put there, and a heading over invented links
+   * is worse than no heading.
+   */
+  occasions?: ShopOccasion[];
   /**
    * The label from the admin's Collections nav row. It read "Shop",
    * hardcoded, while the editor offered a label field for that row and a
@@ -67,7 +89,12 @@ interface MegaMenuProps {
   label?: string;
 }
 
-export function MegaMenu({ isActive, label = "Shop", categories: shopCategories }: MegaMenuProps) {
+export function MegaMenu({
+  isActive,
+  label = "Shop",
+  categories: shopCategories,
+  occasions: shopOccasions,
+}: MegaMenuProps) {
   const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
   const categories = filterWedding(
@@ -78,7 +105,14 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
         }))
       : fallbackCategories,
   );
-  const occasions = filterWedding(shopMegaMenu.occasions);
+  const occasions = filterWedding(
+    (shopOccasions ?? []).map((occasion) => ({
+      label: occasion.name,
+      // The same route a category slug resolves through — an occasion tag
+      // has always matched at /store/collections/<slug>.
+      href: routes.store.collection(occasion.slug),
+    })),
+  );
   // The first of the shop's own categories that has a picture. Nothing to show
   // is a real answer — the menu is complete without this card.
   const withPicture = (shopCategories ?? []).find((category) => category.image?.trim());
@@ -118,6 +152,9 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
                 ))}
               </ul>
             </div>
+            {/* Hidden entirely when the shop keeps no occasions — a heading
+                over an empty list reads as something that failed to load. */}
+            {occasions.length > 0 ? (
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Shop by Occasion
@@ -135,6 +172,7 @@ export function MegaMenu({ isActive, label = "Shop", categories: shopCategories 
                 ))}
               </ul>
             </div>
+            ) : null}
             {/*
               A category the shop actually has, with a picture it actually
               uploaded — or no card.
@@ -186,10 +224,12 @@ export function MobileShopLinks({
   // Collections row's label changed the desktop menu and not this one.
   label = "Shop",
   categories: shopCategories,
+  occasions: shopOccasions,
 }: {
   onNavigate?: () => void;
   label?: string;
   categories?: ShopCategory[];
+  occasions?: ShopOccasion[];
 }) {
   const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
@@ -200,6 +240,20 @@ export function MobileShopLinks({
           href: routes.store.collection(category.slug),
         }))
       : fallbackCategories,
+  );
+  /**
+   * The same occasions the desktop menu shows.
+   *
+   * This component had no occasion column at all, so the two menus already
+   * disagreed — and the phone is the one an Indian shop's customers actually
+   * use. Adding it here rather than only fixing the desktop source is the
+   * point: a menu that differs by screen size is two menus.
+   */
+  const occasions = filterWedding(
+    (shopOccasions ?? []).map((occasion) => ({
+      label: occasion.name,
+      href: routes.store.collection(occasion.slug),
+    })),
   );
   return (
     <div className="space-y-1 border-t border-border pt-3">
@@ -216,6 +270,23 @@ export function MobileShopLinks({
           {item.label}
         </Link>
       ))}
+      {occasions.length > 0 ? (
+        <>
+          <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Shop by Occasion
+          </p>
+          {occasions.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </>
+      ) : null}
     </div>
   );
 }

@@ -182,6 +182,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             <MegaMenu
               label={collectionsRow.label}
               categories={chrome.categories}
+              occasions={chrome.occasions}
               isActive={
                 pathname === routes.store.collections ||
                 pathname.startsWith(`${routes.store.collections}/`)
@@ -320,6 +321,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               <MobileShopLinks
                 label={collectionsRow.label}
                 categories={chrome.categories}
+                occasions={chrome.occasions}
                 onNavigate={() => setMobileOpen(false)}
               />
             ) : null}

@@ -1,7 +1,10 @@
 import { cache } from "react";
 
 import { getSettings } from "@/features/settings/server/settings.service";
-import { getStorefrontCategories } from "./storefront-categories.server";
+import {
+  getStorefrontCategories,
+  getStorefrontOccasions,
+} from "./storefront-categories.server";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { defaultHeaderSettings, selectVisibleNavItems } from "@/features/site-layout/lib/header-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
@@ -29,6 +32,8 @@ export interface StorefrontChrome {
   siteName: string;
   /** The shop's own categories, for the header's Shop menu. */
   categories: { id: string; name: string; slug: string; image?: string }[];
+  /** The shop's own occasions, for the same menu's second column. */
+  occasions: { id: string; name: string; slug: string }[];
   /** General settings logo URL. Empty means "render the letter mark instead". */
   logo: string;
   logoLetter: string;
@@ -73,8 +78,11 @@ function firstLetterOf(siteName: string): string {
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
-    // The settings read failed; the demo taxonomy is the only list there is.
+    // The settings read failed. EMPTY, not the demo taxonomy: this is the
+    // database-unreachable path, and a menu of links into a catalogue we
+    // cannot read is a menu of links to empty grids.
     categories: [],
+    occasions: [],
     logo: "",
     logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
@@ -120,13 +128,17 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
     // Concurrently with the rest. The categories read was added as a serial
     // `await` further down, which put a whole extra round trip on the critical
     // path of every storefront render for a value the others do not depend on.
-    const [settingsRaw, headerRaw, footerRaw, appearanceRaw, categories] = await Promise.all([
-      getSettings(),
-      getSiteLayout("header"),
-      getSiteLayout("footer"),
-      getSiteLayout("appearance"),
-      getStorefrontCategories(),
-    ]);
+    const [settingsRaw, headerRaw, footerRaw, appearanceRaw, categories, occasions] =
+      await Promise.all([
+        getSettings(),
+        getSiteLayout("header"),
+        getSiteLayout("footer"),
+        getSiteLayout("appearance"),
+        getStorefrontCategories(),
+        // In the SAME Promise.all — the note above records what a serial
+        // await here cost the critical path of every storefront render.
+        getStorefrontOccasions(),
+      ]);
 
     const settings = settingsRaw as unknown as Record<string, unknown>;
     const general = (settings.general ?? {}) as Record<string, string | undefined>;
@@ -192,6 +204,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
        * taxonomy already; this is the other half of that fix.
        */
       categories,
+      occasions,
       brand: {
         name,
         tagline: general.siteTagline || brandInfo.tagline,

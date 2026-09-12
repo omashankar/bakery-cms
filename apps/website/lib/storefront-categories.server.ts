@@ -36,6 +36,40 @@ export async function getStorefrontCategories(): Promise<
 }
 
 /**
+ * The shop's OWN occasions — Birthday, Anniversary, whatever it added.
+ *
+ * The mega menu's second column was three hardcoded bakery entries, and the
+ * file holding them said so in as many words: "every entry here is a promise
+ * this file cannot keep on its own". A florist got Birthday, Anniversary and
+ * Wedding whether or not it had them; a shop that created "Housewarming" got
+ * no way in.
+ *
+ * The list is real and already populated — occasions are a live membership
+ * axis, tagged on products and matched at /store/collections/<slug> — so
+ * this is the menu catching up with data the shop already has.
+ *
+ * No demo fallback and `[]` on a throw, for the same reason as collections:
+ * an occasion nobody created is a menu row that opens an empty grid.
+ */
+export async function getStorefrontOccasions(): Promise<
+  { id: string; name: string; slug: string }[]
+> {
+  try {
+    const catalog = await getCatalog();
+    const rows = (catalog.occasions ?? []) as { id: string; name: string; slug: string }[];
+    const bySlug = new Map<string, { id: string; name: string; slug: string }>();
+    for (const { id, name, slug } of rows) {
+      // First row wins, as everywhere else: a second row with the same slug
+      // is unreachable and must not be offered as though it were not.
+      if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug });
+    }
+    return [...bySlug.values()];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * The shop's CURATED groups. Empty is a real and common answer.
  *
  * No demo fallback, unlike `getStorefrontCategories` above — and that
