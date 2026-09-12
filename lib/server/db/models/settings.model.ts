@@ -111,6 +111,22 @@ const commerceSchema = new mongoose.Schema(
     deliveryLeadDays: { type: Number, default: 1 },
     estimatedDeliveryDays: { type: Number, default: 1 },
     deliveryTimeSlots: { type: [String], default: [] },
+    /*
+      THE THIRD TIME. See the note below about `sameDayCutoff`.
+
+      The delivery speeds a shop sells — id, label, description, fee, windows —
+      shipped declared on `CommerceSettings`, validated by Zod, defaulted, given
+      an admin editor, and wired through pricing. Every one of those said the
+      feature worked. This line was missing, so Mongoose dropped the whole array
+      on write: the owner would have typed their speeds, been told "Delivery
+      slots saved", and found the list empty on the next load, with no error
+      anywhere. Mixed, like `productTrustCards`, because the entries are objects.
+
+      `tests/domain/a-setting-the-shop-types-is-a-setting-the-shop-keeps.test.ts`
+      now compares every key of `defaultCommerceSettings` against this schema's
+      paths, so a fourth one cannot happen quietly.
+    */
+    deliveryTiers: { type: [mongoose.Schema.Types.Mixed], default: [] },
     orderNumberPrefix: { type: String, default: "BK" },
     /*
       Two settings that could not be saved.
