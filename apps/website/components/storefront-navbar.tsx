@@ -19,6 +19,7 @@ import {
 } from "@/apps/website/account/components/customer-auth-modal";
 import { AccountMenu } from "@/apps/website/account/components/account-menu";
 import { GuestMenu } from "@/apps/website/account/components/guest-menu";
+import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
 import { getWishlistCount } from "@/apps/website/lib/wishlist";
@@ -212,7 +213,13 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       */}
       {utilityNav.length > 0 || currencyNote ? (
         <div className="hidden border-b border-border/60 bg-cream-50/40 lg:block">
-          <div className="mx-auto flex max-w-7xl items-center justify-end gap-0 px-4 py-1.5 text-xs text-muted-foreground sm:px-6 lg:px-8">
+          {/* The same column as everything below it — see layoutSpacing. */}
+          <div
+            className={cn(
+              layoutSpacing.container,
+              "flex items-center justify-end gap-0 py-1.5 text-xs text-muted-foreground"
+            )}
+          >
             {currencyNote ? (
               <>
                 {/*
@@ -257,13 +264,15 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       */}
       <div
         data-header-bar
-        /*
-          Taller from lg, where the reference row is about 90px and there is
-          room for it. Appended rather than written in place of `h-16`: the
-          base height is what a phone gets, and the two survive together
-          because they are different breakpoints.
-        */
-        className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:h-[88px] lg:gap-4 lg:px-8"
+        className={cn(
+          layoutSpacing.container,
+          /*
+            Taller from lg, where the reference row is about 90px and there is
+            room for it. The base height is what a phone gets; the two survive
+            together because they are different breakpoints.
+          */
+          "flex h-16 items-center justify-between gap-2 lg:h-[88px] lg:gap-4"
+        )}
       >
         {/*
           `min-w-0` and a cap on the phone, because the shop's name is free
@@ -480,7 +489,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         className="hidden border-y border-border bg-cream-100 lg:block"
       >
         <nav
-          className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-1.5 sm:px-6 lg:px-8"
+          className={cn(layoutSpacing.container, "flex items-center gap-1 py-1.5")}
           aria-label="Shop categories"
         >
         {bandRows.map((item, index) => {

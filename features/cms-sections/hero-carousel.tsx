@@ -665,25 +665,85 @@ export function HeroCarousel({
         what lets the dots move out from over the picture.
       */}
       <div className="relative">
-        <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          {/* key forces a fresh mount per slide so the staggered entrance replays */}
-          <div key={activeIndex} className="col-start-1 row-start-1">
-            {banner ? (
-              <HeroBannerSlideView
-                slide={active}
-                priority={activeIndex === 0}
-                side={copySide}
-              />
-            ) : (
+        {/*
+          TWO WAYS TO CHANGE SLIDE, because the two layouts are different
+          things and one answer was wrong for one of them.
+
+          THE BANNER SLIDES SIDEWAYS. Every slide is drawn, in a row as wide
+          as all of them together, and the row is moved one slide's width at a
+          time. Mounting one at a time cannot do this at any duration: React
+          removes the old node in the same commit that adds the new one, so
+          there is nothing on screen to move, and the band hard-cut between
+          pictures.
+
+          THE SPLIT HERO STILL MOUNTS ONE AT A TIME. Its copy arrives on a
+          staggered entrance, and an animation only plays on mount; drawn all
+          at once, every slide would have played its entrance during the first
+          paint and none would ever play again.
+        */}
+        {banner ? (
+          <div className="overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+            <div
+              className={cn(
+                "flex transition-transform duration-700 ease-out",
+                // Nobody who asked for less movement gets a 700ms slide.
+                "motion-reduce:transition-none"
+              )}
+              style={{
+                /*
+                  100% PER SLIDE, and the reason is not the obvious one.
+
+                  `translateX` resolves its percentage against the element's
+                  own width — so this depends entirely on how wide the track
+                  actually is, and the track is NOT as wide as its contents.
+                  Its width comes from its parent (one slide), each child is
+                  `w-full` of THAT, and `shrink-0` lets the row overflow
+                  instead of growing it. So the track measures one slide, and
+                  100% of it is exactly one slide.
+
+                  `100 / count` is the version that reads correct and is not:
+                  it assumes a track as wide as all the slides together, and on
+                  a three-slide hero it moves 480px of a 1440px slide. Measured
+                  in a browser, which is the only place this can be settled.
+                */
+                transform: `translateX(-${activeIndex * 100}%)`,
+              }}
+            >
+              {slides.map((slide, i) => (
+                <div
+                  key={i}
+                  /*
+                    `w-full` against the VIEWPORT of the track — the wrapper —
+                    and `shrink-0` so three of them do not divide one width
+                    between themselves, which is what flex does by default.
+                  */
+                  className="w-full shrink-0"
+                  /*
+                    `inert` rather than `aria-hidden` alone. Both hide the
+                    slide from a screen reader, but only `inert` takes its link
+                    out of the tab order — and a banner slide IS a link, so
+                    without it a keyboard user tabs through two pictures that
+                    are off the side of the screen before reaching the page.
+                  */
+                  inert={i !== activeIndex}
+                >
+                  <HeroBannerSlideView slide={slide} priority={i === 0} side={copySide} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+            <div key={activeIndex} className="col-start-1 row-start-1">
               <HeroSlideView
                 slide={active}
                 priority={activeIndex === 0}
                 rating={rating}
                 stats={stats}
               />
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {multi ? (
           <>

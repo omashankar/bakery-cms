@@ -1,6 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
+import { layoutSpacing } from "@/constants/spacing";
+import { cn } from "@/lib/utils";
 
 /**
  * Tells an EXEMPT viewer that the shop they are browsing is closed to everyone
@@ -26,7 +28,7 @@ export function MaintenanceBanner({ maintenance }: { maintenance: MaintenanceSta
 
   return (
     <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-      <div className="mx-auto flex max-w-7xl items-start gap-3 text-sm">
+      <div className={cn(layoutSpacing.container, "flex items-start gap-3 px-0 text-sm")}>
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
         <p>
           <span className="font-medium">

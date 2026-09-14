@@ -92,6 +92,97 @@ for (const { name, width, height } of WIDTHS) {
   });
 }
 
+test("one slide slides into the next rather than cutting", async ({ page }) => {
+  /**
+   * The only way to tell a move from a cut is to look DURING it: both end
+   * with one picture on screen. Sampled part-way through, a moving row is
+   * somewhere strictly between the two positions and a cut never is.
+   *
+   * It also checks the DISTANCE, because the direction being right says
+   * nothing about the amount: the first version of this moved 480px of a
+   * 1440px slide and looked, in a screenshot, exactly like a slide.
+   */
+  const width = 1440;
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const measure = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const pictures = [...(hero?.querySelectorAll("img") ?? [])];
+      return {
+        count: pictures.length,
+        first: pictures[0] ? pictures[0].getBoundingClientRect().left : null,
+        widest: pictures.reduce((most, img) => Math.max(most, img.getBoundingClientRect().width), 0),
+        height: hero ? hero.getBoundingClientRect().height : 0,
+      };
+    });
+
+  const before = await measure();
+  if (before.count < 2) test.skip(true, "this shop has one hero slide");
+  expect(Math.round(before.first!)).toBe(0);
+
+  /*
+    EACH SLIDE IS THE WHOLE WIDTH, and this is a separate question from where
+    the row is. Drop `shrink-0` and flex divides one width between the three,
+    so all of them are on screen at a third the size — while the transform,
+    which is a percentage of the track, still moves exactly the distance this
+    test was checking. It survived the mutation until this line existed.
+  */
+  expect(
+    Math.round(before.widest),
+    `the widest slide is ${Math.round(before.widest)}px in a ${width}px window`,
+  ).toBe(width);
+
+  await page.click('[aria-label="Next slide"]');
+  await page.waitForTimeout(250);
+  const mid = await measure();
+
+  expect(
+    mid.first!,
+    `the row is at ${Math.round(mid.first!)}px a quarter of a second in`,
+  ).toBeLessThan(-20);
+  expect(mid.first!).toBeGreaterThan(-width + 20);
+
+  await page.waitForTimeout(900);
+  const after = await measure();
+  expect(
+    Math.abs(after.first! + width),
+    `settled at ${Math.round(after.first!)}px, expected ${-width}`,
+  ).toBeLessThan(4);
+
+  /*
+    And the band does not move while it happens. Every slide is in the flow,
+    so a picture of a different shape would resize the row mid-move and take
+    the whole page with it.
+  */
+  expect(Math.abs(after.height - before.height)).toBeLessThan(2);
+});
+
+test("and only the slide on screen can be tabbed to", async ({ page }) => {
+  /**
+   * A banner slide is a link. Drawn all at once, the two off the side of the
+   * screen are still in the document — and without `inert` a keyboard user
+   * tabs through both of them before reaching the page.
+   */
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const reachable = await page.evaluate(() => {
+    const hero = document.querySelector('[data-section-id^="hero"]');
+    const links = [...(hero?.querySelectorAll("a") ?? [])];
+    return {
+      total: links.length,
+      free: links.filter((a) => !a.closest("[inert]")).length,
+    };
+  });
+
+  if (reachable.total < 2) test.skip(true, "this shop has one hero slide");
+  expect(reachable.free, `${reachable.free} of ${reachable.total} hero links are tabbable`).toBe(1);
+});
+
 test("the banner is shown whole, at whatever shape the shop uploaded", async ({ page }) => {
   /**
    * The band used to impose a ratio ladder and crop to it — and its middle rung

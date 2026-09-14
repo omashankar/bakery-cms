@@ -43,9 +43,27 @@ export const spacing = {
 export const layoutSpacing = {
   sectionY: "py-16 sm:py-20 lg:py-24",
   sectionX: "px-4 sm:px-6 lg:px-8",
-  container: "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8",
+  /**
+   * THE CONTENT COLUMN — 1440, not `max-w-7xl`'s 1280.
+   *
+   * Measured against the layout this storefront is drawn from: its rows of
+   * category tiles span about 1520px of a 1900px window, and at 1280 ours
+   * stopped 150px short on each side, so a strip meant to read as the way
+   * into the catalogue looked like a narrow panel floating in white.
+   *
+   * A CHANGE TO EVERY PAGE, deliberately: the header, the nav band, the
+   * grids, the cart and the checkout all draw their column from here, and
+   * widening one of them alone is how a page stops lining up with its own
+   * header. Text is not affected — every block of prose in this repo carries
+   * its own narrower max-width (SectionHeader's `max-w-2xl`, and
+   * `containerNarrow` for whole pages of it), which is what makes widening
+   * this safe.
+   */
+  container: "mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8",
   containerNarrow: "mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8",
-  containerWide: "mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8",
+  // Still the wide one, and still wider than `container` — it was 1400,
+  // which the line above has just overtaken.
+  containerWide: "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8",
   cardPadding: "p-6",
   cardPaddingSm: "p-4",
   stackSm: "space-y-2",

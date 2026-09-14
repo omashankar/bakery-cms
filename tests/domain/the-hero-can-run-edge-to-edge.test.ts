@@ -897,3 +897,105 @@ describe("bands a shop can switch off", () => {
     expect(good.showBannerStrip).toBe(false);
   });
 });
+
+describe("how one slide becomes the next", () => {
+  const carousel = () => codeOf(read(CAROUSEL));
+
+  it("the banner draws every slide, because a slide needs somewhere to go", () => {
+    /**
+     * Mounting one at a time cannot move at any duration: React removes the
+     * old node in the same commit that adds the new one, so there is nothing
+     * on screen to move and the band hard-cuts between pictures. Every slide
+     * is drawn, in a row, and the row is what moves.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/slides\.map\(\(slide, i\) => \(/);
+    expect(body).toContain("transition-transform");
+    expect(body).toContain("w-full shrink-0");
+  });
+
+  it("and moves the row by exactly one slide, not by one third of one", () => {
+    /**
+     * `translateX` resolves its percentage against the element's OWN width,
+     * and the track is NOT as wide as its contents: its width comes from its
+     * parent, each child is `w-full` of that, and `shrink-0` lets the row
+     * overflow rather than growing it. So the track measures one slide and
+     * 100% of it is one slide.
+     *
+     * `100 / count` is the version that reads correct and is not. It assumes a
+     * track as wide as all the slides together, and on a three-slide hero it
+     * moved 480px of a 1440px slide — measured in a browser, which is the only
+     * place the question can be settled, and the first version of this shipped
+     * it.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/translateX\(-\$\{activeIndex \* 100\}%\)/);
+    expect(body, "the track is being moved a fraction of a slide").not.toContain(
+      "(activeIndex * 100) / count",
+    );
+  });
+
+  it("and clips the slides that are off the side of it", () => {
+    // Without this the row simply extends past the window and gives the whole
+    // storefront a horizontal scrollbar as wide as every slide together.
+    const body = carousel();
+    const at = body.indexOf("slides.map((slide, i) => (");
+
+    expect(body.slice(0, at)).toContain('<div className="overflow-hidden"');
+  });
+
+  it("and the ones off screen are out of the tab order", () => {
+    /**
+     * A banner slide IS a link. `aria-hidden` alone hides it from a screen
+     * reader and leaves it tabbable, so a keyboard user would tab through two
+     * pictures that are off the side of the screen before reaching the page.
+     * `inert` does both.
+     */
+    expect(carousel()).toMatch(/inert=\{i !== activeIndex\}/);
+  });
+
+  it("and a 700ms move is not forced on somebody who asked for less", () => {
+    expect(carousel()).toContain("motion-reduce:transition-none");
+  });
+
+  it("while the split hero still mounts one at a time, for its entrance", () => {
+    /**
+     * Its copy arrives on a staggered entrance, and an animation only plays on
+     * mount. Drawn all at once, every slide would have played its entrance
+     * during the first paint and none would ever play again.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/<div key=\{activeIndex\} className="col-start-1 row-start-1">/);
+    expect(body).toContain("<HeroSlideView");
+  });
+});
+
+describe("the column the page is drawn in", () => {
+  it("is one width, and the header uses it too", () => {
+    /**
+     * The header drew `max-w-7xl` inline while the bands below it took theirs
+     * from `layoutSpacing` — so widening the content column would have left
+     * the logo, the search box and the nav band lining up with nothing.
+     */
+    const spacing = read("constants/spacing.ts");
+    const navbar = codeOf(read("apps/website/components/storefront-navbar.tsx"));
+
+    expect(spacing).toContain('container: "mx-auto w-full max-w-[1440px]');
+    expect(navbar, "the header still fixes its own width").not.toContain("max-w-7xl");
+    // The three rows of the header: utility, main bar, category band.
+    expect((navbar.match(/layoutSpacing\.container/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("and the wide one is still wider than it", () => {
+    // `containerWide` was 1400, which the line above has just overtaken. A
+    // ladder whose top rung is below the one under it is not a ladder.
+    const spacing = read("constants/spacing.ts");
+    const width = (key: string) =>
+      Number(new RegExp(`${key}: "mx-auto w-full max-w-\\[(\\d+)px\\]`).exec(spacing)?.[1] ?? 0);
+
+    expect(width("containerWide")).toBeGreaterThan(width("container"));
+  });
+});
