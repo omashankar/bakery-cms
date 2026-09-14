@@ -56,3 +56,6 @@ next-env.d.ts
 
 # One-off migration snapshots: whole collections, including customer addresses.
 scripts/.snapshots/
+
+# Banner artwork dropped here to be uploaded to the CDN, not to be committed.
+banners/
