@@ -751,9 +751,15 @@ export function HeroCarousel({
         page's own background, which is where the reference layout puts them
         and where the split hero already had them; so the two layouts share one
         row and one palette instead of keeping a light set nobody could see.
+
+        AND CLOSE TO IT, because they belong to it. At 24 and 32px they read
+        as their own band floating between the hero and whatever follows,
+        which is how 186px of white between the banner and the first row of
+        the page came to look deliberate. About 14px in the reference this is
+        drawn from.
       */}
       {multi ? (
-        <div className="mt-6 flex items-center justify-center gap-2 sm:mt-8">
+        <div className="mt-3 flex items-center justify-center gap-2 sm:mt-4">
           {slides.map((_, i) => (
             <button
               key={i}

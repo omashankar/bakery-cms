@@ -521,7 +521,17 @@ function HeroSection(props: HomepageSectionRendererProps) {
       */
       <SectionShell
         {...props}
-        className="py-0 pb-8 sm:py-0 sm:pb-10 lg:py-0 lg:pb-14"
+        /*
+          ENOUGH TO CLEAR THE DOTS, and no more.
+
+          This was 32/40/56px, and the band below brings its own top padding —
+          so the two stacked into 186px of white between the banner and the
+          first row of the page, measured at every width from 390 to 1900. The
+          floor here exists because the dots and the promises strip sit under
+          the picture rather than over it; it is not the page's own rhythm,
+          and paying for that rhythm twice is what made the hero look adrift.
+        */
+        className="py-0 pb-4 sm:py-0 sm:pb-5 lg:py-0 lg:pb-6"
         fullBleed
       >
         {carousel}
@@ -553,7 +563,16 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
   if (items.length === 0) return null;
 
   return (
-    <SectionShell {...props}>
+    /*
+      TIGHTER THAN A CONTENT BAND, because it is not one.
+
+      The shell's own `py-16 sm:py-20 lg:py-24` is the rhythm for a band with
+      a heading and a paragraph and a grid of cards in it. This is a strip of
+      links — the way into the catalogue, usually directly under the hero —
+      and at 96px top and bottom it floated half a screen from the thing it
+      belongs to.
+    */
+    <SectionShell {...props} className="py-8 sm:py-10 lg:py-12">
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
@@ -566,8 +585,15 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
             negated so the scroll runs to the edge of the screen instead of
             stopping 16px short, which is what tells a customer there is more
             to the right.
+
+            NO TOP MARGIN. It had `mt-8`, which was the gap under the heading
+            — except SectionHeader carries its own `mb-10` for that, so the
+            two were stacked, and when the shop blanked the heading the
+            margin stayed behind and held 32px of nothing above the tiles.
+            Spacing under a heading belongs to the heading, which is the only
+            thing that knows whether there is one.
           */
-          "mt-8 -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden",
+          "-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden",
           /*
             THE COLUMN COUNT FOLLOWS THE TILES. It was hard-wired to eight,
             so a shop with three categories got three cards and five columns
