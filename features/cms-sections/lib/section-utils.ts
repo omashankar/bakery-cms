@@ -1,4 +1,42 @@
 
+import type { HeroLayout, HomepageSectionInstance } from "@/types/homepage-builder";
+
+/**
+ * SPLIT unless the shop asked for a banner, and anything unrecognised is split.
+ *
+ * The fallback is the load-bearing half, not the registry's default. Every hero
+ * section stored before this key existed has no `layout` at all and nothing
+ * migrates them, so a shop that has never opened the builder since reads its
+ * layout HERE — the registry default only ever reaches sections created after
+ * the deploy. Flip this to "banner" and every existing shop's homepage changes
+ * shape without anyone touching it.
+ */
+export function heroLayoutOf(
+  content: HomepageSectionInstance["content"],
+): HeroLayout {
+  return content.layout === "banner" ? "banner" : "split";
+}
+
+/**
+ * The slides worth drawing — not the same list in the two layouts.
+ *
+ * A split slide can be words with no picture: the words are the half a
+ * customer reads, and the empty frame beside them is already guarded. A banner
+ * slide IS its picture — drawn edge to edge with the words laid over it — so
+ * one with no image is a blank band the height of the hero, and the arrows and
+ * dots would still count it. Dropped instead.
+ */
+export function heroSlidesFor<T extends { headline: string; imageUrl: string }>(
+  layout: HeroLayout,
+  slides: readonly T[],
+): T[] {
+  return slides.filter((slide) =>
+    layout === "banner"
+      ? Boolean(slide.imageUrl)
+      : Boolean(slide.headline || slide.imageUrl),
+  );
+}
+
 export function sortSections<T extends { order: number }>(sections: T[]): T[] {
   return [...sections]
     .sort((a, b) => a.order - b.order)

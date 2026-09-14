@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
-  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -13,6 +12,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { layoutSpacing } from "@/constants/spacing";
+import type { HeroLayout } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
 
 export interface HeroSlide {
@@ -174,16 +175,15 @@ function HeroSlideView({
           </div>
         </div>
 
-        {/* Freshness badge */}
-        <div
-          className={cn(
-            reveal,
-            "absolute top-4 right-4 flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 shadow-sm zoom-in-90 [animation-delay:560ms]"
-          )}
-        >
-          <BadgeCheck className="size-4 text-green-600" />
-          <span className="text-xs font-semibold text-foreground">100% Fresh</span>
-        </div>
+        {/*
+          THE "100% FRESH" PILL IS GONE.
+
+          It sat pinned to the corner of every hero image, on every slide, for
+          every shop running this CMS, with no box anywhere to edit or remove
+          it — a claim about goods this CMS knows nothing about, made in the
+          shop's name. A shop that wants to say it can now write it in the
+          promises strip under the hero, in its own words.
+        */}
 
         {/*
           Rating chip — the shop's own approved reviews, or no chip.
@@ -214,6 +214,150 @@ function HeroSlideView({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * THE BANNER SLIDE — here the picture IS the slide.
+ *
+ * A second view rather than a handful of props on the one above, because
+ * almost nothing survives between them: no framed card, no rounding, no
+ * two-column grid, no max width, different crops at every breakpoint, and the
+ * words sit ON the image instead of beside it. Six conditionals threaded
+ * through HeroSlideView would leave neither layout readable, and the split
+ * hero is what every existing shop is still showing.
+ */
+function HeroBannerSlideView({
+  slide,
+  priority,
+}: {
+  slide: HeroSlide;
+  priority?: boolean;
+}) {
+  const image = (
+    <OptimizedImage
+      src={slide.imageUrl}
+      alt={
+        /*
+          The headline is DRAWN over the picture when there is one, so the
+          picture is then decorative and an alt repeating it makes a screen
+          reader read the same sentence twice. With no headline the picture is
+          the whole slide and the shop's own button label is the nearest true
+          description of where it leads — a slide carries no alt-text box to
+          read instead, and writing a sentence about a photograph nobody here
+          has seen is the one thing this must not do.
+        */
+        slide.headline ? "" : slide.primaryLabel
+      }
+      fill
+      priority={priority}
+      className="object-cover"
+      /*
+        100vw, because this band spans the window rather than the content
+        column. The split view asks for "45vw on desktop" and is right to —
+        it is painted in half a column. Left at that here the browser picks a
+        source a third the width it is painted at and the banner is soft.
+      */
+      sizes="100vw"
+    />
+  );
+
+  return (
+    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted sm:aspect-[2/1] lg:aspect-[3/1]">
+      {slide.headline ? (
+        image
+      ) : (
+        /*
+          A banner with no words is a picture that goes somewhere, so the whole
+          picture is the link. With a headline the buttons carry the links
+          instead — an anchor inside an anchor is invalid, and it is the inner
+          one a browser throws away.
+        */
+        <Link href={slide.primaryHref} className="absolute inset-0 block">
+          {image}
+        </Link>
+      )}
+
+      {slide.headline ? (
+        <div
+          className={cn(
+            /*
+              A scrim, not a tint over the whole picture: the words need
+              contrast at the left edge and the photograph is the point
+              everywhere else. Dark because the type below is white, and the
+              CMS cannot know whether the shop's picture is.
+            */
+            "absolute inset-0 flex items-center bg-gradient-to-r from-black/70 via-black/40 to-transparent"
+          )}
+        >
+          <div className={cn(layoutSpacing.container, "w-full")}>
+            <div className="max-w-xl space-y-4 text-white sm:space-y-5">
+              {slide.badge ? (
+                <div className={cn(reveal, "slide-in-from-bottom-2 [animation-delay:80ms]")}>
+                  <Badge
+                    variant="accent"
+                    className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]"
+                  >
+                    <Sparkles className="size-3.5" />
+                    {slide.badge}
+                  </Badge>
+                </div>
+              ) : null}
+
+              <h1
+                className={cn(
+                  reveal,
+                  "font-heading text-[1.75rem] font-bold leading-[1.12] tracking-tight slide-in-from-bottom-4 [animation-delay:180ms] sm:text-[2.5rem] lg:text-5xl"
+                )}
+              >
+                {slide.headline}
+              </h1>
+
+              {slide.subtext ? (
+                <p
+                  className={cn(
+                    reveal,
+                    // white/85 rather than the muted token: that token is tuned
+                    // for the cream page background and disappears on a photo.
+                    "max-w-md text-sm leading-relaxed text-white/85 slide-in-from-bottom-4 [animation-delay:240ms] sm:text-base"
+                  )}
+                >
+                  {slide.subtext}
+                </p>
+              ) : null}
+
+              <div
+                className={cn(
+                  reveal,
+                  "flex flex-wrap gap-3 slide-in-from-bottom-4 [animation-delay:300ms]"
+                )}
+              >
+                <Button size="lg" className="rounded-xl" render={<Link href={slide.primaryHref} />}>
+                  {slide.primaryLabel}
+                  <ArrowRight className="size-4" />
+                </Button>
+                {slide.secondaryLabel && slide.secondaryHref ? (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    /*
+                      The outline button is drawn for a pale page, so on a
+                      photograph it is a dark border round dark text. Restated
+                      in white here rather than swapped for a solid one: two
+                      solid buttons side by side leaves neither looking primary.
+                    */
+                    className="rounded-xl border-white/70 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+                    render={<Link href={slide.secondaryHref} />}
+                  >
+                    {slide.secondaryLabel}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -250,17 +394,27 @@ export function HeroCarousel({
    */
   rating = null,
   stats = [],
+  /**
+   * Which of the two views to draw, defaulted to the one every shop has.
+   *
+   * The default is here as well as at the renderer's read because this
+   * component is exported and mounted from more than one place; a caller that
+   * has never heard of the key gets the hero it was already drawing.
+   */
+  layout = "split",
 }: {
   slides: HeroSlide[];
   rating?: { count: number; average: number } | null;
   /** The shop's own stats strip, from the hero section's `stats` field. */
   stats?: { value?: string; label?: string }[];
+  layout?: HeroLayout;
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const count = slides.length;
   const multi = count > 1;
+  const banner = layout === "banner";
 
   const go = useCallback((next: number) => setIndex((next + count) % count), [count]);
 
@@ -307,23 +461,42 @@ export function HeroCarousel({
       <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* key forces a fresh mount per slide so the staggered entrance replays */}
         <div key={activeIndex} className="col-start-1 row-start-1">
-          <HeroSlideView
-            slide={active}
-            priority={activeIndex === 0}
-            rating={rating}
-            stats={stats}
-          />
+          {banner ? (
+            <HeroBannerSlideView slide={active} priority={activeIndex === 0} />
+          ) : (
+            <HeroSlideView
+              slide={active}
+              priority={activeIndex === 0}
+              rating={rating}
+              stats={stats}
+            />
+          )}
         </div>
       </div>
 
       {multi ? (
         <>
-          {/* Sits fully outside the content column (in the page gutter), vertically centred */}
+          {/*
+            WHERE THE ARROWS SIT depends on whether there is a gutter to sit in.
+
+            The split hero is a card inside the content column, so its arrows
+            park in the page margin beside it — and only from 2xl, the first
+            width where that margin is wide enough to hold them. The banner has
+            no margin: it runs to both edges of the window. Its arrows go over
+            the picture, and they show at every width, because on a phone a
+            swipe is the only other way to reach slide two and nothing on the
+            screen says it is there.
+          */}
           <button
             type="button"
             onClick={() => go(activeIndex - 1)}
             aria-label="Previous slide"
-            className="absolute top-1/2 left-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+            className={cn(
+              "absolute top-1/2 left-0 z-20 size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
+              banner
+                ? "ml-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:ml-5"
+                : "hidden translate-x-[calc(-100%-1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+            )}
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -331,12 +504,27 @@ export function HeroCarousel({
             type="button"
             onClick={() => go(activeIndex + 1)}
             aria-label="Next slide"
-            className="absolute top-1/2 right-0 z-20 hidden size-11 -translate-y-1/2 translate-x-[calc(100%+1.25rem)] items-center justify-center rounded-full border border-border bg-white text-bakery-700 shadow-md transition-all hover:scale-105 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+            className={cn(
+              "absolute top-1/2 right-0 z-20 size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
+              banner
+                ? "mr-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:mr-5"
+                : "hidden translate-x-[calc(100%+1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+            )}
           >
             <ChevronRight className="size-5" />
           </button>
 
-          <div className="mt-8 flex items-center justify-center gap-2">
+          <div
+            className={cn(
+              "flex items-center justify-center gap-2",
+              // Below the card in the split hero; over the foot of the picture
+              // in the banner, which has no below — the next section starts
+              // immediately under it.
+              banner
+                ? "absolute inset-x-0 bottom-4 z-20 sm:bottom-5"
+                : "mt-8"
+            )}
+          >
             {slides.map((_, i) => (
               <button
                 key={i}
@@ -346,9 +534,13 @@ export function HeroCarousel({
                 aria-current={i === activeIndex}
                 className={cn(
                   "h-2 rounded-full transition-all duration-300",
-                  i === activeIndex
-                    ? "w-7 bg-bakery-700"
-                    : "w-2 bg-bakery-200 hover:bg-bakery-300"
+                  banner
+                    ? i === activeIndex
+                      ? "w-7 bg-white"
+                      : "w-2 bg-white/50 hover:bg-white/80"
+                    : i === activeIndex
+                      ? "w-7 bg-bakery-700"
+                      : "w-2 bg-bakery-200 hover:bg-bakery-300"
                 )}
               />
             ))}

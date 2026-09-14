@@ -293,8 +293,35 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       slides: JSON.stringify(DEFAULT_HERO_SLIDES),
+      /*
+        The renderer falls back to this same word for a section that has no
+        layout key — which is every hero stored before this existed, and
+        nothing migrates them. This default only reaches sections created
+        AFTER the deploy; the renderer's fallback is the half that keeps
+        every existing shop's homepage where it was.
+      */
+      layout: "split",
     },
     fields: [
+      {
+        /*
+          SPLIT IS LISTED FIRST, and that is load-bearing rather than tidy.
+
+          The editor's select renders `value ?? options[0].value` — it SHOWS
+          the first option when the key is absent but never COMMITS it. Every
+          hero stored today has no layout key, so whatever sits first here is
+          what an admin sees in the dropdown. List the banner first and every
+          shop opens the builder to a control reading "Full-bleed banner" over
+          a preview and a live page that are both split.
+        */
+        key: "layout",
+        label: "Hero layout",
+        type: "select",
+        options: [
+          { label: "Split — words beside a picture", value: "split" },
+          { label: "Full-bleed banner", value: "banner" },
+        ],
+      },
       { key: "slides", label: "Hero slides", type: "slides" },
       {
         /**
@@ -310,6 +337,40 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         itemFields: [
           { key: "value", label: "Figure", type: "text", placeholder: "500+" },
           { key: "label", label: "Label", type: "text", placeholder: "Cakes baked" },
+        ],
+      },
+      {
+        /*
+          THE BAR UNDER THE HERO, minus the two lines nobody wrote.
+
+          It was four fixed tiles. Two read the shop's own settings — the
+          free-delivery threshold and the delivery promise — and are facts,
+          so they stay and are still derived. Two were claims: "100% Quality
+          / Premium ingredients" and "Made with Love", asserted on behalf of
+          whichever shop runs this CMS, about goods it may not even make, and
+          with no box anywhere to change or remove them.
+
+          They are gone. What a shop wants to promise beyond the two facts,
+          it writes here. Empty is the honest starting state.
+        */
+        key: "trust",
+        label: "Promises strip",
+        type: "list",
+        emptyHint: "Nothing added — only your delivery facts will show.",
+        itemFields: [
+          {
+            key: "icon",
+            label: "Icon",
+            type: "select",
+            options: [
+              { label: "Van", value: "Truck" },
+              { label: "Clock", value: "Clock" },
+              { label: "Tick", value: "BadgeCheck" },
+              { label: "Heart", value: "Heart" },
+            ],
+          },
+          { key: "title", label: "Title", type: "text" },
+          { key: "subtitle", label: "Line under it", type: "text" },
         ],
       },
     ],

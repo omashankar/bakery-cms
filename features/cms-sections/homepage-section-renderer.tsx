@@ -64,7 +64,8 @@ import {
   getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
-import type { HomepageSectionInstance } from "@/types/homepage-builder";
+import { heroLayoutOf, heroSlidesFor } from "./lib/section-utils";
+import type { HeroLayout, HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -191,10 +192,30 @@ function SectionShell({
   children,
   className,
   noReveal,
+  fullBleed,
 }: HomepageSectionRendererProps & {
   children: React.ReactNode;
   className?: string;
   noReveal?: boolean;
+  /**
+   * Skip the max-width container, so the band runs edge to edge.
+   *
+   * Expressed by DROPPING the wrapper rather than by a viewport-unit escape
+   * (`w-screen`, `calc(50% - 50vw)`), and that choice is the whole point:
+   *
+   *  - `100vw` includes the scrollbar, so on any desktop page that scrolls a
+   *    viewport-wide child is wider than the content box and the shop gets a
+   *    horizontal scrollbar on its own homepage.
+   *  - the admin builder PREVIEW mounts these renderers inside a 1024px-max
+   *    panel, not the viewport, so a viewport-unit bleed is right on the live
+   *    page and broken in the preview — the exact live-works-preview-doesn't
+   *    split this file has been bitten by before.
+   *
+   * Without the wrapper the section simply fills its parent, which is the
+   * page on the storefront and the panel in the preview. Correct in both,
+   * with no units involved.
+   */
+  fullBleed?: boolean;
 }) {
   /**
    * The Background setting, and the ONLY place a section background is decided.
@@ -225,9 +246,17 @@ function SectionShell({
         className
       )}
     >
-      <div className={layoutSpacing.container}>
-        {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
-      </div>
+      {fullBleed ? (
+        revealOnScroll ? (
+          <ScrollReveal>{children}</ScrollReveal>
+        ) : (
+          children
+        )
+      ) : (
+        <div className={layoutSpacing.container}>
+          {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
+        </div>
+      )}
     </section>
   );
 }
@@ -246,20 +275,40 @@ function SectionShell({
  * "Since 1965" in the hero badge a few hundred pixels above. It goes; the tile
  * keeps its title.
  */
-function heroTrustBarFor(trust: HomepageSectionRendererProps["trust"]) {
-  const freeDelivery =
-    trust == null
-      ? ""
-      : trust.freeDeliveryThreshold > 0
-        ? `On orders over ${formatCurrency(trust.freeDeliveryThreshold)}`
-        : "On every order";
+function heroTrustBarFor(
+  trust: HomepageSectionRendererProps["trust"],
+): { icon?: string; title?: string; subtitle?: string }[] {
+  /**
+   * NOTHING rather than a placeholder, when the shop cannot be read.
+   *
+   * It returned a tile titled "Delivery" with an empty line under it and a
+   * "Free Delivery" with no threshold — two tiles that assert a service on a
+   * page that has just failed to find out whether the shop offers it. The
+   * builder preview takes this path on every render.
+   */
+  if (trust == null) return [];
 
+  /*
+    THE TWO THAT WERE CLAIMS ARE GONE.
+
+    "100% Quality / Premium ingredients" and "Made with Love" sat here as
+    literals, asserted on behalf of whichever shop runs this CMS, about goods
+    it may not make, with no box anywhere to edit or remove them. The two
+    below survive because they are not claims: both are read from the shop's
+    own commerce settings, and they are also the only place on the homepage
+    that states either figure.
+  */
   return [
-    { icon: "Truck", title: "Free Delivery", subtitle: freeDelivery },
-    { icon: "Clock", title: trust?.deliveryPromise ?? "Delivery", subtitle: "" },
-    { icon: "BadgeCheck", title: "100% Quality", subtitle: "Premium ingredients" },
-    { icon: "Heart", title: "Made with Love", subtitle: "" },
-  ] as const;
+    {
+      icon: "Truck",
+      title: "Free Delivery",
+      subtitle:
+        trust.freeDeliveryThreshold > 0
+          ? `On orders over ${formatCurrency(trust.freeDeliveryThreshold)}`
+          : "On every order",
+    },
+    { icon: "Clock", title: trust.deliveryPromise, subtitle: "" },
+  ];
 }
 
 const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
@@ -268,8 +317,11 @@ function HeroSection(props: HomepageSectionRendererProps) {
   const labels = useBusinessLabels();
   const { section } = props;
 
-  const slides: HeroSlide[] = parseHeroSlides(section.content)
-    .map((slide) => ({
+  const layout: HeroLayout = heroLayoutOf(section.content);
+
+  const slides: HeroSlide[] = heroSlidesFor(
+    layout,
+    parseHeroSlides(section.content).map((slide) => ({
       badge: slide.badge?.trim() || undefined,
       headline: slide.headline ?? "",
       subtext: slide.subtext?.trim() || undefined,
@@ -278,22 +330,75 @@ function HeroSection(props: HomepageSectionRendererProps) {
       secondaryLabel: slide.secondaryLabel?.trim() || undefined,
       secondaryHref: slide.secondaryHref?.trim() || undefined,
       imageUrl: slide.imageUrl ?? "",
-    }))
-    .filter((slide) => slide.headline || slide.imageUrl);
+    })),
+  );
 
-  return (
-    <SectionShell {...props} className="py-10 sm:py-12 lg:py-16">
-      <HeroCarousel
-        slides={slides}
-        rating={props.trust?.rating ?? null}
-        stats={renderableRows(parseListField(props.section.content, "stats"))}
-      />
+  /**
+   * The shop's own promises, under its two delivery facts.
+   *
+   * Read here rather than inside `heroTrustBarFor` because
+   * `builder-list-field-round-trip` slices THIS function's body to check that
+   * every list field the hero declares is actually read by the component the
+   * switch dispatches to — a read one call deeper passes the editor and fails
+   * the guard, which is the point of the guard.
+   */
+  const promises = [
+    ...heroTrustBarFor(props.trust),
+    ...renderableRows(parseListField(props.section.content, "trust")),
+  ];
 
-      <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:mt-12 sm:gap-6 sm:p-6 lg:grid-cols-4">
-        {heroTrustBarFor(props.trust).map((item) => {
-          const Icon = heroTrustIcons[item.icon as keyof typeof heroTrustIcons];
+  const carousel = (
+    <HeroCarousel
+      slides={slides}
+      layout={layout}
+      rating={props.trust?.rating ?? null}
+      stats={renderableRows(parseListField(props.section.content, "stats"))}
+    />
+  );
+
+  /**
+   * The promises strip — the band under the hero.
+   *
+   * Null when there is nothing to say. That happens when the shop's commerce
+   * settings are unreadable (the builder preview, every render) AND nobody has
+   * written a promise: an empty bordered box is worse than no box.
+   *
+   * It carries no container of its own. The split hero already sits in one,
+   * and nesting a second `max-w-7xl px-4` inside the first indents this band
+   * past the carousel above it. The banner branch, which has no container to
+   * inherit, adds one.
+   */
+  const promisesStrip =
+    promises.length === 0 ? null : (
+      <div
+        className={cn(
+          /*
+            Two columns on a phone whatever the count — a four-across strip at
+            360px gives each tile 80px, which is an icon and a truncated word.
+            Wide enough to lay them out, the count decides, so two promises
+            fill the band instead of leaving half of it empty. Written as
+            whole class names rather than a style prop because Tailwind only
+            emits the classes it can see.
+          */
+          "grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:gap-6 sm:p-6",
+          promises.length === 1 && "grid-cols-1",
+          promises.length === 2 && "lg:grid-cols-2",
+          promises.length === 3 && "lg:grid-cols-3",
+          promises.length >= 4 && "lg:grid-cols-4",
+        )}
+      >
+        {promises.map((item, index) => {
+          /*
+            Falls back to a tick for an icon this build does not have. The
+            value is a string off a Mongo document — an older name, a typo, a
+            key from a build where the list was longer — and an undefined
+            component in a JSX slot is not a blank space, it throws and takes
+            the homepage with it.
+          */
+          const Icon =
+            heroTrustIcons[item.icon as keyof typeof heroTrustIcons] ?? BadgeCheck;
           return (
-            <div key={item.title} className="flex items-center gap-3">
+            <div key={`${item.title}-${index}`} className="flex items-center gap-3">
               <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-white text-bakery-700 shadow-sm">
                 <Icon className="size-5" />
               </span>
@@ -307,6 +412,46 @@ function HeroSection(props: HomepageSectionRendererProps) {
           );
         })}
       </div>
+    );
+
+  /*
+    Two layouts, one component — branched HERE rather than dispatched from the
+    switch below.
+
+    `builder-list-field-round-trip` resolves the hero's renderer by finding the
+    switch arm for this section type, reading the first capitalised tag after
+    it, and scanning THAT component's body for every list field the hero
+    declares. A ternary up in the switch returning a second component would
+    pass the eye and fail the guard — and the guard would be right: half the
+    hero's fields would then be read somewhere it never looks.
+
+    The arm is described rather than quoted, because the guard finds its marker
+    with a plain indexOf and a quoted copy up here is the earlier hit. Not
+    hypothetical: this comment did exactly that, and the suite caught it.
+  */
+  if (layout === "banner") {
+    return (
+      /*
+        No vertical padding: the banner is meant to start where the header ends
+        and end where the next band begins, which is the whole point of it.
+      */
+      <SectionShell {...props} className="py-0" fullBleed>
+        {carousel}
+        {promisesStrip ? (
+          <div className={cn(layoutSpacing.container, "mt-10 sm:mt-12")}>
+            {promisesStrip}
+          </div>
+        ) : null}
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell {...props} className="py-10 sm:py-12 lg:py-16">
+      {carousel}
+      {/* The margin rides the strip, not a wrapper: an empty div with 40px of
+          top margin is still 40px of nothing between the hero and the page. */}
+      {promisesStrip ? <div className="mt-10 sm:mt-12">{promisesStrip}</div> : null}
     </SectionShell>
   );
 }
