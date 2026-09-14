@@ -345,6 +345,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
       secondaryHref: slide.secondaryHref?.trim() || undefined,
       imageUrl: slide.imageUrl ?? "",
       imageAlt: slide.imageAlt,
+      mobileImageUrl: slide.mobileImageUrl,
     })),
   );
 

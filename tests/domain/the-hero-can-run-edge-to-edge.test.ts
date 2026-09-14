@@ -261,7 +261,12 @@ describe("the banner band", () => {
      * it, which are precisely the ones with no headline.
      */
     const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
-    const alt = view.slice(view.indexOf("alt={"), view.indexOf("alt={") + 400);
+    // The expression, wherever it is written. It moved out of the JSX into a
+    // const once two picture elements had to share it, and an anchor on
+    // `alt={` then found `alt={alt}` and read 400 characters of markup.
+    const at = view.indexOf("const alt =");
+    expect(at, "the banner no longer computes an alt at all").toBeGreaterThan(-1);
+    const alt = view.slice(at, at + 400);
 
     expect(alt).toContain("slide.imageAlt");
     expect(
@@ -622,5 +627,53 @@ describe("the figures a shop typed into the hero", () => {
     expect(banner, "the figures render only alongside the promises").toMatch(
       /\{statsStrip \|\| promisesStrip \?/,
     );
+  });
+});
+
+describe("a wide banner on a phone", () => {
+  const bannerView = () => bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+
+  it("shows the whole picture rather than its middle, when there is no phone version", () => {
+    /**
+     * A 3:1 graphic cropped to a phone's 4:3 box keeps about 43% of its width
+     * — and on a banner with its words drawn into the right half, the words
+     * are the part that goes. Short and complete beats tall and truncated,
+     * and being visibly short is the nudge towards uploading a phone picture.
+     */
+    expect(bannerView()).toMatch(
+      /mobile \|\| slide\.headline \? "aspect-\[4\/3\]" : "aspect-\[3\/1\]"/,
+    );
+  });
+
+  it("takes the taller phone box once there is a picture made for it", () => {
+    const view = bannerView();
+    expect(view).toContain("slide.mobileImageUrl");
+    expect(view).toContain('<source media="(min-width: 640px)"');
+  });
+
+  it("puts one picture on the wire, not two", () => {
+    /**
+     * `display: none` does not stop a browser fetching an <img>, so two images
+     * toggled with `hidden` / `sm:block` would put both banners on the wire on
+     * every device — the largest image on the page, twice, on a phone, before
+     * anything else renders. <source media> is the element that picks one.
+     */
+    const view = bannerView();
+    expect(view).toContain("<picture>");
+    expect(view, "the phone image is toggled with CSS again").not.toMatch(
+      /mobileImageUrl[\s\S]{0,300}sm:hidden/,
+    );
+  });
+
+  it("and the renderer hands the phone picture over", () => {
+    // Seven fields mapped by hand; leaving one out is silent.
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+    expect(hero).toContain("mobileImageUrl: slide.mobileImageUrl");
+  });
+
+  it("with a box to upload it that says what it is for", () => {
+    const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
+    expect(editor).toContain("mobileImageUrl: next");
+    expect(editor).toContain("Used below 640px");
   });
 });

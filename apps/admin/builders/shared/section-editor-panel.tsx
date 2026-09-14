@@ -350,6 +350,21 @@ function SlidesField({
             value={slide.imageUrl ?? ""}
             onChange={(next) => updateSlide(index, { imageUrl: next })}
           />
+          <PhotoField
+            id={`slide-${index}-mobile-image`}
+            label="Phone image (optional)"
+            value={slide.mobileImageUrl ?? ""}
+            onChange={(next) => updateSlide(index, { mobileImageUrl: next })}
+          />
+          {/*
+            Says what it is for. A wide banner on a phone is either cropped to
+            its middle or shrunk to a strip, and neither is fixable in CSS —
+            the answer is a differently composed picture.
+          */}
+          <p className="-mt-1 text-xs text-muted-foreground">
+            Used below 640px. Leave blank and the wide image shows whole,
+            which on a phone is short.
+          </p>
           <div className="space-y-2">
             <Label htmlFor={`slide-${index}-alt`}>Image description</Label>
             <Input

@@ -144,6 +144,19 @@ export interface HeroSlideContent {
    * makes a reader say the same sentence twice.
    */
   imageAlt?: string;
+  /**
+   * A SECOND PICTURE, SHAPED FOR A PHONE.
+   *
+   * A banner is a wide graphic — roughly 3:1 — and a phone is not wide. Crop
+   * one to a phone's box and the sides go: on a banner with its words drawn
+   * into the right half, the words are what goes. Fit it instead and a 390px
+   * screen gets a 130px-tall strip with 8px type in it.
+   *
+   * Neither is fixable in CSS, because the answer is a differently composed
+   * picture. This is that picture. Absent is the ordinary case and changes
+   * nothing — see HeroBannerSlideView for what the phone does without one.
+   */
+  mobileImageUrl?: string;
 }
 
 export interface HomepageSectionInstance {

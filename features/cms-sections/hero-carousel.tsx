@@ -29,6 +29,8 @@ export interface HeroSlide {
   imageUrl: string;
   /** What the picture says, when the words are drawn into it. */
   imageAlt?: string;
+  /** A second picture, composed for a phone. */
+  mobileImageUrl?: string;
 }
 
 const AUTOPLAY_MS = 6000;
@@ -245,28 +247,56 @@ function HeroBannerSlideView({
   /** Which half of the picture the words sit in. */
   side: HeroCopySide;
 }) {
-  const image = (
+  const alt =
+    /*
+      THE SHOP'S OWN DESCRIPTION FIRST, and that order is the point.
+
+      A banner is usually a designed graphic with the headline, the line
+      under it and the button drawn INTO the picture. None of that is in
+      the DOM, so without this box a screen reader got the fallback below
+      and the shop's actual offer was invisible to the people who most
+      need it read out.
+
+      Failing that: the headline is drawn OVER the picture when there is
+      one, so the picture is decorative and an alt repeating it makes a
+      reader say the same sentence twice. With no headline the picture is
+      the whole slide, and the shop's own button label is the nearest true
+      description of where it leads — never a sentence invented here
+      about a photograph nobody in this codebase has seen.
+    */
+    slide.imageAlt?.trim() || (slide.headline ? "" : slide.primaryLabel);
+
+  const mobile = slide.mobileImageUrl?.trim();
+
+  /**
+   * ONE download, the right picture.
+   *
+   * A <picture> rather than two images toggled with `hidden` / `sm:block`:
+   * `display: none` does not stop a browser fetching an <img>, so the toggle
+   * would put both banners on the wire on every device — on the largest
+   * image on the page, on a phone, before anything else renders.
+   *
+   * A plain <img> inside it, because <source media> is the whole mechanism
+   * and next/image does not expose it. That trades the optimiser for
+   * correctness, and costs less than it sounds: this path only runs when a
+   * shop has deliberately uploaded a second, already-sized picture.
+   */
+  const image = mobile ? (
+    <picture>
+      <source media="(min-width: 640px)" srcSet={slide.imageUrl} />
+      <img
+        src={mobile}
+        alt={alt}
+        className="absolute inset-0 size-full object-cover"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+      />
+    </picture>
+  ) : (
     <OptimizedImage
       src={slide.imageUrl}
-      alt={
-        /*
-          THE SHOP'S OWN DESCRIPTION FIRST, and that order is the point.
-
-          A banner is usually a designed graphic with the headline, the line
-          under it and the button drawn INTO the picture. None of that is in
-          the DOM, so without this box a screen reader got the fallback below
-          and the shop's actual offer was invisible to the people who most
-          need it read out.
-
-          Failing that: the headline is drawn OVER the picture when there is
-          one, so the picture is decorative and an alt repeating it makes a
-          reader say the same sentence twice. With no headline the picture is
-          the whole slide, and the shop's own button label is the nearest true
-          description of where it leads — never a sentence invented here
-          about a photograph nobody in this codebase has seen.
-        */
-        slide.imageAlt?.trim() || (slide.headline ? "" : slide.primaryLabel)
-      }
+      alt={alt}
       fill
       priority={priority}
       className="object-cover"
@@ -281,7 +311,27 @@ function HeroBannerSlideView({
   );
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted sm:aspect-[2/1] lg:aspect-[3/1]">
+    <div
+      className={cn(
+        /*
+          WHAT SHAPE THE PHONE GETS, and why it is not one answer.
+
+          Wide everywhere is right when the picture IS the message and there
+          is no phone version of it: a 3:1 graphic cropped to a phone's box
+          loses its sides, and on a banner with its words in the right half,
+          the words are the side that goes. Short and complete beats tall and
+          truncated — and the shop can see that it is short, which is the
+          nudge towards uploading a phone picture.
+
+          Taller on a phone is right in the other two cases. With a phone
+          picture, that picture was composed for this box. With a headline,
+          the words are real text laid over the photograph and they need the
+          room — cropping a photograph is what `object-cover` is for.
+        */
+        "relative w-full overflow-hidden bg-muted sm:aspect-[2/1] lg:aspect-[3/1]",
+        mobile || slide.headline ? "aspect-[4/3]" : "aspect-[3/1]"
+      )}
+    >
       {slide.headline ? (
         image
       ) : (
