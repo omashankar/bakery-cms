@@ -69,6 +69,15 @@ export type HomepageSectionType =
 
 export type HeroLayout = "split" | "banner";
 
+/**
+ * Which half of a banner the words sit in.
+ *
+ * Only the banner reads it. The split hero is a two-column grid whose sides
+ * are the grid's, and "left" is the fallback everywhere for the same reason
+ * "split" is: nothing migrates a hero that predates the key.
+ */
+export type HeroCopySide = "left" | "right";
+
 export type SectionFieldType =
   | "text"
   | "textarea"

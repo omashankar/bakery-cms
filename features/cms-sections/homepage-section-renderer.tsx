@@ -64,7 +64,7 @@ import {
   getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
-import { heroLayoutOf, heroSlidesFor } from "./lib/section-utils";
+import { heroCopySideOf, heroLayoutOf, heroSlidesFor } from "./lib/section-utils";
 import type { HeroLayout, HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
@@ -241,6 +241,19 @@ function SectionShell({
         "scroll-mt-4 border-2 border-transparent transition-premium",
         bgClass,
         layoutSpacing.sectionY,
+        /*
+          A 2px TRANSPARENT BORDER IS STILL 2px OF PAGE.
+
+          It exists so the builder's hover and selection outlines can appear
+          without the section jumping — a fair trade inside a container, and
+          invisible there. Around a band that runs to both edges of the
+          window it is a white frame down each side of the picture, which is
+          the one thing a full-bleed band must not have.
+
+          Dropped only on the live page: the builder keeps the reserved 2px,
+          because a section that cannot be outlined cannot be selected.
+        */
+        fullBleed && !interactive && "border-0",
         interactive && "cursor-pointer hover:border-bakery-200",
         selected && "border-bakery-500 ring-2 ring-bakery-200",
         className
@@ -318,6 +331,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
   const { section } = props;
 
   const layout: HeroLayout = heroLayoutOf(section.content);
+  const copySide = heroCopySideOf(section.content);
 
   const slides: HeroSlide[] = heroSlidesFor(
     layout,
@@ -347,14 +361,45 @@ function HeroSection(props: HomepageSectionRendererProps) {
     ...renderableRows(parseListField(props.section.content, "trust")),
   ];
 
+  /**
+   * The shop's own figures.
+   *
+   * Read once, here, because the two layouts show them in different places:
+   * the split hero paints them inside its copy column, and a banner has no
+   * copy column — the words are on the picture — so they go in the band
+   * underneath beside the promises. They were reaching neither in the banner
+   * before this, which meant a shop that typed three figures and then chose
+   * the banner layout silently lost all three.
+   */
+  const stats = renderableRows(parseListField(props.section.content, "stats"));
+
   const carousel = (
     <HeroCarousel
       slides={slides}
       layout={layout}
+      copySide={copySide}
       rating={props.trust?.rating ?? null}
-      stats={renderableRows(parseListField(props.section.content, "stats"))}
+      stats={stats}
     />
   );
+
+  const statsStrip =
+    layout !== "banner" || stats.length === 0 ? null : (
+      <div className="flex flex-wrap items-baseline justify-center gap-x-10 gap-y-4 text-center">
+        {stats.map((stat, index) => (
+          <div key={`${stat.label}-${index}`}>
+            {stat.value ? (
+              <p className="font-heading text-2xl font-bold text-bakery-800 sm:text-3xl">
+                {stat.value}
+              </p>
+            ) : null}
+            {stat.label ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
 
   /**
    * The promises strip — the band under the hero.
@@ -429,16 +474,56 @@ function HeroSection(props: HomepageSectionRendererProps) {
     with a plain indexOf and a quoted copy up here is the earlier hit. Not
     hypothetical: this comment did exactly that, and the suite caught it.
   */
+  /**
+   * A HERO WITH NOTHING IN IT IS NOT A BAND.
+   *
+   * The banner drops every slide that has no picture, and a shop switching to
+   * the banner layout BEFORE uploading wide artwork is the ordinary order of
+   * events — so zero slides is a real state, not a corner. With the padding
+   * cancelled below it would draw as a 4px line of nothing across the top of
+   * the homepage.
+   *
+   * The builder says so instead of vanishing, the way every other empty
+   * section in this file does.
+   */
+  if (slides.length === 0 && promises.length === 0 && stats.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+          {layout === "banner"
+            ? "This hero is set to the full-bleed banner, and a banner slide is its picture — add an image to a slide and it will appear here."
+            : "Nothing is set on this hero yet. Add a slide with a headline or an image."}
+        </div>
+      </SectionShell>
+    );
+  }
+
   if (layout === "banner") {
     return (
       /*
-        No vertical padding: the banner is meant to start where the header ends
-        and end where the next band begins, which is the whole point of it.
+        NO TOP PADDING, A FLOOR AT THE BOTTOM.
+
+        The band is meant to start where the header ends, which is the whole
+        point of it. `py-0` alone did not get there: the shell's own
+        `py-16 sm:py-20 lg:py-24` is three classes, and tailwind-merge only
+        resolves the one at the same breakpoint — so `py-0` cancelled the
+        base and left 80px at sm and 96px at lg, a white gap above the
+        picture at exactly the widths the layout is for.
+
+        The bottom is not zero, because the dots and the promises strip now
+        sit under the picture rather than over it, and at zero they would be
+        flush against whatever band comes next.
       */
-      <SectionShell {...props} className="py-0" fullBleed>
+      <SectionShell
+        {...props}
+        className="py-0 pb-8 sm:py-0 sm:pb-10 lg:py-0 lg:pb-14"
+        fullBleed
+      >
         {carousel}
-        {promisesStrip ? (
-          <div className={cn(layoutSpacing.container, "mt-10 sm:mt-12")}>
+        {statsStrip || promisesStrip ? (
+          <div className={cn(layoutSpacing.container, "mt-10 space-y-8 sm:mt-12")}>
+            {statsStrip}
             {promisesStrip}
           </div>
         ) : null}

@@ -330,6 +330,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         every existing shop's homepage where it was.
       */
       layout: "split",
+      copySide: "left",
     },
     fields: [
       {
@@ -349,6 +350,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         options: [
           { label: "Split — words beside a picture", value: "split" },
           { label: "Full-bleed banner", value: "banner" },
+        ],
+      },
+      {
+        /*
+          LEFT IS LISTED FIRST for the same reason split is: the editor shows
+          `options[0]` for a section with no value and never writes it, so
+          whatever sits first here is what an admin sees on every hero stored
+          before this key existed.
+
+          Banner only. The split hero's two columns are a grid, and the side
+          its words are on is the grid's, not the shop's.
+        */
+        key: "copySide",
+        label: "Banner words sit",
+        type: "select",
+        options: [
+          { label: "On the left", value: "left" },
+          { label: "On the right", value: "right" },
         ],
       },
       { key: "slides", label: "Hero slides", type: "slides" },

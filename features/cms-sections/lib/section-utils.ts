@@ -1,5 +1,9 @@
 
-import type { HeroLayout, HomepageSectionInstance } from "@/types/homepage-builder";
+import type {
+  HeroCopySide,
+  HeroLayout,
+  HomepageSectionInstance,
+} from "@/types/homepage-builder";
 
 /**
  * SPLIT unless the shop asked for a banner, and anything unrecognised is split.
@@ -15,6 +19,19 @@ export function heroLayoutOf(
   content: HomepageSectionInstance["content"],
 ): HeroLayout {
   return content.layout === "banner" ? "banner" : "split";
+}
+
+/**
+ * Which half of a banner the words sit in — LEFT unless the shop said right.
+ *
+ * Same shape and same reason as `heroLayoutOf`: an unrecognised value is not
+ * a request for a different hero, and every section stored before this key
+ * existed has no value at all.
+ */
+export function heroCopySideOf(
+  content: HomepageSectionInstance["content"],
+): HeroCopySide {
+  return content.copySide === "right" ? "right" : "left";
 }
 
 /**

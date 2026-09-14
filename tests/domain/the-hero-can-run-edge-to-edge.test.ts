@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { heroLayoutOf, heroSlidesFor } from "@/features/cms-sections/lib/section-utils";
+import {
+  heroCopySideOf,
+  heroLayoutOf,
+  heroSlidesFor,
+} from "@/features/cms-sections/lib/section-utils";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
@@ -320,5 +324,236 @@ describe("what the hero says on the shop's behalf", () => {
       expect(map, `the icon picker offers "${option.value}" and the renderer has no such icon`)
         .toContain(option.value);
     }
+  });
+});
+
+describe("which half of a banner the words sit in", () => {
+  it("is the left one for every section stored before the choice existed", () => {
+    // Same shape, same risk, same answer as the layout key: `{}` is every
+    // hero document in every database, and nothing migrates them.
+    expect(heroCopySideOf(content({}))).toBe("left");
+  });
+
+  it("is the right one only when the shop asked for it in those exact letters", () => {
+    expect(heroCopySideOf(content({ copySide: "right" }))).toBe("right");
+    for (const value of ["Right", "RIGHT", "end", "", " right", true, 1]) {
+      expect(
+        heroCopySideOf(content({ copySide: value })),
+        `"${String(value)}" moved the words`,
+      ).toBe("left");
+    }
+  });
+
+  it("is whatever its dropdown offers, and the dropdown leads with the fallback", () => {
+    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
+    const field = hero.fields.find((f) => f.key === "copySide")!;
+
+    expect(field?.options?.[0]?.value, "the editor shows options[0] and commits none").toBe(
+      "left",
+    );
+    expect(hero.defaultContent.copySide).toBe(heroCopySideOf(content({})));
+    for (const option of field.options!) {
+      expect(
+        heroCopySideOf(content({ copySide: option.value })),
+        `the dropdown offers "${option.value}" and the renderer does not know it`,
+      ).toBe(option.value);
+    }
+  });
+
+  it("turns the scrim round with the words", () => {
+    /**
+     * A scrim is a dark wash under the type so white letters stay readable on
+     * a photograph nobody here has seen. Left fixed while the words move, it
+     * is the worst of both outcomes at once — the subject of the picture
+     * dimmed, and the type sitting on the bright half it was meant to protect
+     * against. So the direction is not decoration; it is the thing working.
+     */
+    const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+
+    expect(view).toContain("bg-gradient-to-l");
+    expect(view).toContain("bg-gradient-to-r");
+    expect(view).toMatch(/side === "right"/);
+  });
+});
+
+describe("the banner band's edges", () => {
+  it("cancels the section padding at every breakpoint, not just the base one", () => {
+    /**
+     * The shell's own padding is `py-16 sm:py-20 lg:py-24` — three classes.
+     * tailwind-merge resolves a conflict only within the same breakpoint, so
+     * a bare `py-0` cancelled the base and left 80px at sm and 96px at lg: a
+     * white gap above a band whose whole purpose is to start where the header
+     * ends, at exactly the widths the layout is for.
+     */
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+    const branchAt = hero.indexOf('if (layout === "banner")');
+    const splitAt = hero.lastIndexOf("  return (");
+    const banner = hero.slice(branchAt, splitAt);
+
+    expect(banner).toContain("py-0");
+    expect(banner, "sm keeps the shell's 80px").toContain("sm:py-0");
+    expect(banner, "lg keeps the shell's 96px").toContain("lg:py-0");
+  });
+
+  it("keeps a floor under the dots and the promises", () => {
+    // They sit below the picture now rather than over it, so a band padded to
+    // zero on both sides leaves them flush against whatever comes next.
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+    const banner = hero.slice(hero.indexOf('if (layout === "banner")'), hero.lastIndexOf("  return ("));
+
+    expect(banner).toMatch(/pb-\d/);
+  });
+
+  it("draws no frame down the sides of a band that runs to both edges", () => {
+    /**
+     * `border-2 border-transparent` is reserved space so the builder's hover
+     * and selection outlines do not move the page. Inside a container it is
+     * invisible; around a full-bleed band it is 2px of white down each side of
+     * the picture, which is the one thing a full-bleed band must not have.
+     *
+     * Gated on `!interactive`, because a section the builder cannot outline is
+     * a section nobody can select.
+     */
+    const shell = bodyOf(read(RENDERER), "function SectionShell(");
+
+    expect(shell).toMatch(/fullBleed && !interactive && "border-0"/);
+    expect(shell, "the builder lost its selection outline").toContain(
+      'selected && "border-bakery-500 ring-2 ring-bakery-200"',
+    );
+  });
+});
+
+describe("the slideshow's own controls", () => {
+  it("puts the dots below the picture, on the page, in both layouts", () => {
+    /**
+     * The banner's were absolute over the foot of the image — least legible
+     * exactly there (a photograph, not a flat colour) and covering the part of
+     * the picture a 3:1 crop has least of. In the flow they land on the page's
+     * own background, which is where the split hero already had them, so one
+     * row and one palette now serve both.
+     */
+    const carousel = read(CAROUSEL);
+    const at = carousel.indexOf("aria-label={`Go to slide");
+    expect(at, "the dots are gone").toBeGreaterThan(-1);
+
+    const row = codeOf(carousel).slice(0, codeOf(carousel).indexOf("aria-label={`Go to slide"));
+    const lastRowOpen = row.lastIndexOf("<div");
+    const dotsWrapper = row.slice(lastRowOpen);
+
+    expect(dotsWrapper, "the dots are painted over the picture again").not.toContain(
+      "absolute",
+    );
+    expect(dotsWrapper).toContain("justify-center");
+  });
+
+  it("gives each dot a target a thumb can hit", () => {
+    // 8px is the visual. It is also the only way to change slide on a phone in
+    // the split layout, whose arrows are 2xl-only, and 8x8 is below every
+    // touch-target floor there is.
+    const carousel = codeOf(read(CAROUSEL));
+    const dot = carousel.slice(carousel.indexOf("aria-label={`Go to slide"));
+
+    expect(dot.slice(0, 400)).toMatch(/before:-inset-2/);
+  });
+
+  it("can be stopped by someone who cannot hover", () => {
+    /**
+     * Autoplay paused on hover and on focus. A phone has neither — so on the
+     * device most of this shop's customers use, a hero that moved every six
+     * seconds could not be stopped at all.
+     */
+    const carousel = codeOf(read(CAROUSEL));
+
+    expect(carousel).toMatch(/setPaused\(\(was\) => !was\)/);
+    expect(carousel).toMatch(/aria-label=\{paused \? "Resume slideshow" : "Pause slideshow"\}/);
+  });
+
+  it("keeps the banner's arrows off the words on a phone", () => {
+    /**
+     * At 390px a 44px button centred vertically lands on the headline and
+     * takes the first 40px of the line with it — unreadable underneath and
+     * untappable through it. Below sm the pair drops to the foot of the
+     * picture; the inset position starts at sm, where there is room.
+     */
+    const carousel = codeOf(read(CAROUSEL));
+
+    /*
+      EACH ARROW, not the pair.
+
+      Checking the whole block for one `bottom-3` passed with the left arrow
+      moved back onto the headline and the right one left alone, which is
+      both a real way to write the bug and the more confusing one to look at.
+    */
+    for (const which of ["Previous", "Next"]) {
+      const at = carousel.indexOf(`aria-label="${which} slide"`);
+      expect(at, `the ${which} arrow is gone`).toBeGreaterThan(-1);
+      const arrow = carousel.slice(at, at + 700);
+
+      expect(arrow, `the ${which} arrow sits on the words at phone width`).toContain(
+        "bottom-3",
+      );
+      expect(arrow, `the ${which} arrow never takes its inset position`).toMatch(
+        /sm:top-1\/2/,
+      );
+    }
+  });
+});
+
+describe("a hero with nothing in it", () => {
+  it("renders nothing on the live page rather than a band of air", () => {
+    /**
+     * A banner drops every slide with no picture, and choosing the banner
+     * BEFORE uploading wide artwork is the ordinary order of events. With the
+     * padding cancelled that empty band is a 4px line across the top of the
+     * homepage.
+     */
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+
+    expect(hero).toMatch(
+      /slides\.length === 0 && promises\.length === 0 && stats\.length === 0/,
+    );
+    expect(hero).toContain("if (!props.interactive) return null;");
+  });
+
+  it("but says why in the builder, where somebody can fix it", () => {
+    // Every other empty section in this file does the same: a section that
+    // renders nothing cannot be clicked, and an admin cannot fix what they
+    // cannot click.
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+
+    expect(hero).toContain("border-dashed");
+  });
+});
+
+describe("the figures a shop typed into the hero", () => {
+  it("reach the page in the banner layout too", () => {
+    /**
+     * The stats strip is painted inside the split hero's copy column. A banner
+     * has no copy column — the words are on the picture — so the rows were
+     * read, passed to a component that ignores them, and silently dropped: a
+     * shop that typed three figures and then chose the banner lost all three,
+     * with the boxes still full in the builder.
+     */
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+
+    expect(hero).toContain("const statsStrip =");
+    expect(hero).toMatch(/layout !== "banner" \|\| stats\.length === 0 \? null/);
+
+    const banner = hero.slice(
+      hero.indexOf('if (layout === "banner")'),
+      hero.lastIndexOf("  return ("),
+    );
+    expect(banner, "the banner band does not render them").toContain("{statsStrip}");
+    /*
+      AND THE WRAPPER OPENS FOR THEM ON THEIR OWN.
+
+      Asserting the slot alone passed with the condition narrowed back to
+      `promisesStrip ?` — the figures then reach the page only when the shop
+      also happens to have delivery settings readable, and vanish in the
+      builder preview, which has none.
+    */
+    expect(banner, "the figures render only alongside the promises").toMatch(
+      /\{statsStrip \|\| promisesStrip \?/,
+    );
   });
 });

@@ -7,13 +7,15 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  Pause,
+  Play,
   Sparkles,
   Star,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
-import type { HeroLayout } from "@/types/homepage-builder";
+import type { HeroCopySide, HeroLayout } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
 
 export interface HeroSlide {
@@ -231,9 +233,12 @@ function HeroSlideView({
 function HeroBannerSlideView({
   slide,
   priority,
+  side,
 }: {
   slide: HeroSlide;
   priority?: boolean;
+  /** Which half of the picture the words sit in. */
+  side: HeroCopySide;
 }) {
   const image = (
     <OptimizedImage
@@ -283,16 +288,30 @@ function HeroBannerSlideView({
         <div
           className={cn(
             /*
-              A scrim, not a tint over the whole picture: the words need
-              contrast at the left edge and the photograph is the point
-              everywhere else. Dark because the type below is white, and the
-              CMS cannot know whether the shop's picture is.
+              A SCRIM ON THE HALF THE WORDS ARE ON, not a tint over the whole
+              picture: the type needs contrast and the photograph is the point
+              everywhere else. Dark because the type over it is white, and
+              this CMS cannot know whether the shop's picture is.
+
+              It follows the side, because a scrim on the left under words on
+              the right is the worst of both — the subject dimmed and the type
+              unreadable.
             */
-            "absolute inset-0 flex items-center bg-gradient-to-r from-black/70 via-black/40 to-transparent"
+            "absolute inset-0 z-10 flex items-center",
+            side === "right"
+              ? "bg-gradient-to-l from-black/70 via-black/40 to-transparent"
+              : "bg-gradient-to-r from-black/70 via-black/40 to-transparent"
           )}
         >
           <div className={cn(layoutSpacing.container, "w-full")}>
-            <div className="max-w-xl space-y-4 text-white sm:space-y-5">
+            <div
+              className={cn(
+                "max-w-xl space-y-4 text-white sm:space-y-5",
+                // `ml-auto` rather than a flex row, so the column keeps its
+                // own max width and simply sits against the far edge.
+                side === "right" && "ml-auto text-right"
+              )}
+            >
               {slide.badge ? (
                 <div className={cn(reveal, "slide-in-from-bottom-2 [animation-delay:80ms]")}>
                   <Badge
@@ -320,7 +339,8 @@ function HeroBannerSlideView({
                     reveal,
                     // white/85 rather than the muted token: that token is tuned
                     // for the cream page background and disappears on a photo.
-                    "max-w-md text-sm leading-relaxed text-white/85 slide-in-from-bottom-4 [animation-delay:240ms] sm:text-base"
+                    "max-w-md text-sm leading-relaxed text-white/85 slide-in-from-bottom-4 [animation-delay:240ms] sm:text-base",
+                    side === "right" && "ml-auto"
                   )}
                 >
                   {slide.subtext}
@@ -330,7 +350,8 @@ function HeroBannerSlideView({
               <div
                 className={cn(
                   reveal,
-                  "flex flex-wrap gap-3 slide-in-from-bottom-4 [animation-delay:300ms]"
+                  "flex flex-wrap gap-3 slide-in-from-bottom-4 [animation-delay:300ms]",
+                  side === "right" && "justify-end"
                 )}
               >
                 <Button size="lg" className="rounded-xl" render={<Link href={slide.primaryHref} />}>
@@ -402,12 +423,20 @@ export function HeroCarousel({
    * has never heard of the key gets the hero it was already drawing.
    */
   layout = "split",
+  /**
+   * Which half of a banner the words sit in.
+   *
+   * Only the banner reads it — the split layout is already a two-column grid
+   * whose sides are fixed by the grid itself.
+   */
+  copySide = "left",
 }: {
   slides: HeroSlide[];
   rating?: { count: number; average: number } | null;
   /** The shop's own stats strip, from the hero section's `stats` field. */
   stats?: { value?: string; label?: string }[];
   layout?: HeroLayout;
+  copySide?: HeroCopySide;
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -458,94 +487,143 @@ export function HeroCarousel({
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {/* key forces a fresh mount per slide so the staggered entrance replays */}
-        <div key={activeIndex} className="col-start-1 row-start-1">
-          {banner ? (
-            <HeroBannerSlideView slide={active} priority={activeIndex === 0} />
-          ) : (
-            <HeroSlideView
-              slide={active}
-              priority={activeIndex === 0}
-              rating={rating}
-              stats={stats}
-            />
-          )}
+      {/*
+        THE ARROWS BELONG TO THE SLIDE, not to the whole carousel.
+
+        They were positioned against the root, which also holds the row of
+        dots — so `top-1/2` centred them on the slide PLUS the dots, and the
+        split hero's arrows sat about 20px below the middle of the card they
+        point at. Their own `relative` box fixes it for both layouts, and is
+        what lets the dots move out from over the picture.
+      */}
+      <div className="relative">
+        <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          {/* key forces a fresh mount per slide so the staggered entrance replays */}
+          <div key={activeIndex} className="col-start-1 row-start-1">
+            {banner ? (
+              <HeroBannerSlideView
+                slide={active}
+                priority={activeIndex === 0}
+                side={copySide}
+              />
+            ) : (
+              <HeroSlideView
+                slide={active}
+                priority={activeIndex === 0}
+                rating={rating}
+                stats={stats}
+              />
+            )}
+          </div>
         </div>
+
+        {multi ? (
+          <>
+            {/*
+              WHERE THE ARROWS SIT depends on whether there is a gutter beside
+              the slide to sit in.
+
+              The split hero is a card inside the content column, so its arrows
+              park in the page margin — and only from 2xl, the first width
+              where that margin is wide enough to hold them. The banner runs to
+              both edges of the window and has no margin at all, so its arrows
+              go over the picture, and they show at every width because a swipe
+              is otherwise the only way to reach slide two and nothing on the
+              screen says it is there.
+
+              BUT NOT ACROSS THE WORDS. At 390px a 44px button centred
+              vertically lands on the headline and takes the first 40px of the
+              line with it — the text is unreadable underneath and untappable
+              through it. Below sm the banner's pair drops to the foot of the
+              picture, clear of the copy; from sm there is room at the sides
+              and they take their inset position.
+            */}
+            <button
+              type="button"
+              onClick={() => go(activeIndex - 1)}
+              aria-label="Previous slide"
+              className={cn(
+                "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
+                banner
+                  ? "bottom-3 left-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:left-5"
+                  : "top-1/2 left-0 hidden -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+              )}
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(activeIndex + 1)}
+              aria-label="Next slide"
+              className={cn(
+                "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
+                banner
+                  ? "bottom-3 right-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:right-5"
+                  : "top-1/2 right-0 hidden -translate-y-1/2 translate-x-[calc(100%+1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+              )}
+            >
+              <ChevronRight className="size-5" />
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {multi ? (
-        <>
-          {/*
-            WHERE THE ARROWS SIT depends on whether there is a gutter to sit in.
+      {/*
+        THE DOTS SIT BELOW THE PICTURE, in both layouts.
 
-            The split hero is a card inside the content column, so its arrows
-            park in the page margin beside it — and only from 2xl, the first
-            width where that margin is wide enough to hold them. The banner has
-            no margin: it runs to both edges of the window. Its arrows go over
-            the picture, and they show at every width, because on a phone a
-            swipe is the only other way to reach slide two and nothing on the
-            screen says it is there.
+        The banner's were absolute over the foot of the image — which is where
+        they are least legible (a photograph, not a flat colour, so a white dot
+        lands on whatever happens to be there) and where they cover the part of
+        the picture a wide crop has least of. They are in the flow now, on the
+        page's own background, which is where the reference layout puts them
+        and where the split hero already had them; so the two layouts share one
+        row and one palette instead of keeping a light set nobody could see.
+      */}
+      {multi ? (
+        <div className="mt-6 flex items-center justify-center gap-2 sm:mt-8">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setIndex(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              aria-current={i === activeIndex}
+              /*
+                An 8px visual with a 24px reach. The dot is the only way to
+                change slide on a phone in the split layout — its arrows are
+                2xl-only — and an 8x8 target is below every touch floor there
+                is. `before` grows the hit area without moving anything.
+              */
+              className="relative flex h-2 items-center rounded-full transition-all duration-300 before:absolute before:-inset-2 before:content-['']"
+            >
+              <span
+                className={cn(
+                  "h-2 rounded-full transition-all duration-300",
+                  i === activeIndex
+                    ? "w-7 bg-bakery-700"
+                    : "w-2 bg-bakery-200 hover:bg-bakery-300"
+                )}
+              />
+            </button>
+          ))}
+
+          {/*
+            A PAUSE THE TOUCH USER CAN REACH.
+
+            Autoplay already stops on hover and on focus, and a phone has
+            neither — so on the device most of this shop's customers use, a
+            slide that moves every six seconds could not be stopped at all.
+            An icon and a label, no copy.
           */}
           <button
             type="button"
-            onClick={() => go(activeIndex - 1)}
-            aria-label="Previous slide"
-            className={cn(
-              "absolute top-1/2 left-0 z-20 size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-              banner
-                ? "ml-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:ml-5"
-                : "hidden translate-x-[calc(-100%-1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
-            )}
+            onClick={() => setPaused((was) => !was)}
+            aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
+            className="ml-2 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
           >
-            <ChevronLeft className="size-5" />
+            {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
           </button>
-          <button
-            type="button"
-            onClick={() => go(activeIndex + 1)}
-            aria-label="Next slide"
-            className={cn(
-              "absolute top-1/2 right-0 z-20 size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-              banner
-                ? "mr-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:mr-5"
-                : "hidden translate-x-[calc(100%+1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
-            )}
-          >
-            <ChevronRight className="size-5" />
-          </button>
-
-          <div
-            className={cn(
-              "flex items-center justify-center gap-2",
-              // Below the card in the split hero; over the foot of the picture
-              // in the banner, which has no below — the next section starts
-              // immediately under it.
-              banner
-                ? "absolute inset-x-0 bottom-4 z-20 sm:bottom-5"
-                : "mt-8"
-            )}
-          >
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-label={`Go to slide ${i + 1}`}
-                aria-current={i === activeIndex}
-                className={cn(
-                  "h-2 rounded-full transition-all duration-300",
-                  banner
-                    ? i === activeIndex
-                      ? "w-7 bg-white"
-                      : "w-2 bg-white/50 hover:bg-white/80"
-                    : i === activeIndex
-                      ? "w-7 bg-bakery-700"
-                      : "w-2 bg-bakery-200 hover:bg-bakery-300"
-                )}
-              />
-            ))}
-          </div>
-        </>
+        </div>
       ) : null}
     </div>
   );
