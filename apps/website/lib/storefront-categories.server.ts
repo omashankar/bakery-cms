@@ -1,5 +1,4 @@
 import { getCatalog } from "@/features/catalog/server/catalog.service";
-import { categories as demoCategories } from "@/constants/landing-data";
 
 /**
  * The shop's own product categories, for the storefront's category pills.
@@ -8,10 +7,24 @@ import { categories as demoCategories } from "@/constants/landing-data";
  * shop added had no pill and could only be reached by typing its URL, a renamed
  * one still showed its old name, and a deleted one kept a pill leading nowhere.
  *
- * Falls back to the demo list only when the catalogue cannot be read at all —
- * a storefront with no way to browse by category is worse than one browsing by
- * the wrong names, and an empty catalogue section is not the same as a
- * database that is down.
+ * NO DEMO LIST, IN EITHER FAILURE.
+ *
+ * This substituted the shipped demo taxonomy — Birthday Cakes, Photo Cakes,
+ * Eggless Cakes, Seasonal, nine rows of it — whenever the shop's own list came
+ * back empty, on the argument that browsing by the wrong names beats not
+ * browsing at all. That argument does not survive the question this CMS is
+ * sold on: a brand-new florist, whose list IS empty, was handed nine cake
+ * pages in the header of every storefront page, each of them a link to an
+ * empty grid.
+ *
+ * It also made the component's own fallback dead code. `useFallbackCategories`
+ * in mega-menu.tsx exists for exactly this case and is written for any trade —
+ * and it could never run, because the server had already filled the list.
+ * The test covering it was reading a branch no storefront reached.
+ *
+ * Empty on a throw too, which is the answer the occasions sibling below
+ * already argues for in its own docblock: a database that cannot be read is
+ * not a shop that sells cakes.
  *
  * DE-DUPLICATED BY SLUG, here rather than in each consumer.
  *
@@ -29,9 +42,9 @@ export async function getStorefrontCategories(): Promise<
   try {
     const catalog = await getCatalog();
     const rows = (catalog.categories ?? []) as { id: string; name: string; slug: string; image?: string }[];
-    return rows.length > 0 ? dedupeBySlug(rows) : demoCategories;
+    return dedupeBySlug(rows);
   } catch {
-    return demoCategories;
+    return [];
   }
 }
 

@@ -156,8 +156,32 @@ describe("both menus draw it, and the shop that wrote none is untouched", () => 
      */
     const navbar = code("apps/website/components/storefront-navbar.tsx");
 
-    expect(navbar.match(/drawableGroups\(item\.menu\)/g) ?? []).toHaveLength(2);
-    expect(navbar).toContain("groups={item.menu}");
+    /*
+      THE TWO PLACES, not a count of two.
+
+      This asserted `=== 2` occurrences, which says nothing about WHERE they
+      are — two calls in the desktop band would have satisfied it with the
+      phone drawing plain links — and forbids a third legitimate one. It
+      started failing the moment the taxonomy row joined the same map and
+      had to ask the same question. Sliced at the two markers instead, so
+      the case now fails for the reason it is named after.
+    */
+    const bandAt = navbar.indexOf("data-nav-band");
+    const drawerAt = navbar.indexOf('id="storefront-mobile-nav"');
+    expect(bandAt, "the desktop band is gone").toBeGreaterThan(-1);
+    expect(drawerAt, "the phone drawer is gone").toBeGreaterThan(bandAt);
+
+    const band = navbar.slice(bandAt, drawerAt);
+    const drawer = navbar.slice(drawerAt);
+
+    expect(band, "the desktop band ignores a row's groups").toContain(
+      "drawableGroups(item.menu)",
+    );
+    expect(drawer, "the phone drawer ignores a row's groups").toContain(
+      "drawableGroups(item.menu)",
+    );
+    expect(band).toContain("groups={item.menu}");
+    expect(drawer).toContain("groups={item.menu}");
   });
 
   it("and the Collections row with no groups still draws the shop's taxonomy", () => {

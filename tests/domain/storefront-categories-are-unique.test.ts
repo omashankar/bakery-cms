@@ -74,14 +74,31 @@ describe("the shop's categories", () => {
     expect(categories.map((category) => category.slug)).toEqual(["chocolate"]);
   });
 
-  it("still falls back to the demo list when the catalogue cannot be read", async () => {
-    // A storefront with no way to browse by category is worse than one browsing
-    // by the wrong names — and a read that THREW is not an empty catalogue.
+  it("offers nothing of anyone else's when the catalogue cannot be read", async () => {
+    /**
+     * THIS USED TO ASSERT THE OPPOSITE, on the argument that a storefront with
+     * no way to browse by category is worse than one browsing by the wrong
+     * names. The wrong names were the shipped demo taxonomy — Birthday Cakes,
+     * Photo Cakes, Eggless Cakes, Seasonal — so a florist whose database was
+     * unreachable, or who simply had not added a category yet, got nine cake
+     * pages in the header of every page, each linking to an empty grid.
+     *
+     * Empty is not nothing: `useFallbackCategories` in mega-menu.tsx draws one
+     * row built from the shop's OWN product noun, pointing at the collections
+     * page, which renders whatever the shop has. That code was written for
+     * this case and could never run while the server filled the list first.
+     */
     getCatalog.mockRejectedValue(new Error("down"));
 
-    const categories = await (await load())();
+    expect(await (await load())()).toEqual([]);
+  });
 
-    expect(categories.length).toBeGreaterThan(0);
+  it("and offers nothing when the shop simply has none yet", async () => {
+    // The commoner of the two, and the one a brand-new shop of any trade is in
+    // for as long as it takes to add a category.
+    getCatalog.mockResolvedValue({ categories: [] });
+
+    expect(await (await load())()).toEqual([]);
   });
 
   it("does not fall back when the shop genuinely has one category", async () => {

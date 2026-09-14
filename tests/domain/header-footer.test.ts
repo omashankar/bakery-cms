@@ -259,18 +259,26 @@ describe("controls that reached no customer", () => {
     // both take that same prop, so a single `toContain` passed with either one
     // deleted.
     /*
-      THE ONE CARRYING THE PROP, not the first one in the file.
+      THE TAXONOMY MENU, found by what makes it the taxonomy one.
 
-      Any nav row can be a menu now, so `<MegaMenu` appears twice — and
+      Any nav row can be a menu, so `<MegaMenu` appears more than once, and
       slicing from the first occurrence forced the Collections menu to stay
-      physically first in the source, which is the same thing as forcing it
-      to render first in the band. A shop that reorders its rows in the admin
-      cannot move that one, and this guard was half the reason why.
+      physically first in the source — which is the same thing as forcing it
+      to render first in the band, whatever the admin's reorder arrows said.
+
+      It is a row in the ordinary list now, so its label comes through the
+      map's own `item` rather than a separate lookup. The invariant this case
+      is named for is unchanged: the SHOP's stored label drives the menu, not
+      the hardcoded "Shop" it used to read. What identifies the taxonomy menu
+      is that it is handed the shop's categories.
     */
     const desktop = navbar.split("<MegaMenu").find((chunk) =>
-      chunk.slice(0, chunk.indexOf("/>")).includes("label={collectionsRow.label}"),
+      chunk.slice(0, chunk.indexOf("/>")).includes("categories={chrome.categories}"),
     );
-    expect(desktop, "no MegaMenu takes the Collections row's label").toBeTruthy();
+    expect(desktop, "nothing renders the shop's taxonomy menu").toBeTruthy();
+    expect(desktop!.slice(0, desktop!.indexOf("/>"))).toContain("label={item.label}");
+    // …and the row it reads is still the Collections one.
+    expect(navbar).toContain("item.href === routes.store.collections");
 
     const mobile = navbar.slice(navbar.indexOf("<MobileShopLinks"));
     expect(mobile.slice(0, mobile.indexOf("/>"))).toContain("label={collectionsRow.label}");

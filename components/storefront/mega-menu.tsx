@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { MegaMenuLink } from "@/constants/storefront-nav";
 import type { MegaMenuGroup } from "@/types/site-layout";
+import { navIcon } from "@/config/nav-icons";
 import { routes } from "@/constants/routes";
 import { SafeImage } from "@/components/shared/safe-image";
 import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
@@ -26,18 +27,22 @@ import { cn } from "@/lib/utils";
  * catalogue or the row opens an empty grid, and a florist with no categories
  * yet was offered five cake pages.
  *
- * Now only the two rows that are true for ANY shop: everything, and the
- * best-selling of it. Both point at the collections page itself, which
- * renders whatever the shop has.
+ * Now ONE row that is true for any shop: everything, pointing at the
+ * collections page itself, which renders whatever the shop has.
+ *
+ * There were two. The second was "Best Sellers" at `?sort=popular` — and the
+ * collections page never reads `searchParams`, while its default sort is
+ * already `popular`, so the two rows were the same page under two names. A
+ * menu offering one destination twice is the shape of thing this file keeps
+ * being fixed for.
+ *
+ * This is reachable for the first time: the server used to substitute the
+ * demo taxonomy before an empty list could ever reach here.
  */
 function useFallbackCategories(): MegaMenuLink[] {
   const labels = useBusinessLabels();
   return [
     { label: `All ${labels.productWordPlural}`, href: routes.store.collections },
-    {
-      label: "Best Sellers",
-      href: `${routes.store.collections}?sort=popular`,
-    },
   ];
 }
 
@@ -103,6 +108,28 @@ interface MegaMenuProps {
    * visibility switch — neither of which reached this component.
    */
   label?: string;
+  /**
+   * THE THREE THINGS A ROW LOST BY GAINING A MENU.
+   *
+   * The admin offers Highlight, Icon and Badge on EVERY nav row, with no
+   * hint that a row behaves differently once it has groups — and the navbar
+   * passed none of them here, so the moment a shop gave its promoted row a
+   * dropdown, its emphasis, its icon and its badge silently went. The
+   * reference layout's first item is a highlighted category, which is
+   * exactly the row a shop is most likely to give a menu.
+   */
+  highlight?: boolean;
+  icon?: string;
+  badge?: string;
+  /**
+   * Which edge of the trigger the panel hangs from.
+   *
+   * The panel is 640px and was always `left-0`. The band appears at lg,
+   * where the content column is 960px — so any trigger more than 320px
+   * along, which is the fourth row of a seven-row nav, pushed the panel past
+   * the window and gave the whole storefront a horizontal scrollbar.
+   */
+  align?: "left" | "right";
 }
 
 /**
@@ -117,6 +144,20 @@ export function drawableGroups(groups?: MegaMenuGroup[]): MegaMenuGroup[] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
 
+/**
+ * The row's icon as an ELEMENT, not as a component held in a variable.
+ *
+ * `const RowIcon = navIcon(icon)` in the component body is what the navbar
+ * does inside its map, and it reads fine — but at component scope
+ * `react-hooks/static-components` cannot tell a lookup in a fixed map from a
+ * component defined during render, and reports it. This is the same lookup,
+ * one call deeper, where the question does not arise.
+ */
+function rowIcon(name?: string) {
+  const Icon = navIcon(name);
+  return Icon ? <Icon className="size-4" /> : null;
+}
+
 export function MegaMenu({
   isActive,
   label = "Shop",
@@ -124,6 +165,10 @@ export function MegaMenu({
   occasions: shopOccasions,
   groups,
   href = routes.store.collections,
+  highlight,
+  icon,
+  badge,
+  align = "left",
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
   const filterWedding = useWeddingLinkFilter();
@@ -156,17 +201,47 @@ export function MegaMenu({
         // page — the menu is per nav row now, and each row has its own.
         href={href}
         className={cn(
-          "inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
-          isActive
-            ? "bg-cream-100 text-bakery-700"
-            : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
+          /*
+            UPPERCASE AND LETTER-SPACED, matching the plain rows beside it.
+
+            The transform is CSS, not a change to the stored string — the
+            label stays exactly what the shop typed in the Header screen, so
+            nothing about this is lossy.
+
+            Hover fills to cream-200 rather than cream-100, because the band
+            behind it is cream-100 now and a hover the same colour as its
+            own background is no hover at all.
+          */
+          "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
+          highlight
+            ? "font-semibold text-bakery-700 hover:bg-cream-200"
+            : isActive
+              ? "bg-cream-200 text-bakery-700"
+              : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
         )}
       >
+        {rowIcon(icon)}
         {label}
+        {badge ? (
+          <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-700">
+            {badge}
+          </span>
+        ) : null}
         <ChevronDown className="size-3.5 transition-transform group-hover:rotate-180" />
       </Link>
 
-      <div className="pointer-events-none invisible absolute top-full left-0 z-50 w-[640px] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100">
+      <div
+        className={cn(
+          /*
+            NEVER WIDER THAN THE WINDOW, and hung from whichever edge keeps
+            it inside. A fixed 640px pinned to `left-0` overflows the moment
+            its trigger is more than 320px along the band — which at lg, with
+            a seven-row nav, is the fourth row onwards.
+          */
+          "pointer-events-none invisible absolute top-full z-50 w-[min(640px,calc(100vw-2rem))] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100",
+          align === "right" ? "right-0" : "left-0"
+        )}
+      >
         <div className="overflow-hidden rounded-xl border border-border bg-white p-6 shadow-sm">
           {authored.length > 0 ? (
             /*
@@ -275,10 +350,14 @@ export function MegaMenu({
                   />
                 </div>
                 <div className="p-3">
+                  {/*
+                    "Browse our <name>." went from here — a sentence this CMS
+                    composed and presented as the shop's, with no field behind
+                    it and no way to remove it. The card already carries the
+                    category's name and its picture, and the whole thing is a
+                    link; nothing is lost by not narrating it.
+                  */}
                   <p className="text-sm font-semibold">{featured.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Browse our {featured.name.toLowerCase()}.
-                  </p>
                 </div>
               </Link>
             ) : null}

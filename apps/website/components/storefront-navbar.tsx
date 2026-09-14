@@ -62,6 +62,16 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
    */
   const collectionsRow = navItems.find((item) => item.href === routes.store.collections);
   const homeRow = navItems.find((item) => item.href === routes.store.home);
+  /**
+   * THE ROWS THE BAND DRAWS, in the order the shop set.
+   *
+   * Collections is in here. It used to be rendered before the map and
+   * filtered out of it, which pinned it to the head of the band whatever the
+   * admin's reorder arrows said — so a shop that wanted its promoted row
+   * first could not have it, and the control that promised otherwise did
+   * nothing. Home is not: on desktop the logo is the way home.
+   */
+  const bandRows = navItems.filter((item) => item.href !== routes.store.home);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -178,8 +188,17 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     <>
     <header
       className={cn(
-        "sticky top-0 z-50 w-full border-b bg-white transition-colors",
-        scrolled ? "border-border" : "border-transparent"
+        /*
+          A SHADOW ON SCROLL, not a border.
+
+          The band below owns a hairline of its own now — the reference has
+          one above it and one below — and the header's border sat on the
+          same edge, so the two stacked into a 2px line the moment anybody
+          scrolled. A shadow says the same thing (the header is floating over
+          the page) without competing for that pixel.
+        */
+        "sticky top-0 z-50 w-full bg-white transition-shadow",
+        scrolled && "shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
       )}
     >
       {/*
@@ -384,31 +403,78 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       {/* `data-nav-band` for the same reason `data-header-bar` exists: the
           guard below cares that this band is hidden on a phone, not what
           colour it is. */}
+      {/*
+        NOTHING TO SHOW MEANS NO BAND.
+
+        A shop that switches every nav row off still got the strip: a
+        hairline, 12px of padding and nothing between them, under the main
+        bar of every desktop page. Invisible while the fill was white on
+        white; a grey bar of nothing the moment the fill became real.
+      */}
+      {bandRows.length > 0 ? (
       <div
         data-nav-band
-        className="hidden border-t border-border bg-cream-50/60 lg:block"
+        /*
+          cream-100, NOT cream-50.
+
+          `--cream-50` is literally `#ffffff` — in globals.css and, for every
+          shop palette, in appearance-tokens — so `bg-cream-50/60` over a
+          white header painted white at 60% opacity onto white. The band the
+          comment below describes was, to a customer, not there at all.
+          `--cream-100` is the shop's own surface colour, so the tint tracks
+          whatever palette the shop picked instead of being a fixed grey.
+
+          A hairline above AND below, which is what closes it as a band. The
+          header's own border moved to a shadow so they do not stack.
+        */
+        className="hidden border-y border-border bg-cream-100 lg:block"
       >
         <nav
           className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-1.5 sm:px-6 lg:px-8"
           aria-label="Shop categories"
         >
-        {collectionsRow ? (
-          <MegaMenu
-            label={collectionsRow.label}
-            categories={chrome.categories}
-            occasions={chrome.occasions}
-            isActive={
-              pathname === routes.store.collections ||
-              pathname.startsWith(`${routes.store.collections}/`)
-            }
-          />
-        ) : null}
-        {navItems
-          .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
-          .map((item) => {
+        {bandRows.map((item, index) => {
           const isActive =
             pathname === item.href ||
             (item.href !== routes.store.home && pathname.startsWith(item.href));
+          /**
+           * WHICH EDGE THE PANEL HANGS FROM.
+           *
+           * The panel is 640px and the band's content column is 960px at lg,
+           * so a trigger in the second half of the row pushed a left-anchored
+           * panel past the window and gave the storefront a horizontal
+           * scrollbar. Decided from position rather than measured, because
+           * measuring means reading layout during render.
+           */
+          const align = index >= Math.floor(bandRows.length / 2) ? "right" : "left";
+          const divider = item.dividerBefore && index > 0 ? (
+            /* A divider before the FIRST row separates it from nothing. */
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+          ) : null;
+
+          /*
+            The taxonomy menu is a row in this list now, so its place in the
+            band is its own sortOrder. A shop that has written its own groups
+            for this row gets those instead, exactly as any other row does.
+          */
+          if (item.href === routes.store.collections && drawableGroups(item.menu).length === 0) {
+            return (
+              <div key={item.id} className="flex items-center gap-1">
+                {divider}
+                <MegaMenu
+                  label={item.label}
+                  href={item.href}
+                  categories={chrome.categories}
+                  occasions={chrome.occasions}
+                  isActive={isActive}
+                  highlight={item.highlight}
+                  icon={item.icon}
+                  badge={item.badge}
+                  align={align}
+                />
+              </div>
+            );
+          }
           /**
            * A ROW WITH ITS OWN MENU IS A MENU, NOT A LINK.
            *
@@ -421,41 +487,70 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           const authored = drawableGroups(item.menu);
           if (authored.length > 0) {
             return (
-              <MegaMenu
-                key={item.id}
-                label={item.label}
-                href={item.href}
-                groups={item.menu}
-                isActive={isActive}
-              />
+              <div key={item.id} className="flex items-center gap-1">
+                {divider}
+                {/*
+                  The four promoted fields travel now. They stopped at the
+                  plain-link branch, so a shop that gave its highlighted row a
+                  dropdown lost the highlight, the icon and the badge with no
+                  warning anywhere — and the divider, which the type says is a
+                  property of the ROW precisely so that it travels with it.
+                */}
+                <MegaMenu
+                  label={item.label}
+                  href={item.href}
+                  groups={item.menu}
+                  isActive={isActive}
+                  highlight={item.highlight}
+                  icon={item.icon}
+                  badge={item.badge}
+                  align={align}
+                />
+              </div>
             );
           }
           const RowIcon = navIcon(item.icon);
           return (
-            <div key={item.id} className="flex items-center gap-1">
-              {/* A divider that belongs to the ROW, so hiding or reordering
-                  the promoted item takes its separator with it. */}
-              {item.dividerBefore ? (
-                <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-              ) : null}
+            /*
+              THE GATE IS ON THE WRAPPER, not on the link inside it.
+
+              `[data-gate-wedding]` is hidden with display:none for a shop
+              whose wedding module is off. On the Link alone that hid the link
+              and left its divider behind: a 20px hairline floating in the
+              band with nothing after it.
+            */
+            <div
+              key={item.id}
+              className="flex items-center gap-1"
+              data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
+            >
+              {divider}
               <Link
                 href={item.href}
-                data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-premium",
+                  /*
+                    UPPERCASE, letter-spaced and a size smaller — the
+                    reference's category strip, and what makes eleven rows
+                    plus a promoted item fit across the band at all. The
+                    transform is CSS: the stored label is still exactly what
+                    the shop typed.
+                  */
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
                   // The shop's emphasis beats the route's. A promoted row
-                  // reads as promoted whether or not you are standing on it.
+                  // reads as promoted whether or not you are standing on it —
+                  // and it is bolder as well as brand-coloured, because eleven
+                  // neighbours at the same weight swallow a colour change.
                   item.highlight
-                    ? "text-bakery-700 hover:bg-cream-100"
+                    ? "font-semibold text-bakery-700 hover:bg-cream-200"
                     : isActive
-                      ? "bg-cream-100 text-bakery-700"
-                      : "text-muted-foreground hover:bg-cream-100 hover:text-foreground"
+                      ? "bg-cream-200 text-bakery-700"
+                      : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
                 )}
               >
                 {RowIcon ? <RowIcon className="size-4" /> : null}
                 {item.label}
                 {item.badge ? (
-                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-700">
                     {item.badge}
                   </span>
                 ) : null}
@@ -465,10 +560,25 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         })}
         </nav>
       </div>
+      ) : null}
       {mobileOpen ? (
         <div
           id="storefront-mobile-nav"
-          className="border-t border-border bg-white lg:hidden"
+          /*
+            A CEILING, AND ITS OWN SCROLL.
+
+            The drawer is plain in-flow content and `useBodyScrollLock` sets
+            `overflow: hidden` on the body while it is open — so anything
+            past the fold could not be reached at all. With this shop's seven
+            nav rows it already ran past a 667px phone, which put the
+            wishlist/cart/account row, and the only way to sign in on a
+            phone, below a fold nobody could scroll to.
+
+            `dvh` rather than `vh` because mobile browser chrome collapses on
+            scroll, and `overscroll-contain` so the locked body does not
+            swallow the drawer's own scroll at its ends.
+          */
+          className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-white lg:hidden"
         >
           <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobile navigation">
             {homeRow ? (
@@ -495,7 +605,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             ) : null}
             {navItems
               .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
-              .map((item) => {
+              .map((item, index) => {
                 /*
                   The phone gets the same groups, for the reason this repo
                   keeps relearning: a menu that differs by screen size is two
@@ -517,18 +627,22 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               // is two headers, and this is the one a customer uses.
               const RowIcon = navIcon(item.icon);
               return (
-                <div key={item.id}>
-                  {item.dividerBefore ? (
+                /* The gate sits on the wrapper here too, so a row hidden for
+                   a shop with no wedding module takes its rule with it. */
+                <div
+                  key={item.id}
+                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
+                >
+                  {item.dividerBefore && index > 0 ? (
                     <div className="my-2 h-px bg-border" aria-hidden="true" />
                   ) : null}
                   <Link
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
-                    data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
                     className={cn(
                       "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium",
                       item.highlight
-                        ? "text-bakery-700 hover:bg-cream-100"
+                        ? "font-semibold text-bakery-700 hover:bg-cream-100"
                         : isActive
                           ? "bg-cream-100 text-bakery-700"
                           : "hover:bg-cream-100"
@@ -595,6 +709,36 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 <Search className="size-4" />
                 Search
               </Link>
+            ) : null}
+
+            {/*
+              THE UTILITY ROW, WHICH THE PHONE COULD NOT REACH AT ALL.
+
+              Its own band is `hidden … lg:block`, and nothing else rendered
+              it — so Track Order, Help, and whatever else a shop puts up
+              there existed only on a desktop. Those are exactly the rows a
+              customer goes looking for, and this shop's customers are on
+              phones.
+            */}
+            {utilityNav.length > 0 || currencyNote ? (
+              <div className="mt-2 space-y-1 border-t border-border pt-3">
+                {utilityNav.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-cream-100 hover:text-bakery-700"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {currencyNote ? (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    Currency ·{" "}
+                    <span className="font-medium text-foreground">{currencyNote}</span>
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </nav>
         </div>
