@@ -331,6 +331,12 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       */
       layout: "split",
       copySide: "left",
+      /*
+        TRUE, so nothing changes for a shop that already has this band.
+        Turning it off from here would take a true and useful line off every
+        existing homepage without anybody asking.
+      */
+      showDeliveryFacts: true,
     },
     fields: [
       {
@@ -393,6 +399,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             placeholder: "Orders delivered",
           },
         ],
+      },
+      {
+        /*
+          THE TWO FACTS ARE A CHOICE NOW, not an assumption.
+
+          They are true — both are read from the shop's own commerce settings
+          and track them — but true is not the same as wanted. A shop that
+          carries its delivery terms in its banner artwork, or in the strip
+          below, or simply does not want a band of promises under its hero,
+          had no way to say so: the tiles appeared because the settings were
+          readable, which is a decision this software was making for them.
+
+          Off, the band draws only what the shop wrote in the list below —
+          and nothing at all when that is empty.
+        */
+        key: "showDeliveryFacts",
+        label: "Show your delivery facts",
+        type: "boolean",
       },
       {
         /*

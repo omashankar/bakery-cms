@@ -90,6 +90,21 @@ export interface HeaderSettings {
   showCta: boolean;
   ctaLabel: string;
   ctaHref: string;
+  /**
+   * The promo strip ABOVE the header, which draws the shop's active banners.
+   *
+   * A switch because those banners already have a home: the Promo Banner
+   * section on the homepage draws the same list, so on the page most
+   * customers land on, a shop's offer was being shown TWICE — once above the
+   * logo and once in the page. The strip also mounts after hydration and
+   * pushes the whole page down as it appears.
+   *
+   * Defaults ON, because every shop running this today has it and turning it
+   * off for them from here would be this software deciding their offer is
+   * not worth the top of the page. Switched off, the banners keep rendering
+   * in the section that was always meant to carry them.
+   */
+  showBannerStrip?: boolean;
   nav: HeaderNavItem[];
   /**
    * The thin row ABOVE the main bar — Help, Track Order, and whatever else

@@ -8,6 +8,7 @@ import {
   heroSlidesFor,
 } from "@/features/cms-sections/lib/section-utils";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import { headerSchema } from "@/features/site-layout/server/site-layout.validators";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
 /**
@@ -530,14 +531,55 @@ describe("the slideshow's own controls", () => {
 
   it("can be stopped by someone who cannot hover", () => {
     /**
-     * Autoplay paused on hover and on focus. A phone has neither — so on the
-     * device most of this shop's customers use, a hero that moved every six
-     * seconds could not be stopped at all.
+     * Autoplay follows `paused`, which follows hover and focus — and a phone
+     * has neither, so on the device most of this shop's customers use a hero
+     * moving every six seconds could not be halted at all.
+     *
+     * A visible pause button was one answer and is no longer the one here:
+     * the reference layout's control row is dots and nothing else. The
+     * requirement did not go with it. `stopped` is sticky and every
+     * deliberate move sets it, so taking hold of the carousel is what keeps
+     * it — no second control to find.
      */
     const carousel = codeOf(read(CAROUSEL));
 
-    expect(carousel).toMatch(/setPaused\(\(was\) => !was\)/);
-    expect(carousel).toMatch(/aria-label=\{paused \? "Resume slideshow" : "Pause slideshow"\}/);
+    expect(carousel).toMatch(/const \[stopped, setStopped\] = useState\(false\)/);
+    expect(carousel, "autoplay ignores that it was stopped").toMatch(
+      /if \(!multi \|\| paused \|\| stopped\) return;/,
+    );
+    expect(carousel, "the effect will not re-run when it is stopped").toMatch(
+      /\[multi, paused, stopped, count\]/,
+    );
+  });
+
+  it("and every way of moving between slides is that stop", () => {
+    /**
+     * `go` is the only thing that sets it, so anything that moves a slide
+     * WITHOUT going through `go` silently keeps the carousel running under a
+     * customer who has just taken hold of it. The dots used to call
+     * `setIndex` directly, and on a phone in the split layout they are the
+     * only control there is.
+     */
+    const carousel = codeOf(read(CAROUSEL));
+    const body = carousel.slice(carousel.indexOf("export function HeroCarousel"));
+
+    expect(body).toMatch(/const go = useCallback\(\s*\(next: number\) => \{\s*setStopped\(true\);/);
+    expect(body, "the dots move a slide without stopping the autoplay").toContain(
+      "onClick={() => go(i)}",
+    );
+    /*
+      The autoplay tick is the one legitimate `setIndex` outside `go`, and it
+      is inside the effect. Any other is a control that does not stop.
+    */
+    expect((body.match(/setIndex\(/g) ?? []).length).toBe(2);
+  });
+
+  it("and the row under the picture is dots, with no other control in it", () => {
+    // What the reference shows, and what the shop asked for.
+    const carousel = codeOf(read(CAROUSEL));
+
+    expect(carousel, "the pause button is back").not.toContain("Pause slideshow");
+    expect(carousel, "the pause icons are back").not.toMatch(/[^A-Za-z](Pause|Play)[,\s]/);
   });
 
   it("keeps the banner's arrows off a band only as tall as its artwork", () => {
@@ -794,5 +836,64 @@ describe("what the admin sees of the artwork before it publishes", () => {
     // And the default is unchanged, so every other field in the admin keeps
     // the thumbnail crop it was designed around.
     expect(photoField).toMatch(/fit = "cover"/);
+  });
+});
+
+describe("bands a shop can switch off", () => {
+  it("the two delivery facts under the hero, which were not a choice", () => {
+    /**
+     * They are true — both read from the shop's own commerce settings, and
+     * both track them. True is not the same as wanted: a shop carrying its
+     * delivery terms in the banner artwork, or not wanting a band of promises
+     * under its hero at all, had no way to say so. They appeared because the
+     * settings were readable, which is this software deciding for the shop.
+     */
+    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
+    const field = hero.fields.find((f) => f.key === "showDeliveryFacts");
+
+    expect(field?.type, "there is no switch for the delivery facts").toBe("boolean");
+    // ON by default, so no shop loses a band it already has.
+    expect(hero.defaultContent.showDeliveryFacts).toBe(true);
+  });
+
+  it("and the renderer defaults it on for a section stored before it existed", () => {
+    // Every hero on every shop predates this key. Reading it as false would
+    // take the band off all of them at once.
+    const body = bodyOf(read(RENDERER), "function HeroSection(");
+
+    expect(body).toMatch(
+      /contentBoolean\(section\.content, "showDeliveryFacts", true\)/,
+    );
+  });
+
+  it("and the promo strip above the header, which drew the same banners twice", () => {
+    /**
+     * The homepage's Promo Banner section draws the same list, so on the page
+     * most customers land on, a shop's offer appeared above the logo AND in
+     * the page. The strip also mounts after hydration and pushes everything
+     * below it down as it arrives.
+     */
+    const defaults = read("features/site-layout/lib/header-utils.ts");
+    expect(defaults).toContain("showBannerStrip: true");
+
+    const shell = read("layouts/storefront-layout.tsx");
+    expect(shell).toMatch(/\{chrome\.showBannerStrip \? <StorefrontBannerStrip \/> : null\}/);
+  });
+
+  it("and a stored string cannot turn that switch back on by being truthy", () => {
+    /**
+     * `headerSchema` is `.passthrough()`, so an undeclared key round-trips
+     * unvalidated — and the renderer reads this as `?? true`, so a stored
+     * "false" (a string, which is what a hand-edited document or an older
+     * form holds) is truthy and the switch stops working in the one direction
+     * anybody uses it in.
+     */
+    const parsed = headerSchema.safeParse({ logoLetter: "", nav: [], showBannerStrip: "false" });
+    expect(parsed.success, "a string passed validation as a switch").toBe(false);
+
+    const good = headerSchema.parse({ logoLetter: "", nav: [], showBannerStrip: false }) as {
+      showBannerStrip?: boolean;
+    };
+    expect(good.showBannerStrip).toBe(false);
   });
 });

@@ -7,8 +7,6 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
-  Pause,
-  Play,
   Sparkles,
   Star,
 } from "lucide-react";
@@ -586,15 +584,39 @@ export function HeroCarousel({
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  /**
+   * STOPPED FOR GOOD, not paused — and this is the pause CONTROL, not a
+   * nicety.
+   *
+   * Content that moves on its own has to be stoppable, and hover and focus,
+   * which are what `paused` follows, do not exist on a phone: on the device
+   * most of this shop's customers use, a slide changing every six seconds
+   * could not be halted at all. A visible pause button is one answer and the
+   * one that was here; it is not the only one, and the reference layout — and
+   * the shop — wanted the row to be dots and nothing else.
+   *
+   * So the gesture IS the control. Press an arrow, press a dot, swipe: any
+   * deliberate move between slides ends the autoplay for the rest of the
+   * visit. A customer who takes hold of the carousel keeps it, and does not
+   * have to find a second control to say so.
+   */
+  const [stopped, setStopped] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const count = slides.length;
   const multi = count > 1;
   const banner = layout === "banner";
 
-  const go = useCallback((next: number) => setIndex((next + count) % count), [count]);
+  /** Every deliberate move goes through here, which is what makes it the stop. */
+  const go = useCallback(
+    (next: number) => {
+      setStopped(true);
+      setIndex((next + count) % count);
+    },
+    [count],
+  );
 
   useEffect(() => {
-    if (!multi || paused) return;
+    if (!multi || paused || stopped) return;
     if (
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -603,7 +625,7 @@ export function HeroCarousel({
     }
     const id = window.setInterval(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS);
     return () => window.clearInterval(id);
-  }, [multi, paused, count]);
+  }, [multi, paused, stopped, count]);
 
   if (count === 0) return null;
 
@@ -736,7 +758,10 @@ export function HeroCarousel({
             <button
               key={i}
               type="button"
-              onClick={() => setIndex(i)}
+              // `go`, not `setIndex` — pressing a dot is as deliberate as
+              // pressing an arrow, and it is the only one of the three a
+              // phone has in the split layout.
+              onClick={() => go(i)}
               aria-label={`Go to slide ${i + 1}`}
               aria-current={i === activeIndex}
               /*
@@ -759,21 +784,16 @@ export function HeroCarousel({
           ))}
 
           {/*
-            A PAUSE THE TOUCH USER CAN REACH.
+            NO PAUSE BUTTON. The row is dots and nothing else, which is what
+            the reference layout shows and what a shop asked for.
 
-            Autoplay already stops on hover and on focus, and a phone has
-            neither — so on the device most of this shop's customers use, a
-            slide that moves every six seconds could not be stopped at all.
-            An icon and a label, no copy.
+            The requirement behind that button has not gone, though: content
+            that moves on its own has to be stoppable, and hover and focus —
+            the only two things that stopped it — do not exist on a phone.
+            `stop()` is what replaced it. Any deliberate move between slides
+            ends the autoplay for good, so a customer who takes hold of the
+            carousel keeps it, and nobody has to find a control to say so.
           */}
-          <button
-            type="button"
-            onClick={() => setPaused((was) => !was)}
-            aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
-            className="ml-2 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
-          >
-            {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
-          </button>
         </div>
       ) : null}
     </div>

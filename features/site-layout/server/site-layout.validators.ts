@@ -158,6 +158,14 @@ export const headerSchema = z
     // The same row shape, so the same validator — see HeaderSettings.
     utilityNav: z.array(headerNavSchema).optional(),
     showCurrencyNote: z.boolean().optional(),
+    /*
+      Declared, because the schema is `.passthrough()` and the renderer reads
+      this as `?? true`. Left undeclared, a stored "false" — a string, which
+      is what a hand-edited document or an older form would hold — is truthy,
+      and the switch silently stops working in the one direction anybody uses
+      it in.
+    */
+    showBannerStrip: z.boolean().optional(),
   })
   .passthrough();
 

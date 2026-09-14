@@ -373,7 +373,9 @@ export function HeaderAdminPage() {
             <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">Show CTA button</p>
-                <p className="text-xs text-muted-foreground">Order inquiry button on desktop.</p>
+                <p className="text-xs text-muted-foreground">
+                  A button beside the cart, for whatever you want asked first.
+                </p>
               </div>
               <Switch
                 checked={settings.showCta}
@@ -381,6 +383,22 @@ export function HeaderAdminPage() {
                   setSettings((prev) => ({ ...prev, showCta: checked }))
                 }
                 aria-label="Show CTA button"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Show promo strip</p>
+                <p className="text-xs text-muted-foreground">
+                  Your active banners, above the header. They also appear in the
+                  homepage&rsquo;s Promo Banner section.
+                </p>
+              </div>
+              <Switch
+                checked={settings.showBannerStrip ?? true}
+                onCheckedChange={(checked) =>
+                  setSettings((prev) => ({ ...prev, showBannerStrip: checked }))
+                }
+                aria-label="Show promo strip"
               />
             </div>
             <div className="space-y-2">

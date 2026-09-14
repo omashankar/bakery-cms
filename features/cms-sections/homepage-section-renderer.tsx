@@ -359,7 +359,9 @@ function HeroSection(props: HomepageSectionRendererProps) {
    * the guard, which is the point of the guard.
    */
   const promises = [
-    ...heroTrustBarFor(props.trust),
+    ...(contentBoolean(section.content, "showDeliveryFacts", true)
+      ? heroTrustBarFor(props.trust)
+      : []),
     ...renderableRows(parseListField(props.section.content, "trust")),
   ];
 

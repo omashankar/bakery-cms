@@ -78,7 +78,10 @@ export function StorefrontLayoutShell({
       ) : null}
       <div className="contents print:hidden">
         <MaintenanceBanner maintenance={maintenance} />
-        <StorefrontBannerStrip />
+        {/* The same banners the homepage's Promo Banner section draws, above
+            the header instead. A shop that wants them in one place only can
+            switch this off; see HeaderSettings.showBannerStrip. */}
+        {chrome.showBannerStrip ? <StorefrontBannerStrip /> : null}
         <StorefrontNavbar chrome={chrome} />
       </div>
       <main className="flex-1">{children}</main>

@@ -19,6 +19,9 @@ export const defaultHeaderSettings: HeaderSettings = {
   logoLetter: "",
   showSearch: true,
   showCta: true,
+  // ON, so no shop loses the strip it has today. See the type's own note for
+  // why it is a switch at all.
+  showBannerStrip: true,
   ctaLabel: "Order Inquiry",
   ctaHref: routes.store.contact,
   /**

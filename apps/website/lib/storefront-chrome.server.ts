@@ -41,6 +41,8 @@ export interface StorefrontChrome {
   showSearch: boolean;
   /** The shop's own line for the search box; blank means the generic one. */
   searchPlaceholder: string;
+  /** Draw the promo strip above the header at all. */
+  showBannerStrip: boolean;
   /**
    * The header's call-to-action button.
    *
@@ -126,6 +128,7 @@ function fallbackChrome(): StorefrontChrome {
     logo: "",
     logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
+    showBannerStrip: defaultHeaderSettings.showBannerStrip ?? true,
     searchPlaceholder: "",
     cta: {
       show: defaultHeaderSettings.showCta,
@@ -240,6 +243,8 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       logoLetter: header.logoLetter?.trim() || firstLetterOf(name),
       showSearch: header.showSearch ?? defaultHeaderSettings.showSearch,
       searchPlaceholder: (header.searchPlaceholder ?? "").trim(),
+      showBannerStrip:
+        header.showBannerStrip ?? defaultHeaderSettings.showBannerStrip ?? true,
       cta: {
         show: header.showCta ?? defaultHeaderSettings.showCta,
         // An empty label would render a button with no accessible name.
