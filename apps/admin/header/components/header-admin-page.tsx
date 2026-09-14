@@ -329,7 +329,15 @@ export function HeaderAdminPage() {
             <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">Show search</p>
-                <p className="text-xs text-muted-foreground">Search icon on desktop navbar.</p>
+                {/*
+                  It said "Search icon on desktop navbar" for a control that
+                  is a search BOX, from tablet width up, with an icon on
+                  phones. Three things wrong in seven words, on the screen
+                  whose job is to explain the switch.
+                */}
+                <p className="text-xs text-muted-foreground">
+                  Search box in the storefront header.
+                </p>
               </div>
               <Switch
                 checked={settings.showSearch}
@@ -338,6 +346,29 @@ export function HeaderAdminPage() {
                 }
                 aria-label="Show search"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="search-placeholder">Search placeholder</Label>
+              <Input
+                id="search-placeholder"
+                value={settings.searchPlaceholder ?? ""}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, searchPlaceholder: e.target.value }))
+                }
+                disabled={!settings.showSearch}
+                /*
+                  DELIBERATELY NOT AN EXAMPLE. The reference header's line
+                  reads "Search 5000+ flowers, cakes, gifts etc" — a claim
+                  about the size of a catalogue that only this shop knows,
+                  and prefilling anything like it here is this software
+                  putting a number in the shop's mouth. Blank falls back to
+                  the shop's own plural noun.
+                */
+                placeholder="Optional"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to use your own product wording.
+              </p>
             </div>
             <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
               <div className="min-w-0">

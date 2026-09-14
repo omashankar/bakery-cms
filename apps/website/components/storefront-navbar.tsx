@@ -257,7 +257,13 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       */}
       <div
         data-header-bar
-        className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
+        /*
+          Taller from lg, where the reference row is about 90px and there is
+          room for it. Appended rather than written in place of `h-16`: the
+          base height is what a phone gets, and the two survive together
+          because they are different breakpoints.
+        */
+        className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:h-[88px] lg:gap-4 lg:px-8"
       >
         {/*
           `min-w-0` and a cap on the phone, because the shop's name is free

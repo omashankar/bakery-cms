@@ -147,6 +147,34 @@ describe("the search box", () => {
     expect(navbar).toContain("labels.productWordPlural.toLowerCase()");
   });
 
+  it("and the shop has somewhere to type that line", () => {
+    /**
+     * The field was typed, validated, carried through the chrome and rendered
+     * by the navbar — with no input anywhere in the admin. A shop could not
+     * set it by any means short of editing the document, so the fallback was
+     * the only line any shop ever saw.
+     */
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+
+    expect(admin, "there is no box for the search placeholder").toContain(
+      "searchPlaceholder: e.target.value",
+    );
+    /*
+      And the box is NOT prefilled with an example. A placeholder here would
+      be this software suggesting a sentence about the size of a catalogue it
+      knows nothing about, which is the claim the field exists to avoid.
+    */
+    const box = admin.slice(admin.indexOf('id="search-placeholder"'));
+    expect(box.slice(0, 500)).toContain('placeholder="Optional"');
+  });
+
+  it("and the switch beside it describes what it switches", () => {
+    // It read "Search icon on desktop navbar" for a control that is a search
+    // BOX, from tablet width up, with an icon on phones.
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+    expect(admin).not.toContain("Search icon on desktop navbar");
+  });
+
   it("is a box from the first width that can hold one", () => {
     /**
      * It started at lg. Between 640 and 1023px — every tablet, and every
