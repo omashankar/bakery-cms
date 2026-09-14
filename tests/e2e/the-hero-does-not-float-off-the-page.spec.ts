@@ -232,3 +232,175 @@ test("the banner is shown whole, at whatever shape the shop uploaded", async ({ 
     `the band is ${Math.round(shape!.bandHeight!)}px around a ${Math.round(shape!.paintedHeight)}px picture`,
   ).toBeGreaterThanOrEqual(Math.round(shape!.paintedHeight) - 1);
 });
+
+test("the loop never runs backwards, and picks itself up again", async ({ page }) => {
+  /**
+   * Two things only a clock can see.
+   *
+   * The wrap: with a modulo the last slide returning to the first animated the
+   * whole row backwards, and every still frame of that looks identical to a
+   * correct slider. It has to be watched.
+   *
+   * And the resume: a press used to stop the autoplay for the rest of the
+   * visit, which reads as a carousel that has died.
+   */
+  test.setTimeout(120_000);
+  const width = 1440;
+  const height = 900;
+  await page.setViewportSize({ width, height });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const sample = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const boxes = [...(hero?.querySelectorAll("img") ?? [])].map((img) =>
+        img.getBoundingClientRect(),
+      );
+      const middle = window.innerWidth / 2;
+      return {
+        left: boxes[0]?.left ?? null,
+        /*
+          IS THERE A PICTURE UNDER THE MIDDLE OF THE WINDOW?
+
+          Where the row IS says nothing about whether anything is in it. Drop
+          the clone and the last turn slides onto empty space and then jumps
+          home — which satisfies every assertion about the row's position,
+          and shows the customer a blank band. It survived the mutation until
+          this line existed.
+        */
+        covered: boxes.some((box) => box.left <= middle && box.right >= middle),
+      };
+    });
+
+  const rowLeft = async () => (await sample()).left;
+
+  const slides = await page.evaluate(
+    () => document.querySelectorAll('[data-section-id^="hero"] img').length,
+  );
+  if (slides < 3) test.skip(true, "this shop has fewer than two hero slides");
+
+  /*
+    Sampled twice a second through two full turns of the loop. Every reading
+    must be at or left of the one before it until the row jumps home — a
+    single sample drifting RIGHT while still animating is the backwards
+    rewind, and it is the only way to catch it.
+  */
+  let previous = (await sample()).left!;
+  let jumpsHome = 0;
+  for (let i = 0; i < 44; i += 1) {
+    await page.waitForTimeout(500);
+    const now = await sample();
+
+    expect(
+      now.covered,
+      `no picture under the middle of the window at ${(i * 0.5).toFixed(1)}s`,
+    ).toBe(true);
+
+    const jumped = now.left! > previous + 10;
+    if (jumped) {
+      // A jump home is allowed only from the clone, and only all the way.
+      expect(
+        Math.round(now.left!),
+        `the row jumped from ${Math.round(previous)} to ${Math.round(now.left!)}`,
+      ).toBe(0);
+      jumpsHome += 1;
+    }
+    previous = now.left!;
+  }
+
+  expect(jumpsHome, "the loop never came round in 22 seconds").toBeGreaterThan(0);
+
+  /*
+    And it picks itself up — pressed WITH THE MOUSE, which is the whole point.
+
+    A real click leaves the button focused, and focus used to pause the
+    autoplay for as long as it lasted: the hero had not moved fifteen seconds
+    later. A programmatic `.click()` does not reproduce that, and the first
+    version of this test used one — so the mutation that restores the bug
+    passed it. The pointer is then moved off the hero, because hovering is a
+    separate and legitimate pause.
+  */
+  await page.click('[aria-label="Next slide"]');
+  await page.mouse.move(5, height - 20);
+  await page.waitForTimeout(1500);
+  const afterPress = (await rowLeft())!;
+
+  // Longer than the pause plus one turn, so a hero that has resumed has
+  // demonstrably moved and one that has not, has not.
+  await page.waitForTimeout(21_000);
+  const later = (await rowLeft())!;
+
+  expect(
+    Math.abs(later - afterPress),
+    `the row is still at ${Math.round(later)} twenty-one seconds after a press`,
+  ).toBeGreaterThan(10);
+});
+
+test("a tap on an arrow does not stop the hero for the rest of the visit", async ({
+  browser,
+}) => {
+  /**
+   * THE PHONE PATH, and it is the one that breaks.
+   *
+   * `paused` is written by hover AND by focus. With a mouse the two cancel
+   * out: a click focuses the arrow and pauses it, and moving the pointer away
+   * fires `mouseleave`, which unpauses it. A TAP has no pointer to move away —
+   * so the focus left on the button by the tap pauses the autoplay and nothing
+   * ever clears it, and the hero never moves again.
+   *
+   * `:focus-visible` is the distinction that fixes it: the browser sets it for
+   * focus arrived at by keyboard, not for focus left behind by a tap.
+   *
+   * This has to be a touch context. I first wrote it with a mouse click and it
+   * passed against the bug — `mouseleave` was quietly doing the work, and the
+   * test proved nothing.
+   */
+  test.setTimeout(90_000);
+  const context = await browser.newContext({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 },
+  });
+  const page = await context.newPage();
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const rowLeft = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const img = hero?.querySelector("img");
+      return img ? img.getBoundingClientRect().left : null;
+    });
+
+  const slides = await page.evaluate(
+    () => document.querySelectorAll('[data-section-id^="hero"] img').length,
+  );
+  if (slides < 3) {
+    await context.close();
+    test.skip(true, "this shop has fewer than two hero slides");
+    return;
+  }
+
+  /*
+    The banner's arrows are hidden below sm — the band is only as tall as its
+    artwork there — so the dots are the control a phone actually has, and they
+    leave focus behind in exactly the same way.
+  */
+  await page.tap('[aria-label="Go to slide 2"]');
+  await page.waitForTimeout(1500);
+  const afterTap = (await rowLeft())!;
+
+  // Longer than the pause plus one turn, so a hero that has resumed has
+  // demonstrably moved and one that has not, has not.
+  await page.waitForTimeout(21_000);
+  const later = (await rowLeft())!;
+
+  const moved = Math.abs(later - afterTap) > 10;
+  await context.close();
+
+  expect(
+    moved,
+    `the hero has not moved twenty-one seconds after one tap (still at ${Math.round(later)})`,
+  ).toBe(true);
+});

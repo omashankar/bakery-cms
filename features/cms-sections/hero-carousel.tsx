@@ -32,6 +32,16 @@ export interface HeroSlide {
 }
 
 const AUTOPLAY_MS = 6000;
+/** How long one slide takes to move. Must match `duration-700` on the track. */
+const SLIDE_MS = 700;
+/**
+ * How long a press holds the autoplay before it picks up again.
+ *
+ * Two turns. Long enough that somebody reading a slide they chose is not
+ * interrupted; short enough that a carousel they pressed once does not look
+ * like one that has died, which is what a permanent stop looked like.
+ */
+const RESUME_MS = 12000;
 const SWIPE_THRESHOLD = 48;
 
 /** Staggered entrance — CSS driven, always settles visible (fill-mode both). */
@@ -582,57 +592,117 @@ export function HeroCarousel({
   layout?: HeroLayout;
   copySide?: HeroCopySide;
 }) {
-  const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  /**
-   * STOPPED FOR GOOD, not paused — and this is the pause CONTROL, not a
-   * nicety.
-   *
-   * Content that moves on its own has to be stoppable, and hover and focus,
-   * which are what `paused` follows, do not exist on a phone: on the device
-   * most of this shop's customers use, a slide changing every six seconds
-   * could not be halted at all. A visible pause button is one answer and the
-   * one that was here; it is not the only one, and the reference layout — and
-   * the shop — wanted the row to be dots and nothing else.
-   *
-   * So the gesture IS the control. Press an arrow, press a dot, swipe: any
-   * deliberate move between slides ends the autoplay for the rest of the
-   * visit. A customer who takes hold of the carousel keeps it, and does not
-   * have to find a second control to say so.
-   */
-  const [stopped, setStopped] = useState(false);
-  const touchStartX = useRef<number | null>(null);
   const count = slides.length;
   const multi = count > 1;
   const banner = layout === "banner";
 
-  /** Every deliberate move goes through here, which is what makes it the stop. */
+  /**
+   * 0 … count, where `count` is the CLONE of the first slide.
+   *
+   * The row used to run 0…count-1 and wrap with a modulo, so the last slide
+   * going back to the first animated the whole row backwards — on this
+   * three-slide hero, 2,880px of travel in 700ms, every third turn. Measured;
+   * it is the thing that made the slider look broken rather than slow.
+   *
+   * A copy of the first slide sits after the last one, so the wrap is a
+   * forward move like every other. `snapBack` then puts the row back to 0
+   * with the transition off, which nobody sees because the picture at
+   * `count` and the picture at 0 are the same picture.
+   */
+  const [index, setIndex] = useState(0);
+  const [snapBack, setSnapBack] = useState(false);
+  const [paused, setPaused] = useState(false);
+  /**
+   * A PAUSE THAT ENDS, not a stop.
+   *
+   * This was sticky: one press of an arrow and the hero never moved again for
+   * the rest of the visit. It was meant as the pause control — content that
+   * moves by itself has to be stoppable, and hover and focus do not exist on
+   * a phone — but a carousel that dies on the first touch reads as broken,
+   * which is exactly how it was reported.
+   *
+   * So it resumes. What still answers the requirement it was there for:
+   * `prefers-reduced-motion` switches the autoplay off entirely, which is a
+   * setting rather than a button and reaches the people who most need it
+   * without asking them to find anything; and hover, focus and a finger on
+   * the picture all hold it while they last.
+   */
+  const [nudgedAt, setNudgedAt] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+
+  /** Which of the shop's slides is showing — the clone counts as the first. */
+  const activeIndex = count > 0 ? index % count : 0;
+
+  /**
+   * Every deliberate move goes through here.
+   *
+   * Clamped to 0…count-1 rather than to the clone: a customer pressing Next
+   * on the last slide should land on the first, and the clone is a rendering
+   * detail that only the autoplay walks onto.
+   */
   const go = useCallback(
     (next: number) => {
-      setStopped(true);
-      setIndex((next + count) % count);
+      setNudgedAt(Date.now());
+      setSnapBack(false);
+      setIndex(((next % count) + count) % count);
     },
     [count],
   );
 
   useEffect(() => {
-    if (!multi || paused || stopped) return;
+    if (!multi || paused || nudgedAt) return;
     if (
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       return;
     }
-    const id = window.setInterval(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS);
+    /*
+      UP TO `count`, not modulo `count`. `count` is the clone of the first
+      slide, so the last turn of the loop is a forward move like every other;
+      the effect below puts the row back to 0 once it has arrived.
+    */
+    const id = window.setInterval(
+      () => setIndex((i) => (i >= count ? 1 : i + 1)),
+      AUTOPLAY_MS,
+    );
     return () => window.clearInterval(id);
-  }, [multi, paused, stopped, count]);
+  }, [multi, paused, nudgedAt, count]);
+
+  /**
+   * The jump home, once the move onto the clone has finished.
+   *
+   * Nobody sees it: the clone and slide 0 are the same picture, so the row
+   * changing position underneath it changes nothing on screen. `snapBack`
+   * switches the transition off for that one change, or the jump would
+   * animate — which is the rewind this whole arrangement exists to remove.
+   */
+  useEffect(() => {
+    if (index !== count || count === 0) return;
+    const id = window.setTimeout(() => {
+      setSnapBack(true);
+      setIndex(0);
+    }, SLIDE_MS + 40);
+    return () => window.clearTimeout(id);
+  }, [index, count]);
+
+  /** And the transition comes straight back, so the NEXT move animates. */
+  useEffect(() => {
+    if (!snapBack) return;
+    const id = window.requestAnimationFrame(() => setSnapBack(false));
+    return () => window.cancelAnimationFrame(id);
+  }, [snapBack]);
+
+  /** The pause a press buys, and then gives back. */
+  useEffect(() => {
+    if (!nudgedAt) return;
+    const id = window.setTimeout(() => setNudgedAt(0), RESUME_MS);
+    return () => window.clearTimeout(id);
+  }, [nudgedAt]);
 
   if (count === 0) return null;
 
-  // Clamped, because the slide list changes under this component while an admin
-  // edits it — see activeSlideIndex.
-  const activeIndex = activeSlideIndex(index, count);
-  const active = slides[activeIndex];
+  const active = slides[activeSlideIndex(activeIndex, count)];
 
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -650,9 +720,44 @@ export function HeroCarousel({
       role="region"
       aria-roledescription="carousel"
       aria-label="Featured highlights"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
+      /*
+        A POINTER THAT IS NOT A FINGER.
+
+        These were `onMouseEnter` / `onMouseLeave`, and a browser fires
+        compatibility mouse events after a tap — so tapping a dot on a phone
+        raised `mouseenter`, paused the autoplay, and then never raised
+        `mouseleave`, because there is no pointer to move away. One tap and the
+        hero stopped for the rest of the visit. Measured on a touch device:
+        twenty-one seconds later it had not moved.
+
+        `pointerType` is the only thing that can tell the two apart. A mouse
+        resting on the picture still holds it, which is what the pause is for.
+      */
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "touch") setPaused(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "touch") setPaused(false);
+      }}
+      /*
+        KEYBOARD FOCUS PAUSES. A MOUSE CLICK DOES NOT.
+
+        A click leaves the button it landed on focused, and `onFocusCapture`
+        took that as somebody reading — so pressing Next once paused the
+        autoplay for as long as that arrow kept focus, which is until the
+        visitor clicks somewhere else on the page. Measured: the hero had not
+        moved fifteen seconds later, and it reads as a carousel that has died.
+
+        `:focus-visible` is exactly this distinction — the browser sets it for
+        focus arrived at by keyboard and not for focus left behind by a
+        pointer. So tabbing into the carousel still holds it, which is the
+        case the pause was for.
+      */
+      onFocusCapture={(event) => {
+        if (event.target instanceof Element && event.target.matches(":focus-visible")) {
+          setPaused(true);
+        }
+      }}
       onBlurCapture={() => setPaused(false)}
     >
       {/*
@@ -687,7 +792,14 @@ export function HeroCarousel({
               className={cn(
                 "flex transition-transform duration-700 ease-out",
                 // Nobody who asked for less movement gets a 700ms slide.
-                "motion-reduce:transition-none"
+                "motion-reduce:transition-none",
+                /*
+                  And the one move nobody should see animate: the row going
+                  from the clone back to slide 0. Same picture either side of
+                  it, so with the transition off it is invisible, and with it
+                  on it is the whole-row rewind this arrangement removes.
+                */
+                snapBack && "transition-none"
               )}
               style={{
                 /*
@@ -706,10 +818,21 @@ export function HeroCarousel({
                   a three-slide hero it moves 480px of a 1440px slide. Measured
                   in a browser, which is the only place this can be settled.
                 */
-                transform: `translateX(-${activeIndex * 100}%)`,
+                transform: `translateX(-${index * 100}%)`,
               }}
             >
-              {slides.map((slide, i) => (
+              {/*
+                THE SLIDES, AND A COPY OF THE FIRST ONE AFTER THEM.
+
+                The copy is what makes the loop go forwards. Without it the
+                last slide returning to the first animated the whole row
+                backwards — 2,880px in 700ms on a three-slide hero, every
+                third turn, which is what made this look broken rather than
+                slow. With it, that turn is a forward move like any other and
+                the row is put back to the start afterwards, invisibly,
+                because the picture does not change.
+              */}
+              {[...slides, slides[0]].map((slide, i) => (
                 <div
                   key={i}
                   /*
@@ -722,10 +845,14 @@ export function HeroCarousel({
                     `inert` rather than `aria-hidden` alone. Both hide the
                     slide from a screen reader, but only `inert` takes its link
                     out of the tab order — and a banner slide IS a link, so
-                    without it a keyboard user tabs through two pictures that
+                    without it a keyboard user tabs through the pictures that
                     are off the side of the screen before reaching the page.
+
+                    Against `index`, not `activeIndex`: while the row is on the
+                    clone those are different, and it is the clone that is on
+                    screen.
                   */
-                  inert={i !== activeIndex}
+                  inert={i !== index}
                 >
                   <HeroBannerSlideView slide={slide} priority={i === 0} side={copySide} />
                 </div>

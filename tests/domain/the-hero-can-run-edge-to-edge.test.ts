@@ -529,33 +529,30 @@ describe("the slideshow's own controls", () => {
     expect(dot.slice(0, 400)).toMatch(/before:-inset-2/);
   });
 
-  it("can be stopped by someone who cannot hover", () => {
+  it("can be halted by someone who cannot hover", () => {
     /**
      * Autoplay follows `paused`, which follows hover and focus — and a phone
      * has neither, so on the device most of this shop's customers use a hero
-     * moving every six seconds could not be halted at all.
+     * moving every six seconds could not be held at all.
      *
-     * A visible pause button was one answer and is no longer the one here:
-     * the reference layout's control row is dots and nothing else. The
-     * requirement did not go with it. `stopped` is sticky and every
-     * deliberate move sets it, so taking hold of the carousel is what keeps
-     * it — no second control to find.
+     * Two things answer that, and neither is a button, because the reference
+     * layout's control row is dots and nothing else. `prefers-reduced-motion`
+     * switches the autoplay off outright — a setting rather than a control,
+     * which reaches the people who most need it without asking them to find
+     * anything. And a finger on the picture holds it, through the same touch
+     * handlers the swipe uses.
      */
     const carousel = codeOf(read(CAROUSEL));
 
-    expect(carousel).toMatch(/const \[stopped, setStopped\] = useState\(false\)/);
-    expect(carousel, "autoplay ignores that it was stopped").toMatch(
-      /if \(!multi \|\| paused \|\| stopped\) return;/,
-    );
-    expect(carousel, "the effect will not re-run when it is stopped").toMatch(
-      /\[multi, paused, stopped, count\]/,
-    );
+    expect(carousel).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(carousel).toMatch(/if \(!multi \|\| paused \|\| nudgedAt\) return;/);
+    expect(carousel).toMatch(/\[multi, paused, nudgedAt, count\]/);
   });
 
-  it("and every way of moving between slides is that stop", () => {
+  it("and every way of moving between slides pauses it", () => {
     /**
-     * `go` is the only thing that sets it, so anything that moves a slide
-     * WITHOUT going through `go` silently keeps the carousel running under a
+     * `go` is the only thing that sets the pause, so anything that moves a
+     * slide WITHOUT going through `go` keeps the carousel running under a
      * customer who has just taken hold of it. The dots used to call
      * `setIndex` directly, and on a phone in the split layout they are the
      * only control there is.
@@ -563,15 +560,18 @@ describe("the slideshow's own controls", () => {
     const carousel = codeOf(read(CAROUSEL));
     const body = carousel.slice(carousel.indexOf("export function HeroCarousel"));
 
-    expect(body).toMatch(/const go = useCallback\(\s*\(next: number\) => \{\s*setStopped\(true\);/);
-    expect(body, "the dots move a slide without stopping the autoplay").toContain(
+    expect(body).toMatch(
+      /const go = useCallback\(\s*\(next: number\) => \{\s*setNudgedAt\(Date\.now\(\)\);/,
+    );
+    expect(body, "the dots move a slide without pausing the autoplay").toContain(
       "onClick={() => go(i)}",
     );
     /*
-      The autoplay tick is the one legitimate `setIndex` outside `go`, and it
-      is inside the effect. Any other is a control that does not stop.
+      Four legitimate `setIndex` calls outside `go`: the autoplay tick, the
+      jump home from the clone, and the two inside `go` itself are one. Any
+      more is a control that moves a slide without pausing.
     */
-    expect((body.match(/setIndex\(/g) ?? []).length).toBe(2);
+    expect((body.match(/setIndex\(/g) ?? []).length).toBe(3);
   });
 
   it("and the row under the picture is dots, with no other control in it", () => {
@@ -910,9 +910,87 @@ describe("how one slide becomes the next", () => {
      */
     const body = carousel();
 
-    expect(body).toMatch(/slides\.map\(\(slide, i\) => \(/);
+    expect(body).toMatch(/\]\.map\(\(slide, i\) => \(/);
     expect(body).toContain("transition-transform");
     expect(body).toContain("w-full shrink-0");
+  });
+
+  it("carries a copy of the first slide, so the loop never runs backwards", () => {
+    /**
+     * The row used to wrap with a modulo, so the last slide returning to the
+     * first animated the whole row backwards — 2,880px in 700ms on a
+     * three-slide hero, every third turn. Measured in a browser, and it is
+     * the thing that made the slider look broken rather than slow.
+     *
+     * A copy of the first slide after the last one makes that turn a forward
+     * move like any other; the row is then put back to the start with the
+     * transition off, which nobody sees because the picture does not change.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/\[\.\.\.slides, slides\[0\]\]\.map/);
+    expect(body).toMatch(/snapBack && "transition-none"/);
+    // The autoplay walks ONTO the clone rather than wrapping past it.
+    expect(body).toMatch(/i >= count \? 1 : i \+ 1/);
+  });
+
+  it("and the track follows the row, not the slide number", () => {
+    /**
+     * `activeIndex` is `index % count`, so at the clone it reads 0 — and a
+     * transform built from it never moves onto the clone at all: the row
+     * jumped home instead of sliding there, which looked exactly like the
+     * rewind this was meant to remove. Measured; the first version shipped it.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/translateX\(-\$\{index \* 100\}%\)/);
+    expect(body, "the track is driven by the slide number again").not.toContain(
+      "translateX(-${activeIndex * 100}%)",
+    );
+  });
+
+  it("and a press pauses the autoplay rather than ending it", () => {
+    /**
+     * It used to be sticky: one press of an arrow and the hero never moved
+     * again for the rest of the visit. That was meant as the pause control,
+     * and it reads as a carousel that has died — which is how it was
+     * reported. What answers the requirement instead is `prefers-reduced-
+     * motion`, which switches the autoplay off entirely, plus hover and focus
+     * holding it while they last.
+     */
+    const body = carousel();
+
+    expect(body).toMatch(/setNudgedAt\(Date\.now\(\)\)/);
+    expect(body).toMatch(/setTimeout\(\(\) => setNudgedAt\(0\), RESUME_MS\)/);
+    expect(body, "the pause is permanent again").not.toContain("const [stopped, setStopped]");
+  });
+
+  it("and a mouse click does not leave it paused", () => {
+    /**
+     * A click leaves the button it landed on focused, and `onFocusCapture`
+     * took that as somebody reading — so pressing Next once paused the
+     * autoplay until the visitor clicked somewhere else entirely. Measured:
+     * the hero had not moved fifteen seconds later.
+     *
+     * `:focus-visible` is exactly the distinction: set for focus arrived at
+     * by keyboard, not for focus left behind by a pointer.
+     */
+    const body = carousel();
+
+    expect(body).toContain('matches(":focus-visible")');
+    expect(body, "focus pauses it however it arrived").not.toMatch(
+      /onFocusCapture=\{\(\) => setPaused\(true\)\}/,
+    );
+  });
+
+  it("and the timings the loop depends on are named, not scattered", () => {
+    // `SLIDE_MS` has to match the track's own duration or the jump home
+    // happens mid-move and the rewind is visible after all.
+    const body = carousel();
+
+    expect(body).toContain("const SLIDE_MS = 700;");
+    expect(body).toContain("duration-700");
+    expect(body).toMatch(/const RESUME_MS = \d+;/);
   });
 
   it("and moves the row by exactly one slide, not by one third of one", () => {
@@ -931,9 +1009,8 @@ describe("how one slide becomes the next", () => {
      */
     const body = carousel();
 
-    expect(body).toMatch(/translateX\(-\$\{activeIndex \* 100\}%\)/);
     expect(body, "the track is being moved a fraction of a slide").not.toContain(
-      "(activeIndex * 100) / count",
+      "(index * 100) / count",
     );
   });
 
@@ -949,11 +1026,14 @@ describe("how one slide becomes the next", () => {
   it("and the ones off screen are out of the tab order", () => {
     /**
      * A banner slide IS a link. `aria-hidden` alone hides it from a screen
-     * reader and leaves it tabbable, so a keyboard user would tab through two
+     * reader and leaves it tabbable, so a keyboard user would tab through the
      * pictures that are off the side of the screen before reaching the page.
      * `inert` does both.
+     *
+     * Against `index`, not `activeIndex`: while the row sits on the clone
+     * those two differ, and it is the clone that is on screen.
      */
-    expect(carousel()).toMatch(/inert=\{i !== activeIndex\}/);
+    expect(carousel()).toMatch(/inert=\{i !== index\}/);
   });
 
   it("and a 700ms move is not forced on somebody who asked for less", () => {
