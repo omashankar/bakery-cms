@@ -594,7 +594,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               of alignment. Inside, the border encloses both and every tile
               is the same height whatever its name does.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white transition-premium hover:border-bakery-300 hover:shadow-sm sm:w-auto"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white p-2 transition-premium hover:border-bakery-300 hover:shadow-sm sm:w-auto sm:p-3"
           >
             {/*
               A ROUNDED SQUARE, not a circle.
@@ -602,8 +602,14 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               A circle crops a product photograph to its middle — a bouquet
               loses its stems, a boxed gift loses its corners — and the
               reference strip is squares for exactly that reason.
+
+              INSET, so the card's own tint frames the picture rather than the
+              picture being the card. That is what the reference shows, and it
+              is what makes a cut-out product image — the kind with no
+              background of its own — read as sitting ON the tile instead of
+              floating in a white void.
             */}
-            <div className="relative aspect-square w-full overflow-hidden">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl">
               {category.image ? (
                 <OptimizedImage
                   src={category.image}
@@ -620,7 +626,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 px-2 py-2.5 text-center text-xs font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
+            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-xs font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
               {category.name}
             </p>
           </Link>
