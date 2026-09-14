@@ -557,34 +557,68 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className="mt-8 flex snap-x gap-5 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-4 sm:gap-6 sm:overflow-visible lg:grid-cols-8 [&::-webkit-scrollbar]:hidden">
+      <div
+        className={cn(
+          /*
+            A ROW THAT SCROLLS ON A PHONE, a grid above it — and the gutter
+            negated so the scroll runs to the edge of the screen instead of
+            stopping 16px short, which is what tells a customer there is more
+            to the right.
+          */
+          "mt-8 -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden",
+          /*
+            THE COLUMN COUNT FOLLOWS THE TILES. It was hard-wired to eight,
+            so a shop with three categories got three cards and five columns
+            of air. Whole class names rather than a style prop, because
+            Tailwind only emits the classes it can see.
+          */
+          items.length <= 4 && "lg:grid-cols-4",
+          items.length === 5 && "lg:grid-cols-5",
+          items.length === 6 && "lg:grid-cols-6",
+          items.length === 7 && "lg:grid-cols-7",
+          items.length >= 8 && "lg:grid-cols-8"
+        )}
+      >
         {items.map((category) => (
           <Link
             key={category.id}
             href={routes.store.collection(category.slug)}
-            className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2.5 sm:w-auto"
+            /*
+              THE CARD IS THE WHOLE TILE, name included.
+
+              The name used to sit outside the bordered box, under it — so
+              the tile was a picture with a caption floating beneath rather
+              than one object, and a two-line name pushed its neighbours out
+              of alignment. Inside, the border encloses both and every tile
+              is the same height whatever its name does.
+            */
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white transition-premium hover:border-bakery-300 hover:shadow-sm sm:w-auto"
           >
             {/*
               A ROUNDED SQUARE, not a circle.
 
               A circle crops a product photograph to its middle — a bouquet
               loses its stems, a boxed gift loses its corners — and the
-              reference strip is squares for exactly that reason. Same size,
-              same spacing, a soft tint behind the picture so a cut-out on
-              white still reads as a tile.
+              reference strip is squares for exactly that reason.
             */}
-            <div className="relative aspect-square w-20 overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white transition-premium group-hover:border-bakery-300 group-hover:shadow-sm sm:w-full">
+            <div className="relative aspect-square w-full overflow-hidden">
               {category.image ? (
                 <OptimizedImage
                   src={category.image}
                   alt={category.name}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="120px"
+                  /*
+                    120px was only ever right in the eight-across case. At a
+                    1023px viewport the four-column grid paints these at about
+                    225px, so the browser was asked for a source under half
+                    the painted width and every tablet got soft tiles.
+                  */
+                  sizes="(min-width: 1024px) 160px, (min-width: 640px) 25vw, 88px"
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 text-center text-sm font-semibold text-foreground group-hover:text-bakery-700">
+            <p className="line-clamp-2 px-2 py-2.5 text-center text-xs font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
               {category.name}
             </p>
           </Link>

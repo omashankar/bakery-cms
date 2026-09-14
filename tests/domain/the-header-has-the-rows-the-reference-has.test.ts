@@ -147,10 +147,33 @@ describe("the search box", () => {
     expect(navbar).toContain("labels.productWordPlural.toLowerCase()");
   });
 
-  it("and the icon stays for phones, where there is no room for a box", () => {
+  it("is a box from the first width that can hold one", () => {
+    /**
+     * It started at lg. Between 640 and 1023px — every tablet, and every
+     * phone held sideways — there was an icon linking to a separate page,
+     * which is the arrangement this whole file exists to replace.
+     */
     const navbar = code(NAVBAR);
+    const form = navbar.slice(navbar.indexOf("<form"), navbar.indexOf("</form>"));
 
-    expect(navbar).toContain("sm:flex lg:hidden");
+    expect(form, "the box starts at lg again").toContain("sm:flex");
+    expect(form).not.toContain("lg:flex");
+  });
+
+  it("and the icon is phones-only, which is what the file always claimed", () => {
+    /**
+     * The class was `hidden … sm:flex lg:hidden`, which HID the icon below
+     * 640px and showed it on tablets — so a phone had no search control in
+     * the header at all, under a comment saying "phones only". The comment
+     * was the accurate half of the intent; the classes were the bug.
+     */
+    const navbar = code(NAVBAR);
+    const at = navbar.indexOf('href={routes.store.search} aria-label="Search"');
+    expect(at, "the phone search icon is gone").toBeGreaterThan(-1);
+    const icon = navbar.slice(at - 400, at);
+
+    expect(icon, "the icon is hidden on phones again").toContain("sm:hidden");
+    expect(icon).not.toContain("sm:flex");
   });
 });
 

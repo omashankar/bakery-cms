@@ -7,6 +7,7 @@ import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { navIcon } from "@/config/nav-icons";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-mark";
+import { DeliveryLocationButton } from "./delivery-location-button";
 import {
   drawableGroups,
   MegaMenu,
@@ -258,10 +259,33 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         data-header-bar
         className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
       >
-        <Link href={routes.store.home} className="flex items-center gap-2.5">
+        {/*
+          `min-w-0` and a cap on the phone, because the shop's name is free
+          text of any length and this is the flex child that grows. A long
+          one pushed the cart and the menu button off the row entirely.
+        */}
+        <Link
+          href={routes.store.home}
+          className="flex min-w-0 max-w-[9rem] shrink-0 items-center gap-2.5 sm:max-w-[12rem] lg:max-w-none"
+        >
           <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
         </Link>
 
+
+        {/*
+          WHERE THE ORDER IS GOING, beside the search.
+
+          Mounted only when the shop has an active delivery zone — with none,
+          the only answer the panel could give is that nothing covers you,
+          which is a claim about the shop rather than a fact about its zone
+          list. Hidden below sm, where the row has no width for it and the
+          same check is a tap away in the drawer.
+        */}
+        {chrome.hasDeliveryZones ? (
+          <div className="ml-auto hidden sm:block lg:ml-3 lg:shrink-0">
+            <DeliveryLocationButton />
+          </div>
+        ) : null}
 
         {/*
           THE SEARCH BOX.
@@ -278,7 +302,20 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         {showSearch ? (
           <form
             action={routes.store.search}
-            className="mx-6 hidden max-w-xl flex-1 items-center lg:flex"
+            /*
+              FROM sm, NOT FROM lg.
+
+              Between 640 and 1023px there is easily room for a search box,
+              and what stood there was an icon linking to a separate page —
+              a whole navigation away from the control the reference header
+              puts in front of every visitor. That band is every tablet and
+              every phone held sideways.
+
+              `min-w-0` because a flex child will not shrink below its
+              content without it, and this one sits between a shop name of
+              unknown length and an icon cluster.
+            */
+            className="mx-3 hidden min-w-0 max-w-xl flex-1 items-center sm:flex lg:mx-6"
             role="search"
           >
             <div className="relative w-full">
@@ -324,8 +361,15 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             <Button
               variant="ghost"
               size="icon-lg"
-              // Phones only — the box above covers every wider screen.
-              className="hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:hidden"
+              /*
+                Phones only, which this comment claimed and the classes
+                contradicted: `hidden … sm:flex lg:hidden` HID the icon below
+                640px and showed it on tablets, so a phone got no search
+                control in the header at all while the file documented the
+                opposite. Now that the box starts at sm, phones-only is both
+                what it says and what it does.
+              */
+              className="flex text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:hidden"
               render={<Link href={routes.store.search} aria-label="Search" />}
             >
               <Search className="size-5" />

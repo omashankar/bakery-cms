@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import { getSettings } from "@/features/settings/server/settings.service";
+import { getPublicZones } from "@/features/commerce/server/commerce.service";
 import {
   getStorefrontCategories,
   getStorefrontOccasions,
@@ -74,6 +75,36 @@ export interface StorefrontChrome {
    * standing rather than writing half a theme.
    */
   appearance: Record<string, string>;
+  /**
+   * Has the shop configured ANY active delivery zone?
+   *
+   * The header's delivery-location control checks a PIN code against the
+   * shop's own zones. With no zones the only answer it could ever give is
+   * that nothing covers you — which is the difference between "we do not
+   * deliver there" and "nobody has said yet", and a shop that takes that
+   * order by phone would be called a liar by its own header. So the control
+   * does not mount.
+   *
+   * A boolean, not the list: this is read on every storefront page, and the
+   * zones themselves are fetched when the panel opens.
+   */
+  hasDeliveryZones: boolean;
+}
+
+/**
+ * Whether the shop has any delivery zone switched on.
+ *
+ * `getPublicZones` already filters to active ones. Its own failure is
+ * answered with false, which hides the control — the same rule the rest of
+ * this file follows for a read it could not make: show nothing rather than
+ * something that might not be true.
+ */
+async function hasActiveDeliveryZones(): Promise<boolean> {
+  try {
+    return (await getPublicZones()).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** The navbar badge falls back to the shop's initial rather than a seeded letter. */
@@ -88,6 +119,9 @@ function fallbackChrome(): StorefrontChrome {
     // database-unreachable path, and a menu of links into a catalogue we
     // cannot read is a menu of links to empty grids.
     categories: [],
+    // Same rule: with no way to read the zones there is nothing to check a
+    // PIN code against, so the control does not appear.
+    hasDeliveryZones: false,
     occasions: [],
     logo: "",
     logoLetter: firstLetterOf(brandInfo.name),
@@ -137,7 +171,15 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
     // Concurrently with the rest. The categories read was added as a serial
     // `await` further down, which put a whole extra round trip on the critical
     // path of every storefront render for a value the others do not depend on.
-    const [settingsRaw, headerRaw, footerRaw, appearanceRaw, categories, occasions] =
+    const [
+      settingsRaw,
+      headerRaw,
+      footerRaw,
+      appearanceRaw,
+      categories,
+      occasions,
+      hasDeliveryZones,
+    ] =
       await Promise.all([
         getSettings(),
         getSiteLayout("header"),
@@ -147,6 +189,8 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         // In the SAME Promise.all — the note above records what a serial
         // await here cost the critical path of every storefront render.
         getStorefrontOccasions(),
+        // And this one too, for the same reason.
+        hasActiveDeliveryZones(),
       ]);
 
     const settings = settingsRaw as unknown as Record<string, unknown>;
@@ -221,6 +265,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
        */
       categories,
       occasions,
+      hasDeliveryZones,
       brand: {
         name,
         tagline: general.siteTagline || brandInfo.tagline,
