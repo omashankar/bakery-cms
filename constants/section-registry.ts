@@ -1,5 +1,10 @@
 import type { ResolvedLabels } from "@/config/business-labels";
-import { brandInfo } from "@/constants/landing-data";
+/*
+  `brandInfo` used to be imported here for the hero's shipped headline and
+  subtext. Those are blank now — the demo brand's tagline was a claim about
+  goods, published as whichever shop installs this — so nothing in this
+  registry reaches into the demo shop's identity any more.
+*/
 import { demoPhotoIds, unsplash } from "@/constants/demo-images";
 import { routes } from "@/constants/routes";
 import type {
@@ -116,39 +121,63 @@ export interface HomepageSectionRegistryEntry {
 }
 
 /** Seed slides for a fresh hero carousel — all editable in the builder. */
+/**
+ * THREE PICTURES, AND NOT ONE WORD THE SHOP DID NOT WRITE.
+ *
+ * This shipped a sale, a service and a trade. Every install's homepage
+ * opened on "Summer Celebration Sale / Up to 25% off our seasonal favourites
+ * — this week only", then "Wedding Season Special / Book a tasting and design
+ * a custom tiered cake", under a headline reading "Freshly baked, every day"
+ * — a discount nobody was offering, a tasting nobody booked, and a trade the
+ * shop may not be in. A customer reading a price off that page would have
+ * been reading a number this software made up.
+ *
+ * They are blank now rather than replaced, because there is no sentence this
+ * CMS can write on a shop's behalf that is true of every shop. Every one of
+ * these fields is guarded at the render — the badge, headline and subtext
+ * each draw nothing when empty (hero-carousel.tsx), and `primaryLabel` falls
+ * back to the shop's OWN plural noun, so each slide keeps a working button
+ * that names whatever this shop sells.
+ *
+ * The pictures stay: they are demo photographs, which is what a demo is for,
+ * and a shop replaces them with its own.
+ */
 export const DEFAULT_HERO_SLIDES: HeroSlideContent[] = [
   {
-    // No founding year, no superlative: the badge renders only when truthy
-    // (hero-carousel.tsx), and a claim the shop cannot stand behind is worse
-    // than no badge. The shop types its own in the builder.
     badge: "",
-    headline: brandInfo.tagline,
-    subtext: brandInfo.description,
-    primaryLabel: "Shop Cakes",
+    headline: "",
+    subtext: "",
+    primaryLabel: "",
     primaryHref: routes.store.collections,
-    secondaryLabel: "Wedding Collection",
-    secondaryHref: routes.store.weddingCakes,
-    imageUrl: unsplash(demoPhotoIds.blushCake, 800, 1000),
+    secondaryLabel: "",
+    secondaryHref: "",
+    /*
+      WIDE, because a hero can now be a full-bleed banner and a banner slide
+      IS its picture. 800x1000 is portrait — it was cropped to the split
+      hero's frame, and in a 3:1 band `object-cover` would keep a thin strip
+      through the middle and throw the rest away.
+    */
+    imageUrl: unsplash(demoPhotoIds.blushCake, 1920, 640),
   },
   {
-    badge: "Limited Time",
-    headline: "Summer Celebration Sale",
-    subtext: "Up to 25% off our seasonal favourites — this week only.",
-    primaryLabel: "Shop the Sale",
+    badge: "",
+    headline: "",
+    subtext: "",
+    primaryLabel: "",
     primaryHref: routes.store.collections,
-    secondaryLabel: "View Menu",
-    secondaryHref: routes.store.collections,
-    imageUrl: unsplash(demoPhotoIds.chocolateCake, 800, 1000),
+    secondaryLabel: "",
+    secondaryHref: "",
+    imageUrl: unsplash(demoPhotoIds.chocolateCake, 1920, 640),
   },
   {
-    badge: "Bespoke Cakes",
-    headline: "Wedding Season Special",
-    subtext: "Book a tasting and design a custom tiered cake for your big day.",
-    primaryLabel: "Explore Wedding Cakes",
-    primaryHref: routes.store.weddingCakes,
-    secondaryLabel: "Enquire",
-    secondaryHref: routes.store.contact,
-    imageUrl: unsplash(demoPhotoIds.weddingCake, 800, 1000),
+    badge: "",
+    headline: "",
+    subtext: "",
+    primaryLabel: "",
+    primaryHref: routes.store.collections,
+    secondaryLabel: "",
+    secondaryHref: "",
+    imageUrl: unsplash(demoPhotoIds.weddingCake, 1920, 640),
   },
 ];
 
@@ -336,7 +365,14 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         emptyHint: "No stats — the strip will not appear on the page.",
         itemFields: [
           { key: "value", label: "Figure", type: "text", placeholder: "500+" },
-          { key: "label", label: "Label", type: "text", placeholder: "Cakes baked" },
+          {
+            key: "label",
+            label: "Label",
+            type: "text",
+            // A placeholder is an example, so it has to be an example any
+            // shop could follow. "Cakes baked" is one only a bakery can.
+            placeholder: "Orders delivered",
+          },
         ],
       },
       {
@@ -382,8 +418,18 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       overline: "Explore",
-      title: "Our Menu",
-      description: "Shop by category — cakes, pastries, chocolates, and more.",
+      /*
+        "Our Menu" over "cakes, pastries, chocolates, and more" — a list of a
+        bakery's goods, published as the heading of whichever shop installs
+        this. The tiles under it are read from the shop's OWN categories, so
+        the heading naming a different trade's is the one part of this band
+        that was never about the shop.
+
+        The title says what the band does, in words true of any catalogue.
+        The description is blank: the tiles are captioned already.
+      */
+      title: "Shop by category",
+      description: "",
       maxCount: 8,
     },
     fields: [
@@ -399,10 +445,21 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     icon: "Tag",
     defaultBackground: "cream",
     defaultContent: {
-      overline: "Limited Time",
-      title: "Summer Celebration Sale",
-      description: "Up to 20% off on selected celebration cakes this week.",
-      ctaLabel: "Shop Offers",
+      /*
+        A SALE NOBODY WAS RUNNING, shipped switched on.
+
+        "Limited Time / Summer Celebration Sale / Up to 20% off on selected
+        celebration cakes this week" is a discount, a season and a deadline,
+        stated as the shop's on every install. A customer who came for that
+        20% would have found it nowhere, because it never existed.
+
+        The band draws the shop's own promo banners; blank copy above them
+        renders no heading at all.
+      */
+      overline: "",
+      title: "",
+      description: "",
+      ctaLabel: "",
       ctaHref: routes.store.collections,
       maxCount: 2,
     },
@@ -578,9 +635,14 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       overline: "Handpicked Favourites",
-      title: "Featured Cakes",
-      description:
-        "Our most loved creations, crafted with premium ingredients and decades of expertise.",
+      /*
+        The title named the trade and the description made three claims at
+        once — "most loved", "premium ingredients", "decades of expertise" —
+        about goods and a history this CMS knows nothing about. The heading
+        that stays says only which row this is.
+      */
+      title: "Featured",
+      description: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -610,7 +672,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "What's Hot",
       title: "Trending Now",
-      description: "The cakes everyone is talking about this season.",
+      // A claim about what everyone is talking about, for a shop with no
+      // way to know and nothing behind the sentence.
+      description: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -740,7 +804,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Personalised",
       title: "Photo Cakes",
-      description: "Turn your favourite memories into delicious edible art.",
+      // The section is a bakery one and keeps its name. The description was
+      // still a claim about taste ("delicious") made in the shop's voice.
+      description: "",
       maxCount: 4,
       ctaLabel: "Shop Photo Cakes",
       ctaHref: routes.store.collection("photo-cakes"),
@@ -877,7 +943,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Sweet Inspiration",
       title: "Gallery",
-      description: "A glimpse into our world of cakes, pastries, and celebrations.",
+      // The pictures are the shop's own; the sentence over them named a
+      // trade that may not be.
+      description: "",
       ctaLabel: "View Full Gallery",
       ctaHref: routes.store.gallery,
       // The homepage strip is a taste of the gallery, not the gallery. It used
@@ -972,7 +1040,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     // addresses. This CMS stores one address; the section shows it.
     defaultContent: {
       overline: "Visit Us",
-      title: "Visit Our Bakery",
+      // The band shows the shop's one stored address. Naming the trade in
+      // the heading above it is the only part that was not the shop's.
+      title: "Visit Us",
       description: "Here is where to find us, and when we are open.",
       buttonLabel: "Get Directions",
     },
@@ -990,8 +1060,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       title: "Stay in the Loop",
-      description:
-        "Subscribe for exclusive offers, new cake launches, and seasonal specials delivered to your inbox.",
+      // Promised exclusive offers, launches and seasonal specials — three
+      // things no shop agreed to send. The box and its button say what it is.
+      description: "",
       buttonLabel: "Subscribe",
       disclaimer: "No spam. Unsubscribe anytime.",
     },
@@ -1009,9 +1080,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       overline: "Get in Touch",
-      title: "Ready to Order Your Perfect Cake?",
-      description:
-        "Whether it's a birthday surprise, wedding centerpiece, or corporate celebration — our team is here to help.",
+      // The question named the goods and called them perfect; the line under
+      // it promised a team. Neither is this software's to say.
+      title: "Ready to order?",
+      description: "",
       ctaLabel: "Contact Us",
       ctaHref: routes.store.contact,
       showPhone: true,

@@ -319,8 +319,21 @@ describe("the section the shop already has stored", () => {
     expect(renderer).toContain('const CATEGORY_ROWS: ReadonlySet<string> = new Set(["eggless", "seasonal"])');
     expect(renderer).toContain("CATEGORY_ROWS.has(props.section.type)");
     expect(renderer).toContain("Nothing is filed under this category yet");
-    // …and the flag wording survives for the rows that DO have one.
-    expect(renderer).toContain("Flag some cakes under Products");
+
+    /*
+      …and the OTHER branch survives for the rows that do have a flag.
+
+      This used to pin the literal "Flag some cakes under Products", which
+      made a sentence read by a florist's staff — in a CMS that sells to any
+      trade — unchangeable without reddening a test about eggless rows. The
+      branch is what matters here; the noun in it belongs to the shop, and
+      `no-new-bakery-wording` is what keeps it that way.
+    */
+    expect(renderer).toContain("Flag some");
+    expect(renderer).toContain("under Products");
+    expect(renderer, "the panel names the trade again").not.toContain(
+      "Flag some cakes under Products",
+    );
   });
 
   it("ships no promise about what is in the cake", () => {

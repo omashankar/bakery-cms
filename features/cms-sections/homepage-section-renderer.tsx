@@ -676,6 +676,7 @@ function ProductGridSection(
   }
 ) {
   const c = props.section.content;
+  const labels = useBusinessLabels();
   const maxCount = contentNumber(c, "maxCount", 4);
   const ctaHref = contentString(c, "ctaHref");
   const ctaLabel = contentString(c, "ctaLabel");
@@ -712,13 +713,17 @@ function ProductGridSection(
             <>
               Nothing is filed under this category yet, so the row stays hidden
               on the live homepage. Set the category on a product under
-              Products, or lower &ldquo;Max cakes shown&rdquo;.
+              Products, or lower &ldquo;Max {labels.productWordPlural.toLowerCase()}{" "}
+              shown&rdquo;.
             </>
           ) : (
             <>
-              No cake is set for this row yet, so it stays hidden on the live
-              homepage. Flag some cakes under Products, or lower &ldquo;Max
-              cakes shown&rdquo;.
+              {/* The shop's own noun, twice — this panel is read by whoever
+                  runs the shop, and it told a florist to flag some cakes. */}
+              No {labels.productWord.toLowerCase()} is set for this row yet, so it
+              stays hidden on the live homepage. Flag some{" "}
+              {labels.productWordPlural.toLowerCase()} under Products, or lower{" "}
+              &ldquo;Max {labels.productWordPlural.toLowerCase()} shown&rdquo;.
             </>
           )}
         </div>

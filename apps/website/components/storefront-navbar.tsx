@@ -226,7 +226,19 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </div>
       ) : null}
 
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      {/*
+        `data-header-bar` is read by a test, and that is its whole job.
+
+        The guard that proves the category strip sits BELOW this row used to
+        find it by the literal string `mx-auto flex h-16 max-w-7xl` — so the
+        row's height and its container width were pinned by a test about
+        neither, and any restyle reddened a guard that had nothing to say
+        about the change. A marker moves with the element it marks.
+      */}
+      <div
+        data-header-bar
+        className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
+      >
         <Link href={routes.store.home} className="flex items-center gap-2.5">
           <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
         </Link>
@@ -369,7 +381,13 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
 
         Hidden on a phone, where the same rows are in the drawer.
       */}
-      <div className="hidden border-t border-border bg-cream-50/60 lg:block">
+      {/* `data-nav-band` for the same reason `data-header-bar` exists: the
+          guard below cares that this band is hidden on a phone, not what
+          colour it is. */}
+      <div
+        data-nav-band
+        className="hidden border-t border-border bg-cream-50/60 lg:block"
+      >
         <nav
           className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-1.5 sm:px-6 lg:px-8"
           aria-label="Shop categories"

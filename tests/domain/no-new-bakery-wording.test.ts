@@ -46,6 +46,8 @@ const SCANNED = [
    * because it is invisible.
    */
   "lib/images",
+  "constants/section-registry.ts",
+  "features/cms-sections",
 ];
 
 /**
@@ -59,7 +61,7 @@ const SCANNED = [
  * "It is the only match in the file" came to cover a second one nobody had
  * argued for. Give it whenever the reason is about a particular sentence.
  */
-const ALLOWED: { path: string; why: string; only?: string }[] = [
+const ALLOWED: { path: string; why: string; only?: string | string[] }[] = [
   {
     path: "apps/admin/settings/components/modules-settings-page",
     why: "the optional modules ARE bakery product fields — flavour, egg preference, weight, shape, photo cake. Naming them is what tells a florist which to switch off.",
@@ -90,6 +92,22 @@ const ALLOWED: { path: string; why: string; only?: string }[] = [
     path: "apps/admin/products/components/product-form-page",
     why: "one placeholder, deliberately naming one edible thing and one not — 'Chocolate Truffle Cake, 65W Type-C Charger' — so the box shows a shop that this field is not about cake. It is the only match in the file, and `only` is what keeps that true.",
     only: "e.g. Chocolate Truffle Cake, 65W Type-C Charger",
+  },
+  {
+    /**
+     * TWO SECTION TYPES THAT REALLY ARE BAKERY ONES.
+     *
+     * `photo-cakes` and `eggless` are bakery slugs frozen into the section
+     * type — the renderer says so where it dispatches them, and they stay
+     * only because layouts already published carry them. `category-rail` is
+     * what a shop adds instead, and it picks the category from the shop's
+     * own list. So these four strings name two legacy rows, the way the
+     * wedding row keeps its own name; every other line in this file is
+     * copy shipped to every trade, and stays inside the ratchet.
+     */
+    path: "constants/section-registry.ts",
+    why: "two legacy bakery section types, kept for layouts already published — a shop adds a Category row instead.",
+    only: ["Photo Cakes", "Shop Photo Cakes", "Eggless Cakes"],
   },
   {
     path: "features/design-system",
@@ -299,7 +317,17 @@ describe("no new bakery wording on a shop surface", () => {
 
     for (const { line, number } of codeLines(readFileSync(file, "utf8"))) {
       for (const text of readableStrings(line)) {
-        if (allowance?.only && text.includes(allowance.only)) continue;
+        /*
+          `only` may name SEVERAL strings now, and still forgives nothing
+          else. One file can hold two narrow reasons — the section registry
+          names two legacy bakery section TYPES — and a single string forced
+          the choice between listing one of them and forgiving the file.
+        */
+        const only = allowance?.only;
+        const forgiven = only
+          ? (Array.isArray(only) ? only : [only]).some((one) => text.includes(one))
+          : false;
+        if (forgiven) continue;
         offenders.push(`${rel}:${number}  ${text.trim().slice(0, 90)}`);
       }
     }

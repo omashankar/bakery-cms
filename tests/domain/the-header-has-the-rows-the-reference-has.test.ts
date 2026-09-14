@@ -91,8 +91,26 @@ describe("the currency line is a readout, not a switcher", () => {
 
     expect(chrome).toContain("header.showCurrencyNote");
     expect(chrome).toContain("general.currency");
-    // A readout: no select, no form, no handler anywhere near it.
-    const row = navbar.slice(navbar.indexOf("currencyNote ? ("), navbar.indexOf("utilityNav.map"));
+
+    /**
+     * THE WHOLE ROW, not the gap between two markers.
+     *
+     * It sliced from `currencyNote ? (` to `utilityNav.map` — two markers in
+     * a fixed order today, and `String.slice(a, b)` with b < a returns the
+     * empty string. Move the links above the readout, which is an ordinary
+     * layout change, and the guard passes by measuring nothing. Anchored on
+     * the row's own opening test and the next band instead, so it covers the
+     * readout wherever inside the row it sits.
+     */
+    const start = navbar.indexOf("utilityNav.length > 0 || currencyNote");
+    const end = navbar.indexOf("data-header-bar");
+    expect(start, "the utility row is gone").toBeGreaterThan(-1);
+    expect(end, "the main bar is gone").toBeGreaterThan(start);
+
+    const row = navbar.slice(start, end);
+    expect(row, "the readout is no longer in the row being checked").toContain(
+      "{currencyNote}",
+    );
     expect(row).not.toMatch(/<select|onChange|onClick/);
   });
 });
@@ -147,19 +165,28 @@ describe("the nav is its own full-width strip", () => {
      * closes, not within it.
      */
     const navbar = code(NAVBAR);
-    const mainBar = navbar.indexOf('className="mx-auto flex h-16 max-w-7xl');
+    /*
+      `data-header-bar` rather than the row's class string. The invariant is
+      ORDER — the strip comes after the bar — and the previous anchor pinned
+      the bar's height and container width as a side effect, so a restyle
+      reddened a test with no opinion about either.
+    */
+    const mainBar = navbar.indexOf("data-header-bar");
     const strip = navbar.indexOf('aria-label="Shop categories"');
 
-    expect(mainBar).toBeGreaterThan(-1);
+    expect(mainBar, "the main bar lost its marker").toBeGreaterThan(-1);
     expect(strip, "the category strip is gone").toBeGreaterThan(-1);
     expect(strip, "the nav is still inside the main bar").toBeGreaterThan(mainBar);
   });
 
   it("and is hidden on a phone, where the same rows are in the drawer", () => {
     const navbar = code(NAVBAR);
-    const strip = navbar.slice(navbar.indexOf("border-t border-border bg-cream-50"));
+    // Marker, not fill: this case is about the band being hidden on a phone,
+    // and `bg-cream-50` is a colour the reference restyle changes.
+    const at = navbar.indexOf("data-nav-band");
+    expect(at, "the nav band lost its marker").toBeGreaterThan(-1);
 
-    expect(strip.slice(0, 120)).toContain("lg:block");
+    expect(navbar.slice(at, at + 200)).toContain("lg:block");
   });
 });
 
@@ -172,11 +199,23 @@ describe("the category tiles are squares, not circles", () => {
      * round.
      */
     const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
-    const strip = renderer.slice(
-      renderer.indexOf("function OurMenuSection"),
-      renderer.indexOf("function OurMenuSection") + 2600,
-    );
+    /*
+      THE FUNCTION, not 2,600 characters of whatever follows it.
 
+      OurMenuSection measures about 1,800, so the fixed window already ran
+      800 characters into the next section's docblock — and it would keep
+      passing if the tiles moved out of this function entirely, because the
+      window would still be full of somebody else's markup.
+    */
+    const at = renderer.indexOf("function OurMenuSection");
+    expect(at, "OurMenuSection is gone").toBeGreaterThan(-1);
+    const rest = renderer.slice(at + 1);
+    const next = rest.search(/\n(?:export )?(?:function|const) /);
+    const strip = next < 0 ? rest : rest.slice(0, next);
+
+    expect(strip, "the slice ran past OurMenuSection").not.toContain(
+      "function StoreLocatorSection",
+    );
     expect(strip).toContain("rounded-2xl");
     expect(strip, "the tiles are circles again").not.toContain("rounded-full");
   });

@@ -39,13 +39,24 @@ const CAROUSEL = "features/cms-sections/hero-carousel.tsx";
 const codeOf = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
-/** A section body's own slice, so an assertion cannot be satisfied by a sibling. */
-function bodyOf(source: string, marker: string, until = "\nfunction ") {
+/**
+ * A function's own slice, so an assertion cannot be satisfied by a sibling.
+ *
+ * The end marker matches an EXPORTED declaration too, and that is the whole
+ * point of the regex. With a plain `indexOf("\nfunction ")` the slice for
+ * `HeroBannerSlideView` ran past the two exported functions that follow it and
+ * returned 8,112 characters — the entire rest of the module — so three
+ * assertions below that say "the banner view" were reading HeroCarousel as
+ * well. They passed, and they would have gone on passing while the thing they
+ * name quietly stopped being true.
+ */
+function bodyOf(source: string, marker: string, until = /\n(?:export )?(?:function|const) /) {
   source = codeOf(source);
   const at = source.indexOf(marker);
   expect(at, `${marker} is gone from this file`).toBeGreaterThan(-1);
-  const next = source.indexOf(until, at + 1);
-  return source.slice(at, next < 0 ? source.length : next);
+  const rest = source.slice(at + marker.length);
+  const next = rest.search(until);
+  return marker + (next < 0 ? rest : rest.slice(0, next));
 }
 
 const content = (value: Record<string, unknown>) =>
@@ -176,6 +187,7 @@ describe("the banner band", () => {
      */
     const shell = bodyOf(read(RENDERER), "function SectionShell(");
     expect(shell).toContain("fullBleed");
+    expect(shell, "the slice ran past SectionShell").not.toContain("function HeroSection(");
     expect(shell, "the shell reaches out of its parent with viewport units").not.toMatch(
       /w-screen|100vw|50vw\)/,
     );
@@ -215,6 +227,12 @@ describe("the banner band", () => {
      * visibly soft on exactly the screens it was built for.
      */
     const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+    // Proves the slice stopped where it should: the split view's own sizes
+    // string lives above it and the carousel's below, and either one inside
+    // this slice would make the next two assertions meaningless.
+    expect(view, "the slice ran past the banner view").not.toContain(
+      "export function HeroCarousel",
+    );
     expect(view).toContain('sizes="100vw"');
     expect(view, "the banner still asks for a split-hero source").not.toContain("45vw");
   });

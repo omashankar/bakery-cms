@@ -258,8 +258,19 @@ describe("controls that reached no customer", () => {
     // Per element, not once for the file: the desktop menu and the mobile list
     // both take that same prop, so a single `toContain` passed with either one
     // deleted.
-    const desktop = navbar.slice(navbar.indexOf("<MegaMenu"));
-    expect(desktop.slice(0, desktop.indexOf("/>"))).toContain("label={collectionsRow.label}");
+    /*
+      THE ONE CARRYING THE PROP, not the first one in the file.
+
+      Any nav row can be a menu now, so `<MegaMenu` appears twice — and
+      slicing from the first occurrence forced the Collections menu to stay
+      physically first in the source, which is the same thing as forcing it
+      to render first in the band. A shop that reorders its rows in the admin
+      cannot move that one, and this guard was half the reason why.
+    */
+    const desktop = navbar.split("<MegaMenu").find((chunk) =>
+      chunk.slice(0, chunk.indexOf("/>")).includes("label={collectionsRow.label}"),
+    );
+    expect(desktop, "no MegaMenu takes the Collections row's label").toBeTruthy();
 
     const mobile = navbar.slice(navbar.indexOf("<MobileShopLinks"));
     expect(mobile.slice(0, mobile.indexOf("/>"))).toContain("label={collectionsRow.label}");

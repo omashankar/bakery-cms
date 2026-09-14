@@ -283,9 +283,16 @@ describe("a row the shop wants noticed", () => {
      */
     const navbar = code("apps/website/components/storefront-navbar.tsx");
 
+    /*
+      `\\.` in a normal string is just `.`, and String.replace with a string
+      pattern changes the FIRST occurrence only — so this built the regex
+      /item.highlight/, where the dot matches any character. It counted
+      `itemXhighlight` as readily as the thing it was looking for. String.raw
+      keeps the backslash, and the /g on the replace covers every dot.
+    */
     for (const field of ["item.highlight", "item.badge", "item.dividerBefore"]) {
       expect(
-        (navbar.match(new RegExp(field.replace(".", "\."), "g")) ?? []).length,
+        (navbar.match(new RegExp(field.replace(/\./g, String.raw`\.`), "g")) ?? []).length,
         `${field} is drawn in only one of the two menus`,
       ).toBeGreaterThanOrEqual(2);
     }
