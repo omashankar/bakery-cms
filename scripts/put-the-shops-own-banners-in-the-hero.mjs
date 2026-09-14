@@ -1,12 +1,13 @@
 /**
- * One-off: the shop drew four hero banners. Put them on the homepage.
+ * The shop draws its own hero banners. This puts them on the homepage.
  *
  * Run:  node --env-file=.env.local scripts/put-the-shops-own-banners-in-the-hero.mjs
  *       node --env-file=.env.local scripts/put-the-shops-own-banners-in-the-hero.mjs --apply
  *
- * Reads `banners/banner-1.png` … `banner-4.png`, uploads each to Cloudinary, and
- * rewrites the hero section's slides to point at them — in `draft` and in
- * `published` — with `layout: "banner"`.
+ * Reads every `banners/banner-*.png` named in SLIDES below, uploads each to
+ * Cloudinary, and REPLACES the hero section's slides with them — in `draft`
+ * and in `published` — with `layout: "banner"`. Replaces, not appends: the
+ * folder is the list, so a banner dropped from it is dropped from the page.
  *
  * WHY THE SLIDES END UP WITH NO WORDS IN THEM.
  *
@@ -23,15 +24,16 @@
  *
  * NOT RUN BY THE SCRIPT, and worth knowing before publishing:
  *
- *   - Every slide's link except the first goes to the whole collections page.
- *     The first says "Birthday" in as many words, so it goes to that category;
- *     the other three name festivals and a delivery window, and this shop has
- *     no category for any of them. Point them wherever you like in the builder.
- *   - There is no phone-sized version of any of these. A 3:1 banner on a 390px
- *     screen is a 130px strip, so the type in it is small. `mobileImageUrl` is a
- *     field on every slide when you have one.
+ *   - Only the first slide's link is specific. It says "Birthday" in as many
+ *     words and the shop has that category; the rest name festivals this shop
+ *     has no category for, so they go to the whole collections page rather
+ *     than to a guess that lands on an empty grid. Change them in the builder.
+ *   - There is no phone-sized version of any of these. The band takes its
+ *     height from the artwork, so a 4.8:1 banner on a 390px screen is an 81px
+ *     strip and the type drawn into it is small. `mobileImageUrl` is a field
+ *     on every slide for a picture composed for that box.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
@@ -77,19 +79,50 @@ const SLIDES = [
   },
   {
     file: "banner-3.png",
-    alt: "When the clock strikes twelve, be there. Midnight Cake Delivery, delivered fresh between 11 PM and 12 AM. Order now.",
-    href: "/store/collections",
-  },
-  {
-    file: "banner-4.png",
     alt: "Ganpati Bappa Morya. Festive Gifts and Sweets — modaks, gift hampers, pooja essentials. Order now.",
     href: "/store/collections",
   },
 ];
 
+/**
+ * THE FOLDER AND THE LIST ABOVE MUST AGREE, exactly.
+ *
+ * The alt text is a transcription of the words drawn into each picture, so it
+ * cannot be derived from the file — it has to be written per banner, by hand,
+ * after looking at it. Which means a file in the folder that nobody has
+ * described would be published with no description, and an entry here whose
+ * file has been renamed would publish the WRONG description against whatever
+ * took its place.
+ *
+ * Both are silent. Neither is allowed.
+ */
+function checkTheFolderMatches(names) {
+  const listed = SLIDES.map((slide) => slide.file).sort();
+  const found = names.filter((name) => /^banner-.*\.png$/i.test(name)).sort();
+
+  const undescribed = found.filter((name) => !listed.includes(name));
+  const missing = listed.filter((name) => !found.includes(name));
+
+  if (undescribed.length || missing.length) {
+    for (const name of undescribed) {
+      console.log(`FAIL: ${name} is in banners/ with no description written for it`);
+    }
+    for (const name of missing) {
+      console.log(`FAIL: ${name} has a description here but is not in banners/`);
+    }
+    console.log(
+      `\nLook at each new banner and add it to SLIDES in ${"scripts/put-the-shops-own-banners-in-the-hero.mjs"},` +
+        "\nwith its words transcribed. Nothing was uploaded.",
+    );
+    process.exit(1);
+  }
+}
+
 const ROOT = process.cwd();
 
 console.log(APPLY ? "=== APPLYING ===" : "=== DRY RUN — pass --apply to write ===\n");
+
+checkTheFolderMatches(await readdir(path.join(ROOT, "banners")));
 
 /** Read and measure first, so a wrong-shaped file is caught before anything uploads. */
 const prepared = [];
@@ -112,13 +145,24 @@ for (const slide of SLIDES) {
   const ratio = width / height;
   console.log(`${slide.file}  ${width} x ${height}  (${ratio.toFixed(2)}:1)  ${(bytes.length / 1024).toFixed(0)} KB`);
   /*
-    A WARNING, NOT A REFUSAL — it is the shop's artwork. But a banner is drawn
-    at 3:1 across the window, and `object-cover` on anything much taller keeps a
-    strip through the middle and throws the rest away. At 2.5 that is already
-    a fifth of the picture gone.
+    NOTHING IS CROPPED ANY MORE — the band takes its height from the picture,
+    so any ratio renders whole. What these warn about is the consequence of
+    that: a squarer banner is a TALLER band, and a very tall one is clamped
+    and letterboxed rather than being allowed to fill the screen.
+
+    Warnings, not refusals. It is the shop's artwork.
   */
-  if (ratio < 2.5) {
-    console.log(`  WARNING: much taller than the 3:1 band — it will be cropped top and bottom.`);
+  if (ratio < 1.5) {
+    console.log(
+      `  WARNING: nearly square — the band will be about as tall as the page is wide,`,
+    );
+    console.log(`           and anything past 0.75x that is letterboxed.`);
+  }
+  if (ratio > 3.2) {
+    console.log(
+      `  WARNING: very wide — on a 390px phone this is a ${Math.round(390 / ratio)}px strip,`,
+    );
+    console.log(`           so any type drawn into it will be small. Consider a phone version.`);
   }
   if (width < 1400) {
     console.log(`  WARNING: narrower than most desktops — it will be scaled up and look soft.`);
@@ -127,7 +171,9 @@ for (const slide of SLIDES) {
 }
 
 if (!APPLY) {
-  console.log("\nWould upload 4 file(s) and rewrite the hero's slides in draft and published.");
+  console.log(
+    `\nWould upload ${prepared.length} file(s) and REPLACE the hero's slides in draft and published.`,
+  );
   console.log("Dry run — nothing uploaded, nothing written. Re-run with --apply.");
   process.exit(0);
 }
@@ -160,6 +206,23 @@ console.log(`data.version = ${version} (the write is pinned to it)`);
 
 const next = JSON.parse(JSON.stringify(doc.data));
 
+/*
+  REPLACING, not appending — so say what goes.
+
+  The pictures these point at stay on the CDN; nothing here deletes them, and
+  an orphaned asset is cheaper than a deletion that turns out to have been the
+  one the shop wanted back.
+*/
+const replacing = JSON.parse(
+  next.published.sections.find((s) => s.type === "hero")?.content?.slides ?? "[]",
+);
+if (replacing.length) {
+  console.log(`\nreplacing ${replacing.length} slide(s) already on the homepage:`);
+  for (const [index, slide] of replacing.entries()) {
+    console.log(`  [${index}] ${String(slide.imageUrl ?? "").slice(-28)}`);
+  }
+}
+
 const slideContent = prepared.map((slide) => ({
   // Blank, deliberately: the words are drawn into the picture. See the note at
   // the top of this file.
@@ -183,7 +246,7 @@ for (const which of ["draft", "published"]) {
   }
   hero.content.slides = JSON.stringify(slideContent);
   hero.content.layout = "banner";
-  console.log(`SET   ${which}/hero  4 slides, layout = "banner"`);
+  console.log(`SET   ${which}/hero  ${slideContent.length} slides, layout = "banner"`);
 }
 
 next.version = version + 1;
@@ -213,8 +276,10 @@ for (const which of ["draft", "published"]) {
     wrong += 1;
   }
   const stored = JSON.parse(hero?.content?.slides ?? "[]");
-  if (stored.length !== 4) {
-    console.log(`READBACK: ${which}/hero has ${stored.length} slide(s), expected 4`);
+  if (stored.length !== prepared.length) {
+    console.log(
+      `READBACK: ${which}/hero has ${stored.length} slide(s), expected ${prepared.length}`,
+    );
     wrong += 1;
   }
   for (const [index, slide] of stored.entries()) {
