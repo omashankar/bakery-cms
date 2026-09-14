@@ -344,17 +344,26 @@ function SlidesField({
               />
             </div>
           </div>
+          {/*
+            WIDE AND UNCROPPED, because a hero slide is the one picture whose
+            own edges carry the message. The default 16:9 cover preview cut a
+            4.8:1 banner down to its middle in the very control used to upload
+            it, so the admin could not see what a customer would get.
+          */}
           <PhotoField
             id={`slide-${index}-image`}
             label="Slide image"
             value={slide.imageUrl ?? ""}
             onChange={(next) => updateSlide(index, { imageUrl: next })}
+            aspect="wide"
+            fit="contain"
           />
           <PhotoField
             id={`slide-${index}-mobile-image`}
             label="Phone image (optional)"
             value={slide.mobileImageUrl ?? ""}
             onChange={(next) => updateSlide(index, { mobileImageUrl: next })}
+            fit="contain"
           />
           {/*
             Says what it is for. A wide banner on a phone is either cropped to

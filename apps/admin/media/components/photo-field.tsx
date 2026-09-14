@@ -21,6 +21,17 @@ interface PhotoFieldProps {
   /** Shape of the preview. A logo, a banner and a cake are not the same shape. */
   aspect?: "video" | "square" | "wide";
   /**
+   * Whether the preview may crop what was uploaded.
+   *
+   * It always did, and for most fields that is right: a product photograph
+   * shown in a 16:9 tile is a thumbnail, and the page it appears on crops it
+   * the same way. For a BANNER it is not — the artwork carries its own
+   * headline and button, and "cover" in a 3:1 box hides the parts of a 4.8:1
+   * design that say what it is. An admin cannot check artwork the upload
+   * control will not show them.
+   */
+  fit?: "cover" | "contain";
+  /**
    * A validation message from the caller.
    *
    * Setting it also OPENS Advanced: the only thing that can be invalid here is
@@ -72,6 +83,7 @@ export function PhotoField({
   onChange,
   placeholder,
   aspect = "video",
+  fit = "cover",
   error,
 }: PhotoFieldProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -166,7 +178,16 @@ export function PhotoField({
         )}
       >
         {trimmed && !isUploading ? (
-          <SafeImage src={trimmed} alt={label} className="object-cover" />
+          <SafeImage
+            src={trimmed}
+            alt={label}
+            /*
+              SafeImage bakes `object-cover` into its own class list, so this
+              only wins because `cn` runs them through tailwind-merge and the
+              later one takes the conflict.
+            */
+            className={fit === "contain" ? "object-contain" : "object-cover"}
+          />
         ) : null}
 
         {isUploading ? (

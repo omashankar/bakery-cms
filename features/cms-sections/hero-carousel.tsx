@@ -176,7 +176,11 @@ function HeroSlideView({
                 // is the second-best answer, not the first.
                 alt={slide.imageAlt?.trim() || slide.headline}
                 fill
-                priority={priority}
+                // `priority` is deprecated as of Next 16 (see the Image docs'
+                // own version table). The eager/high pair says the same thing
+                // and is what the banner's <picture> branch already hand-rolls.
+                loading={priority ? "eager" : "lazy"}
+                fetchPriority={priority ? "high" : undefined}
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 45vw"
               />
@@ -269,6 +273,25 @@ function HeroBannerSlideView({
   const mobile = slide.mobileImageUrl?.trim();
 
   /**
+   * IS THIS SLIDE ALLOWED TO BE CROPPED?
+   *
+   * Twice yes, once no, and the once is the case this band exists for.
+   *
+   * A phone picture was composed for the phone's box, so cropping it to that
+   * box is what it is for. A slide with a headline lays DOM text over a
+   * photograph, and text needs a minimum height whatever the photograph is —
+   * cropping a photograph is exactly what `object-cover` is for.
+   *
+   * A slide with neither is a designed graphic whose headline, strapline and
+   * button are drawn INTO the picture. Crop it and you delete the message:
+   * these banners carry their words in the right half, which is the half a
+   * centre crop throws away. There is no ratio this CMS can pick that is
+   * right for every shop's artwork, so it picks none and shows the whole
+   * thing.
+   */
+  const cropped = Boolean(mobile || slide.headline);
+
+  /**
    * ONE download, the right picture.
    *
    * A <picture> rather than two images toggled with `hidden` / `sm:block`:
@@ -293,12 +316,13 @@ function HeroBannerSlideView({
         decoding="async"
       />
     </picture>
-  ) : (
+  ) : cropped ? (
     <OptimizedImage
       src={slide.imageUrl}
       alt={alt}
       fill
-      priority={priority}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       className="object-cover"
       /*
         100vw, because this band spans the window rather than the content
@@ -308,28 +332,79 @@ function HeroBannerSlideView({
       */
       sizes="100vw"
     />
+  ) : (
+    <OptimizedImage
+      src={slide.imageUrl}
+      alt={alt}
+      /*
+        WIDTH AND HEIGHT HERE ARE A SPACE RESERVATION, NOT A SHAPE.
+
+        Two facts make that true, and both are checkable rather than
+        believed:
+
+         - next/image never reads `width` for the srcset when `sizes` is
+           present. `getWidths` returns early on `if (sizes)` and derives
+           the widths from the vw percentages instead
+           (next/dist/shared/lib/get-img-props.js:50-69). So these numbers
+           cannot change which source is served.
+         - the attributes compute to `aspect-ratio: auto 1920 / 640`, and
+           the `auto` keyword hands layout back to the real image's own
+           ratio the moment it loads. With `h-auto` the box before load is
+           3:1 and the box after load is whatever the shop uploaded.
+
+        So 4.8:1, 3:1 and 16:9 artwork all render WHOLE, at their own
+        ratio. The only thing the numbers decide is how far the page moves
+        on a cold load, and 3:1 is the shape this CMS has always drawn
+        banners at, so it is the smallest average move.
+      */
+      width={1920}
+      height={640}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
+      /*
+        `max-h` in CONTAINER units, never `vh`. The admin builder mounts this
+        same component inside a 1024px-max preview panel, where `vh` resolves
+        against the admin's whole window and would clamp at a height that has
+        nothing to do with the box the picture is painted in. `cqw` resolves
+        against the band, which is the right answer in both mounts.
+
+        It is a guard against one upload, not a shape: a portrait photograph
+        dropped into a banner slot would otherwise be a 2,500px-tall band.
+        `object-contain` letterboxes that rather than cropping it, so the
+        owner sees what they uploaded and can see it is wrong.
+      */
+      className="block h-auto w-full max-h-[calc(100cqw*0.75)] object-contain"
+      sizes="100vw"
+    />
   );
 
   return (
     <div
       className={cn(
         /*
-          WHAT SHAPE THE PHONE GETS, and why it is not one answer.
+          WHERE THE BAND'S HEIGHT COMES FROM.
 
-          Wide everywhere is right when the picture IS the message and there
-          is no phone version of it: a 3:1 graphic cropped to a phone's box
-          loses its sides, and on a banner with its words in the right half,
-          the words are the side that goes. Short and complete beats tall and
-          truncated — and the shop can see that it is short, which is the
-          nudge towards uploading a phone picture.
+          A cropped slide gets a ratio ladder, because something has to give
+          the box a height before there is an image in it and the picture is
+          allowed to lose its edges.
 
-          Taller on a phone is right in the other two cases. With a phone
-          picture, that picture was composed for this box. With a headline,
-          the words are real text laid over the photograph and they need the
-          room — cropping a photograph is what `object-cover` is for.
+          AN UNCROPPED ONE TAKES ITS HEIGHT FROM THE PICTURE. The ladder used
+          to apply here too, and the middle rung was wrong for every banner
+          this CMS has ever shipped: `sm:aspect-[2/1]` against 3:1 artwork
+          threw away a third of the width at 640-1023px — every tablet and
+          every phone held sideways — and asked for a source 1.5x too small
+          into the bargain, so it was cropped AND soft. Nothing was wrong at
+          390px or at 1440px, which is why it survived being looked at.
+
+          `@container` is here so the image's `max-h` clamp has something to
+          resolve against. It does not stop the band taking its height from
+          the in-flow image: `container-type: inline-size` contains the inline
+          axis only.
         */
-        "relative w-full overflow-hidden bg-muted sm:aspect-[2/1] lg:aspect-[3/1]",
-        mobile || slide.headline ? "aspect-[4/3]" : "aspect-[3/1]"
+        "relative w-full overflow-hidden bg-muted",
+        cropped
+          ? "aspect-[4/3] sm:aspect-[2/1] lg:aspect-[3/1]"
+          : "@container"
       )}
     >
       {slide.headline ? (
@@ -340,8 +415,17 @@ function HeroBannerSlideView({
           picture is the link. With a headline the buttons carry the links
           instead — an anchor inside an anchor is invalid, and it is the inner
           one a browser throws away.
+
+          IN FLOW WHEN THE PICTURE IS. `absolute inset-0` took the only child
+          out of the flow, so a band with no ratio had nothing to get a height
+          from and `overflow-hidden` clipped the entire hero to 0px — at every
+          width at once. It stays absolute in the cropped case, where the band
+          has a ratio and the picture inside is absolute too.
         */
-        <Link href={slide.primaryHref} className="absolute inset-0 block">
+        <Link
+          href={slide.primaryHref}
+          className={cropped ? "absolute inset-0 block" : "block"}
+        >
           {image}
         </Link>
       )}
@@ -593,12 +677,17 @@ export function HeroCarousel({
               is otherwise the only way to reach slide two and nothing on the
               screen says it is there.
 
-              BUT NOT ACROSS THE WORDS. At 390px a 44px button centred
-              vertically lands on the headline and takes the first 40px of the
-              line with it — the text is unreadable underneath and untappable
-              through it. Below sm the banner's pair drops to the foot of the
-              picture, clear of the copy; from sm there is room at the sides
-              and they take their inset position.
+              BUT NOT ON A PHONE AT ALL, since the band stopped being cropped.
+              An uncropped banner is as tall as its artwork is at that width:
+              130px for 3:1 art on a 390px screen, 81px for 4.8:1. Two 44px
+              buttons plus their inset is most of that, over a picture whose
+              words are drawn into it.
+
+              Nothing is lost by dropping them there. The dots sit under the
+              picture now rather than over it, with a 24px hit area each, so
+              the phone already has a visible way to reach slide two — which
+              is the only reason the arrows were shown at every width. From
+              sm there is room at the sides and they take their inset spot.
             */}
             <button
               type="button"
@@ -607,7 +696,7 @@ export function HeroCarousel({
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
                 banner
-                  ? "bottom-3 left-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:left-5"
+                  ? "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:left-5 sm:flex sm:-translate-y-1/2"
                   : "top-1/2 left-0 hidden -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
               )}
             >
@@ -620,7 +709,7 @@ export function HeroCarousel({
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
                 banner
-                  ? "bottom-3 right-3 flex border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:right-5"
+                  ? "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:right-5 sm:flex sm:-translate-y-1/2"
                   : "top-1/2 right-0 hidden -translate-y-1/2 translate-x-[calc(100%+1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
               )}
             >

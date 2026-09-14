@@ -540,31 +540,37 @@ describe("the slideshow's own controls", () => {
     expect(carousel).toMatch(/aria-label=\{paused \? "Resume slideshow" : "Pause slideshow"\}/);
   });
 
-  it("keeps the banner's arrows off the words on a phone", () => {
+  it("keeps the banner's arrows off a band only as tall as its artwork", () => {
     /**
-     * At 390px a 44px button centred vertically lands on the headline and
-     * takes the first 40px of the line with it — unreadable underneath and
-     * untappable through it. Below sm the pair drops to the foot of the
-     * picture; the inset position starts at sm, where there is room.
+     * An uncropped banner is as tall as its picture is at that width: 130px
+     * for 3:1 art on a 390px screen, 81px for 4.8:1. Two 44px buttons and
+     * their inset is most of that, over a picture whose words are drawn into
+     * it — so below sm they are not drawn at all.
+     *
+     * Nothing is lost. The dots sit under the picture with a 24px hit area
+     * each, which is the visible way to reach slide two that the arrows were
+     * being shown at every width to provide.
      */
     const carousel = codeOf(read(CAROUSEL));
 
     /*
       EACH ARROW, not the pair.
 
-      Checking the whole block for one `bottom-3` passed with the left arrow
-      moved back onto the headline and the right one left alone, which is
-      both a real way to write the bug and the more confusing one to look at.
+      Checking the whole block for one class passed with the left arrow moved
+      back over the picture and the right one left alone, which is both a
+      real way to write the bug and the more confusing one to look at.
     */
     for (const which of ["Previous", "Next"]) {
       const at = carousel.indexOf(`aria-label="${which} slide"`);
       expect(at, `the ${which} arrow is gone`).toBeGreaterThan(-1);
       const arrow = carousel.slice(at, at + 700);
+      const bannerArm = arrow.slice(arrow.indexOf("banner"), arrow.indexOf("          : "));
 
-      expect(arrow, `the ${which} arrow sits on the words at phone width`).toContain(
-        "bottom-3",
+      expect(bannerArm, `the ${which} arrow is drawn over a phone-height band`).toContain(
+        "hidden",
       );
-      expect(arrow, `the ${which} arrow never takes its inset position`).toMatch(
+      expect(bannerArm, `the ${which} arrow never appears at all`).toContain("sm:flex");
+      expect(bannerArm, `the ${which} arrow never takes its inset position`).toMatch(
         /sm:top-1\/2/,
       );
     }
@@ -633,16 +639,84 @@ describe("the figures a shop typed into the hero", () => {
 describe("a wide banner on a phone", () => {
   const bannerView = () => bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
 
-  it("shows the whole picture rather than its middle, when there is no phone version", () => {
+  it("is not cropped at all when the picture carries the message", () => {
     /**
-     * A 3:1 graphic cropped to a phone's 4:3 box keeps about 43% of its width
-     * — and on a banner with its words drawn into the right half, the words
-     * are the part that goes. Short and complete beats tall and truncated,
-     * and being visibly short is the nudge towards uploading a phone picture.
+     * There is no ratio this CMS can pick that is right for every shop's
+     * artwork, so it picks none: the band takes its height from the picture
+     * and the picture is shown whole.
+     *
+     * The ladder that used to apply here had a wrong middle rung, and it was
+     * wrong for every banner this CMS has ever shipped: `sm:aspect-[2/1]`
+     * against 3:1 artwork threw away a third of the width between 640 and
+     * 1023px — every tablet, every phone held sideways — and asked for a
+     * source 1.5x too small into the bargain. Nothing was wrong at 390px or
+     * at 1440px, which is how it survived being looked at.
      */
-    expect(bannerView()).toMatch(
-      /mobile \|\| slide\.headline \? "aspect-\[4\/3\]" : "aspect-\[3\/1\]"/,
+    const view = bannerView();
+
+    expect(view).toMatch(/const cropped = Boolean\(mobile \|\| slide\.headline\)/);
+    expect(view).toMatch(
+      /cropped\s*\?\s*"aspect-\[4\/3\] sm:aspect-\[2\/1\] lg:aspect-\[3\/1\]"\s*:\s*"@container"/,
     );
+  });
+
+  it("and takes that height from an image that is in the flow", () => {
+    /**
+     * `absolute inset-0` on the link took the band's only child out of the
+     * flow. With no ratio to fall back on the band then had no height source
+     * at all and `overflow-hidden` clipped the whole hero to 0px — at every
+     * width at once, with every source-scanning guard in this file still
+     * green.
+     */
+    const view = bannerView();
+
+    expect(view).toMatch(/cropped \? "absolute inset-0 block" : "block"/);
+  });
+
+  it("reserves the space before the picture loads, without claiming a shape", () => {
+    /**
+     * `width` and `height` are a pre-load reservation here and nothing else,
+     * and both halves of that are checkable rather than believed:
+     *
+     *  - next/image never reads `width` for the srcset while `sizes` is
+     *    present — `getWidths` returns early on `if (sizes)`
+     *    (next/dist/shared/lib/get-img-props.js:50-69)
+     *  - the attributes compute to `aspect-ratio: auto 1920 / 640`, and the
+     *    `auto` keyword hands layout back to the real image's ratio on load
+     *
+     * So the numbers cannot crop, cannot distort and cannot change which
+     * source is served. Dropping them would only make the page jump further.
+     */
+    const view = bannerView();
+
+    expect(view).toContain("width={1920}");
+    expect(view).toContain("height={640}");
+    expect(view).toContain("h-auto");
+    expect(view, "an uncropped banner is being cropped again").toContain("object-contain");
+  });
+
+  it("clamps a pathological upload in container units, never viewport ones", () => {
+    /**
+     * A portrait photograph dropped into a banner slot would be a 2,500px
+     * band. But `vh` resolves against the admin's whole window, and the
+     * builder mounts this same component inside a 1024px-max preview panel —
+     * so a vh clamp is right live and wrong in the preview, which is the
+     * split this file has been bitten by before. `cqw` resolves against the
+     * band in both mounts.
+     */
+    const view = bannerView();
+
+    expect(view).toContain("max-h-[calc(100cqw*0.75)]");
+    expect(view, "the clamp is measured against the viewport again").not.toContain("vh]");
+  });
+
+  it("and asks for the picture eagerly without the prop Next deprecated", () => {
+    // `priority` was deprecated in Next 16; the eager/high pair says the same
+    // thing and is what the <picture> branch already hand-rolls.
+    const carousel = codeOf(read(CAROUSEL));
+
+    expect(carousel, "priority is back").not.toMatch(/priority=\{priority\}/);
+    expect((carousel.match(/fetchPriority=\{priority \? "high"/g) ?? []).length).toBe(4);
   });
 
   it("takes the taller phone box once there is a picture made for it", () => {
@@ -675,5 +749,50 @@ describe("a wide banner on a phone", () => {
     const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
     expect(editor).toContain("mobileImageUrl: next");
     expect(editor).toContain("Used below 640px");
+  });
+});
+
+describe("what the admin sees of the artwork before it publishes", () => {
+  it("the whole of it, in the control used to upload it", () => {
+    /**
+     * PhotoField defaults to a 16:9 preview and SafeImage bakes `object-cover`
+     * into its own class list — so a 4.8:1 banner was cut down to its middle in
+     * the very box the admin drops it into. They could not check the artwork
+     * the storefront would show, in the screen whose job is to show it.
+     *
+     * `aspect="wide"` alone does NOT fix it: ASPECT.wide is `aspect-[3/1]`,
+     * which still crops anything wider. The fit is the half that matters.
+     */
+    const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
+    const at = editor.indexOf("id={`slide-${index}-image`}");
+    expect(at, "the slide image field is gone").toBeGreaterThan(-1);
+    const field = editor.slice(at, at + 400);
+
+    expect(field, "the slide preview crops the banner").toContain('fit="contain"');
+    expect(field).toContain('aspect="wide"');
+  });
+
+  it("and the phone picture is shown whole too", () => {
+    const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
+    const at = editor.indexOf("id={`slide-${index}-mobile-image`}");
+    expect(at, "the phone image field is gone").toBeGreaterThan(-1);
+
+    expect(editor.slice(at, at + 400)).toContain('fit="contain"');
+  });
+
+  it("because PhotoField actually honours the fit it is given", () => {
+    /**
+     * SafeImage hardcodes `object-cover` when it fills, so the override only
+     * lands because `cn` runs both through tailwind-merge and the later class
+     * takes the conflict. A field that accepted the prop and ignored it would
+     * pass the two cases above and change nothing on screen.
+     */
+    const photoField = read("apps/admin/media/components/photo-field.tsx");
+
+    expect(photoField).toMatch(/fit\?: "cover" \| "contain"/);
+    expect(photoField).toMatch(/fit === "contain" \? "object-contain" : "object-cover"/);
+    // And the default is unchanged, so every other field in the admin keeps
+    // the thumbnail crop it was designed around.
+    expect(photoField).toMatch(/fit = "cover"/);
   });
 });
