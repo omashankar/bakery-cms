@@ -248,6 +248,73 @@ describe("the banner band", () => {
     const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
     expect(view).toMatch(/slide\.headline \? "" : slide\.primaryLabel/);
   });
+
+  it("reads out what the shop wrote, when the words are part of the picture", () => {
+    /**
+     * A banner is usually a designed graphic with the headline, the line under
+     * it and the button drawn INTO the artwork. None of that reaches the DOM,
+     * so a screen reader got the fallback and the shop's actual offer was
+     * invisible to the people who most need it read out.
+     *
+     * The shop's own description has to come FIRST, ahead of both fallbacks —
+     * behind either of them it would never be reached on the slides that need
+     * it, which are precisely the ones with no headline.
+     */
+    const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+    const alt = view.slice(view.indexOf("alt={"), view.indexOf("alt={") + 400);
+
+    expect(alt).toContain("slide.imageAlt");
+    expect(
+      alt.indexOf("slide.imageAlt"),
+      "the shop's description is behind a fallback that always answers first",
+    ).toBeLessThan(alt.indexOf("slide.primaryLabel"));
+
+    /*
+      AND THE RENDERER HANDS IT OVER. Everything above is about a prop that
+      arrives — and the section that builds the slides maps seven fields by
+      hand, so leaving this one out of that list is both easy and completely
+      silent: the box stays in the builder, the value stays in the document,
+      and the picture goes out with the fallback alt.
+    */
+    const hero = bodyOf(read(RENDERER), "function HeroSection(");
+    expect(hero, "the slide mapping drops the description").toContain(
+      "imageAlt: slide.imageAlt",
+    );
+  });
+
+  it("and the split hero prefers it over repeating its own headline", () => {
+    const carousel = codeOf(read(CAROUSEL));
+    const view = carousel.slice(
+      carousel.indexOf("function HeroSlideView("),
+      carousel.indexOf("function HeroBannerSlideView("),
+    );
+
+    expect(view).toMatch(/alt=\{slide\.imageAlt\?\.trim\(\) \|\| slide\.headline\}/);
+  });
+
+  it("has a box to type it in, beside the picture it describes", () => {
+    const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
+
+    expect(editor).toContain("imageAlt: e.target.value");
+    // And it says when it matters, rather than asking for it on every slide.
+    expect(editor).toContain("Needed when the words are part of the picture");
+  });
+
+  it("and a new slide seeds no words nobody wrote", () => {
+    /**
+     * `headline: "New slide"` publishes as a heading on the live homepage
+     * until somebody notices, and `primaryLabel: "Shop Now"` overrides the
+     * fallback that would otherwise name whatever this shop actually sells.
+     */
+    // codeOf, because the note explaining why the two strings went is a
+    // verbatim copy of both of them — the third time this file has had to
+    // strip its own prose to stop a guard failing on the fix it guards.
+    const editor = codeOf(read("apps/admin/builders/shared/section-editor-panel.tsx"));
+    const add = editor.slice(editor.indexOf("const addSlide"), editor.indexOf("const removeSlide"));
+
+    expect(add).not.toContain("New slide");
+    expect(add).not.toContain("Shop Now");
+  });
 });
 
 describe("what the hero says on the shop's behalf", () => {

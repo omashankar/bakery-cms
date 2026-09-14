@@ -130,6 +130,20 @@ export interface HeroSlideContent {
   secondaryLabel?: string;
   secondaryHref?: string;
   imageUrl?: string;
+  /**
+   * WHAT THE PICTURE SAYS, for someone who cannot see it.
+   *
+   * A banner slide is very often a designed graphic with the words drawn
+   * INTO it — a headline, a line under it and a button, all pixels. Nothing
+   * in the DOM carries any of that, so a screen reader got whatever the
+   * image fell back to, and a shop's actual offer was invisible to the
+   * people who most need it read out.
+   *
+   * Blank is fine and common: a slide whose words are real text beside the
+   * picture has a decorative picture, and an alt repeating the headline
+   * makes a reader say the same sentence twice.
+   */
+  imageAlt?: string;
 }
 
 export interface HomepageSectionInstance {

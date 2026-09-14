@@ -27,6 +27,8 @@ export interface HeroSlide {
   secondaryLabel?: string;
   secondaryHref?: string;
   imageUrl: string;
+  /** What the picture says, when the words are drawn into it. */
+  imageAlt?: string;
 }
 
 const AUTOPLAY_MS = 6000;
@@ -167,7 +169,10 @@ function HeroSlideView({
             {slide.imageUrl ? (
               <OptimizedImage
                 src={slide.imageUrl}
-                alt={slide.headline}
+                // The shop's own description first here too. The headline is
+                // real text in the column beside this frame, so repeating it
+                // is the second-best answer, not the first.
+                alt={slide.imageAlt?.trim() || slide.headline}
                 fill
                 priority={priority}
                 className="object-cover"
@@ -245,15 +250,22 @@ function HeroBannerSlideView({
       src={slide.imageUrl}
       alt={
         /*
-          The headline is DRAWN over the picture when there is one, so the
-          picture is then decorative and an alt repeating it makes a screen
-          reader read the same sentence twice. With no headline the picture is
-          the whole slide and the shop's own button label is the nearest true
-          description of where it leads — a slide carries no alt-text box to
-          read instead, and writing a sentence about a photograph nobody here
-          has seen is the one thing this must not do.
+          THE SHOP'S OWN DESCRIPTION FIRST, and that order is the point.
+
+          A banner is usually a designed graphic with the headline, the line
+          under it and the button drawn INTO the picture. None of that is in
+          the DOM, so without this box a screen reader got the fallback below
+          and the shop's actual offer was invisible to the people who most
+          need it read out.
+
+          Failing that: the headline is drawn OVER the picture when there is
+          one, so the picture is decorative and an alt repeating it makes a
+          reader say the same sentence twice. With no headline the picture is
+          the whole slide, and the shop's own button label is the nearest true
+          description of where it leads — never a sentence invented here
+          about a photograph nobody in this codebase has seen.
         */
-        slide.headline ? "" : slide.primaryLabel
+        slide.imageAlt?.trim() || (slide.headline ? "" : slide.primaryLabel)
       }
       fill
       priority={priority}

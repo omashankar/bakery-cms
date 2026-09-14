@@ -208,9 +208,17 @@ function SlidesField({
     commit([
       ...slides,
       {
-        headline: "New slide",
+        /*
+          BLANK, not "New slide" and "Shop Now".
+
+          Both were placeholder words that publish: the headline renders as a
+          heading on the live homepage until somebody notices, and the button
+          label overrides the fallback that would otherwise name whatever the
+          shop actually sells. An empty label is the one that adapts.
+        */
+        headline: "",
         subtext: "",
-        primaryLabel: "Shop Now",
+        primaryLabel: "",
         primaryHref: routes.store.collections,
         imageUrl: "",
       },
@@ -342,6 +350,25 @@ function SlidesField({
             value={slide.imageUrl ?? ""}
             onChange={(next) => updateSlide(index, { imageUrl: next })}
           />
+          <div className="space-y-2">
+            <Label htmlFor={`slide-${index}-alt`}>Image description</Label>
+            <Input
+              id={`slide-${index}-alt`}
+              value={slide.imageAlt ?? ""}
+              onChange={(e) => updateSlide(index, { imageAlt: e.target.value })}
+              placeholder="Optional"
+            />
+            {/*
+              Says WHEN it matters rather than asking for it every time. A
+              slide whose words are real text beside the picture needs
+              nothing here; a banner with the words drawn into the artwork
+              carries them nowhere else, and a reader gets silence.
+            */}
+            <p className="text-xs text-muted-foreground">
+              Needed when the words are part of the picture — it is what a
+              screen reader reads out.
+            </p>
+          </div>
         </div>
       ))}
 
