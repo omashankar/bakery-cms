@@ -38,9 +38,16 @@ export function PriceDisplay({
           >
             {formatCurrency(compareAtPrice)}
           </span>
+          {/*
+            GREEN, which is what a saving is in this repo already: the tax
+            breakdown paints a discount line `text-green-700`, and the shared
+            Badge has a `success` variant in the same family. This pill was
+            the odd one out in gold, which on a cream card reads as decoration
+            rather than as money off.
+          */}
           <span
             className={cn(
-              "rounded-md bg-gold-50 font-semibold text-gold-800",
+              "rounded-md bg-green-100 font-semibold text-green-800",
               isSm ? "px-1.5 py-0.5 text-[11px]" : "px-2 py-0.5 text-xs"
             )}
           >

@@ -539,12 +539,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       description: "",
       maxCount: 4,
       tabs: "[]",
+      // Blank, like every other rail's. A link nobody wrote is not a link.
+      ctaLabel: "",
+      ctaHref: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} per tab", type: "number" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
       {
         key: "tabs",
         label: "Tabs",

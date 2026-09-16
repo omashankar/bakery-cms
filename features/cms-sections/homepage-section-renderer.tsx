@@ -1112,6 +1112,8 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
    * slug would make clicking one light up the other.
    */
   const [active, setActive] = useState(0);
+  const railCtaLabel = contentString(c, "ctaLabel");
+  const railCtaHref = contentString(c, "ctaHref");
 
   if (tabs.length === 0) return null;
 
@@ -1124,36 +1126,57 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
   return (
     <SectionShell {...props} noReveal>
       <ScrollReveal>
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          description={contentString(c, "description")}
-          className="mb-0"
-        />
         {/*
-          The tabs sit under the heading and scroll sideways rather than
-          wrapping: four tabs on a phone wrap to two lines and move the grid
-          down the page every time one is pressed.
+          THE HEADING, THE TABS AND THE LINK ON ONE LINE.
+
+          They were stacked and centred, which on a band whose heading is
+          blank left a row of tabs floating alone in the middle of an empty
+          strip. The layout this follows puts the three side by side: what
+          the row is, what it can be switched to, and the way in.
+
+          `flex-wrap`, so a phone stacks them rather than squeezing; and the
+          heading goes back to ranged left, because a centred heading beside
+          a left-hand row of tabs is neither.
         */}
-        <div className="mt-6 flex justify-center">
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-border bg-cream-50 p-1">
-            {tabs.map((tab, index) => (
-              <button
-                key={`${tab.label}-${index}`}
-                type="button"
-                onClick={() => setActive(index)}
-                aria-pressed={index === active}
-                className={cn(
-                  "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-premium",
-                  index === active
-                    ? "bg-white text-bakery-700 shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tab.label || tab.categorySlug}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
+            <SectionHeader
+              overline={contentString(c, "overline")}
+              title={contentString(c, "title")}
+              description={contentString(c, "description")}
+              align="left"
+              className="mb-0"
+            />
+            {/*
+              The tabs scroll sideways rather than wrapping: four tabs on a
+              phone wrap to two lines and move the grid down the page every
+              time one is pressed.
+            */}
+            <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-border bg-cream-50 p-1">
+              {tabs.map((tab, index) => (
+                <button
+                  key={`${tab.label}-${index}`}
+                  type="button"
+                  onClick={() => setActive(index)}
+                  aria-pressed={index === active}
+                  className={cn(
+                    "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-premium",
+                    index === active
+                      ? "bg-white text-bakery-700 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label || tab.categorySlug}
+                </button>
+              ))}
+            </div>
           </div>
+          {railCtaHref && railCtaLabel ? (
+            <Button variant="outline" size="sm" render={<Link href={railCtaHref} />}>
+              {railCtaLabel}
+              <ArrowRight className="size-4" />
+            </Button>
+          ) : null}
         </div>
       </ScrollReveal>
 

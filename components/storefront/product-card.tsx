@@ -175,26 +175,23 @@ export function ProductCard({
       </div>
 
       {/*
-        CENTRED, under the middle of the picture above it.
+        LEFT, and that is a correction.
 
-        Left-aligned text under a centred photograph reads as two different
-        layouts stacked, and at four cards across it is four ragged left edges
-        against four centred subjects. The layout this is drawn from centres
-        the name and the price under every card.
+        These were centred for a day, on a reading of a reference layout that
+        mixed up two different cards: the ones it centres are CATEGORY tiles —
+        a name and a from-price, no product behind them — while its product
+        cards, the ones with a name, a price and a rating, are ranged left.
+        This is a product card.
+
+        Ranged left is also the better of the two here regardless: a name that
+        wraps to two lines centres its second line under its first, and four
+        of those across a row have four different shapes.
       */}
-      <div className="flex flex-1 flex-col gap-2 p-3 text-center">
+      <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="space-y-1">
-          <div className="flex items-center justify-center gap-2">
-            <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              {cake.category}
-            </p>
-            {cake.rating ? (
-              <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-                <Star className="size-3 fill-gold-300 text-gold-300" />
-                {cake.rating}
-              </span>
-            ) : null}
-          </div>
+          <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            {cake.category}
+          </p>
           <h3 className="font-heading text-sm font-semibold leading-snug">
             <Link
               href={routes.store.cake(cake.slug)}
@@ -206,9 +203,25 @@ export function ProductCard({
         </div>
 
         <div className={cn("mt-auto", showAddToCart && "space-y-3")}>
-          {/* The price row centres with the rest of the card. */}
-          <div className="flex justify-center">
+          {/*
+            THE RATING SITS WITH THE PRICE, at the other end of its row.
+
+            It used to sit beside the category, in the small grey line at the
+            top — which is where a customer looks last, and it was grey on
+            grey next to it. The price row is where the decision is made, and
+            the rating is part of that decision.
+          */}
+          <div className="flex items-center justify-between gap-2">
             <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
+            {cake.rating ? (
+              <span
+                className="flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800"
+                aria-label={`Rated ${cake.rating} out of 5`}
+              >
+                {cake.rating}
+                <Star className="size-3 fill-green-700 text-green-700" />
+              </span>
+            ) : null}
           </div>
           {showAddToCart ? (
             <Button
