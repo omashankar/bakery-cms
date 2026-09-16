@@ -145,8 +145,16 @@ describe("a section's Background setting", () => {
     expect(body, "the panel background is gone").toContain(
       'const panel = section.background === "panel" && !fullBleed;',
     );
-    expect(body, "the panel is not drawn as an inset card").toContain(
-      'surface-cream rounded-2xl',
+    /*
+      `cream-200`, a step deeper than the full-width band tint.
+
+      It was `surface-cream` — the same near-white the stripes use — and at
+      the size of an inset box that is invisible against the white around it:
+      the card had a shape and no edge. A full-width stripe wants the faintest
+      tint that still reads; a small box wants one step more.
+    */
+    expect(body, "the panel is not drawn as an inset card").toMatch(
+      /rounded-2xl bg-cream-200/,
     );
   });
 });

@@ -279,7 +279,7 @@ function SectionShell({
       ) : (
         <div className={layoutSpacing.container}>
           {panel ? (
-            <div className="surface-cream rounded-2xl px-4 py-6 sm:px-6 sm:py-8">
+            <div className="rounded-2xl bg-cream-200 px-4 py-6 sm:px-6 sm:py-8">
               {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
             </div>
           ) : revealOnScroll ? (
