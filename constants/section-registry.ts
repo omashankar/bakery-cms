@@ -329,7 +329,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         AFTER the deploy; the renderer's fallback is the half that keeps
         every existing shop's homepage where it was.
       */
-      layout: "split",
+
       copySide: "left",
       /*
         TRUE, so nothing changes for a shop that already has this band.
@@ -339,25 +339,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       showDeliveryFacts: true,
     },
     fields: [
-      {
-        /*
-          SPLIT IS LISTED FIRST, and that is load-bearing rather than tidy.
-
-          The editor's select renders `value ?? options[0].value` — it SHOWS
-          the first option when the key is absent but never COMMITS it. Every
-          hero stored today has no layout key, so whatever sits first here is
-          what an admin sees in the dropdown. List the banner first and every
-          shop opens the builder to a control reading "Full-bleed banner" over
-          a preview and a live page that are both split.
-        */
-        key: "layout",
-        label: "Hero layout",
-        type: "select",
-        options: [
-          { label: "Split — words beside a picture", value: "split" },
-          { label: "Full-bleed banner", value: "banner" },
-        ],
-      },
       {
         /*
           LEFT IS LISTED FIRST for the same reason split is: the editor shows

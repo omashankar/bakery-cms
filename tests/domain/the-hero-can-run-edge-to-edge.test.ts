@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 import {
   heroCopySideOf,
-  heroLayoutOf,
   heroSlidesFor,
 } from "@/features/cms-sections/lib/section-utils";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
@@ -12,16 +11,16 @@ import { headerSchema } from "@/features/site-layout/server/site-layout.validato
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
 /**
- * THE HERO CAN RUN EDGE TO EDGE — and a shop that never asked still gets the
- * one it has.
+ * THE HERO RUNS EDGE TO EDGE, and there is no second hero to choose.
  *
- * The reference storefront opens on a full-width banner. This CMS opened on a
- * split hero: a column of words beside a framed photograph, inside the content
- * column. Both are now available, chosen per section, and the whole risk of
- * that change lives in one place — what a section that predates the choice
- * resolves to. Every hero stored before the key existed has no `layout` at all
- * and nothing migrates them, so a wrong fallback silently reshapes the homepage
- * of every shop running this CMS.
+ * This CMS used to draw two: a full-width banner, and a column of words
+ * beside a framed photograph inside the content column, picked per section
+ * from a dropdown. The shop asked for the banner and only the banner, so the
+ * choice is gone — one hero, and no control that can get it wrong.
+ *
+ * What that leaves worth guarding is the shape of the one that remains, and
+ * the absence of the one that does not: a stored `layout` key is now an
+ * ignored leftover, and nothing may read it back into a branch.
  */
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -67,114 +66,96 @@ function bodyOf(source: string, marker: string, until = /\n(?:export )?(?:functi
 const content = (value: Record<string, unknown>) =>
   value as HomepageSectionInstance["content"];
 
-describe("which hero a section gets", () => {
-  it("is the split one for every section stored before the choice existed", () => {
-    // The regression this whole file exists for. `{}` is not a hypothetical
-    // input: it is the shape of every hero document in every database today,
-    // because the key was added in the same change as this test.
-    expect(heroLayoutOf(content({}))).toBe("split");
+describe("there is one hero, and no way to ask for another", () => {
+  const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
+
+  it("offers no layout control, so no shop can pick the one that is gone", () => {
+    /**
+     * The dropdown read "Split — words beside a picture" / "Full-bleed
+     * banner". The shop asked to keep the banner only. A control that still
+     * offered the choice would save a value the renderer no longer reads —
+     * which looks like a setting that works and does nothing.
+     */
+    expect(hero.fields.find((f) => f.key === "layout")).toBeUndefined();
+    expect(hero.defaultContent.layout, "a new hero is still stamped with a layout").toBeUndefined();
   });
 
-  it("is the banner only when the shop asked for it in those exact letters", () => {
-    expect(heroLayoutOf(content({ layout: "banner" }))).toBe("banner");
-    expect(heroLayoutOf(content({ layout: "split" }))).toBe("split");
-  });
-
-  it("is the split one for anything it does not recognise", () => {
-    // A value can reach here from a hand-edited document, an older build's
-    // spelling, or a dropdown someone renamed. None of those are a request for
-    // a different homepage, so none of them get one.
-    for (const value of ["Banner", "BANNER", "full", "full-bleed", "", " banner", true, 1]) {
-      expect(heroLayoutOf(content({ layout: value })), `"${String(value)}" changed the hero`).toBe(
-        "split",
+  it("and nothing reads a stored layout back into a branch", () => {
+    /**
+     * Every hero in every database still carries whatever `layout` it was
+     * last saved with — nothing migrates them, and nothing needs to, because
+     * an unread key is harmless. It stops being harmless the moment a branch
+     * reads it again, so this fails if one does.
+     */
+    for (const path of [RENDERER, CAROUSEL]) {
+      const body = codeOf(read(path));
+      expect(body, `${path} branches on a hero layout again`).not.toMatch(
+        /layout === "banner"|layout !== "banner"|heroLayoutOf/,
       );
     }
   });
+});
 
-  it("is whatever the dropdown offers — every option, not just the two named here", () => {
-    /**
-     * The dropdown and the branch are two lists of strings compared across a
-     * Mongo round trip. A third spelling added to one and not the other is a
-     * control that appears to work, saves, and changes nothing — the renderer
-     * reads a word it does not know and quietly draws the split hero.
-     *
-     * Written over the registry's own options rather than a copy of them, so
-     * adding a third layout to the dropdown fails here until the branch knows
-     * it, instead of failing silently on the page.
-     */
-    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero");
-    const field = hero?.fields.find((f) => f.key === "layout");
-    expect(field?.options, "the hero has no layout dropdown").toBeTruthy();
+describe("a slide list that shrinks under the row", () => {
+  /**
+   * `index` is state and outlives the `slides` prop. Autoplay walks it to the
+   * last slide within seconds, so deleting that slide in the builder used to
+   * leave `slides[index]` undefined and `slide.badge` threw — inside the live
+   * preview, which has no error boundary, taking every unsaved edit with it.
+   * A clamp called `activeSlideIndex` existed to stop it.
+   *
+   * The clamp is gone because the hero that read a slide by the live index is
+   * gone. What remains reads the list at its two ends only, behind a
+   * zero-length guard, so there is no index left to outlive anything. That is
+   * a stronger guarantee than the clamp was, and this is what pins it: add a
+   * read by `index` back and it fails.
+   */
+  it("is never read at an index, so it cannot be read past its end", () => {
+    const body = bodyOf(read(CAROUSEL), "export function HeroCarousel(", /\n(?:export )?function /);
 
-    for (const option of field!.options!) {
-      expect(
-        heroLayoutOf(content({ layout: option.value })),
-        `the dropdown offers "${option.value}" and the renderer does not know it`,
-      ).toBe(option.value);
-    }
+    expect(body, "the carousel draws without a zero-length guard").toContain(
+      "if (count === 0) return null;",
+    );
+
+    const reads = [...body.matchAll(/slides\[[^\]]*\]/g)].map((m) => m[0]);
+    expect(
+      [...new Set(reads)].sort(),
+      "the carousel reads a slide by something other than the two ends of the list",
+    ).toEqual(["slides[0]", "slides[count - 1]"]);
   });
 });
 
-describe("the layout dropdown", () => {
-  const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
-  const field = hero.fields.find((f) => f.key === "layout")!;
-
-  it("lists split first, because the editor shows the first option and commits none", () => {
-    /**
-     * `section-editor-panel` renders a select as `value ?? options[0].value` —
-     * it DISPLAYS the first option when the key is absent, and never writes it.
-     * Every hero stored today has no layout key, so whatever sits first here is
-     * what an admin sees. Put the banner first and every shop opens the builder
-     * to a control reading "Full-bleed banner" over a preview, and a live page,
-     * that are both split.
-     */
-    expect(field.options?.[0]?.value).toBe("split");
-    expect(heroLayoutOf(content({}))).toBe(field.options![0].value);
-  });
-
-  it("starts a new hero on the same layout the old ones resolve to", () => {
-    // Two defaults, one answer. This one reaches sections created after the
-    // deploy; heroLayoutOf's reaches every section created before it. They
-    // disagreeing is two shops on one build with two different homepages.
-    expect(hero.defaultContent.layout).toBe(heroLayoutOf(content({})));
-  });
-});
-
-describe("which slides a layout draws", () => {
+describe("which slides the hero draws", () => {
   const words = { headline: "Order for Diwali", imageUrl: "" };
   const picture = { headline: "", imageUrl: "/b.jpg" };
   const both = { headline: "Gift boxes", imageUrl: "/g.jpg" };
   const neither = { headline: "", imageUrl: "" };
 
-  it("keeps a words-only slide in the split hero", () => {
-    // The words are the half a customer reads; the empty frame beside them is
-    // already guarded in HeroSlideView.
-    expect(heroSlidesFor("split", [words])).toEqual([words]);
-  });
-
-  it("drops a words-only slide from the banner", () => {
+  it("drops a words-only slide", () => {
     /**
-     * A banner slide IS its picture — drawn edge to edge with the words laid
+     * A hero slide IS its picture — drawn edge to edge with the words laid
      * over it. Without one it is a blank band the height of the hero, and the
      * arrows and dots still count it, so a customer can page onto nothing.
+     *
+     * This was kept when the shop could also choose the split hero, where the
+     * words were the half a customer read and the frame beside them was
+     * allowed to be empty. There is no such slide now.
      */
-    expect(heroSlidesFor("banner", [words, both])).toEqual([both]);
+    expect(heroSlidesFor([words, both])).toEqual([both]);
+    expect(heroSlidesFor([words])).toEqual([]);
   });
 
-  it("keeps a picture-only slide in both", () => {
-    expect(heroSlidesFor("banner", [picture])).toEqual([picture]);
-    expect(heroSlidesFor("split", [picture])).toEqual([picture]);
+  it("keeps a picture-only slide", () => {
+    expect(heroSlidesFor([picture])).toEqual([picture]);
   });
 
-  it("drops an empty slide from both", () => {
-    expect(heroSlidesFor("split", [neither])).toEqual([]);
-    expect(heroSlidesFor("banner", [neither])).toEqual([]);
+  it("drops an empty slide", () => {
+    expect(heroSlidesFor([neither])).toEqual([]);
   });
 
   it("leaves the order the shop put them in", () => {
     const ordered = [both, picture, { headline: "Third", imageUrl: "/3.jpg" }];
-    expect(heroSlidesFor("banner", ordered)).toEqual(ordered);
-    expect(heroSlidesFor("split", ordered)).toEqual(ordered);
+    expect(heroSlidesFor(ordered)).toEqual(ordered);
   });
 });
 
@@ -200,26 +181,20 @@ describe("the banner band", () => {
 
   it("is the only thing that asks for the full width", () => {
     /**
-     * The split hero must NOT carry it — that is the layout every shop is on,
-     * and a split hero out of its container is a 2000px line of body text.
+     * NO OTHER BAND MAY CARRY IT. A section out of its container is a 2000px
+     * line of body text, and every band on this page but the hero is words.
      *
-     * Sliced at the LAST `return (` rather than at the banner branch: the
-     * split return comes after the banner one, so a slice that runs from the
-     * branch to the end of the function contains both returns and a stray
-     * `fullBleed` on the split one lands inside the half being asserted to
-     * have it. That is not hypothetical — the first version of this test read
-     * exactly that way and survived the mutation.
+     * This used to slice the hero at its layout branch, because the split
+     * return sat after the banner one and a careless slice put the split
+     * half inside the half being asserted to have `fullBleed`. There is one
+     * return now, so the scoping that matters is which FUNCTION asks.
      */
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
-    const branchAt = hero.indexOf('if (layout === "banner")');
-    const splitAt = hero.lastIndexOf("  return (");
-    expect(branchAt, "the banner branch is gone").toBeGreaterThan(-1);
-    expect(splitAt, "the split return no longer comes last").toBeGreaterThan(branchAt);
+    const shell = bodyOf(read(RENDERER), "function SectionShell(");
+    const elsewhere = codeOf(read(RENDERER)).replace(hero, "").replace(shell, "");
 
-    expect(hero.slice(branchAt, splitAt), "the banner no longer runs edge to edge").toContain(
-      "fullBleed",
-    );
-    expect(hero.slice(splitAt), "the split hero broke out of its container").not.toContain(
+    expect(hero, "the hero no longer runs edge to edge").toContain("fullBleed");
+    expect(elsewhere, "another band broke out of the container").not.toContain(
       "fullBleed",
     );
   });
@@ -288,15 +263,6 @@ describe("the banner band", () => {
     );
   });
 
-  it("and the split hero prefers it over repeating its own headline", () => {
-    const carousel = codeOf(read(CAROUSEL));
-    const view = carousel.slice(
-      carousel.indexOf("function HeroSlideView("),
-      carousel.indexOf("function HeroBannerSlideView("),
-    );
-
-    expect(view).toMatch(/alt=\{slide\.imageAlt\?\.trim\(\) \|\| slide\.headline\}/);
-  });
 
   it("has a box to type it in, beside the picture it describes", () => {
     const editor = read("apps/admin/builders/shared/section-editor-panel.tsx");
@@ -329,14 +295,12 @@ describe("what the hero says on the shop's behalf", () => {
      * "100% Fresh" sat in the corner of every hero image, on every slide, for
      * every shop running this CMS, with no box anywhere to edit or remove it —
      * a claim about goods this CMS knows nothing about, made in the shop's
-     * name. Scoped to the slide views so the note explaining its removal does
+     * name. Scoped to the slide view so the note explaining its removal does
      * not satisfy the test that removed it.
      */
-    const source = read(CAROUSEL);
-    const views =
-      bodyOf(source, "function HeroSlideView(") + bodyOf(source, "function HeroBannerSlideView(");
-    expect(views).not.toContain("100% Fresh");
-    expect(views).not.toContain("BadgeCheck");
+    const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+    expect(view).not.toContain("100% Fresh");
+    expect(view).not.toContain("BadgeCheck");
   });
 
   it("keeps only the two tiles it can actually derive", () => {
@@ -459,22 +423,18 @@ describe("the banner band's edges", () => {
      * ends, at exactly the widths the layout is for.
      */
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
-    const branchAt = hero.indexOf('if (layout === "banner")');
-    const splitAt = hero.lastIndexOf("  return (");
-    const banner = hero.slice(branchAt, splitAt);
 
-    expect(banner).toContain("py-0");
-    expect(banner, "sm keeps the shell's 80px").toContain("sm:py-0");
-    expect(banner, "lg keeps the shell's 96px").toContain("lg:py-0");
+    expect(hero).toContain("py-0");
+    expect(hero, "sm keeps the shell's 80px").toContain("sm:py-0");
+    expect(hero, "lg keeps the shell's 96px").toContain("lg:py-0");
   });
 
   it("keeps a floor under the dots and the promises", () => {
     // They sit below the picture now rather than over it, so a band padded to
     // zero on both sides leaves them flush against whatever comes next.
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
-    const banner = hero.slice(hero.indexOf('if (layout === "banner")'), hero.lastIndexOf("  return ("));
 
-    expect(banner).toMatch(/pb-\d/);
+    expect(hero).toMatch(/pb-\d/);
   });
 
   it("draws no frame down the sides of a band that runs to both edges", () => {
@@ -617,14 +577,19 @@ describe("the slideshow's own controls", () => {
     for (const which of ["Previous", "Next"]) {
       const at = carousel.indexOf(`aria-label="${which} slide"`);
       expect(at, `the ${which} arrow is gone`).toBeGreaterThan(-1);
-      const arrow = carousel.slice(at, at + 700);
-      const bannerArm = arrow.slice(arrow.indexOf("banner"), arrow.indexOf("          : "));
+      /*
+        The button's own class list, cut at its closing `)}` so the slice
+        cannot run into the next button and read ITS classes — which is how
+        one arrow moved back over the picture with the pair still passing.
+      */
+      const rest = carousel.slice(at);
+      const arrow = rest.slice(0, rest.indexOf(")}"));
 
-      expect(bannerArm, `the ${which} arrow is drawn over a phone-height band`).toContain(
+      expect(arrow, `the ${which} arrow is drawn over a phone-height band`).toContain(
         "hidden",
       );
-      expect(bannerArm, `the ${which} arrow never appears at all`).toContain("sm:flex");
-      expect(bannerArm, `the ${which} arrow never takes its inset position`).toMatch(
+      expect(arrow, `the ${which} arrow never appears at all`).toContain("sm:flex");
+      expect(arrow, `the ${which} arrow never takes its inset position`).toMatch(
         /sm:top-1\/2/,
       );
     }
@@ -658,24 +623,19 @@ describe("a hero with nothing in it", () => {
 });
 
 describe("the figures a shop typed into the hero", () => {
-  it("reach the page in the banner layout too", () => {
+  it("reach the page, rather than a component that ignores them", () => {
     /**
-     * The stats strip is painted inside the split hero's copy column. A banner
-     * has no copy column — the words are on the picture — so the rows were
-     * read, passed to a component that ignores them, and silently dropped: a
-     * shop that typed three figures and then chose the banner lost all three,
-     * with the boxes still full in the builder.
+     * The strip used to be painted inside the split hero's copy column. This
+     * hero has no copy column — the words are on the picture — so the rows
+     * were read, passed to a component that ignored them, and silently
+     * dropped: a shop that typed three figures lost all three, with the boxes
+     * still full in the builder.
      */
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
 
     expect(hero).toContain("const statsStrip =");
-    expect(hero).toMatch(/layout !== "banner" \|\| stats\.length === 0 \? null/);
-
-    const banner = hero.slice(
-      hero.indexOf('if (layout === "banner")'),
-      hero.lastIndexOf("  return ("),
-    );
-    expect(banner, "the banner band does not render them").toContain("{statsStrip}");
+    expect(hero).toMatch(/stats\.length === 0 \? null/);
+    expect(hero, "the band does not render them").toContain("{statsStrip}");
     /*
       AND THE WRAPPER OPENS FOR THEM ON THEIR OWN.
 
@@ -684,7 +644,7 @@ describe("the figures a shop typed into the hero", () => {
       also happens to have delivery settings readable, and vanish in the
       builder preview, which has none.
     */
-    expect(banner, "the figures render only alongside the promises").toMatch(
+    expect(hero, "the figures render only alongside the promises").toMatch(
       /\{statsStrip \|\| promisesStrip \?/,
     );
   });
@@ -770,7 +730,12 @@ describe("a wide banner on a phone", () => {
     const carousel = codeOf(read(CAROUSEL));
 
     expect(carousel, "priority is back").not.toMatch(/priority=\{priority\}/);
-    expect((carousel.match(/fetchPriority=\{priority \? "high"/g) ?? []).length).toBe(4);
+    /*
+      THREE, not four. The fourth was the split hero's framed picture, and
+      that view is gone — a count left at four would have failed here and
+      read as a lost eager hint rather than a deleted component.
+    */
+    expect((carousel.match(/fetchPriority=\{priority \? "high"/g) ?? []).length).toBe(3);
   });
 
   it("takes the taller phone box once there is a picture made for it", () => {
@@ -1173,16 +1138,20 @@ describe("how one slide becomes the next", () => {
     expect(carousel()).toContain("motion-reduce:transition-none");
   });
 
-  it("while the split hero still mounts one at a time, for its entrance", () => {
+  it("and there is no second view left to mount one slide at a time", () => {
     /**
-     * Its copy arrives on a staggered entrance, and an animation only plays on
-     * mount. Drawn all at once, every slide would have played its entrance
-     * during the first paint and none would ever play again.
+     * The split hero mounted one slide per commit, because its copy arrived
+     * on a staggered entrance and an animation only plays on mount. That is
+     * the arrangement that cannot slide — React removes the old node in the
+     * same commit that adds the new one — so if it ever comes back beside
+     * this one, the hero has two answers again and one of them hard-cuts.
      */
     const body = carousel();
 
-    expect(body).toMatch(/<div key=\{activeIndex\} className="col-start-1 row-start-1">/);
-    expect(body).toContain("<HeroSlideView");
+    expect(body, "a second slide view is back").not.toContain("HeroSlideView");
+    expect(body, "a slide is mounted on its own again").not.toMatch(
+      /key=\{activeIndex\}/,
+    );
   });
 });
 

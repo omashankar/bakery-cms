@@ -1,32 +1,14 @@
 
 import type {
   HeroCopySide,
-  HeroLayout,
   HomepageSectionInstance,
 } from "@/types/homepage-builder";
 
 /**
- * SPLIT unless the shop asked for a banner, and anything unrecognised is split.
+ * Which half of the picture the words sit in — LEFT unless the shop said right.
  *
- * The fallback is the load-bearing half, not the registry's default. Every hero
- * section stored before this key existed has no `layout` at all and nothing
- * migrates them, so a shop that has never opened the builder since reads its
- * layout HERE — the registry default only ever reaches sections created after
- * the deploy. Flip this to "banner" and every existing shop's homepage changes
- * shape without anyone touching it.
- */
-export function heroLayoutOf(
-  content: HomepageSectionInstance["content"],
-): HeroLayout {
-  return content.layout === "banner" ? "banner" : "split";
-}
-
-/**
- * Which half of a banner the words sit in — LEFT unless the shop said right.
- *
- * Same shape and same reason as `heroLayoutOf`: an unrecognised value is not
- * a request for a different hero, and every section stored before this key
- * existed has no value at all.
+ * An unrecognised value is not a request for something else, and every section
+ * stored before this key existed has no value at all.
  */
 export function heroCopySideOf(
   content: HomepageSectionInstance["content"],
@@ -35,23 +17,20 @@ export function heroCopySideOf(
 }
 
 /**
- * The slides worth drawing — not the same list in the two layouts.
+ * The slides worth drawing: the ones that have a picture.
  *
- * A split slide can be words with no picture: the words are the half a
- * customer reads, and the empty frame beside them is already guarded. A banner
- * slide IS its picture — drawn edge to edge with the words laid over it — so
- * one with no image is a blank band the height of the hero, and the arrows and
- * dots would still count it. Dropped instead.
+ * A hero slide IS its picture — drawn edge to edge with the words laid over
+ * it — so one with no image is a blank band the height of the hero, and the
+ * arrows and dots would still count it. Dropped instead.
+ *
+ * This used to take the layout as well, because the hero the shop could also
+ * choose was words in a column beside a frame, and there a slide with no
+ * picture was still worth drawing. That hero is gone.
  */
 export function heroSlidesFor<T extends { headline: string; imageUrl: string }>(
-  layout: HeroLayout,
   slides: readonly T[],
 ): T[] {
-  return slides.filter((slide) =>
-    layout === "banner"
-      ? Boolean(slide.imageUrl)
-      : Boolean(slide.headline || slide.imageUrl),
-  );
+  return slides.filter((slide) => Boolean(slide.imageUrl));
 }
 
 export function sortSections<T extends { order: number }>(sections: T[]): T[] {

@@ -33,17 +33,6 @@ export type HomepageSectionType =
    * they are one band and a click — which is why the reference uses this
    * shape more than once on the same page.
    */
-  /**
-   * How the hero is drawn.
-   *
-   * Exported so the registry's dropdown and the renderer's branch read the
-   * SAME two words. They are compared as strings across a Mongo round trip,
-   * and a third spelling in either place is a hero that silently falls back.
-   *
-   * "split" is the fallback everywhere, and must be: every hero section
-   * stored before this existed has no layout key at all, and nothing
-   * migrates them.
-   */
   | "tabbed-rail"
   | "promo-collage"
   /**
@@ -67,14 +56,10 @@ export type HomepageSectionType =
   | "newsletter"
   | "cta";
 
-export type HeroLayout = "split" | "banner";
-
 /**
- * Which half of a banner the words sit in.
+ * Which half of the picture the words sit in.
  *
- * Only the banner reads it. The split hero is a two-column grid whose sides
- * are the grid's, and "left" is the fallback everywhere for the same reason
- * "split" is: nothing migrates a hero that predates the key.
+ * "left" is the fallback: nothing migrates a hero that predates the key.
  */
 export type HeroCopySide = "left" | "right";
 

@@ -64,8 +64,8 @@ import {
   getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
-import { heroCopySideOf, heroLayoutOf, heroSlidesFor } from "./lib/section-utils";
-import type { HeroLayout, HomepageSectionInstance } from "@/types/homepage-builder";
+import { heroCopySideOf, heroSlidesFor } from "./lib/section-utils";
+import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -330,11 +330,9 @@ function HeroSection(props: HomepageSectionRendererProps) {
   const labels = useBusinessLabels();
   const { section } = props;
 
-  const layout: HeroLayout = heroLayoutOf(section.content);
   const copySide = heroCopySideOf(section.content);
 
   const slides: HeroSlide[] = heroSlidesFor(
-    layout,
     parseHeroSlides(section.content).map((slide) => ({
       badge: slide.badge?.trim() || undefined,
       headline: slide.headline ?? "",
@@ -366,29 +364,19 @@ function HeroSection(props: HomepageSectionRendererProps) {
   ];
 
   /**
-   * The shop's own figures.
+   * The shop's own figures, in the band under the picture.
    *
-   * Read once, here, because the two layouts show them in different places:
-   * the split hero paints them inside its copy column, and a banner has no
-   * copy column — the words are on the picture — so they go in the band
-   * underneath beside the promises. They were reaching neither in the banner
-   * before this, which meant a shop that typed three figures and then chose
-   * the banner layout silently lost all three.
+   * There is no copy column to paint them in — the words are part of the
+   * artwork — so they sit beside the promises underneath. They reached
+   * nowhere at all for a while, which meant a shop that typed three figures
+   * silently lost all three.
    */
   const stats = renderableRows(parseListField(props.section.content, "stats"));
 
-  const carousel = (
-    <HeroCarousel
-      slides={slides}
-      layout={layout}
-      copySide={copySide}
-      rating={props.trust?.rating ?? null}
-      stats={stats}
-    />
-  );
+  const carousel = <HeroCarousel slides={slides} copySide={copySide} />;
 
   const statsStrip =
-    layout !== "banner" || stats.length === 0 ? null : (
+    stats.length === 0 ? null : (
       <div className="flex flex-wrap items-baseline justify-center gap-x-10 gap-y-4 text-center">
         {stats.map((stat, index) => (
           <div key={`${stat.label}-${index}`}>
@@ -481,11 +469,10 @@ function HeroSection(props: HomepageSectionRendererProps) {
   /**
    * A HERO WITH NOTHING IN IT IS NOT A BAND.
    *
-   * The banner drops every slide that has no picture, and a shop switching to
-   * the banner layout BEFORE uploading wide artwork is the ordinary order of
-   * events — so zero slides is a real state, not a corner. With the padding
-   * cancelled below it would draw as a 4px line of nothing across the top of
-   * the homepage.
+   * Every slide that has no picture is dropped, and a shop writing its words
+   * BEFORE uploading wide artwork is the ordinary order of events — so zero
+   * slides is a real state, not a corner. With the padding cancelled below it
+   * would draw as a 4px line of nothing across the top of the homepage.
    *
    * The builder says so instead of vanishing, the way every other empty
    * section in this file does.
@@ -495,62 +482,52 @@ function HeroSection(props: HomepageSectionRendererProps) {
     return (
       <SectionShell {...props}>
         <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
-          {layout === "banner"
-            ? "This hero is set to the full-bleed banner, and a banner slide is its picture — add an image to a slide and it will appear here."
-            : "Nothing is set on this hero yet. Add a slide with a headline or an image."}
+          {/* A hero slide IS its picture, so a slide with no image is not a
+              slide yet. Say that, rather than leaving an empty band. */}
+          A hero slide is its picture — add an image to a slide and it will
+          appear here.
         </div>
       </SectionShell>
     );
   }
 
-  if (layout === "banner") {
-    return (
-      /*
-        NO TOP PADDING, A FLOOR AT THE BOTTOM.
-
-        The band is meant to start where the header ends, which is the whole
-        point of it. `py-0` alone did not get there: the shell's own
-        `py-16 sm:py-20 lg:py-24` is three classes, and tailwind-merge only
-        resolves the one at the same breakpoint — so `py-0` cancelled the
-        base and left 80px at sm and 96px at lg, a white gap above the
-        picture at exactly the widths the layout is for.
-
-        The bottom is not zero, because the dots and the promises strip now
-        sit under the picture rather than over it, and at zero they would be
-        flush against whatever band comes next.
-      */
-      <SectionShell
-        {...props}
-        /*
-          ENOUGH TO CLEAR THE DOTS, and no more.
-
-          This was 32/40/56px, and the band below brings its own top padding —
-          so the two stacked into 186px of white between the banner and the
-          first row of the page, measured at every width from 390 to 1900. The
-          floor here exists because the dots and the promises strip sit under
-          the picture rather than over it; it is not the page's own rhythm,
-          and paying for that rhythm twice is what made the hero look adrift.
-        */
-        className="py-0 pb-4 sm:py-0 sm:pb-5 lg:py-0 lg:pb-6"
-        fullBleed
-      >
-        {carousel}
-        {statsStrip || promisesStrip ? (
-          <div className={cn(layoutSpacing.container, "mt-10 space-y-8 sm:mt-12")}>
-            {statsStrip}
-            {promisesStrip}
-          </div>
-        ) : null}
-      </SectionShell>
-    );
-  }
-
   return (
-    <SectionShell {...props} className="py-10 sm:py-12 lg:py-16">
+    /*
+      NO TOP PADDING, A FLOOR AT THE BOTTOM.
+
+      The band is meant to start where the header ends, which is the whole
+      point of it. `py-0` alone did not get there: the shell's own
+      `py-16 sm:py-20 lg:py-24` is three classes, and tailwind-merge only
+      resolves the one at the same breakpoint — so `py-0` cancelled the
+      base and left 80px at sm and 96px at lg, a white gap above the
+      picture at exactly the widths the layout is for.
+
+      The bottom is not zero, because the dots and the promises strip now
+      sit under the picture rather than over it, and at zero they would be
+      flush against whatever band comes next.
+    */
+    <SectionShell
+      {...props}
+      /*
+        ENOUGH TO CLEAR THE DOTS, and no more.
+
+        This was 32/40/56px, and the band below brings its own top padding —
+        so the two stacked into 186px of white between the banner and the
+        first row of the page, measured at every width from 390 to 1900. The
+        floor here exists because the dots and the promises strip sit under
+        the picture rather than over it; it is not the page's own rhythm,
+        and paying for that rhythm twice is what made the hero look adrift.
+      */
+      className="py-0 pb-4 sm:py-0 sm:pb-5 lg:py-0 lg:pb-6"
+      fullBleed
+    >
       {carousel}
-      {/* The margin rides the strip, not a wrapper: an empty div with 40px of
-          top margin is still 40px of nothing between the hero and the page. */}
-      {promisesStrip ? <div className="mt-10 sm:mt-12">{promisesStrip}</div> : null}
+      {statsStrip || promisesStrip ? (
+        <div className={cn(layoutSpacing.container, "mt-10 space-y-8 sm:mt-12")}>
+          {statsStrip}
+          {promisesStrip}
+        </div>
+      ) : null}
     </SectionShell>
   );
 }

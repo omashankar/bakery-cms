@@ -3,17 +3,11 @@
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Star,
-} from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
-import type { HeroCopySide, HeroLayout } from "@/types/homepage-builder";
+import type { HeroCopySide } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
 
 export interface HeroSlide {
@@ -48,206 +42,15 @@ const SWIPE_THRESHOLD = 48;
 const reveal =
   "animate-in fade-in-0 duration-700 [animation-fill-mode:both] motion-reduce:animate-none";
 
-/** Tints the final word of the headline in the brand tone for a subtle two-tone pop. */
-function accentLastWord(headline: string) {
-  const words = headline.trim().split(/\s+/);
-  if (words.length < 2) return headline;
-  const last = words[words.length - 1];
-  const rest = words.slice(0, -1).join(" ");
-  return (
-    <>
-      {rest} <span className="text-bakery-600">{last}</span>
-    </>
-  );
-}
-
-function HeroSlideView({
-  slide,
-  priority,
-  rating,
-  stats = [],
-}: {
-  slide: HeroSlide;
-  priority?: boolean;
-  /** The shop's approved-review figures, or null for no chip. */
-  rating?: { count: number; average: number } | null;
-  /** The shop's own stats strip. Empty renders no strip. */
-  stats?: { value?: string; label?: string }[];
-}) {
-  return (
-    <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-      {/* Copy — left on phones, centred on tablet (fills the single column), split-left on desktop */}
-      <div className="space-y-6 text-left sm:text-center lg:text-left">
-        {slide.badge ? (
-          <div className={cn(reveal, "slide-in-from-bottom-2 [animation-delay:80ms]")}>
-            <Badge
-              variant="accent"
-              className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]"
-            >
-              <Sparkles className="size-3.5" />
-              {slide.badge}
-            </Badge>
-          </div>
-        ) : null}
-
-        <div
-          className={cn(
-            reveal,
-            "space-y-4 slide-in-from-bottom-4 [animation-delay:180ms]"
-          )}
-        >
-          {/* Guarded like the badge above and the subtext below. A slide can
-              reach here with an empty headline — the section filter admits any
-              slide that has EITHER a headline or an image — and an unguarded
-              h1 then rendered as an empty heading block with full type styling
-              on it, which is worse than no heading. */}
-          {slide.headline ? (
-            <h1 className="font-heading text-[2.25rem] font-bold leading-[1.1] tracking-tight text-bakery-950 sm:text-[2.75rem] lg:text-5xl">
-              {accentLastWord(slide.headline)}
-            </h1>
-          ) : null}
-          {slide.subtext ? (
-            <p className="max-w-md text-base leading-relaxed text-muted-foreground sm:mx-auto sm:text-lg lg:mx-0">
-              {slide.subtext}
-            </p>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            reveal,
-            "flex flex-wrap gap-3 slide-in-from-bottom-4 [animation-delay:300ms] sm:justify-center lg:justify-start"
-          )}
-        >
-          <Button size="lg" className="rounded-xl" render={<Link href={slide.primaryHref} />}>
-            {slide.primaryLabel}
-            <ArrowRight className="size-4" />
-          </Button>
-          {slide.secondaryLabel && slide.secondaryHref ? (
-            <Button
-              size="lg"
-              variant="outline"
-              className="rounded-xl"
-              render={<Link href={slide.secondaryHref} />}
-            >
-              {slide.secondaryLabel}
-            </Button>
-          ) : null}
-        </div>
-
-        {/*
-          The stats strip, from the shop's own figures.
-
-          It was a constant — "1M+ Happy customers · 500+ Cake varieties · 60+
-          Years of joy" — the demo brand's numbers shown as whichever shop runs
-          this CMS, with no field to change them. Empty renders no strip: a
-          border-topped band of nothing is worse than no band.
-        */}
-        {stats.length > 0 ? (
-          <div
-            className={cn(
-              reveal,
-              "grid max-w-md gap-4 border-t border-border pt-6 slide-in-from-bottom-4 [animation-delay:400ms] sm:mx-auto lg:mx-0"
-            )}
-            style={{ gridTemplateColumns: `repeat(${Math.min(stats.length, 3)}, minmax(0, 1fr))` }}
-          >
-            {stats.map((stat, index) => (
-              <div key={`${stat.label}-${index}`}>
-                {stat.value ? (
-                  <p className="font-heading text-2xl font-bold text-bakery-800 sm:text-3xl">
-                    {stat.value}
-                  </p>
-                ) : null}
-                {stat.label ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Visual */}
-      <div
-        className={cn(
-          reveal,
-          "relative mx-auto w-full max-w-lg zoom-in-95 [animation-delay:120ms] lg:max-w-none"
-        )}
-      >
-        <div className="rounded-[2rem] border border-border bg-cream-100 p-2.5 shadow-md">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] bg-muted sm:aspect-[3/2] lg:aspect-[4/3]">
-            {slide.imageUrl ? (
-              <OptimizedImage
-                src={slide.imageUrl}
-                // The shop's own description first here too. The headline is
-                // real text in the column beside this frame, so repeating it
-                // is the second-best answer, not the first.
-                alt={slide.imageAlt?.trim() || slide.headline}
-                fill
-                // `priority` is deprecated as of Next 16 (see the Image docs'
-                // own version table). The eager/high pair says the same thing
-                // and is what the banner's <picture> branch already hand-rolls.
-                loading={priority ? "eager" : "lazy"}
-                fetchPriority={priority ? "high" : undefined}
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 45vw"
-              />
-            ) : null}
-          </div>
-        </div>
-
-        {/*
-          THE "100% FRESH" PILL IS GONE.
-
-          It sat pinned to the corner of every hero image, on every slide, for
-          every shop running this CMS, with no box anywhere to edit or remove
-          it — a claim about goods this CMS knows nothing about, made in the
-          shop's name. A shop that wants to say it can now write it in the
-          promises strip under the hero, in its own words.
-        */}
-
-        {/*
-          Rating chip — the shop's own approved reviews, or no chip.
-
-          This read "4.9 Rating · 2000+ reviews" as a constant on every slide.
-          Both numbers were invented: the real figures come from the approved
-          review aggregate, and on this shop they are 4.7 across 27. A shop with
-          nothing approved now shows nothing, rather than borrowing a score.
-        */}
-        {rating ? (
-          <div
-            className={cn(
-              reveal,
-              "absolute bottom-4 left-4 flex items-center gap-2.5 rounded-2xl border border-border bg-white/95 p-2.5 shadow-sm zoom-in-90 [animation-delay:660ms]"
-            )}
-          >
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
-              <Star className="size-4 fill-current" />
-            </span>
-            <div>
-              <p className="text-sm font-bold leading-none text-foreground">
-                {rating.average} Rating
-              </p>
-              <p className="mt-1 text-[11px] leading-none text-muted-foreground">
-                {rating.count} review{rating.count === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 /**
  * THE BANNER SLIDE — here the picture IS the slide.
  *
- * A second view rather than a handful of props on the one above, because
- * almost nothing survives between them: no framed card, no rounding, no
- * two-column grid, no max width, different crops at every breakpoint, and the
- * words sit ON the image instead of beside it. Six conditionals threaded
- * through HeroSlideView would leave neither layout readable, and the split
- * hero is what every existing shop is still showing.
+ * The only hero there is. A second arrangement used to sit above this one —
+ * a framed picture with the words in a column beside it — and the shop chose
+ * between them in the builder. It is gone: this CMS draws one hero, the
+ * words are part of the artwork the shop uploads, and there is no control to
+ * get any of that wrong.
  */
 function HeroBannerSlideView({
   slide,
@@ -556,64 +359,16 @@ function HeroBannerSlideView({
   );
 }
 
-/**
- * The slide to show, given an index that may have outlived the list.
- *
- * `index` is component state and survives a shrinking `slides` prop. Autoplay
- * walks it to the last slide within seconds while the admin's cursor is over the
- * editor panel, so deleting the last slide left `slides[index]` undefined and the
- * very next line — `slide.badge` inside HeroSlideView — threw. That happens in
- * the builder's live preview, which has no error boundary, so the crash unmounted
- * the builder and took every unsaved edit with it.
- *
- * Pulled out as a function because this repo has no React renderer in its test
- * setup: this is the part that can be pinned by a test.
- */
-export function activeSlideIndex(index: number, count: number): number {
-  if (count <= 0) return 0;
-  if (index < 0) return 0;
-  return index < count ? index : count - 1;
-}
-
 export function HeroCarousel({
   slides,
-  /**
-   * The shop's own approved-review figures, or null.
-   *
-   * The chip below said "4.9 Rating · 2000+ reviews" as a constant, on every
-   * slide, for every shop running this CMS — on this one the real numbers are
-   * 4.7 across 27 approved reviews. Null (a shop with none approved, or the
-   * builder preview, which has no server data) renders no chip at all rather
-   * than an invented score.
-   */
-  rating = null,
-  stats = [],
-  /**
-   * Which of the two views to draw, defaulted to the one every shop has.
-   *
-   * The default is here as well as at the renderer's read because this
-   * component is exported and mounted from more than one place; a caller that
-   * has never heard of the key gets the hero it was already drawing.
-   */
-  layout = "split",
-  /**
-   * Which half of a banner the words sit in.
-   *
-   * Only the banner reads it — the split layout is already a two-column grid
-   * whose sides are fixed by the grid itself.
-   */
+  /** Which half of the picture the words sit in. */
   copySide = "left",
 }: {
   slides: HeroSlide[];
-  rating?: { count: number; average: number } | null;
-  /** The shop's own stats strip, from the hero section's `stats` field. */
-  stats?: { value?: string; label?: string }[];
-  layout?: HeroLayout;
   copySide?: HeroCopySide;
 }) {
   const count = slides.length;
   const multi = count > 1;
-  const banner = layout === "banner";
 
   /**
    * A CLONE AT EACH END, so the loop is forward in both directions.
@@ -810,8 +565,6 @@ export function HeroCarousel({
 
   if (count === 0) return null;
 
-  const active = slides[activeSlideIndex(activeIndex, count)];
-
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
   };
@@ -872,30 +625,21 @@ export function HeroCarousel({
         THE ARROWS BELONG TO THE SLIDE, not to the whole carousel.
 
         They were positioned against the root, which also holds the row of
-        dots — so `top-1/2` centred them on the slide PLUS the dots, and the
-        split hero's arrows sat about 20px below the middle of the card they
-        point at. Their own `relative` box fixes it for both layouts, and is
-        what lets the dots move out from over the picture.
+        dots — so `top-1/2` centred them on the slide PLUS the dots, and they
+        sat about 20px below the middle of the picture they point at. Their
+        own `relative` box fixes it, and is what lets the dots move out from
+        over the picture.
       */}
       <div className="relative">
         {/*
-          TWO WAYS TO CHANGE SLIDE, because the two layouts are different
-          things and one answer was wrong for one of them.
-
-          THE BANNER SLIDES SIDEWAYS. Every slide is drawn, in a row as wide
-          as all of them together, and the row is moved one slide's width at a
+          THE ROW SLIDES SIDEWAYS. Every slide is drawn, in a row as wide as
+          all of them together, and the row is moved one slide's width at a
           time. Mounting one at a time cannot do this at any duration: React
           removes the old node in the same commit that adds the new one, so
           there is nothing on screen to move, and the band hard-cut between
           pictures.
-
-          THE SPLIT HERO STILL MOUNTS ONE AT A TIME. Its copy arrives on a
-          staggered entrance, and an animation only plays on mount; drawn all
-          at once, every slide would have played its entrance during the first
-          paint and none would ever play again.
         */}
-        {banner ? (
-          <div className="overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className="overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div
               className={cn(
                 "flex transition-transform duration-700 ease-out",
@@ -964,33 +708,13 @@ export function HeroCarousel({
                 </div>
               ))}
             </div>
-          </div>
-        ) : (
-          <div className="grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            <div key={activeIndex} className="col-start-1 row-start-1">
-              <HeroSlideView
-                slide={active}
-                priority={activeIndex === 0}
-                rating={rating}
-                stats={stats}
-              />
-            </div>
-          </div>
-        )}
+        </div>
 
         {multi ? (
           <>
             {/*
-              WHERE THE ARROWS SIT depends on whether there is a gutter beside
-              the slide to sit in.
-
-              The split hero is a card inside the content column, so its arrows
-              park in the page margin — and only from 2xl, the first width
-              where that margin is wide enough to hold them. The banner runs to
-              both edges of the window and has no margin at all, so its arrows
-              go over the picture, and they show at every width because a swipe
-              is otherwise the only way to reach slide two and nothing on the
-              screen says it is there.
+              THE ARROWS GO OVER THE PICTURE, because there is no margin for
+              them to park in: the band runs to both edges of the window.
 
               BUT NOT ON A PHONE AT ALL, since the band stopped being cropped.
               An uncropped banner is as tall as its artwork is at that width:
@@ -1010,9 +734,7 @@ export function HeroCarousel({
               aria-label="Previous slide"
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-                banner
-                  ? "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:left-5 sm:flex sm:-translate-y-1/2"
-                  : "top-1/2 left-0 hidden -translate-y-1/2 translate-x-[calc(-100%-1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+                "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:left-5 sm:flex sm:-translate-y-1/2"
               )}
             >
               <ChevronLeft className="size-5" />
@@ -1023,9 +745,7 @@ export function HeroCarousel({
               aria-label="Next slide"
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-                banner
-                  ? "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:right-5 sm:flex sm:-translate-y-1/2"
-                  : "top-1/2 right-0 hidden -translate-y-1/2 translate-x-[calc(100%+1.25rem)] border-border bg-white text-bakery-700 hover:bg-cream-100 hover:text-bakery-800 2xl:flex"
+                "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:right-5 sm:flex sm:-translate-y-1/2"
               )}
             >
               <ChevronRight className="size-5" />
@@ -1035,15 +755,14 @@ export function HeroCarousel({
       </div>
 
       {/*
-        THE DOTS SIT BELOW THE PICTURE, in both layouts.
+        THE DOTS SIT BELOW THE PICTURE.
 
-        The banner's were absolute over the foot of the image — which is where
-        they are least legible (a photograph, not a flat colour, so a white dot
-        lands on whatever happens to be there) and where they cover the part of
-        the picture a wide crop has least of. They are in the flow now, on the
-        page's own background, which is where the reference layout puts them
-        and where the split hero already had them; so the two layouts share one
-        row and one palette instead of keeping a light set nobody could see.
+        They were absolute over the foot of the image — which is where they
+        are least legible (a photograph, not a flat colour, so a white dot
+        lands on whatever happens to be there) and where they cover the part
+        of the picture a wide crop has least of. They are in the flow now, on
+        the page's own background, which is where the reference layout puts
+        them.
 
         AND CLOSE TO IT, because they belong to it. At 24 and 32px they read
         as their own band floating between the hero and whatever follows,

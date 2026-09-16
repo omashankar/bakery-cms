@@ -67,7 +67,19 @@ describe("the homepage renderers", () => {
     const renderer = read("features/cms-sections/homepage-section-renderer.tsx");
 
     expect(renderer).toMatch(/trust == null/);
-    expect(renderer).toMatch(/props\.trust\?\./);
+    /*
+      HANDED STRAIGHT ON, null and all.
+
+      This used to look for `props.trust?.`, which was the hero's rating chip
+      reading the figure defensively. That chip lived in the split hero, and
+      the split hero is gone — so the optional chain went with it and the test
+      failed on a component's deletion rather than on a lost guard.
+
+      What still has to hold is the same thing it always was: the value is
+      passed through as it comes, and the reader deals with absence. A `??`
+      here would be the invented number coming back.
+    */
+    expect(renderer).toMatch(/heroTrustBarFor\(props\.trust\)/);
   });
 });
 
