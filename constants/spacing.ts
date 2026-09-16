@@ -41,7 +41,24 @@ export const spacing = {
 
 /** Semantic layout spacing */
 export const layoutSpacing = {
+  /**
+   * A WHOLE PAGE of something — checkout, the cart, a product, a CMS page.
+   *
+   * Twenty-odd pages draw from this, and they are each one subject with air
+   * around it. The homepage is not: it is a stack of twenty bands, and at
+   * this rhythm it ran to 11,325px with 96px of nothing between every row.
+   * That band spacing is `bandY` below.
+   */
   sectionY: "py-16 sm:py-20 lg:py-24",
+  /**
+   * ONE BAND of a homepage that has twenty of them.
+   *
+   * Measured against the storefront this one is drawn from: its rows sit
+   * about 32px apart, and ours sat at 96px — so a page with the same number
+   * of rows was half as long again, and every row read as its own screen
+   * rather than as part of a catalogue.
+   */
+  bandY: "py-8 sm:py-10 lg:py-12",
   sectionX: "px-4 sm:px-6 lg:px-8",
   /**
    * THE CONTENT COLUMN — 1440, not `max-w-7xl`'s 1280.

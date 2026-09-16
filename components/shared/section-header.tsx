@@ -33,26 +33,35 @@ export function SectionHeader({
 
   if (!hasOverline && !hasTitle && !hasDescription) return null;
 
+  /*
+    SIZED FOR A ROW, not for the top of a page.
+
+    This was a 36/40px title with a 12px stack and 40px under it — about
+    150px of heading over every row of four products, on a page with twenty
+    rows. The storefront this is drawn from gives the same job about 70px: a
+    title a little larger than the product names under it, one quiet line
+    beneath, and the row starting straight after.
+  */
   return (
     <div
       className={cn(
-        "mb-10 space-y-3",
+        "mb-6 space-y-1.5",
         align === "center" && "mx-auto max-w-2xl text-center",
         className
       )}
     >
       {hasOverline && (
-        <p className="text-xs font-semibold uppercase tracking-widest text-bakery-700">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-bakery-700">
           {overline}
         </p>
       )}
       {hasTitle && (
-        <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        <h2 className="font-heading text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {title}
         </h2>
       )}
       {hasDescription && (
-        <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}

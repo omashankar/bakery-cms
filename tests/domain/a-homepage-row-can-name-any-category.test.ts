@@ -293,13 +293,22 @@ describe("every product row offers a way in to more of itself", () => {
      * that width, and a link nobody can reach is worse than one below the fold.
      */
     const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
-    const grid = renderer.indexOf('<StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2');
+    /*
+      FOUND BY WHAT THE ROW IS, not by what it is spaced at.
+
+      This looked the grid up by its exact class string — `mt-8 grid gap-6
+      sm:grid-cols-2` — so tightening the page's spacing broke a test about
+      where a LINK sits. The grid is the thing that draws the cards; its
+      margin is nobody's business here.
+    */
+    const grid = renderer.indexOf("<ProductCard key={cake.id}");
     const heading = renderer.lastIndexOf("props.showCta && ctaHref && ctaLabel", grid);
 
+    expect(grid, "the product grid is gone").toBeGreaterThan(-1);
     expect(heading, "the view-all is no longer on the heading row").toBeGreaterThan(-1);
     expect(heading).toBeLessThan(grid);
     // And the one that remains below the grid is phone-only.
-    expect(renderer).toContain('className="mt-8 text-center sm:hidden"');
+    expect(renderer).toMatch(/className="mt-\d+ text-center sm:hidden"/);
   });
 });
 

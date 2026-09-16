@@ -150,12 +150,24 @@
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Shadows — soft, border-first design */
-  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.03);
-  --shadow-sm: 0 1px 2px 0 rgb(45 45 45 / 0.04);
-  --shadow-md: 0 2px 4px 0 rgb(45 45 45 / 0.05);
-  --shadow-lg: 0 4px 8px 0 rgb(45 45 45 / 0.06);
-  --shadow-xl: 0 4px 12px 0 rgb(45 45 45 / 0.07);
+  /*
+    VISIBLE, and only just.
+
+    Every step of this scale was 3-7% of black over a 2-12px blur, which at
+    a card's size is nothing at all: the product cards read as flat rectangles
+    pasted on the page, and `hover:shadow-md` changed nothing a customer could
+    see. Two layers each now — a tight contact shadow and a wider soft one —
+    at roughly two thirds of the usual web strength, so a card lifts without
+    the page turning into a pile of floating boxes.
+
+    Warm grey rather than black: the whole surface is cream, and a neutral
+    black shadow on a warm ground reads as dirt.
+  */
+  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(45 45 45 / 0.06), 0 1px 2px -1px rgb(45 45 45 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(45 45 45 / 0.07), 0 2px 4px -2px rgb(45 45 45 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(45 45 45 / 0.08), 0 4px 6px -4px rgb(45 45 45 / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(45 45 45 / 0.09), 0 8px 10px -6px rgb(45 45 45 / 0.06);
   --shadow-card: 0 0 0 1px var(--border-soft);
 
   /* Semantic — Light mode (primary) */
@@ -232,11 +244,12 @@ html.dark {
   --sidebar-border: #5c4638;
   --sidebar-ring: #d4a373;
 
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.15);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-  --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.25);
-  --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.3);
-  --shadow-xl: 0 4px 12px 0 rgb(0 0 0 / 0.35);
+  /* The same two-layer scale, at the strength a dark ground needs. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.28), 0 1px 2px -1px rgb(0 0 0 / 0.24);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.32), 0 2px 4px -2px rgb(0 0 0 / 0.26);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.38), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.42), 0 8px 10px -6px rgb(0 0 0 / 0.32);
   --shadow-card: 0 0 0 1px rgb(250 248 244 / 10%);
 
   --border-soft: #5c4638;
@@ -274,11 +287,11 @@ html.dark {
   --surface-cream: #faf8f4;
   --beige: #f5f2ec;
   --text-primary: #2d2d2d;
-  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.03);
-  --shadow-sm: 0 1px 2px 0 rgb(45 45 45 / 0.04);
-  --shadow-md: 0 2px 4px 0 rgb(45 45 45 / 0.05);
-  --shadow-lg: 0 4px 8px 0 rgb(45 45 45 / 0.06);
-  --shadow-xl: 0 4px 12px 0 rgb(45 45 45 / 0.07);
+  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(45 45 45 / 0.06), 0 1px 2px -1px rgb(45 45 45 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(45 45 45 / 0.07), 0 2px 4px -2px rgb(45 45 45 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(45 45 45 / 0.08), 0 4px 6px -4px rgb(45 45 45 / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(45 45 45 / 0.09), 0 8px 10px -6px rgb(45 45 45 / 0.06);
   --shadow-card: 0 0 0 1px var(--border-soft);
 }
 
@@ -337,8 +350,18 @@ html.dark {
     font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
   }
 
+  /*
+    THE SHOP'S SURFACE COLOUR, which is what the name says.
+
+    This drew `--muted`, and `--muted` is the surface colour shaded 4%
+    darker — so the alternating band on the homepage came out a flat grey
+    against white, and a page of twenty bands read as horizontal stripes
+    rather than as one page. `--surface-cream` is set from the same shop
+    setting without the shading, which is the near-white tint the class was
+    named for and what the storefront this is drawn from uses.
+  */
   .surface-cream {
-    background-color: var(--muted);
+    background-color: var(--surface-cream);
     color: var(--foreground);
   }
 

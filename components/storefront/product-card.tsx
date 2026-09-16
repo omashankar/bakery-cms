@@ -109,7 +109,17 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
   return (
     <article
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-bakery-300 hover:shadow-md",
+        /*
+          A SHADOW AT REST, not only on hover.
+
+          The card carried a 1px border and nothing else until a pointer
+          touched it, so a grid of four read as four rectangles ruled onto
+          the background — and on a phone, where there is no hover at all,
+          that was the only state there was. The border goes almost away in
+          exchange: two ways of separating a card from its ground is one
+          too many, and the box drawn round each picture was the heavier.
+        */
+        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-bakery-200 hover:shadow-lg",
         className
       )}
     >

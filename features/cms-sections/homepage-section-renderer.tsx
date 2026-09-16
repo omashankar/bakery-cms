@@ -240,7 +240,7 @@ function SectionShell({
       className={cn(
         "scroll-mt-4 border-2 border-transparent transition-premium",
         bgClass,
-        layoutSpacing.sectionY,
+        layoutSpacing.bandY,
         /*
           A 2px TRANSPARENT BORDER IS STILL 2px OF PAGE.
 
@@ -769,20 +769,44 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
           description={contentString(c, "description")}
         />
       </ScrollReveal>
-      <StaggerReveal className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
+      {/*
+        SIX ACROSS, not three.
+
+        At three columns in a 1440px column each tile was 464px wide, so a
+        4:3 picture of a category was 348px tall — larger than the product
+        photographs further down the page, for a link whose whole content is
+        a name and a count. Six categories then took two rows and 1,018px.
+
+        The storefront this is drawn from draws the same thing at about
+        200px: a row of small pictures you scan, not six posters.
+      */}
+      <StaggerReveal className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
         {items.map((category) => (
           <Link
             key={category.id}
             href={routes.store.collection(category.slug)}
-            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
+            // Same resting lift as the product cards below; a row of tiles
+            // and a row of cards on one page should not be drawn two ways.
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg"
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
-                <OptimizedImage src={category.image} alt={category.name} fill className="object-cover" sizes="300px" />
+                <OptimizedImage
+                  src={category.image}
+                  alt={category.name}
+                  fill
+                  className="object-cover"
+                  /*
+                    The tile is a sixth of the column now, not a third — a
+                    300px hint asked every browser for roughly twice the
+                    picture it draws, six times over, above the fold.
+                  */
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
+                />
               ) : null}
             </div>
-            <div className="p-4">
-              <p className="font-medium">{category.name}</p>
+            <div className="p-3">
+              <p className="truncate text-sm font-medium">{category.name}</p>
               <p className="text-xs text-muted-foreground">{category.count} cakes</p>
             </div>
           </Link>
@@ -897,7 +921,7 @@ function ProductGridSection(
           </div>
         </div>
       </ScrollReveal>
-      <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         {cakes.map((cake) => (
           <ProductCard key={cake.id} cake={cake} className="h-full" />
         ))}
@@ -906,7 +930,7 @@ function ProductGridSection(
           centred heading at that width, and a link nobody can reach is
           worse than one below the fold. */}
       {props.showCta && ctaHref && ctaLabel ? (
-        <ScrollReveal className="mt-8 text-center sm:hidden">
+        <ScrollReveal className="mt-6 text-center sm:hidden">
           <Button variant="outline" render={<Link href={ctaHref} />}>
             {ctaLabel}
             <ArrowRight className="size-4" />
@@ -1124,7 +1148,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
           Nothing here yet.
         </p>
       ) : (
-        <StaggerReveal className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {cakes.map((cake) => (
             <ProductCard key={cake.id} cake={cake} className="h-full" />
           ))}
