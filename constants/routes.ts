@@ -33,8 +33,7 @@ export const routes = {
     collection: (slug: string) => `/store/collections/${slug}`,
     cake: (slug: string) => `/store/cakes/${slug}`,
     weddingCakes: "/store/wedding-cakes",
-    about: "/store/about",
-    gallery: "/store/gallery",
+
     contact: "/store/contact",
     faq: "/store/faq",
     search: "/store/search",

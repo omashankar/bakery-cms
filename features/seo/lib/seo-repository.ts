@@ -99,14 +99,7 @@ function seedRoutes(): SeoRouteEntry[] {
       "Elegant wedding cakes and custom celebration designs.",
       ["wedding cakes", "custom wedding cake"]
     ),
-    route(
-      "store-about",
-      routes.store.about,
-      "About",
-      "About Us",
-      "Our bakery story, heritage, and commitment to quality.",
-      ["bakery story"]
-    ),
+
     route(
       "store-contact",
       routes.store.contact,
@@ -123,14 +116,7 @@ function seedRoutes(): SeoRouteEntry[] {
       "Frequently asked questions about ordering, delivery, and our cakes.",
       ["bakery faq", "cake delivery"]
     ),
-    route(
-      "store-gallery",
-      routes.store.gallery,
-      "Gallery",
-      "Gallery",
-      "Explore our cake gallery, wedding designs, and celebration creations.",
-      ["cake gallery", "bakery photos"]
-    ),
+
     route(
       "store-privacy",
       routes.store.privacy,

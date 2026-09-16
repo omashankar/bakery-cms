@@ -1062,8 +1062,14 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // The pictures are the shop's own; the sentence over them named a
       // trade that may not be.
       description: "",
-      ctaLabel: "View Full Gallery",
-      ctaHref: routes.store.gallery,
+      /*
+        BLANK. This pointed at /store/gallery, and that page is gone — the
+        shop's photographs live in this band now. A shop that wants a
+        view-all here can give it somewhere to go; until then the button
+        does not render, which is what every other rail on this page does.
+      */
+      ctaLabel: "",
+      ctaHref: "",
       // The homepage strip is a taste of the gallery, not the gallery. It used
       // to be a hardcoded `slice(0, 8)`; the photos are the shop's own list now
       // and the same list feeds /store/gallery, so without a cap here a shop

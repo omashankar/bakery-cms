@@ -26,13 +26,12 @@ const stripComments = (source: string) =>
 const SURFACES = [
   "features/cms-sections/homepage-section-renderer.tsx",
   "features/cms-sections/wedding-section-renderer.tsx",
-  "apps/website/landing/components/landing-gallery.tsx",
-  // The dedicated gallery page and the route that feeds it. Both were missing
-  // here, and `GalleryPage` declares `photos` as an optional prop defaulting to
-  // `[]` — so dropping the wiring at the call site type-checks and degrades to
-  // "Photographs of our work are on their way." with nothing red anywhere.
-  "app/(storefront)/store/gallery/page.tsx",
-  "apps/website/pages/gallery-page.tsx",
+
+  /*
+    The dedicated gallery page and its route used to be on this list. The
+    shop asked for that page to go, so the surfaces that can show somebody
+    else's photographs as this shop's own are the two renderers above.
+  */
 ];
 
 /** One renderer function's own body, so an assertion cannot match a sibling's. */
@@ -82,25 +81,22 @@ describe("every surface that shows photographs", () => {
     }
   });
 
-  it("does not let the homepage strip govern the standalone gallery page", () => {
+  it("reads a section's content without filtering it by visibility", () => {
     /**
      * Hiding a section means "not on the homepage", not "throw the content
-     * away". /store/gallery is a nav item of its own that sources its photos
-     * from the Gallery section because there is no second place to upload them
-     * — read through the visibility-filtered accessor, an admin who hid the
-     * homepage strip emptied a different page while the builder still showed
-     * every photo.
+     * away". A second surface reading the same section through the
+     * visibility-filtered accessor would go empty the moment an admin hid
+     * the homepage band, while the builder still showed every photo.
+     *
+     * The standalone gallery page was that second surface and this test was
+     * written for it. That page is gone, but the accessor is still the one
+     * anything else would reach for, and it is still the half that can be
+     * got wrong silently.
      */
-    const route = stripComments(read("app/(storefront)/store/gallery/page.tsx"));
-
-    expect(route, "the standalone page reads the visibility-filtered list").not.toContain(
-      "getPublishedHomepageSections",
-    );
-    expect(route).toContain('getPublishedSectionContent("gallery")');
-    expect(route, "the photos never reach the page").toMatch(/photos=\{photos\}/);
-
     const accessor = stripComments(read("features/cms-sections/data/homepage-sections.server.ts"));
     const body = accessor.slice(accessor.indexOf("export async function getPublishedSectionContent"));
+
+    expect(body, "the accessor is gone").not.toBe("");
     expect(body.slice(0, body.indexOf("\n}")), "the unfiltered accessor filters after all").not.toContain(
       "getVisibleSections",
     );

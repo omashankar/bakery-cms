@@ -19,7 +19,7 @@ export const defaultFooterSettings: FooterSettings = {
         { id: "ql-1", label: "Home", href: routes.store.home },
         { id: "ql-2", label: "Collections", href: routes.store.collections },
         { id: "ql-3", label: "Wedding Cakes", href: routes.store.weddingCakes },
-        { id: "ql-4", label: "Gallery", href: routes.store.gallery },
+
         { id: "ql-5", label: "FAQ", href: routes.store.faq },
       ],
     },
@@ -27,7 +27,7 @@ export const defaultFooterSettings: FooterSettings = {
       id: "col-company",
       title: "Company",
       links: [
-        { id: "co-1", label: "About Us", href: routes.store.about },
+
         { id: "co-2", label: "Contact", href: routes.store.contact },
         { id: "co-3", label: "Privacy Policy", href: routes.store.privacy },
         { id: "co-4", label: "Terms of Service", href: routes.store.terms },

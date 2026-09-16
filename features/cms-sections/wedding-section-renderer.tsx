@@ -205,14 +205,9 @@ function WeddingHeroSection(props: WeddingSectionRendererProps) {
               {contentString(c, "ctaLabel", "Request a Quote")}
               <ArrowRight className="size-4" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="rounded-xl"
-              render={<Link href={routes.store.gallery} />}
-            >
-              View Gallery
-            </Button>
+            {/* The second button here was a hardcoded link to the gallery
+                page, which is gone. The quote button above is the one this
+                band is for. */}
           </div>
           {highlights.length > 0 ? (
           <ul className="grid max-w-md gap-3 border-t border-border pt-6 sm:grid-cols-3">
@@ -527,12 +522,22 @@ function WeddingGallerySection(props: WeddingSectionRendererProps) {
           );
         })}
       </StaggerReveal>
-      <ScrollReveal className="mt-8 text-center">
-        <Button variant="outline" render={<Link href={contentString(c, "ctaHref", routes.store.gallery)} />}>
-          {contentString(c, "ctaLabel", "View Gallery")}
-          <ArrowRight className="size-4" />
-        </Button>
-      </ScrollReveal>
+      {/*
+        ONLY WHEN THERE IS SOMEWHERE TO GO.
+
+        This fell back to /store/gallery, and that page is gone — so without
+        the guard the band draws a button to a 404. A shop that wants a
+        view-all here gives it a link; until then there is no button, which
+        is what every other rail on the page already does.
+      */}
+      {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+        <ScrollReveal className="mt-8 text-center">
+          <Button variant="outline" render={<Link href={contentString(c, "ctaHref")} />}>
+            {contentString(c, "ctaLabel")}
+            <ArrowRight className="size-4" />
+          </Button>
+        </ScrollReveal>
+      ) : null}
     </SectionShell>
   );
 }
@@ -696,11 +701,8 @@ function WeddingCtaSection(props: WeddingSectionRendererProps) {
             {contentString(c, "ctaLabel", "Contact Us")}
             <ArrowRight className="size-4" />
           </Button>
-          {contentBoolean(c, "showGalleryLink", true) ? (
-            <Button variant="outline" render={<Link href={routes.store.gallery} />}>
-              View Gallery
-            </Button>
-          ) : null}
+          {/* A second button linking to the gallery page stood here. That
+              page is gone, and so is the switch that showed it. */}
         </div>
       </div>
     </SectionShell>

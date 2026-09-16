@@ -55,9 +55,12 @@ function shopStore(): SeoStore {
 
 describe("the metadata builder", () => {
   it("uses the store it is handed, not a module variable", () => {
-    const metadata = buildRouteMetadataFrom(shopStore(), "store-about");
-    expect(metadata.alternates?.canonical).toBe("https://cakes.test-shop.invalid/store/about");
-    expect(metadata.openGraph?.url).toBe("https://cakes.test-shop.invalid/store/about");
+    // `store-about` stood here until that page was removed from the shop.
+    // Any route in the table proves the same thing: the base URL comes from
+    // the store passed in, not from a module-level read.
+    const metadata = buildRouteMetadataFrom(shopStore(), "store-contact");
+    expect(metadata.alternates?.canonical).toBe("https://cakes.test-shop.invalid/store/contact");
+    expect(metadata.openGraph?.url).toBe("https://cakes.test-shop.invalid/store/contact");
   });
 
   it("is what the sitemap builder uses too", () => {
@@ -134,11 +137,9 @@ describe("robots, sitemap and every storefront page", () => {
   it("build metadata per request, not once at module load", () => {
     const pages = [
       "app/(storefront)/store/page.tsx",
-      "app/(storefront)/store/about/page.tsx",
       "app/(storefront)/store/collections/page.tsx",
       "app/(storefront)/store/contact/page.tsx",
       "app/(storefront)/store/faq/page.tsx",
-      "app/(storefront)/store/gallery/page.tsx",
       "app/(storefront)/store/privacy/page.tsx",
       "app/(storefront)/store/search/page.tsx",
       "app/(storefront)/store/terms/page.tsx",
@@ -308,7 +309,7 @@ describe("what the server accepts", () => {
     // backup missing them threw on that screen and produced Invalid Dates.
     const parsed = siteLayoutSchemas.seo.parse({
       global: { siteName: "A Bakery" },
-      routes: [{ id: "r1", routeKey: "store-about", path: "/store/about" }],
+      routes: [{ id: "r1", routeKey: "store-contact", path: "/store/contact" }],
     });
 
     expect(parsed.routes[0].label).toBe("");

@@ -1644,12 +1644,22 @@ function GallerySection(props: HomepageSectionRendererProps) {
           );
         })}
       </StaggerReveal>
-      <ScrollReveal className="mt-8 text-center">
-        <Button variant="outline" render={<Link href={contentString(c, "ctaHref", routes.store.gallery)} />}>
-          {contentString(c, "ctaLabel", "View Gallery")}
-          <ArrowRight className="size-4" />
-        </Button>
-      </ScrollReveal>
+      {/*
+        ONLY WHEN THERE IS SOMEWHERE TO GO.
+
+        This fell back to /store/gallery, and that page is gone — so without
+        the guard the band draws a button to a 404. A shop that wants a
+        view-all here gives it a link; until then there is no button, which
+        is what every other rail on the page already does.
+      */}
+      {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+        <ScrollReveal className="mt-8 text-center">
+          <Button variant="outline" render={<Link href={contentString(c, "ctaHref")} />}>
+            {contentString(c, "ctaLabel")}
+            <ArrowRight className="size-4" />
+          </Button>
+        </ScrollReveal>
+      ) : null}
     </SectionShell>
   );
 }

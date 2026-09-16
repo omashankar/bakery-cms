@@ -143,8 +143,10 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       title: "Wedding Gallery",
       description: "A glimpse of celebrations we have been honoured to sweeten.",
       maxCount: 8,
-      ctaLabel: "View Full Gallery",
-      ctaHref: routes.store.gallery,
+      // Blank for the same reason as the homepage gallery band's: the page
+      // it pointed at is gone.
+      ctaLabel: "",
+      ctaHref: "",
     },
     fields: [
       {
@@ -226,14 +228,14 @@ export const WEDDING_SECTION_REGISTRY: WeddingSectionRegistryEntry[] = [
       description: "Book a consultation with our wedding specialists today.",
       ctaLabel: "Contact Us",
       ctaHref: routes.store.contact,
-      showGalleryLink: true,
+
     },
     fields: [
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
-      { key: "showGalleryLink", label: "Show gallery link", type: "boolean" },
+
     ],
   },
 ];

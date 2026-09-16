@@ -30,8 +30,7 @@ export const storefrontNav: NavItem[] = [
   { label: "Home", href: routes.store.home },
   { label: "Collections", href: routes.store.collections },
   { label: "Wedding Cakes", href: routes.store.weddingCakes },
-  { label: "About", href: routes.store.about },
-  { label: "Gallery", href: routes.store.gallery },
+
   { label: "Contact", href: routes.store.contact },
   { label: "FAQ", href: routes.store.faq },
 ];
