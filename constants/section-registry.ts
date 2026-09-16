@@ -248,6 +248,26 @@ export function parseHeroSlides(
  * Deciding what is worth SHOWING belongs to the renderer, which is what
  * `renderableRows` below is for.
  */
+/**
+ * A TICKBOX IN A LIST ROW, read back.
+ *
+ * `parseListField` below coerces every value in a row to a string, because
+ * a row is admin-typed and the rest of the fields genuinely are strings. So
+ * a tickbox that was OFF comes back as the string "false" — which is five
+ * characters long and therefore truthy. A card explicitly marked NOT wide
+ * was rendering wide, and the only way to make it narrow again was to clear
+ * the field rather than untick it.
+ *
+ * Anything a person would read as off is off: an empty value, "false", "0",
+ * "no", "off". Everything else is on, so a row saved before this existed
+ * with a hand-typed "true" or "yes" still means what it said.
+ */
+export function rowFlag(value: string | undefined): boolean {
+  const text = (value ?? "").trim().toLowerCase();
+  if (!text) return false;
+  return !(["false", "0", "no", "off"].includes(text));
+}
+
 export function parseListField(
   content: Record<string, string | number | boolean>,
   key: string,

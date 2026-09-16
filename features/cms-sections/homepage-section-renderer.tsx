@@ -49,6 +49,7 @@ import {
   parseListField,
   photoRows,
   renderableRows,
+  rowFlag,
 } from "@/constants/section-registry";
 import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 import {
@@ -1209,9 +1210,14 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
 
           const className = cn(
             "overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:border-bakery-300 hover:shadow-md",
-            // A card with no link is still a card. The reference's SALE
-            // banner is artwork, not a destination.
-            card.wide ? "sm:col-span-2" : "",
+            // A card with no link is still a card: a banner can be artwork
+            // rather than a destination.
+            /*
+              `rowFlag`, not the value itself. A row's values are all strings
+              by the time they reach here, so an UNTICKED box arrived as the
+              string "false" and spanned two columns.
+            */
+            rowFlag(card.wide) ? "sm:col-span-2" : "",
           );
 
           return card.href ? (

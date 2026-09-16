@@ -8,7 +8,7 @@ import type {
   SectionBackground,
   SectionFieldDef,
 } from "@/types/homepage-builder";
-import { parseHeroSlides, parseListField } from "@/constants/section-registry";
+import { parseHeroSlides, parseListField, rowFlag } from "@/constants/section-registry";
 import { routes } from "@/constants/routes";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,29 @@ function ListField({
                   value={row[column.key] ?? ""}
                   onChange={(next) => updateRow(index, column.key, next)}
                 />
+              ) : column.type === "boolean" ? (
+                /*
+                  A TICKBOX, not a text box.
+
+                  Every other column here is a string, so a boolean column
+                  fell through to the Input below and an admin had to type
+                  the word `true` to widen a card — and typing `false` to
+                  narrow it did nothing, because a non-empty string is
+                  truthy. `rowFlag` is the matching reader.
+                */
+                <div
+                  key={column.key}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                >
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`}>{column.label}</Label>
+                  <Switch
+                    id={`${field.key}-${id}-${column.key}`}
+                    checked={rowFlag(row[column.key])}
+                    onCheckedChange={(checked) =>
+                      updateRow(index, column.key, checked ? "true" : "false")
+                    }
+                  />
+                </div>
               ) : column.type === "select" ? (
                 <select
                   key={column.key}
