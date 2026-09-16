@@ -924,7 +924,7 @@ function ProductGridSection(
       </ScrollReveal>
       <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         {cakes.map((cake) => (
-          <ProductCard key={cake.id} cake={cake} className="h-full" />
+          <ProductCard key={cake.id} cake={cake} className="h-full" showAddToCart={false} />
         ))}
       </StaggerReveal>
       {/* The phone keeps it under the grid: there is no room beside a
@@ -1151,7 +1151,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
       ) : (
         <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {cakes.map((cake) => (
-            <ProductCard key={cake.id} cake={cake} className="h-full" />
+            <ProductCard key={cake.id} cake={cake} className="h-full" showAddToCart={false} />
           ))}
         </StaggerReveal>
       )}

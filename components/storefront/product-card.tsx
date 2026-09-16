@@ -23,9 +23,28 @@ interface ProductCardProps {
   cake: LandingProduct;
   variant?: "default" | "tall";
   className?: string;
+  /**
+   * The buy button, which not every row wants.
+   *
+   * DEFAULTS TO SHOWN, so every surface that had it keeps it — the
+   * wishlist, where adding to the cart is the entire point of the page, and
+   * the collection and search grids, where a customer is already choosing.
+   *
+   * The homepage rows turn it off. A solid full-width button under every
+   * one of sixteen cards is the heaviest thing on that page, and the row it
+   * sits in is for browsing: the card itself is the link, and the product
+   * page is where the choices (weight, flavour, message) are made anyway.
+   * That is also how the layout this storefront is drawn from does it.
+   */
+  showAddToCart?: boolean;
 }
 
-export function ProductCard({ cake, variant = "default", className }: ProductCardProps) {
+export function ProductCard({
+  cake,
+  variant = "default",
+  className,
+  showAddToCart = true,
+}: ProductCardProps) {
   const labels = useBusinessLabels();
   const [wishlisted, setWishlisted] = useState(false);
   /**
@@ -178,18 +197,28 @@ export function ProductCard({ cake, variant = "default", className }: ProductCar
           </h3>
         </div>
 
-        <div className="mt-auto space-y-3">
+        <div className={cn("mt-auto", showAddToCart && "space-y-3")}>
           <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
-          <Button
-            type="button"
-            variant="bakery"
-            className="h-10 w-full"
-            disabled={outOfStock}
-            onClick={handleAddToCart}
-          >
-            <ShoppingBag className="size-4" />
-            {outOfStock ? "Out of stock" : "Add to Cart"}
-          </Button>
+          {showAddToCart ? (
+            <Button
+              type="button"
+              variant="bakery"
+              className="h-10 w-full"
+              disabled={outOfStock}
+              onClick={handleAddToCart}
+            >
+              <ShoppingBag className="size-4" />
+              {outOfStock ? "Out of stock" : "Add to Cart"}
+            </Button>
+          ) : outOfStock ? (
+            /*
+              STILL SAYS SO. Without the button there is nothing else on the
+              card carrying this, and a customer who taps through to a
+              product page only to find it unavailable has been sent there
+              by us.
+            */
+            <p className="text-xs font-medium text-muted-foreground">Out of stock</p>
+          ) : null}
         </div>
       </div>
     </article>
