@@ -24,7 +24,7 @@ export const defaultBanners: Banner[] = [
     id: "banner-hero-2",
     title: "Wedding Season Special",
     image: specialOffers[1]?.image ?? unsplash(demoPhotoIds.pastries, 1200, 630),
-    link: routes.store.weddingCakes,
+    link: routes.store.collections,
     isActive: true,
     position: "hero",
     priority: 10,

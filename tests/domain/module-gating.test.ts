@@ -13,30 +13,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildSitemapEntries } from "@/features/seo/lib/sitemap-generator";
 import { buildRouteMetadata } from "@/features/seo/lib/seo-metadata";
 import { seedGlobal } from "@/features/seo/lib/seo-repository";
-import { routes } from "@/constants/routes";
-
-describe("the sitemap and a disabled module", () => {
-  it("lists the wedding page while the module is on", () => {
-    const paths = buildSitemapEntries({ weddingEnabled: true }).map((entry) => entry.url);
-    expect(paths.some((url) => url.endsWith(routes.store.weddingCakes))).toBe(true);
-  });
-
-  it("drops it once the module is off, because the route now 404s", () => {
-    const paths = buildSitemapEntries({ weddingEnabled: false }).map((entry) => entry.url);
-    expect(paths.some((url) => url.endsWith(routes.store.weddingCakes))).toBe(false);
-
-    // Only that one route goes; the rest of the sitemap is untouched.
-    expect(paths.length).toBe(buildSitemapEntries({ weddingEnabled: true }).length - 1);
-  });
-
-  it("defaults to listing it, so a failed settings read never silently deindexes", () => {
-    const paths = buildSitemapEntries().map((entry) => entry.url);
-    expect(paths.some((url) => url.endsWith(routes.store.weddingCakes))).toBe(true);
-  });
-});
 
 describe("route titles", () => {
   it("does not let the root template append the site name a second time", () => {

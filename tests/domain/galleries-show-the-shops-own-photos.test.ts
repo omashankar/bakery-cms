@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
-import { WEDDING_SECTION_REGISTRY } from "@/constants/wedding-section-registry";
 
 /**
  * A bakery's photographs are the thing customers choose it by.
@@ -25,7 +24,7 @@ const stripComments = (source: string) =>
 
 const SURFACES = [
   "features/cms-sections/homepage-section-renderer.tsx",
-  "features/cms-sections/wedding-section-renderer.tsx",
+
 
   /*
     The dedicated gallery page and its route used to be on this list. The
@@ -63,12 +62,12 @@ describe("every surface that shows photographs", () => {
      * for exactly that, still green.
      */
     const homepage = stripComments(read(SURFACES[0]));
-    const wedding = stripComments(read(SURFACES[1]));
+
 
     const sections = [
       { body: bodyOf(homepage, "GallerySection"), key: "images", where: "the homepage gallery" },
       { body: bodyOf(homepage, "InstagramSection"), key: "posts", where: "the Instagram strip" },
-      { body: bodyOf(wedding, "WeddingGallerySection"), key: "images", where: "the wedding gallery" },
+
     ];
 
     for (const { body, key, where } of sections) {
@@ -112,9 +111,10 @@ describe("the builder", () => {
     );
 
   it("offers a photo picker on every gallery section", () => {
-    const all = [...listFieldsOf(HOMEPAGE_SECTION_REGISTRY), ...listFieldsOf(WEDDING_SECTION_REGISTRY)];
+    const all = listFieldsOf(HOMEPAGE_SECTION_REGISTRY);
 
-    for (const section of ["gallery", "instagram", "wedding-gallery"]) {
+    // `wedding-gallery` stood here until the wedding builder was removed.
+    for (const section of ["gallery", "instagram"]) {
       const match = all.find((entry) => entry.section === section);
       expect(match, `${section} has no list field to upload photos into`).toBeTruthy();
       expect(

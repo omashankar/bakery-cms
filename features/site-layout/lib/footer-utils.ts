@@ -18,7 +18,7 @@ export const defaultFooterSettings: FooterSettings = {
       links: [
         { id: "ql-1", label: "Home", href: routes.store.home },
         { id: "ql-2", label: "Collections", href: routes.store.collections },
-        { id: "ql-3", label: "Wedding Cakes", href: routes.store.weddingCakes },
+
 
         { id: "ql-5", label: "FAQ", href: routes.store.faq },
       ],

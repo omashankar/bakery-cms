@@ -59,7 +59,7 @@ describe("a write that carries a client-held array", () => {
 describe("both builders", () => {
   const stores = [
     "features/cms-sections/data/homepage-sections.server.ts",
-    "features/cms-sections/data/wedding-sections.server.ts",
+
   ];
 
   it("puts the guard on every write that replaces the whole layout", () => {
@@ -78,7 +78,7 @@ describe("both builders", () => {
 describe("the builder screens", () => {
   const pages = [
     "apps/admin/builders/homepage/homepage-builder-page.tsx",
-    "apps/admin/builders/wedding/wedding-builder-page.tsx",
+
   ];
 
   it("track whether the layout was actually read, not merely that mounting finished", () => {

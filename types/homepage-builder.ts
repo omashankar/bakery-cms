@@ -22,7 +22,7 @@ export type HomepageSectionType =
   | "trending"
   | "best-sellers"
   | "offers"
-  | "wedding"
+
   /**
    * A product row named after one of the shop's OWN categories.
    *

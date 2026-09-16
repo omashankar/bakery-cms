@@ -33,23 +33,7 @@ const RENDERERS = [
     file: "features/cms-sections/homepage-section-renderer.tsx",
     sections: ["TestimonialsSection", "WhyUsSection", "GallerySection", "OffersSection"],
   },
-  {
-    file: "features/cms-sections/wedding-section-renderer.tsx",
-    sections: [
-      "WeddingTestimonialsSection",
-      // NOT currently reachable: `wedding-faq` has a renderer case but no entry
-      // in `constants/wedding-section-registry.ts`, so the builder cannot add
-      // it, and no stored wedding page contains one. Kept in this list on
-      // purpose — if it is ever wired up, the guard is already there and pinned,
-      // rather than being remembered at the point someone enables it. It is not
-      // evidence that anything live is protected.
-      "WeddingFaqSection",
-      "WeddingWhyUsSection",
-      "WeddingOffersSection",
-      "WeddingCollectionsSection",
-      "WeddingGallerySection",
-    ],
-  },
+
 ];
 
 /** One section's function body, bounded by the next declaration. */
@@ -94,10 +78,7 @@ describe("a section with nothing in it", () => {
  * A section may still override its PADDING. It may not override its background.
  */
 describe("a section's Background setting", () => {
-  for (const file of [
-    "features/cms-sections/homepage-section-renderer.tsx",
-    "features/cms-sections/wedding-section-renderer.tsx",
-  ]) {
+  for (const file of ["features/cms-sections/homepage-section-renderer.tsx"]) {
     it(`${file.split("/").pop()} lets the setting decide, not the section`, () => {
       const src = code(file);
 
@@ -113,17 +94,14 @@ describe("a section's Background setting", () => {
     });
   }
 
-  it("computes the background from the stored setting in both renderers", () => {
+  it("computes the background from the stored setting", () => {
     /*
       Matched as a SHAPE, not as one line of source. This pinned the exact
       string including its whitespace, so wrapping the expression across two
       lines — which is what adding a third background did — failed a test
       about where the value comes from.
     */
-    for (const file of [
-      "features/cms-sections/homepage-section-renderer.tsx",
-      "features/cms-sections/wedding-section-renderer.tsx",
-    ]) {
+    for (const file of ["features/cms-sections/homepage-section-renderer.tsx"]) {
       expect(code(file), file).toMatch(
         /const bgClass =\s*section\.background === "cream" \? "surface-cream" : "bg-white"/,
       );

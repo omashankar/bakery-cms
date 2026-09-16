@@ -9,7 +9,6 @@ import {
   photoRows,
   renderableRows,
 } from "@/constants/section-registry";
-import { WEDDING_SECTION_REGISTRY } from "@/constants/wedding-section-registry";
 
 /**
  * A list field has to survive the round trip its own editor makes.
@@ -143,7 +142,7 @@ describe("every list field", () => {
 
   const BUILDERS = [
     { registry: HOMEPAGE_SECTION_REGISTRY, path: "features/cms-sections/homepage-section-renderer.tsx" },
-    { registry: WEDDING_SECTION_REGISTRY, path: "features/cms-sections/wedding-section-renderer.tsx" },
+
   ];
 
   /**

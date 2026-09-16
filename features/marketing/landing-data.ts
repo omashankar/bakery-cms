@@ -86,7 +86,7 @@ export const ctaLinks = {
   store: routes.store.home,
   getStarted: routes.auth.login,
   homepageBuilder: routes.admin.builders.homepage,
-  weddingBuilder: routes.admin.builders.wedding,
+
   reports: routes.admin.reports,
 };
 

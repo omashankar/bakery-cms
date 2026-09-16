@@ -142,11 +142,6 @@ export const docChapters: DocChapter[] = [
         where: { label: "Homepage Builder", href: routes.admin.builders.homepage },
       },
       {
-        title: "Wedding pages",
-        body: "A separate builder for the wedding collection, with its own sections and its own enquiry form. Switch the whole module off if you do not do weddings.",
-        where: { label: "Wedding Builder", href: routes.admin.builders.wedding },
-      },
-      {
         title: "Header, footer and colours",
         body: "Your navigation menu, the footer columns, the call-to-action button, and the shop's colour palette. Changes show on the storefront immediately.",
         where: { label: "Appearance", href: routes.admin.appearance },

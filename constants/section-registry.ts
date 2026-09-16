@@ -847,30 +847,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
-    type: "wedding",
-    label: "Wedding Collection",
-    icon: "Heart",
-    defaultBackground: "cream",
-    defaultContent: {
-      overline: "Forever Starts Here",
-      title: "Wedding Collection",
-      description:
-        "Bespoke wedding cakes designed to make your special day unforgettable.",
-      ctaLabel: "View Wedding Cakes",
-      ctaHref: routes.store.weddingCakes,
-      imageUrl:
-        "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=900&h=900&fit=crop&q=80",
-    },
-    fields: [
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
-      { key: "imageUrl", label: "Image URL", type: "url", isImage: true },
-    ],
-  },
-  {
     /*
       THE OPEN ROW. Every other product row in this registry is named after
       a bakery category — Photo Cakes, Eggless Cakes, Seasonal — so a plant

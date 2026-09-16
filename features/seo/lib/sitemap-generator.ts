@@ -26,9 +26,7 @@ export function buildSitemapEntriesFrom(
 
   return store.routes
     .filter((entry) => !entry.noIndex && global.allowIndexing)
-    // A route the Wedding module has closed now returns 404. Leaving it in the
-    // sitemap asks search engines to crawl a page the shop deliberately removed.
-    .filter((entry) => weddingEnabled || entry.path !== routes.store.weddingCakes)
+
     .map((entry) => ({
       url: `${base}${entry.path}`,
       lastModified: new Date(entry.updatedAt),

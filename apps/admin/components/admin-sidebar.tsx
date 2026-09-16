@@ -412,9 +412,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   const [inquiryBadge, setInquiryBadge] = useState(0);
   const [inventoryBadge, setInventoryBadge] = useState(0);
   const [notificationBadge, setNotificationBadge] = useState(0);
-  // Wedding Builder is bakery-only: hidden for other business types or when the
-  // module is off. Hidden from the sidebar only — the route/page still exist.
-  const [hideWedding, setHideWedding] = useState(false);
+
   /**
    * Whose panel this is.
    *
@@ -450,9 +448,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     }
 
     function refreshModules() {
-      // The switch is the whole gate now — it also required the business type
-      // to be "bakery", which no longer exists.
-      setHideWedding(!getModuleSettings().weddingBuilder);
+      // Nothing in the sidebar is module-gated since the Wedding Builder went.
     }
 
     function refreshBrand() {
@@ -487,12 +483,11 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     return adminNavSections.map((section) => ({
       ...section,
       items: section.items
-        .filter((item) => !hideWedding || item.href !== routes.admin.builders.wedding)
         // The route and component stay named "cakes"; only the visible label
         // changes. Shared with the command palette, which used to disagree.
         .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
     }));
-  }, [hideWedding, labels]);
+  }, [labels]);
 
   useEffect(() => {
     setOpenMenu(findOpenMenuHref(pathname));

@@ -83,7 +83,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                       On the <li>, not the <a>: hiding the anchor alone would
                       leave its bullet and spacing behind.
                     */
-                    data-gate-wedding={link.href === routes.store.weddingCakes ? "" : undefined}
+
                   >
                     <Link
                       href={link.href}

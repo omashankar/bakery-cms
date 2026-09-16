@@ -32,7 +32,7 @@ export const routes = {
     collections: "/store/collections",
     collection: (slug: string) => `/store/collections/${slug}`,
     cake: (slug: string) => `/store/cakes/${slug}`,
-    weddingCakes: "/store/wedding-cakes",
+
 
     contact: "/store/contact",
     faq: "/store/faq",
@@ -89,7 +89,7 @@ export const routes = {
 
     builders: {
       homepage: "/admin/builders/homepage",
-      wedding: "/admin/builders/wedding",
+
     },
 
     pages: {

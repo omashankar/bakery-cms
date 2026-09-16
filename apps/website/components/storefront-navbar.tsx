@@ -581,7 +581,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             <div
               key={item.id}
               className="flex items-center gap-1"
-              data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
             >
               {divider}
               <Link
@@ -688,10 +687,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               return (
                 /* The gate sits on the wrapper here too, so a row hidden for
                    a shop with no wedding module takes its rule with it. */
-                <div
-                  key={item.id}
-                  data-gate-wedding={item.href === routes.store.weddingCakes ? "" : undefined}
-                >
+                <div key={item.id}>
                   {item.dividerBefore && index > 0 ? (
                     <div className="my-2 h-px bg-border" aria-hidden="true" />
                   ) : null}

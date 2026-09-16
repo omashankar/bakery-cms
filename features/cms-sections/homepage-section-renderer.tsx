@@ -966,114 +966,6 @@ const weddingPerks = [
   { icon: Heart, label: "Tasting before you book" },
 ] as const;
 
-function WeddingSection(props: HomepageSectionRendererProps) {
-  // Wedding is bakery-only. Default to shown so SSR / bakery render unchanged,
-  // then hide after mount for other business types / when the module is off.
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
-  useEffect(() => {
-    const sync = () => setWeddingEnabled(isWeddingEnabled());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
-
-  const c = props.section.content;
-  const showcase = weddingCakes[0];
-  /**
-   * Never set, versus cleared on purpose — two different things.
-   *
-   * The key being absent means the section was created before it had an image
-   * field, so the showcase photo stands in. The key being present and empty is
-   * the "Clear image" button in the media field, and it has to mean cleared:
-   * falling back there would put a stock Unsplash cake back on the live homepage
-   * the moment an admin removed the demo photo, which is the opposite of what
-   * they asked for.
-   */
-  const storedImage = c.imageUrl;
-  const teaserImage =
-    typeof storedImage === "string" ? storedImage.trim() : showcase?.image ?? "";
-
-  if (!weddingEnabled) return null;
-
-  // No background class below. This section hardcoded `surface-cream` while its
-  // stored setting said "white", so the Background dropdown read White, the page
-  // and the preview rendered cream, and changing the dropdown did nothing.
-  return (
-    <div className="contents" data-gate-wedding>
-    <SectionShell {...props} noReveal>
-      <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
-        <ScrollReveal className="space-y-6">
-          <Badge variant="accent" className="gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]">
-            <Heart className="size-3.5" />
-            {contentString(c, "overline", "Wedding Collection")}
-          </Badge>
-          <div className="space-y-4">
-            <h2 className="font-heading text-3xl font-bold leading-tight text-bakery-950 sm:text-4xl">
-              {contentString(c, "title")}
-            </h2>
-            <p className="max-w-md text-base leading-relaxed text-muted-foreground">
-              {contentString(c, "description")}
-            </p>
-          </div>
-          <ul className="grid gap-3">
-            {weddingPerks.map((perk) => {
-              const Icon = perk.icon;
-              return (
-                <li key={perk.label} className="flex items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-bakery-700 shadow-sm">
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="text-sm font-medium text-foreground">{perk.label}</span>
-                </li>
-              );
-            })}
-          </ul>
-          <Button
-            size="lg"
-            className="rounded-xl"
-            render={<Link href={contentString(c, "ctaHref", routes.store.weddingCakes)} />}
-          >
-            {contentString(c, "ctaLabel", "View Wedding Cakes")}
-            <ArrowRight className="size-4" />
-          </Button>
-        </ScrollReveal>
-
-        <ScrollReveal delay={120} className="relative mx-auto w-full max-w-lg lg:max-w-none">
-          <div className="rounded-[2rem] border border-border bg-white p-2.5 shadow-md">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-cream-100 sm:aspect-[4/3] lg:aspect-square">
-              {/* An empty string is a string, so `contentString`'s fallback never
-                  fired for a CLEARED field — and the media field's "Clear image"
-                  button sets exactly that. The result was `src=""`: next/image
-                  does not throw, it just ships an empty grey panel to every
-                  visitor. The wedding renderer's twin guards this the same way. */}
-              {teaserImage ? (
-                <OptimizedImage
-                  src={teaserImage}
-                  alt="Wedding cake"
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 45vw"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                  {props.interactive ? "Choose an image for this section." : null}
-                </div>
-              )}
-            </div>
-          </div>
-          {/* A floating card used to sit here naming a specific cake, quoting a
-              specific price and awarding it five filled stars — all three read
-              from the hardcoded `weddingCakes[0]`, not from the catalogue and not
-              from any review. The price never followed the product: an admin who
-              repriced that cake still had the old figure on their homepage, with
-              no field anywhere in the builder to correct it. The teaser links to
-              the wedding page, where the real cakes carry their real prices. */}
-        </ScrollReveal>
-      </div>
-    </SectionShell>
-    </div>
-  );
-}
 
 const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
@@ -2124,8 +2016,7 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <BlogCardsSection {...props} />;
     case "offers":
       return <OffersSection {...props} />;
-    case "wedding":
-      return <WeddingSection {...props} />;
+
     case "photo-cakes":
       return (
         <ProductGridSection

@@ -11,7 +11,6 @@ export type * from "./catalog";
 export type * from "./site-layout";
 export type * from "./content";
 export type * from "./homepage-builder";
-export type * from "./wedding-builder";
 export type * from "./review";
 export type * from "./communication";
 export type * from "./invoice";

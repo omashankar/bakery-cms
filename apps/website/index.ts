@@ -4,7 +4,6 @@ export { ContactForm } from "@/components/shared/contact-form";
 export { StoreHomePage } from "./pages/store-home-page";
 export { CollectionsPage } from "./pages/collections-page";
 export { ProductDetailPage } from "./pages/product-detail-page";
-export { WeddingPage } from "./pages/wedding-page";
 
 export { ContactPage } from "./pages/contact-page";
 

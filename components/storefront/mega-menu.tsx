@@ -54,8 +54,10 @@ function useWeddingLinkFilter() {
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
-  return (items: MegaMenuLink[]) =>
-    weddingEnabled ? items : items.filter((item) => item.href !== routes.store.weddingCakes);
+  // The wedding link this removed is gone; the hook stays only so the
+  // settings subscription above keeps its shape for the next gated link.
+  void weddingEnabled;
+  return (items: MegaMenuLink[]) => items;
 }
 
 /** One entry in the shop's own category list, as the server resolved it. */

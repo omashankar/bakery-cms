@@ -91,14 +91,7 @@ function seedRoutes(): SeoRouteEntry[] {
       "Browse all cake collections and categories.",
       ["cake collections", "birthday cakes", "premium cakes"]
     ),
-    route(
-      "store-wedding",
-      routes.store.weddingCakes,
-      "Wedding Cakes",
-      "Wedding Cakes",
-      "Elegant wedding cakes and custom celebration designs.",
-      ["wedding cakes", "custom wedding cake"]
-    ),
+
 
     route(
       "store-contact",

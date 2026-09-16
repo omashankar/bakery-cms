@@ -56,7 +56,7 @@ vi.mock("@/lib/server/db/cms-store", () => {
 });
 
 import * as homepage from "@/features/cms-sections/data/homepage-sections.server";
-import * as wedding from "@/features/cms-sections/data/wedding-sections.server";
+
 
 const FUTURE = "2027-01-01T09:00:00.000Z";
 
@@ -109,16 +109,7 @@ const BUILDERS: BuilderApi[] = [
     restore: homepage.restoreHomepageRevision,
     resetStore: homepage.resetHomepageStore,
   },
-  {
-    what: "wedding",
-    getState: wedding.getWeddingState,
-    saveDraft: wedding.saveWeddingDraft,
-    publish: wedding.publishWeddingSections,
-    reset: wedding.resetWeddingSections,
-    listRevisions: wedding.listWeddingRevisions,
-    restore: wedding.restoreWeddingRevision,
-    resetStore: wedding.resetWeddingStore,
-  },
+
 ].map((entry) => entry as unknown as BuilderApi);
 
 describe.each(BUILDERS)("$what builder store", (builder) => {

@@ -29,7 +29,7 @@ export function navItemLabel(
 export const storefrontNav: NavItem[] = [
   { label: "Home", href: routes.store.home },
   { label: "Collections", href: routes.store.collections },
-  { label: "Wedding Cakes", href: routes.store.weddingCakes },
+
 
   { label: "Contact", href: routes.store.contact },
   { label: "FAQ", href: routes.store.faq },
@@ -88,7 +88,7 @@ export const adminNavSections: AdminNavSection[] = [
     title: "Website",
     items: [
       { label: "Homepage Builder", href: routes.admin.builders.homepage, icon: "Home" },
-      { label: "Wedding Builder", href: routes.admin.builders.wedding, icon: "Heart" },
+
       { label: "Pages", href: routes.admin.pages.list, icon: "FileText" },
       { label: "Media Library", href: routes.admin.media, icon: "FolderOpen" },
       { label: "Banners", href: routes.admin.banners, icon: "Flag" },

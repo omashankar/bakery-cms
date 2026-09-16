@@ -1,7 +1,6 @@
 import type { ResolvedLabels } from "@/config/business-labels";
 import { adminNavSections, navItemLabel } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
-import { isWeddingEnabled } from "@/features/settings/lib/settings-repository";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { loadCoupons } from "@/features/commerce/lib/coupons-repository";
 import {
@@ -629,11 +628,10 @@ function searchNavigation(
   limit: number,
   labels: PaletteLabels,
 ): GlobalSearchResult[] {
-  // Don't surface the Wedding Builder in search when it's hidden from the sidebar.
-  const weddingOn = isWeddingEnabled();
+
   return buildNavigationEntries(labels).filter(
     (entry) =>
-      (weddingOn || entry.href !== routes.admin.builders.wedding) && matchesQuery(entry, text)
+      matchesQuery(entry, text)
   ).slice(0, limit);
 }
 

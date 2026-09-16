@@ -265,22 +265,6 @@ describe("the words in the band", () => {
   });
 });
 
-describe("a row the wedding gate hides", () => {
-  it("takes its divider with it", () => {
-    /**
-     * `[data-gate-wedding]` is hidden with display:none for a shop whose
-     * wedding module is off. It sat on the Link, inside a wrapper that also
-     * held the divider — so the link went and the separator stayed: a 20px
-     * hairline in the band with nothing after it.
-     */
-    const navbar = code(NAVBAR);
-    expect(navbar).toMatch(/<div[\s\S]{0,200}data-gate-wedding/);
-    expect(navbar, "the gate is back on the link alone").not.toMatch(
-      /<Link\s+href=\{item\.href\}\s+data-gate-wedding/,
-    );
-  });
-});
-
 describe("the phone drawer this band hides behind", () => {
   it("has a ceiling, and scrolls inside it", () => {
     /**
