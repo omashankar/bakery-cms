@@ -121,7 +121,6 @@ test("one slide slides into the next rather than cutting", async ({ page }) => {
 
   const before = await measure();
   if (before.count < 2) test.skip(true, "this shop has one hero slide");
-  expect(Math.round(before.first!)).toBe(0);
 
   /*
     EACH SLIDE IS THE WHOLE WIDTH, and this is a separate question from where
@@ -135,21 +134,27 @@ test("one slide slides into the next rather than cutting", async ({ page }) => {
     `the widest slide is ${Math.round(before.widest)}px in a ${width}px window`,
   ).toBe(width);
 
+  /*
+    MEASURED AS MOVEMENT, not as a position. The row starts on a clone of the
+    last slide, so its absolute offset is one slide in already — and pinning
+    the first reading to 0 broke the moment that clone was added, on a
+    carousel that was working.
+  */
   await page.click('[aria-label="Next slide"]');
   await page.waitForTimeout(250);
   const mid = await measure();
+  const partWay = before.first! - mid.first!;
 
-  expect(
-    mid.first!,
-    `the row is at ${Math.round(mid.first!)}px a quarter of a second in`,
-  ).toBeLessThan(-20);
-  expect(mid.first!).toBeGreaterThan(-width + 20);
+  expect(partWay, `the row moved ${Math.round(partWay)}px in a quarter second`).toBeGreaterThan(
+    20,
+  );
+  expect(partWay).toBeLessThan(width - 20);
 
   await page.waitForTimeout(900);
   const after = await measure();
   expect(
-    Math.abs(after.first! + width),
-    `settled at ${Math.round(after.first!)}px, expected ${-width}`,
+    Math.abs(before.first! - after.first! - width),
+    `the row moved ${Math.round(before.first! - after.first!)}px, expected ${width}`,
   ).toBeLessThan(4);
 
   /*
@@ -231,6 +236,25 @@ test("the banner is shown whole, at whatever shape the shop uploaded", async ({ 
     Math.round(shape!.bandHeight!),
     `the band is ${Math.round(shape!.bandHeight!)}px around a ${Math.round(shape!.paintedHeight)}px picture`,
   ).toBeGreaterThanOrEqual(Math.round(shape!.paintedHeight) - 1);
+
+  /*
+    AND NO TALLER, which is a different failure and a real one.
+
+    The slides share one flex row, so the row is as tall as the tallest — and
+    an unloaded image reports the ratio of its width/height attributes, not
+    its own. A 4.8:1 banner that had not loaded claimed 633px where the loaded
+    ones took 396, and the hero carried 237px of empty band under the picture
+    until that slide came round. Every assertion above passed throughout.
+  */
+  const rowHeights = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-section-id^="hero"] img')].map((img) =>
+      Math.round(img.getBoundingClientRect().height),
+    ),
+  );
+  expect(
+    Math.max(...rowHeights) - Math.min(...rowHeights),
+    `the slides are ${rowHeights.join(", ")}px tall`,
+  ).toBeLessThan(2);
 });
 
 test("the loop never runs backwards, and picks itself up again", async ({ page }) => {
@@ -288,23 +312,49 @@ test("the loop never runs backwards, and picks itself up again", async ({ page }
   */
   let previous = (await sample()).left!;
   let jumpsHome = 0;
-  for (let i = 0; i < 44; i += 1) {
-    await page.waitForTimeout(500);
+  /*
+    SAMPLED EVERY 150ms, not every 500ms, and the interval is the whole test.
+
+    The autoplay only ever goes forward, so the row should only ever move LEFT
+    — except for one instantaneous jump off a clone, which is a whole lap. That
+    gives a rule with no middle ground: a rightward reading is either the jump
+    (at least a slide's width in one sample) or a bug.
+
+    At half-second samples an ANIMATED lap reads as a single large rightward
+    delta and passes for the jump it is imitating — which is exactly what a
+    snap that forgot `transition-none` does, and it survived that mutation. At
+    150ms the same animation is four or five smaller rightward readings, and a
+    fraction of a slide moving right is something the correct version never
+    produces.
+  */
+  for (let i = 0; i < 140; i += 1) {
+    await page.waitForTimeout(150);
     const now = await sample();
 
     expect(
       now.covered,
-      `no picture under the middle of the window at ${(i * 0.5).toFixed(1)}s`,
+      `no picture under the middle of the window at ${(i * 0.15).toFixed(1)}s`,
     ).toBe(true);
 
-    const jumped = now.left! > previous + 10;
-    if (jumped) {
-      // A jump home is allowed only from the clone, and only all the way.
+    const moved = now.left! - previous;
+    const lap = width * (slides - 2);
+
+    if (moved > 10) {
+      // Rightward at all: it has to be the jump, in one sample, about a lap.
       expect(
-        Math.round(now.left!),
-        `the row jumped from ${Math.round(previous)} to ${Math.round(now.left!)}`,
-      ).toBe(0);
+        moved,
+        `the row moved ${Math.round(moved)}px RIGHT at ${(i * 0.15).toFixed(1)}s — the autoplay only goes forward`,
+      ).toBeGreaterThanOrEqual(width - 4);
+      expect(
+        Math.abs(moved - lap),
+        `the row jumped ${Math.round(moved)}px, which is not the ${lap}px lap`,
+      ).toBeLessThan(width);
       jumpsHome += 1;
+    } else {
+      expect(
+        Math.abs(moved),
+        `the row moved ${Math.round(moved)}px between samples`,
+      ).toBeLessThanOrEqual(width + 4);
     }
     previous = now.left!;
   }
@@ -403,4 +453,142 @@ test("a tap on an arrow does not stop the hero for the rest of the visit", async
     moved,
     `the hero has not moved twenty-one seconds after one tap (still at ${Math.round(later)})`,
   ).toBe(true);
+});
+
+test("the arrows loop at both ends, one slide at a time", async ({ page }) => {
+  /**
+   * THE ARROWS, ALL THE WAY ROUND AND OUT THE OTHER SIDE.
+   *
+   * Everything else here watches the autoplay, which only ever moves one way
+   * and only ever wraps at the end — so the arrows' own wrap was never
+   * exercised, and when they still wrapped with a modulo while the autoplay
+   * used a clone, every test passed. Pressing Next on the last slide rewound
+   * the whole row, which is the thing the shop reported.
+   *
+   * DIRECTION IS THE DISCRIMINATOR, not distance. Across a correct wrap the
+   * row ends up (count-1) slides to the right of where it started — exactly
+   * where a rewind would leave it — because it slides one slide onto a clone
+   * and then jumps a lap with the transition off. The two are only
+   * distinguishable DURING the move: forward slides left for 700ms, a rewind
+   * slides right.
+   */
+  test.setTimeout(120_000);
+  const width = 1440;
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const read = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const pictures = [...(hero?.querySelectorAll("img") ?? [])];
+      const dots = [...(hero?.querySelectorAll('[aria-label^="Go to slide"]') ?? [])];
+      const middle = window.innerWidth / 2;
+      return {
+        x: pictures[0]?.getBoundingClientRect().left ?? null,
+        pictures: pictures.length,
+        dot: dots.findIndex((d) => d.getAttribute("aria-current") === "true"),
+        covered: pictures.some((img) => {
+          const box = img.getBoundingClientRect();
+          return box.left <= middle && box.right >= middle;
+        }),
+      };
+    });
+
+  const start = await read();
+  const count = start.pictures - 2;
+  if (count < 2) test.skip(true, "this shop has fewer than two hero slides");
+
+  /** One press, watched while it moves. */
+  const press = async (label: string, expected: -1 | 1) => {
+    const before = await read();
+    await page.click(`[aria-label="${label}"]`);
+    await page.mouse.move(5, 880);
+    await page.waitForTimeout(260);
+    const during = await read();
+
+    const travelled = during.x! - before.x!;
+    const wentLeft = travelled < -10;
+    const wentRight = travelled > 10;
+    expect(
+      expected === 1 ? wentLeft : wentRight,
+      `${label} from dot ${before.dot} moved ${Math.round(travelled)}px`,
+    ).toBe(true);
+    // And never more than one slide, which is what a rewind would exceed.
+    expect(Math.abs(travelled), `${label} travelled ${Math.round(travelled)}px`).toBeLessThan(
+      width + 4,
+    );
+
+    await page.waitForTimeout(900);
+    const after = await read();
+    expect(after.covered, `nothing on screen after ${label} from dot ${before.dot}`).toBe(true);
+    return after;
+  };
+
+  /*
+    Round once and one past, so the wrap itself is pressed — and then back the
+    other way past the start, which is the clone the autoplay never touches.
+  */
+  for (let i = 0; i <= count; i += 1) {
+    await press("Next slide", 1);
+  }
+  for (let i = 0; i <= count + 1; i += 1) {
+    await press("Previous slide", -1);
+  }
+
+  const end = await read();
+  expect(end.dot, "the dots lost track of which slide is showing").toBeGreaterThanOrEqual(0);
+  expect(end.covered).toBe(true);
+});
+
+test("every hero slide is fetched at once, so the row is never mismatched", async ({
+  page,
+}) => {
+  /**
+   * The slides share one flex row, so the row is as tall as the tallest — and
+   * an image that has not loaded reports the ratio of its `width`/`height`
+   * attributes rather than its own. Those are a 3:1 reservation, so a 4.8:1
+   * banner that had not loaded claimed 633px where the loaded ones took 396,
+   * and the hero carried 237px of empty band under the picture until that
+   * slide happened to come round.
+   *
+   * WHY THIS CHECKS THE ATTRIBUTE AND NOT THE HEIGHT. A pending image reports
+   * the reservation ratio whether it is eager or lazy — eager only means the
+   * request has been made. So the two are indistinguishable by measurement
+   * during the window that matters, and a test that holds the network back to
+   * create that window makes EVERY slide pending, which is uniform and passes
+   * against the bug. I wrote that version first and it did exactly that.
+   *
+   * What separates them is whether the browser is ever asked. Read off the
+   * live DOM rather than the source, so a build that strips or rewrites the
+   * attribute is still caught.
+   */
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const state = await page.evaluate(() => {
+    const hero = document.querySelector('[data-section-id^="hero"]');
+    const pictures = [...(hero?.querySelectorAll("img") ?? [])];
+    return {
+      count: pictures.length,
+      lazy: pictures.filter((img) => img.getAttribute("loading") === "lazy").length,
+      loaded: pictures.filter((img) => img.complete && img.naturalWidth > 0).length,
+      heights: pictures.map((img) => Math.round(img.getBoundingClientRect().height)),
+    };
+  });
+
+  if (state.count < 2) test.skip(true, "this shop has one hero slide");
+
+  expect(
+    state.lazy,
+    `${state.lazy} of ${state.count} hero pictures are lazy, so the row is as tall as whichever has not loaded`,
+  ).toBe(0);
+
+  // And the settled consequence: every slide the same height, all loaded.
+  expect(state.loaded).toBe(state.count);
+  expect(
+    Math.max(...state.heights) - Math.min(...state.heights),
+    `slides are ${state.heights.join(", ")}px tall`,
+  ).toBeLessThan(2);
 });

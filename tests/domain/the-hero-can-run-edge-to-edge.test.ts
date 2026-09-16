@@ -560,18 +560,28 @@ describe("the slideshow's own controls", () => {
     const carousel = codeOf(read(CAROUSEL));
     const body = carousel.slice(carousel.indexOf("export function HeroCarousel"));
 
-    expect(body).toMatch(
-      /const go = useCallback\(\s*\(next: number\) => \{\s*setNudgedAt\(Date\.now\(\)\);/,
-    );
+    /*
+      TWO HELPERS, and both have to pause. `step` is the arrows and the swipe,
+      `goTo` is the dots — and on a phone in the split layout the dots are the
+      only control there is, so a dot that moved a slide without pausing would
+      leave the autoplay running under a customer who had just taken hold.
+    */
+    for (const helper of ["step", "goTo"]) {
+      const at = body.indexOf(`const ${helper} = useCallback(`);
+      expect(at, `${helper} is gone`).toBeGreaterThan(-1);
+      expect(body.slice(at, at + 220), `${helper} does not pause the autoplay`).toContain(
+        "setNudgedAt(Date.now())",
+      );
+    }
     expect(body, "the dots move a slide without pausing the autoplay").toContain(
-      "onClick={() => go(i)}",
+      "onClick={() => goTo(i)}",
     );
     /*
-      Four legitimate `setIndex` calls outside `go`: the autoplay tick, the
-      jump home from the clone, and the two inside `go` itself are one. Any
-      more is a control that moves a slide without pausing.
+      Four legitimate `setIndex` calls: the autoplay tick, the jump off a
+      clone, and one inside each of `step` and `goTo`. Any more is a control
+      that moves a slide without pausing.
     */
-    expect((body.match(/setIndex\(/g) ?? []).length).toBe(3);
+    expect((body.match(/setIndex\(/g) ?? []).length).toBe(4);
   });
 
   it("and the row under the picture is dots, with no other control in it", () => {
@@ -915,23 +925,82 @@ describe("how one slide becomes the next", () => {
     expect(body).toContain("w-full shrink-0");
   });
 
-  it("carries a copy of the first slide, so the loop never runs backwards", () => {
+  it("carries a copy of a slide at each end, so no move ever runs backwards", () => {
     /**
-     * The row used to wrap with a modulo, so the last slide returning to the
-     * first animated the whole row backwards — 2,880px in 700ms on a
-     * three-slide hero, every third turn. Measured in a browser, and it is
-     * the thing that made the slider look broken rather than slow.
+     * A wrap used to be a modulo, and a modulo animates the whole row the
+     * other way — 2,880px in 700ms on a three-slide hero.
      *
-     * A copy of the first slide after the last one makes that turn a forward
-     * move like any other; the row is then put back to the start with the
-     * transition off, which nobody sees because the picture does not change.
+     * ONE clone at the end fixed that for the autoplay and left the arrows
+     * doing it, because `go` wrapped separately: pressing Next on the last
+     * slide still rewound the lot. Both ends, or neither. The row jumps off a
+     * clone with the transition off, which nobody sees because a clone and
+     * the slide it copies are the same picture.
      */
     const body = carousel();
 
-    expect(body).toMatch(/\[\.\.\.slides, slides\[0\]\]\.map/);
+    expect(body).toMatch(/\[slides\[count - 1\], \.\.\.slides, slides\[0\]\]\.map/);
     expect(body).toMatch(/snapBack && "transition-none"/);
-    // The autoplay walks ONTO the clone rather than wrapping past it.
-    expect(body).toMatch(/i >= count \? 1 : i \+ 1/);
+    // The autoplay only ever counts up; the clones are where the ends go.
+    expect(body).toMatch(/setInterval\(\(\) => setIndex\(\(i\) => i \+ 1\), AUTOPLAY_MS\)/);
+    // And the arrows step, rather than wrapping with an arithmetic of their own.
+    expect(body).toContain("onClick={() => step(-1)}");
+    expect(body).toContain("onClick={() => step(1)}");
+    /*
+      Scoped to what `setIndex` is GIVEN, not to the file. `activeIndex` uses
+      the same arithmetic to work out which of the shop's slides is showing,
+      which is correct and has to stay — a blanket search for it fails on the
+      one line that is allowed to do it.
+    */
+    expect(body, "a control still wraps its own index with a modulo").not.toMatch(
+      /setIndex\([^)]*% count/,
+    );
+  });
+
+  it("and comes off BOTH clones, not just the one at the end", () => {
+    // Landing on the head clone and staying there is a hero showing the last
+    // slide while the dots say the first, for the rest of the visit.
+    const body = carousel();
+
+    expect(body).toMatch(/index !== 0 && index !== count \+ 1/);
+    expect(body).toMatch(/const landing = index === 0 \? count : 1;/);
+    // And the row starts on the first REAL slide, not on the head clone.
+    expect(body).toMatch(/useState\(1\)/);
+  });
+
+  it("and every slide is fetched, because an unloaded one stretches the band", () => {
+    /**
+     * The slides sit in one flex row, so the row is as tall as the tallest —
+     * and an image that has not loaded reports the ratio of its `width` and
+     * `height` attributes rather than its own. Those are a 3:1 reservation,
+     * so a 4.8:1 banner that had not loaded claimed 633px where the loaded
+     * ones took 396, and the hero carried 237px of empty band underneath the
+     * picture until that slide happened to come round. Measured.
+     */
+    /*
+      THE INTRINSIC PICTURE ONLY, which is the one that can stretch anything.
+
+      The split hero mounts one slide at a time, and the banner's own cropped
+      branch sits in a band with a fixed ratio — neither can pull the row
+      taller, so neither has to be eager. A search across the file, or even
+      across the banner view, finds those legitimate `lazy`s and fails on
+      them; the question is only about the `h-auto` one.
+    */
+    const view = bodyOf(read(CAROUSEL), "function HeroBannerSlideView(");
+    const at = view.indexOf("h-auto");
+    expect(at, "the intrinsic banner picture is gone").toBeGreaterThan(-1);
+    // Its OWN element, found by walking back to the tag that opens it — a
+    // fixed-size window reaches into the cropped branch above, whose `lazy` is
+    // legitimate because its band has a ratio and cannot be stretched.
+    const opens = view.lastIndexOf("<OptimizedImage", at);
+    expect(opens, "the intrinsic picture is not an OptimizedImage").toBeGreaterThan(-1);
+    const intrinsic = view.slice(opens, at);
+
+    expect(intrinsic, "the picture that sizes the row is still lazy").not.toContain(
+      '"lazy"',
+    );
+    expect(intrinsic).toContain('loading="eager"');
+    // `priority` still decides which one is asked for FIRST.
+    expect(intrinsic).toMatch(/fetchPriority=\{priority \? "high" : undefined\}/);
   });
 
   it("and the track follows the row, not the slide number", () => {

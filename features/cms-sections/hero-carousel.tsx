@@ -255,6 +255,20 @@ function HeroBannerSlideView({
   side,
 }: {
   slide: HeroSlide;
+  /**
+   * Fetch this one straight away, and ask for it first.
+   *
+   * EVERY banner slide is eager, not just the one on screen, and that is not
+   * a performance oversight — it is what keeps the band the right height.
+   * The slides sit in one flex row so the row is as tall as the tallest, and
+   * an image that has not loaded reports the ratio of its `width`/`height`
+   * attributes rather than its own. Those attributes are a 3:1 reservation,
+   * so a 4.8:1 banner that had not loaded yet claimed 633px where the loaded
+   * ones took 396 — and the hero carried 237px of empty band underneath the
+   * picture until the third slide happened to come round. Measured.
+   *
+   * `priority` still marks the FIRST one, which is what gets `fetchPriority`.
+   */
   priority?: boolean;
   /** Which half of the picture the words sit in. */
   side: HeroCopySide;
@@ -319,7 +333,10 @@ function HeroBannerSlideView({
         src={mobile}
         alt={alt}
         className="absolute inset-0 size-full object-cover"
-        loading={priority ? "eager" : "lazy"}
+        // Same reason as the branch below, though this one is cropped to a
+        // fixed ratio and so cannot stretch the row — eager for consistency,
+        // and because it is on screen within seconds either way.
+        loading="eager"
         fetchPriority={priority ? "high" : undefined}
         decoding="async"
       />
@@ -367,7 +384,9 @@ function HeroBannerSlideView({
       */
       width={1920}
       height={640}
-      loading={priority ? "eager" : "lazy"}
+      // See the note on `priority` above: every banner slide loads eagerly,
+      // because an unloaded one makes the whole band too tall.
+      loading="eager"
       fetchPriority={priority ? "high" : undefined}
       /*
         `max-h` in CONTAINER units, never `vh`. The admin builder mounts this
@@ -597,19 +616,21 @@ export function HeroCarousel({
   const banner = layout === "banner";
 
   /**
-   * 0 … count, where `count` is the CLONE of the first slide.
+   * A CLONE AT EACH END, so the loop is forward in both directions.
    *
-   * The row used to run 0…count-1 and wrap with a modulo, so the last slide
-   * going back to the first animated the whole row backwards — on this
-   * three-slide hero, 2,880px of travel in 700ms, every third turn. Measured;
-   * it is the thing that made the slider look broken rather than slow.
+   * The row is `[last, ...slides, first]` and `index` runs 0…count+1. The
+   * shop's own slides are 1…count; 0 and count+1 are copies of the ones at
+   * the far end, and the row jumps between them with the transition off,
+   * which nobody sees because the picture either side of the jump is the
+   * same picture.
    *
-   * A copy of the first slide sits after the last one, so the wrap is a
-   * forward move like every other. `snapBack` then puts the row back to 0
-   * with the transition off, which nobody sees because the picture at
-   * `count` and the picture at 0 are the same picture.
+   * Without them a wrap is a modulo, and a modulo means the whole row
+   * animates back the other way — 2,880px in 700ms on a three-slide hero.
+   * One clone at the end fixed that for the autoplay and left the arrows
+   * doing it, because `go` still wrapped: pressing Next on the last slide
+   * rewound the lot. Both ends, or neither.
    */
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(1);
   const [snapBack, setSnapBack] = useState(false);
   const [paused, setPaused] = useState(false);
   /**
@@ -630,24 +651,29 @@ export function HeroCarousel({
   const [nudgedAt, setNudgedAt] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
-  /** Which of the shop's slides is showing — the clone counts as the first. */
-  const activeIndex = count > 0 ? index % count : 0;
+  /** Which of the shop's slides is showing. A clone reads as the one it copies. */
+  const activeIndex = count > 0 ? (((index - 1) % count) + count) % count : 0;
 
   /**
-   * Every deliberate move goes through here.
+   * One step, in either direction, ONTO the clones rather than around them.
    *
-   * Clamped to 0…count-1 rather than to the clone: a customer pressing Next
-   * on the last slide should land on the first, and the clone is a rendering
-   * detail that only the autoplay walks onto.
+   * `index` is deliberately not clamped here: stepping past either end lands
+   * on a clone, which is a forward move, and the effect below then puts the
+   * row on the real slide it copies. Clamping with a modulo is what made the
+   * arrows rewind the whole row.
    */
-  const go = useCallback(
-    (next: number) => {
-      setNudgedAt(Date.now());
-      setSnapBack(false);
-      setIndex(((next % count) + count) % count);
-    },
-    [count],
-  );
+  const step = useCallback((direction: 1 | -1) => {
+    setNudgedAt(Date.now());
+    setSnapBack(false);
+    setIndex((i) => i + direction);
+  }, []);
+
+  /** A dot names one of the shop's slides; the row's index is one further on. */
+  const goTo = useCallback((slide: number) => {
+    setNudgedAt(Date.now());
+    setSnapBack(false);
+    setIndex(slide + 1);
+  }, []);
 
   useEffect(() => {
     if (!multi || paused || nudgedAt) return;
@@ -657,31 +683,27 @@ export function HeroCarousel({
     ) {
       return;
     }
-    /*
-      UP TO `count`, not modulo `count`. `count` is the clone of the first
-      slide, so the last turn of the loop is a forward move like every other;
-      the effect below puts the row back to 0 once it has arrived.
-    */
-    const id = window.setInterval(
-      () => setIndex((i) => (i >= count ? 1 : i + 1)),
-      AUTOPLAY_MS,
-    );
+    // Always forward. The clone at the end is where the last turn goes, and
+    // the effect below moves the row off it.
+    const id = window.setInterval(() => setIndex((i) => i + 1), AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [multi, paused, nudgedAt, count]);
 
   /**
-   * The jump home, once the move onto the clone has finished.
+   * The jump off a clone, once the move onto it has finished.
    *
-   * Nobody sees it: the clone and slide 0 are the same picture, so the row
-   * changing position underneath it changes nothing on screen. `snapBack`
-   * switches the transition off for that one change, or the jump would
-   * animate — which is the rewind this whole arrangement exists to remove.
+   * Nobody sees it: a clone and the slide it copies are the same picture, so
+   * the row changing position underneath it changes nothing on screen.
+   * `snapBack` switches the transition off for that one change, or the jump
+   * would animate — which is the rewind this arrangement exists to remove.
    */
   useEffect(() => {
-    if (index !== count || count === 0) return;
+    if (count === 0) return;
+    if (index !== 0 && index !== count + 1) return;
+    const landing = index === 0 ? count : 1;
     const id = window.setTimeout(() => {
       setSnapBack(true);
-      setIndex(0);
+      setIndex(landing);
     }, SLIDE_MS + 40);
     return () => window.clearTimeout(id);
   }, [index, count]);
@@ -710,7 +732,7 @@ export function HeroCarousel({
   const onTouchEnd = (event: React.TouchEvent) => {
     if (touchStartX.current === null || !multi) return;
     const delta = (event.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
-    if (Math.abs(delta) > SWIPE_THRESHOLD) go(activeIndex + (delta < 0 ? 1 : -1));
+    if (Math.abs(delta) > SWIPE_THRESHOLD) step(delta < 0 ? 1 : -1);
     touchStartX.current = null;
   };
 
@@ -822,17 +844,15 @@ export function HeroCarousel({
               }}
             >
               {/*
-                THE SLIDES, AND A COPY OF THE FIRST ONE AFTER THEM.
+                A COPY OF THE LAST SLIDE BEFORE THEM, AND OF THE FIRST AFTER.
 
-                The copy is what makes the loop go forwards. Without it the
-                last slide returning to the first animated the whole row
-                backwards — 2,880px in 700ms on a three-slide hero, every
-                third turn, which is what made this look broken rather than
-                slow. With it, that turn is a forward move like any other and
-                the row is put back to the start afterwards, invisibly,
-                because the picture does not change.
+                They are what make the loop go forwards in BOTH directions.
+                Without them a wrap is a modulo, and a modulo animates the
+                whole row the other way — 2,880px in 700ms on a three-slide
+                hero. One clone at the end fixed the autoplay and left the
+                arrows rewinding, because they wrapped separately.
               */}
-              {[...slides, slides[0]].map((slide, i) => (
+              {[slides[count - 1], ...slides, slides[0]].map((slide, i) => (
                 <div
                   key={i}
                   /*
@@ -900,7 +920,7 @@ export function HeroCarousel({
             */}
             <button
               type="button"
-              onClick={() => go(activeIndex - 1)}
+              onClick={() => step(-1)}
               aria-label="Previous slide"
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
@@ -913,7 +933,7 @@ export function HeroCarousel({
             </button>
             <button
               type="button"
-              onClick={() => go(activeIndex + 1)}
+              onClick={() => step(1)}
               aria-label="Next slide"
               className={cn(
                 "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
@@ -951,10 +971,10 @@ export function HeroCarousel({
             <button
               key={i}
               type="button"
-              // `go`, not `setIndex` — pressing a dot is as deliberate as
+              // `goTo`, not `setIndex` — pressing a dot is as deliberate as
               // pressing an arrow, and it is the only one of the three a
               // phone has in the split layout.
-              onClick={() => go(i)}
+              onClick={() => goTo(i)}
               aria-label={`Go to slide ${i + 1}`}
               aria-current={i === activeIndex}
               /*
