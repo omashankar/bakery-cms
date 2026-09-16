@@ -592,3 +592,134 @@ test("every hero slide is fetched at once, so the row is never mismatched", asyn
     `slides are ${state.heights.join(", ")}px tall`,
   ).toBeLessThan(2);
 });
+
+test("pressing faster than the slide can move never empties the band", async ({ page }) => {
+  /**
+   * The jump home takes 740ms. Pressing again inside that window used to step
+   * from the clone to the slide after it, which is off the end of the track —
+   * six quick presses reached -13,300px on a five-slide row and the hero went
+   * blank, permanently, because nothing brings an out-of-range row back.
+   *
+   * Every other test here waits for each move to settle, which is precisely
+   * the thing a customer does not do. This one presses at 80ms.
+   */
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const covered = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const pictures = [...(hero?.querySelectorAll("img") ?? [])];
+      const middle = window.innerWidth / 2;
+      return {
+        covered: pictures.some((img) => {
+          const box = img.getBoundingClientRect();
+          return box.left <= middle && box.right >= middle;
+        }),
+        x: Math.round(pictures[0]?.getBoundingClientRect().left ?? 0),
+      };
+    });
+
+  const slides = await page.evaluate(
+    () => document.querySelectorAll('[data-section-id^="hero"] img').length,
+  );
+  if (slides < 3) test.skip(true, "this shop has fewer than two hero slides");
+
+  for (const label of ["Next slide", "Previous slide"]) {
+    /*
+      CHECKED WHILE IT IS HAPPENING, not only once it has settled.
+
+      There is a backstop that brings an out-of-range row home, so a band
+      that went blank still recovered within 740ms — and a test that only
+      looked at the end passed against the very defect it is named for. What
+      a customer sees is the 740ms.
+    */
+    for (let i = 0; i < 8; i += 1) {
+      await page.evaluate((l) => {
+        const button = document.querySelector(`[aria-label="${l}"]`);
+        if (button instanceof HTMLElement) button.click();
+      }, label);
+      await page.waitForTimeout(80);
+      const during = await covered();
+      expect(
+        during.covered,
+        `the band is empty mid-press ${i + 1} of ${label} (row at ${during.x}px)`,
+      ).toBe(true);
+    }
+
+    // …and still once everything has settled.
+    await page.waitForTimeout(2500);
+    const now = await covered();
+    expect(
+      now.covered,
+      `the band is empty after eight quick presses of ${label} (row at ${now.x}px)`,
+    ).toBe(true);
+  }
+});
+
+test("and at speed the row still only ever moves forwards", async ({ page }) => {
+  /**
+   * The reported fault, measured rather than described: pressing Next again
+   * while the row sat on the clone at the end sent it BACKWARDS across two
+   * slides — -5332px to -3487px at 1440px wide — because coming home and
+   * taking the next step arrived as one change and the browser animated the
+   * whole lap in reverse.
+   *
+   * Coming home is itself a rightward move, and a legitimate one: it is a
+   * whole lap, taken with the transition off, onto the same picture. What
+   * separates the two is that one is instant and the other is drawn. So this
+   * samples at 50ms and allows a rightward jump only if it is at least a lap
+   * less one slide — an animated rewind moves a fraction of that per frame.
+   */
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+
+  const row = () =>
+    page.evaluate(() => {
+      const hero = document.querySelector('[data-section-id^="hero"]');
+      const track = hero?.querySelector("[style*='translateX']");
+      if (!(track instanceof HTMLElement)) return null;
+      return {
+        x: new DOMMatrixReadOnly(getComputedStyle(track).transform).m41,
+        width: track.clientWidth,
+        nodes: track.querySelectorAll(":scope > *").length,
+      };
+    });
+
+  const first = await row();
+  if (!first || first.nodes < 5) test.skip(true, "this shop has fewer than three hero slides");
+  const width = first!.width;
+  // The track carries a copy of a slide at each end, so the shop's own count
+  // is two fewer than the number of children.
+  const lap = (first!.nodes - 2) * width;
+
+  const seen: number[] = [first!.x];
+  for (let i = 0; i < 6; i += 1) {
+    await page.evaluate(() => {
+      const button = document.querySelector('[aria-label="Next slide"]');
+      if (button instanceof HTMLElement) button.click();
+    });
+    for (let s = 0; s < 3; s += 1) {
+      await page.waitForTimeout(50);
+      const now = await row();
+      if (now) seen.push(now.x);
+    }
+  }
+
+  const rewinds: string[] = [];
+  for (let i = 1; i < seen.length; i += 1) {
+    const delta = seen[i]! - seen[i - 1]!;
+    if (delta > 1 && delta < lap - width) {
+      rewinds.push(`${Math.round(seen[i - 1]!)}px → ${Math.round(seen[i]!)}px`);
+    }
+  }
+
+  expect(
+    rewinds,
+    `pressing Next ran the row backwards: ${rewinds.join(", ")}`,
+  ).toEqual([]);
+});

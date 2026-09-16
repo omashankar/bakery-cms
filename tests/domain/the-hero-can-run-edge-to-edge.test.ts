@@ -577,11 +577,13 @@ describe("the slideshow's own controls", () => {
       "onClick={() => goTo(i)}",
     );
     /*
-      Four legitimate `setIndex` calls: the autoplay tick, the jump off a
-      clone, and one inside each of `step` and `goTo`. Any more is a control
-      that moves a slide without pausing.
+      Six legitimate `setIndex` calls, and no more: the autoplay tick, the
+      timed jump off a clone, the step a press queues behind that jump, one in
+      each of `step`'s two branches — the ordinary move and the one that comes
+      home off a clone first — and `goTo`. Any seventh is a control that moves
+      a slide without pausing, which is the fault this counts for.
     */
-    expect((body.match(/setIndex\(/g) ?? []).length).toBe(4);
+    expect((body.match(/setIndex\(/g) ?? []).length).toBe(6);
   });
 
   it("and the row under the picture is dots, with no other control in it", () => {
@@ -941,7 +943,7 @@ describe("how one slide becomes the next", () => {
     expect(body).toMatch(/\[slides\[count - 1\], \.\.\.slides, slides\[0\]\]\.map/);
     expect(body).toMatch(/snapBack && "transition-none"/);
     // The autoplay only ever counts up; the clones are where the ends go.
-    expect(body).toMatch(/setInterval\(\(\) => setIndex\(\(i\) => i \+ 1\), AUTOPLAY_MS\)/);
+    expect(body).toMatch(/setIndex\(\(i\) => \(i >= count \+ 1 \? 2 : i \+ 1\)\)/);
     // And the arrows step, rather than wrapping with an arithmetic of their own.
     expect(body).toContain("onClick={() => step(-1)}");
     expect(body).toContain("onClick={() => step(1)}");
@@ -956,13 +958,75 @@ describe("how one slide becomes the next", () => {
     );
   });
 
+  it("and can never be asked for a slide the row does not have", () => {
+    /**
+     * The jump home takes 740ms, and pressing again inside that window used
+     * to step from the clone to the slide AFTER it — which is off the end of
+     * the track. Six quick presses reached -13,300px on a five-slide row and
+     * the band went blank. Reported by the shop, reproduced in a browser.
+     *
+     * Three places have to hold the line, because any one of them alone is a
+     * blank band: a press that finds the row on a clone brings it home rather
+     * than stepping off the end, the autoplay tick cannot run past the end
+     * when a background tab coalesces its timer, and the effect that comes
+     * home accepts anything out of range rather than only the two clones.
+     */
+    const body = carousel();
+
+    expect(body, "a step off a clone does not come home first").toMatch(
+      /if \(at > 0 && at < count \+ 1\) \{/,
+    );
+    expect(body, "a step can walk off the end of the track").toMatch(
+      /const home = at <= 0 \? count : 1;/,
+    );
+    expect(body, "the autoplay tick is unbounded").toMatch(
+      /setIndex\(\(i\) => \(i >= count \+ 1 \? 2 : i \+ 1\)\)/,
+    );
+    expect(body, "only the exact clone positions come home").toMatch(
+      /if \(index > 0 && index < count \+ 1\) return;/,
+    );
+  });
+
+  it("and a press at the join waits a frame, so no lap is ever animated back", () => {
+    /**
+     * Coming home off a clone is a move of a whole lap. Taking that and the
+     * next step in one commit hands the browser a single change — the clone
+     * at one end to a slide near the other — and it animates that lap, in
+     * reverse, across every picture in between. Measured at 1440px: a press
+     * at the join ran the row from -5332px to -3487px, two slides backwards,
+     * which is how the shop reported it.
+     *
+     * So the step waits for the jump home to be DRAWN, and one frame is not
+     * enough — a callback booked from an effect can run before the browser
+     * has painted the commit that booked it, and an undrawn jump home is a
+     * jump that never happened.
+     */
+    const body = carousel();
+
+    expect(body, "the step is taken in the same commit as the jump home").toMatch(
+      /pendingStep\.current = direction;/,
+    );
+    expect(body, "the queued step does not wait for a second frame").toMatch(
+      /inner = window\.requestAnimationFrame\(/,
+    );
+    /*
+      A press arriving while the row is already coming home leaves `snapBack`
+      set, so `snapBack` on its own as a dependency strands that press's step
+      for ever — the arrow stops answering rather than moving the wrong way,
+      which is a quieter version of the same fault.
+    */
+    expect(body, "a step queued during a jump home is never taken").toMatch(
+      /\}, \[snapBack, index\]\);/,
+    );
+  });
+
   it("and comes off BOTH clones, not just the one at the end", () => {
     // Landing on the head clone and staying there is a hero showing the last
     // slide while the dots say the first, for the rest of the visit.
     const body = carousel();
 
-    expect(body).toMatch(/index !== 0 && index !== count \+ 1/);
-    expect(body).toMatch(/const landing = index === 0 \? count : 1;/);
+    expect(body).toMatch(/if \(index > 0 && index < count \+ 1\) return;/);
+    expect(body).toMatch(/const landing = index <= 0 \? count : 1;/);
     // And the row starts on the first REAL slide, not on the head clone.
     expect(body).toMatch(/useState\(1\)/);
   });

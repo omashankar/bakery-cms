@@ -651,27 +651,74 @@ export function HeroCarousel({
   const [nudgedAt, setNudgedAt] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
+  /**
+   * Where the row is, readable the instant a press arrives.
+   *
+   * `index` is a render behind, and deciding inside the updater is not an
+   * option: the branch below has to switch the transition off as well, and a
+   * state update is not a place to do that.
+   */
+  const indexRef = useRef(1);
+  /** A step that is waiting for the jump home to be drawn. */
+  const pendingStep = useRef<1 | -1 | 0>(0);
+
   /** Which of the shop's slides is showing. A clone reads as the one it copies. */
   const activeIndex = count > 0 ? (((index - 1) % count) + count) % count : 0;
+
+  /* The autoplay and the timed jump home move the row too; the mirror follows. */
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
 
   /**
    * One step, in either direction, ONTO the clones rather than around them.
    *
-   * `index` is deliberately not clamped here: stepping past either end lands
-   * on a clone, which is a forward move, and the effect below then puts the
-   * row on the real slide it copies. Clamping with a modulo is what made the
-   * arrows rewind the whole row.
+   * Stepping past an end lands on a clone, which is a forward move, and the
+   * effect below then puts the row on the real slide it copies. A modulo
+   * instead is what made the arrows rewind the whole row.
+   *
+   * PRESSING AGAIN WHILE THE ROW IS ON A CLONE IS THE HARD CASE, and it is
+   * the one that was reported: at speed the hero lurched backwards. Coming
+   * home off a clone is a move of a whole lap. Doing that and taking the
+   * next step in one go gives the browser a single change — from the clone
+   * at one end to a slide near the other — and it animates that lap, in
+   * reverse, across every picture in between. Measured: a press at the join
+   * ran the row from -5332px to -3487px, two slides the wrong way.
+   *
+   * So it is two changes. Coming home happens with the transition off, where
+   * nobody sees it because a clone and the slide it copies are the same
+   * picture, and the step waits for the frame after that one has been drawn.
+   * If it did not wait, the browser would coalesce the two and animate the
+   * lap anyway — the bug this is here to remove.
    */
-  const step = useCallback((direction: 1 | -1) => {
-    setNudgedAt(Date.now());
-    setSnapBack(false);
-    setIndex((i) => i + direction);
-  }, []);
+  const step = useCallback(
+    (direction: 1 | -1) => {
+      setNudgedAt(Date.now());
+      const at = indexRef.current;
+
+      if (at > 0 && at < count + 1) {
+        pendingStep.current = 0;
+        setSnapBack(false);
+        indexRef.current = at + direction;
+        setIndex(at + direction);
+        return;
+      }
+
+      const home = at <= 0 ? count : 1;
+      pendingStep.current = direction;
+      indexRef.current = home;
+      setSnapBack(true);
+      setIndex(home);
+    },
+    [count],
+  );
 
   /** A dot names one of the shop's slides; the row's index is one further on. */
   const goTo = useCallback((slide: number) => {
     setNudgedAt(Date.now());
+    pendingStep.current = 0;
     setSnapBack(false);
+    indexRef.current = slide + 1;
     setIndex(slide + 1);
   }, []);
 
@@ -683,9 +730,16 @@ export function HeroCarousel({
     ) {
       return;
     }
-    // Always forward. The clone at the end is where the last turn goes, and
-    // the effect below moves the row off it.
-    const id = window.setInterval(() => setIndex((i) => i + 1), AUTOPLAY_MS);
+    /*
+      Always forward, and never past the end of the track. The clone at the
+      end is where the last turn goes and the effect below moves the row off
+      it — but a background tab coalesces timers, so this tick can land
+      before that one has run. An unbounded `i + 1` then walks off the row.
+    */
+    const id = window.setInterval(
+      () => setIndex((i) => (i >= count + 1 ? 2 : i + 1)),
+      AUTOPLAY_MS,
+    );
     return () => window.clearInterval(id);
   }, [multi, paused, nudgedAt, count]);
 
@@ -699,8 +753,13 @@ export function HeroCarousel({
    */
   useEffect(() => {
     if (count === 0) return;
-    if (index !== 0 && index !== count + 1) return;
-    const landing = index === 0 ? count : 1;
+    if (index > 0 && index < count + 1) return;
+    /*
+      `<= 0` and `>= count + 1` rather than `=== `, so an index that has got
+      out of range by any route still comes home. The two callers are bounded
+      now; this is what stops a blank band being permanent if one ever is not.
+    */
+    const landing = index <= 0 ? count : 1;
     const id = window.setTimeout(() => {
       setSnapBack(true);
       setIndex(landing);
@@ -708,12 +767,39 @@ export function HeroCarousel({
     return () => window.clearTimeout(id);
   }, [index, count]);
 
-  /** And the transition comes straight back, so the NEXT move animates. */
+  /**
+   * The transition comes straight back, so the NEXT move animates — and any
+   * step that was waiting on the jump home goes now.
+   *
+   * TWO frames, not one. A callback booked from an effect can still run
+   * before the browser has drawn the commit that booked it, and a jump home
+   * that is never drawn is a jump that never happened: the browser would see
+   * one move, from the clone to the far side of the row, and animate the lap
+   * backwards. The second frame is the guarantee that it was drawn.
+   *
+   * `index` is a dependency as well as `snapBack`, because a press that
+   * arrives while the row is already coming home leaves `snapBack` set and
+   * would otherwise leave its step queued for ever.
+   */
   useEffect(() => {
     if (!snapBack) return;
-    const id = window.requestAnimationFrame(() => setSnapBack(false));
-    return () => window.cancelAnimationFrame(id);
-  }, [snapBack]);
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        setSnapBack(false);
+        const direction = pendingStep.current;
+        if (direction === 0) return;
+        pendingStep.current = 0;
+        const next = indexRef.current + direction;
+        indexRef.current = next;
+        setIndex(next);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+    };
+  }, [snapBack, index]);
 
   /** The pause a press buys, and then gives back. */
   useEffect(() => {
