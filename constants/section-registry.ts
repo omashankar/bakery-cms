@@ -634,6 +634,73 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      SHIPS EMPTY, and that is the setting rather than an unfinished one.
+
+      This band is a shop writing about its own trade, at whatever length it
+      wants. Anything seeded here would publish as that shop's words on its
+      own homepage without anybody writing them — and this CMS does not know
+      what the shop sells, let alone what it would want to say about it.
+    */
+    type: "seo-prose",
+    label: "About what you sell",
+    icon: "Text",
+    defaultBackground: "cream",
+    defaultContent: {
+      overline: "",
+      title: "",
+      blocks: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        key: "blocks",
+        label: "Paragraphs",
+        type: "list",
+        emptyHint: "Nothing written yet — this section will not appear on the page.",
+        itemFields: [
+          { key: "heading", label: "Heading", type: "text" },
+          { key: "body", label: "Text", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "blog-cards",
+    label: "From the blog",
+    icon: "Newspaper",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      ctaLabel: "",
+      ctaHref: "",
+      posts: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "ctaLabel", label: "Link label", type: "text" },
+      { key: "ctaHref", label: "Link", type: "url" },
+      {
+        key: "posts",
+        label: "Articles",
+        type: "list",
+        emptyHint: "No articles — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Picture", type: "url", isImage: true },
+          { key: "title", label: "Headline", type: "text" },
+          { key: "excerpt", label: "Standfirst", type: "textarea" },
+          { key: "meta", label: "Date or byline", type: "text" },
+          { key: "href", label: "Link", type: "url" },
+        ],
+      },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

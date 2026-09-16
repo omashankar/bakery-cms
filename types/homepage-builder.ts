@@ -54,6 +54,15 @@ export type HomepageSectionType =
   | "instagram"
   | "faq"
   | "newsletter"
+  /**
+   * The block of prose at the foot of a shop's homepage.
+   *
+   * Every storefront of this kind carries one, and it is the shop's own
+   * writing about what it sells — not a band this CMS can fill in.
+   */
+  | "seo-prose"
+  /** A row of the shop's own articles, linked out. */
+  | "blog-cards"
   | "cta";
 
 /**

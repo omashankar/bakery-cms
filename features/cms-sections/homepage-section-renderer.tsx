@@ -1237,6 +1237,143 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
  * catalogue category, which is why `CategoriesSection` cannot express them:
  * that one is driven by the taxonomy and can only point at a category page.
  */
+/**
+ * THE SHOP'S OWN WRITING, folded away until somebody wants it.
+ *
+ * A storefront of this kind carries a long block of prose at the foot of the
+ * homepage. Left open it is most of the page's height for the part of it
+ * that is read least, so the first paragraph stands and the rest is behind a
+ * control — which is what the layout this is drawn from does too.
+ *
+ * The toggle is NOT rendered when there is only one paragraph: a control
+ * that reveals nothing is worse than no control.
+ */
+function SeoProseSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const blocks = renderableRows(parseListField(c, "blocks"));
+  const [open, setOpen] = useState(false);
+
+  if (blocks.length === 0) return null;
+
+  const shown = open ? blocks : blocks.slice(0, 1);
+
+  return (
+    <SectionShell {...props}>
+      <SectionHeader
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        align="left"
+        className="mb-4"
+      />
+      <div className="space-y-4">
+        {shown.map((block, index) => (
+          <div key={`${block.heading}-${index}`} className="space-y-1.5">
+            {block.heading ? (
+              <h3 className="text-sm font-semibold text-foreground">{block.heading}</h3>
+            ) : null}
+            {block.body ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                {block.body}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {blocks.length > 1 ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            /*
+              The shell makes the whole band a select target in the builder,
+              so without this an admin pressing Read more selects the section
+              and never sees the text open.
+            */
+            event.stopPropagation();
+            setOpen((value) => !value);
+          }}
+          className="mt-4 text-sm font-semibold text-bakery-700 underline-offset-4 hover:underline"
+          aria-expanded={open}
+        >
+          {open ? "Show less" : "Read more"}
+        </button>
+      ) : null}
+    </SectionShell>
+  );
+}
+
+/** A row of the shop's own articles. Empty is not a band. */
+function BlogCardsSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const posts = renderableRows(parseListField(c, "posts"));
+  const ctaHref = contentString(c, "ctaHref");
+  const ctaLabel = contentString(c, "ctaLabel");
+
+  if (posts.length === 0) return null;
+
+  return (
+    <SectionShell {...props}>
+      {/* The link sits on the heading line, the same as every product row. */}
+      <div className="flex items-end justify-between gap-4">
+        <div className="hidden flex-1 sm:block" aria-hidden="true" />
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+          className="mb-0"
+        />
+        <div className="hidden flex-1 justify-end sm:flex">
+          {ctaHref && ctaLabel ? (
+            <Button variant="outline" size="sm" render={<Link href={ctaHref} />}>
+              {ctaLabel}
+              <ArrowRight className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+        {posts.map((post, index) => {
+          const body = (
+            <>
+              <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+                <SafeImage src={post.image ?? ""} alt={post.title ?? ""} />
+              </div>
+              <div className="space-y-1.5 p-4">
+                {post.meta ? (
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {post.meta}
+                  </p>
+                ) : null}
+                {post.title ? (
+                  <h3 className="font-heading text-sm font-semibold leading-snug">{post.title}</h3>
+                ) : null}
+                {post.excerpt ? (
+                  <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                    {post.excerpt}
+                  </p>
+                ) : null}
+              </div>
+            </>
+          );
+
+          // Same resting lift as the product cards, so one page draws one card.
+          const card =
+            "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg";
+
+          return post.href ? (
+            <Link key={`${post.title}-${index}`} href={post.href} className={card}>
+              {body}
+            </Link>
+          ) : (
+            <article key={`${post.title}-${index}`} className={card}>
+              {body}
+            </article>
+          );
+        })}
+      </div>
+    </SectionShell>
+  );
+}
+
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const tiles = renderableRows(parseListField(c, "tiles"));
@@ -1924,6 +2061,10 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <PromoCollageSection {...props} />;
     case "tile-grid":
       return <TileGridSection {...props} />;
+    case "seo-prose":
+      return <SeoProseSection {...props} />;
+    case "blog-cards":
+      return <BlogCardsSection {...props} />;
     case "offers":
       return <OffersSection {...props} />;
     case "wedding":
