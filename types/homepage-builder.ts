@@ -1,4 +1,16 @@
-export type SectionBackground = "white" | "cream";
+/**
+ * The ground a band is drawn on.
+ *
+ * "white" and "cream" are full-width: the colour runs to both edges of the
+ * window and the band's content sits in the page's column.
+ *
+ * "panel" is not a ground at all, it is a CARD. The band stays white and the
+ * content is drawn inside a rounded tinted box inset from the edges — the
+ * shape the reference layout gives the rows it wants to lift out of the page
+ * (its bestseller rails, its trust strip). A stripe says 'a different part of
+ * the page'; a card says 'this row, in particular'.
+ */
+export type SectionBackground = "white" | "cream" | "panel";
 
 export type HomepageSectionType =
   | "hero"

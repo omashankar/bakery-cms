@@ -609,6 +609,7 @@ export function SectionEditorPanel<T extends BuilderEditableSection>({
               >
                 <option value="white">White</option>
                 <option value="cream">Cream</option>
+                <option value="panel">Card — tinted, inset from the edges</option>
               </AdminSelect>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">{settingsNote}</p>

@@ -114,13 +114,39 @@ describe("a section's Background setting", () => {
   }
 
   it("computes the background from the stored setting in both renderers", () => {
+    /*
+      Matched as a SHAPE, not as one line of source. This pinned the exact
+      string including its whitespace, so wrapping the expression across two
+      lines — which is what adding a third background did — failed a test
+      about where the value comes from.
+    */
     for (const file of [
       "features/cms-sections/homepage-section-renderer.tsx",
       "features/cms-sections/wedding-section-renderer.tsx",
     ]) {
-      expect(code(file), file).toContain(
-        'const bgClass = section.background === "cream" ? "surface-cream" : "bg-white"',
+      expect(code(file), file).toMatch(
+        /const bgClass =\s*section\.background === "cream" \? "surface-cream" : "bg-white"/,
       );
     }
+  });
+
+  it("and the homepage draws a card rather than a stripe when asked for one", () => {
+    /**
+     * The third background is not a ground: `panel` leaves the band white and
+     * tints a rounded box inside the page's column, which is the shape the
+     * reference gives the rows it wants lifted out of the page.
+     *
+     * `fullBleed` has to win. The hero is the only caller, and a band that has
+     * asked to run to both edges of the window cannot also be inset from them
+     * — a panel there would put a frame round the picture.
+     */
+    const body = code("features/cms-sections/homepage-section-renderer.tsx");
+
+    expect(body, "the panel background is gone").toContain(
+      'const panel = section.background === "panel" && !fullBleed;',
+    );
+    expect(body, "the panel is not drawn as an inset card").toContain(
+      'surface-cream rounded-2xl',
+    );
   });
 });

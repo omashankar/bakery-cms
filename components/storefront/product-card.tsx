@@ -174,9 +174,17 @@ export function ProductCard({
         </Button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2.5 p-3.5">
+      {/*
+        CENTRED, under the middle of the picture above it.
+
+        Left-aligned text under a centred photograph reads as two different
+        layouts stacked, and at four cards across it is four ragged left edges
+        against four centred subjects. The layout this is drawn from centres
+        the name and the price under every card.
+      */}
+      <div className="flex flex-1 flex-col gap-2 p-3 text-center">
         <div className="space-y-1">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-center gap-2">
             <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {cake.category}
             </p>
@@ -198,7 +206,10 @@ export function ProductCard({
         </div>
 
         <div className={cn("mt-auto", showAddToCart && "space-y-3")}>
-          <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
+          {/* The price row centres with the rest of the card. */}
+          <div className="flex justify-center">
+            <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
+          </div>
           {showAddToCart ? (
             <Button
               type="button"

@@ -229,7 +229,17 @@ function SectionShell({
    *
    * A section may override its PADDING here. It may not override its background.
    */
-  const bgClass = section.background === "cream" ? "surface-cream" : "bg-white";
+  /**
+   * A CARD, not a stripe.
+   *
+   * `panel` leaves the band white and tints a rounded box inside the page's
+   * column instead. `fullBleed` wins, because a band that has asked to run to
+   * both edges of the window cannot also be inset from them — the hero is the
+   * only caller and a panel there would be a picture with a frame round it.
+   */
+  const panel = section.background === "panel" && !fullBleed;
+  const bgClass =
+    section.background === "cream" ? "surface-cream" : "bg-white";
   // Hero runs its own entrance; the builder preview must stay fully visible while editing.
   // noReveal: the section reveals its own parts (e.g. staggered card grids).
   const revealOnScroll = !interactive && section.type !== "hero" && !noReveal;
@@ -268,7 +278,15 @@ function SectionShell({
         )
       ) : (
         <div className={layoutSpacing.container}>
-          {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
+          {panel ? (
+            <div className="surface-cream rounded-2xl px-4 py-6 sm:px-6 sm:py-8">
+              {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
+            </div>
+          ) : revealOnScroll ? (
+            <ScrollReveal>{children}</ScrollReveal>
+          ) : (
+            children
+          )}
         </div>
       )}
     </section>
