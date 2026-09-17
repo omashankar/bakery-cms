@@ -235,10 +235,20 @@ export function ProductCard({
         of those across a row have four different shapes.
       */}
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <div className="space-y-1">
-          <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            {cake.category}
-          </p>
+        {/*
+          NO CATEGORY OVER THE NAME.
+
+          It was a small uppercase line above every product — ENGAGEMENT CAKE,
+          PHOTO CAKES — and the shop asked for it to go. It is worth saying
+          why it is no loss: on a row the customer reached BY category, it
+          repeats the heading four times; and the card already links to the
+          product, where the category is on the page it lands on.
+
+          The wrapper stays. It holds the name, and the name alone wraps to
+          two lines, so the div is what keeps the price pinned to the bottom
+          of a card whose neighbour has a one-line name.
+        */}
+        <div>
           <h3 className="font-heading text-sm font-semibold leading-snug">
             <Link
               href={routes.store.cake(cake.slug)}

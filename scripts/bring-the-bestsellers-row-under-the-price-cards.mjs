@@ -1,35 +1,31 @@
 /**
- * THE TABBED RAIL, DIRECTLY UNDER THE CATEGORY PRICE CARDS.
+ * THE BESTSELLERS ROW, DIRECTLY UNDER THE CATEGORY PRICE CARDS.
  *
- *   node --env-file=.env.local scripts/bring-the-tabbed-rail-under-the-price-cards.mjs
+ *   node --env-file=.env.local scripts/bring-the-bestsellers-row-under-the-price-cards.mjs
  *   …add --apply to write.
  *
- * MOVES an existing band rather than adding another. The homepage already has
- * two tabbed rails — `tabbed-rail-top` at order 7 and `tabbed-rail-lower` at
- * 17 — and a third would be the same row three times. The shop asked for this
- * shape directly under the price cards, so the top one goes there.
+ * MOVES a band rather than adding one. The shop wanted the layout's
+ * "Bestsellers" row in this position, and there is exactly one band on this
+ * page entitled to that word: `best-sellers` selects on the product's own
+ * isBestSeller flag. The tabbed rails beside it select on CATEGORY, so calling
+ * one of those Bestsellers would be a claim about what sells that nothing in
+ * the data backs.
  *
- * It also gains its View-all link, which the layout has and this band did not:
- * `ViewAllLink` draws nothing unless BOTH a label and a href are set, so the
- * button has been silently absent.
+ * Nothing about its content is rewritten. It already carries the shop's own
+ * heading, its own line under it and its own View-all link.
  *
- * WHAT IS NOT SET HERE is the heading. The layout this is drawn from says
- * "Bestsellers" over it, and these tabs are CATEGORIES — birthday, wedding,
- * photo cakes. Writing "Bestsellers" over a category listing is a claim about
- * what sells that this file cannot check; the shop has a `best-sellers` band
- * further down that reads the real flag. The heading box is left for the shop.
+ * WHY NO TABS, which the layout has: on this shop's catalogue there are 7
+ * flagged bestsellers across 5 categories — 3 in Birthday and one each in
+ * Pastries, Photo Cakes, Anniversary and Eggless. Tabs over that give a row of
+ * one product per tab. The tabs are worth adding when more products are
+ * flagged, not before.
  */
 import mongoose from "mongoose";
 
 const APPLY = process.argv.includes("--apply");
 
-const ID = "tabbed-rail-top";
+const ID = "best-sellers-6";
 const AFTER = "category-price-cards-1";
-
-const CONTENT_PATCH = {
-  ctaLabel: "View all",
-  ctaHref: "/store/collections",
-};
 
 await mongoose.connect(process.env.MONGODB_URI, {
   bufferCommands: false,
@@ -58,25 +54,32 @@ function rebuild(which) {
   const moving = sections.find((s) => s.instanceId === ID);
   if (!moving) throw new Error(`no such section to move: ${ID}`);
 
-  const patched = { ...moving, content: { ...moving.content, ...CONTENT_PATCH } };
   const rest = sections.filter((s) => s.instanceId !== ID);
   const anchor = rest.findIndex((s) => s.instanceId === AFTER);
   if (anchor < 0) throw new Error(`no such section to sit under: ${AFTER}`);
 
-  const out = [...rest.slice(0, anchor + 1), patched, ...rest.slice(anchor + 1)];
-  return { sections: out.map((s, i) => ({ ...s, order: i })), from: moving.order };
+  const out = [...rest.slice(0, anchor + 1), moving, ...rest.slice(anchor + 1)];
+  return { sections: out.map((s, i) => ({ ...s, order: i })), from: moving.order, moving };
 }
 
 const draft = rebuild("draft");
 const published = rebuild("published");
+const to = published.sections.findIndex((s) => s.instanceId === ID);
 
-console.log(`  ${ID}: order ${published.from} -> ${published.sections.findIndex((s) => s.instanceId === ID)}`);
-console.log(`  gains: ${JSON.stringify(CONTENT_PATCH)}`);
+console.log(`  ${ID}: order ${published.from} -> ${to}`);
+console.log(`  content untouched — heading "${published.moving.content?.title ?? ""}", link "${published.moving.content?.ctaLabel ?? ""}"`);
 console.log(`  sections: ${store.data.published.sections.length} -> ${published.sections.length}  (moved, not added)\n`);
 console.log("  the top of the page reads:");
 for (const s of published.sections.slice(0, 7)) {
   console.log(`    ${String(s.order).padStart(2)}  ${s.type.padEnd(22)}${s.instanceId}`);
 }
+
+// What the row will actually hold, from the shop's own catalogue.
+const products = (await db.collection("products").find({}).toArray()).filter(
+  (p) => p.status === "published" && p.isBestSeller,
+);
+console.log(`\n  ${products.length} products carry the bestseller flag:`);
+for (const p of products.slice(0, 8)) console.log(`    Rs ${String(p.price).padEnd(7)}${p.name}`);
 
 if (!APPLY) {
   console.log("\n  DRY RUN — nothing written.");
