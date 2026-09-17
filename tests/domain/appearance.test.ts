@@ -29,6 +29,7 @@ import {
   defaultAppearanceSettings,
   readableInkOn,
 } from "@/features/site-layout/lib/appearance-tokens";
+import { appearancePresets } from "@/features/site-layout/lib/appearance-utils";
 import type { AppearanceSettings } from "@/types/appearance";
 
 function source(relativePath: string): string {
@@ -90,6 +91,114 @@ describe("the palette as data", () => {
 
     const chrome = code("apps/website/lib/storefront-chrome.server.ts");
     expect(chrome).toContain("appearanceCssVariables(");
+  });
+});
+
+describe("the palettes a shop can start from", () => {
+  /**
+   * This CMS is not a bakery CMS. Three presets shipped and all three were
+   * brown, so a florist or a gift shop had a hex field and nothing else.
+   *
+   * What these guard is not the taste — it is the two ways a palette list
+   * goes wrong without anyone noticing: an id the type offers that no
+   * definition answers (the button does nothing and the shop silently gets
+   * the demo brown), and a palette whose own button cannot be read.
+   */
+  const luminance = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const ch = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+    );
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  /** Hue in degrees, so "is this list all one colour" can be asked. */
+  const hue = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const [r, g, b] = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    if (d === 0) return 0;
+    const h =
+      max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return ((h * 60) % 360 + 360) % 360;
+  };
+
+  it("answers every id the type offers", () => {
+    /*
+      An id in the union with no definition behind it is a preset button that
+      selects nothing: `settingsFromPreset` falls through to
+      `defaultAppearanceSettings`, so the shop clicks Teal and gets the
+      shipped brown, saved, with no error anywhere.
+    */
+    const declared = [
+      ...source("types/appearance.ts")
+        .slice(0, source("types/appearance.ts").indexOf(";"))
+        .matchAll(/"([a-z-]+)"/g),
+    ]
+      .map((m) => m[1])
+      .filter((id) => id !== "custom")
+      .sort();
+
+    expect(declared.length, "no preset ids found in the type").toBeGreaterThan(2);
+    expect(appearancePresets.map((p) => p.id).sort()).toEqual(declared);
+  });
+
+  it("gives every palette a button whose words can be read", () => {
+    for (const preset of appearancePresets) {
+      const ink = readableInkOn(preset.primaryColor);
+
+      expect(
+        contrast(ink, preset.primaryColor),
+        `${preset.name}: ${ink} on ${preset.primaryColor} is unreadable`,
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(preset.primaryColor, preset.surfaceColor),
+        `${preset.name}: its own brand colour cannot be read on its own surface`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps every surface light, because the storefront is", () => {
+    // The Appearance screen promises "the public website stays light". A dark
+    // surface would also collapse --cream-100/200/--beige into each other,
+    // because the shading is flat sRGB arithmetic.
+    for (const preset of appearancePresets) {
+      expect(luminance(preset.surfaceColor), `${preset.name} has a dark surface`)
+        .toBeGreaterThan(0.75);
+    }
+  });
+
+  it("is not all one colour, which is what it was", () => {
+    /*
+      The three that shipped were #6f4e37, #4a3324 and #7a4a3a — the same
+      warm brown three times. A shop that does not sell cakes had no starting
+      point at all and had to hand-type hex.
+    */
+    const families = new Set(
+      appearancePresets.map((p) => Math.round(hue(p.primaryColor) / 40)),
+    );
+
+    expect(
+      families.size,
+      `every preset is the same hue: ${appearancePresets.map((p) => p.primaryColor).join(", ")}`,
+    ).toBeGreaterThanOrEqual(4);
+  });
+
+  it("names a colour rather than a trade", () => {
+    // "Classic Bakery" was the first thing a non-bakery shop read here.
+    for (const preset of appearancePresets) {
+      expect(
+        `${preset.name} ${preset.description}`.toLowerCase(),
+        `${preset.name} names a trade`,
+      ).not.toMatch(/bakery|cake|bakes|patisserie/);
+    }
   });
 });
 

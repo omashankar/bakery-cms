@@ -39,12 +39,14 @@ import { APPEARANCE_UPDATED_EVENT } from "@/features/site-layout/lib/appearance-
 import { AppearancePreview } from "./appearance-preview";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
+// The shipped palette, asked for rather than copied out again — this held a
+// fourth hand-written copy of the demo brown.
 const EMPTY_OVERVIEW: AppearanceOverview = {
   presetLabel: "—",
   isCustom: false,
-  borderRadius: 12,
-  primaryColor: "#6f4e37",
-  accentColor: "#d4a373",
+  borderRadius: defaultAppearanceSettings.borderRadius,
+  primaryColor: defaultAppearanceSettings.primaryColor,
+  accentColor: defaultAppearanceSettings.accentColor,
 };
 
 /*

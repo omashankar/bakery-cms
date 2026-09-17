@@ -29,8 +29,8 @@ export type { ApplyAppearanceOptions };
 export const appearancePresets: AppearancePresetDefinition[] = [
   {
     id: "classic",
-    name: "Classic Bakery",
-    description: "Brown primary, cream surfaces, minimal gold accent.",
+    name: "Classic Cream",
+    description: "Warm brown primary, cream surfaces, a soft gold accent.",
     primaryColor: "#6f4e37",
     accentColor: "#d4a373",
     surfaceColor: "#faf8f4",
@@ -53,6 +53,62 @@ export const appearancePresets: AppearancePresetDefinition[] = [
     accentColor: "#d4a373",
     surfaceColor: "#fdf8f6",
     swatches: ["#7a4a3a", "#d4a373", "#fdf8f6", "#ffffff"],
+  },
+  /*
+    NOT BROWN, which is the whole reason these five are here.
+
+    Every primary is dark enough that `readableInkOn` answers white and the
+    button clears 4.5:1 with room to spare — measured, lowest is 7.3:1
+    across all eight — and every surface is light, because the storefront is
+    light-only and the Appearance screen says so.
+
+    Named for the colour, never for a trade: a shop that sells flowers
+    should not have to read past three kinds of cake to find its palette.
+  */
+  {
+    id: "ink",
+    name: "Ink",
+    description: "Deep navy with a muted gold accent on cool white.",
+    primaryColor: "#1f2a44",
+    accentColor: "#c8a04a",
+    surfaceColor: "#f5f7fa",
+    swatches: ["#1f2a44", "#c8a04a", "#f5f7fa", "#ffffff"],
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    description: "Deep green with a warm amber accent on a soft green white.",
+    primaryColor: "#24543f",
+    accentColor: "#d99a3e",
+    surfaceColor: "#f3f8f4",
+    swatches: ["#24543f", "#d99a3e", "#f3f8f4", "#ffffff"],
+  },
+  {
+    id: "plum",
+    name: "Plum",
+    description: "Deep purple with a dusty rose accent on a pale blush.",
+    primaryColor: "#5b2e59",
+    accentColor: "#c97b9c",
+    surfaceColor: "#f8f3f7",
+    swatches: ["#5b2e59", "#c97b9c", "#f8f3f7", "#ffffff"],
+  },
+  {
+    id: "teal",
+    name: "Teal",
+    description: "Deep teal with a bright orange accent on a cool white.",
+    primaryColor: "#0f4c5c",
+    accentColor: "#e36414",
+    surfaceColor: "#f1f6f8",
+    swatches: ["#0f4c5c", "#e36414", "#f1f6f8", "#ffffff"],
+  },
+  {
+    id: "slate",
+    name: "Slate",
+    description: "Neutral grey-blue with a soft green accent. The quietest of these.",
+    primaryColor: "#33404d",
+    accentColor: "#5b8c85",
+    surfaceColor: "#f6f7f8",
+    swatches: ["#33404d", "#5b8c85", "#f6f7f8", "#ffffff"],
   },
 ];
 
