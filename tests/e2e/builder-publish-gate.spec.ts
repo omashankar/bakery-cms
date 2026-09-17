@@ -19,7 +19,6 @@ import { adminSession } from "./admin-session";
  */
 const BUILDERS = [
   { name: "homepage", path: "/admin/builders/homepage", api: "**/api/homepage-sections" },
-  { name: "wedding", path: "/admin/builders/wedding", api: "**/api/wedding-sections" },
 ];
 
 for (const builder of BUILDERS) {
