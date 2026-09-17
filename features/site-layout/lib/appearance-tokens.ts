@@ -114,6 +114,59 @@ function shadeHex(base: string, amount: number): string {
   return `#${shade(r)}${shade(g)}${shade(b)}`;
 }
 
+/**
+ * THE INK THAT CAN BE READ ON A GIVEN FILL.
+ *
+ * `--primary-foreground` was the literal `"#ffffff"`, welded to whatever
+ * `primaryColor` the shop had picked, and nothing anywhere in this pipeline
+ * looked at how light that colour was. Measured in a browser on the real
+ * storefront button:
+ *
+ *   the shipped brown #6f4e37   white on it   7.44:1   fine
+ *   a pale mint      #a8e6cf   white on it   1.41:1   invisible
+ *   a pale yellow    #ffe66d   white on it   1.25:1   invisible
+ *
+ * 4.5:1 is the line at which body text is considered readable. A shop that
+ * picks a pale brand colour — the most likely thing a shop that does not
+ * sell cakes does — gets an Add to Cart button with no words on it, and the
+ * Appearance preview shows the same unreadable button, so it reads as
+ * intended rather than broken.
+ *
+ * So the ink is CHOSEN rather than assumed: white or the page's own dark,
+ * whichever the eye can actually read. Not exposed as a setting, because a
+ * picker would only let an owner choose wrong twice.
+ */
+const DARK_INK = "#2d2d2d";
+
+/** WCAG relative luminance, sRGB. 0 is black, 1 is white. */
+function relativeLuminance(hex: string): number {
+  const normalized = normalizeHexColor(hex).replace("#", "");
+  if (normalized.length !== 6) return 0;
+  const num = parseInt(normalized, 16);
+  if (Number.isNaN(num)) return 0;
+  const channel = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel((num >> 16) & 255);
+  const g = channel((num >> 8) & 255);
+  const b = channel(num & 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a: string, b: string): number {
+  const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort(
+    (x, y) => y - x
+  );
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+export function readableInkOn(fill: string): string {
+  return contrastRatio("#ffffff", fill) >= contrastRatio(DARK_INK, fill)
+    ? "#ffffff"
+    : DARK_INK;
+}
+
 export type ApplyAppearanceOptions = {
   /**
    * When true, always write light semantic tokens (--primary, --muted, …).
@@ -174,9 +227,9 @@ export function appearanceCssVariables(
   return {
     ...brand,
     "--primary": primaryColor,
-    "--primary-foreground": "#ffffff",
+    "--primary-foreground": readableInkOn(primaryColor),
     "--sidebar-primary": primaryColor,
-    "--sidebar-primary-foreground": "#ffffff",
+    "--sidebar-primary-foreground": readableInkOn(primaryColor),
     "--ring": accentColor,
     "--sidebar-ring": accentColor,
     "--secondary": surfaceColor,

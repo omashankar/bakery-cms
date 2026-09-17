@@ -27,6 +27,7 @@ afterEach(() => {
 import {
   appearanceCssVariables,
   defaultAppearanceSettings,
+  readableInkOn,
 } from "@/features/site-layout/lib/appearance-tokens";
 import type { AppearanceSettings } from "@/types/appearance";
 
@@ -89,6 +90,62 @@ describe("the palette as data", () => {
 
     const chrome = code("apps/website/lib/storefront-chrome.server.ts");
     expect(chrome).toContain("appearanceCssVariables(");
+  });
+});
+
+describe("the ink on a shop's own brand colour", () => {
+  /**
+   * `--primary-foreground` was the literal "#ffffff", welded to whatever the
+   * shop had picked, with no luminance check anywhere in the pipeline.
+   * Measured on the real storefront button: the shipped brown reads at
+   * 7.44:1, a pale mint at 1.41:1, a pale yellow at 1.25:1. The last two are
+   * a button with no words on it — and the Appearance preview showed the
+   * same unreadable button, so it read as a choice rather than a fault.
+   */
+  const luminance = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const ch = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+    );
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("stays white on a dark brand colour, as it always was", () => {
+    expect(readableInkOn("#6f4e37")).toBe("#ffffff");
+    expect(appearanceCssVariables(defaultAppearanceSettings)["--primary-foreground"]).toBe(
+      "#ffffff",
+    );
+  });
+
+  it("turns dark on a pale one, rather than leaving the button blank", () => {
+    for (const pale of ["#a8e6cf", "#ffe66d", "#f7d6e0", "#ffffff"]) {
+      const ink = readableInkOn(pale);
+
+      expect(ink, `white was kept on ${pale}`).not.toBe("#ffffff");
+      expect(contrast(ink, pale), `${ink} on ${pale} is still unreadable`).toBeGreaterThan(4.5);
+    }
+  });
+
+  it("reaches the token a button actually paints with", () => {
+    const vars = appearanceCssVariables({ ...CUSTOM, primaryColor: "#ffe66d" });
+
+    expect(vars["--primary-foreground"]).toBe(readableInkOn("#ffe66d"));
+    expect(vars["--sidebar-primary-foreground"]).toBe(readableInkOn("#ffe66d"));
+  });
+
+  it("is never left as a hardcoded white in the generator", () => {
+    // The whole defect in one line: a literal here cannot see the fill.
+    const tokens = code("features/site-layout/lib/appearance-tokens.ts");
+
+    expect(tokens).not.toMatch(/"--primary-foreground":s*"#ffffff"/);
+    expect(tokens).not.toMatch(/"--sidebar-primary-foreground":s*"#ffffff"/);
   });
 });
 
