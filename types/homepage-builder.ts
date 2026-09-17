@@ -71,6 +71,7 @@ export type HomepageSectionType =
    */
   | "tile-grid"
   | "banner-grid"
+  | "category-price-cards"
   | "category-rail"
   | "photo-cakes"
   | "eggless"

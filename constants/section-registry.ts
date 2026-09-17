@@ -766,6 +766,83 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      A ROW OF CATEGORIES WITH THE CHEAPEST THING IN EACH.
+
+      THE PRICE IS NOT A FIELD, and that is the point of this entry. It is
+      the lowest price among the products actually in the chosen category,
+      read at render time. A `Starting from` box an admin could type into
+      would be a price this CMS cannot keep true: the shop edits a product,
+      the row keeps advertising last month's number, and the customer
+      arrives at a page that disagrees with the card that sent them.
+
+      Everything else IS a field, because everything else is a choice: which
+      categories, in what order, on which tint, behind which picture.
+
+      Ships empty. There is no sensible default set of categories — they are
+      whatever this shop named its own.
+    */
+    type: "category-price-cards",
+    label: "Category cards with prices",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      description: "",
+      ctaLabel: "",
+      ctaHref: "",
+      priceLabel: "Starting from",
+      items: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
+      {
+        key: "priceLabel",
+        label: "Wording before the price",
+        type: "text",
+        placeholder: "Starting from",
+      },
+      {
+        key: "items",
+        label: "Cards",
+        type: "list",
+        emptyHint: "No cards — this section will not appear on the page.",
+        itemFields: [
+          {
+            key: "categorySlug",
+            label: "Shows",
+            type: "select",
+            // Filled from the shop's own catalogue when the editor renders.
+            optionsFrom: "categories",
+          },
+          { key: "image", label: "Picture", type: "url", isImage: true },
+          {
+            key: "tone",
+            label: "Tint behind the picture",
+            type: "select",
+            options: [
+              { label: "Rose", value: "rose" },
+              { label: "Mint", value: "mint" },
+              { label: "Sand", value: "sand" },
+              { label: "Sky", value: "sky" },
+              { label: "Neutral", value: "neutral" },
+            ],
+          },
+          {
+            key: "label",
+            label: "Name shown (blank uses the category's own)",
+            type: "text",
+          },
+        ],
+      },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

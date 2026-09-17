@@ -1455,6 +1455,128 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/** The four band tints, per card rather than per band. */
+const CARD_TONES: Record<string, string> = {
+  rose: "bg-band-rose",
+  mint: "bg-band-mint",
+  sand: "bg-band-sand",
+  sky: "bg-band-sky",
+  neutral: "bg-cream-200",
+};
+
+/**
+ * THE CHEAPEST THING IN A CATEGORY, or nothing at all.
+ *
+ * Read from the rail the server already built for that slug, so the number
+ * on the card is the number on the page the card links to. `null` when the
+ * shop has no products in that category yet, and `null` in the builder
+ * preview, where `categoryRails` is absent by design — a card that says
+ * nothing about price is honest, and one that says a price nobody can buy
+ * at is not.
+ */
+function startingPriceOf(rail: LandingProduct[] | undefined): number | null {
+  const prices = (rail ?? [])
+    .map((product) => product.price)
+    .filter((price) => typeof price === "number" && Number.isFinite(price) && price > 0);
+
+  return prices.length ? Math.min(...prices) : null;
+}
+
+function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const items = renderableRows(parseListField(c, "items"));
+
+  if (items.length === 0) return null;
+
+  /*
+    The shop's own categories, for the NAME on each card. Typing it again
+    into the row would be a second copy that stops agreeing with the
+    catalogue the moment a category is renamed — so the row holds a slug,
+    and `label` is only there for a shop that wants the card to read
+    differently from the category itself.
+  */
+  const categories = props.categories ?? getHomepageCategories(24);
+  const nameOf = new Map(categories.map((category) => [category.slug, category.name]));
+  const priceLabel = contentString(c, "priceLabel") || "Starting from";
+
+  return (
+    <SectionShell {...props}>
+      {/*
+        A CENTRED HEADING WITH THE LINK PINNED BESIDE IT.
+
+        Centring the header and floating the link is what the layout does,
+        and it only works while the link is out of the flow — inside it, the
+        heading centres on the space LEFT OVER and sits visibly off-centre.
+        Absolute from `sm` up, and below the heading on a phone, where
+        there is no room beside it.
+      */}
+      <div className="relative mb-6">
+        <SectionHeader
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          description={contentString(c, "description")}
+          className="mb-0"
+        />
+        <div className="mt-4 flex justify-center sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:items-center">
+          <ViewAllLink
+            href={contentString(c, "ctaHref")}
+            label={contentString(c, "ctaLabel")}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
+        {items.map((item, index) => {
+          const slug = (item.categorySlug ?? "").trim();
+          const name = (item.label ?? "").trim() || nameOf.get(slug) || "";
+          const tone = CARD_TONES[(item.tone ?? "").trim()] ?? CARD_TONES.neutral;
+          const price = startingPriceOf(props.categoryRails?.[slug]);
+
+          const card = (
+            <>
+              <div className={cn("relative aspect-square", tone)}>
+                {/*
+                  CONTAINED, not covered. These are cut-out product pictures
+                  sitting ON the tint — that is the whole reason the tint is
+                  there. `object-cover` would fill the box and hide it, and
+                  a square photograph letterboxes onto the tint rather than
+                  being cropped to it.
+                */}
+                <SafeImage src={item.image} alt="" className="object-contain p-4 sm:p-5" />
+              </div>
+              <div className="px-2 py-3 text-center">
+                {name ? (
+                  <p className="line-clamp-2 text-[13px] font-semibold text-foreground sm:text-sm">
+                    {name}
+                  </p>
+                ) : null}
+                {price !== null ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {priceLabel} {formatCurrency(price)}
+                  </p>
+                ) : null}
+              </div>
+            </>
+          );
+
+          const box =
+            "flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs";
+
+          return slug ? (
+            <Link key={`${slug}-${index}`} href={routes.store.collection(slug)} className={box}>
+              {card}
+            </Link>
+          ) : (
+            <div key={`${item.image}-${index}`} className={box}>
+              {card}
+            </div>
+          );
+        })}
+      </div>
+    </SectionShell>
+  );
+}
+
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const tiles = renderableRows(parseListField(c, "tiles"));
@@ -2155,6 +2277,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <PromoCollageSection {...props} />;
     case "banner-grid":
       return <BannerGridSection {...props} />;
+    case "category-price-cards":
+      return <CategoryPriceCardsSection {...props} />;
     case "tile-grid":
       return <TileGridSection {...props} />;
     case "seo-prose":
