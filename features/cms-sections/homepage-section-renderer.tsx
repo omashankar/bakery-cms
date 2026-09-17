@@ -588,15 +588,18 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
 
   return (
     /*
-      TIGHTER THAN A CONTENT BAND, because it is not one.
+      THE OVERRIDE IS GONE, and that is what closed the gap under this strip.
 
-      The shell's own `py-16 sm:py-20 lg:py-24` is the rhythm for a band with
-      a heading and a paragraph and a grid of cards in it. This is a strip of
-      links — the way into the catalogue, usually directly under the hero —
-      and at 96px top and bottom it floated half a screen from the thing it
-      belongs to.
+      It set `py-8 sm:py-10 lg:py-12` because the shell's own rhythm was then
+      `py-16 sm:py-20 lg:py-24` — 96px top and bottom, which floated a strip
+      of links half a screen from the hero it belongs under.
+
+      The shell is `bandY` now, and tighter than the override ever was. So
+      the override had quietly become the loosest band on the page: the exact
+      opposite of the thing it was written to fix, and the gap the shop
+      pointed at. A band that wants the page's rhythm should not name one.
     */
-    <SectionShell {...props} className="py-8 sm:py-10 lg:py-12">
+    <SectionShell {...props}>
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
