@@ -98,12 +98,22 @@ describe("the category tiles under the hero", () => {
     return found![0];
   };
 
-  it("frame the picture in the card's own tint rather than being the picture", () => {
+  /*
+    THE TILE TURNED INSIDE OUT, and these three turned with it.
+
+    They used to guard an INSET picture: padding on the card, a radius on the
+    image box, and no clipping on the card because nothing reached its
+    corners. Each of those was a real promise at the time and each is now the
+    opposite of one — the shop looked at three bands at once and asked for the
+    picture to fill the card the way an ecommerce card does.
+
+    Rewritten rather than deleted, because the tile still has to be a tile:
+    the tint, the hairline and the lift all stay, the corners still have to
+    be clipped by SOMETHING, and the name still needs room it no longer
+    inherits from the card.
+  */
+  it("fills the card with the picture, and keeps the tint behind it", () => {
     /**
-     * The image filled the card edge to edge, so a cut-out product photograph
-     * — the kind with no background of its own — floated in a white void.
-     * Inset, the tile reads as a tile.
-     *
      * ALL THREE OF TINT, HAIRLINE AND LIFT, because the tile needs each for a
      * different reason and this went wrong twice by treating them as one.
      * First the tint was `from-cream-50 to-white` — and `--cream-50` is
@@ -111,12 +121,16 @@ describe("the category tiles under the hero", () => {
      * all, only the hairline. Then the tint became real and the hairline was
      * dropped as redundant, leaving a grey-beige slab with no edge.
      *
-     * They are not redundant. The tint gives a cut-out product something to
-     * sit on, the hairline says where the tile stops against a white band,
-     * and the shadow lifts it off one. This asks for all three.
+     * They are not redundant. The tint is what shows through a picture with
+     * no background of its own and what fills the card while one loads, the
+     * hairline says where the tile stops against a white band, and the shadow
+     * lifts it off one.
      */
     const tile = tileClasses();
-    expect(tile, "the picture is flush to the card edge").toMatch(/\bp-2\b/);
+
+    expect(tile, "the picture is inset from the card edge again").not.toMatch(
+      /(?:^|\s)(?:sm:|md:|lg:)?p-\d/,
+    );
     expect(tile, "the tint is white, which is not a tint").not.toMatch(
       /bg-cream-50\b|from-cream-50\b/,
     );
@@ -129,29 +143,58 @@ describe("the category tiles under the hero", () => {
     );
   });
 
-  it("and the picture keeps a corner radius inside that frame", () => {
-    // Square corners inside a rounded card is the one combination that looks
-    // like a mistake rather than a choice.
+  it("clips at the card's own corners, so the picture reaches them", () => {
+    /*
+      With no padding the picture runs to the card's edge, so SOMETHING has to
+      round it off — and it has to be the card, because the card is what has
+      the corner. Without this the square paints over a rounded card and
+      squares it off at the top.
+    */
+    const tile = tileClasses();
+
+    expect(tile, "the picture will square off the card's corners").toContain(
+      "overflow-hidden",
+    );
+    expect(tile, "the card has no corner to clip to").toMatch(/\brounded-/);
+  });
+
+  it("and the picture carries no second radius inside that one", () => {
+    /*
+      The image box had `rounded-xl` because it was inset and had to round
+      itself. Now the card clips, and a rounded square floating inside a
+      rounder one is the one combination that reads as a mistake.
+    */
     const body = strip();
     const box = body.indexOf("relative aspect-square w-full");
     expect(box, "the image box is gone").toBeGreaterThan(-1);
 
-    expect(body.slice(box, box + 200)).toContain("rounded-xl");
+    const boxClasses = body.slice(box, body.indexOf('"', box));
+    expect(boxClasses, "two radii, one inside the other").not.toMatch(/\brounded-/);
   });
 
-  it("and the card no longer needs to clip what it contains", () => {
-    /**
-     * `overflow-hidden` was on the card because the image was flush to its
-     * corners. With the image inset and rounded itself, the card clipping
-     * anything would only be hiding a mistake.
-     *
-     * Scoped to the card's OWN class string, not a window past it: the image
-     * box a few lines down legitimately clips, and a fixed-length window
-     * reached it and failed on code that was correct.
-     */
-    const classString = tileClasses();
+  it("gives the name its own room, because the card has none to lend", () => {
+    /*
+      The name read `px-1 pt-2.5 pb-1` and leaned on the card's 8/12px for the
+      rest of its margin. With the card's padding gone it would have touched
+      three edges — and this is the kind of thing that looks like a rendering
+      fault rather than a style choice.
+    */
+    const body = strip();
+    /*
+      Matched as the ELEMENT, not by looking backwards from the text. The
+      first {category.name} in this body is the image's ALT attribute, not
+      the caption — a window before it found the image box every time, and
+      the assertion then failed on a tile that was perfectly correct.
+    */
+    const name = body.match(
+      /<p className="([^"]+)">\s*\{category\.name\}/,
+    );
+    expect(name, "the category name is no longer its own line").toBeTruthy();
 
-    expect(classString.length, "the card class string is unreadable").toBeGreaterThan(40);
-    expect(classString).not.toContain("overflow-hidden");
+    const classes = name![1];
+
+    expect(classes, "the name has no side padding").toMatch(/\bpx-\d/);
+    expect(classes, "the name has no room above it").toMatch(/\bpt-\d/);
+    expect(classes, "the name sits on the card's bottom edge").toMatch(/\bpb-\d/);
   });
 });

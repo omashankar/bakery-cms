@@ -697,23 +697,33 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
 
               cream-100 (#faf8f4) is the lightest tint the palette has that is
               still a tint. shadow-xs is 4% at one pixel.
+
+              THE INSET IS GONE. It was 8px, 12px from `sm`, and it made the
+              tint a frame around the picture. The shop asked for the
+              picture to fill the card the way an ecommerce card does, and
+              said so about all three bands at once.
+
+              So the tint stops framing and becomes a backdrop — what shows
+              through a picture with no background of its own, and what
+              fills the card while one loads. `overflow-hidden` moves HERE:
+              with no padding, the picture reaches the card's own corners,
+              and without it the square would square them off.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl border border-border/70 bg-cream-100 p-2 shadow-xs sm:w-auto sm:p-3"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-cream-100 shadow-xs sm:w-auto"
           >
             {/*
-              A ROUNDED SQUARE, not a circle.
+              A SQUARE, not a circle.
 
               A circle crops a product photograph to its middle — a bouquet
-              loses its stems, a boxed gift loses its corners — and the
-              reference strip is squares for exactly that reason.
+              loses its stems, a boxed gift loses its corners — and the strip
+              this is drawn from is squares for exactly that reason.
 
-              INSET, so the card's own tint frames the picture rather than the
-              picture being the card. That is what the reference shows, and it
-              is what makes a cut-out product image — the kind with no
-              background of its own — read as sitting ON the tile instead of
-              floating in a white void.
+              NO RADIUS OF ITS OWN any more. It had `rounded-xl` because it
+              was inset and had to round itself; now the card clips, and two
+              radii on top of each other is how you get a rounded square
+              floating inside a rounder one.
             */}
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl">
+            <div className="relative aspect-square w-full bg-cream-100">
               {category.image ? (
                 <OptimizedImage
                   src={category.image}
@@ -730,7 +740,12 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-[13px] font-semibold text-foreground sm:text-sm">
+            {/*
+              ITS OWN PADDING, because the card no longer has any. This read
+              `px-1 pt-2.5 pb-1` and leaned on the card's 8/12px for the rest
+              — with that gone the name would have touched three edges.
+            */}
+            <p className="line-clamp-2 px-2 pt-2.5 pb-3 text-center text-[13px] font-semibold text-foreground sm:text-sm">
               {category.name}
             </p>
           </Link>
