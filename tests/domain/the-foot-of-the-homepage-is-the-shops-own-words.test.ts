@@ -160,6 +160,9 @@ describe("the row of the shop's own articles", () => {
 
     expect(body).toContain("shadow-sm");
     expect(body).toContain("border-border/60");
-    expect(body).toContain("hover:shadow-lg");
+    // Was `hover:shadow-lg`. The cards stopped lifting and changing shadow
+    // under the pointer when the shop asked for the design without motion;
+    // what still has to match across the page is the resting style.
+    expect(body).toContain("hover:border-bakery-200");
   });
 });

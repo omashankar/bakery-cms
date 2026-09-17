@@ -138,7 +138,7 @@ export function ProductCard({
           exchange: two ways of separating a card from its ground is one
           too many, and the box drawn round each picture was the heavier.
         */
-        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-bakery-200 hover:shadow-lg",
+        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200",
         className
       )}
     >
@@ -154,7 +154,7 @@ export function ProductCard({
             alt={cake.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover"
           />
         </Link>
         {cake.badge ? (

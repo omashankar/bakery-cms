@@ -257,7 +257,7 @@ function SectionShell({
       data-section-id={section.instanceId}
       onClick={interactive ? onSelect : undefined}
       className={cn(
-        "scroll-mt-4 border-2 border-transparent transition-premium",
+        "scroll-mt-4 border-2 border-transparent",
         bgClass,
         layoutSpacing.bandY,
         /*
@@ -366,7 +366,7 @@ function ViewAllLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase transition-premium hover:bg-cream-300"
+      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase hover:bg-cream-300"
     >
       {label}
     </Link>
@@ -656,7 +656,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               saying where a tile ends is one too many, and the tint is the
               one that also gives a cut-out picture something to sit on.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 transition-premium hover:bg-cream-300 sm:w-auto sm:p-3"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 hover:bg-cream-300 sm:w-auto sm:p-3"
           >
             {/*
               A ROUNDED SQUARE, not a circle.
@@ -677,7 +677,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                   src={category.image}
                   alt={category.name}
                   fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="object-cover"
                   /*
                     120px was only ever right in the eight-across case. At a
                     1023px viewport the four-column grid paints these at about
@@ -846,7 +846,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
             href={routes.store.collection(category.slug)}
             // Same resting lift as the product cards below; a row of tiles
             // and a row of cards on one page should not be drawn two ways.
-            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg"
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200"
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
@@ -1090,7 +1090,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                   onClick={() => setActive(index)}
                   aria-pressed={index === active}
                   className={cn(
-                    "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold transition-premium",
+                    "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold",
                     index === active
                       ? "border-bakery-950 bg-bakery-950 text-white"
                       : "border-border bg-white text-foreground hover:border-bakery-300"
@@ -1194,7 +1194,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
           );
 
           const className = cn(
-            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg",
+            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200",
             // A card with no link is still a card: a banner can be artwork
             // rather than a destination.
             /*
@@ -1343,7 +1343,7 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
 
           // Same resting lift as the product cards, so one page draws one card.
           const card =
-            "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg";
+            "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200";
 
           return post.href ? (
             <Link key={`${post.title}-${index}`} href={post.href} className={card}>
@@ -1408,7 +1408,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
             <Link
               key={`${tile.label}-${index}`}
               href={tile.href}
-              className="group/tile transition-premium hover:opacity-90"
+              className="group/tile hover:opacity-90"
             >
               {body}
             </Link>
@@ -1451,7 +1451,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
           return (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-xl border border-border bg-white p-5 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
+              className="rounded-xl border border-border bg-white p-5 hover:border-bakery-300"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
@@ -1501,7 +1501,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         {items.map((item) => (
           <article
             key={item.id}
-            className="flex flex-col rounded-xl border border-border bg-white p-6 transition-all duration-300 hover:border-bakery-300 hover:shadow-md"
+            className="flex flex-col rounded-xl border border-border bg-white p-6 hover:border-bakery-300"
           >
             <RatingStars rating={item.rating} className="mb-4 text-gold-300" />
             <Quote className="mb-2 size-6 text-gold-300/60" />
@@ -1562,7 +1562,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
                 src={src}
                 alt={title || `Gallery ${index + 1}`}
                 fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                className="object-cover"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
               {title || tag ? (
@@ -1717,7 +1717,10 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
           >
             <div className="relative aspect-[21/9] bg-muted">
               <OptimizedImage src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
-              <div className="absolute inset-0 bg-bakery-950/35 transition-colors group-hover:bg-bakery-950/45" />
+              {/* The scrim stays — the words above it sit on a photograph and
+                  need it to be readable. What went is its darkening under the
+                  pointer, which was decoration. */}
+              <div className="absolute inset-0 bg-bakery-950/35" />
               <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
                 <p className="text-sm font-medium">{banner.title}</p>
                 <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide">
@@ -1889,7 +1892,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
               src={post.image}
               alt=""
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              className="object-cover"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
             />
             <div className="absolute inset-0 flex items-center justify-center bg-bakery-950/0 transition-all duration-300 group-hover:bg-bakery-950/45">

@@ -38,9 +38,16 @@ const SLIDE_MS = 700;
 const RESUME_MS = 12000;
 const SWIPE_THRESHOLD = 48;
 
-/** Staggered entrance — CSS driven, always settles visible (fill-mode both). */
-const reveal =
-  "animate-in fade-in-0 duration-700 [animation-fill-mode:both] motion-reduce:animate-none";
+/**
+ * WAS the staggered entrance: each part of a slide faded and slid in on a
+ * delay. The shop asked for the design without the motion, so it is empty.
+ *
+ * Kept as a constant rather than deleted from its call sites: those also
+ * carry `slide-in-from-*` and `[animation-delay:*]` utilities, and every one
+ * of those is inert on its own — they describe an animation that `animate-in`
+ * is what actually starts.
+ */
+const reveal = "";
 
 
 /**
