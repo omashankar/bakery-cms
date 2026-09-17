@@ -37,6 +37,19 @@ interface ProductCardProps {
    * That is also how the layout this storefront is drawn from does it.
    */
   showAddToCart?: boolean;
+  /**
+   * The wishlist heart, which not every row wants either.
+   *
+   * DEFAULTS TO SHOWN, so the collection grid, search and the wishlist
+   * itself keep it. The homepage rows turn it off: the shop asked for it to
+   * live on the listing and the product page instead, which are the two
+   * places a customer is comparing rather than passing by.
+   *
+   * Separate from `showAddToCart` rather than folded into one "browsing"
+   * flag, because the two are genuinely independent — a row can want the
+   * heart and not the button.
+   */
+  showWishlist?: boolean;
 }
 
 export function ProductCard({
@@ -44,6 +57,7 @@ export function ProductCard({
   variant = "default",
   className,
   showAddToCart = true,
+  showWishlist = true,
 }: ProductCardProps) {
   const labels = useBusinessLabels();
   const [wishlisted, setWishlisted] = useState(false);
@@ -162,16 +176,49 @@ export function ProductCard({
             {cake.badge}
           </Badge>
         ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute top-2.5 right-2.5 border border-border bg-white/95 shadow-sm"
-          onClick={handleWishlist}
-          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-        >
-          <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
-        </Button>
+        {showWishlist ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute top-2.5 right-2.5 border border-border bg-card/95 shadow-sm"
+            onClick={handleWishlist}
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
+          </Button>
+        ) : null}
+        {/*
+          THE RATING, ON THE PICTURE.
+
+          It sat in the price row, at the other end from the price. The shop
+          pointed at a listing where it sits low-left ON the photograph and
+          asked for that — and it is the better place for a second reason:
+          the price row now carries a price, a struck-through price and a
+          discount, and a fourth thing on that line is a scrum.
+
+          THE COUNT IS ONLY DRAWN IF THERE IS ONE. A rating with no reviews
+          behind it is a number this shop has not earned, and `(0)` beside
+          it reads worse than nothing at all.
+        */}
+        {cake.rating ? (
+          <span
+            className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-md border border-border bg-card/95 px-1.5 py-0.5 text-[11px] font-semibold text-foreground shadow-sm"
+            aria-label={
+              cake.reviewCount
+                ? `Rated ${cake.rating} out of 5 from ${cake.reviewCount} reviews`
+                : `Rated ${cake.rating} out of 5`
+            }
+          >
+            {cake.rating}
+            <Star aria-hidden="true" className="size-3 fill-green-700 text-green-700" />
+            {cake.reviewCount ? (
+              <span className="font-normal text-muted-foreground">
+                ({cake.reviewCount.toLocaleString()})
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
 
       {/*
@@ -204,25 +251,14 @@ export function ProductCard({
 
         <div className={cn("mt-auto", showAddToCart && "space-y-3")}>
           {/*
-            THE RATING SITS WITH THE PRICE, at the other end of its row.
+            THE PRICE HAS THE ROW TO ITSELF NOW.
 
-            It used to sit beside the category, in the small grey line at the
-            top — which is where a customer looks last, and it was grey on
-            grey next to it. The price row is where the decision is made, and
-            the rating is part of that decision.
+            The rating used to sit at the other end of it. It has moved onto
+            the picture — where the shop asked for it, and where it leaves
+            this line to the price, the struck-through price and the
+            discount, which is already three things.
           */}
-          <div className="flex items-center justify-between gap-2">
-            <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
-            {cake.rating ? (
-              <span
-                className="flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-semibold text-green-800"
-                aria-label={`Rated ${cake.rating} out of 5`}
-              >
-                {cake.rating}
-                <Star className="size-3 fill-green-700 text-green-700" />
-              </span>
-            ) : null}
-          </div>
+          <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
           {showAddToCart ? (
             <Button
               type="button"
