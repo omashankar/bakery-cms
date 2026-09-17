@@ -47,10 +47,18 @@ const EMPTY_OVERVIEW: AppearanceOverview = {
   accentColor: "#d4a373",
 };
 
+/*
+  THE COLOUR IS NAMED BY ITS JOB, not by what the demo shop happened to pick.
+
+  These read "Primary brown", "Gold accent" and "Cream surface" — so a florist
+  or a gift shop opened this screen and was asked to choose its brown. The
+  hints already say what each colour does; the labels were describing the one
+  palette that shipped with the software.
+*/
 const COLOR_FIELDS = [
-  { key: "primaryColor" as const, label: "Primary brown", hint: "Buttons, links, brand marks" },
-  { key: "accentColor" as const, label: "Gold accent", hint: "Focus rings and highlights" },
-  { key: "surfaceColor" as const, label: "Cream surface", hint: "Soft backgrounds and panels" },
+  { key: "primaryColor" as const, label: "Primary colour", hint: "Buttons, links, brand marks" },
+  { key: "accentColor" as const, label: "Accent colour", hint: "Focus rings and highlights" },
+  { key: "surfaceColor" as const, label: "Surface colour", hint: "Soft backgrounds and panels" },
 ];
 
 export function AppearancePage() {
