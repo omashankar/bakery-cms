@@ -139,6 +139,16 @@ export function buildHomepageProducts(
    * Seasonal happened to work only because its name IS its slug.
    */
   categories?: { name: string; slug: string }[],
+  /**
+   * Return the SELECTION, not a full grid.
+   *
+   * Private to `matchHomepageSource` below, which is the readable name for
+   * it. The padding is a display decision about keeping a grid full, and a
+   * caller that wants to ask "which products carry this flag" must not get
+   * it — least of all by asking for a huge maxCount, which pads with the
+   * entire shop.
+   */
+  unpadded = false,
 ): LandingProduct[] {
   const published = adminProducts.filter((cake) => cake.status === "published");
   const flags = {
@@ -200,6 +210,38 @@ export function buildHomepageProducts(
   };
 
   const matched = sourceMatchers[source]();
+  if (unpadded) return matched;
+  return padRail(source, matched, all, maxCount);
+}
+
+/**
+ * WHAT MATCHES A SOURCE, and nothing else.
+ *
+ * `buildHomepageProducts` pads its answer up to `maxCount` from the wider
+ * catalogue, which is a display decision about keeping a grid full. Any
+ * caller that wants the SELECTION rather than a full grid has to come here
+ * instead — and asking for the selection by calling the padded one with a
+ * huge maxCount does the opposite of what it looks like: it pads with the
+ * entire shop. That is not hypothetical. It shipped for an hour, and the
+ * Bestsellers row's Birthday tab listed eight products of which three were
+ * not bestsellers at all.
+ */
+export function matchHomepageSource(
+  source: HomepageProductSource,
+  adminProducts: Product[],
+  all: LandingProduct[],
+  names?: TaxonomyNames,
+  categories?: { name: string; slug: string }[],
+): LandingProduct[] {
+  return buildHomepageProducts(source, Number.POSITIVE_INFINITY, adminProducts, all, names, categories, true);
+}
+
+function padRail(
+  source: HomepageProductSource,
+  matched: LandingProduct[],
+  all: LandingProduct[],
+  maxCount: number,
+): LandingProduct[] {
   if (matched.length >= maxCount) return matched.slice(0, maxCount);
 
   /**

@@ -26,6 +26,7 @@ import {
   buildCategoryRail,
   categoryStartingPrices,
   buildHomepageProducts,
+  matchHomepageSource,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
 import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
@@ -564,14 +565,9 @@ export async function getHomepageRails(maxCount = 8): Promise<{
   > = {};
 
   for (const source of FLAG_SOURCES) {
-    const flagged = buildHomepageProducts(
-      source,
-      Number.MAX_SAFE_INTEGER,
-      products,
-      all,
-      names,
-      categories,
-    ).map((product) => toCard(product, modules));
+    const flagged = matchHomepageSource(source, products, all, names, categories).map(
+      (product) => toCard(product, modules),
+    );
 
     const byCategory: Record<string, LandingProduct[]> = {};
     for (const category of categories ?? []) {
