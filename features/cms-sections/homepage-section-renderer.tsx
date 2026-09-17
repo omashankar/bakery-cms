@@ -273,7 +273,7 @@ function SectionShell({
           because a section that cannot be outlined cannot be selected.
         */
         fullBleed && !interactive && "border-0",
-        interactive && "cursor-pointer hover:border-bakery-200",
+        interactive && "cursor-pointer",
         selected && "border-bakery-500 ring-2 ring-bakery-200",
         className
       )}
@@ -366,7 +366,7 @@ function ViewAllLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase hover:bg-cream-300"
+      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase"
     >
       {label}
     </Link>
@@ -656,7 +656,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               saying where a tile ends is one too many, and the tint is the
               one that also gives a cut-out picture something to sit on.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 hover:bg-cream-300 sm:w-auto sm:p-3"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 sm:w-auto sm:p-3"
           >
             {/*
               A ROUNDED SQUARE, not a circle.
@@ -688,7 +688,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-[13px] font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
+            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-[13px] font-semibold text-foreground sm:text-sm">
               {category.name}
             </p>
           </Link>
@@ -780,7 +780,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
               {location.phone ? (
                 <a
                   href={`tel:${location.phone.replace(/\s+/g, "")}`}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-bakery-700"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
                 >
                   <Phone className="size-3" />
                   {location.phone}
@@ -846,7 +846,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
             href={routes.store.collection(category.slug)}
             // Same resting lift as the product cards below; a row of tiles
             // and a row of cards on one page should not be drawn two ways.
-            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200"
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm"
           >
             <div className="relative aspect-[4/3] bg-muted">
               {category.image ? (
@@ -1093,7 +1093,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                     "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold",
                     index === active
                       ? "border-bakery-950 bg-bakery-950 text-white"
-                      : "border-border bg-white text-foreground hover:border-bakery-300"
+                      : "border-border bg-white text-foreground"
                   )}
                 >
                   {tab.label || tab.categorySlug}
@@ -1194,7 +1194,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
           );
 
           const className = cn(
-            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200",
+            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
             // A card with no link is still a card: a banner can be artwork
             // rather than a destination.
             /*
@@ -1282,7 +1282,7 @@ function SeoProseSection(props: HomepageSectionRendererProps) {
             event.stopPropagation();
             setOpen((value) => !value);
           }}
-          className="mt-4 text-sm font-semibold text-bakery-700 underline-offset-4 hover:underline"
+          className="mt-4 text-sm font-semibold text-bakery-700 underline-offset-4"
           aria-expanded={open}
         >
           {open ? "Show less" : "Read more"}
@@ -1343,7 +1343,7 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
 
           // Same resting lift as the product cards, so one page draws one card.
           const card =
-            "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200";
+            "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm";
 
           return post.href ? (
             <Link key={`${post.title}-${index}`} href={post.href} className={card}>
@@ -1408,7 +1408,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
             <Link
               key={`${tile.label}-${index}`}
               href={tile.href}
-              className="group/tile hover:opacity-90"
+              className="group/tile"
             >
               {body}
             </Link>
@@ -1451,7 +1451,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
           return (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-xl border border-border bg-white p-5 hover:border-bakery-300"
+              className="rounded-xl border border-border bg-white p-5"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
@@ -1501,7 +1501,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         {items.map((item) => (
           <article
             key={item.id}
-            className="flex flex-col rounded-xl border border-border bg-white p-6 hover:border-bakery-300"
+            className="flex flex-col rounded-xl border border-border bg-white p-6"
           >
             <RatingStars rating={item.rating} className="mb-4 text-gold-300" />
             <Quote className="mb-2 size-6 text-gold-300/60" />
@@ -1565,8 +1565,11 @@ function GallerySection(props: HomepageSectionRendererProps) {
                 className="object-cover"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
+              {/* Shown, not revealed. This was invisible until a pointer
+                  touched it, which is a caption a phone never saw at all. The
+                  scrim is permanent now so the words stay readable. */}
               {title || tag ? (
-                <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/0 p-3 opacity-0 transition-all duration-300 group-hover:bg-bakery-950/45 group-hover:opacity-100">
+                <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/45 p-3">
                   {tag ? (
                     <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
                       {tag}
@@ -1626,7 +1629,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
               <AccordionItem
                 key={faq.id}
                 value={faq.id}
-                className="overflow-hidden rounded-2xl border border-border bg-white transition-colors hover:border-bakery-300"
+                className="overflow-hidden rounded-2xl border border-border bg-white transition-colors"
               >
                 <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
                   {faq.question}
@@ -1895,9 +1898,6 @@ function InstagramSection(props: HomepageSectionRendererProps) {
               className="object-cover"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-bakery-950/0 transition-all duration-300 group-hover:bg-bakery-950/45">
-              <Camera className="size-6 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-            </div>
           </a>
         ))}
       </StaggerReveal>

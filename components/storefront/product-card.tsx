@@ -138,7 +138,7 @@ export function ProductCard({
           exchange: two ways of separating a card from its ground is one
           too many, and the box drawn round each picture was the heavier.
         */
-        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm hover:border-bakery-200",
+        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
         className
       )}
     >
@@ -166,7 +166,7 @@ export function ProductCard({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className="absolute top-2.5 right-2.5 border border-border bg-white/95 shadow-sm hover:bg-white"
+          className="absolute top-2.5 right-2.5 border border-border bg-white/95 shadow-sm"
           onClick={handleWishlist}
           aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
         >
@@ -195,7 +195,7 @@ export function ProductCard({
           <h3 className="font-heading text-sm font-semibold leading-snug">
             <Link
               href={routes.store.cake(cake.slug)}
-              className="line-clamp-2 hover:text-bakery-700"
+              className="line-clamp-2"
             >
               {cake.name}
             </Link>
