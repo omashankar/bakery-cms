@@ -76,8 +76,17 @@ describe("the row that reads its own prices", () => {
   it("reads the cheapest live product instead of a stored number", () => {
     const section = body();
 
-    expect(section, "the card no longer reads the category's own rail").toContain(
-      "props.categoryRails?.[slug]",
+    /*
+      NOT the rail. The rail is capped at ROW_CAP and ordered by curation, so
+      its cheapest member is the cheapest of the first twelve — which was the
+      true minimum only because no category here has twelve products yet, and
+      nothing would have failed the day one did.
+    */
+    expect(section, "the card no longer reads the whole-category minimum").toContain(
+      "props.categoryStartingPrices?.[slug]",
+    );
+    expect(section, "the price is back to the capped rail").not.toContain(
+      "startingPriceOf(props.categoryRails",
     );
     expect(section, "a price is being taken from the row instead of the catalogue").not.toMatch(
       /item\.(price|startingFrom|amount)/,
@@ -95,12 +104,33 @@ describe("the row that reads its own prices", () => {
     expect(at, "startingPriceOf is gone").toBeGreaterThan(-1);
     const fn = src.slice(at, at + 420);
 
-    expect(fn, "an empty category no longer yields nothing").toContain(": null");
+    expect(fn, "an empty category no longer yields nothing").toContain("null");
     expect(fn, "a zero or negative price would be shown as a real one").toMatch(
       /price > 0/,
     );
     expect(body(), "the price line is drawn even when there is no price").toContain(
       "price !== null ?",
+    );
+  });
+
+  it("takes the minimum over the whole category, not over a capped rail", () => {
+    /*
+      The rails are sliced to ROW_CAP. A starting price taken from one is
+      the cheapest of the first twelve products, which stops being the
+      cheapest of the category the moment a thirteenth is added — silently,
+      on a card whose whole job is to name that number.
+    */
+    const rails = codeOf(read("features/products/lib/homepage-rails.ts"));
+    const at = rails.indexOf("export function categoryStartingPrices(");
+    expect(at, "categoryStartingPrices is gone").toBeGreaterThan(-1);
+    const fn = rails.slice(at, at + 700);
+
+    expect(fn, "the price stopped using the catalogue's own membership rule").toContain(
+      "filterProductsByCategory(",
+    );
+    expect(fn, "a cap crept into the whole-category minimum").not.toMatch(/\bslice\(/);
+    expect(fn, "a free or unpriced product would set the starting price").toMatch(
+      /price > 0/,
     );
   });
 

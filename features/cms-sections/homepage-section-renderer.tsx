@@ -93,6 +93,20 @@ export interface HomepageSectionRendererProps {
    */
   categoryRails?: Record<string, LandingProduct[]>;
   /**
+   * The cheapest live product in each category, keyed by SLUG.
+   *
+   * Not derived from `categoryRails`, deliberately. A rail is capped at
+   * ROW_CAP and ordered by curation, so the cheapest thing IN one is the
+   * cheapest of the first twelve — the true minimum today only because no
+   * category here has twelve products yet. This is computed over the whole
+   * category, with the same membership rule the collection page uses, so a
+   * card's "Starting from" is a statement about the page it links to.
+   *
+   * Absent in the builder preview, like the rails, and with the same
+   * consequence: no price rather than a wrong one.
+   */
+  categoryStartingPrices?: Record<string, number>;
+  /**
    * Active hero banners read on the server. When absent (admin builder preview)
    * the promo section falls back to the browser banner store.
    */
@@ -1467,19 +1481,21 @@ const CARD_TONES: Record<string, string> = {
 /**
  * THE CHEAPEST THING IN A CATEGORY, or nothing at all.
  *
- * Read from the rail the server already built for that slug, so the number
- * on the card is the number on the page the card links to. `null` when the
- * shop has no products in that category yet, and `null` in the builder
- * preview, where `categoryRails` is absent by design — a card that says
- * nothing about price is honest, and one that says a price nobody can buy
- * at is not.
+ * This took the minimum over the category's RAIL, which is capped at
+ * ROW_CAP (12) and ordered by curation — so it was the cheapest of the
+ * first twelve, and the true minimum only for as long as no category has
+ * twelve products in it. Nothing would have failed the day one did: the
+ * card would simply have named a price that is not the lowest on the page
+ * it links to.
+ *
+ * The server computes it over the whole category now, with the same
+ * membership rule the collection page uses. `null` when the shop has
+ * nothing priced in that category, and `null` in the builder preview,
+ * where the map is absent by design — a card that says nothing about price
+ * is honest, and one that says a price nobody can buy at is not.
  */
-function startingPriceOf(rail: LandingProduct[] | undefined): number | null {
-  const prices = (rail ?? [])
-    .map((product) => product.price)
-    .filter((price) => typeof price === "number" && Number.isFinite(price) && price > 0);
-
-  return prices.length ? Math.min(...prices) : null;
+function startingPriceOf(price: number | undefined): number | null {
+  return typeof price === "number" && Number.isFinite(price) && price > 0 ? price : null;
 }
 
 function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
@@ -1530,7 +1546,7 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
           const slug = (item.categorySlug ?? "").trim();
           const name = (item.label ?? "").trim() || nameOf.get(slug) || "";
           const tone = CARD_TONES[(item.tone ?? "").trim()] ?? CARD_TONES.neutral;
-          const price = startingPriceOf(props.categoryRails?.[slug]);
+          const price = startingPriceOf(props.categoryStartingPrices?.[slug]);
 
           const card = (
             <>

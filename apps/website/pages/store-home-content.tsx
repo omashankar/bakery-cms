@@ -27,6 +27,8 @@ interface HomepageSectionData {
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
   /** The same, for rows named after one of the shop's own categories. */
   categoryRails?: Record<string, LandingProduct[]>;
+  /** What the cheapest thing in each category costs, so a card can say so. */
+  categoryStartingPrices?: Record<string, number>;
   /** Active hero banners read from the server, so both passes render the same banners. */
   banners: Banner[];
   /** Categories read from the server, so both passes render the same category cards. */

@@ -49,6 +49,40 @@ const UNPADDED_SOURCES: ReadonlySet<HomepageProductSource> = new Set([
  * row, the same reason the three named sources are exempt from the top-up
  * below.
  */
+/**
+ * WHAT THE CHEAPEST THING IN A CATEGORY COSTS — over all of it.
+ *
+ * Not `Math.min` over a RAIL. A rail is capped (ROW_CAP is 12) and ordered
+ * by curation, so its cheapest member is the cheapest of the first twelve —
+ * which is the true minimum today only because no category here has twelve
+ * products yet. The day one does, a card reading "Starting from" would name
+ * a price that is not the lowest on the page it links to, and nothing would
+ * fail: the number would simply be wrong.
+ *
+ * Membership comes from `filterProductsByCategory`, the same function the
+ * rails and the collection page use, because the promise a card makes is
+ * about the page it links to and no other definition of the category.
+ *
+ * A category with nothing priced in it gets no entry at all, so the caller
+ * renders no price rather than a zero.
+ */
+export function categoryStartingPrices(
+  all: LandingProduct[],
+  categories?: { name: string; slug: string }[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+
+  for (const category of categories ?? []) {
+    const prices = filterProductsByCategory(all, category.slug, categories)
+      .map((product) => product.price)
+      .filter((price) => typeof price === "number" && Number.isFinite(price) && price > 0);
+
+    if (prices.length) out[category.slug] = Math.min(...prices);
+  }
+
+  return out;
+}
+
 export function buildCategoryRail(
   slug: string,
   maxCount: number,

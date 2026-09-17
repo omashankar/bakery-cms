@@ -24,6 +24,7 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import type { ModuleSettings } from "@/types/settings";
 import {
   buildCategoryRail,
+  categoryStartingPrices,
   buildHomepageProducts,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
@@ -463,6 +464,13 @@ export async function getHomepageRails(maxCount = 8): Promise<{
    * bug this whole function exists to have fixed.
    */
   categoryRails: Record<string, LandingProduct[]>;
+  /**
+   * The cheapest live product in each category, over ALL of it.
+   *
+   * Beside the rails rather than derived from one, because a rail is capped
+   * and a starting price may not be inside the cap.
+   */
+  categoryStartingPrices: Record<string, number>;
 }> {
   const [products, names, categories, modules] = await Promise.all([
     readProductsOnce(),
@@ -504,5 +512,26 @@ export async function getHomepageRails(maxCount = 8): Promise<{
     ]),
   ) as Record<string, LandingProduct[]>;
 
-  return { rails, categoryRails };
+  /*
+    THE PRICE A CARD SHOWS, not the price on the record.
+
+    `all` carries `product.price` — the base figure in the database. What a
+    customer reads on a grid is `toCard`'s price: the base with each variant
+    group's DEFAULT option already applied, because that is what the server
+    would charge for the thing untouched. The two differ by real money here:
+    this shop's Birthday Cake is 999 on the record and 899 on the page.
+
+    Caught by measuring rather than reading. The card said "Starting from
+    Rs 749" while the page it links to started at Rs 899 — a price no
+    customer could pay, on the one band whose whole job is to name that
+    number. Mapping through `toCard` first is what makes the card's claim and
+    the page it links to the same statement.
+  */
+  const cards = all.map((product) => toCard(product, modules));
+
+  return {
+    rails,
+    categoryRails,
+    categoryStartingPrices: categoryStartingPrices(cards, categories),
+  };
 }

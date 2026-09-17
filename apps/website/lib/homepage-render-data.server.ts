@@ -34,6 +34,8 @@ export interface HomepageRenderData {
    * while this is open and keyed by whatever the shop called its categories.
    */
   categoryRails: Awaited<ReturnType<typeof getHomepageRails>>["categoryRails"];
+  /** The cheapest live product in each category, over all of it — not over a rail. */
+  categoryStartingPrices: Awaited<ReturnType<typeof getHomepageRails>>["categoryStartingPrices"];
   banners: Banner[];
   categories: ReturnType<typeof selectHomepageCategories>;
   testimonials: Testimonial[];
@@ -122,6 +124,7 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
   return {
     rails: rails.rails,
     categoryRails: rails.categoryRails,
+    categoryStartingPrices: rails.categoryStartingPrices,
     // "homepage", not "all" — `"all"` is the WILDCARD in this selector, meaning
     // "apply no visibility filter", not the visibility value "all". Passing it
     // here made the admin's Visibility field inert: a banner scoped to
