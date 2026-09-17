@@ -1552,13 +1552,19 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
             <>
               <div className={cn("relative aspect-square", tone)}>
                 {/*
-                  CONTAINED, not covered. These are cut-out product pictures
-                  sitting ON the tint — that is the whole reason the tint is
-                  there. `object-cover` would fill the box and hide it, and
-                  a square photograph letterboxes onto the tint rather than
-                  being cropped to it.
+                  EDGE TO EDGE, and the tint is what sits BEHIND it.
+
+                  This was inset on the tint, on the reasoning that a cut-out
+                  product should float on a colour. The shop looked at it and
+                  said the picture fills the card — and the layout it is drawn
+                  from agrees: the pastel there is painted INTO the artwork,
+                  swirls and all, not applied by CSS around it.
+
+                  So the tint stops being a frame and becomes a backdrop: what
+                  shows through a picture with no background of its own, and
+                  what fills the card while one loads or if none was set.
                 */}
-                <SafeImage src={item.image} alt="" className="object-contain p-4 sm:p-5" />
+                <SafeImage src={item.image} alt="" />
               </div>
               <div className="px-2 py-3 text-center">
                 {name ? (
