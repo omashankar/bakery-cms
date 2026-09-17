@@ -40,13 +40,24 @@ describe("who gets a buy button on the card", () => {
   });
 
   it("and the homepage rows say otherwise", () => {
-    // Both of them: the product grid every rail uses, and the tabbed rail.
-    const renderer = codeOf(read(RENDERER));
-    const opted = renderer.match(/<ProductCard[^/]*showAddToCart=\{false\}/g) ?? [];
-    const all = renderer.match(/<ProductCard/g) ?? [];
+    /*
+      EVERY call site, checked one at a time — not two counts compared.
 
-    expect(all.length, "the homepage stopped drawing product cards").toBe(2);
-    expect(opted.length, "a homepage row still carries the buy button").toBe(2);
+      This matched `/<ProductCard[^/]*showAddToCart=\{false\}/` and counted the
+      hits against the number of cards. `[^/]*` stops at the first slash, so
+      the day a card's className held one — a `calc()` with a division in it
+      — the count fell to one and the test failed on a row that was still
+      perfectly correct. A count also says nothing about WHICH row is wrong.
+    */
+    const renderer = codeOf(read(RENDERER));
+    const calls = renderer.match(/<ProductCard[^>]*>/g) ?? [];
+
+    expect(calls.length, "the homepage stopped drawing product cards").toBeGreaterThan(1);
+    for (const call of calls) {
+      expect(call, `a homepage row still carries the buy button: ${call}`).toContain(
+        "showAddToCart={false}",
+      );
+    }
   });
 
   it("but a card without the button still says when a product is gone", () => {

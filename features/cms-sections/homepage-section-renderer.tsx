@@ -6,6 +6,8 @@ import { SafeImage } from "@/components/shared/safe-image";
 import {
   ArrowRight,
   Award,
+  ChevronLeft,
+  ChevronRight,
   BadgeCheck,
   Camera,
   Clock,
@@ -68,7 +70,7 @@ import { heroCopySideOf, heroSlidesFor } from "./lib/section-utils";
 import type { HomepageSectionInstance, SectionBackground } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
@@ -106,6 +108,22 @@ export interface HomepageSectionRendererProps {
    * consequence: no price rather than a wrong one.
    */
   categoryStartingPrices?: Record<string, number>;
+  /**
+   * The flagged rows cut by category — "the bestsellers that are cakes".
+   *
+   * A tabbed row can be about a FLAG and a CATEGORY at once, and neither of
+   * the two rails above can answer that: one knows nothing about categories
+   * and the other nothing about the flag. Computed on the server, because a
+   * card carries `badge` rather than the flags and `badge` has a precedence
+   * — featured beats bestseller — so filtering on it in the browser would
+   * drop a featured bestseller out of the bestsellers tab.
+   *
+   * Absent in the builder preview, like the rails, with the same
+   * consequence: the tab says it is empty rather than showing the wrong row.
+   */
+  flaggedCategoryRails?: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  >;
   /**
    * Active hero banners read on the server. When absent (admin builder preview)
    * the promo section falls back to the browser banner store.
@@ -1076,6 +1094,86 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
  * `categoryRails` the open category row uses — one answer to "what is in
  * this category", not a second one that can drift.
  */
+/**
+ * A ROW THAT SCROLLS, with the arrows the layout puts on it.
+ *
+ * The arrows are drawn ONLY when the strip actually overflows. A row of
+ * four in a space that fits four has nowhere to go, and a pair of dead
+ * chevrons either side of it is a control that lies about what it does —
+ * which on a phone, where the strip nearly always overflows, is the
+ * opposite problem.
+ *
+ * Measured rather than counted: whether four cards overflow depends on the
+ * window, not on the number four.
+ */
+function ScrollStrip({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState({ back: false, forward: false });
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    // 1px of slack: sub-pixel widths make an exactly-fitting row report a
+    // scrollWidth a fraction larger than its client width.
+    setCanScroll({
+      back: el.scrollLeft > 1,
+      forward: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, children]);
+
+  const step = (direction: -1 | 1) => {
+    const el = ref.current;
+    if (!el) return;
+    // A little under a full screen, so the card at the edge stays in view
+    // and a customer does not lose their place.
+    el.scrollBy({ left: direction * el.clientWidth * 0.85, behavior: "smooth" });
+  };
+
+  const arrow =
+    "absolute top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md";
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onScroll={measure}
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:gap-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      {canScroll.back ? (
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          aria-label="Previous"
+          className={cn(arrow, "left-0 -translate-x-1/2")}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+      ) : null}
+      {canScroll.forward ? (
+        <button
+          type="button"
+          onClick={() => step(1)}
+          aria-label="Next"
+          className={cn(arrow, "right-0 translate-x-1/2")}
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function TabbedRailSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const tabs = renderableRows(parseListField(c, "tabs")).filter((tab) =>
@@ -1092,14 +1190,25 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
   const [active, setActive] = useState(0);
   const railCtaLabel = contentString(c, "ctaLabel");
   const railCtaHref = contentString(c, "ctaHref");
+  /**
+   * WHAT THE ROW IS ABOUT, beside what each tab is about.
+   *
+   * Blank means every product in the tab's category, which is what this row
+   * has always been. Set to a flag and the row becomes "the bestsellers that
+   * are cakes" — which is the only honest way for a row headed Bestsellers
+   * to carry category tabs. Without it the heading is a claim about what
+   * sells made over a listing that selects on something else entirely.
+   */
+  const source = contentString(c, "source");
 
   if (tabs.length === 0) return null;
 
   const current = tabs[Math.min(active, tabs.length - 1)];
-  const cakes = (props.categoryRails?.[current.categorySlug ?? ""] ?? []).slice(
-    0,
-    maxCount,
-  );
+  const slug = current.categorySlug ?? "";
+  const pool = source
+    ? (props.flaggedCategoryRails?.[source as HomepageProductSource]?.[slug] ?? [])
+    : (props.categoryRails?.[slug] ?? []);
+  const cakes = pool.slice(0, maxCount);
 
   return (
     <SectionShell {...props} noReveal>
@@ -1180,11 +1289,27 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
           Nothing here yet.
         </p>
       ) : (
-        <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-          {cakes.map((cake) => (
-            <ProductCard key={cake.id} cake={cake} className="h-full" showAddToCart={false} showWishlist={false} />
-          ))}
-        </StaggerReveal>
+        <div className="mt-6">
+          {/*
+            FOUR ACROSS, and the fifth is off the edge.
+
+            The card widths are a quarter of the strip minus its gaps, so a
+            row of four looks exactly like the grid it replaces — and a row
+            of nine scrolls, which is what the arrows are for. A fixed pixel
+            width would leave a ragged half-card at most window sizes.
+          */}
+          <ScrollStrip>
+            {cakes.map((cake) => (
+              <ProductCard
+                key={cake.id}
+                cake={cake}
+                className="h-auto w-[calc((100%-1rem)/1.6)] shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3.75rem)/4)]"
+                showAddToCart={false}
+                showWishlist={false}
+              />
+            ))}
+          </ScrollStrip>
+        </div>
       )}
     </SectionShell>
   );

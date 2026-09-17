@@ -538,6 +538,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "",
       description: "",
       maxCount: 4,
+      source: "",
       tabs: "[]",
       // Blank, like every other rail's. A link nobody wrote is not a link.
       ctaLabel: "",
@@ -550,6 +551,27 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "maxCount", label: "Max {products} per tab", type: "number" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
+      {
+        /*
+          WHAT THE ROW IS ABOUT, beside what each tab is about.
+
+          Blank is every product in the tab's category, which is what this
+          row has always been. Pick a flag and it becomes "the bestsellers
+          that are cakes" — the only honest way for a row headed Bestsellers
+          to carry category tabs, because otherwise the heading is a claim
+          about what sells made over a listing that selects on something
+          else entirely.
+        */
+        key: "source",
+        label: "Draw from",
+        type: "select",
+        options: [
+          { label: "Everything in the category", value: "" },
+          { label: "Only best sellers", value: "best-sellers" },
+          { label: "Only trending", value: "trending" },
+          { label: "Only featured", value: "featured" },
+        ],
+      },
       {
         key: "tabs",
         label: "Tabs",

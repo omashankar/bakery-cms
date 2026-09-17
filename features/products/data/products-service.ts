@@ -28,6 +28,7 @@ import {
   buildHomepageProducts,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
+import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 
 /**
  * Async product data access — the API the rest of the app should use on the server.
@@ -471,6 +472,27 @@ export async function getHomepageRails(maxCount = 8): Promise<{
    * and a starting price may not be inside the cap.
    */
   categoryStartingPrices: Record<string, number>;
+  /**
+   * The FLAGGED rows, cut by category — "the bestsellers that are cakes".
+   *
+   * A tabbed row whose heading says Bestsellers and whose tabs say Cakes and
+   * Flowers is making both statements at once, and neither rail already here
+   * can answer it: `rails['best-sellers']` knows nothing about categories,
+   * and `categoryRails[slug]` knows nothing about the flag.
+   *
+   * It cannot be done in the browser either. A card carries `badge`, not the
+   * flags, and `badge` is derived with a PRECEDENCE — featured beats
+   * bestseller beats trending — so a product that is both featured and a
+   * bestseller reads "Featured", and filtering on the badge would drop it
+   * from the bestsellers tab it belongs in.
+   *
+   * Only the three flag-driven sources, and only the pairs that hold
+   * something: an empty combination is left out rather than serialised, so a
+   * shop that flags nothing pays nothing for this.
+   */
+  flaggedCategoryRails: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  >;
 }> {
   const [products, names, categories, modules] = await Promise.all([
     readProductsOnce(),
@@ -529,9 +551,43 @@ export async function getHomepageRails(maxCount = 8): Promise<{
   */
   const cards = all.map((product) => toCard(product, modules));
 
+  /*
+    Built from the UNCAPPED flag list and capped after the category cut, not
+    before. `buildHomepageProducts(source, maxCount, …)` slices first, so
+    filtering its result would give "the bestsellers in this category, among
+    the first twelve bestsellers" — which is the same shape of silent wrong
+    answer as taking a starting price off a capped rail.
+  */
+  const FLAG_SOURCES: HomepageProductSource[] = ["featured", "trending", "best-sellers"];
+  const flaggedCategoryRails: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  > = {};
+
+  for (const source of FLAG_SOURCES) {
+    const flagged = buildHomepageProducts(
+      source,
+      Number.MAX_SAFE_INTEGER,
+      products,
+      all,
+      names,
+      categories,
+    ).map((product) => toCard(product, modules));
+
+    const byCategory: Record<string, LandingProduct[]> = {};
+    for (const category of categories ?? []) {
+      const cut = filterProductsByCategory(flagged, category.slug, categories).slice(
+        0,
+        maxCount,
+      );
+      if (cut.length) byCategory[category.slug] = cut;
+    }
+    if (Object.keys(byCategory).length) flaggedCategoryRails[source] = byCategory;
+  }
+
   return {
     rails,
     categoryRails,
     categoryStartingPrices: categoryStartingPrices(cards, categories),
+    flaggedCategoryRails,
   };
 }

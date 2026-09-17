@@ -29,6 +29,10 @@ interface HomepageSectionData {
   categoryRails?: Record<string, LandingProduct[]>;
   /** What the cheapest thing in each category costs, so a card can say so. */
   categoryStartingPrices?: Record<string, number>;
+  /** The flagged rows cut by category, for a tabbed row that is about both. */
+  flaggedCategoryRails?: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  >;
   /** Active hero banners read from the server, so both passes render the same banners. */
   banners: Banner[];
   /** Categories read from the server, so both passes render the same category cards. */
