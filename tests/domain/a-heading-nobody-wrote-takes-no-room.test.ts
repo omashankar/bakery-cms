@@ -85,25 +85,47 @@ describe("the category tiles under the hero", () => {
     return next < 0 ? rest : rest.slice(0, next);
   };
 
+  /**
+   * THE TILE'S OWN CLASS STRING, found by the one thing about it that is not
+   * a style choice: its width. Three tests used to locate it by the literal
+   * "rounded-2xl bg-cream-", and all three broke the day a class was inserted
+   * between those two — for a tile that was still perfectly correct. A guard
+   * that fails on class ORDER is testing the author's typing.
+   */
+  const tileClasses = () => {
+    const found = strip().match(/"group flex w-\[5\.5rem\][^"]*"/);
+    expect(found, "the category tile is gone").toBeTruthy();
+    return found![0];
+  };
+
   it("frame the picture in the card's own tint rather than being the picture", () => {
     /**
      * The image filled the card edge to edge, so a cut-out product photograph
      * — the kind with no background of its own — floated in a white void.
      * Inset, the tile reads as a tile.
      *
-     * This used to find the tile by its BORDER, and to call the border the
-     * tint. There was no tint: the card read `from-cream-50 to-white`, and
-     * `--cream-50` is #ffffff, so the gradient ran white to white. The border
-     * has gone and the tint is real, so the guard asks for the tint.
+     * ALL THREE OF TINT, HAIRLINE AND LIFT, because the tile needs each for a
+     * different reason and this went wrong twice by treating them as one.
+     * First the tint was `from-cream-50 to-white` — and `--cream-50` is
+     * #ffffff, so the gradient ran white to white and there was no tint at
+     * all, only the hairline. Then the tint became real and the hairline was
+     * dropped as redundant, leaving a grey-beige slab with no edge.
+     *
+     * They are not redundant. The tint gives a cut-out product something to
+     * sit on, the hairline says where the tile stops against a white band,
+     * and the shadow lifts it off one. This asks for all three.
      */
-    const body = strip();
-    const card = body.indexOf("rounded-2xl bg-cream-");
-    expect(card, "the tile has no tint of its own").toBeGreaterThan(-1);
-
-    const tile = body.slice(card, card + 300);
+    const tile = tileClasses();
     expect(tile, "the picture is flush to the card edge").toMatch(/\bp-2\b/);
     expect(tile, "the tint is white, which is not a tint").not.toMatch(
       /bg-cream-50\b|from-cream-50\b/,
+    );
+    expect(tile, "the tile has no tint of its own").toMatch(/\bbg-cream-\d/);
+    expect(tile, "the tile has no edge against a white band").toMatch(
+      /\bborder-border/,
+    );
+    expect(tile, "the tile is a hole in the page, not a card on it").toMatch(
+      /\bshadow-(xs|sm)\b/,
     );
   });
 
@@ -127,10 +149,7 @@ describe("the category tiles under the hero", () => {
      * box a few lines down legitimately clips, and a fixed-length window
      * reached it and failed on code that was correct.
      */
-    const body = strip();
-    // Found by the tile's tint; it had a border until the tint became real.
-    const card = body.indexOf("rounded-2xl bg-cream-");
-    const classString = body.slice(card, body.indexOf('"', card));
+    const classString = tileClasses();
 
     expect(classString.length, "the card class string is unreadable").toBeGreaterThan(40);
     expect(classString).not.toContain("overflow-hidden");

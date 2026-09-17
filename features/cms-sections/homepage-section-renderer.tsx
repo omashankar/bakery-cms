@@ -264,15 +264,22 @@ function SectionShell({
           A 2px TRANSPARENT BORDER IS STILL 2px OF PAGE.
 
           It exists so the builder's hover and selection outlines can appear
-          without the section jumping — a fair trade inside a container, and
-          invisible there. Around a band that runs to both edges of the
-          window it is a white frame down each side of the picture, which is
-          the one thing a full-bleed band must not have.
+          without the section jumping. That is worth 4px inside the builder.
+          It is worth nothing at all on the live storefront, where no band
+          can be hovered or selected and the reserved frame is simply four
+          more pixels of height on every one of the twenty bands — plus 4px
+          added to the white between each pair of them, on a page the shop
+          has now asked three times to draw closer together.
 
-          Dropped only on the live page: the builder keeps the reserved 2px,
-          because a section that cannot be outlined cannot be selected.
+          It used to drop on full-bleed live bands only, because there the
+          2px showed as a white margin down each side of a picture meant to
+          touch both edges. That was the visible half of the same problem.
+
+          So: the whole live page loses it, and `interactive` — which is the
+          builder, and only the builder — keeps it. A section that cannot be
+          outlined cannot be selected.
         */
-        fullBleed && !interactive && "border-0",
+        !interactive && "border-0",
         interactive && "cursor-pointer",
         selected && "border-bakery-500 ring-2 ring-bakery-200",
         className
@@ -648,18 +655,29 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               is the same height whatever its name does.
             */
             /*
-              A TINT, WHICH THIS DID NOT HAVE.
+              A TINT, A HAIRLINE AND A LIFT — all three, measured.
 
-              It read `bg-gradient-to-b from-cream-50 to-white`, and
-              `--cream-50` is literally #ffffff — so the gradient ran from
-              white to white and the tile had no tint at all. The comment
-              above talks about the card's own tint framing the picture; the
-              only thing separating a tile from the page was the hairline
-              border. It is a real tint now, and the border goes: two ways of
-              saying where a tile ends is one too many, and the tint is the
-              one that also gives a cut-out picture something to sit on.
+              This started as `bg-gradient-to-b from-cream-50 to-white`, and
+              `--cream-50` is literally #ffffff, so the gradient ran white to
+              white and there was no tint at all. The fix for that swung the
+              other way: cream-200 painted #f0eeea, a grey-beige slab against
+              a white band, and dropped the border on the reasoning that a
+              tint and an edge were two ways of saying the same thing.
+
+              They are not. Held next to the layout this is drawn from, the
+              tile there is a near-white panel with a hairline round it and a
+              shadow barely a pixel deep — the tint gives a cut-out product
+              something to sit on, the hairline says where the tile stops
+              against a white page, and the shadow is what lifts it off one.
+              Take any of the three away and it reads as a different object:
+              without the tint a cut-out floats in a void, without the
+              hairline the panel dissolves, without the lift it is a hole in
+              the page rather than a card on it.
+
+              cream-100 (#faf8f4) is the lightest tint the palette has that is
+              still a tint. shadow-xs is 4% at one pixel.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 sm:w-auto sm:p-3"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl border border-border/70 bg-cream-100 p-2 shadow-xs sm:w-auto sm:p-3"
           >
             {/*
               A ROUNDED SQUARE, not a circle.

@@ -203,6 +203,19 @@ describe("the category tiles", () => {
     return next < 0 ? rest : rest.slice(0, next);
   };
 
+  /**
+   * THE TILE'S OWN CLASS STRING, found by the one thing about it that is not
+   * a style choice: its width. Three tests used to locate it by the literal
+   * "rounded-2xl bg-cream-", and all three broke the day a class was inserted
+   * between those two — for a tile that was still perfectly correct. A guard
+   * that fails on class ORDER is testing the author's typing.
+   */
+  const tileClasses = () => {
+    const found = strip().match(/"group flex w-\[5\.5rem\][^"]*"/);
+    expect(found, "the category tile is gone").toBeTruthy();
+    return found![0];
+  };
+
   it("hold the category name inside the card, not floating under it", () => {
     /**
      * The name sat outside the bordered box. So the tile was a picture with a
@@ -210,14 +223,15 @@ describe("the category tiles", () => {
      * neighbours out of alignment. Asserted by ORDER: the tile opens before
      * the name and the name is inside it.
      *
-     * Found by the tile's tint. It was found by its border until the border
-     * went — the tile had no real tint then, only a hairline.
+     * Found by the tile's WIDTH, which is the one thing about its class
+     * string that is not a style choice. Locating it by a slice of that
+     * string broke this the day a class was inserted into the middle of it.
      */
     const body = strip();
-    const card = body.indexOf("rounded-2xl bg-cream-");
+    const card = body.indexOf(tileClasses());
     const name = body.indexOf("{category.name}", card);
 
-    expect(card, "the tile has no tint of its own").toBeGreaterThan(-1);
+    expect(card, "the tile is gone").toBeGreaterThan(-1);
     expect(name, "the name is not inside the card").toBeGreaterThan(card);
     expect(body.slice(card, name), "the card closes before the name").not.toContain("</Link>");
   });

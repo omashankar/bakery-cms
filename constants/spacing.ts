@@ -58,10 +58,17 @@ export const layoutSpacing = {
    * of rows was half as long again, and every row read as its own screen
    * rather than as part of a catalogue.
    *
-   * 96 first, then 32/40/48, then 24/32/40, then this. Each step was the
-   * shop looking at the page and asking for closer.
+   * WHAT THIS NUMBER ACTUALLY CONTROLS is twice itself. Bands sit flush —
+   * measured at 1440px, every one of the twenty had a zero margin to its
+   * neighbour — so the white between two rows is this padding on the bottom
+   * of one plus the same on the top of the next. At `lg:py-8` that read as
+   * 64px of nothing between every row, which is the gap the shop kept
+   * pointing at. `lg:py-6` makes it 48.
+   *
+   * 96 first, then 32/40/48, then 24/32/40, then 20/24/32, then this. Each
+   * step was the shop looking at the page and asking for closer.
    */
-  bandY: "py-5 sm:py-6 lg:py-8",
+  bandY: "py-4 sm:py-5 lg:py-6",
   sectionX: "px-4 sm:px-6 lg:px-8",
   /**
    * THE CONTENT COLUMN — 1440, not `max-w-7xl`'s 1280.

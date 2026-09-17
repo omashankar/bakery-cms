@@ -444,14 +444,27 @@ describe("the banner band's edges", () => {
      * invisible; around a full-bleed band it is 2px of white down each side of
      * the picture, which is the one thing a full-bleed band must not have.
      *
-     * Gated on `!interactive`, because a section the builder cannot outline is
-     * a section nobody can select.
+     * THE RULE WIDENED, and this assertion widened with it. It used to read
+     * `fullBleed && !interactive`, which dropped the reserve only where it
+     * was visible. But it is 4px of height on every band and 4px more white
+     * between each pair of them, and nothing on the live storefront can be
+     * hovered or selected — so the live page drops it everywhere and only
+     * the builder pays for it.
+     *
+     * Asserted as two halves rather than one string, because what this test
+     * is for is the promise, not the spelling: a live full-bleed band has no
+     * frame, and the builder can still outline what you click.
      */
     const shell = bodyOf(read(RENDERER), "function SectionShell(");
 
-    expect(shell).toMatch(/fullBleed && !interactive && "border-0"/);
+    expect(shell, "a live band still reserves the builder's 2px").toMatch(
+      /(?<!fullBleed && )!interactive && "border-0"/,
+    );
     expect(shell, "the builder lost its selection outline").toContain(
       'selected && "border-bakery-500 ring-2 ring-bakery-200"',
+    );
+    expect(shell, "the reserve is gone from the builder too").toContain(
+      "border-2 border-transparent",
     );
   });
 });
