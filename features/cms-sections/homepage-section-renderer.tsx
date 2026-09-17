@@ -1145,7 +1145,18 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
           const body = (
             <>
               {card.image ? (
-                <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+                /*
+                  `flex-1` WITH A FLOOR, not a fixed ratio.
+
+                  `auto-rows-fr` above makes every card in a row as tall as
+                  the tallest — and a wide card's 16:9 picture at double
+                  width is much taller than its neighbours'. At a fixed
+                  ratio the small cards kept their own short picture and
+                  grew a band of white underneath it instead, which is what
+                  the browser showed. Letting the picture grow into the
+                  space fills the card rather than padding it.
+                */
+                <div className="relative min-h-44 flex-1 overflow-hidden bg-muted">
                   {/*
                     SafeImage, not next/image: these URLs are admin-typed on
                     any host, and an un-listed host throws the render of the
@@ -1171,7 +1182,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
           );
 
           const className = cn(
-            "overflow-hidden rounded-xl border border-border bg-white transition-all duration-300 hover:border-bakery-300 hover:shadow-md",
+            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-bakery-200 hover:shadow-lg",
             // A card with no link is still a card: a banner can be artwork
             // rather than a destination.
             /*
