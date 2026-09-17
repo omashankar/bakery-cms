@@ -57,8 +57,11 @@ export const layoutSpacing = {
    * about 32px apart, and ours sat at 96px — so a page with the same number
    * of rows was half as long again, and every row read as its own screen
    * rather than as part of a catalogue.
+   *
+   * 32/40/48 first, then this. The shop looked at the page and wanted the
+   * bands closer still.
    */
-  bandY: "py-8 sm:py-10 lg:py-12",
+  bandY: "py-6 sm:py-8 lg:py-10",
   sectionX: "px-4 sm:px-6 lg:px-8",
   /**
    * THE CONTENT COLUMN — 1440, not `max-w-7xl`'s 1280.
