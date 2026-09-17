@@ -270,7 +270,7 @@ export interface ActivityLog {
  * deleted, so switching back ON restores everything.
  */
 export interface ModuleSettings {
-  weddingBuilder: boolean;
+
   flavour: boolean;
   weight: boolean;
   shape: boolean;

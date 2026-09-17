@@ -37,26 +37,19 @@ import { BUSINESS_BLOCKING_SCRIPT } from "@/lib/business-blocking";
  */
 
 describe("the fallback direction", () => {
-  it("assumes wedding is ON when the stored value is unknown", () => {
-    // Read by: the client's cold-browser default, mergeAppSettings, the reset
-    // defaults, and the server's DB-failure catch. Every one of them is a guess,
-    // and a guess must not switch off a page a shop is already selling from.
-    expect(defaultModuleSettings.weddingBuilder).toBe(true);
-  });
-
-  it("starts a brand-new shop with wedding OFF", () => {
-    // The one place that is not a guess. A shop that has never existed has not
-    // asked for a Wedding Builder, and this is what the enum used to say.
-    expect(newShopModuleSettings.weddingBuilder).toBe(false);
-  });
-
-  it("differs from the fallbacks in that one field and no other", () => {
-    // A second constant is only worth having if it is narrow. Anything else that
-    // drifts between them is a bug in one of the two.
+  it("starts a new shop with exactly what the fallbacks say, for now", () => {
+    /**
+     * The two constants differed in one field: `weddingBuilder`, off for a
+     * shop that had never existed and on everywhere else. That module is
+     * gone, so they are identical today — and that is worth pinning rather
+     * than deleting, because the pair exists for the NEXT optional feature
+     * that should not be live on a fresh install. Anything that drifts
+     * between them without being put there on purpose is a bug in one.
+     */
     const drifted = (Object.keys(defaultModuleSettings) as (keyof typeof defaultModuleSettings)[])
       .filter((key) => defaultModuleSettings[key] !== newShopModuleSettings[key]);
 
-    expect(drifted).toEqual(["weddingBuilder"]);
+    expect(drifted).toEqual([]);
   });
 });
 
@@ -97,34 +90,40 @@ describe("the pre-paint script", () => {
     return document.documentElement;
   }
 
-  it("shows wedding to a browser that has never been here", () => {
-    // `data-wed="0"` is what globals.css hides `[data-gate-wedding]` on. An
-    // empty localStorage is the ordinary case — first visit, private window,
-    // cleared site data — not the edge one.
-    expect(stamp().hasAttribute("data-wed")).toBe(false);
+  it("shows a gated picker to a browser that has never been here", () => {
+    // `data-mod-photo="0"` is what globals.css hides `[data-gate-photo]` on.
+    // An empty localStorage is the ordinary case — first visit, private
+    // window, cleared site data — not the edge one.
+    expect(stamp().hasAttribute("data-mod-photo")).toBe(false);
   });
 
-  it("hides wedding only once the shop has actually switched it off", () => {
-    expect(stamp({ weddingBuilder: false }).getAttribute("data-wed")).toBe("0");
-    expect(stamp({ weddingBuilder: true }).hasAttribute("data-wed")).toBe(false);
+  it("hides it only once the shop has actually switched it off", () => {
+    expect(stamp({ photoCake: false }).getAttribute("data-mod-photo")).toBe("0");
+    expect(stamp({ photoCake: true }).hasAttribute("data-mod-photo")).toBe(false);
   });
 
   it("agrees with the hydrated twin that owns the same attribute", () => {
     // lib/business-blocking.ts says "keep the two in sync" and nothing checked
     // that they were. The twin re-stamps every one of these after hydration, so
     // a disagreement is a flash on every load of an affected shop.
+    /*
+      This watched `data-wed`, which the Wedding module stamped. That module
+      is gone; every other flag is stamped by the same two code paths and
+      can disagree the same way, so the case moves rather than going.
+    */
     for (const modules of [
       undefined,
-      { weddingBuilder: false },
-      { weddingBuilder: true },
+      { photoCake: false },
+      { photoCake: true },
       // Neither one. The two disagreed here: `0 !== false` shows, truthiness hides.
-      { weddingBuilder: 0 },
+      { photoCake: 0 },
     ]) {
-      const fromScript = stamp(modules).getAttribute("data-wed");
+      const fromScript = stamp(modules).getAttribute("data-mod-photo");
       applyBusinessAttributes();
-      expect(document.documentElement.getAttribute("data-wed"), JSON.stringify(modules)).toBe(
-        fromScript,
-      );
+      expect(
+        document.documentElement.getAttribute("data-mod-photo"),
+        JSON.stringify(modules),
+      ).toBe(fromScript);
     }
   });
 

@@ -95,10 +95,17 @@ describe("a shop with nothing of its own is shown nothing of anyone else's", () 
      * whatever the shop has.
      */
     const menu = code("components/storefront/mega-menu.tsx");
+    /*
+      Bounded by the next DECLARATION, not by the hook that used to follow
+      this one. `useWeddingLinkFilter` went with the Wedding Builder, and an
+      `indexOf` that misses returns -1 — which makes the slice empty and the
+      "no cake words here" assertion below pass over nothing at all.
+    */
     const fallback = menu.slice(
       menu.indexOf("function useFallbackCategories"),
-      menu.indexOf("function useWeddingLinkFilter"),
+      menu.indexOf("export interface ShopCategory"),
     );
+    expect(fallback, "the fallback slice is empty").not.toBe("");
 
     expect(fallback).not.toMatch(/cake|bakery|eggless|photo-cakes|seasonal|birthday/i);
     expect(fallback, "the generic 'everything' row is gone").toContain("productWordPlural");

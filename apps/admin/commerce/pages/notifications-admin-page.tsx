@@ -39,10 +39,6 @@ import {
   syncNotifications,
 } from "@/apps/admin/commerce/lib/notifications-repository";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
-import {
-  isWeddingEnabled,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
 import type {
   AdminNotification,
   NotificationListFilters,
@@ -128,14 +124,7 @@ export function NotificationsAdminPage() {
    */
   useOrdersServerSync();
 
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
 
-  useEffect(() => {
-    const sync = () => setWeddingEnabled(isWeddingEnabled());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
   const [filters, setFilters] = useState<NotificationListFilters>(defaultNotificationFilters);
   const [page, setPage] = useState(1);
   const [loadedNotifications, setNotifications] = useState<AdminNotification[] | null>(null);
@@ -431,9 +420,7 @@ export function NotificationsAdminPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{item.label}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.key === "inquiryAlerts" && !weddingEnabled
-                      ? "Contact and newsletter"
-                      : item.description}
+                    {item.description}
                   </p>
                 </div>
                 <Switch

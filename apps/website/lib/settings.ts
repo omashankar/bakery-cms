@@ -6,7 +6,6 @@ import {
   getGeneralSettings,
   getBusinessType,
   getLabelSettings,
-  isWeddingEnabled,
 } from "@/features/settings/lib/settings-repository";
 import {
   isSafeSocialUrl,
@@ -85,10 +84,6 @@ export function getStorefrontBusinessLabels(): BusinessLabels {
   return { ...getBusinessLabels(), ...resolveLabels(getLabelSettings(), getBusinessType()) };
 }
 
-/** Wedding cakes are bakery-only and gated by the wedding module. */
-export function isStorefrontWeddingEnabled(): boolean {
-  return isWeddingEnabled();
-}
 
 /**
  * The client twin of `getStorefrontChrome`'s social read. Kept in step with it

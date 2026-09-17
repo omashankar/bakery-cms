@@ -79,12 +79,12 @@ export const defaultGeneralSettings: GeneralSettings = {
  * `mergeAppSettings`, the reset-to-defaults payload, and `getServerModules`'
  * catch when the database cannot be reached.
  *
- * IT FAILS OPEN, DELIBERATELY. It was briefly flipped so `weddingBuilder` was
- * false — correct for a brand-new shop, and wrong for all four of these. One
- * click of "Reset defaults" took a live bakery's /store/wedding-cakes offline
- * for everyone and persisted it; a first-time visitor had the wedding nav,
- * footer link and homepage section hidden before paint; and a Mongo outage
- * 404'd a revenue page that had served through the same outage the day before.
+ * IT FAILS OPEN, DELIBERATELY. A module switch was once flipped false here
+ * because that was right for a brand-new shop — and wrong for all four of
+ * these. One click of "Reset defaults" took a live page off a running shop
+ * and persisted it; a first-time visitor lost nav links before paint; and a
+ * Mongo outage 404'd a page that had served through the same outage the day
+ * before.
  *
  * A guess may not switch off something a running shop already has. The one path
  * that is NOT a guess — creating a shop that has never existed — uses
@@ -93,7 +93,7 @@ export const defaultGeneralSettings: GeneralSettings = {
  * These hide UI only: data and routes are never deleted.
  */
 export const defaultModuleSettings: ModuleSettings = {
-  weddingBuilder: true,
+
   flavour: true,
   weight: true,
   shape: true,
@@ -103,19 +103,16 @@ export const defaultModuleSettings: ModuleSettings = {
 /**
  * What a shop that has NEVER EXISTED is created with.
  *
- * The only module path that is a decision rather than a guess, and the only one
- * that may start something off. Wedding is off here because the business type
- * that used to gate it is gone: without this, a fresh install of any trade would
- * ship a live Wedding Builder and a public /store/wedding-cakes page. A bakery
- * turns it on once; nobody else has to notice it.
+ * The only module path that is a decision rather than a guess, and the only
+ * one that may start something OFF. Nothing does today — the one module that
+ * started off was the Wedding Builder, and that feature is gone — so this
+ * equals the defaults. It stays because the distinction is the point: the
+ * next optional feature that should not be live on a fresh install belongs
+ * here and not in `defaultModuleSettings`, which fails open.
  *
- * Read by `getOrCreateSettings` and nowhere else — see `defaultModuleSettings`
- * for why every other path fails open instead.
+ * Read by `getOrCreateSettings` and nowhere else.
  */
-export const newShopModuleSettings: ModuleSettings = {
-  ...defaultModuleSettings,
-  weddingBuilder: false,
-};
+export const newShopModuleSettings: ModuleSettings = { ...defaultModuleSettings };
 
 export const defaultContactSettings: ContactSettings = {
   email: contactInfo.email,

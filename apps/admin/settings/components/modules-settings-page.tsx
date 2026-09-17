@@ -68,10 +68,7 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
  * from it rather than from `Object.values(settings)`, which would silently drift
  * the moment the stored object carries a key this page does not render.
  */
-const MODULE_KEYS: ModuleKey[] = [
-  ...PRODUCT_MODULES.map((mod) => mod.key),
-  "weddingBuilder",
-];
+const MODULE_KEYS: ModuleKey[] = PRODUCT_MODULES.map((mod) => mod.key);
 
 export function ModulesSettingsPage() {
   const router = useRouter();
@@ -167,17 +164,11 @@ export function ModulesSettingsPage() {
             <CardDescription>Optional website builders for bakery-specific pages.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <ModuleSwitch
-              title="Wedding Builder"
-              description="Wedding cakes page, builder, and storefront link."
-              checked={settings.weddingBuilder}
-              onCheckedChange={(checked) => toggle("weddingBuilder", checked)}
-            />
             {/*
-              A note used to sit here explaining that the business type had
-              already hidden the Wedding Builder "regardless of this toggle" —
-              i.e. telling the admin that the switch in front of them decided
-              nothing. It is now the only thing that decides it.
+              The Wedding Builder switch stood here. The feature it switched
+              is gone — the page, the builder and the band it published — so
+              the switch went with it rather than staying as a control that
+              decides nothing.
             */}
           </CardContent>
         </Card>

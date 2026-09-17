@@ -34,7 +34,7 @@ export function applyBusinessAttributes() {
   // a gate that does not know must not take down a page a shop is selling from.
   const toggle = (attr: string, on: unknown) =>
     on !== false ? root.removeAttribute(attr) : root.setAttribute(attr, "0");
-  toggle("data-wed", m.weddingBuilder);
+
   toggle("data-mod-flavour", m.flavour);
   toggle("data-mod-weight", m.weight);
   toggle("data-mod-shape", m.shape);

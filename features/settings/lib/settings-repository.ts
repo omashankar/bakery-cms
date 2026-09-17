@@ -428,23 +428,6 @@ export function getBusinessType(): BusinessType {
   return loadSettings().general?.businessType ?? "other";
 }
 
-/**
- * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
- * gated by the wedding module alone. Shared by admin + storefront so every
- * surface hides wedding consistently.
- */
-export function isWeddingEnabled(): boolean {
-  // The switch is the whole gate. This also required
-  // `businessType === "bakery"`. The field is BACK — as wording only — and this
-  // gate deliberately did NOT come back with it: a shop that sells cakes and
-  // flowers should not lose its Wedding Builder for calling itself a florist.
-  // A shop that never asked for a
-  // Wedding Builder is not given one by `newShopModuleSettings` when it is
-  // created; the copy READ here fails open, because an unknown value in a cold
-  // browser must not hide a page a running shop is selling from.
-  return loadSettings().modules.weddingBuilder;
-}
-
 export function getActivityLog(): ActivityLog[] {
   return loadSettings().activity;
 }

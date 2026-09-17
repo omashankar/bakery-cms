@@ -101,14 +101,15 @@ describe("the special case is gone", () => {
     ).toEqual([stored]);
   });
 
-  it("leaves the shop five module switches, not six", async () => {
+  it("leaves the shop four module switches, not six", async () => {
     const { modulesSchema } = await import("@/features/settings/server/settings.validators");
 
+    // Six, then five when the egg special case went, then four when the
+    // Wedding Builder was removed along with the page it published.
     expect(Object.keys(modulesSchema.shape).sort()).toEqual([
       "flavour",
       "photoCake",
       "shape",
-      "weddingBuilder",
       "weight",
     ]);
   });

@@ -1,23 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { MegaMenuLink } from "@/constants/storefront-nav";
 import type { MegaMenuGroup } from "@/types/site-layout";
 import { navIcon } from "@/config/nav-icons";
 import { routes } from "@/constants/routes";
 import { SafeImage } from "@/components/shared/safe-image";
-import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
-import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { cn } from "@/lib/utils";
 
-/**
- * Wedding Cakes is bakery-only. Defaults to enabled so SSR/first paint matches
- * the bakery template, then drops wedding links after mount for other business
- * types (settings live in client localStorage).
- */
 /**
  * What a shop with NO categories of its own gets.
  *
@@ -44,20 +37,6 @@ function useFallbackCategories(): MegaMenuLink[] {
   return [
     { label: `All ${labels.productWordPlural}`, href: routes.store.collections },
   ];
-}
-
-function useWeddingLinkFilter() {
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
-  useEffect(() => {
-    const sync = () => setWeddingEnabled(isStorefrontWeddingEnabled());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
-  // The wedding link this removed is gone; the hook stays only so the
-  // settings subscription above keeps its shape for the next gated link.
-  void weddingEnabled;
-  return (items: MegaMenuLink[]) => items;
 }
 
 /** One entry in the shop's own category list, as the server resolved it. */
@@ -173,24 +152,19 @@ export function MegaMenu({
   align = "left",
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
-  const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
-  const categories = filterWedding(
-    shopCategories?.length
-      ? shopCategories.map((category) => ({
-          label: category.name,
-          href: routes.store.collection(category.slug),
-        }))
-      : fallbackCategories,
-  );
-  const occasions = filterWedding(
-    (shopOccasions ?? []).map((occasion) => ({
-      label: occasion.name,
-      // The same route a category slug resolves through — an occasion tag
-      // has always matched at /store/collections/<slug>.
-      href: routes.store.collection(occasion.slug),
-    })),
-  );
+  const categories = shopCategories?.length
+    ? shopCategories.map((category) => ({
+        label: category.name,
+        href: routes.store.collection(category.slug),
+      }))
+    : fallbackCategories;
+  const occasions = (shopOccasions ?? []).map((occasion) => ({
+    label: occasion.name,
+    // The same route a category slug resolves through — an occasion tag
+    // has always matched at /store/collections/<slug>.
+    href: routes.store.collection(occasion.slug),
+  }));
   // The first of the shop's own categories that has a picture. Nothing to show
   // is a real answer — the menu is complete without this card.
   const withPicture = (shopCategories ?? []).find((category) => category.image?.trim());
@@ -388,16 +362,13 @@ export function MobileShopLinks({
   groups?: MegaMenuGroup[];
 }) {
   const authored = drawableGroups(groups);
-  const filterWedding = useWeddingLinkFilter();
   const fallbackCategories = useFallbackCategories();
-  const categories = filterWedding(
-    shopCategories?.length
-      ? shopCategories.map((category) => ({
-          label: category.name,
-          href: routes.store.collection(category.slug),
-        }))
-      : fallbackCategories,
-  );
+  const categories = shopCategories?.length
+    ? shopCategories.map((category) => ({
+        label: category.name,
+        href: routes.store.collection(category.slug),
+      }))
+    : fallbackCategories;
   /**
    * The same occasions the desktop menu shows.
    *
@@ -406,12 +377,10 @@ export function MobileShopLinks({
    * use. Adding it here rather than only fixing the desktop source is the
    * point: a menu that differs by screen size is two menus.
    */
-  const occasions = filterWedding(
-    (shopOccasions ?? []).map((occasion) => ({
-      label: occasion.name,
-      href: routes.store.collection(occasion.slug),
-    })),
-  );
+  const occasions = (shopOccasions ?? []).map((occasion) => ({
+    label: occasion.name,
+    href: routes.store.collection(occasion.slug),
+  }));
   /**
    * The shop's own columns become the shop's own SECTIONS here.
    *

@@ -70,10 +70,7 @@ import type { HomepageSectionInstance } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import {
-  isWeddingEnabled,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, HelpCircle, Mail, MessageCircle, Phone, Search } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -16,8 +16,7 @@ import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs, selectStorefrontFaqs } from "@/features/content/lib/storefront-content";
-import { getStorefrontContactInfo, isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
-import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import { getStorefrontContactInfo } from "@/apps/website/lib/settings";
 import type { FaqCategory, FaqItem } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -44,22 +43,9 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
   const contactInfo = contact ?? getStorefrontContactInfo();
-  // "Wedding" is a bakery-only FAQ category — hide that pill when wedding is off.
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
-  useEffect(() => {
-    const sync = () => {
-      const on = isStorefrontWeddingEnabled();
-      setWeddingEnabled(on);
-      if (!on) setCategory((current) => (current === "wedding" ? "all" : current));
-    };
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
-
-  const categories = weddingEnabled
-    ? faqCategories
-    : faqCategories.filter((item) => item.value !== "wedding");
+  // The Wedding pill was hidden with the Wedding module. Wedding cakes are
+  // still a category this shop sells, so the pill is not optional any more.
+  const categories = faqCategories;
 
   const categoryFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();

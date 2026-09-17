@@ -169,7 +169,7 @@ const modulesSchema = new mongoose.Schema(
     // existed starts wedding OFF, but that is decided once by
     // `getOrCreateSettings` with `newShopModuleSettings` — not by this schema
     // default, which fills in for a document that simply does not say.
-    weddingBuilder: { type: Boolean, default: true },
+
     flavour: { type: Boolean, default: true },
     weight: { type: Boolean, default: true },
     shape: { type: Boolean, default: true },

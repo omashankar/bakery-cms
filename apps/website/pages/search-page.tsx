@@ -20,7 +20,6 @@ import {
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
-import { isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
 
 // `requires` chips only show when that bakery module (or wedding) is enabled.
 const POPULAR_SEARCHES: Array<{
@@ -50,12 +49,11 @@ export function SearchPage({ catalog }: SearchPageProps) {
     setQuery(initialQuery);
   }, [initialQuery]);
 
-  // Hide module-specific quick-search chips when the module / wedding is off.
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
+  // Hide module-specific quick-search chips when the module is off.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   useEffect(() => {
     const sync = () => {
-      setWeddingEnabled(isStorefrontWeddingEnabled());
+
       setModules(getModuleSettings());
     };
     sync();
@@ -76,11 +74,11 @@ export function SearchPage({ catalog }: SearchPageProps) {
   const popularSearches = useMemo(
     () =>
       POPULAR_SEARCHES.filter((item) => {
-        if (item.requires === "wedding" && !weddingEnabled) return false;
+
         if (item.requires === "photoCake" && !modules.photoCake) return false;
         return searchProducts(item.term, catalog).length > 0;
       }),
-    [catalog, modules.photoCake, weddingEnabled],
+    [catalog, modules.photoCake],
   );
 
   // Searching stays on the client (it is interactive); the catalogue it searches

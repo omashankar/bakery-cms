@@ -495,7 +495,7 @@ html.dark {
  * The React components still gate in JS (final DOM + interactivity); this only
  * removes the pre-hydration flash.
  */
-html[data-wed="0"] [data-gate-wedding],
+
 html[data-mod-flavour="0"] [data-gate-flavour],
 html[data-mod-weight="0"] [data-gate-weight],
 html[data-mod-shape="0"] [data-gate-shape],

@@ -131,7 +131,10 @@ describe("robots, sitemap and every storefront page", () => {
 
     const sitemap = code("app/sitemap.ts");
     expect(sitemap).toContain("getSeoStoreServer()");
-    expect(sitemap).toContain("buildSitemapEntriesFrom(store");
+    // Was `buildSitemapEntriesFrom(store` — the store was destructured out of
+    // a Promise.all whose other half read the Wedding module. With that gone
+    // there is one read, passed straight in.
+    expect(sitemap).toMatch(/buildSitemapEntriesFrom\(await getSeoStoreServer\(\)\)/);
   });
 
   it("build metadata per request, not once at module load", () => {

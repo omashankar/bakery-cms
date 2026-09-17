@@ -20,21 +20,10 @@ import { getPublicSettings } from "./settings.service";
  */
 export interface ServerModules {
   modules: ModuleSettings;
-  /**
-   * Gated by its own switch, and nothing else.
-   *
-   * This was `businessType === "bakery" && modules.weddingBuilder`. The
-   * business type is gone, so the switch is the whole gate — which is what it
-   * always described itself as. What the enum used to guarantee — that a shop
-   * does not open with a live Wedding Builder — is carried by
-   * `newShopModuleSettings` at the one place a shop is created, NOT by
-   * `defaultModuleSettings`, which fails open and is what this file reads.
-   */
-  weddingEnabled: boolean;
 }
 
 function resolve(modules: ModuleSettings): ServerModules {
-  return { modules, weddingEnabled: modules.weddingBuilder };
+  return { modules };
 }
 
 export const getServerModules = cache(async (): Promise<ServerModules> => {
@@ -66,10 +55,6 @@ export const getServerModules = cache(async (): Promise<ServerModules> => {
   }
 });
 
-/** True when the wedding page, builder and storefront link should exist at all. */
-export async function isWeddingEnabledOnServer(): Promise<boolean> {
-  return (await getServerModules()).weddingEnabled;
-}
 
 /*
   `getServerDeliveryInformation` stood here, reading the shop-wide delivery copy
