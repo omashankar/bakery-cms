@@ -183,28 +183,47 @@ function ListField({
                   />
                 </div>
               ) : column.type === "select" ? (
-                <select
-                  key={column.key}
-                  aria-label={column.label}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
-                  value={row[column.key] ?? ""}
-                  onChange={(event) => updateRow(index, column.key, event.target.value)}
-                >
-                  {(column.options ?? []).map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                /*
+                  A LABEL THAT STAYS.
+
+                  These two carried their name in `aria-label` and the
+                  placeholder only, so the moment an admin typed anything the
+                  name vanished. The picture and tickbox columns beside them
+                  have always had a visible one. On a row of four fields —
+                  which the banner grid has, eight times over — two boxes of
+                  filled-in text with nothing saying which is which is a
+                  screen you have to guess at.
+                */
+                <div key={column.key} className="space-y-1">
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`} className="text-xs">
+                    {column.label}
+                  </Label>
+                  <select
+                    id={`${field.key}-${id}-${column.key}`}
+                    className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                    value={row[column.key] ?? ""}
+                    onChange={(event) => updateRow(index, column.key, event.target.value)}
+                  >
+                    {(column.options ?? []).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : (
-                <Input
-                  key={column.key}
-                  className="h-9 text-sm"
-                  aria-label={column.label}
-                  placeholder={column.placeholder ?? column.label}
-                  value={row[column.key] ?? ""}
-                  onChange={(event) => updateRow(index, column.key, event.target.value)}
-                />
+                <div key={column.key} className="space-y-1">
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`} className="text-xs">
+                    {column.label}
+                  </Label>
+                  <Input
+                    id={`${field.key}-${id}-${column.key}`}
+                    className="h-9 text-sm"
+                    placeholder={column.placeholder ?? column.label}
+                    value={row[column.key] ?? ""}
+                    onChange={(event) => updateRow(index, column.key, event.target.value)}
+                  />
+                </div>
               ),
             )}
           </div>
