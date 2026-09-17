@@ -745,7 +745,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
             <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
               {contentString(c, "overline")}
             </p>
-            <h2 className="font-heading text-3xl sm:text-4xl font-bold">{title}</h2>
+            <h2 className="font-heading text-xl font-bold sm:text-2xl">{title}</h2>
             <p className="text-muted-foreground">{description}</p>
           </div>
           <Button
@@ -827,7 +827,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
         The storefront this is drawn from draws the same thing at about
         200px: a row of small pictures you scan, not six posters.
       */}
-      <StaggerReveal className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+      <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         {items.map((category) => (
           <Link
             key={category.id}
@@ -1140,7 +1140,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
         component — the reference's three-wide-then-five-small band is one
         grid, not two.
       */}
-      <div className="mt-8 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:gap-5 auto-rows-fr sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, index) => {
           const body = (
             <>
@@ -1379,7 +1379,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className={cn("mt-8 grid gap-4", columnClass)}>
+      <div className={cn("mt-6 grid gap-4 sm:gap-5", columnClass)}>
         {tiles.map((tile, index) => {
           const body = (
             <>
@@ -1433,7 +1433,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
           return (
@@ -1485,7 +1485,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {items.map((item) => (
           <article
             key={item.id}
@@ -1533,7 +1533,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
           description={contentString(c, "description")}
         />
       </ScrollReveal>
-      <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+      <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
         {photos.map((photo, index) => {
           const src = photo.image;
           // An untouched column is "" from the editor, not undefined, so `??`
@@ -1643,7 +1643,7 @@ function CtaSection(props: HomepageSectionRendererProps) {
       <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
         {contentString(c, "overline")}
       </p>
-      <h2 className="mt-3 font-heading text-3xl font-bold sm:text-4xl">{contentString(c, "title")}</h2>
+      <h2 className="mt-3 font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
       <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
         {contentString(c, "description")}
       </p>
@@ -1696,7 +1696,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2">
         {banners.map((banner) => (
           <Link
             key={banner.id}
@@ -1757,7 +1757,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         description={contentString(c, "description")}
       />
-      <div className="mt-8 grid gap-6 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {offers.map((offer) => (
           <article
             key={offer.id}
@@ -1940,7 +1940,7 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
       <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-white border border-border text-bakery-700">
         <Mail className="size-5" />
       </div>
-      <h2 className="font-heading text-3xl font-bold sm:text-4xl">{contentString(c, "title")}</h2>
+      <h2 className="font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
       <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
         {contentString(c, "description")}
       </p>
