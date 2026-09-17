@@ -19,7 +19,15 @@
 /** Generous: the homepage registry ships 19 sections and duplicates are allowed. */
 export const MAX_SECTIONS = 200;
 
-const BACKGROUNDS = new Set(["white", "cream", "panel"]);
+const BACKGROUNDS = new Set([
+  "white",
+  "cream",
+  "panel",
+  "panel-rose",
+  "panel-mint",
+  "panel-sand",
+  "panel-sky",
+]);
 
 export interface SectionPayloadIssue {
   index: number;

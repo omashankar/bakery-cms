@@ -139,7 +139,7 @@ describe("the row of the shop's own articles", () => {
       renderer.indexOf("function BlogCardsSection("),
       renderer.indexOf("function TileGridSection("),
     );
-    const heading = body.indexOf("ctaHref && ctaLabel");
+    const heading = body.indexOf("<ViewAllLink");
     const grid = body.indexOf("posts.map(");
 
     expect(heading, "the link is gone from the heading line").toBeGreaterThan(-1);

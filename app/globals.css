@@ -19,6 +19,19 @@
   --color-bakery-900: var(--bakery-900);
   --color-bakery-950: var(--bakery-950);
 
+  /*
+    THE BAND TONES.
+
+    Not surfaces — the shop's own surface colour drives those, and these do
+    not move with it. They are the tint a `panel` band is drawn in, so a long
+    page of rows reads as a sequence rather than as one colour repeated. Soft
+    enough that the product photographs on top stay the loudest thing there.
+  */
+  --color-band-rose: var(--band-rose);
+  --color-band-mint: var(--band-mint);
+  --color-band-sand: var(--band-sand);
+  --color-band-sky: var(--band-sky);
+
   --color-cream-50: var(--cream-50);
   --color-cream-100: var(--cream-100);
   --color-cream-200: var(--cream-200);
@@ -123,6 +136,10 @@
   --bakery-950: #2d1f16;
 
   --cream-50: #ffffff;
+  --band-rose: #fdf2f5;
+  --band-mint: #f1f8f2;
+  --band-sand: #fdf8ec;
+  --band-sky: #f1f6fd;
   --cream-100: #faf8f4;
   --cream-200: #f5f2ec;
   --cream-300: #ebe6dc;
@@ -253,6 +270,10 @@ html.dark {
   --shadow-card: 0 0 0 1px rgb(250 248 244 / 10%);
 
   --border-soft: #5c4638;
+  --band-rose: #3a2a30;
+  --band-mint: #26332a;
+  --band-sand: #383021;
+  --band-sky: #242e3a;
   --surface-cream: #4a3324;
   --beige: #3a281c;
   --text-primary: #faf8f4;
@@ -284,6 +305,10 @@ html.dark {
   --input: #e8e5df;
   --ring: #d4a373;
   --border-soft: #e8e5df;
+  --band-rose: #fdf2f5;
+  --band-mint: #f1f8f2;
+  --band-sand: #fdf8ec;
+  --band-sky: #f1f6fd;
   --surface-cream: #faf8f4;
   --beige: #f5f2ec;
   --text-primary: #2d2d2d;

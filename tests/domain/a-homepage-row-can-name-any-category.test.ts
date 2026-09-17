@@ -302,7 +302,9 @@ describe("every product row offers a way in to more of itself", () => {
       margin is nobody's business here.
     */
     const grid = renderer.indexOf("<ProductCard key={cake.id}");
-    const heading = renderer.lastIndexOf("props.showCta && ctaHref && ctaLabel", grid);
+    // The inline button became a shared `ViewAllLink`, so the thing to find
+    // on the heading line is the component, not the condition it replaced.
+    const heading = renderer.lastIndexOf("<ViewAllLink", grid);
 
     expect(grid, "the product grid is gone").toBeGreaterThan(-1);
     expect(heading, "the view-all is no longer on the heading row").toBeGreaterThan(-1);

@@ -34,11 +34,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  weddingCakes,
-  type LandingCategory,
-  type LandingOffer,
-  type LandingProduct,
+import type {
+  LandingCategory,
+  LandingOffer,
+  LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
@@ -66,11 +65,10 @@ import {
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
 import { heroCopySideOf, heroSlidesFor } from "./lib/section-utils";
-import type { HomepageSectionInstance } from "@/types/homepage-builder";
+import type { HomepageSectionInstance, SectionBackground } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import { useState } from "react";
 import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
 import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
@@ -234,7 +232,20 @@ function SectionShell({
    * both edges of the window cannot also be inset from them — the hero is the
    * only caller and a panel there would be a picture with a frame round it.
    */
-  const panel = section.background === "panel" && !fullBleed;
+  const panel = section.background.startsWith("panel") && !fullBleed;
+  /*
+    `Partial`, because the map is keyed on the four TONES and the setting can
+    also be white, cream or plain `panel`. Typed as a full Record it does not
+    compile; typed as a loose object it would silently accept a tone nobody
+    has declared a colour for.
+  */
+  const PANEL_TONES: Partial<Record<SectionBackground, string>> = {
+    "panel-rose": "bg-band-rose",
+    "panel-mint": "bg-band-mint",
+    "panel-sand": "bg-band-sand",
+    "panel-sky": "bg-band-sky",
+  };
+  const panelTone = PANEL_TONES[section.background] ?? "bg-cream-200";
   const bgClass =
     section.background === "cream" ? "surface-cream" : "bg-white";
   // Hero runs its own entrance; the builder preview must stay fully visible while editing.
@@ -276,7 +287,7 @@ function SectionShell({
       ) : (
         <div className={layoutSpacing.container}>
           {panel ? (
-            <div className="rounded-2xl bg-cream-200 px-4 py-6 sm:px-6 sm:py-8">
+            <div className={cn("rounded-2xl px-4 py-6 sm:px-6 sm:py-8", panelTone)}>
               {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
             </div>
           ) : revealOnScroll ? (
@@ -341,6 +352,26 @@ function heroTrustBarFor(
 }
 
 const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
+
+/**
+ * THE WAY IN, on the heading line of every row that has one.
+ *
+ * Small, upper-case and solid rather than an outlined button with an arrow:
+ * at the end of a heading it reads as a label for the row rather than as a
+ * second call to action competing with the cards under it. One component so
+ * the product rails, the tabbed rails and the blog row cannot drift apart.
+ */
+function ViewAllLink({ href, label }: { href: string; label: string }) {
+  if (!href || !label) return null;
+  return (
+    <Link
+      href={href}
+      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase transition-premium hover:bg-cream-300"
+    >
+      {label}
+    </Link>
+  );
+}
 
 function HeroSection(props: HomepageSectionRendererProps) {
   const labels = useBusinessLabels();
@@ -928,12 +959,7 @@ function ProductGridSection(
             className="mb-0"
           />
           <div className="hidden flex-1 justify-end sm:flex">
-            {props.showCta && ctaHref && ctaLabel ? (
-              <Button variant="outline" size="sm" render={<Link href={ctaHref} />}>
-                {ctaLabel}
-                <ArrowRight className="size-4" />
-              </Button>
-            ) : null}
+            {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} /> : null}
           </div>
         </div>
       </ScrollReveal>
@@ -956,12 +982,6 @@ function ProductGridSection(
     </SectionShell>
   );
 }
-
-const weddingPerks = [
-  { icon: Palette, label: "Custom themes & colours" },
-  { icon: Award, label: "Multi-tier showpieces" },
-  { icon: Heart, label: "Tasting before you book" },
-] as const;
 
 
 const whyIcons = { Award, Leaf, Truck, Palette } as const;
@@ -1041,7 +1061,16 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               phone wrap to two lines and move the grid down the page every
               time one is pressed.
             */}
-            <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-border bg-cream-50 p-1">
+            {/*
+              BOXES, and the chosen one is filled.
+
+              They were pale pills inside a pill, which on a tinted band left
+              the chosen tab and the unchosen ones at almost the same weight.
+              Filled-dark against outlined-white reads at a glance, and the
+              little pointer under the chosen one ties it to the row below —
+              which is the whole reason a tab is not just a filter chip.
+            */}
+            <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
               {tabs.map((tab, index) => (
                 <button
                   key={`${tab.label}-${index}`}
@@ -1049,24 +1078,27 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                   onClick={() => setActive(index)}
                   aria-pressed={index === active}
                   className={cn(
-                    "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-premium",
+                    "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold transition-premium",
                     index === active
-                      ? "bg-white text-bakery-700 shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "border-bakery-950 bg-bakery-950 text-white"
+                      : "border-border bg-white text-foreground hover:border-bakery-300"
                   )}
                 >
                   {tab.label || tab.categorySlug}
+                  {index === active ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-bakery-950"
+                    />
+                  ) : null}
                 </button>
               ))}
             </div>
           </div>
-          {railCtaHref && railCtaLabel ? (
-            <Button variant="outline" size="sm" render={<Link href={railCtaHref} />}>
-              {railCtaLabel}
-              <ArrowRight className="size-4" />
-            </Button>
-          ) : null}
+          <ViewAllLink href={railCtaHref} label={railCtaLabel} />
         </div>
+        {/* The rule the heading row sits on, as the layout draws it. */}
+        <div className="mt-4 h-px bg-border" />
       </ScrollReveal>
 
       {cakes.length === 0 ? (
@@ -1258,12 +1290,7 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
           className="mb-0"
         />
         <div className="hidden flex-1 justify-end sm:flex">
-          {ctaHref && ctaLabel ? (
-            <Button variant="outline" size="sm" render={<Link href={ctaHref} />}>
-              {ctaLabel}
-              <ArrowRight className="size-4" />
-            </Button>
-          ) : null}
+          <ViewAllLink href={ctaHref} label={ctaLabel} />
         </div>
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">

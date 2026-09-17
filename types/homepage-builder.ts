@@ -10,7 +10,21 @@
  * (its bestseller rails, its trust strip). A stripe says 'a different part of
  * the page'; a card says 'this row, in particular'.
  */
-export type SectionBackground = "white" | "cream" | "panel";
+export type SectionBackground =
+  | "white"
+  | "cream"
+  /**
+   * A card, in one of four tints.
+   *
+   * `panel` is the neutral one. The four named tones exist so a page of
+   * twenty rows reads as a sequence rather than as one colour repeated —
+   * which is what the layout being followed does with its rails.
+   */
+  | "panel"
+  | "panel-rose"
+  | "panel-mint"
+  | "panel-sand"
+  | "panel-sky";
 
 export type HomepageSectionType =
   | "hero"

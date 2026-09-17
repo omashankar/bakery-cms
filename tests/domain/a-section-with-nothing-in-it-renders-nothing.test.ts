@@ -120,19 +120,42 @@ describe("a section's Background setting", () => {
      */
     const body = code("features/cms-sections/homepage-section-renderer.tsx");
 
-    expect(body, "the panel background is gone").toContain(
-      'const panel = section.background === "panel" && !fullBleed;',
-    );
     /*
-      `cream-200`, a step deeper than the full-width band tint.
-
-      It was `surface-cream` — the same near-white the stripes use — and at
-      the size of an inset box that is invisible against the white around it:
-      the card had a shape and no edge. A full-width stripe wants the faintest
-      tint that still reads; a small box wants one step more.
+      `startsWith`, because there are five panel values now: the neutral one
+      and four tones. An `=== "panel"` here would draw every toned band as a
+      full-width stripe instead of a card.
     */
-    expect(body, "the panel is not drawn as an inset card").toMatch(
-      /rounded-2xl bg-cream-200/,
+    expect(body, "the panel background is gone").toContain(
+      'const panel = section.background.startsWith("panel") && !fullBleed;',
     );
+    expect(body, "the panel is not drawn as an inset card").toMatch(
+      /rounded-2xl px-4 py-6[^"]*", panelTone/,
+    );
+  });
+
+  it("and every tone the setting offers has a colour behind it", () => {
+    /**
+     * The tone map, the type and the validator are three lists that have to
+     * agree. A tone in the dropdown with no entry in the map falls back to the
+     * neutral tint — a setting that saves, reads back correctly in the builder,
+     * and draws the wrong colour. A tone in the map that the validator rejects
+     * is worse: the save is refused with no clue why.
+     */
+    const body = code("features/cms-sections/homepage-section-renderer.tsx");
+    const types = code("types/homepage-builder.ts");
+    const payload = code("features/cms-sections/lib/section-payload.ts");
+
+    const declared = [...types.matchAll(/"(panel-[a-z]+)"/g)].map((m) => m[1]).sort();
+    expect(declared.length, "no tones are declared any more").toBeGreaterThan(0);
+
+    const mapped = [...body.matchAll(/"(panel-[a-z]+)": "bg-band-[a-z]+"/g)].map((m) => m[1]).sort();
+    expect(mapped, "a tone the type offers has no colour in the renderer").toEqual(declared);
+
+    for (const tone of declared) {
+      expect(payload, `${tone} is not accepted by the payload validator`).toContain(`"${tone}"`);
+    }
+
+    // And the fallback, so an unknown value is a tint rather than no class.
+    expect(body).toContain('PANEL_TONES[section.background] ?? "bg-cream-200"');
   });
 });
