@@ -48,7 +48,7 @@ export function ContactPage({
         <div className={layoutSpacing.container}>
           <div className="grid items-start gap-8 lg:grid-cols-[1.35fr_1fr]">
             {/* Form */}
-            <ScrollReveal className="rounded-2xl border border-border bg-white p-6 sm:p-8">
+            <ScrollReveal className="rounded-2xl border border-border bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-bold sm:text-2xl">Send us a message</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Fill in the details below and our team will get back to you within 24 hours.
@@ -75,7 +75,7 @@ export function ContactPage({
                 */}
                 <ul className="mt-5 space-y-3">
                   {contactInfo.address ? (
-                    <li className="flex items-start gap-3.5 rounded-xl border border-border bg-white p-3.5">
+                    <li className="flex items-start gap-3.5 rounded-xl border border-border bg-card p-3.5">
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                         <MapPin className="size-4" />
                       </span>
@@ -91,7 +91,7 @@ export function ContactPage({
                     <li>
                       <a
                         href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
-                        className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                        className="flex items-center gap-3.5 rounded-xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                       >
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                           <Phone className="size-4" />
@@ -109,7 +109,7 @@ export function ContactPage({
                     <li>
                       <a
                         href={`mailto:${contactInfo.email}`}
-                        className="flex items-center gap-3.5 rounded-xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                        className="flex items-center gap-3.5 rounded-xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                       >
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                           <Mail className="size-4" />
@@ -134,7 +134,7 @@ export function ContactPage({
                 is its own small lie about a shop that publishes no hours.
               */}
               {businessHours.length > 0 ? (
-              <div className="rounded-2xl border border-border bg-white p-6 sm:p-7">
+              <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Opening Hours</h2>
                 <ul className="mt-5 space-y-3 text-sm">
                   {businessHours.map((item, index) => (

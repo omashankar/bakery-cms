@@ -1457,7 +1457,7 @@ export function ProductDetailPage({
               ) : null}
 
               {offers.length > 0 ? (
-                <div className="rounded-xl border border-dashed border-bakery-300 bg-white p-4">
+                <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
                   <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
                     <Tag className="size-4" />
                     Available offers
@@ -1619,7 +1619,7 @@ export function ProductDetailPage({
                         {questions.map((question) => (
                           <article
                             key={question.id}
-                            className="rounded-xl border border-border bg-white p-4"
+                            className="rounded-xl border border-border bg-card p-4"
                           >
                             <p className="text-sm font-medium">Q: {question.message}</p>
                             <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
@@ -1714,7 +1714,7 @@ export function ProductDetailPage({
                       reviews.map((review) => (
                         <article
                           key={review.id}
-                          className="rounded-xl border border-border bg-white p-4"
+                          className="rounded-xl border border-border bg-card p-4"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">
@@ -1867,7 +1867,7 @@ export function ProductDetailPage({
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white p-4 lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-4 lg:hidden">
         <div className="mx-auto flex max-w-lg gap-3">
           <Button
             variant="bakery"

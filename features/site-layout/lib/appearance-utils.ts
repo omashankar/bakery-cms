@@ -133,40 +133,27 @@ export function applyAppearanceSettingsTo(
   }
 }
 
+/**
+ * Put every token this palette can write back to the stylesheet's own value.
+ *
+ * THE LIST IS ASKED FOR, NOT WRITTEN DOWN. It used to be twenty-eight names
+ * copied out by hand, which is a second copy of the token map with nothing
+ * holding the two in step: a token added to the generator and not to this
+ * array is a token Reset leaves painted on the page for the rest of the
+ * session, and the failure is silent — the shop presses Reset, most of the
+ * colours go back, and the ones that stay look like the stylesheet's.
+ *
+ * Asking the generator for the names cannot drift, because it IS the names.
+ * The default settings are only a vehicle for the keys; the values are
+ * discarded, and `removeProperty` uncovers whatever the stylesheet says.
+ */
 export function clearAppearanceOverrides(): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const keys = [
-    "--brand-primary",
-    "--bakery-700",
-    "--bakery-600",
-    "--bakery-500",
-    "--bakery-800",
-    "--bakery-900",
-    "--brand-accent",
-    "--gold-300",
-    "--gold-400",
-    "--gold-500",
-    "--surface-cream",
-    "--cream-50",
-    "--cream-100",
-    "--cream-200",
-    "--beige",
-    "--radius",
-    "--primary",
-    "--primary-foreground",
-    "--sidebar-primary",
-    "--sidebar-primary-foreground",
-    "--ring",
-    "--sidebar-ring",
-    "--secondary",
-    "--secondary-foreground",
-    "--muted",
-    "--accent",
-    "--accent-foreground",
-    "--sidebar",
-  ];
-  keys.forEach((key) => root.style.removeProperty(key));
+
+  for (const key of Object.keys(appearanceCssVariables(defaultAppearanceSettings))) {
+    root.style.removeProperty(key);
+  }
 }
 
 export function notifyAppearanceUpdated(): void {

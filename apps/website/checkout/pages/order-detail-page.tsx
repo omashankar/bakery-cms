@@ -185,7 +185,7 @@ export function OrderDetailPage() {
         />
         <section className={layoutSpacing.sectionY}>
           <div className={layoutSpacing.containerNarrow}>
-            <div className="rounded-xl border border-border bg-white p-8 text-center">
+            <div className="rounded-xl border border-border bg-card p-8 text-center">
               <p className="text-muted-foreground">
                 Please check the order number, and look it up with the email used to
                 place it.
@@ -249,7 +249,7 @@ export function OrderDetailPage() {
                 load.
               */}
               <div className={hasPartner ? "grid gap-6 lg:grid-cols-2" : "space-y-6"}>
-                <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                   <div className="flex items-center gap-2">
                     <Package className="size-5 text-bakery-700" />
                     <h2 className="font-heading text-lg font-semibold">Order timeline</h2>
@@ -278,7 +278,7 @@ export function OrderDetailPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-5 text-bakery-700" />
                   <h2 className="font-heading text-lg font-semibold">Delivery address</h2>

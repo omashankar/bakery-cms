@@ -328,7 +328,7 @@ export function PhotoPrintEditor({
             rounding the box instead only worked while every print was round.
           */}
           <div
-            className="relative mx-auto mb-5 w-full max-w-sm overflow-hidden rounded-lg border border-border bg-white sm:mb-0"
+            className="relative mx-auto mb-5 w-full max-w-sm overflow-hidden rounded-lg border border-border bg-card sm:mb-0"
             style={{ aspectRatio: `${previewBox.width} / ${previewBox.height}` }}
           >
             <canvas

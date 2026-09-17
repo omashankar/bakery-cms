@@ -96,15 +96,31 @@ describe("a section's Background setting", () => {
 
   it("computes the background from the stored setting", () => {
     /*
-      Matched as a SHAPE, not as one line of source. This pinned the exact
-      string including its whitespace, so wrapping the expression across two
-      lines — which is what adding a third background did — failed a test
-      about where the value comes from.
+      Matched as a SHAPE, not as one line of source — and twice now the shape
+      was drawn too tightly. First it pinned the whitespace, so wrapping the
+      expression across two lines failed a test about where the value comes
+      from. Then it pinned the untinted branch as the literal "bg-white",
+      and failed the day that branch became a TOKEN — which is strictly more
+      of what this test is named for, not less.
+
+      What matters is the two halves: the class is chosen by reading
+      `section.background`, and neither branch is a raw colour a dropdown
+      cannot reach.
     */
     for (const file of ["features/cms-sections/homepage-section-renderer.tsx"]) {
-      expect(code(file), file).toMatch(
-        /const bgClass =\s*section\.background === "cream" \? "surface-cream" : "bg-white"/,
+      const src = code(file);
+
+      const chosen = src.match(
+        /const bgClass =\s*section\.background === "cream"\s*\?\s*("[^"]+")\s*:\s*("[^"]+")/,
       );
+      expect(chosen, `${file}: the band no longer reads section.background`).toBeTruthy();
+
+      for (const branch of chosen!.slice(1)) {
+        expect(
+          branch,
+          `${file}: ${branch} is a fixed colour, so the Appearance screen cannot reach it`,
+        ).not.toMatch(/"(?:bg-)?(?:white|black)"|#/);
+      }
     }
   });
 

@@ -68,7 +68,7 @@ export function CheckoutProgress({
                 "flex size-8 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
                 isComplete || isActive
                   ? "border-bakery-700 bg-bakery-700 text-white"
-                  : "border-border bg-white text-muted-foreground",
+                  : "border-border bg-card text-muted-foreground",
                 canNavigate && "group-hover:bg-bakery-800"
               )}
             >

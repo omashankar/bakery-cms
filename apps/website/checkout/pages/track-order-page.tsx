@@ -73,7 +73,7 @@ export function TrackOrderPage() {
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-            <div className="rounded-xl border border-border bg-white p-6 shadow-sm sm:p-8">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <div className="mb-6 flex items-center gap-2">
                 <PackageSearch className="size-5 text-bakery-700" />
                 <h2 className="font-heading text-lg font-semibold">Find your order</h2>
@@ -166,7 +166,7 @@ export function TrackOrderPage() {
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-bakery-700">
                   <MapPin className="size-4" />
                   <p className="text-sm font-medium">Need help?</p>

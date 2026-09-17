@@ -154,7 +154,7 @@ export function AccountAddressesPage() {
               <div
                 key={address.id}
                 className={cn(
-                  "rounded-2xl border bg-white p-5 shadow-sm sm:p-6",
+                  "rounded-2xl border bg-card p-5 shadow-sm sm:p-6",
                   address.isDefault ? "border-bakery-700 ring-1 ring-bakery-700/20" : "border-border"
                 )}
               >
@@ -216,7 +216,7 @@ export function AccountAddressesPage() {
           )}
         </div>
 
-        <div className="h-fit rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+        <div className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="font-heading text-lg font-bold text-foreground">
             {editingId ? "Edit address" : "Add new address"}
           </h2>
@@ -246,7 +246,7 @@ export function AccountAddressesPage() {
                         "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                         active
                           ? "border-bakery-700 bg-bakery-700 text-white"
-                          : "border-border bg-white text-foreground hover:border-bakery-700"
+                          : "border-border bg-card text-foreground hover:border-bakery-700"
                       )}
                     >
                       {option}

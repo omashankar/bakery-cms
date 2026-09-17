@@ -200,20 +200,54 @@ export function appearanceCssVariables(
   const surfaceColor = normalizeHexColor(settings.surfaceColor);
   const borderRadius = settings.borderRadius === 16 ? 16 : 12;
 
+  /*
+    THE WHOLE RAMP, not five steps of it.
+
+    This wrote 5 of the 11 `--bakery-*` steps and 3 of the 8 `--gold-*` ones,
+    and the storefront names the missing ones 45 times — `bakery-300` alone
+    22 times. A shop that picked a colour therefore got a chip whose fill
+    moved and whose edge did not, or a badge two thirds recoloured and one
+    third still warm cream. The ramp has to be complete or it splits.
+
+    The amounts are chosen so the SHIPPED brown lands within a unit or two of
+    the values `globals.css` already hardcodes, which is how a shop on the
+    default palette sees no change at all from this.
+  */
   const brand: Record<string, string> = {
     "--brand-primary": primaryColor,
-    "--bakery-700": primaryColor,
-    "--bakery-600": mixHex(primaryColor, 0.08),
+    "--bakery-50": mixHex(primaryColor, 0.96),
+    "--bakery-100": mixHex(primaryColor, 0.88),
+    "--bakery-200": mixHex(primaryColor, 0.75),
+    "--bakery-300": mixHex(primaryColor, 0.55),
+    "--bakery-400": mixHex(primaryColor, 0.3),
     "--bakery-500": mixHex(primaryColor, 0.18),
+    "--bakery-600": mixHex(primaryColor, 0.08),
+    "--bakery-700": primaryColor,
     "--bakery-800": shadeHex(primaryColor, 0.12),
     "--bakery-900": shadeHex(primaryColor, 0.22),
+    "--bakery-950": shadeHex(primaryColor, 0.6),
 
     "--brand-accent": accentColor,
+    "--gold-50": mixHex(accentColor, 0.9),
+    "--gold-100": mixHex(accentColor, 0.78),
+    "--gold-200": mixHex(accentColor, 0.55),
     "--gold-300": accentColor,
     "--gold-400": accentColor,
     "--gold-500": shadeHex(accentColor, 0.08),
+    "--gold-600": shadeHex(accentColor, 0.25),
+    "--gold-700": shadeHex(accentColor, 0.365),
+    "--gold-800": shadeHex(accentColor, 0.52),
+    "--gold-900": shadeHex(accentColor, 0.64),
 
     "--surface-cream": surfaceColor,
+    /*
+      STILL WHITE BY DECREE, and deliberately.
+
+      `the-nav-band-is-a-band` pins this in both the stylesheet and here,
+      because the nav band was once filled with it and went white on white.
+      The token MEANS white. Anything that wanted a tint and reached for it
+      was reaching for the wrong one.
+    */
     "--cream-50": "#ffffff",
     "--cream-100": surfaceColor,
     "--cream-200": shadeHex(surfaceColor, 0.04),
@@ -226,6 +260,42 @@ export function appearanceCssVariables(
 
   return {
     ...brand,
+    /*
+      THE GROUND THE PAGE IS DRAWN ON.
+
+      `--background` and `--card` were fixed `#ffffff`, and the storefront
+      shell's own class was the literal `bg-white` — on the very element
+      that carries this palette inline. 16 of the 25 section types default
+      to a white band, so the majority of the page's height was a colour no
+      shop setting could reach. Measured in a browser with a deliberately
+      alien palette applied: of nine surfaces on the redesigned homepage,
+      exactly one moved.
+
+      Lightened 80% toward white rather than set TO the surface, because the
+      ground and the tinted band have to stay apart: `--cream-100` is the
+      surface itself, and if the ground were too, every band boundary on the
+      page would vanish. At the shipped cream this lands on #fefefd, a unit
+      off the white it replaces.
+    */
+    "--background": mixHex(surfaceColor, 0.8),
+    "--card": mixHex(surfaceColor, 0.8),
+    "--popover": mixHex(surfaceColor, 0.8),
+    /*
+      THE HAIRLINE ROUND EVERYTHING.
+
+      `--border` was fixed #e8e5df — a warm beige — and `globals.css` applies
+      `border-border` to `*` in the base layer, so it is the outline of every
+      tile, card, panel and row in the shop whether or not a class names it.
+      A cool-grey surface with a warm hairline round it is the exact
+      mismatch the category tile's own comment says destroys the object.
+
+      Derived from the SURFACE rather than the brand, because a hairline's
+      job is to be just visible against the thing it sits on — and a pale
+      brand colour lightened toward white would disappear entirely.
+    */
+    "--border": shadeHex(surfaceColor, 0.08),
+    "--input": shadeHex(surfaceColor, 0.08),
+    "--border-soft": shadeHex(surfaceColor, 0.08),
     "--primary": primaryColor,
     "--primary-foreground": readableInkOn(primaryColor),
     "--sidebar-primary": primaryColor,

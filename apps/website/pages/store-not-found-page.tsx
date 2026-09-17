@@ -9,7 +9,7 @@ export function StoreNotFoundPage() {
   return (
     <section className={layoutSpacing.sectionY}>
       <div className={layoutSpacing.containerNarrow}>
-        <ScrollReveal className="rounded-2xl border border-border bg-white p-8 text-center sm:p-12">
+        <ScrollReveal className="rounded-2xl border border-border bg-card p-8 text-center sm:p-12">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl bg-cream-100">
             <SearchX className="size-8 text-bakery-700" />
           </div>

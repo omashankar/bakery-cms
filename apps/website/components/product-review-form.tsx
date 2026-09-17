@@ -133,7 +133,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
               id="review-rating-select"
               value={rating}
               onChange={(event) => setRating(Number(event.target.value))}
-              className="flex h-10 rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="flex h-10 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {[5, 4, 3, 2, 1].map((value) => (
                 <option key={value} value={value}>
@@ -192,7 +192,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
             {photoUrls.map((url) => (
               <span
                 key={url}
-                className="relative size-16 overflow-hidden rounded-lg border border-border bg-white"
+                className="relative size-16 overflow-hidden rounded-lg border border-border bg-card"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="size-full object-cover" />

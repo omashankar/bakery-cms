@@ -253,7 +253,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
           <div
             aria-hidden
             data-testid="zoom-panel"
-            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-white bg-no-repeat shadow-lg lg:block"
+            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-card bg-no-repeat shadow-lg lg:block"
             style={{
               backgroundImage: `url("${magnifiedSrc}")`,
               backgroundSize: `${HOVER_ZOOM * 100}%`,
@@ -287,7 +287,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                   type="button"
                   onClick={() => step(-1)}
                   aria-label="Previous image"
-                  className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-white"
+                  className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-card"
                 >
                   <ChevronLeft className="size-5" />
                 </button>
@@ -295,7 +295,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                   type="button"
                   onClick={() => step(1)}
                   aria-label="Next image"
-                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-white"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full border border-border bg-white/90 p-2 text-bakery-700 transition-premium hover:bg-card"
                 >
                   <ChevronRight className="size-5" />
                 </button>

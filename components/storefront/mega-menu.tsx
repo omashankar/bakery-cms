@@ -218,7 +218,7 @@ export function MegaMenu({
           align === "right" ? "right-0" : "left-0"
         )}
       >
-        <div className="overflow-hidden rounded-xl border border-border bg-white p-6 shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm">
           {authored.length > 0 ? (
             /*
               THE SHOP'S OWN COLUMNS.

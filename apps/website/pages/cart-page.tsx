@@ -324,7 +324,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 {[0, 1].map((row) => (
                   <div
                     key={row}
-                    className="flex gap-4 rounded-xl border border-border bg-white p-4"
+                    className="flex gap-4 rounded-xl border border-border bg-card p-4"
                   >
                     <div className="size-20 shrink-0 animate-pulse rounded-lg bg-cream-100" />
                     <div className="flex-1 space-y-2 py-1">
@@ -384,7 +384,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-border bg-white p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 gap-4">
@@ -581,7 +581,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   every install until an owner switches one on.
                 */}
                 {offers.length > 0 ? (
-                  <div className="rounded-xl border border-dashed border-bakery-300 bg-white p-4">
+                  <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
                     <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
                       <Tag className="size-4" />
                       Offers you can use
@@ -658,7 +658,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   A coupon box of its own here would be a second coupon system
                   on the one screen where the customer decides what to pay.
                 */}
-                <div className="rounded-xl border border-border bg-white p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <p className="mb-3 text-sm font-medium">Have a coupon?</p>
                   <CouponInput
                     cart={couponLines}
@@ -750,7 +750,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
         summary is already pinned. `pb-24` on the section leaves room for it.
       */}
       {loaded && items.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white p-4 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-4 lg:hidden">
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0">
               <p className="font-semibold">{formatCurrency(totals.total)}</p>
@@ -787,7 +787,7 @@ function SavedForLaterSection({
   onRemove: (savedId: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-4">
         <h2 className="font-heading text-lg font-semibold">Saved for later</h2>
         <p className="text-sm text-muted-foreground">

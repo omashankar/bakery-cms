@@ -470,7 +470,7 @@ function CategoryPill({
         "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",
         active
           ? "border-bakery-700 bg-bakery-700 text-white shadow-sm"
-          : "border-border bg-white text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
+          : "border-border bg-card text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
       )}
     >
       {label}

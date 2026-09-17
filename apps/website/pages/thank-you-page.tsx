@@ -13,7 +13,7 @@ export async function ThankYouPage() {
   return (
     <section className={layoutSpacing.sectionY}>
       <div className={layoutSpacing.containerNarrow}>
-        <ScrollReveal className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm sm:p-12">
+        <ScrollReveal className="rounded-2xl border border-border bg-card p-8 text-center shadow-sm sm:p-12">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl bg-green-50">
             <CheckCircle2 className="size-8 text-green-600" />
           </div>

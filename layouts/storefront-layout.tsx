@@ -48,7 +48,7 @@ export function StorefrontLayoutShell({
 }: StorefrontLayoutShellProps) {
   return (
     <div
-      className={cn("flex min-h-screen flex-col bg-white text-foreground", className)}
+      className={cn("flex min-h-screen flex-col bg-background text-foreground", className)}
       data-storefront-theme="light"
       /*
         The shop's palette in the FIRST paint.

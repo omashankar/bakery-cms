@@ -101,7 +101,7 @@ function renderSections(
         bands that reads as a gap rather than as a section.
       */
       return (
-        <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.bandY)}>
+        <section key="newsletter-cta-row" className={cn("bg-background", layoutSpacing.bandY)}>
           <div className={layoutSpacing.container}>
             <StaggerReveal className="grid items-stretch gap-6 lg:grid-cols-2">
               <HomepageSectionRenderer {...data} section={pair.newsletter} embedded />

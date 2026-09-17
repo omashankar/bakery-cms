@@ -246,8 +246,15 @@ function SectionShell({
     "panel-sky": "bg-band-sky",
   };
   const panelTone = PANEL_TONES[section.background] ?? "bg-cream-200";
+  /*
+    THE BAND THAT IS NOT TINTED IS THE PAGE ITSELF.
+
+    `bg-white` was a Tailwind literal, not a token — so the majority of
+    the homepage's height was a colour no shop setting could reach. 16 of
+    the 25 section types default to this branch.
+  */
   const bgClass =
-    section.background === "cream" ? "surface-cream" : "bg-white";
+    section.background === "cream" ? "surface-cream" : "bg-background";
   // Hero runs its own entrance; the builder preview must stay fully visible while editing.
   // noReveal: the section reveals its own parts (e.g. staggered card grids).
   const revealOnScroll = !interactive && section.type !== "hero" && !noReveal;
@@ -471,7 +478,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
             whole class names rather than a style prop because Tailwind only
             emits the classes it can see.
           */
-          "grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-50 p-5 sm:gap-6 sm:p-6",
+          "grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-100 p-5 sm:gap-6 sm:p-6",
           promises.length === 1 && "grid-cols-1",
           promises.length === 2 && "lg:grid-cols-2",
           promises.length === 3 && "lg:grid-cols-3",
@@ -490,7 +497,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
             heroTrustIcons[item.icon as keyof typeof heroTrustIcons] ?? BadgeCheck;
           return (
             <div key={`${item.title}-${index}`} className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-white text-bakery-700 shadow-sm">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-bakery-700 shadow-sm">
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0">
@@ -535,7 +542,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
     if (!props.interactive) return null;
     return (
       <SectionShell {...props}>
-        <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8">
           {/* A hero slide IS its picture, so a slide with no image is not a
               slide yet. Say that, rather than leaving an empty band. */}
           A hero slide is its picture — add an image to a slide and it will
@@ -758,7 +765,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
     if (!props.interactive) return null;
     return (
       <SectionShell {...props}>
-        <div className="rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8">
           This section shows your shop&apos;s address and opening hours from
           Settings → Contact. Until you set a real address there it stays hidden
           on the live homepage — the shipped example address is in Mumbai.
@@ -769,7 +776,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props}>
-      <div className="grid gap-8 rounded-2xl border border-border bg-white p-6 sm:p-8 lg:grid-cols-2 lg:items-center lg:gap-12">
+      <div className="grid gap-8 rounded-2xl border border-border bg-card p-6 sm:p-8 lg:grid-cols-2 lg:items-center lg:gap-12">
         <div className="space-y-5">
           <div className="flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
             <MapPin className="size-5" />
@@ -792,8 +799,8 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-50 p-4">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-bakery-700">
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-100 p-4">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-card text-bakery-700">
               <Store className="size-4" />
             </span>
             <div className="min-w-0 flex-1 space-y-1">
@@ -814,7 +821,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
               set upstream — printing seeded opening times is a claim about when
               a stranger can turn up at the door. */}
           {location.hours.length > 0 ? (
-            <div className="rounded-xl border border-border bg-cream-50 p-4">
+            <div className="rounded-xl border border-border bg-cream-100 p-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <Clock className="size-3.5 text-bakery-700" />
                 Opening hours
@@ -944,7 +951,7 @@ function ProductGridSection(
           read. An admin following this could look for a tick that does not
           exist and conclude the builder was broken.
         */}
-        <div className="mt-8 rounded-2xl border border-dashed border-border bg-white p-6 text-center text-sm text-muted-foreground sm:p-8">
+        <div className="mt-8 rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8">
           {CATEGORY_ROWS.has(props.section.type) ? (
             <>
               Nothing is filed under this category yet, so the row stays hidden
@@ -1114,7 +1121,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                     "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold",
                     index === active
                       ? "border-bakery-950 bg-bakery-950 text-white"
-                      : "border-border bg-white text-foreground"
+                      : "border-border bg-card text-foreground"
                   )}
                 >
                   {tab.label || tab.categorySlug}
@@ -1539,7 +1546,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
           return (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-xl border border-border bg-white p-5"
+              className="rounded-xl border border-border bg-card p-5"
             >
               <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                 <Icon className="size-5" />
@@ -1589,7 +1596,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         {items.map((item) => (
           <article
             key={item.id}
-            className="flex flex-col rounded-xl border border-border bg-white p-6"
+            className="flex flex-col rounded-xl border border-border bg-card p-6"
           >
             <RatingStars rating={item.rating} className="mb-4 text-gold-300" />
             <Quote className="mb-2 size-6 text-gold-300/60" />
@@ -1717,7 +1724,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
               <AccordionItem
                 key={faq.id}
                 value={faq.id}
-                className="overflow-hidden rounded-2xl border border-border bg-white transition-colors"
+                className="overflow-hidden rounded-2xl border border-border bg-card transition-colors"
               >
                 <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
                   {faq.question}
@@ -1867,7 +1874,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         {offers.map((offer) => (
           <article
             key={offer.id}
-            className="overflow-hidden rounded-xl border border-border bg-white"
+            className="overflow-hidden rounded-xl border border-border bg-card"
           >
             <div className="relative aspect-[3/2] bg-muted">
               <OptimizedImage src={offer.image} alt={offer.title || offer.discount} fill className="object-cover" sizes="33vw" />
@@ -2040,7 +2047,7 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
         props.embedded ? "flex h-full flex-col justify-center" : "mx-auto max-w-3xl"
       )}
     >
-      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-white border border-border text-bakery-700">
+      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-card border border-border text-bakery-700">
         <Mail className="size-5" />
       </div>
       <h2 className="font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
@@ -2055,7 +2062,7 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="h-10 flex-1 bg-white"
+          className="h-10 flex-1 bg-card"
         />
         <Button type="submit" variant="bakery" disabled={loading} className="h-10 shrink-0">
           <Send className="size-4" />

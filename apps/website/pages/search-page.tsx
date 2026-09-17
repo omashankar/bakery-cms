@@ -134,7 +134,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
                   onClick={() => runSearch(item.term)}
                   data-gate-wedding={item.requires === "wedding" ? "" : undefined}
                   data-gate-photo={item.requires === "photoCake" ? "" : undefined}
-                  className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
+                  className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                 >
                   {item.term}
                 </button>
@@ -148,7 +148,7 @@ export function SearchPage({ catalog }: SearchPageProps) {
 
           {results.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">
-              <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-white text-bakery-400 shadow-sm">
+              <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-card text-bakery-400 shadow-sm">
                 <Search className="size-6" />
               </span>
               <p className="font-heading text-lg font-semibold">No results found</p>

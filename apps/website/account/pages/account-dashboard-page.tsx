@@ -104,7 +104,7 @@ export function AccountDashboardPage() {
       description="Manage your personal details and quick access to your activity."
     >
       {/* Personal Information */}
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="font-heading text-lg font-bold text-foreground">
           Personal Information
         </h2>
@@ -179,7 +179,7 @@ export function AccountDashboardPage() {
       </div>
 
       {/* Quick Links */}
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="font-heading text-lg font-bold text-foreground">Quick Links</h2>
         <div className="mt-1 h-px bg-border" />
 

@@ -55,7 +55,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     aria-label={social.label}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
+                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                   >
                     <SocialMark platform={social.platform} />
                   </a>

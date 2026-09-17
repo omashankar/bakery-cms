@@ -76,7 +76,7 @@ function StandardTemplate({ page, preview }: { page: CmsPage; preview: boolean }
       />
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.containerNarrow}>
-          <div className="mx-auto max-w-2xl rounded-xl border border-border bg-white p-6 text-foreground sm:p-8">
+          <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 text-foreground sm:p-8">
             {renderBlocks(page.blocks)}
           </div>
         </div>
@@ -159,7 +159,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
       />
 
       {/* Our Story */}
-      <section className={cn("bg-white", layoutSpacing.sectionY)}>
+      <section className={cn("bg-background", layoutSpacing.sectionY)}>
         <div className={layoutSpacing.container}>
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             {page.heroImage ? (
@@ -224,7 +224,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
 
       {/* Why Choose Us — heading, copy and cards each stand on their own. */}
       {about.highlightsTitle || about.highlightsDescription || about.highlights.length > 0 ? (
-      <section className={cn("bg-white", layoutSpacing.sectionY)}>
+      <section className={cn("bg-background", layoutSpacing.sectionY)}>
         <div className={layoutSpacing.container}>
           {about.highlightsTitle || about.highlightsDescription ? (
             <ScrollReveal className="max-w-2xl">
@@ -244,7 +244,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
               return (
                 <div
                   key={item.id}
-                  className="h-full rounded-2xl border border-border bg-white p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                  className="h-full rounded-2xl border border-border bg-card p-5 transition-all hover:border-bakery-300 hover:shadow-sm"
                 >
                   <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                     <Icon className="size-5" />
@@ -267,7 +267,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
 
       {/* CTA — each button appears only if it has been given a label. */}
       {about.ctaTitle || about.ctaDescription || about.ctaPrimaryLabel || about.ctaSecondaryLabel ? (
-      <section className={cn("bg-white pb-16 lg:pb-20")}>
+      <section className={cn("bg-background pb-16 lg:pb-20")}>
         <div className={layoutSpacing.container}>
           <ScrollReveal className="rounded-3xl border border-border bg-cream-100 px-6 py-12 text-center sm:px-10 lg:py-14">
             {about.ctaTitle ? (

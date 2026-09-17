@@ -65,7 +65,7 @@ export function OptionButton({
         "rounded-lg border px-4 py-2 text-sm font-medium transition-premium",
         active
           ? "border-bakery-700 bg-bakery-700 text-white"
-          : "border-border bg-white hover:border-bakery-300"
+          : "border-border bg-card hover:border-bakery-300"
       )}
     >
       {children}

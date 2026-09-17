@@ -175,7 +175,7 @@ export function AccountOrdersPage() {
           {paginated.map((order) => (
             <div
               key={order.id}
-              className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
             >
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">

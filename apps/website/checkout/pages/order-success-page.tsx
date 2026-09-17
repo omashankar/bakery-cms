@@ -122,7 +122,7 @@ export function OrderSuccessPage() {
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.containerNarrow}>
-          <ScrollReveal className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm sm:p-12">
+          <ScrollReveal className="rounded-2xl border border-border bg-card p-8 text-center shadow-sm sm:p-12">
             <div className="relative mx-auto mb-4 flex size-16 items-center justify-center">
               {looking ? (
                 <span className="relative flex size-16 items-center justify-center rounded-2xl bg-muted">

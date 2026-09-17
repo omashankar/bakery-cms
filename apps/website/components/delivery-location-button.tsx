@@ -126,7 +126,7 @@ export function DeliveryLocationButton() {
       </button>
 
       {open ? (
-        <div className="absolute top-full right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-white p-4 shadow-md">
+        <div className="absolute top-full right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-popover p-4 shadow-md">
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">Check your PIN code</p>
             <button

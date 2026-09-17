@@ -52,7 +52,7 @@ export function AccountShell({
           {mobileOpen ? (
             <div
               id="account-mobile-nav"
-              className="mb-6 overflow-hidden rounded-2xl border border-border bg-white shadow-sm lg:hidden"
+              className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:hidden"
             >
               <AccountNav onNavigate={() => setMobileOpen(false)} />
             </div>
@@ -60,7 +60,7 @@ export function AccountShell({
 
           <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
             <aside className="hidden lg:block">
-              <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+              <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                 <AccountNav />
               </div>
             </aside>

@@ -199,7 +199,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           scrolled. A shadow says the same thing (the header is floating over
           the page) without competing for that pixel.
         */
-        "sticky top-0 z-50 w-full bg-white transition-shadow",
+        "sticky top-0 z-50 w-full bg-background transition-shadow",
         scrolled && "shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
       )}
     >
@@ -636,7 +636,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             scroll, and `overscroll-contain` so the locked body does not
             swallow the drawer's own scroll at its ends.
           */
-          className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-white lg:hidden"
+          className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-background lg:hidden"
         >
           <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobile navigation">
             {homeRow ? (

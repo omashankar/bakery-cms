@@ -95,7 +95,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                       "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",
                       category === item.value
                         ? "border-bakery-700 bg-bakery-700 text-white shadow-sm"
-                        : "border-border bg-white text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
+                        : "border-border bg-card text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
                     )}
                   >
                     {item.label}
@@ -124,7 +124,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                     <AccordionItem
                       key={faq.id}
                       value={faq.id}
-                      className="overflow-hidden rounded-2xl border border-border bg-white transition-colors hover:border-bakery-300"
+                      className="overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-bakery-300"
                     >
                       <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
                         {faq.question}
@@ -147,7 +147,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
             {/* Help sidebar */}
             <ScrollReveal delay={120} className="lg:sticky lg:top-24 lg:self-start">
               <aside className="rounded-3xl border border-border bg-cream-100 p-6 sm:p-8">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-bakery-700 shadow-sm">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-card text-bakery-700 shadow-sm">
                   <MessageCircle className="size-6" />
                 </span>
                 <h2 className="mt-5 font-heading text-xl font-bold sm:text-2xl">
@@ -164,7 +164,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   {contactInfo.phone ? (
                     <a
                       href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                     >
                       <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                         <Phone className="size-4" />
@@ -180,7 +180,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   {contactInfo.email ? (
                     <a
                       href={`mailto:${contactInfo.email}`}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                     >
                       <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                         <Mail className="size-4" />

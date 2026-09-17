@@ -66,7 +66,7 @@ export function ProductQuestionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-white p-4">
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-card p-4">
       <p className="text-sm font-medium">Ask about this {"—"} the shop replies by email</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">

@@ -1379,7 +1379,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
               {step === 1 ? (
-                <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                   {/*
                     "Delivery details" covered two questions — where, and when —
                     and only one of them is still asked here. The when moved to
@@ -1426,7 +1426,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
 
                     {addressFormOpen ? (
-                      <div className="space-y-4 rounded-xl border border-border bg-white p-4">
+                      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-medium">
                             {editingAddressId ? "Edit address" : "New delivery address"}
@@ -1632,7 +1632,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                   "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                                   active
                                     ? "border-bakery-700 bg-bakery-700 text-white"
-                                    : "border-border bg-white text-foreground hover:border-bakery-700"
+                                    : "border-border bg-card text-foreground hover:border-bakery-700"
                                 )}
                               >
                                 {option}
@@ -1715,7 +1715,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
               {step === 2 ? (
                 <div className="space-y-6">
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Personalize your order</h2>
 
                     <div className="mt-5 space-y-4">
@@ -1751,7 +1751,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                     "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
                                     active
                                       ? "border-bakery-700 bg-bakery-50"
-                                      : "border-border bg-white hover:border-bakery-700"
+                                      : "border-border bg-card hover:border-bakery-700"
                                   )}
                                 >
                                   <span>
@@ -1876,7 +1876,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                     "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
                                     active
                                       ? "border-bakery-700 bg-bakery-700 text-white"
-                                      : "border-border bg-white text-foreground hover:border-bakery-700"
+                                      : "border-border bg-card text-foreground hover:border-bakery-700"
                                   )}
                                 >
                                   {option}
@@ -1906,7 +1906,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         />
                       </div>
 
-                      <div className="space-y-3 rounded-xl border border-border bg-white p-4">
+                      <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium">Who it is from</p>
@@ -1993,7 +1993,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
               {step === 3 ? (
                 <div className="space-y-6">
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Pay securely online, or choose Cash on Delivery.
@@ -2020,7 +2020,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <Label htmlFor="orderNotes">Special instructions (optional)</Label>
                     <Textarea
                       id="orderNotes"
@@ -2035,7 +2035,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     />
                   </div>
 
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <h2 className="font-heading text-lg font-semibold">Review & confirm</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Please verify your details before placing the order.
@@ -2195,7 +2195,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                 giftWrapLabel={commerce.giftWrapLabel}
               />
               {commerce.giftWrapEnabled ? (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-white p-4">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4">
                   <Checkbox
                     checked={giftWrap}
                     onCheckedChange={(checked) => {
@@ -2213,7 +2213,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                 </label>
               ) : null}
 
-              <div className="rounded-xl border border-border bg-white p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                   <p className="mb-3 text-sm font-medium">Have a coupon?</p>
                   <CouponInput
                     cart={couponLines}
