@@ -207,14 +207,17 @@ describe("the category tiles", () => {
     /**
      * The name sat outside the bordered box. So the tile was a picture with a
      * caption beneath rather than one object, and a two-line name pushed its
-     * neighbours out of alignment. Asserted by ORDER: the border opens before
+     * neighbours out of alignment. Asserted by ORDER: the tile opens before
      * the name and the name is inside it.
+     *
+     * Found by the tile's tint. It was found by its border until the border
+     * went — the tile had no real tint then, only a hairline.
      */
     const body = strip();
-    const card = body.indexOf("rounded-2xl border border-border");
+    const card = body.indexOf("rounded-2xl bg-cream-");
     const name = body.indexOf("{category.name}", card);
 
-    expect(card, "the card lost its border").toBeGreaterThan(-1);
+    expect(card, "the tile has no tint of its own").toBeGreaterThan(-1);
     expect(name, "the name is not inside the card").toBeGreaterThan(card);
     expect(body.slice(card, name), "the card closes before the name").not.toContain("</Link>");
   });

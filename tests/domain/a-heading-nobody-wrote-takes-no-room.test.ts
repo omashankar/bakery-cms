@@ -87,17 +87,23 @@ describe("the category tiles under the hero", () => {
 
   it("frame the picture in the card's own tint rather than being the picture", () => {
     /**
-     * The image filled the card edge to edge, so the tint and the border were a
-     * hairline nobody could see and a cut-out product photograph — the kind
-     * with no background of its own — floated in a white void. Inset, the tile
-     * reads as a tile.
+     * The image filled the card edge to edge, so a cut-out product photograph
+     * — the kind with no background of its own — floated in a white void.
+     * Inset, the tile reads as a tile.
+     *
+     * This used to find the tile by its BORDER, and to call the border the
+     * tint. There was no tint: the card read `from-cream-50 to-white`, and
+     * `--cream-50` is #ffffff, so the gradient ran white to white. The border
+     * has gone and the tint is real, so the guard asks for the tint.
      */
     const body = strip();
-    const card = body.indexOf("rounded-2xl border border-border");
-    expect(card, "the card lost its border").toBeGreaterThan(-1);
+    const card = body.indexOf("rounded-2xl bg-cream-");
+    expect(card, "the tile has no tint of its own").toBeGreaterThan(-1);
 
-    expect(body.slice(card, card + 300), "the picture is flush to the card edge").toMatch(
-      /\bp-2\b/,
+    const tile = body.slice(card, card + 300);
+    expect(tile, "the picture is flush to the card edge").toMatch(/\bp-2\b/);
+    expect(tile, "the tint is white, which is not a tint").not.toMatch(
+      /bg-cream-50\b|from-cream-50\b/,
     );
   });
 
@@ -122,7 +128,8 @@ describe("the category tiles under the hero", () => {
      * reached it and failed on code that was correct.
      */
     const body = strip();
-    const card = body.indexOf("rounded-2xl border border-border");
+    // Found by the tile's tint; it had a border until the tint became real.
+    const card = body.indexOf("rounded-2xl bg-cream-");
     const classString = body.slice(card, body.indexOf('"', card));
 
     expect(classString.length, "the card class string is unreadable").toBeGreaterThan(40);

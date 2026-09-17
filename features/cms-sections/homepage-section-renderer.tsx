@@ -644,7 +644,19 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               of alignment. Inside, the border encloses both and every tile
               is the same height whatever its name does.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl border border-border bg-gradient-to-b from-cream-50 to-white p-2 transition-premium hover:border-bakery-300 hover:shadow-sm sm:w-auto sm:p-3"
+            /*
+              A TINT, WHICH THIS DID NOT HAVE.
+
+              It read `bg-gradient-to-b from-cream-50 to-white`, and
+              `--cream-50` is literally #ffffff — so the gradient ran from
+              white to white and the tile had no tint at all. The comment
+              above talks about the card's own tint framing the picture; the
+              only thing separating a tile from the page was the hairline
+              border. It is a real tint now, and the border goes: two ways of
+              saying where a tile ends is one too many, and the tint is the
+              one that also gives a cut-out picture something to sit on.
+            */
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col rounded-2xl bg-cream-200 p-2 transition-premium hover:bg-cream-300 sm:w-auto sm:p-3"
           >
             {/*
               A ROUNDED SQUARE, not a circle.
@@ -676,7 +688,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                 />
               ) : null}
             </div>
-            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-xs font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
+            <p className="line-clamp-2 px-1 pt-2.5 pb-1 text-center text-[13px] font-semibold text-foreground group-hover:text-bakery-700 sm:text-sm">
               {category.name}
             </p>
           </Link>
