@@ -726,6 +726,46 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      ARTWORK, AND NOTHING THIS FILE WRITES OVER IT.
+
+      The shop makes these banners somewhere else — the heading, the line
+      under it and the button are all drawn INTO the picture. So this band
+      renders the picture and a link round it, and nothing else. A title
+      typed here would sit on top of a title that is already in the image,
+      which is why this has no subtitle or button field at all.
+
+      `label` is not drawn either. It is what a screen reader announces for
+      the link, because a picture whose words are pixels says nothing to
+      somebody who cannot see it.
+    */
+    type: "banner-grid",
+    label: "Banner grid",
+    icon: "LayoutGrid",
+    defaultBackground: "white",
+    defaultContent: {
+      overline: "",
+      title: "",
+      banners: "[]",
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        key: "banners",
+        label: "Banners",
+        type: "list",
+        emptyHint: "No banners — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Banner picture", type: "url", isImage: true },
+          { key: "label", label: "What it says (for screen readers)", type: "text" },
+          { key: "href", label: "Link", type: "url" },
+          { key: "wide", label: "Wide — 3 across instead of 5", type: "boolean" },
+        ],
+      },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

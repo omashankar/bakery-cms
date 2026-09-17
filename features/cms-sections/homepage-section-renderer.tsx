@@ -1360,6 +1360,73 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/**
+ * A GRID OF FINISHED ARTWORK.
+ *
+ * Every other band on this page draws words over or under a picture. This
+ * one does not: the shop exports banners with their own heading, strapline
+ * and button baked in, so anything this file painted on top would be a
+ * second heading over the first.
+ *
+ * FIFTEEN COLUMNS, which is the only number that does what the layout asks.
+ * The arrangement is a row of three wide banners over a row of five narrow
+ * ones — and 15 is the smallest grid both divide into: wide spans 5, narrow
+ * spans 3. A 4- or 5-column grid cannot hold a row of three without leaving
+ * a hole.
+ */
+function BannerGridSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const banners = renderableRows(parseListField(c, "banners"));
+
+  if (banners.length === 0) return null;
+
+  return (
+    <SectionShell {...props}>
+      <SectionHeader
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        align="left"
+      />
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-15">
+        {banners.map((banner, index) => {
+          const wide = rowFlag(banner.wide);
+          const box = cn(
+            "relative block overflow-hidden rounded-2xl bg-muted",
+            /*
+              A RATIO EACH, so a row lines up whatever the shop exported.
+              Without one the tallest picture sets the row height and the
+              rest sit in a band of their own background.
+            */
+            wide ? "aspect-[11/10] lg:col-span-5" : "aspect-[2/3] lg:col-span-3",
+          );
+          const picture = (
+            <SafeImage
+              src={banner.image ?? ""}
+              /*
+                The words are pixels inside the picture, so the alt text is
+                the only thing a screen reader has. Empty when the shop has
+                not written one — an invented description of a picture nobody
+                here has seen is worse than silence.
+              */
+              alt={banner.label ?? ""}
+            />
+          );
+
+          return banner.href ? (
+            <Link key={`${banner.image}-${index}`} href={banner.href} className={box}>
+              {picture}
+            </Link>
+          ) : (
+            <div key={`${banner.image}-${index}`} className={box}>
+              {picture}
+            </div>
+          );
+        })}
+      </div>
+    </SectionShell>
+  );
+}
+
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const tiles = renderableRows(parseListField(c, "tiles"));
@@ -2058,6 +2125,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <TabbedRailSection {...props} />;
     case "promo-collage":
       return <PromoCollageSection {...props} />;
+    case "banner-grid":
+      return <BannerGridSection {...props} />;
     case "tile-grid":
       return <TileGridSection {...props} />;
     case "seo-prose":

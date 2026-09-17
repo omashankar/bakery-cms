@@ -70,6 +70,7 @@ export type HomepageSectionType =
    * point at a category page.
    */
   | "tile-grid"
+  | "banner-grid"
   | "category-rail"
   | "photo-cakes"
   | "eggless"
