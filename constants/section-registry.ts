@@ -732,11 +732,35 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      columns: "",
       banners: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        /*
+          TWO SHAPES OF BAND, from one section.
+
+          Blank is the collage this band started as: a fifteen-column grid
+          where each card is wide or narrow and the row is deliberately
+          uneven. It ships blank so every band already published keeps
+          the shape it was published with.
+
+          2 and 3 are the even row — same width, same ratio, all the way
+          across. It is a different band to look at and the same band to
+          fill in, which is why it is a setting here rather than a second
+          section type with its own copy of the picture, link and label.
+        */
+        key: "columns",
+        label: "Banners per row",
+        type: "select",
+        options: [
+          { label: "Mixed — wide and narrow", value: "" },
+          { label: "2 across", value: "2" },
+          { label: "3 across", value: "3" },
+        ],
+      },
       {
         key: "banners",
         label: "Banners",
@@ -748,11 +772,15 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Banner picture",
             type: "url",
             isImage: true,
-            hint: "1100 x 1000 for a wide card, 800 x 1200 for a narrow one",
+            hint: "2 across: 750 x 290 · 3 across: 490 x 290 · Mixed: 1100 x 1000 wide, 800 x 1200 narrow",
           },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
-          { key: "wide", label: "Wide — 3 across instead of 5", type: "boolean" },
+          {
+            key: "wide",
+            label: "Wide — only used when the band is set to Mixed",
+            type: "boolean",
+          },
         ],
       },
     ],

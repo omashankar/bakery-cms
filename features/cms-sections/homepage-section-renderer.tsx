@@ -1590,9 +1590,55 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
  * spans 3. A 4- or 5-column grid cannot hold a row of three without leaving
  * a hole.
  */
+/**
+ * THE EVEN ROW: same width, same ratio, all the way across.
+ *
+ * The ratios are the band's own, not the picture's. A row of banners whose
+ * artwork was exported at three different shapes is a row of three
+ * different heights with the shop's background showing through the gaps —
+ * so the band states one box per shape and the editor says what to export.
+ *
+ * The numbers come off the content column, which is 1520 at its widest:
+ * two across a 20px gap is 750 each, three is 493. The height is the same
+ * 290 either way, so a shop that switches between them is not re-exporting
+ * its artwork to a new height as well as a new width.
+ */
+/**
+ * WHERE EACH SHAPE SPLITS.
+ *
+ * ONE RULE, AND IT WAS MEASURED RATHER THAN CHOSEN: a step may never make
+ * a card smaller than the one a phone already gets. Splitting a row in two
+ * halves every card in it, so a split at the wrong width leaves somebody
+ * on a bigger screen looking at a smaller banner.
+ *
+ * Both first drafts broke it, and neither looked wrong in a diff. The pair
+ * split at `md`: at 768 its two banners came out 350x135 against a 390px
+ * phone's 358x138. The trio kept `md` on the argument that one 1.7:1
+ * banner across a tablet is 976x574 and most of the screen — a real point
+ * about taste, and it lost to the same 350 against 358.
+ *
+ * So both wait for `lg`, and the trio takes its third column at `xl`.
+ * Measured after: the smallest a banner ever gets is the phone's own, and
+ * the smallest above that is 392.
+ */
+const BANNER_ROW = {
+  "2": { grid: "grid-cols-1 lg:grid-cols-2", box: "aspect-[750/290]" },
+  "3": { grid: "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3", box: "aspect-[493/290]" },
+} as const;
+
 function BannerGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const banners = renderableRows(parseListField(c, "banners"));
+  /*
+    ONE COLUMN ON A PHONE, whichever shape the shop picked.
+
+    Three 493px banners side by side on a 390px screen is 120px each, and
+    the words in these pictures are pixels — there is no size at which a
+    120px banner reads. Stacked, each one is the full width of the screen,
+    which is LARGER than it gets on a desktop. Where each shape splits is
+    a measured question; see BANNER_ROW.
+  */
+  const across = BANNER_ROW[contentString(c, "columns").trim() as keyof typeof BANNER_ROW];
 
   if (banners.length === 0) return null;
 
@@ -1603,7 +1649,12 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align="left"
       />
-      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-15">
+      <div
+        className={cn(
+          "grid gap-4 sm:gap-5",
+          across ? across.grid : "grid-cols-2 lg:grid-cols-15",
+        )}
+      >
         {banners.map((banner, index) => {
           const wide = rowFlag(banner.wide);
           const box = cn(
@@ -1612,8 +1663,17 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
               A RATIO EACH, so a row lines up whatever the shop exported.
               Without one the tallest picture sets the row height and the
               rest sit in a band of their own background.
+
+              In the even row every card takes the same one and the card's
+              own `wide` flag is ignored — it is the collage's control, and
+              honouring it here would break the very evenness that was
+              chosen. The editor's label says so.
             */
-            wide ? "aspect-[11/10] lg:col-span-5" : "aspect-[2/3] lg:col-span-3",
+            across
+              ? across.box
+              : wide
+                ? "aspect-[11/10] lg:col-span-5"
+                : "aspect-[2/3] lg:col-span-3",
           );
           const picture = (
             <SafeImage
