@@ -1231,18 +1231,48 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
           strip. The layout this follows puts the three side by side: what
           the row is, what it can be switched to, and the way in.
 
-          `flex-wrap`, so a phone stacks them rather than squeezing; and the
-          heading goes back to ranged left, because a centred heading beside
-          a left-hand row of tabs is neither.
+          The heading is ranged left, because a centred heading beside a
+          left-hand row of tabs is neither.
+
+          AND NOTHING WRAPS PAST THE RULE. It used to: on a phone the link
+          dropped to a second line, which put the rule under the LINK instead
+          of under the tabs, so the tabs floated again and the pointer
+          pointed at nothing. Measured: on the rule at 1440 and 1920, off it
+          at 390, 768 and 1024.
+
+          Putting all three on one line fixed that and broke something else —
+          at 390 the heading and the link left the tab strip 107px, so the
+          first tab read "Birthday Ca". So the HEADING moves above the tabs
+          on a phone and stands beside them from `sm`. The link stays where
+          it is, at the bottom right, and the tabs keep the rest of the line.
+
+          The strip scrolls rather than wrapping, which it was already built
+          to do. `min-w-0` is what lets it shrink: without it a flex child
+          refuses to go below its content width and pushes the link off the
+          edge instead.
         */}
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
+        {/*
+          THE TABS STAND ON THE RULE. They do not float above it.
+
+          The rule was a separate strip 16px below, so the tabs hung in the
+          air over it and the pointer under the chosen one pointed at
+          nothing. In the layout this follows they are FOLDER TABS: the rule
+          is the row's own bottom edge, each tab's bottom sits on it, and the
+          unchosen ones open into it — no line across their foot — so the
+          rule reads as the front of the drawer they are pulled out of.
+
+          `items-end` is what puts them there, and the heading and the link
+          lift themselves off the line with their own padding rather than
+          sitting on it too.
+        */}
+        <div className="flex items-end justify-between gap-x-4 border-b border-border sm:gap-x-6">
+          <div className="flex min-w-0 flex-col items-start gap-y-2 sm:flex-row sm:items-end sm:gap-x-5 sm:gap-y-0">
             <SectionHeader
               overline={contentString(c, "overline")}
               title={contentString(c, "title")}
               description={contentString(c, "description")}
               align="left"
-              className="mb-0"
+              className="mb-0 shrink-0 pb-0 sm:pb-2.5"
             />
             {/*
               The tabs scroll sideways rather than wrapping: four tabs on a
@@ -1271,7 +1301,16 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               sits on. The pointer takes the same colour, because it is the
               tab's own corner rather than a decoration.
             */}
-            <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+            {/*
+              `pb-2 -mb-2` is room for the pointer, not spacing.
+
+              `overflow-x-auto` clips BOTH axes — a box that scrolls sideways
+              cuts anything below it too — so the pointer hanging under the
+              chosen tab simply disappeared. The padding gives it somewhere to
+              be inside the clip and the negative margin puts the strip back
+              where it was, so the tabs still stand on the rule.
+            */}
+            <div className="-mb-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2 sm:w-auto">
               {tabs.map((tab, index) => (
                 <button
                   key={`${tab.label}-${index}`}
@@ -1279,27 +1318,35 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                   onClick={() => setActive(index)}
                   aria-pressed={index === active}
                   className={cn(
-                    "relative shrink-0 rounded-md border px-5 py-2.5 text-base font-semibold",
+                    /*
+                      `-mb-px` pulls the tab down over the row's rule so its
+                      own fill covers that one pixel — which is what makes an
+                      unchosen tab open into the line instead of being boxed
+                      off from it. Square at the foot for the same reason: a
+                      rounded bottom corner leaves a notch of rule showing
+                      through beside it.
+                    */
+                    "relative -mb-px shrink-0 rounded-t-md border px-5 py-2.5 text-base font-semibold",
                     index === active
                       ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-card text-foreground"
+                      : "border-border border-b-transparent bg-card text-foreground"
                   )}
                 >
                   {tab.label || tab.categorySlug}
                   {index === active ? (
                     <span
                       aria-hidden="true"
-                      className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-foreground"
+                      className="absolute -bottom-1.5 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-foreground"
                     />
                   ) : null}
                 </button>
               ))}
             </div>
           </div>
-          <ViewAllLink href={railCtaHref} label={railCtaLabel} />
+          <div className="shrink-0 pb-2.5">
+            <ViewAllLink href={railCtaHref} label={railCtaLabel} />
+          </div>
         </div>
-        {/* The rule the heading row sits on, as the layout draws it. */}
-        <div className="mt-4 h-px bg-border" />
       </ScrollReveal>
 
       {cakes.length === 0 ? (
