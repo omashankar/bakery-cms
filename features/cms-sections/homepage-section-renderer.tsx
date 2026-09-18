@@ -1036,12 +1036,12 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
  * least use: a finger already drags the row, and the chevrons sit on top
  * of the cards to say so.
  *
- * WHAT IT COSTS is that one row, on a laptop, driven by a mouse. Below
- * the cut there is no arrow and no visible bar, and a wheel scrolls a
- * page down rather than a row sideways — so a trackpad or a touchscreen
- * reaches the fifth card and a plain mouse does not. It is one row and
- * about half a card; hijacking the wheel to fix it would take the page's
- * own scrolling away from everybody, which is the worse trade.
+ * WHAT IT COSTS is that one row, below 1400, driven by a mouse. There is
+ * no arrow and no visible bar there, and a wheel scrolls a page down
+ * rather than a row sideways — so a trackpad or a touchscreen reaches the
+ * fifth card and a plain mouse does not. It is one row and about half a
+ * card; hijacking the wheel to fix it would take the page's own scrolling
+ * away from everybody, which is the worse trade.
  */
 function ScrollStrip({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1087,19 +1087,26 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
     slides sideways is not.
   */
   /*
-    WIDER THAN A LAPTOP, and the number is doing real work.
+    1400, AND IT IS THE SHOP'S NUMBER — used here and on the hero, so the
+    two sets of arrows appear and disappear together rather than the page
+    growing controls in two stages.
 
-    1536 is not a safe cut even though Tailwind calls it `2xl`: a 1920px
-    laptop at the 125% scaling Windows ships by default reports exactly
-    1536 CSS pixels, and that is the commonest laptop there is. A cut at
-    1536 would hand the arrows straight back to the machine this is
-    meant to take them off.
+    It does not line up with a Tailwind breakpoint on purpose. `xl` is
+    1280, which is a small laptop and below the line the shop drew; `2xl`
+    is 1536, and a 1920px laptop at the 125% scaling Windows ships by
+    default reports exactly 1536 CSS pixels, so cutting there would put
+    the arrows back on the commonest laptop of all. 1400 sits between the
+    two.
+
+    44px, not 36. A 36px circle over a card is a small target for a
+    pointer and under the floor for anything else, and these now only
+    appear on the screens with the most room for them.
 
     `hidden` and not `invisible` or `opacity-0`: the button has to leave
     the tab order too, or a keyboard reaches a control nobody can see.
   */
   const arrow =
-    "absolute top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md min-[1600px]:flex";
+    "absolute top-1/2 z-10 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md min-[1400px]:flex";
 
   return (
     <div className="relative">
@@ -1117,7 +1124,7 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
           aria-label="Previous"
           className={cn(arrow, "left-1")}
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-5" />
         </button>
       ) : null}
       {canScroll.forward ? (
@@ -1127,7 +1134,7 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
           aria-label="Next"
           className={cn(arrow, "right-1")}
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-5" />
         </button>
       ) : null}
     </div>

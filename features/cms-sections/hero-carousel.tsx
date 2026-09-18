@@ -3,7 +3,7 @@
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
@@ -671,14 +671,13 @@ export function HeroCarousel({
       onBlurCapture={() => setPaused(false)}
     >
       {/*
-        THE PICTURE'S OWN BOX, which is why it is still here with nothing
-        positioned against it.
+        THE ARROWS BELONG TO THE SLIDE, not to the whole carousel.
 
-        It was drawn for the arrows: they were positioned against the root,
-        which also holds the row of dots, so `top-1/2` centred them on the
-        slide PLUS the dots and they sat about 20px low. The arrows are gone
-        and this stays, because it is also what keeps the dots out from over
-        the picture — remove it and they climb back on top of the artwork.
+        They were positioned against the root, which also holds the row of
+        dots — so `top-1/2` centred them on the slide PLUS the dots, and
+        they sat about 20px below the middle of the picture they point at.
+        This box fixes that, and it is also what keeps the dots out from
+        over the artwork: remove it and they climb back on top.
       */}
       <div className="relative">
         {/*
@@ -760,6 +759,47 @@ export function HeroCarousel({
             </div>
         </div>
 
+        {multi ? (
+          <>
+            {/*
+              THE ARROWS GO OVER THE PICTURE, because there is no margin for
+              them to park in: the band runs to both edges of the window.
+
+              AND ONLY ON A WIDE SCREEN, which is the shop's decision and the
+              same one the product rows follow — see the note on `min-[1400px]`
+              in homepage-section-renderer.tsx. Below it the hero is moved by
+              its dots, or by a swipe on anything with a finger.
+
+              It is also the honest cut for this band in particular. An
+              uncropped banner is as tall as its artwork is at that width:
+              130px for 3:1 art on a 390px screen, 81px for 4.8:1. Two 44px
+              buttons plus their inset is most of that, laid over a picture
+              whose offer is drawn INTO it.
+            */}
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              aria-label="Previous slide"
+              className={cn(
+                "absolute z-20 hidden size-11 items-center justify-center rounded-full border shadow-md",
+                "border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm min-[1400px]:top-1/2 min-[1400px]:left-5 min-[1400px]:flex min-[1400px]:-translate-y-1/2",
+              )}
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              aria-label="Next slide"
+              className={cn(
+                "absolute z-20 hidden size-11 items-center justify-center rounded-full border shadow-md",
+                "border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm min-[1400px]:top-1/2 min-[1400px]:right-5 min-[1400px]:flex min-[1400px]:-translate-y-1/2",
+              )}
+            >
+              <ChevronRight className="size-5" />
+            </button>
+          </>
+        ) : null}
       </div>
 
       {/*

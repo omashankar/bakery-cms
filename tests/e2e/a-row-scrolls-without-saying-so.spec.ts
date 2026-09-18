@@ -11,10 +11,14 @@ import { expect, test } from "@playwright/test";
  *   - whether a bar is actually painted, which depends on a pseudo-element
  *     rule no source scan can resolve.
  *
- * WHY 1600 AND NOT `2xl`. A 1920px laptop at the 125% scaling Windows ships by
- * default reports exactly 1536 CSS pixels — Tailwind's `2xl` — so a cut there
- * would hand the arrows straight back to the commonest laptop there is. 1599
- * and 1600 are the two widths that matter, and they are both here.
+ * 1400 IS THE SHOP'S NUMBER, and it is not a Tailwind breakpoint. `xl` is
+ * 1280 and `2xl` is 1536, and the line the shop drew sits between them: a
+ * 1280px laptop scrolls, a 1440 or a 1536 gets the arrows. 1399 and 1400 are
+ * the two widths that decide it, so both are here — and so is 1536, on the
+ * other side, because an earlier cut at 1600 put it on the wrong one.
+ *
+ * The hero follows the same number, so the page does not grow its controls in
+ * two stages, and both sets are checked here together.
  */
 
 /**
@@ -43,7 +47,7 @@ async function settle(page: import("@playwright/test").Page) {
 }
 
 test.describe("a row that scrolls sideways", () => {
-  for (const width of [390, 768, 1280, 1536, 1599, 1600, 1920]) {
+  for (const width of [390, 768, 1280, 1536, 1399, 1400, 1920]) {
     test(`never paints a scrollbar at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/store");
@@ -82,72 +86,92 @@ test.describe("a row that scrolls sideways", () => {
     });
   }
 
-  test("has no previous/next arrow on a laptop, at any of its widths", async ({ page }) => {
-    /*
-      THE SHOP'S DECISION, MEASURED. Below the cut the row is moved by
-      scrolling it — a finger, or a trackpad — and the arrows are not drawn.
+  /**
+   * BOTH SETS, COUNTED SEPARATELY.
+   *
+   * The rows say "Previous"/"Next" and the hero says "Previous slide"/"Next
+   * slide". Counting them together would let one set cover for the other —
+   * and they are drawn by two different files that only agree on a number.
+   *
+   * `offsetParent === null` is the check, because `hidden` is display:none:
+   * a box with no offset parent is not painted AND is out of the tab order,
+   * which an `invisible` or `opacity-0` gate would not be.
+   */
+  const controls = (page: import("@playwright/test").Page) =>
+    page.evaluate(() => {
+      const shown = (selector: string) =>
+        [...document.querySelectorAll(selector)].filter(
+          (el) => (el as HTMLElement).offsetParent !== null,
+        ).length;
+      return {
+        rows: shown(
+          '[data-section-id] [aria-label="Previous"], [data-section-id] [aria-label="Next"]',
+        ),
+        hero: shown('[aria-label="Previous slide"], [aria-label="Next slide"]'),
+        overflowing: [...document.querySelectorAll("[data-section-id] div")].filter((el) => {
+          const s = getComputedStyle(el);
+          if (s.overflowX !== "auto" && s.overflowX !== "scroll") return false;
+          return el.scrollWidth - el.clientWidth > 1;
+        }).length,
+      };
+    });
 
-      `hidden` is display:none, so this also proves they are out of the tab
-      order: a zero-size box with no offsetParent cannot be reached.
-    */
-    for (const width of [390, 768, 1280, 1536, 1599]) {
+  for (const width of [390, 768, 1024, 1280, 1399]) {
+    test(`shows no arrow at all at ${width}px`, async ({ page }) => {
+      /*
+        BELOW THE CUT the row is moved by scrolling it — a finger, or a
+        trackpad — and the hero by its dots or a swipe. Neither draws a
+        chevron, and the rows here DO overflow at these widths, so there is
+        something for an arrow to have been drawn for.
+      */
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/store");
       await expect(page.locator("[data-section-id]").first()).toBeVisible();
       await settle(page);
 
-      const shown = await page.evaluate(() => {
-        const arrows = [
-          ...document.querySelectorAll(
-            '[data-section-id] [aria-label="Previous"], [data-section-id] [aria-label="Next"]',
-          ),
-        ];
-        return arrows.filter((a) => (a as HTMLElement).offsetParent !== null).length;
-      });
-
-      expect(shown, `${shown} arrows are drawn at ${width}px`).toBe(0);
-    }
-  });
-
-  test("and gets them back on a screen wider than one", async ({ page }) => {
-    /*
-      THE OTHER HALF, and the half that makes the first one mean something: a
-      test that only proved the arrows were absent would pass just as happily
-      against arrows deleted outright.
-
-      Measured on this shop: from 1024px up exactly one row overflows, by
-      about 300px, so one arrow is what a correct page shows here. At rest the
-      row is at its left end, so it is the forward one.
-    */
-    await page.setViewportSize({ width: 1600, height: 900 });
-    await page.goto("/store");
-    await expect(page.locator("[data-section-id]").first()).toBeVisible();
-    await settle(page);
-
-    const seen = await page.evaluate(() => {
-      const visible = (a: Element) => (a as HTMLElement).offsetParent !== null;
-      const overflowing = [...document.querySelectorAll("[data-section-id] div")].filter((el) => {
-        const s = getComputedStyle(el);
-        if (s.overflowX !== "auto" && s.overflowX !== "scroll") return false;
-        return el.scrollWidth - el.clientWidth > 1;
-      }).length;
-      const arrows = [
-        ...document.querySelectorAll(
-          '[data-section-id] [aria-label="Previous"], [data-section-id] [aria-label="Next"]',
-        ),
-      ].filter(visible).length;
-      return { overflowing, arrows };
+      const seen = await controls(page);
+      expect(seen.rows, `${seen.rows} row arrows are drawn at ${width}px`).toBe(0);
+      expect(seen.hero, `${seen.hero} hero arrows are drawn at ${width}px`).toBe(0);
     });
+  }
 
-    // If this shop's rows all happen to fit, there is nothing for an arrow to
-    // do and the case has nothing to say — rather than passing quietly.
-    test.skip(
-      seen.overflowing === 0,
-      "no row on this shop's homepage overflows at 1600px",
-    );
-    expect(
-      seen.arrows,
-      `${seen.overflowing} rows overflow at 1600px and ${seen.arrows} arrows are drawn`,
-    ).toBeGreaterThan(0);
-  });
+  for (const width of [1400, 1536, 1920]) {
+    test(`and both sets come back at ${width}px`, async ({ page }) => {
+      /*
+        THE OTHER HALF, and the half that makes the first one mean something:
+        a test that only proved the arrows were absent would pass just as
+        happily against arrows deleted outright.
+
+        1536 is here on purpose. An earlier cut at 1600 left a 1920px laptop
+        at the 125% scaling Windows ships by default — which reports exactly
+        1536 CSS pixels — on the wrong side of the line.
+
+        Measured on this shop: from 1024px up exactly one row overflows, by
+        about 300px, so one row arrow is what a correct page shows. At rest
+        the strip is at its left end, so it is the forward one.
+      */
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/store");
+      await expect(page.locator("[data-section-id]").first()).toBeVisible();
+      await settle(page);
+
+      const seen = await controls(page);
+
+      // A hero with one slide has no arrows to draw, and this shop's has
+      // three — but say so rather than passing quietly if that ever changes.
+      const slides = await page.locator('[aria-label^="Go to slide"]').count();
+      expect(slides, "this shop's hero has one slide, so it has no controls")
+        .toBeGreaterThan(1);
+      expect(seen.hero, `${seen.hero} hero arrows are drawn at ${width}px`).toBe(2);
+
+      test.skip(
+        seen.overflowing === 0,
+        `no row on this shop's homepage overflows at ${width}px`,
+      );
+      expect(
+        seen.rows,
+        `${seen.overflowing} rows overflow at ${width}px and ${seen.rows} arrows are drawn`,
+      ).toBeGreaterThan(0);
+    });
+  }
 });

@@ -7,7 +7,7 @@ import { join } from "node:path";
  *
  * Two decisions live here, both the shop's:
  *
- *   - the previous/next arrows belong on a screen wider than a laptop, and
+ *   - the previous/next arrows belong on a screen at least 1400px wide, and
  *     everywhere else the row is moved by scrolling it;
  *   - no scrolling row ever paints a scrollbar.
  *
@@ -39,15 +39,55 @@ function strip(): string {
   return src.slice(at, next < 0 ? src.length : next);
 }
 
+const CUT = "min-[1400px]:";
+
 describe("the arrows on a row that scrolls", () => {
-  it("are drawn only on a screen wider than a laptop", () => {
+  it("are drawn only on a screen at least 1400px wide", () => {
     const body = strip();
     const at = body.indexOf("const arrow =");
     expect(at, "the arrow class is gone").toBeGreaterThan(-1);
     const arrow = body.slice(at, body.indexOf(";", at));
 
     expect(arrow, "the arrows are drawn at every width again").toContain("hidden");
-    expect(arrow, "the arrows never appear at any width").toContain("min-[1600px]:flex");
+    expect(arrow, "the arrows never appear at any width").toContain(CUT + "flex");
+  });
+
+  it("and the hero's arrows use the very same number", () => {
+    /*
+      TWO FILES, ONE NUMBER. The hero's chevrons and the rows' are drawn by
+      different components, and the shop asked for them to appear together —
+      so a page that grew its controls in two stages, at 1280 and again at
+      1400, would be the bug. Nothing but this ties them.
+
+      Scoped to each button: checking the file for one occurrence passed with
+      the Previous arrow moved and the Next one left behind, which is both a
+      real way to write it and the harder one to see.
+    */
+    const hero = codeOf(read("features/cms-sections/hero-carousel.tsx"));
+
+    for (const which of ["Previous", "Next"]) {
+      const at = hero.indexOf(`aria-label="${which} slide"`);
+      expect(at, `the hero's ${which} arrow is gone`).toBeGreaterThan(-1);
+
+      // The button's own class list, cut at its closing `)}` so the slice
+      // cannot run on into the next button and read ITS classes.
+      const rest = hero.slice(at);
+      const button = rest.slice(0, rest.indexOf(")}"));
+
+      expect(button, `the hero's ${which} arrow is drawn at every width`).toContain("hidden");
+      expect(button, `the hero's ${which} arrow is on a different cut`).toContain(CUT + "flex");
+    }
+  });
+
+  it("and are big enough to press wherever they are drawn", () => {
+    // 36px was under the floor for a pointer and well under it for anything
+    // else. They only appear on the roomiest screens now, so there is no
+    // reason for them to be the smallest control on the page.
+    const body = strip();
+    const at = body.indexOf("const arrow =");
+    const arrow = body.slice(at, body.indexOf(";", at));
+
+    expect(arrow, "the row arrows shrank again").toContain("size-11");
   });
 
   it("and the gate is not cancelled by the class beside it", () => {

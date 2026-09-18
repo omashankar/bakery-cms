@@ -555,32 +555,54 @@ describe("the slideshow's own controls", () => {
     expect(carousel, "the pause icons are back").not.toMatch(/[^A-Za-z](Pause|Play)[,\s]/);
   });
 
-  it("has no arrows at all, at any width", () => {
+  it("keeps its arrows for the wide screens and nowhere else", () => {
     /**
-     * THE SHOP ASKED FOR THE DOTS ALONE, and the page agreed with them.
+     * THE CUT IS 1400, AND IT IS SHARED. The product rows below use the same
+     * number, because the shop asked for one line rather than a page that
+     * grows controls in two stages. tests/domain/a-row-scrolls-without-saying-
+     * so.test.ts holds the other half of that pair.
      *
-     * The arrows were already `hidden sm:flex`, so on the band they were
-     * drawn over — an uncropped banner is 130px tall for 3:1 art on a 390px
-     * screen — they never appeared at all. Above that they sat on top of
-     * artwork whose offer is drawn INTO the picture.
-     *
-     * What is left is what was already carrying the phone: the dots under
-     * the picture, and the swipe.
+     * It is also the honest cut for this band. An uncropped banner is as tall
+     * as its artwork at that width — 130px for 3:1 art on a 390px screen,
+     * 81px for 4.8:1 — and two 44px buttons plus their inset is most of that,
+     * laid over a picture whose offer is drawn INTO it. Below the cut the
+     * dots and the swipe are the controls.
      */
     const carousel = codeOf(read(CAROUSEL));
 
+    /*
+      EACH ARROW, not the pair. Checking the whole file for one class passed
+      with the left arrow left on every width and the right one gated, which
+      is both a real way to write the bug and the more confusing one to look
+      at.
+    */
     for (const which of ["Previous", "Next"]) {
-      expect(
-        carousel.includes('aria-label="' + which + ' slide"'),
-        which + " is back on the hero",
-      ).toBe(false);
-    }
+      const at = carousel.indexOf('aria-label="' + which + ' slide"');
+      expect(at, "the " + which + " arrow is gone").toBeGreaterThan(-1);
 
-    // The icons go with the buttons, or the import sits there unused — and
-    // an unused import here is a warning, not an error, so nothing else
-    // would have said so.
-    for (const icon of ["ChevronLeft", "ChevronRight"]) {
-      expect(carousel.includes(icon), icon + " is still imported").toBe(false);
+      // The button's own class list, cut at its closing `)}` so the slice
+      // cannot run into the next button and read ITS classes.
+      const rest = carousel.slice(at);
+      const arrow = rest.slice(0, rest.indexOf(")}"));
+
+      expect(arrow, "the " + which + " arrow is drawn at every width").toContain("hidden");
+      expect(arrow, "the " + which + " arrow is on the wrong cut").toContain(
+        "min-[1400px]:flex",
+      );
+      expect(arrow, "the " + which + " arrow never takes its inset position").toContain(
+        "min-[1400px]:top-1/2",
+      );
+      /*
+        `hidden`, not a trick. `invisible` and `opacity-0` leave a keyboard
+        walking into a control nobody can see, and sr-only is
+        position:absolute, which is its own escaped-containing-block bug.
+      */
+      for (const cheat of ["invisible", "opacity-0", "sr-only"]) {
+        expect(
+          arrow.includes(cheat),
+          "the " + which + " arrow is hidden with " + cheat,
+        ).toBe(false);
+      }
     }
   });
 
