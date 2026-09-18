@@ -580,7 +580,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
           },
           { key: "title", label: "Heading", type: "text" },
           { key: "subtitle", label: "Line under it", type: "text" },
-          { key: "ctaLabel", label: "Button label", type: "text", placeholder: "Shop Now" },
+          { key: "ctaLabel", label: "Button label", type: "text", placeholder: "Shop now" },
           { key: "href", label: "Link", type: "url" },
           {
             /*
@@ -1392,7 +1392,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // The question named the goods and called them perfect; the line under
       // it promised a team. Neither is this software's to say.
       title: "Ready to order?",
-      ctaLabel: "Contact Us",
+      ctaLabel: "Contact us",
       ctaHref: routes.store.contact,
       showPhone: true,
       // Blank, not `contactInfo.phone`: this section stores its OWN copy of the

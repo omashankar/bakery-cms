@@ -2349,7 +2349,7 @@ function CtaSection(props: HomepageSectionRendererProps) {
 
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button render={<Link href={contentString(c, "ctaHref", routes.store.contact)} />}>
-          {contentString(c, "ctaLabel", "Contact Us")}
+          {contentString(c, "ctaLabel", "Contact us")}
           <ArrowRight className="size-4" />
         </Button>
         {contentBoolean(c, "showPhone", true) && contentString(c, "phone") ? (
@@ -2411,7 +2411,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
               <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
                 <p className="text-sm font-medium">{banner.title}</p>
                 <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide">
-                  {contentString(c, "ctaLabel", "Shop Now")}
+                  {contentString(c, "ctaLabel", "Shop now")}
                   <ArrowRight className="size-3.5" />
                 </span>
               </div>
@@ -2488,7 +2488,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
                 </div>
               ) : null}
               <Button variant="bakery" className="w-full" render={<Link href={routes.store.collections} />}>
-                Shop Now
+                Shop now
               </Button>
             </div>
           </article>
