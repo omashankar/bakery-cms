@@ -955,7 +955,28 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Banner picture",
             type: "url",
             isImage: true,
-            hint: "1520 x 120 — a wide strip",
+            hint: "1520 x 120 — a wide strip, shown on desktop",
+          },
+          {
+            /*
+              A SECOND PICTURE, SHAPED FOR A PHONE.
+
+              Measured: the wide strip is 12.6:1, which on a 390px screen is
+              28 PIXELS TALL. Nothing written into a banner can be read in
+              28px, and no CSS fixes it — the answer is a differently
+              composed picture, which is what this is. The hero already
+              carries one for the same reason.
+
+              Optional. Without it the phone shows the wide banner WHOLE,
+              letterboxed on the band's own tint rather than cropped: a
+              banner with its offer drawn into one end would lose the offer,
+              and this file has not seen the artwork.
+            */
+            key: "mobileImage",
+            label: "Picture for phones",
+            type: "url",
+            isImage: true,
+            hint: "760 x 200 — phones and tablets; without it the wide one is shown whole",
           },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },

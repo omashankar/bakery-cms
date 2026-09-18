@@ -413,7 +413,14 @@ function ViewAllLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="shrink-0 rounded-md bg-cream-200 px-3.5 py-2 text-xs font-semibold tracking-wider text-foreground uppercase"
+      /*
+        `min-h-9` is a thumb, not a look. Measured at 390px it came out 90x31,
+        and a 31px target is under every guideline there is — the padding
+        alone could not reach 36 because the label is 12px type. The height is
+        set and the text centred in it rather than the padding being grown,
+        so the pill does not get taller on the desktop rows where it is fine.
+      */
+      className="flex min-h-9 shrink-0 items-center rounded-md bg-cream-200 px-3.5 text-xs font-semibold tracking-wider text-foreground uppercase"
     >
       {label}
     </Link>
@@ -1822,8 +1829,15 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   So the band states what it wants instead of asking, and the size is on the
   picture field, where the shop is standing when it matters.
 */
-/** 1520 x 120. Stated on the picture field so the export matches the box. */
-const STRIP_SHAPE = "aspect-[1520/120]";
+/*
+  TWO SHAPES, because one of them is 28 pixels tall.
+
+  Measured: 1520/120 is 12.6:1, and on a 390px screen that is a band 28px
+  high. Nothing written into a banner can be read in 28px. A phone gets a
+  box it can show something in, and the row carries a second picture cut
+  for it — the hero already does exactly this, for the same reason.
+*/
+const STRIP_SHAPE = "aspect-[760/200] lg:aspect-[1520/120]";
 /** How long each banner holds. */
 const STRIP_SECONDS = 5;
 /** The turn, in ms. One banner leaves, then the next arrives, each taking this. */
@@ -1897,17 +1911,46 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
         onBlur={() => setPaused(false)}
       >
         {banners.map((banner, i) => {
+          /*
+            THE PHONE GETS ITS OWN PICTURE, or the wide one shown WHOLE.
+
+            Measured: the wide strip is 12.6:1, which on a 390px screen is a
+            band 28 pixels tall — nothing written into a banner can be read
+            in 28px, and no CSS fixes it, because the answer is a
+            differently composed picture. The hero already carries one for
+            exactly this reason.
+
+            Without one the phone shows the wide banner letterboxed on the
+            band's own tint rather than cropped to fill. A banner with its
+            offer drawn into one end would lose the offer, and nothing here
+            has seen the artwork. Letterboxed looks unfinished, which is the
+            honest state for a picture that has not been exported yet.
+          */
+          const phone = banner.mobileImage?.trim();
+          const alt = banner.label ?? "";
           const picture = (
-            <SafeImage
-              src={banner.image ?? ""}
-              /*
-                The words are pixels inside the picture, so this is the only
-                thing a screen reader has. Empty when the shop has not
+            <>
+              <SafeImage
+                src={phone || banner.image || ""}
+                alt={alt}
+                className={cn(
+                  "lg:hidden",
+                  phone ? "object-cover" : "object-contain",
+                )}
+              />
+              {/*
+                The words are pixels inside the picture, so the alt is the
+                only thing a screen reader has. Empty when the shop has not
                 written one — an invented description of a picture nobody
-                here has seen is worse than silence.
-              */
-              alt={banner.label ?? ""}
-            />
+                here has seen is worse than silence. It goes on BOTH, and
+                only one of the two is ever displayed.
+              */}
+              <SafeImage
+                src={banner.image ?? ""}
+                alt={alt}
+                className="hidden lg:block"
+              />
+            </>
           );
           /*
             Every banner is in the DOM, stacked, and only the current one is

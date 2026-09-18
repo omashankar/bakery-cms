@@ -47,7 +47,15 @@ describe("the strip that turns over", () => {
     */
     const columns = entry!.fields.find((f) => f.key === "banners")?.itemFields ?? [];
 
-    expect(columns.map((c) => c.key).sort()).toEqual(["href", "image", "label"]);
+    expect(columns.map((c) => c.key).sort()).toEqual([
+      "href",
+      "image",
+      "label",
+      "mobileImage",
+    ]);
+    // A phone picture is a PICTURE. It carries no words of its own, so it does
+    // not reopen the trap this test is named for.
+    expect(columns.find((c) => c.key === "mobileImage")!.isImage).toBe(true);
     for (const banned of ["title", "subtitle", "ctaLabel", "description"]) {
       expect(
         entry!.fields.some((f) => f.key === banned),
@@ -69,6 +77,42 @@ describe("the strip that turns over", () => {
     expect(BANNER_STRIP_MAX).toBe(3);
     expect(body(), "the page draws whatever is stored").toContain(
       ".slice(0, BANNER_STRIP_MAX)",
+    );
+  });
+
+  it("gives a phone a box it can show something in", () => {
+    /*
+      MEASURED: the wide strip is 12.6:1, and on a 390px screen that box is
+      28 PIXELS TALL. Nothing written into a banner can be read in 28px, and
+      no CSS fixes it — the answer is a differently composed picture, which
+      is why the row carries a second one. The hero already does this.
+
+      The switch is at `lg`, not `sm`: a 760x200 phone banner is an exact fit
+      in a 720px tablet box, while the wide one there would be 57px.
+    */
+    // STRIP_SHAPE is a module constant, so this one reads the file rather
+    // than the function body — the body only names it.
+    const file = codeOf(read(RENDERER));
+
+    expect(file, "the strip has one shape, so a phone gets the wide one").toContain(
+      "aspect-[760/200] lg:aspect-[1520/120]",
+    );
+    expect(body(), "the strip no longer uses that shape").toContain("STRIP_SHAPE");
+    expect(body(), "the phone picture is never reached for").toContain(
+      "banner.mobileImage",
+    );
+  });
+
+  it("shows the wide banner WHOLE on a phone rather than cropping it", () => {
+    /*
+      Without a phone picture the wide one has to go in the phone's box
+      somehow. Cropped to fill, a banner with its offer drawn into one end
+      loses the offer — and nothing here has seen the artwork. Letterboxed on
+      the band's own tint looks unfinished, which is the honest state for a
+      picture that has not been exported yet.
+    */
+    expect(body()).toContain(
+      'phone ? "object-cover" : "object-contain"',
     );
   });
 
