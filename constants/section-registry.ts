@@ -880,6 +880,73 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      ONE WIDE BANNER AT A TIME, turning over.
+
+      A strip the shop fills with finished artwork — the words, the offer
+      and the button are all drawn into the picture — and when there is more
+      than one they cross-fade. So this has no title, subtitle or button
+      field: anything typed here would land on top of the words already in
+      the image, which is the same reasoning as the banner grid above.
+
+      `label` is not drawn. It is what a screen reader announces, because a
+      picture whose words are pixels says nothing at all to somebody who
+      cannot see it.
+
+      Ships empty. A strip with no artwork in it draws nothing.
+    */
+    type: "banner-strip",
+    label: "Banner strip",
+    icon: "Image",
+    defaultBackground: "white",
+    defaultContent: {
+      banners: "[]",
+      seconds: 5,
+      shape: "wide",
+    },
+    fields: [
+      {
+        key: "banners",
+        label: "Banners",
+        type: "list",
+        emptyHint: "No banners — this section will not appear on the page.",
+        itemFields: [
+          { key: "image", label: "Banner picture", type: "url", isImage: true },
+          { key: "label", label: "What it says (for screen readers)", type: "text" },
+          { key: "href", label: "Link", type: "url" },
+        ],
+      },
+      {
+        /*
+          THE SHAPE IS A SETTING because the artwork has to be exported to
+          match it, and a shop that exports 1520x120 and gets a 3:1 box has a
+          band of background either side of its own banner. The box holds its
+          ratio whatever loads into it, so the page does not jump while the
+          picture arrives.
+        */
+        key: "shape",
+        label: "Shape",
+        type: "select",
+        options: [
+          { label: "Wide strip — export 1520x120", value: "wide" },
+          { label: "Banner — export 1520x260", value: "banner" },
+          { label: "Panel — export 1520x500", value: "panel" },
+        ],
+      },
+      {
+        /*
+          Seconds between turns. 0 stops it on the first banner, which is the
+          setting for a shop that wants one picture and no movement — and the
+          turning stops by itself anyway for a visitor whose system asks for
+          reduced motion.
+        */
+        key: "seconds",
+        label: "Seconds each banner is shown (0 = do not turn)",
+        type: "number",
+      },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

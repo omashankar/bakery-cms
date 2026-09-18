@@ -1809,6 +1809,145 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/** The three shapes the strip offers, and what to export for each. */
+const STRIP_SHAPES: Record<string, string> = {
+  wide: "aspect-[1520/120]",
+  banner: "aspect-[1520/260]",
+  panel: "aspect-[1520/500]",
+};
+
+function BannerStripSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const banners = renderableRows(parseListField(c, "banners")).filter((banner) =>
+    Boolean(banner.image),
+  );
+  const shape = STRIP_SHAPES[contentString(c, "shape")] ?? STRIP_SHAPES.wide;
+  /*
+    Clamped, not obeyed. A number typed into a box reaches this, and 0.2
+    seconds is a strobe while 600 is a banner nobody will ever see turn. 0
+    is kept as itself: it means do not turn at all.
+  */
+  const typed = contentNumber(c, "seconds", 5);
+  const seconds = typed <= 0 ? 0 : Math.min(30, Math.max(2, typed));
+
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const count = banners.length;
+
+  useEffect(() => {
+    if (count < 2 || seconds === 0 || paused) return;
+    /*
+      A visitor whose system asks for less movement gets none. Checked here
+      rather than in CSS because stopping the fade would still leave the
+      picture changing underneath it, which is the part that moves.
+    */
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    const id = window.setInterval(() => setIndex((i) => (i + 1) % count), seconds * 1000);
+    return () => window.clearInterval(id);
+  }, [count, seconds, paused]);
+
+  /* A banner removed in the builder must not leave the strip on an index
+     that no longer exists — the band would go blank with no clue why. */
+  const current = count ? index % count : 0;
+
+  if (count === 0) return null;
+
+  return (
+    <SectionShell {...props}>
+      {/*
+        PAUSES WHEN SOMEBODY IS THERE.
+
+        Not a hover effect — nothing changes on screen. It is the pause a
+        thing that moves on its own has to have: a customer reading the
+        small print, or tabbing onto a dot, should not have it turn under
+        them. `focusWithin` covers the keyboard, where there is no pointer
+        to hover with.
+      */}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-2xl bg-cream-100",
+          shape,
+        )}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={() => setPaused(false)}
+      >
+        {banners.map((banner, i) => {
+          const picture = (
+            <SafeImage
+              src={banner.image ?? ""}
+              /*
+                The words are pixels inside the picture, so this is the only
+                thing a screen reader has. Empty when the shop has not
+                written one — an invented description of a picture nobody
+                here has seen is worse than silence.
+              */
+              alt={banner.label ?? ""}
+            />
+          );
+          /*
+            Every banner is in the DOM, stacked, and only the current one is
+            opaque. A strip that swapped `src` would show the page's
+            background between two pictures on every turn, because the next
+            one starts loading when it becomes the current one.
+          */
+          return (
+            <div
+              key={`${banner.image}-${i}`}
+              aria-hidden={i === current ? undefined : true}
+              className={cn(
+                "absolute inset-0 transition-opacity duration-700",
+                i === current ? "opacity-100" : "pointer-events-none opacity-0",
+              )}
+            >
+              {banner.href ? (
+                <Link
+                  href={banner.href}
+                  className="absolute inset-0"
+                  tabIndex={i === current ? undefined : -1}
+                >
+                  {picture}
+                </Link>
+              ) : (
+                picture
+              )}
+            </div>
+          );
+        })}
+
+        {/*
+          THE DOTS ARE THE PAUSE CONTROL as much as they are a place
+          marker. Something that moves on its own has to be stoppable, and
+          pressing a dot ends the turn on the one you asked for.
+        */}
+        {count > 1 ? (
+          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+            {banners.map((banner, i) => (
+              <button
+                key={`dot-${banner.image}-${i}`}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Show banner ${i + 1} of ${count}`}
+                aria-current={i === current ? true : undefined}
+                className={cn(
+                  "size-2 rounded-full border border-foreground/20",
+                  i === current ? "bg-foreground" : "bg-card/80",
+                )}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </SectionShell>
+  );
+}
+
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const tiles = renderableRows(parseListField(c, "tiles"));
@@ -2509,6 +2648,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <PromoCollageSection {...props} />;
     case "banner-grid":
       return <BannerGridSection {...props} />;
+    case "banner-strip":
+      return <BannerStripSection {...props} />;
     case "category-price-cards":
       return <CategoryPriceCardsSection {...props} />;
     case "tile-grid":
