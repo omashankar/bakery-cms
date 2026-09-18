@@ -1257,6 +1257,19 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               Filled-dark against outlined-white reads at a glance, and the
               little pointer under the chosen one ties it to the row below —
               which is the whole reason a tab is not just a filter chip.
+
+              SIZED LIKE A CHOICE, not like a filter chip. The shop held the
+              layout up beside this and the tabs there are the second-largest
+              thing on the line after the heading — text at the body size,
+              not the small one, and enough padding round it to be an obvious
+              target on a phone.
+
+              THE FILL IS NEUTRAL, not the brand. `--foreground` is the
+              page's own ink, so the chosen tab is the same dark as the
+              heading beside it whatever palette the shop picks — and on a
+              tinted band a brand-coloured fill competes with the tint it
+              sits on. The pointer takes the same colour, because it is the
+              tab's own corner rather than a decoration.
             */}
             <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
               {tabs.map((tab, index) => (
@@ -1266,9 +1279,9 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                   onClick={() => setActive(index)}
                   aria-pressed={index === active}
                   className={cn(
-                    "relative shrink-0 rounded-md border px-4 py-2 text-sm font-semibold",
+                    "relative shrink-0 rounded-md border px-5 py-2.5 text-base font-semibold",
                     index === active
-                      ? "border-bakery-950 bg-bakery-950 text-white"
+                      ? "border-foreground bg-foreground text-background"
                       : "border-border bg-card text-foreground"
                   )}
                 >
@@ -1276,7 +1289,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                   {index === active ? (
                     <span
                       aria-hidden="true"
-                      className="absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-bakery-950"
+                      className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-foreground"
                     />
                   ) : null}
                 </button>
