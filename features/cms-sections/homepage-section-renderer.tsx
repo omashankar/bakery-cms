@@ -1614,6 +1614,18 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   const categories = props.categories ?? getHomepageCategories(24);
   const nameOf = new Map(categories.map((category) => [category.slug, category.name]));
   const priceLabel = contentString(c, "priceLabel") || "Starting from";
+  /*
+    IS THERE A HEADING AT ALL? The link's placement depends on it.
+
+    `SectionHeader` draws nothing for a blank one — which is the SHIPPED
+    state, and what a second copy of this row looks like until the shop
+    writes its own. With nothing in it the wrapper collapsed to 0px and the
+    link, positioned against it, landed on top of the cards. Measured: the
+    row with a heading had a 32px header box and the one without had none.
+  */
+  const hasHeading = Boolean(
+    contentString(c, "overline").trim() || contentString(c, "title").trim(),
+  );
 
   return (
     <SectionShell {...props}>
@@ -1625,14 +1637,26 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
         heading centres on the space LEFT OVER and sits visibly off-centre.
         Absolute from `sm` up, and below the heading on a phone, where
         there is no room beside it.
+
+        ONLY WHILE THERE IS A HEADING TO PIN IT BESIDE. With none the
+        wrapper has no height, so an absolutely placed link has nothing to
+        sit in and lands on the cards. It goes back into the flow then, at
+        the right-hand edge, which is where a link with no heading belongs.
       */}
-      <div className="relative mb-6">
+      <div className={cn("mb-6", hasHeading && "relative")}>
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
           className="mb-0"
         />
-        <div className="mt-4 flex justify-center sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:items-center">
+        <div
+          className={cn(
+            "flex",
+            hasHeading
+              ? "mt-4 justify-center sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:items-center"
+              : "justify-end",
+          )}
+        >
           <ViewAllLink
             href={contentString(c, "ctaHref")}
             label={contentString(c, "ctaLabel")}

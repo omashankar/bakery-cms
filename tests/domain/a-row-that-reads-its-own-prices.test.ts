@@ -141,6 +141,30 @@ describe("the row that reads its own prices", () => {
     );
   });
 
+  it("keeps the view-all link off the cards when there is no heading", () => {
+    /*
+      A BLANK HEADING IS THE SHIPPED STATE, and it is what a second copy of
+      this row looks like until the shop writes its own. `SectionHeader`
+      draws nothing for one, so the wrapper it sits in has no height — and a
+      link positioned against that wrapper lands on top of the first card.
+
+      Measured on the live page: the row with a heading had a 32px header box
+      and the row without had 0, with the link over the grid. It goes back
+      into the flow when there is nothing to pin it beside.
+    */
+    const section = body();
+
+    expect(section, "the link is placed without asking whether there is a heading").toContain(
+      "hasHeading",
+    );
+    expect(section, "the wrapper is a positioning context even when empty").toContain(
+      'cn("mb-6", hasHeading && "relative")',
+    );
+    expect(section, "the link never returns to the flow").toContain(
+      '"justify-end"',
+    );
+  });
+
   it("draws nothing at all when the shop has added no cards", () => {
     expect(body()).toContain("if (items.length === 0) return null;");
   });
