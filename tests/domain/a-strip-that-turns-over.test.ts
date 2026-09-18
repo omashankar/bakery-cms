@@ -97,27 +97,63 @@ describe("the strip that turns over", () => {
     );
   });
 
-  it("gives a phone a box it can show something in", () => {
+  it("offers both shapes the page actually uses", () => {
     /*
-      MEASURED: the wide strip is 12.6:1, and on a 390px screen that box is
-      28 PIXELS TALL. Nothing written into a banner can be read in 28px, and
-      no CSS fixes it — the answer is a differently composed picture, which
-      is why the row carries a second one. The hero already does this.
+      A REVERSAL. The Shape setting was removed as a choice with no good
+      answer behind it — true while there was ONE band, because picking a
+      shape does nothing unless the artwork is exported to match.
 
-      The switch is at `lg`, not `sm`: a 760x200 phone banner is an exact fit
-      in a 720px tablet box, while the wide one there would be 57px.
+      It stopped being true the moment there were two. The strip under the
+      banner grid is a thin ribbon and right that way; the one under trending
+      is 4.6:1, measured off the layout the shop held up — its picture spans
+      about 1380 of a 1900px window and stands 297px tall. One ratio cannot
+      be both, and neither is wrong.
     */
-    // STRIP_SHAPE is a module constant, so this one reads the file rather
-    // than the function body — the body only names it.
-    const file = codeOf(read(RENDERER));
+    const field = entry!.fields.find((f) => f.key === "shape");
+    expect(field, "there is no way to choose a shape").toBeTruthy();
+    expect(field!.options?.map((o) => o.value)).toEqual(["strip", "banner"]);
 
-    expect(file, "the strip has one shape, so a phone gets the wide one").toContain(
-      "aspect-[760/200] lg:aspect-[1520/120]",
+    // The thinner one ships, so a band already on the page keeps its shape.
+    expect(entry!.defaultContent.shape).toBe("strip");
+
+    /*
+      SCOPED TO EACH SHAPE. A first draft asked the whole file for
+      "aspect-[1520/120]" and survived changing the strip's wide ratio,
+      because the phone variant on the line below still spelled it.
+    */
+    const file = codeOf(read(RENDERER));
+    const shapes = file.slice(
+      file.indexOf("const STRIP_SHAPES = {"),
+      file.indexOf("} as const;", file.indexOf("const STRIP_SHAPES = {")),
     );
-    expect(body(), "the strip no longer uses that shape").toContain("STRIP_SHAPE");
-    expect(body(), "the phone picture is never reached for").toContain(
-      "banner.mobileImage",
+    const wideOf = (name: string) => {
+      const at = shapes.indexOf(name + ": {");
+      expect(at, `the ${name} shape is gone`).toBeGreaterThan(-1);
+      return shapes.slice(at, shapes.indexOf("withPhone", at));
+    };
+
+    expect(wideOf("strip"), "the thin ribbon is gone").toContain("aspect-[1520/120]");
+    expect(wideOf("banner"), "the taller banner is gone").toContain("aspect-[1520/330]");
+  });
+
+  it("only gives a phone the taller box when there is a picture cut for it", () => {
+    /*
+      THE TALL PHONE BOX ONLY HELPS IF THAT PICTURE EXISTS, and this is the
+      mistake that shipped. Without one the wide banner is shown whole inside
+      it and `object-contain` enlarges nothing: measured at 390, a 326x86 box
+      held a picture 326x26 — the same unreadable 26px with 60px of tint
+      wrapped round it, and on a tablet a 927x244 box holding a picture 244px
+      shorter than itself.
+
+      It passed a check because the check measured the BOX and called it
+      readable. The shape is a question about the content now.
+    */
+    const section = body();
+
+    expect(section, "the shape ignores whether there is a phone picture").toContain(
+      "banners.some((banner) => banner.mobileImage?.trim())",
     );
+    expect(section, "the wide ratio is not the fallback").toContain("chosen.wide");
   });
 
   it("shows the wide banner WHOLE on a phone rather than cropping it", () => {
@@ -238,24 +274,20 @@ describe("the strip that turns over", () => {
     expect(body()).toContain("count ? index % count : 0");
   });
 
-  it("states its shape and its pace rather than asking", () => {
+  it("states its pace rather than asking", () => {
     /*
-      Both were settings and the shop asked for both boxes gone. They were a
-      choice with no good answer behind it: picking a shape in the builder
-      does nothing unless the artwork is re-exported to match, and a seconds
-      box invites a number — 0.5, 60 — that reads as a strobe or as a banner
-      nobody ever sees turn.
+      The seconds box invited a number — 0.5, 60 — that reads as a strobe or
+      as a banner nobody ever sees turn, so the band states its own pace.
 
-      What replaces them is the size, stated on the picture field where the
-      shop is standing when it matters.
+      THE SHAPE WENT THE OTHER WAY and came back: see the case above. It was
+      removed for the same reason and that reasoning only held while there
+      was one band on the page. Two bands, two honest answers.
     */
-    for (const gone of ["shape", "seconds"]) {
-      expect(
-        entry!.fields.some((f) => f.key === gone),
-        `${gone} is a box again`,
-      ).toBe(false);
-      expect(entry!.defaultContent[gone], `${gone} still ships a value`).toBeUndefined();
-    }
+    expect(
+      entry!.fields.some((f) => f.key === "seconds"),
+      "the seconds box is back",
+    ).toBe(false);
+    expect(entry!.defaultContent.seconds, "seconds still ships a value").toBeUndefined();
 
     const field = entry!.fields.find((f) => f.key === "banners");
     const picture = field!.itemFields!.find((c) => c.isImage);

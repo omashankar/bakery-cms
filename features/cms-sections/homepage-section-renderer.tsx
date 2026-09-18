@@ -1748,14 +1748,52 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   picture field, where the shop is standing when it matters.
 */
 /*
-  TWO SHAPES, because one of them is 28 pixels tall.
+  TWO SHAPES, AND ONLY WHEN THERE IS A SECOND PICTURE TO PUT IN ONE.
 
-  Measured: 1520/120 is 12.6:1, and on a 390px screen that is a band 28px
-  high. Nothing written into a banner can be read in 28px. A phone gets a
-  box it can show something in, and the row carries a second picture cut
-  for it — the hero already does exactly this, for the same reason.
+  1520/120 is 12.6:1, which on a 390px screen is a band 28px high — nothing
+  written into a banner can be read in that. So a phone gets a 3.8:1 box and
+  the row carries a picture cut for it, the way the hero already does.
+
+  BUT THE TALL BOX ONLY HELPS IF THAT PICTURE EXISTS. Without one the wide
+  banner is shown whole inside it, and `object-contain` does not enlarge
+  anything: measured at 390, the box was 326x86 and the picture inside it
+  326x26 — the same unreadable 26px with 60px of tint wrapped round it. On a
+  tablet it was worse: a 927x244 box holding a picture 244px shorter than
+  itself.
+
+  That was a real mistake and it shipped, because the check measured the BOX
+  and called it readable. So the shape is now a question about the content:
+  a strip with a phone picture gets the tall box, and one without keeps the
+  wide ratio at every width and is short on a phone — which is the honest
+  state of a band that has one wide picture and nothing else.
 */
-const STRIP_SHAPE = "aspect-[760/200] lg:aspect-[1520/120]";
+/*
+  TWO SHAPES, AND THE SHOP PICKS — which is a reversal, and worth saying why.
+
+  This was a setting, and it was removed as a choice with no good answer
+  behind it. That was true while there was one band: picking a shape does
+  nothing unless the artwork is exported to match, so the box may as well
+  state what it wants.
+
+  It stopped being true the moment there were two. The strip under the
+  banner grid is a thin ribbon and right that way; the one under trending is
+  a 4.6:1 banner, measured off the layout the shop held up — its picture
+  spans about 1380 of a 1900px window and stands 297px tall. One ratio
+  cannot be both, and neither is wrong.
+
+  `strip` is the default, so the band already on the page keeps the shape it
+  has.
+*/
+const STRIP_SHAPES = {
+  strip: {
+    wide: "aspect-[1520/120]",
+    withPhone: "aspect-[760/200] lg:aspect-[1520/120]",
+  },
+  banner: {
+    wide: "aspect-[1520/330]",
+    withPhone: "aspect-[760/400] lg:aspect-[1520/330]",
+  },
+} as const;
 /** How long each banner holds. */
 const STRIP_SECONDS = 5;
 /** The turn, in ms. One banner leaves, then the next arrives, each taking this. */
@@ -1771,6 +1809,23 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
   const banners = renderableRows(parseListField(c, "banners"))
     .filter((banner) => Boolean(banner.image))
     .slice(0, BANNER_STRIP_MAX);
+
+  /*
+    Any of them, not all: the box is one shape for the whole strip, and a
+    banner that has a phone picture is the one that needs the room.
+
+    THE TALL PHONE BOX ONLY HELPS IF THAT PICTURE EXISTS. Without one the
+    wide banner is shown whole inside it and `object-contain` enlarges
+    nothing: measured at 390, a 326x86 box held a picture 326x26 — the same
+    unreadable 26px with 60px of tint round it. That shipped, because the
+    check measured the BOX and called it readable.
+  */
+  const chosen =
+    STRIP_SHAPES[contentString(c, "shape") as keyof typeof STRIP_SHAPES] ??
+    STRIP_SHAPES.strip;
+  const shape = banners.some((banner) => banner.mobileImage?.trim())
+    ? chosen.withPhone
+    : chosen.wide;
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -1845,7 +1900,7 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
             near edge coming toward the reader.
           */
           "relative overflow-hidden rounded-2xl bg-cream-100 perspective-normal",
-          STRIP_SHAPE,
+          shape,
         )}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}

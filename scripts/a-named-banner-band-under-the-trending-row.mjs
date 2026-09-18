@@ -16,7 +16,7 @@
  * ONE banner, not three: the layout gives this band a single wide picture,
  * and with one there is nothing to turn over.
  *
- *   Export 1520 x 120 for the wide one, 760 x 200 for phones.
+ *   Export 1520 x 330 for the wide one, 760 x 400 for phones.
  */
 import mongoose from "mongoose";
 
@@ -71,12 +71,14 @@ const CONTENT = {
   title: TITLE,
   ctaLabel: "View all",
   ctaHref: "/store/collections",
+  // The taller of the two. The strip under the banner grid keeps the thin one.
+  shape: "banner",
   banners: JSON.stringify([
     {
       // A STOCK PLACEHOLDER at the right ratio, so the band can be seen. The
       // shop replaces it with its own artwork — 1520x120, and 760x200 for the
       // phone picture beside it.
-      image: "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=1520&h=120&fit=crop",
+      image: "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=1520&h=330&fit=crop",
       mobileImage: "",
       label: biggest.name,
       href: `/store/collections/${biggest.slug}`,
@@ -112,7 +114,7 @@ const published = rebuild("published");
 console.log(`  ${published.note}`);
 console.log(`  heading ${JSON.stringify(TITLE)} (a placeholder), link "View all"`);
 console.log(`  one banner, pointing at ${biggest.name} (/store/collections/${biggest.slug})`);
-console.log(`  the picture is a stock placeholder at 1520x120 — the shop replaces it\n`);
+console.log(`  the picture is a stock placeholder at 1520x330 — the shop replaces it\n`);
 const at = published.sections.findIndex((s) => s.instanceId === ID);
 console.log("  around it:");
 for (const s of published.sections.slice(Math.max(0, at - 2), at + 3)) {

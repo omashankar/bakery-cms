@@ -867,6 +867,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "",
       ctaLabel: "",
       ctaHref: "",
+      // The thinner one, so a band already on the page keeps its shape.
+      shape: "strip",
       banners: "[]",
     },
     fields: [
@@ -875,6 +877,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // Blank, like every other band's. A link nobody wrote is not a link.
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
+      {
+        /*
+          A REVERSAL, and worth saying why. This was removed as a choice with
+          no good answer behind it — true while there was one band, because
+          picking a shape does nothing unless the artwork is exported to
+          match. It stopped being true the moment there were two: one strip
+          on this page is a thin ribbon and right that way, and the other is
+          a 4.6:1 banner. One ratio cannot be both.
+        */
+        key: "shape",
+        label: "Shape",
+        type: "select",
+        options: [
+          { label: "Strip — export 1520 x 120", value: "strip" },
+          { label: "Banner — export 1520 x 330", value: "banner" },
+        ],
+      },
       {
         key: "banners",
         label: "Banners",
@@ -887,7 +906,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Banner picture",
             type: "url",
             isImage: true,
-            hint: "1520 x 120 — a wide strip, shown on desktop",
+            hint: "1520 x 120 for a Strip, 1520 x 330 for a Banner — match the Shape",
           },
           {
             /*
@@ -908,7 +927,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Picture for phones",
             type: "url",
             isImage: true,
-            hint: "760 x 200 — phones and tablets; without it the wide one is shown whole",
+            hint: "760 x 200 for a Strip, 760 x 400 for a Banner — optional",
           },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
