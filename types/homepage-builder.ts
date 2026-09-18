@@ -138,6 +138,22 @@ export interface SectionFieldDef {
   itemFields?: SectionFieldDef[];
   /** For `type: "list"` — shown in place of the rows when there are none. */
   emptyHint?: string;
+  /**
+   * For `type: "list"` — the most rows this field accepts.
+   *
+   * The editor stops offering Add at the cap and says why. It is NOT a
+   * guarantee: a row already stored, or one written by a script, is still
+   * in the document, so whatever renders the list has to cap it too.
+   */
+  maxItems?: number;
+  /**
+   * For an image field — the size to export at, e.g. "1520 x 120".
+   *
+   * Shown under the label and left there. A shop that uploads a portrait
+   * photograph into a 12:1 strip gets a band of its own background either
+   * side, and nothing on the screen had told it what the box wanted.
+   */
+  hint?: string;
 }
 
 /**

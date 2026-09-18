@@ -89,6 +89,8 @@ function ListField({
 
   const removeRow = (index: number) => commit(rows.filter((_, i) => i !== index));
 
+  const atCap = typeof field.maxItems === "number" && rows.length >= field.maxItems;
+
   const moveRow = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= rows.length) return;
@@ -101,10 +103,28 @@ function ListField({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <Label className="text-xs">{field.label}</Label>
-        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={addRow}>
-          <Plus className="size-3.5" />
-          Add
-        </Button>
+        {/*
+          THE CAP IS SHOWN, not just enforced. A disabled Add with nothing
+          saying why reads as a bug, and the admin looks for the fault
+          instead of reading the count.
+        */}
+        <div className="flex items-center gap-2">
+          {atCap ? (
+            <span className="text-xs text-muted-foreground">
+              {field.maxItems} maximum
+            </span>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={addRow}
+            disabled={atCap}
+          >
+            <Plus className="size-3.5" />
+            Add
+          </Button>
+        </div>
       </div>
 
       {keyed.length === 0 ? (
@@ -156,6 +176,7 @@ function ListField({
                   key={column.key}
                   id={`${field.key}-${id}-${column.key}`}
                   label={column.label}
+                  hint={column.hint}
                   value={row[column.key] ?? ""}
                   onChange={(next) => updateRow(index, column.key, next)}
                 />
@@ -512,6 +533,7 @@ function renderField<T extends BuilderEditableSection>(
         key={field.key}
         id={field.key}
         label={field.label}
+        hint={field.hint}
         value={String(value ?? "")}
         onChange={(next) => updateContent(field.key, next)}
         placeholder={field.placeholder}

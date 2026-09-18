@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import {
+  BANNER_STRIP_MAX,
+  HOMEPAGE_SECTION_REGISTRY,
+} from "@/constants/section-registry";
 
 /**
  * THE BANNER STRIP.
@@ -53,6 +56,22 @@ describe("the strip that turns over", () => {
     }
   });
 
+  it("takes three banners and no more, in the editor AND on the page", () => {
+    /*
+      THE EDITOR'S LIMIT IS NOT A GUARANTEE. It stops an admin adding a
+      fourth; it does nothing about a fourth already in the document — one
+      stored before the cap existed, or written by a script — and the page is
+      what the customer sees. So the cap is named once and read twice.
+    */
+    const field = entry!.fields.find((f) => f.key === "banners");
+
+    expect(field!.maxItems, "the editor will take a fourth banner").toBe(BANNER_STRIP_MAX);
+    expect(BANNER_STRIP_MAX).toBe(3);
+    expect(body(), "the page draws whatever is stored").toContain(
+      ".slice(0, BANNER_STRIP_MAX)",
+    );
+  });
+
   it("draws nothing at all when the shop has added no banners", () => {
     expect(body()).toContain("if (count === 0) return null;");
   });
@@ -70,16 +89,64 @@ describe("the strip that turns over", () => {
     );
   });
 
-  it("can be stopped, and stops itself while somebody is there", () => {
-    // Anything that moves on its own has to be stoppable. The dots are the
-    // control; the pause covers a customer reading it or tabbing onto it.
+  it("stops itself while somebody is reading it", () => {
+    /*
+      Anything that moves on its own has to be stoppable. The dots WERE the
+      control and the shop asked for them off — at 28px tall on a phone they
+      took a third of the band — so this is what is left, and it has to keep
+      working: a pointer over the strip stops it, and so does tabbing onto
+      the banner's own link, which is inside it.
+
+      A strip whose banners carry no link and has no dots turns with nothing
+      but the pointer to stop it. That is the cost of removing them, written
+      down here rather than discovered later.
+    */
     const section = body();
 
-    expect(section, "there is no way to stop it").toContain("onClick={() => setIndex(i)");
     expect(section, "it turns under a reader's hands").toContain("setPaused(true)");
     expect(section, "it never starts again").toContain("setPaused(false)");
     expect(section, "the pause is ignored by the timer").toContain(
-      "if (count < 2 || seconds === 0 || paused) return;",
+      "if (count < 2 || paused) return;",
+    );
+  });
+
+  it("turns by flipping, and every waiting banner waits at the same angle", () => {
+    /*
+      THE SAME ANGLE IS THE WHOLE TRICK. If the outgoing banner rotated one
+      way and the incoming one arrived from the other, the two would meet in
+      the middle and read as a fold rather than a turn. Resting them all at
+      -90 means the one leaving and the one arriving travel the same
+      direction, which is how a flip board moves.
+
+      `perspective` is what makes it a flip at all: without it a rotated
+      plane is just scaled flat, with no near edge coming toward the reader.
+    */
+    const section = body();
+
+    expect(section, "the flip has no depth, so it reads as a squash").toContain(
+      "perspective",
+    );
+    expect(section, "the current banner is not face on").toContain(
+      "[transform:rotateX(0deg)]",
+    );
+    expect(section, "a waiting banner is not turned away").toContain(
+      "[transform:rotateX(-90deg)]",
+    );
+    expect(section, "the turn is not animated").toContain("transition-[transform,opacity]");
+    expect(section, "the back of a turned banner shows through").toContain(
+      "backface-hidden",
+    );
+    /*
+      THE STAGGER IS THE PART THAT MAKES IT A FLIP. Run the leaving banner
+      and the arriving one at the same time and they cross through each
+      other at 45°, which is a smear rather than a turn. Arriving waits
+      exactly as long as leaving takes.
+
+      This was the one thing the other guards did not cover: removing the
+      delay left every assertion above green and the animation wrong.
+    */
+    expect(section, "both halves of the turn run at once").toContain(
+      "transitionDelay: i === current ?",
     );
   });
 
@@ -87,12 +154,12 @@ describe("the strip that turns over", () => {
     /*
       A strip that swapped `src` would show the page's background between two
       pictures on every turn, because the next one only starts loading when
-      it becomes the current one. They are stacked and faded instead.
+      it becomes the current one. They are stacked and turned instead.
     */
     const section = body();
 
-    expect(section, "the banners are no longer stacked").toContain("absolute inset-0 transition-opacity");
-    expect(section, "a hidden banner is still reachable").toContain("pointer-events-none opacity-0");
+    expect(section, "the banners are no longer stacked").toContain("absolute inset-0 origin-top backface-hidden");
+    expect(section, "a hidden banner is still reachable").toContain("pointer-events-none");
   });
 
   it("hides the banners nobody is looking at from a screen reader", () => {
@@ -110,12 +177,29 @@ describe("the strip that turns over", () => {
     expect(body()).toContain("count ? index % count : 0");
   });
 
-  it("clamps the interval, and keeps 0 as its own answer", () => {
-    // 0.2 seconds is a strobe and 600 is a banner nobody sees turn. 0 is not
-    // clamped up to 2: it means do not turn at all.
-    const section = body();
+  it("states its shape and its pace rather than asking", () => {
+    /*
+      Both were settings and the shop asked for both boxes gone. They were a
+      choice with no good answer behind it: picking a shape in the builder
+      does nothing unless the artwork is re-exported to match, and a seconds
+      box invites a number — 0.5, 60 — that reads as a strobe or as a banner
+      nobody ever sees turn.
 
-    expect(section).toContain("typed <= 0 ? 0 :");
-    expect(section).toContain("Math.min(30, Math.max(2, typed))");
+      What replaces them is the size, stated on the picture field where the
+      shop is standing when it matters.
+    */
+    for (const gone of ["shape", "seconds"]) {
+      expect(
+        entry!.fields.some((f) => f.key === gone),
+        `${gone} is a box again`,
+      ).toBe(false);
+      expect(entry!.defaultContent[gone], `${gone} still ships a value`).toBeUndefined();
+    }
+
+    const field = entry!.fields.find((f) => f.key === "banners");
+    const picture = field!.itemFields!.find((c) => c.isImage);
+    expect(picture!.hint, "the picture field does not say what size to export").toMatch(
+      /1520/,
+    );
   });
 });

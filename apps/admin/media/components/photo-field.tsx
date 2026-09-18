@@ -18,6 +18,16 @@ interface PhotoFieldProps {
   onChange: (value: string) => void;
   /** Placeholder for the URL box, which lives under Advanced. */
   placeholder?: string;
+  /**
+   * The size to export at, shown under the label and left there.
+   *
+   * NOT the `placeholder` above: that one belongs to the URL box folded
+   * away under Advanced, so it is invisible on the path almost everybody
+   * takes — and an input placeholder disappears the moment there is a
+   * value, which is exactly when somebody is checking whether they used
+   * the right picture.
+   */
+  hint?: string;
   /** Shape of the preview. A logo, a banner and a cake are not the same shape. */
   aspect?: "video" | "square" | "wide";
   /**
@@ -82,6 +92,7 @@ export function PhotoField({
   value,
   onChange,
   placeholder,
+  hint,
   aspect = "video",
   fit = "cover",
   error,
@@ -126,9 +137,14 @@ export function PhotoField({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </label>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">
+            {label}
+          </label>
+          {hint ? (
+            <p className="text-xs text-muted-foreground">{hint}</p>
+          ) : null}
+        </div>
         <button
           type="button"
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"

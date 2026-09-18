@@ -95,12 +95,23 @@
   --font-heading: var(--font-heading);
   --font-mono: var(--font-geist-mono);
 
-  /* Radius — 12px base, 16px for large surfaces */
+  /*
+    Radius — 12px base, and a real scale above it.
+
+    `xl` through `4xl` were ALL 1rem, so `rounded-2xl` and `rounded-xl` drew
+    the identical corner and the four steps were one step wearing four
+    names. The shop asked for less rounding on its cards; this is that, and
+    it also gives the scale somewhere to go.
+
+    Product cards (`rounded-xl`) come down 16px -> 12px, the tiles and
+    panels (`rounded-2xl`) 16px -> 14px. The two largest stay where they
+    were, for the surfaces that want a soft corner.
+  */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: var(--radius);
-  --radius-xl: 1rem;
-  --radius-2xl: 1rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.875rem;
   --radius-3xl: 1rem;
   --radius-4xl: 1rem;
 

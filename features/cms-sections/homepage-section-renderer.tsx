@@ -49,6 +49,7 @@ import {
   parseHeroSlides,
   parseListField,
   photoRows,
+  BANNER_STRIP_MAX,
   renderableRows,
   rowFlag,
 } from "@/constants/section-registry";
@@ -1809,33 +1810,42 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   );
 }
 
-/** The three shapes the strip offers, and what to export for each. */
-const STRIP_SHAPES: Record<string, string> = {
-  wide: "aspect-[1520/120]",
-  banner: "aspect-[1520/260]",
-  panel: "aspect-[1520/500]",
-};
+/*
+  ONE SHAPE, ONE PACE, AND NEITHER IS A SETTING.
+
+  The shop asked for both boxes gone. They were a choice with no good
+  answer behind it: the shape only works if the artwork is exported to
+  match, so picking one in the builder without re-exporting gives a band of
+  background either side of your own banner — and the seconds box invited a
+  number (0.5, 60) that reads as a strobe or as a banner nobody sees turn.
+
+  So the band states what it wants instead of asking, and the size is on the
+  picture field, where the shop is standing when it matters.
+*/
+/** 1520 x 120. Stated on the picture field so the export matches the box. */
+const STRIP_SHAPE = "aspect-[1520/120]";
+/** How long each banner holds. */
+const STRIP_SECONDS = 5;
+/** The turn, in ms. One banner leaves, then the next arrives, each taking this. */
+const STRIP_FLIP_MS = 360;
 
 function BannerStripSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const banners = renderableRows(parseListField(c, "banners")).filter((banner) =>
-    Boolean(banner.image),
-  );
-  const shape = STRIP_SHAPES[contentString(c, "shape")] ?? STRIP_SHAPES.wide;
   /*
-    Clamped, not obeyed. A number typed into a box reaches this, and 0.2
-    seconds is a strobe while 600 is a banner nobody will ever see turn. 0
-    is kept as itself: it means do not turn at all.
+    Capped here as well as in the editor. The editor's limit stops an admin
+    adding a fourth; it does nothing about a fourth that is already stored,
+    and the page is what the customer sees.
   */
-  const typed = contentNumber(c, "seconds", 5);
-  const seconds = typed <= 0 ? 0 : Math.min(30, Math.max(2, typed));
+  const banners = renderableRows(parseListField(c, "banners"))
+    .filter((banner) => Boolean(banner.image))
+    .slice(0, BANNER_STRIP_MAX);
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const count = banners.length;
 
   useEffect(() => {
-    if (count < 2 || seconds === 0 || paused) return;
+    if (count < 2 || paused) return;
     /*
       A visitor whose system asks for less movement gets none. Checked here
       rather than in CSS because stopping the fade would still leave the
@@ -1847,9 +1857,12 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
     ) {
       return;
     }
-    const id = window.setInterval(() => setIndex((i) => (i + 1) % count), seconds * 1000);
+    const id = window.setInterval(
+      () => setIndex((i) => (i + 1) % count),
+      STRIP_SECONDS * 1000,
+    );
     return () => window.clearInterval(id);
-  }, [count, seconds, paused]);
+  }, [count, paused]);
 
   /* A banner removed in the builder must not leave the strip on an index
      that no longer exists — the band would go blank with no clue why. */
@@ -1870,8 +1883,13 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
       */}
       <div
         className={cn(
-          "relative overflow-hidden rounded-2xl bg-cream-100",
-          shape,
+          /*
+            `perspective` is what makes the turn a FLIP rather than a
+            squash: without it a rotated plane is scaled flat, with no
+            near edge coming toward the reader.
+          */
+          "relative overflow-hidden rounded-2xl bg-cream-100 perspective-normal",
+          STRIP_SHAPE,
         )}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
@@ -1893,18 +1911,43 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
           );
           /*
             Every banner is in the DOM, stacked, and only the current one is
-            opaque. A strip that swapped `src` would show the page's
+            face on. A strip that swapped `src` would show the page's
             background between two pictures on every turn, because the next
             one starts loading when it becomes the current one.
+
+            THE TURN IS A FLIP, in two halves rather than all at once.
+            Every banner that is not current rests at the SAME angle, -90°,
+            hinged on its top edge — so the outgoing one falls away from the
+            reader and the incoming one drops in behind it, both travelling
+            the same direction, the way a departure board moves.
+
+            THE DELAY IS WHAT MAKES IT READ. Run both at once and the two
+            banners cross through each other at 45°, which is a smear.
+            Arriving is delayed by exactly as long as leaving takes, so one
+            clears the frame before the next starts.
+
+            `ease-in` on the way out and `ease-out` on the way in, so the
+            pair is fastest in the middle and settles at both ends rather
+            than stopping dead.
+
+            The opacity goes with it because a plane at 90° is a hairline:
+            without the fade there is a frame where neither banner has any
+            width and the box shows its own fill.
           */
           return (
             <div
               key={`${banner.image}-${i}`}
               aria-hidden={i === current ? undefined : true}
               className={cn(
-                "absolute inset-0 transition-opacity duration-700",
-                i === current ? "opacity-100" : "pointer-events-none opacity-0",
+                "absolute inset-0 origin-top backface-hidden transition-[transform,opacity]",
+                i === current
+                  ? "[transform:rotateX(0deg)] opacity-100 ease-out"
+                  : "pointer-events-none [transform:rotateX(-90deg)] opacity-0 ease-in",
               )}
+              style={{
+                transitionDuration: `${STRIP_FLIP_MS}ms`,
+                transitionDelay: i === current ? `${STRIP_FLIP_MS}ms` : "0ms",
+              }}
             >
               {banner.href ? (
                 <Link
@@ -1922,27 +1965,16 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
         })}
 
         {/*
-          THE DOTS ARE THE PAUSE CONTROL as much as they are a place
-          marker. Something that moves on its own has to be stoppable, and
-          pressing a dot ends the turn on the one you asked for.
+          NO DOTS. The shop asked for them off, and at 28px tall on a phone
+          they took a third of the band.
+
+          What that costs is worth writing down: something that moves on its
+          own has to be stoppable, and the dots were the obvious control.
+          The pause is still there and still reachable both ways — a pointer
+          over the band stops it, and so does tabbing onto the banner's own
+          link, which is inside it. A strip with no link and no dots turns
+          with nothing to stop it but the pointer.
         */}
-        {count > 1 ? (
-          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-            {banners.map((banner, i) => (
-              <button
-                key={`dot-${banner.image}-${i}`}
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-label={`Show banner ${i + 1} of ${count}`}
-                aria-current={i === current ? true : undefined}
-                className={cn(
-                  "size-2 rounded-full border border-foreground/20",
-                  i === current ? "bg-foreground" : "bg-card/80",
-                )}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
     </SectionShell>
   );

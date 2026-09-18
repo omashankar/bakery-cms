@@ -300,6 +300,16 @@ export function parseListField(
  * `parseListField`, so the editor keeps its blank rows and the page does not
  * show them.
  */
+/**
+ * The most banners the turning strip takes.
+ *
+ * Named once and read twice — by the editor, which stops offering Add, and
+ * by the renderer, which caps what it draws. The editor's limit is not a
+ * guarantee: a document written before the cap, or by a script, can hold
+ * more, and the page is what the customer sees.
+ */
+export const BANNER_STRIP_MAX = 3;
+
 export function renderableRows(rows: Record<string, string>[]): Record<string, string>[] {
   return rows.filter((row) => Object.values(row).some((value) => value.trim() !== ""));
 }
@@ -636,7 +646,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         type: "list",
         emptyHint: "No cards — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Picture",
+            type: "url",
+            isImage: true,
+            hint: "1200 x 800 — the card crops to fill, so keep the subject centred",
+          },
           { key: "title", label: "Heading", type: "text" },
           { key: "subtitle", label: "Line under it", type: "text" },
           { key: "ctaLabel", label: "Button label", type: "text", placeholder: "Shop Now" },
@@ -688,7 +704,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         type: "list",
         emptyHint: "No tiles — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Picture",
+            type: "url",
+            isImage: true,
+            hint: "600 x 600 — square",
+          },
           { key: "label", label: "Label", type: "text" },
           { key: "href", label: "Link", type: "url" },
         ],
@@ -753,7 +775,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         type: "list",
         emptyHint: "No articles — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Picture",
+            type: "url",
+            isImage: true,
+            hint: "1200 x 675 — 16:9",
+          },
           { key: "title", label: "Headline", type: "text" },
           { key: "excerpt", label: "Standfirst", type: "textarea" },
           { key: "meta", label: "Date or byline", type: "text" },
@@ -794,7 +822,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         type: "list",
         emptyHint: "No banners — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Banner picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Banner picture",
+            type: "url",
+            isImage: true,
+            hint: "1100 x 1000 for a wide card, 800 x 1200 for a narrow one",
+          },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
           { key: "wide", label: "Wide — 3 across instead of 5", type: "boolean" },
@@ -857,7 +891,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             // Filled from the shop's own catalogue when the editor renders.
             optionsFrom: "categories",
           },
-          { key: "image", label: "Picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Picture",
+            type: "url",
+            isImage: true,
+            hint: "800 x 800 — square",
+          },
           {
             key: "tone",
             label: "Tint behind the picture",
@@ -901,48 +941,25 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultBackground: "white",
     defaultContent: {
       banners: "[]",
-      seconds: 5,
-      shape: "wide",
     },
     fields: [
       {
         key: "banners",
         label: "Banners",
         type: "list",
+        maxItems: BANNER_STRIP_MAX,
         emptyHint: "No banners — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Banner picture", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Banner picture",
+            type: "url",
+            isImage: true,
+            hint: "1520 x 120 — a wide strip",
+          },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
         ],
-      },
-      {
-        /*
-          THE SHAPE IS A SETTING because the artwork has to be exported to
-          match it, and a shop that exports 1520x120 and gets a 3:1 box has a
-          band of background either side of its own banner. The box holds its
-          ratio whatever loads into it, so the page does not jump while the
-          picture arrives.
-        */
-        key: "shape",
-        label: "Shape",
-        type: "select",
-        options: [
-          { label: "Wide strip — export 1520x120", value: "wide" },
-          { label: "Banner — export 1520x260", value: "banner" },
-          { label: "Panel — export 1520x500", value: "panel" },
-        ],
-      },
-      {
-        /*
-          Seconds between turns. 0 stops it on the first banner, which is the
-          setting for a shop that wants one picture and no movement — and the
-          turning stops by itself anyway for a visitor whose system asks for
-          reduced motion.
-        */
-        key: "seconds",
-        label: "Seconds each banner is shown (0 = do not turn)",
-        type: "number",
       },
     ],
   },
@@ -1293,7 +1310,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         type: "list",
         emptyHint: "No photos — this section will not appear on the page.",
         itemFields: [
-          { key: "image", label: "Photo", type: "url", isImage: true },
+          {
+            key: "image",
+            label: "Photo",
+            type: "url",
+            isImage: true,
+            hint: "800 x 800 — square",
+          },
           { key: "title", label: "Caption", type: "text" },
           { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
         ],
@@ -1338,7 +1361,15 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         label: "Posts",
         type: "list",
         emptyHint: "No posts — this section will not appear on the page.",
-        itemFields: [{ key: "image", label: "Photo", type: "url", isImage: true }],
+        itemFields: [
+          {
+            key: "image",
+            label: "Photo",
+            type: "url",
+            isImage: true,
+            hint: "800 x 800 — square",
+          },
+        ],
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
