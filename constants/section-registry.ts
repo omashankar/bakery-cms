@@ -450,8 +450,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "Button label", type: "text" },
+      { key: "ctaHref", label: "Button link", type: "url" },
       { key: "maxCount", label: "Max banners shown", type: "number" },
     ],
   },
@@ -688,8 +688,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "ctaLabel", label: "Link label", type: "text" },
-      { key: "ctaHref", label: "Link", type: "url" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
       {
         key: "posts",
         label: "Articles",
@@ -1081,8 +1081,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -1096,15 +1096,21 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // The section is a bakery one and keeps its name. The description was
       // still a claim about taste ("delicious") made in the shop's voice.
       maxCount: 4,
-      ctaLabel: "Shop Photo Cakes",
+      /*
+        BLANK, like every other row. It shipped naming the trade, and the
+        rule this file states elsewhere is that a link nobody wrote is not a
+        link — so a shop that sells flowers was handed a button that says
+        cakes, on a band it had not set up yet.
+      */
+      ctaLabel: "",
       ctaHref: routes.store.collection("photo-cakes"),
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -1125,15 +1131,21 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       overline: "",
       title: "Eggless Collection",
       maxCount: 4,
-      ctaLabel: "Shop Eggless",
+      /*
+        BLANK, like every other row. It shipped naming the trade, and the
+        rule this file states elsewhere is that a link nobody wrote is not a
+        link — so a shop that sells flowers was handed a button that says
+        cakes, on a band it had not set up yet.
+      */
+      ctaLabel: "",
       ctaHref: routes.store.collection("eggless"),
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -1145,15 +1157,21 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       overline: "This Season",
       title: "Seasonal Collection",
       maxCount: 4,
-      ctaLabel: "Shop Seasonal",
+      /*
+        BLANK, like every other row. It shipped naming the trade, and the
+        rule this file states elsewhere is that a link nobody wrote is not a
+        link — so a shop that sells flowers was handed a button that says
+        cakes, on a band it had not set up yet.
+      */
+      ctaLabel: "",
       ctaHref: routes.store.collection("seasonal"),
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
     ],
   },
   {
@@ -1271,8 +1289,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "Button label", type: "text" },
+      { key: "ctaHref", label: "Button link", type: "url" },
       { key: "maxCount", label: "Max photos on the homepage", type: "number" },
     ],
   },
@@ -1385,8 +1403,8 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "ctaLabel", label: "CTA label", type: "text" },
-      { key: "ctaHref", label: "CTA link", type: "url" },
+      { key: "ctaLabel", label: "Button label", type: "text" },
+      { key: "ctaHref", label: "Button link", type: "url" },
       { key: "showPhone", label: "Show phone button", type: "boolean" },
       { key: "phone", label: "Phone number", type: "text" },
     ],
