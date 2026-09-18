@@ -55,8 +55,20 @@ export function SectionHeader({
           {overline}
         </p>
       )}
+      {/*
+        A STEP BIGGER AT THE TOP OF THE SCALE, and only there.
+
+        Measured against the layout this is drawn from: its row heading sits
+        at about 32px in a 1520px column, and ours was 24px in 1376 — the
+        same heading about a quarter smaller for the space it has.
+
+        It goes to 30px from `sm` and stays at 24 below it. Phone is where
+        the old note above still bites: a page of twenty rows cannot spend
+        150px on each heading, and at 390px a 30px title is already two lines
+        for half the rows on this page.
+      */}
       {hasTitle && (
-        <h2 className="font-heading text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+        <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           {title}
         </h2>
       )}
