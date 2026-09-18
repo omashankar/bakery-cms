@@ -42,8 +42,13 @@ describe("the strip that turns over", () => {
 
   it("offers no field that would write words over the artwork", () => {
     /*
-      The same trap as the banner grid: a title box invites an admin to fill
-      it in, and the words land on top of the ones already in the picture.
+      THE RULE IS ABOUT THE CARD, not the band — and this used to say both.
+
+      A title on a BANNER lands on top of the words already in the picture,
+      which is the trap. A heading ABOVE the band does not, and the banner
+      grid has carried one all along. Reading the card's rule onto the band
+      left a shop with a row of artwork it had no way to name, so the band
+      has a heading and a link now and the CARD still has neither.
     */
     const columns = entry!.fields.find((f) => f.key === "banners")?.itemFields ?? [];
 
@@ -53,15 +58,27 @@ describe("the strip that turns over", () => {
       "label",
       "mobileImage",
     ]);
-    // A phone picture is a PICTURE. It carries no words of its own, so it does
-    // not reopen the trap this test is named for.
+    // A phone picture is a PICTURE. It carries no words of its own, so it
+    // does not reopen the trap this test is named for.
     expect(columns.find((c) => c.key === "mobileImage")!.isImage).toBe(true);
+
     for (const banned of ["title", "subtitle", "ctaLabel", "description"]) {
       expect(
-        entry!.fields.some((f) => f.key === banned),
-        `a ${banned} would be drawn over the artwork`,
+        columns.some((c) => c.key === banned),
+        `a card-level ${banned} would be drawn over the artwork`,
       ).toBe(false);
     }
+  });
+
+  it("does let the band itself be named, and linked", () => {
+    // The heading sits above the artwork, not on it. Blank by default, so a
+    // strip nobody has named is the bare band it has always been.
+    for (const key of ["overline", "title", "ctaLabel", "ctaHref"]) {
+      expect(entry!.fields.some((f) => f.key === key), `the band has no ${key}`).toBe(true);
+      expect(entry!.defaultContent[key], `${key} ships with words in it`).toBe("");
+    }
+
+    expect(body(), "the heading is never drawn").toContain("hasHeader");
   });
 
   it("takes three banners and no more, in the editor AND on the page", () => {

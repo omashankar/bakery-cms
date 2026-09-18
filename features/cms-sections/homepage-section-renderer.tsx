@@ -1802,8 +1802,32 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
 
   if (count === 0) return null;
 
+  /*
+    The same header row as every product band: what this is on the left,
+    the way in on the right. `SectionHeader` draws nothing when both are
+    blank, which is the shipped state — so a strip with no heading is the
+    bare band of artwork it has always been.
+  */
+  const hasHeader =
+    Boolean(contentString(c, "overline").trim() || contentString(c, "title").trim()) ||
+    Boolean(contentString(c, "ctaLabel").trim() && contentString(c, "ctaHref").trim());
+
   return (
     <SectionShell {...props}>
+      {hasHeader ? (
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <SectionHeader
+            overline={contentString(c, "overline")}
+            title={contentString(c, "title")}
+            align="left"
+            className="mb-0 min-w-0"
+          />
+          <ViewAllLink
+            href={contentString(c, "ctaHref")}
+            label={contentString(c, "ctaLabel")}
+          />
+        </div>
+      ) : null}
       {/*
         PAUSES WHEN SOMEBODY IS THERE.
 

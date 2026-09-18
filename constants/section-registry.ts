@@ -844,9 +844,13 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
 
       A strip the shop fills with finished artwork — the words, the offer
       and the button are all drawn into the picture — and when there is more
-      than one they cross-fade. So this has no title, subtitle or button
-      field: anything typed here would land on top of the words already in
-      the image, which is the same reasoning as the banner grid above.
+      than one they cross-fade.
+
+      NO TEXT ON A CARD, and that is what the rule was always about. A title
+      on the BANNER would land on top of the words already in the image; a
+      heading above the band would not, and the banner grid has had one all
+      along. This said it had neither, which read the card's rule onto the
+      band and left a shop with a row of artwork it could not name.
 
       `label` is not drawn. It is what a screen reader announces, because a
       picture whose words are pixels says nothing at all to somebody who
@@ -859,9 +863,18 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     icon: "Image",
     defaultBackground: "white",
     defaultContent: {
+      overline: "",
+      title: "",
+      ctaLabel: "",
+      ctaHref: "",
       banners: "[]",
     },
     fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      // Blank, like every other band's. A link nobody wrote is not a link.
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
       {
         key: "banners",
         label: "Banners",
