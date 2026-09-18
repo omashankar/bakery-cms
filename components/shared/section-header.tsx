@@ -62,13 +62,18 @@ export function SectionHeader({
         at about 32px in a 1520px column, and ours was 24px in 1376 — the
         same heading about a quarter smaller for the space it has.
 
-        It goes to 30px from `sm` and stays at 24 below it. Phone is where
-        the old note above still bites: a page of twenty rows cannot spend
-        150px on each heading, and at 390px a 30px title is already two lines
-        for half the rows on this page.
+        28px from `sm`, and 24 below it. It went to 30 first and the shop
+        said that was a step too far — which is the same pull the note above
+        records: this heading sits over a row on a page of twenty of them,
+        not at the top of a page of its own, so the reference's 32 is an
+        upper bound rather than a target.
+
+        Phone stays at 24 because at 390px a 28px title wraps for half the
+        rows here, and two lines of heading over every row is the 150px the
+        note was written about.
       */}
       {hasTitle && (
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
           {title}
         </h2>
       )}
