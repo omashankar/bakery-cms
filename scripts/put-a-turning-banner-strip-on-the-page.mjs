@@ -23,7 +23,7 @@ const APPLY = process.argv.includes("--apply");
 const CLEAR = process.argv.includes("--clear");
 
 const ID = "banner-strip-1";
-const AFTER = "tabbed-rail-top";
+const AFTER = "banner-grid-must-have";
 const SECONDS = 5;
 
 await mongoose.connect(process.env.MONGODB_URI, {
