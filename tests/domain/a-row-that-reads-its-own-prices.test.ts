@@ -42,7 +42,14 @@ describe("the row that reads its own prices", () => {
     expect(entry!.defaultContent.items).toBe("[]");
     // No heading is invented for a shop that has not written one.
     expect(entry!.defaultContent.title).toBe("");
-    expect(entry!.defaultContent.description).toBe("");
+    /*
+      The line under the heading is not blank, it is GONE: the shop asked
+      for the Description box off every section, so there is no key left to
+      ship empty. Asserted as absent rather than deleted, because a default
+      reappearing here is a sentence this CMS would be putting in the shop's
+      mouth.
+    */
+    expect(entry!.defaultContent.description).toBeUndefined();
   });
 
   it("offers nobody a box to type a price into", () => {

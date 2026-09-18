@@ -448,109 +448,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
     })),
   );
 
-  /**
-   * The shop's own promises, under its two delivery facts.
-   *
-   * Read here rather than inside `heroTrustBarFor` because
-   * `builder-list-field-round-trip` slices THIS function's body to check that
-   * every list field the hero declares is actually read by the component the
-   * switch dispatches to — a read one call deeper passes the editor and fails
-   * the guard, which is the point of the guard.
-   */
-  const promises = [
-    ...(contentBoolean(section.content, "showDeliveryFacts", true)
-      ? heroTrustBarFor(props.trust)
-      : []),
-    ...renderableRows(parseListField(props.section.content, "trust")),
-  ];
-
-  /**
-   * The shop's own figures, in the band under the picture.
-   *
-   * There is no copy column to paint them in — the words are part of the
-   * artwork — so they sit beside the promises underneath. They reached
-   * nowhere at all for a while, which meant a shop that typed three figures
-   * silently lost all three.
-   */
-  const stats = renderableRows(parseListField(props.section.content, "stats"));
-
   const carousel = <HeroCarousel slides={slides} copySide={copySide} />;
-
-  const statsStrip =
-    stats.length === 0 ? null : (
-      <div className="flex flex-wrap items-baseline justify-center gap-x-10 gap-y-4 text-center">
-        {stats.map((stat, index) => (
-          <div key={`${stat.label}-${index}`}>
-            {stat.value ? (
-              <p className="font-heading text-2xl font-bold text-bakery-800 sm:text-3xl">
-                {stat.value}
-              </p>
-            ) : null}
-            {stat.label ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-
-  /**
-   * The promises strip — the band under the hero.
-   *
-   * Null when there is nothing to say. That happens when the shop's commerce
-   * settings are unreadable (the builder preview, every render) AND nobody has
-   * written a promise: an empty bordered box is worse than no box.
-   *
-   * It carries no container of its own. The split hero already sits in one,
-   * and nesting a second `max-w-7xl px-4` inside the first indents this band
-   * past the carousel above it. The banner branch, which has no container to
-   * inherit, adds one.
-   */
-  const promisesStrip =
-    promises.length === 0 ? null : (
-      <div
-        className={cn(
-          /*
-            Two columns on a phone whatever the count — a four-across strip at
-            360px gives each tile 80px, which is an icon and a truncated word.
-            Wide enough to lay them out, the count decides, so two promises
-            fill the band instead of leaving half of it empty. Written as
-            whole class names rather than a style prop because Tailwind only
-            emits the classes it can see.
-          */
-          "grid grid-cols-2 gap-x-4 gap-y-5 rounded-2xl border border-border bg-cream-100 p-5 sm:gap-6 sm:p-6",
-          promises.length === 1 && "grid-cols-1",
-          promises.length === 2 && "lg:grid-cols-2",
-          promises.length === 3 && "lg:grid-cols-3",
-          promises.length >= 4 && "lg:grid-cols-4",
-        )}
-      >
-        {promises.map((item, index) => {
-          /*
-            Falls back to a tick for an icon this build does not have. The
-            value is a string off a Mongo document — an older name, a typo, a
-            key from a build where the list was longer — and an undefined
-            component in a JSX slot is not a blank space, it throws and takes
-            the homepage with it.
-          */
-          const Icon =
-            heroTrustIcons[item.icon as keyof typeof heroTrustIcons] ?? BadgeCheck;
-          return (
-            <div key={`${item.title}-${index}`} className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-bakery-700 shadow-sm">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                {item.subtitle ? (
-                  <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
 
   /*
     Two layouts, one component — branched HERE rather than dispatched from the
@@ -578,7 +476,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
    * The builder says so instead of vanishing, the way every other empty
    * section in this file does.
    */
-  if (slides.length === 0 && promises.length === 0 && stats.length === 0) {
+  if (slides.length === 0) {
     if (!props.interactive) return null;
     return (
       <SectionShell {...props}>
@@ -623,12 +521,6 @@ function HeroSection(props: HomepageSectionRendererProps) {
       fullBleed
     >
       {carousel}
-      {statsStrip || promisesStrip ? (
-        <div className={cn(layoutSpacing.container, "mt-10 space-y-8 sm:mt-12")}>
-          {statsStrip}
-          {promisesStrip}
-        </div>
-      ) : null}
     </SectionShell>
   );
 }
@@ -657,7 +549,6 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div
         className={cn(
@@ -808,7 +699,6 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
   // where it belongs, in the registry defaults, so new sections and resets get
   // honest copy and existing content stays the admin's.
   const title = contentString(c, "title");
-  const description = contentString(c, "description");
   const buttonLabel = contentString(c, "buttonLabel", "Get Directions");
 
   // Nothing to show means nothing to show. Rendering the heading alone left a
@@ -841,7 +731,6 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
               {contentString(c, "overline")}
             </p>
             <h2 className="font-heading text-xl font-bold sm:text-2xl">{title}</h2>
-            <p className="text-muted-foreground">{description}</p>
           </div>
           <Button
             variant="bakery"
@@ -908,7 +797,6 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
         />
       </ScrollReveal>
       {/*
@@ -995,7 +883,6 @@ function ProductGridSection(
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
         />
         {/*
           The advice has to match how the row actually chooses.
@@ -1050,7 +937,6 @@ function ProductGridSection(
           <SectionHeader
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
-            description={contentString(c, "description")}
             className="mb-0"
           />
           <div className="hidden flex-1 justify-end sm:flex">
@@ -1077,7 +963,6 @@ function ProductGridSection(
     </SectionShell>
   );
 }
-
 
 const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
@@ -1278,7 +1163,6 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
             <SectionHeader
               overline={contentString(c, "overline")}
               title={contentString(c, "title")}
-              description={contentString(c, "description")}
               align="left"
               className="mb-0 shrink-0 pb-0 sm:pb-2.5"
             />
@@ -1404,7 +1288,6 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       {/*
         `auto-rows-fr` so a wide card and the small ones beside it line up,
@@ -1569,7 +1452,6 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
           className="mb-0"
         />
         <div className="hidden flex-1 justify-end sm:flex">
@@ -1748,7 +1630,6 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
           className="mb-0"
         />
         <div className="mt-4 flex justify-center sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:items-center">
@@ -2052,7 +1933,6 @@ function TileGridSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div className={cn("mt-6 grid gap-4 sm:gap-5", columnClass)}>
         {tiles.map((tile, index) => {
@@ -2098,7 +1978,6 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
    */
   const items = renderableRows(parseListField(c, "items"));
 
-
   if (items.length === 0) return null;
 
   return (
@@ -2106,7 +1985,6 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((item, index) => {
@@ -2158,7 +2036,6 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {items.map((item) => (
@@ -2205,7 +2082,6 @@ function GallerySection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
         />
       </ScrollReveal>
       <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -2283,7 +2159,6 @@ function FaqSection(props: HomepageSectionRendererProps) {
           <SectionHeader
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
-            description={contentString(c, "description")}
           />
         </ScrollReveal>
         <ScrollReveal delay={100}>
@@ -2322,9 +2197,7 @@ function CtaSection(props: HomepageSectionRendererProps) {
         {contentString(c, "overline")}
       </p>
       <h2 className="mt-3 font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
-      <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-        {contentString(c, "description")}
-      </p>
+
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button render={<Link href={contentString(c, "ctaHref", routes.store.contact)} />}>
           {contentString(c, "ctaLabel", "Contact Us")}
@@ -2372,7 +2245,6 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2">
         {banners.map((banner) => (
@@ -2421,7 +2293,6 @@ function OffersSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
-          description={contentString(c, "description")}
         />
         <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No active coupons, so this section is hidden on the live homepage. Add
@@ -2436,7 +2307,6 @@ function OffersSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        description={contentString(c, "description")}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {offers.map((offer) => (
@@ -2533,15 +2403,17 @@ function InstagramSection(props: HomepageSectionRendererProps) {
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
           // The legacy copy reads "@<legacy handle> — daily inspiration…", and
-          // that text is stored on every homepage created before this. Swapping
-          // it at RENDER time keeps the admin's own words and their stored
-          // content untouched, while a shop that has set its real Instagram
-          // stops advertising the old account in prose. With no handle at all
-          // the mention is dropped rather than replaced with a bare "@".
-          description={contentString(c, "description", handle ? `@${handle}` : "").replaceAll(
-            `@${LEGACY_SEED_HANDLE}`,
-            handle ? `@${handle}` : ""
-          )}
+          /*
+            THE SHOP'S OWN HANDLE, and nothing else.
+
+            This read the section's Description with the handle as a
+            fallback, and rewrote a seeded account name inside it. The
+            Description box is gone from every section now, so a stored line
+            here would render with nowhere to edit it — and what belongs
+            under this heading was never prose anyway. Dropped entirely when
+            there is no handle, rather than left as a bare "@".
+          */
+          description={handle ? `@${handle}` : ""}
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -2619,9 +2491,7 @@ function NewsletterSection(props: HomepageSectionRendererProps) {
         <Mail className="size-5" />
       </div>
       <h2 className="font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
-      <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-        {contentString(c, "description")}
-      </p>
+
       <form onSubmit={handleSubmit} className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row">
         <Input
           type="email"

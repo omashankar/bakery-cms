@@ -289,6 +289,24 @@ describe("the banner band", () => {
   });
 });
 
+/*
+  THE STATS STRIP, THE DELIVERY-FACTS SWITCH AND THE PROMISES STRIP ARE GONE
+  FROM THE HERO, and five cases went with them: the ones that checked the
+  shop had somewhere to write its promises, that the icon picker offered
+  nothing the renderer could not draw, that the delivery facts were a choice
+  rather than an assumption, that the switch defaulted on for heroes stored
+  before it existed, and that typed figures reached the page.
+
+  Every one of those was a real decision and none of them was wrong. They
+  are removed because their SUBJECT is — the shop asked for the three
+  settings off this section, and said it may place them elsewhere.
+
+  WHAT THAT COST, measured on the live page rather than assumed: the shop's
+  delivery promise and its free-delivery threshold no longer appear on the
+  homepage at all. `heroTrustBarFor` below is where they were derived from
+  settings and is kept, unused, for whoever places them next — the two cases
+  guarding what it may NOT claim still run.
+*/
 describe("what the hero says on the shop's behalf", () => {
   it("no longer pins a freshness claim to every picture", () => {
     /**
@@ -329,39 +347,6 @@ describe("what the hero says on the shop's behalf", () => {
     expect(bar).toMatch(/if \(trust == null\) return \[\];/);
   });
 
-  it("gives a shop somewhere to write the promises that were taken away", () => {
-    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
-    const trust = hero.fields.find((f) => f.key === "trust");
-    expect(trust?.type, "there is no field for the promises that were removed").toBe("list");
-    expect(trust?.itemFields?.map((f) => f.key)).toEqual(["icon", "title", "subtitle"]);
-    // Empty is the honest starting state, and the hint has to say what empty
-    // means — otherwise it reads as a section somebody forgot to fill in.
-    expect(trust?.emptyHint).toBeTruthy();
-  });
-
-  it("offers no icon the renderer cannot draw", () => {
-    /**
-     * The dropdown's values are keys into a map in the renderer. One added to
-     * the dropdown and not the map used to put `undefined` in a JSX slot, which
-     * throws and takes the homepage with it; it now falls back to a tick, which
-     * is silent. Either way the admin picked something and got something else.
-     */
-    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
-    const icon = hero.fields
-      .find((f) => f.key === "trust")
-      ?.itemFields?.find((f) => f.key === "icon");
-    expect(icon?.options?.length, "the icon picker lost its options").toBeGreaterThan(0);
-
-    const source = read(RENDERER);
-    const map = source.slice(
-      source.indexOf("const heroTrustIcons = {"),
-      source.indexOf("} as const;", source.indexOf("const heroTrustIcons = {")),
-    );
-    for (const option of icon!.options!) {
-      expect(map, `the icon picker offers "${option.value}" and the renderer has no such icon`)
-        .toContain(option.value);
-    }
-  });
 });
 
 describe("which half of a banner the words sit in", () => {
@@ -619,9 +604,16 @@ describe("a hero with nothing in it", () => {
      */
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
 
-    expect(hero).toMatch(
-      /slides\.length === 0 && promises\.length === 0 && stats\.length === 0/,
-    );
+    /*
+      SLIDES ALONE, and that is a narrowing.
+
+      It used to read `slides.length === 0 && promises.length === 0 &&
+      stats.length === 0`, because the hero also carried a stats strip and a
+      promises strip that could fill an otherwise empty band. The shop asked
+      for both off this section — they may go somewhere else later — so a
+      hero with no slides now has nothing at all in it.
+    */
+    expect(hero).toContain("if (slides.length === 0) {");
     expect(hero).toContain("if (!props.interactive) return null;");
   });
 
@@ -632,34 +624,6 @@ describe("a hero with nothing in it", () => {
     const hero = bodyOf(read(RENDERER), "function HeroSection(");
 
     expect(hero).toContain("border-dashed");
-  });
-});
-
-describe("the figures a shop typed into the hero", () => {
-  it("reach the page, rather than a component that ignores them", () => {
-    /**
-     * The strip used to be painted inside the split hero's copy column. This
-     * hero has no copy column — the words are on the picture — so the rows
-     * were read, passed to a component that ignored them, and silently
-     * dropped: a shop that typed three figures lost all three, with the boxes
-     * still full in the builder.
-     */
-    const hero = bodyOf(read(RENDERER), "function HeroSection(");
-
-    expect(hero).toContain("const statsStrip =");
-    expect(hero).toMatch(/stats\.length === 0 \? null/);
-    expect(hero, "the band does not render them").toContain("{statsStrip}");
-    /*
-      AND THE WRAPPER OPENS FOR THEM ON THEIR OWN.
-
-      Asserting the slot alone passed with the condition narrowed back to
-      `promisesStrip ?` — the figures then reach the page only when the shop
-      also happens to have delivery settings readable, and vanish in the
-      builder preview, which has none.
-    */
-    expect(hero, "the figures render only alongside the promises").toMatch(
-      /\{statsStrip \|\| promisesStrip \?/,
-    );
   });
 });
 
@@ -830,32 +794,6 @@ describe("what the admin sees of the artwork before it publishes", () => {
 });
 
 describe("bands a shop can switch off", () => {
-  it("the two delivery facts under the hero, which were not a choice", () => {
-    /**
-     * They are true — both read from the shop's own commerce settings, and
-     * both track them. True is not the same as wanted: a shop carrying its
-     * delivery terms in the banner artwork, or not wanting a band of promises
-     * under its hero at all, had no way to say so. They appeared because the
-     * settings were readable, which is this software deciding for the shop.
-     */
-    const hero = HOMEPAGE_SECTION_REGISTRY.find((entry) => entry.type === "hero")!;
-    const field = hero.fields.find((f) => f.key === "showDeliveryFacts");
-
-    expect(field?.type, "there is no switch for the delivery facts").toBe("boolean");
-    // ON by default, so no shop loses a band it already has.
-    expect(hero.defaultContent.showDeliveryFacts).toBe(true);
-  });
-
-  it("and the renderer defaults it on for a section stored before it existed", () => {
-    // Every hero on every shop predates this key. Reading it as false would
-    // take the band off all of them at once.
-    const body = bodyOf(read(RENDERER), "function HeroSection(");
-
-    expect(body).toMatch(
-      /contentBoolean\(section\.content, "showDeliveryFacts", true\)/,
-    );
-  });
-
   it("and the promo strip above the header, which drew the same banners twice", () => {
     /**
      * The homepage's Promo Banner section draws the same list, so on the page

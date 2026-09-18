@@ -366,7 +366,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         Turning it off from here would take a true and useful line off every
         existing homepage without anybody asking.
       */
-      showDeliveryFacts: true,
     },
     fields: [
       {
@@ -388,81 +387,15 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         ],
       },
       { key: "slides", label: "Hero slides", type: "slides" },
-      {
-        /**
-         * The strip under the hero. It was a constant reading "1M+ Happy
-         * customers · 500+ Cake varieties · 60+ Years of joy" — the demo
-         * brand's figures, shown as whichever shop runs this CMS. Empty by
-         * default, and an empty list renders no strip at all.
-         */
-        key: "stats",
-        label: "Stats strip",
-        type: "list",
-        emptyHint: "No stats — the strip will not appear on the page.",
-        itemFields: [
-          { key: "value", label: "Figure", type: "text", placeholder: "500+" },
-          {
-            key: "label",
-            label: "Label",
-            type: "text",
-            // A placeholder is an example, so it has to be an example any
-            // shop could follow. "Cakes baked" is one only a bakery can.
-            placeholder: "Orders delivered",
-          },
-        ],
-      },
-      {
-        /*
-          THE TWO FACTS ARE A CHOICE NOW, not an assumption.
+      /*
+        THE STATS, DELIVERY FACTS AND PROMISES STRIPS ARE NOT SETTINGS HERE.
 
-          They are true — both are read from the shop's own commerce settings
-          and track them — but true is not the same as wanted. A shop that
-          carries its delivery terms in its banner artwork, or in the strip
-          below, or simply does not want a band of promises under its hero,
-          had no way to say so: the tiles appeared because the settings were
-          readable, which is a decision this software was making for them.
-
-          Off, the band draws only what the shop wrote in the list below —
-          and nothing at all when that is empty.
-        */
-        key: "showDeliveryFacts",
-        label: "Show your delivery facts",
-        type: "boolean",
-      },
-      {
-        /*
-          THE BAR UNDER THE HERO, minus the two lines nobody wrote.
-
-          It was four fixed tiles. Two read the shop's own settings — the
-          free-delivery threshold and the delivery promise — and are facts,
-          so they stay and are still derived. Two were claims: "100% Quality
-          / Premium ingredients" and "Made with Love", asserted on behalf of
-          whichever shop runs this CMS, about goods it may not even make, and
-          with no box anywhere to change or remove them.
-
-          They are gone. What a shop wants to promise beyond the two facts,
-          it writes here. Empty is the honest starting state.
-        */
-        key: "trust",
-        label: "Promises strip",
-        type: "list",
-        emptyHint: "Nothing added — only your delivery facts will show.",
-        itemFields: [
-          {
-            key: "icon",
-            label: "Icon",
-            type: "select",
-            options: [
-              { label: "Van", value: "Truck" },
-              { label: "Clock", value: "Clock" },
-              { label: "Tick", value: "BadgeCheck" },
-              { label: "Heart", value: "Heart" },
-            ],
-          },
-          { key: "title", label: "Title", type: "text" },
-          { key: "subtitle", label: "Line under it", type: "text" },
-        ],
-      },
+        The shop asked for the three of them off the hero editor — not
+        because the idea is wrong, but because this is not where they belong,
+        and they may go somewhere else later. Their rendering went with them:
+        a field removed while its read stays behind leaves stored content on
+        the page with nowhere to edit it, which is worse than either.
+      */
     ],
   },
   {
@@ -483,13 +416,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         The description is blank: the tiles are captioned already.
       */
       title: "Shop by category",
-      description: "",
       maxCount: 8,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max categories shown", type: "number" },
     ],
   },
@@ -512,7 +443,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       */
       overline: "",
       title: "",
-      description: "",
       ctaLabel: "",
       ctaHref: routes.store.collections,
       maxCount: 2,
@@ -520,7 +450,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "maxCount", label: "Max banners shown", type: "number" },
@@ -546,7 +475,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       maxCount: 4,
       maxTabs: 0,
       source: "",
@@ -558,7 +486,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} per tab", type: "number" },
       {
         /*
@@ -633,13 +560,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       cards: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       {
         key: "cards",
         label: "Cards",
@@ -689,14 +614,12 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       columns: 4,
       tiles: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "columns", label: "Tiles per row", type: "number" },
       {
         key: "tiles",
@@ -758,7 +681,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       ctaLabel: "",
       ctaHref: "",
       posts: "[]",
@@ -766,7 +688,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "Link label", type: "text" },
       { key: "ctaHref", label: "Link", type: "url" },
       {
@@ -860,7 +781,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       ctaLabel: "",
       ctaHref: "",
       priceLabel: "Starting from",
@@ -869,7 +789,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
       {
@@ -992,14 +911,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Browse by Occasion",
       title: "Featured Categories",
-      description:
-        "Find the perfect cake for every celebration — birthdays, weddings, anniversaries, and more.",
       maxCount: 6,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max categories shown", type: "number" },
     ],
   },
@@ -1017,7 +933,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         that stays says only which row this is.
       */
       title: "Featured",
-      description: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -1025,7 +940,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       /*
         The way IN to more of this row.
@@ -1049,7 +963,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Trending Now",
       // A claim about what everyone is talking about, for a shop with no
       // way to know and nothing behind the sentence.
-      description: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -1057,7 +970,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       // Same two the other rows carry — blank renders no button.
       { key: "ctaLabel", label: "View-all label", type: "text" },
@@ -1072,7 +984,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Customer Favourites",
       title: "Best Sellers",
-      description: "Tried, tested, and loved by thousands of happy customers.",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -1080,7 +991,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       // Same two the other rows carry — blank renders no button.
       { key: "ctaLabel", label: "View-all label", type: "text" },
@@ -1095,13 +1005,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Limited Time",
       title: "Special Offers",
-      description: "Sweet deals you don't want to miss. Grab them before they're gone!",
       maxCount: 3,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max offers shown", type: "number" },
     ],
   },
@@ -1125,7 +1033,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
-      description: "",
       maxCount: 4,
       categorySlug: "",
       ctaLabel: "",
@@ -1141,7 +1048,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
@@ -1157,7 +1063,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Photo Cakes",
       // The section is a bakery one and keeps its name. The description was
       // still a claim about taste ("delicious") made in the shop's voice.
-      description: "",
       maxCount: 4,
       ctaLabel: "Shop Photo Cakes",
       ctaHref: routes.store.collection("photo-cakes"),
@@ -1165,7 +1070,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
@@ -1188,7 +1092,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       */
       overline: "",
       title: "Eggless Collection",
-      description: "",
       maxCount: 4,
       ctaLabel: "Shop Eggless",
       ctaHref: routes.store.collection("eggless"),
@@ -1196,7 +1099,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
@@ -1210,7 +1112,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "This Season",
       title: "Seasonal Collection",
-      description: "Limited-edition flavours inspired by the season's finest ingredients.",
       maxCount: 4,
       ctaLabel: "Shop Seasonal",
       ctaHref: routes.store.collection("seasonal"),
@@ -1218,7 +1119,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
@@ -1235,7 +1135,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // its own.
       overline: "",
       title: "Why Choose Us",
-      description: "",
     },
     fields: [
       {
@@ -1267,7 +1166,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
     ],
   },
   {
@@ -1278,12 +1176,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Love Letters",
       title: "What Our Customers Say",
-      description: "Real stories from real celebrations across India.",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
     ],
   },
   {
@@ -1296,7 +1192,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Gallery",
       // The pictures are the shop's own; the sentence over them named a
       // trade that may not be.
-      description: "",
       /*
         BLANK. This pointed at /store/gallery, and that page is gone — the
         shop's photographs live in this band now. A shop that wants a
@@ -1344,7 +1239,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "maxCount", label: "Max photos on the homepage", type: "number" },
@@ -1358,7 +1252,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Follow Us",
       title: "On Instagram",
-      description: "Daily inspiration and behind-the-scenes sweetness.",
       // No handle or URL seeded on purpose: left unset, the section uses the
       // shop's own Instagram from Settings → Social. Baking the demo account in
       // here meant a shop that had configured its real profile still advertised
@@ -1394,7 +1287,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "instagramHandle", label: "Instagram handle", type: "text" },
       { key: "instagramUrl", label: "Instagram URL", type: "url" },
       { key: "maxCount", label: "Max posts shown", type: "number" },
@@ -1414,13 +1306,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // The band shows the shop's one stored address. Naming the trade in
       // the heading above it is the only part that was not the shop's.
       title: "Visit Us",
-      description: "Here is where to find us, and when we are open.",
       buttonLabel: "Get Directions",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "buttonLabel", label: "Button label", type: "text" },
     ],
   },
@@ -1433,13 +1323,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Stay in the Loop",
       // Promised exclusive offers, launches and seasonal specials — three
       // things no shop agreed to send. The box and its button say what it is.
-      description: "",
       buttonLabel: "Subscribe",
       disclaimer: "No spam. Unsubscribe anytime.",
     },
     fields: [
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "buttonLabel", label: "Button label", type: "text" },
       { key: "disclaimer", label: "Disclaimer", type: "text" },
     ],
@@ -1454,7 +1342,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // The question named the goods and called them perfect; the line under
       // it promised a team. Neither is this software's to say.
       title: "Ready to order?",
-      description: "",
       ctaLabel: "Contact Us",
       ctaHref: routes.store.contact,
       showPhone: true,
@@ -1466,7 +1353,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
-      { key: "description", label: "Description", type: "textarea" },
       { key: "ctaLabel", label: "CTA label", type: "text" },
       { key: "ctaHref", label: "CTA link", type: "url" },
       { key: "showPhone", label: "Show phone button", type: "boolean" },

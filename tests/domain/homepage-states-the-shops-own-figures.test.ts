@@ -79,7 +79,14 @@ describe("the homepage renderers", () => {
       passed through as it comes, and the reader deals with absence. A `??`
       here would be the invented number coming back.
     */
-    expect(renderer).toMatch(/heroTrustBarFor\(props\.trust\)/);
+    /*
+      AND NOTHING CALLS IT NOW. The shop asked for the delivery-facts strip
+      off the hero, so `heroTrustBarFor` is kept but unused, for whoever
+      places those two figures next. What it may not do is invent one, and
+      the line above still guards that. The call site is not asserted any
+      more, because there is not one.
+    */
+    expect(renderer).toContain("function heroTrustBarFor(");
   });
 });
 

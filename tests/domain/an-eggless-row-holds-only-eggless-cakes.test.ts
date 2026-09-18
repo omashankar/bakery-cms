@@ -353,7 +353,13 @@ describe("the section the shop already has stored", () => {
     // The invariant is that both loud fields ship EMPTY. Forbidding the two
     // sentences that used to be there only rules out those two sentences.
     expect(entry).toContain('overline: ""');
-    expect(entry).toContain('description: ""');
+    /*
+      The description no longer ships at ALL — the shop asked for that box
+      off every section — so the guard is that the key is absent rather than
+      blank. Either way there is no sentence here for a shop to publish
+      without having written it.
+    */
+    expect(entry).not.toContain('description:');
     expect(entry).not.toContain("100% Eggless");
     expect(entry).not.toContain("without eggs for all celebrations");
   });
