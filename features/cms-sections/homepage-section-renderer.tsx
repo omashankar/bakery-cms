@@ -596,7 +596,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
             Spacing under a heading belongs to the heading, which is the only
             thing that knows whether there is one.
           */
-          "-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden",
+          "no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0",
           /*
             THE COLUMN COUNT FOLLOWS THE TILES. It was hard-wired to eight,
             so a shop with three categories got three cards and five columns
@@ -1021,16 +1021,27 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
  * this category", not a second one that can drift.
  */
 /**
- * A ROW THAT SCROLLS, with the arrows the layout puts on it.
+ * A ROW THAT SCROLLS. The arrows are the exception, not the way through.
  *
- * The arrows are drawn ONLY when the strip actually overflows. A row of
- * four in a space that fits four has nowhere to go, and a pair of dead
- * chevrons either side of it is a control that lies about what it does —
- * which on a phone, where the strip nearly always overflows, is the
- * opposite problem.
+ * TWO CONDITIONS, and both have to hold. The strip has to actually
+ * overflow — a row of four in a space that fits four has nowhere to go,
+ * and a pair of dead chevrons either side of it is a control that lies
+ * about what it does. And the window has to be wider than a laptop.
  *
- * Measured rather than counted: whether four cards overflow depends on the
- * window, not on the number four.
+ * The second one is the shop's decision and it is worth writing down what
+ * it costs, because measuring the page first made it look like the
+ * opposite of what it is. At 390px twelve rows on the homepage overflow;
+ * from 1024px up exactly one does, by about 300px. So these arrows live
+ * almost entirely on phones and tablets, which is the one place they are
+ * least use: a finger already drags the row, and the chevrons sit on top
+ * of the cards to say so.
+ *
+ * WHAT IT COSTS is that one row, on a laptop, driven by a mouse. Below
+ * the cut there is no arrow and no visible bar, and a wheel scrolls a
+ * page down rather than a row sideways — so a trackpad or a touchscreen
+ * reaches the fifth card and a plain mouse does not. It is one row and
+ * about half a card; hijacking the wheel to fix it would take the page's
+ * own scrolling away from everybody, which is the worse trade.
  */
 function ScrollStrip({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1075,15 +1086,27 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
     A carousel arrow overlapping the first card is ordinary; a page that
     slides sideways is not.
   */
+  /*
+    WIDER THAN A LAPTOP, and the number is doing real work.
+
+    1536 is not a safe cut even though Tailwind calls it `2xl`: a 1920px
+    laptop at the 125% scaling Windows ships by default reports exactly
+    1536 CSS pixels, and that is the commonest laptop there is. A cut at
+    1536 would hand the arrows straight back to the machine this is
+    meant to take them off.
+
+    `hidden` and not `invisible` or `opacity-0`: the button has to leave
+    the tab order too, or a keyboard reaches a control nobody can see.
+  */
   const arrow =
-    "absolute top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md";
+    "absolute top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md min-[1600px]:flex";
 
   return (
     <div className="relative">
       <div
         ref={ref}
         onScroll={measure}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:gap-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:gap-5"
       >
         {children}
       </div>
@@ -1246,7 +1269,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               be inside the clip and the negative margin puts the strip back
               where it was, so the tabs still stand on the rule.
             */}
-            <div className="-mb-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2 sm:w-auto">
+            <div className="no-scrollbar -mb-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2 sm:w-auto">
               {tabs.map((tab, index) => (
                 <button
                   key={`${tab.label}-${index}`}
@@ -1301,8 +1324,8 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
 
             The card widths are a quarter of the strip minus its gaps, so a
             row of four looks exactly like the grid it replaces — and a row
-            of nine scrolls, which is what the arrows are for. A fixed pixel
-            width would leave a ragged half-card at most window sizes.
+            of nine scrolls. A fixed pixel width would leave a ragged half-card
+            at most window sizes.
           */}
           <ScrollStrip>
             {cakes.map((cake) => (

@@ -3,7 +3,7 @@
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
@@ -398,7 +398,7 @@ export function HeroCarousel({
   /**
    * A PAUSE THAT ENDS, not a stop.
    *
-   * This was sticky: one press of an arrow and the hero never moved again for
+   * This was sticky: one press of a control and the hero never moved again for
    * the rest of the visit. It was meant as the pause control — content that
    * moves by itself has to be stoppable, and hover and focus do not exist on
    * a phone — but a carousel that dies on the first touch reads as broken,
@@ -421,8 +421,23 @@ export function HeroCarousel({
    * state update is not a place to do that.
    */
   const indexRef = useRef(1);
-  /** A step that is waiting for the jump home to be drawn. */
-  const pendingStep = useRef<1 | -1 | 0>(0);
+  /**
+   * The move waiting for the jump home to be drawn — as a row index, not a
+   * direction.
+   *
+   * A DIRECTION WAS ENOUGH WHILE THE ARROWS EXISTED. An arrow always goes
+   * one place from wherever the row lands, so `home + direction` said
+   * everything. A dot does not: it names a slide outright, and it went
+   * straight there with the transition on. Pressed while the row was
+   * sitting on a clone that animated the whole lap backwards — the exact
+   * rewind the clone machinery exists to prevent, reached by the other
+   * door.
+   *
+   * It was rare enough to miss while an arrow was the control anyone
+   * reached for. With the arrows gone the dot IS the control, so the rare
+   * press became the ordinary one and the two paths had to become one.
+   */
+  const pendingIndex = useRef<number | null>(null);
 
   /** Which of the shop's slides is showing. A clone reads as the one it copies. */
   const activeIndex = count > 0 ? (((index - 1) % count) + count) % count : 0;
@@ -459,7 +474,7 @@ export function HeroCarousel({
       const at = indexRef.current;
 
       if (at > 0 && at < count + 1) {
-        pendingStep.current = 0;
+        pendingIndex.current = null;
         setSnapBack(false);
         indexRef.current = at + direction;
         setIndex(at + direction);
@@ -467,7 +482,7 @@ export function HeroCarousel({
       }
 
       const home = at <= 0 ? count : 1;
-      pendingStep.current = direction;
+      pendingIndex.current = home + direction;
       indexRef.current = home;
       setSnapBack(true);
       setIndex(home);
@@ -475,14 +490,40 @@ export function HeroCarousel({
     [count],
   );
 
-  /** A dot names one of the shop's slides; the row's index is one further on. */
-  const goTo = useCallback((slide: number) => {
-    setNudgedAt(Date.now());
-    pendingStep.current = 0;
-    setSnapBack(false);
-    indexRef.current = slide + 1;
-    setIndex(slide + 1);
-  }, []);
+  /**
+   * A dot names one of the shop's slides; the row's index is one further on.
+   *
+   * THE SAME TWO BRANCHES AS `step`, and for the same reason. A dot pressed
+   * while the row is resting on a clone is a move from one end of the track
+   * to the other, and the browser animates it: every picture in between,
+   * backwards. Coming home first — with the transition off, where nobody
+   * sees it because a clone and the slide it copies are the same picture —
+   * turns that into a move of a slide or two from the near end.
+   *
+   * Pressing the dot for the slide the clone is a copy of now moves nothing
+   * at all, which is what it looked like it did all along.
+   */
+  const goTo = useCallback(
+    (slide: number) => {
+      setNudgedAt(Date.now());
+      const at = indexRef.current;
+
+      if (at > 0 && at < count + 1) {
+        pendingIndex.current = null;
+        setSnapBack(false);
+        indexRef.current = slide + 1;
+        setIndex(slide + 1);
+        return;
+      }
+
+      const home = at <= 0 ? count : 1;
+      pendingIndex.current = slide + 1;
+      indexRef.current = home;
+      setSnapBack(true);
+      setIndex(home);
+    },
+    [count],
+  );
 
   useEffect(() => {
     if (!multi || paused || nudgedAt) return;
@@ -549,10 +590,9 @@ export function HeroCarousel({
     const outer = window.requestAnimationFrame(() => {
       inner = window.requestAnimationFrame(() => {
         setSnapBack(false);
-        const direction = pendingStep.current;
-        if (direction === 0) return;
-        pendingStep.current = 0;
-        const next = indexRef.current + direction;
+        const next = pendingIndex.current;
+        if (next === null) return;
+        pendingIndex.current = null;
         indexRef.current = next;
         setIndex(next);
       });
@@ -611,10 +651,12 @@ export function HeroCarousel({
         KEYBOARD FOCUS PAUSES. A MOUSE CLICK DOES NOT.
 
         A click leaves the button it landed on focused, and `onFocusCapture`
-        took that as somebody reading — so pressing Next once paused the
-        autoplay for as long as that arrow kept focus, which is until the
-        visitor clicks somewhere else on the page. Measured: the hero had not
-        moved fifteen seconds later, and it reads as a carousel that has died.
+        took that as somebody reading — so one press paused the autoplay for
+        as long as that button kept focus, which is until the visitor clicks
+        somewhere else on the page. Measured: the hero had not moved fifteen
+        seconds later, and it reads as a carousel that has died. It was an
+        arrow that found this; the dots are the buttons it protects now, and
+        they are the only ones left.
 
         `:focus-visible` is exactly this distinction — the browser sets it for
         focus arrived at by keyboard and not for focus left behind by a
@@ -629,13 +671,14 @@ export function HeroCarousel({
       onBlurCapture={() => setPaused(false)}
     >
       {/*
-        THE ARROWS BELONG TO THE SLIDE, not to the whole carousel.
+        THE PICTURE'S OWN BOX, which is why it is still here with nothing
+        positioned against it.
 
-        They were positioned against the root, which also holds the row of
-        dots — so `top-1/2` centred them on the slide PLUS the dots, and they
-        sat about 20px below the middle of the picture they point at. Their
-        own `relative` box fixes it, and is what lets the dots move out from
-        over the picture.
+        It was drawn for the arrows: they were positioned against the root,
+        which also holds the row of dots, so `top-1/2` centred them on the
+        slide PLUS the dots and they sat about 20px low. The arrows are gone
+        and this stays, because it is also what keeps the dots out from over
+        the picture — remove it and they climb back on top of the artwork.
       */}
       <div className="relative">
         {/*
@@ -717,48 +760,6 @@ export function HeroCarousel({
             </div>
         </div>
 
-        {multi ? (
-          <>
-            {/*
-              THE ARROWS GO OVER THE PICTURE, because there is no margin for
-              them to park in: the band runs to both edges of the window.
-
-              BUT NOT ON A PHONE AT ALL, since the band stopped being cropped.
-              An uncropped banner is as tall as its artwork is at that width:
-              130px for 3:1 art on a 390px screen, 81px for 4.8:1. Two 44px
-              buttons plus their inset is most of that, over a picture whose
-              words are drawn into it.
-
-              Nothing is lost by dropping them there. The dots sit under the
-              picture now rather than over it, with a 24px hit area each, so
-              the phone already has a visible way to reach slide two — which
-              is the only reason the arrows were shown at every width. From
-              sm there is room at the sides and they take their inset spot.
-            */}
-            <button
-              type="button"
-              onClick={() => step(-1)}
-              aria-label="Previous slide"
-              className={cn(
-                "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-                "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:left-5 sm:flex sm:-translate-y-1/2"
-              )}
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => step(1)}
-              aria-label="Next slide"
-              className={cn(
-                "absolute z-20 size-11 items-center justify-center rounded-full border shadow-md transition-all hover:scale-105",
-                "hidden border-white/40 bg-white/85 text-bakery-800 backdrop-blur-sm hover:bg-white sm:top-1/2 sm:right-5 sm:flex sm:-translate-y-1/2"
-              )}
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          </>
-        ) : null}
       </div>
 
       {/*
@@ -783,17 +784,27 @@ export function HeroCarousel({
             <button
               key={i}
               type="button"
-              // `goTo`, not `setIndex` — pressing a dot is as deliberate as
-              // pressing an arrow, and it is the only one of the three a
-              // phone has in the split layout.
+              // `goTo`, not `setIndex` — a dot press is deliberate, and
+              // `goTo` is what pauses the autoplay and comes off a clone
+              // safely. `setIndex` would do neither.
               onClick={() => goTo(i)}
               aria-label={`Go to slide ${i + 1}`}
               aria-current={i === activeIndex}
               /*
-                An 8px visual with a 24px reach. The dot is the only way to
-                change slide on a phone in the split layout — its arrows are
-                2xl-only — and an 8x8 target is below every touch floor there
-                is. `before` grows the hit area without moving anything.
+                An 8px visual with a 24px reach, and now the hit area of the
+                ONLY control on the hero.
+
+                The arrows are gone — the shop asked for the dots alone, and
+                measured, the arrows were mostly a phone thing anyway. What
+                is left is this and the swipe, so an 8x8 target, already
+                below every touch floor there is, would be the whole
+                interface. `before` grows the reach without moving anything.
+
+                A MOUSE HAS ONLY THIS. There is no swipe with a mouse and
+                the pointer resting on the band pauses the autoplay, so for
+                a desktop visitor the dot is not one way through, it is the
+                way through. That is the trade the shop chose and it is
+                worth seeing written down next to the 8 pixels.
               */
               className="relative flex h-2 items-center rounded-full transition-all duration-300 before:absolute before:-inset-2 before:content-['']"
             >

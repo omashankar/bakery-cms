@@ -535,13 +535,16 @@ describe("the slideshow's own controls", () => {
       "onClick={() => goTo(i)}",
     );
     /*
-      Six legitimate `setIndex` calls, and no more: the autoplay tick, the
-      timed jump off a clone, the step a press queues behind that jump, one in
-      each of `step`'s two branches — the ordinary move and the one that comes
-      home off a clone first — and `goTo`. Any seventh is a control that moves
+      Seven legitimate `setIndex` calls, and no more: the autoplay tick,
+      the timed jump off a clone, the move a press queues behind that jump,
+      and two each in `step` and `goTo` — the ordinary move, and the one
+      that comes home off a clone first. Any eighth is a control that moves
       a slide without pausing, which is the fault this counts for.
+
+      It was six. `goTo` grew its second branch when the arrows came off
+      and the dot became the only deliberate control on the hero.
     */
-    expect((body.match(/setIndex\(/g) ?? []).length).toBe(6);
+    expect((body.match(/setIndex\(/g) ?? []).length).toBe(7);
   });
 
   it("and the row under the picture is dots, with no other control in it", () => {
@@ -552,45 +555,53 @@ describe("the slideshow's own controls", () => {
     expect(carousel, "the pause icons are back").not.toMatch(/[^A-Za-z](Pause|Play)[,\s]/);
   });
 
-  it("keeps the banner's arrows off a band only as tall as its artwork", () => {
+  it("has no arrows at all, at any width", () => {
     /**
-     * An uncropped banner is as tall as its picture is at that width: 130px
-     * for 3:1 art on a 390px screen, 81px for 4.8:1. Two 44px buttons and
-     * their inset is most of that, over a picture whose words are drawn into
-     * it — so below sm they are not drawn at all.
+     * THE SHOP ASKED FOR THE DOTS ALONE, and the page agreed with them.
      *
-     * Nothing is lost. The dots sit under the picture with a 24px hit area
-     * each, which is the visible way to reach slide two that the arrows were
-     * being shown at every width to provide.
+     * The arrows were already `hidden sm:flex`, so on the band they were
+     * drawn over — an uncropped banner is 130px tall for 3:1 art on a 390px
+     * screen — they never appeared at all. Above that they sat on top of
+     * artwork whose offer is drawn INTO the picture.
+     *
+     * What is left is what was already carrying the phone: the dots under
+     * the picture, and the swipe.
      */
     const carousel = codeOf(read(CAROUSEL));
 
-    /*
-      EACH ARROW, not the pair.
-
-      Checking the whole block for one class passed with the left arrow moved
-      back over the picture and the right one left alone, which is both a
-      real way to write the bug and the more confusing one to look at.
-    */
     for (const which of ["Previous", "Next"]) {
-      const at = carousel.indexOf(`aria-label="${which} slide"`);
-      expect(at, `the ${which} arrow is gone`).toBeGreaterThan(-1);
-      /*
-        The button's own class list, cut at its closing `)}` so the slice
-        cannot run into the next button and read ITS classes — which is how
-        one arrow moved back over the picture with the pair still passing.
-      */
-      const rest = carousel.slice(at);
-      const arrow = rest.slice(0, rest.indexOf(")}"));
-
-      expect(arrow, `the ${which} arrow is drawn over a phone-height band`).toContain(
-        "hidden",
-      );
-      expect(arrow, `the ${which} arrow never appears at all`).toContain("sm:flex");
-      expect(arrow, `the ${which} arrow never takes its inset position`).toMatch(
-        /sm:top-1\/2/,
-      );
+      expect(
+        carousel.includes('aria-label="' + which + ' slide"'),
+        which + " is back on the hero",
+      ).toBe(false);
     }
+
+    // The icons go with the buttons, or the import sits there unused — and
+    // an unused import here is a warning, not an error, so nothing else
+    // would have said so.
+    for (const icon of ["ChevronLeft", "ChevronRight"]) {
+      expect(carousel.includes(icon), icon + " is still imported").toBe(false);
+    }
+  });
+
+  it("and what is left can still reach every slide", () => {
+    /*
+      THE PART THAT WOULD BE EASIEST TO BREAK WHILE DELETING THE BUTTONS.
+
+      `step` reads as arrow code and is not: the swipe is its only caller
+      now, and the swipe is the only control a phone has besides the dots.
+      Deleting it as arrow residue would leave the hero touch-dead with
+      every assertion about the clone arithmetic still green, because that
+      arithmetic lives inside `step`.
+    */
+    const body = codeOf(read(CAROUSEL));
+
+    expect(body, "the swipe no longer moves the row").toContain(
+      "step(delta < 0 ? 1 : -1)",
+    );
+    expect(body, "the dots no longer move the row").toContain(
+      "onClick={() => goTo(i)}",
+    );
   });
 });
 
@@ -860,9 +871,13 @@ describe("how one slide becomes the next", () => {
     expect(body).toMatch(/snapBack && "transition-none"/);
     // The autoplay only ever counts up; the clones are where the ends go.
     expect(body).toMatch(/setIndex\(\(i\) => \(i >= count \+ 1 \? 2 : i \+ 1\)\)/);
-    // And the arrows step, rather than wrapping with an arithmetic of their own.
-    expect(body).toContain("onClick={() => step(-1)}");
-    expect(body).toContain("onClick={() => step(1)}");
+    /*
+      And whatever moves by one goes through `step`, rather than wrapping
+      with an arithmetic of its own. That used to be the arrows; it is the
+      swipe now, and the swipe reaches the same two branches — which is why
+      taking the buttons off did not take this coverage with them.
+    */
+    expect(body).toContain("step(delta < 0 ? 1 : -1)");
     /*
       Scoped to what `setIndex` is GIVEN, not to the file. `activeIndex` uses
       the same arithmetic to work out which of the shop's slides is showing,
@@ -919,8 +934,34 @@ describe("how one slide becomes the next", () => {
      */
     const body = carousel();
 
-    expect(body, "the step is taken in the same commit as the jump home").toMatch(
-      /pendingStep\.current = direction;/,
+    expect(body, "the move is taken in the same commit as the jump home").toContain(
+      "pendingIndex.current = home + direction;",
+    );
+    /*
+      AND THE DOT TAKES THE SAME DOOR.
+
+      It did not. `goTo` set the row straight to the slide it names with
+      the transition on, so a dot pressed while the row was resting on a
+      clone animated the whole lap backwards — the exact fault this test is
+      named for, reached through the control nobody was watching.
+
+      It survived because an arrow was what anyone pressed, and an arrow
+      took the safe path. The arrows are gone, so the dot is now the only
+      deliberate control on the hero and the rare press became the
+      ordinary one.
+    */
+    const dotAt = body.indexOf("const goTo = useCallback(");
+    expect(dotAt, "goTo is gone").toBeGreaterThan(-1);
+    const dot = body.slice(dotAt, dotAt + 900);
+
+    expect(dot, "goTo never looks at where the row is").toContain(
+      "const at = indexRef.current;",
+    );
+    expect(dot, "goTo has no branch for a clone").toContain(
+      "const home = at <= 0 ? count : 1;",
+    );
+    expect(dot, "the dot does not queue its landing").toContain(
+      "pendingIndex.current = slide + 1;",
     );
     expect(body, "the queued step does not wait for a second frame").toMatch(
       /inner = window\.requestAnimationFrame\(/,

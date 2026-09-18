@@ -412,6 +412,35 @@ html.dark {
 }
 
 @layer utilities {
+  /*
+    A ROW THAT SCROLLS WITHOUT SAYING SO.
+
+    Three properties, because no one of them covers a browser on its own:
+    `scrollbar-width` is the standard and Firefox, the `::-webkit-scrollbar`
+    pseudo-element is Chrome, Edge and Safari, and `-ms-overflow-style` is
+    the old Edge that some shop laptops still run.
+
+    It is here because it was not. Four rows on the storefront scroll
+    sideways and each one had hand-copied a different subset: the category
+    tiles had all three, the product rail had two, the tabbed rail's own tab
+    strip had none at all — so a bar was painted under the tabs in every
+    browser there is, on the one row nobody had thought to check. A rule
+    copied by hand is a rule that drifts; this is the copy.
+
+    ONLY FOR A ROW THAT SCROLLS SIDEWAYS. A vertical bar is usually the only
+    thing telling a customer that a box holds more than it is showing — the
+    checkout's order summary and the phone's navigation drawer both need
+    theirs, and neither should ever wear this class.
+  */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .font-heading {
     font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
   }

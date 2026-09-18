@@ -21,6 +21,56 @@ const WIDTHS = [
   { name: "laptop", width: 1440, height: 900 },
 ];
 
+/**
+ * ONE SLIDE FORWARD OR BACK, THE WAY A CUSTOMER DOES IT NOW.
+ *
+ * These tests used to press `[aria-label="Next slide"]`. The shop asked for
+ * the arrows to go, so there is no such button — and three of the tests that
+ * pressed it reached for it inside `page.evaluate` behind an
+ * `instanceof HTMLElement` guard, which means they would have gone on PASSING
+ * while clicking nothing at all. One of those is the guard for the exact
+ * rewind the shop reported. A green run would have said the hero was fine.
+ *
+ * So the press becomes a swipe, which is not a workaround: `step` — the two
+ * branches that carry the whole clone arithmetic these tests exist for — is
+ * now reachable only from the swipe. Pressing a dot calls `goTo` instead and
+ * takes a different door.
+ *
+ * It THROWS when the hero or its picture is missing, rather than returning.
+ * That is the entire point of rewriting them.
+ */
+async function swipe(page: import("@playwright/test").Page, direction: 1 | -1) {
+  await page.evaluate((forward) => {
+    const hero = document.querySelector('[data-section-id^="hero"]');
+    const target = hero?.querySelector("img");
+    if (!(target instanceof HTMLElement)) {
+      throw new Error("no hero picture to swipe — the carousel is not on the page");
+    }
+    const at = (x: number) =>
+      new Touch({ identifier: 1, target, clientX: x, clientY: 200 });
+    // Past SWIPE_THRESHOLD (48px) either way. Forward is a drag to the LEFT,
+    // the same direction the row itself travels.
+    const from = 400;
+    const to = forward === 1 ? 200 : 600;
+    target.dispatchEvent(
+      new TouchEvent("touchstart", {
+        bubbles: true,
+        cancelable: true,
+        touches: [at(from)],
+        changedTouches: [at(from)],
+      }),
+    );
+    target.dispatchEvent(
+      new TouchEvent("touchend", {
+        bubbles: true,
+        cancelable: true,
+        touches: [],
+        changedTouches: [at(to)],
+      }),
+    );
+  }, direction);
+}
+
 for (const { name, width, height } of WIDTHS) {
   test(`the hero and the row under it are one band at ${name} width`, async ({ page }) => {
     await page.setViewportSize({ width, height });
@@ -140,7 +190,7 @@ test("one slide slides into the next rather than cutting", async ({ page }) => {
     the first reading to 0 broke the moment that clone was added, on a
     carousel that was working.
   */
-  await page.click('[aria-label="Next slide"]');
+  await swipe(page, 1);
   await page.waitForTimeout(250);
   const mid = await measure();
   const partWay = before.first! - mid.first!;
@@ -370,8 +420,13 @@ test("the loop never runs backwards, and picks itself up again", async ({ page }
     version of this test used one — so the mutation that restores the bug
     passed it. The pointer is then moved off the hero, because hovering is a
     separate and legitimate pause.
+
+    A DOT RATHER THAN AN ARROW, and it has to be a real button: this is about
+    the focus a click leaves behind, so a swipe — which leaves none — would
+    test nothing. With the arrows gone the dots are the only buttons on the
+    hero, which makes them the only ones that can hold that focus.
   */
-  await page.click('[aria-label="Next slide"]');
+  await page.click('[aria-label="Go to slide 2"]');
   await page.mouse.move(5, height - 20);
   await page.waitForTimeout(1500);
   const afterPress = (await rowLeft())!;
@@ -387,7 +442,7 @@ test("the loop never runs backwards, and picks itself up again", async ({ page }
   ).toBeGreaterThan(10);
 });
 
-test("a tap on an arrow does not stop the hero for the rest of the visit", async ({
+test("a tap on a dot does not stop the hero for the rest of the visit", async ({
   browser,
 }) => {
   /**
@@ -433,9 +488,10 @@ test("a tap on an arrow does not stop the hero for the rest of the visit", async
   }
 
   /*
-    The banner's arrows are hidden below sm — the band is only as tall as its
-    artwork there — so the dots are the control a phone actually has, and they
-    leave focus behind in exactly the same way.
+    This was always written against a dot, because the banner's arrows were
+    hidden below sm — the band is only as tall as its artwork there. The
+    arrows are gone from every width now, so the dot is not merely what a
+    phone has: it is the only button on the hero at all.
   */
   await page.tap('[aria-label="Go to slide 2"]');
   await page.waitForTimeout(1500);
@@ -455,15 +511,21 @@ test("a tap on an arrow does not stop the hero for the rest of the visit", async
   ).toBe(true);
 });
 
-test("the arrows loop at both ends, one slide at a time", async ({ page }) => {
+test("the swipe loops at both ends, one slide at a time", async ({ page }) => {
   /**
-   * THE ARROWS, ALL THE WAY ROUND AND OUT THE OTHER SIDE.
+   * THE SWIPE, ALL THE WAY ROUND AND OUT THE OTHER SIDE.
+   *
+   * This said "the arrows" and pressed them. The arrows are gone and the test
+   * is NOT: `step`, with the two branches that carry the whole clone
+   * arithmetic, is exactly what a swipe calls — so deleting this along with
+   * the buttons would have left that arithmetic reachable by every phone
+   * customer and covered by nothing.
    *
    * Everything else here watches the autoplay, which only ever moves one way
-   * and only ever wraps at the end — so the arrows' own wrap was never
-   * exercised, and when they still wrapped with a modulo while the autoplay
-   * used a clone, every test passed. Pressing Next on the last slide rewound
-   * the whole row, which is the thing the shop reported.
+   * and only ever wraps at the end — so this wrap was never exercised, and
+   * when it still used a modulo while the autoplay used a clone, every test
+   * passed. Going forward off the last slide rewound the whole row, which is
+   * the thing the shop reported.
    *
    * DIRECTION IS THE DISCRIMINATOR, not distance. Across a correct wrap the
    * row ends up (count-1) slides to the right of where it started — exactly
@@ -499,11 +561,11 @@ test("the arrows loop at both ends, one slide at a time", async ({ page }) => {
   const count = start.pictures - 2;
   if (count < 2) test.skip(true, "this shop has fewer than two hero slides");
 
-  /** One press, watched while it moves. */
-  const press = async (label: string, expected: -1 | 1) => {
+  /** One swipe, watched while it moves. */
+  const drag = async (expected: -1 | 1) => {
+    const way = expected === 1 ? "forward" : "back";
     const before = await read();
-    await page.click(`[aria-label="${label}"]`);
-    await page.mouse.move(5, 880);
+    await swipe(page, expected);
     await page.waitForTimeout(260);
     const during = await read();
 
@@ -512,28 +574,31 @@ test("the arrows loop at both ends, one slide at a time", async ({ page }) => {
     const wentRight = travelled > 10;
     expect(
       expected === 1 ? wentLeft : wentRight,
-      `${label} from dot ${before.dot} moved ${Math.round(travelled)}px`,
+      `a swipe ${way} from dot ${before.dot} moved ${Math.round(travelled)}px`,
     ).toBe(true);
     // And never more than one slide, which is what a rewind would exceed.
-    expect(Math.abs(travelled), `${label} travelled ${Math.round(travelled)}px`).toBeLessThan(
-      width + 4,
-    );
+    expect(
+      Math.abs(travelled),
+      `a swipe ${way} travelled ${Math.round(travelled)}px`,
+    ).toBeLessThan(width + 4);
 
     await page.waitForTimeout(900);
     const after = await read();
-    expect(after.covered, `nothing on screen after ${label} from dot ${before.dot}`).toBe(true);
+    expect(after.covered, `nothing on screen after a swipe ${way} from dot ${before.dot}`).toBe(
+      true,
+    );
     return after;
   };
 
   /*
-    Round once and one past, so the wrap itself is pressed — and then back the
+    Round once and one past, so the wrap itself is crossed — and then back the
     other way past the start, which is the clone the autoplay never touches.
   */
   for (let i = 0; i <= count; i += 1) {
-    await press("Next slide", 1);
+    await drag(1);
   }
   for (let i = 0; i <= count + 1; i += 1) {
-    await press("Previous slide", -1);
+    await drag(-1);
   }
 
   const end = await read();
@@ -612,6 +677,7 @@ test("pressing faster than the slide can move never empties the band", async ({ 
     page.evaluate(() => {
       const hero = document.querySelector('[data-section-id^="hero"]');
       const pictures = [...(hero?.querySelectorAll("img") ?? [])];
+      const dots = [...(hero?.querySelectorAll('[aria-label^="Go to slide"]') ?? [])];
       const middle = window.innerWidth / 2;
       return {
         covered: pictures.some((img) => {
@@ -619,6 +685,7 @@ test("pressing faster than the slide can move never empties the band", async ({ 
           return box.left <= middle && box.right >= middle;
         }),
         x: Math.round(pictures[0]?.getBoundingClientRect().left ?? 0),
+        dot: dots.findIndex((d) => d.getAttribute("aria-current") === "true"),
       };
     });
 
@@ -627,7 +694,10 @@ test("pressing faster than the slide can move never empties the band", async ({ 
   );
   if (slides < 3) test.skip(true, "this shop has fewer than two hero slides");
 
-  for (const label of ["Next slide", "Previous slide"]) {
+  for (const { way, direction } of [
+    { way: "forward", direction: 1 as const },
+    { way: "back", direction: -1 as const },
+  ]) {
     /*
       CHECKED WHILE IT IS HAPPENING, not only once it has settled.
 
@@ -635,18 +705,27 @@ test("pressing faster than the slide can move never empties the band", async ({ 
       that went blank still recovered within 740ms — and a test that only
       looked at the end passed against the very defect it is named for. What
       a customer sees is the 740ms.
+
+      A SWIPE, AND IT THROWS IF THERE IS NOTHING TO SWIPE. This reached for
+      `[aria-label="Next slide"]` inside `page.evaluate` behind an
+      `instanceof HTMLElement` guard, so with the arrows gone it would have
+      clicked nothing eight times and then asserted that a picture covers the
+      middle of the window — true of any idle hero. It would have passed,
+      green, testing nothing.
     */
+    let moves = 0;
+    let previous = (await covered()).dot;
+
     for (let i = 0; i < 8; i += 1) {
-      await page.evaluate((l) => {
-        const button = document.querySelector(`[aria-label="${l}"]`);
-        if (button instanceof HTMLElement) button.click();
-      }, label);
+      await swipe(page, direction);
       await page.waitForTimeout(80);
       const during = await covered();
       expect(
         during.covered,
-        `the band is empty mid-press ${i + 1} of ${label} (row at ${during.x}px)`,
+        `the band is empty mid-swipe ${i + 1} of ${way} (row at ${during.x}px)`,
       ).toBe(true);
+      if (during.dot !== previous) moves += 1;
+      previous = during.dot;
     }
 
     // …and still once everything has settled.
@@ -654,8 +733,24 @@ test("pressing faster than the slide can move never empties the band", async ({ 
     const now = await covered();
     expect(
       now.covered,
-      `the band is empty after eight quick presses of ${label} (row at ${now.x}px)`,
+      `the band is empty after eight quick swipes ${way} (row at ${now.x}px)`,
     ).toBe(true);
+
+    /*
+      AND THE SWIPES HAPPENED. This is the assertion the test was missing, and
+      the arrows going is what exposed it: with the control removed the presses
+      became no-ops and everything above stayed green, because "a picture
+      covers the middle of the window" is true of an idle hero too. Stubbing
+      the swipe out proved it — the test passed while doing nothing.
+
+      Eight swipes at 80ms move the row eight times. The autoplay ticks every
+      6s and this loop runs in under one, so anything above two changes cannot
+      have come from the autoplay alone.
+    */
+    expect(
+      moves,
+      `eight swipes ${way} changed the slide ${moves} times — nothing was swiped`,
+    ).toBeGreaterThan(2);
   }
 });
 
@@ -699,10 +794,17 @@ test("and at speed the row still only ever moves forwards", async ({ page }) => 
 
   const seen: number[] = [first!.x];
   for (let i = 0; i < 6; i += 1) {
-    await page.evaluate(() => {
-      const button = document.querySelector('[aria-label="Next slide"]');
-      if (button instanceof HTMLElement) button.click();
-    });
+    /*
+      A SWIPE, AND IT THROWS WHEN THERE IS NOTHING TO SWIPE.
+
+      This pressed `[aria-label="Next slide"]` from inside `page.evaluate`
+      behind an `instanceof HTMLElement` guard. Once the arrows came off, the
+      lookup returned null, the guard skipped, nothing was ever pressed — and
+      the test went on to collect an empty `rewinds` array from two seconds of
+      a barely-moving row and pass. This is the guard named for the exact
+      fault the shop reported; a silent pass here is worse than no test.
+    */
+    await swipe(page, 1);
     for (let s = 0; s < 3; s += 1) {
       await page.waitForTimeout(50);
       const now = await row();
@@ -720,6 +822,27 @@ test("and at speed the row still only ever moves forwards", async ({ page }) => 
 
   expect(
     rewinds,
-    `pressing Next ran the row backwards: ${rewinds.join(", ")}`,
+    `swiping forward ran the row backwards: ${rewinds.join(", ")}`,
   ).toEqual([]);
+
+  /*
+    AND THE ROW ACTUALLY MOVED — the assertion that was missing, and the one
+    that matters most here.
+
+    An empty `rewinds` array is what this test wants to see and also what it
+    gets from a row that never moved at all. Stubbing the swipe out proved it:
+    green, from two seconds of samples of a hero sitting still. The guard
+    named for the fault the shop reported was the emptiest of the lot.
+
+    Six swipes move six slides. The autoplay ticks every 6s and this loop runs
+    in under a second, so two slide-widths of travel cannot be its doing.
+  */
+  const travelled = seen.reduce(
+    (total, x, i) => (i === 0 ? 0 : total + Math.abs(x - seen[i - 1]!)),
+    0,
+  );
+  expect(
+    travelled,
+    `the row travelled ${Math.round(travelled)}px across six swipes — nothing was swiped`,
+  ).toBeGreaterThan(width * 2);
 });
