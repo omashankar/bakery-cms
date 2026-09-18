@@ -538,6 +538,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "",
       description: "",
       maxCount: 4,
+      maxTabs: 0,
       source: "",
       tabs: "[]",
       // Blank, like every other rail's. A link nobody wrote is not a link.
@@ -549,6 +550,20 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       { key: "title", label: "Title", type: "text" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "maxCount", label: "Max {products} per tab", type: "number" },
+      {
+        /*
+          HOW MANY OF THE TABS TO DRAW.
+
+          Separate from deleting the tab rows, because the two are different
+          things: a shop that wants three tabs on the page and two more
+          ready to swap in should not have to retype them. Blank or 0 draws
+          every tab there is, which is what this row did before the box
+          existed — so nothing already saved changes.
+        */
+        key: "maxTabs",
+        label: "Max tabs shown (0 = all)",
+        type: "number",
+      },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
       {

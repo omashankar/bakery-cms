@@ -1176,9 +1176,19 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
 
 function TabbedRailSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
-  const tabs = renderableRows(parseListField(c, "tabs")).filter((tab) =>
+  const declared = renderableRows(parseListField(c, "tabs")).filter((tab) =>
     Boolean(tab.categorySlug),
   );
+  /*
+    HOW MANY OF THEM TO DRAW.
+
+    0 — and a missing value — means every tab, which is what this row did
+    before the setting existed, so nothing already saved changes. A shop
+    that wants three on the page and two more ready to swap in sets three
+    here rather than deleting and retyping the other two.
+  */
+  const maxTabs = contentNumber(c, "maxTabs", 0);
+  const tabs = maxTabs > 0 ? declared.slice(0, maxTabs) : declared;
   const maxCount = contentNumber(c, "maxCount", 4);
   /**
    * The tab INDEX, not its slug.
