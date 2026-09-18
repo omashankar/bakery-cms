@@ -919,47 +919,49 @@ function ProductGridSection(
   return (
     <SectionShell {...props} noReveal>
       {/*
-        THE ROW'S LINK SITS BESIDE ITS TITLE, not under its grid.
+        THE HEADING RANGES LEFT AND THE LINK SITS OPPOSITE IT.
 
-        It was a centred button below the cards, so a customer who had read
-        the heading and decided they wanted more of THAT had to scroll past
-        four products to find the way in. Every row in the reference puts
-        VIEW ALL on the heading line, at the right-hand edge.
+        It was a centred heading with a spacer either side, and on a phone a
+        centred button under the grid — so a customer who had read the
+        heading and wanted more of THAT scrolled past four products to find
+        the way in. The layout this follows puts the two ends of the line to
+        work: what the row is on the left, the way in on the right, at every
+        width.
 
-        The spacer opposite keeps the heading centred against the button
-        rather than centred in the space left beside it — without it, a row
-        with a link and a row without one sit their titles in different
-        places, which reads as a mistake down a long page.
+        It is also the shape the tabbed rail already had, so seven product
+        rows and that one stop being two different bands wearing the same
+        cards.
       */}
       <ScrollReveal>
-        <div className="flex items-end justify-between gap-4">
-          <div className="hidden flex-1 sm:block" aria-hidden="true" />
+        <div className="flex items-center justify-between gap-4">
           <SectionHeader
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
-            className="mb-0"
+            align="left"
+            className="mb-0 min-w-0"
           />
-          <div className="hidden flex-1 justify-end sm:flex">
-            {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} /> : null}
-          </div>
+          {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} /> : null}
         </div>
       </ScrollReveal>
-      <StaggerReveal className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-        {cakes.map((cake) => (
-          <ProductCard key={cake.id} cake={cake} className="h-full" showAddToCart={false} showWishlist={false} />
-        ))}
-      </StaggerReveal>
-      {/* The phone keeps it under the grid: there is no room beside a
-          centred heading at that width, and a link nobody can reach is
-          worse than one below the fold. */}
-      {props.showCta && ctaHref && ctaLabel ? (
-        <ScrollReveal className="mt-6 text-center sm:hidden">
-          <Button variant="outline" render={<Link href={ctaHref} />}>
-            {ctaLabel}
-            <ArrowRight className="size-4" />
-          </Button>
-        </ScrollReveal>
-      ) : null}
+      {/*
+        THE ROW SCROLLS, with the arrow the layout puts on it — and the arrow
+        only appears when there is somewhere to go, which for a row of four
+        in a space that fits four is nowhere. Same component as the tabbed
+        rail, so the two behave identically.
+      */}
+      <div className="mt-6">
+        <ScrollStrip>
+          {cakes.map((cake) => (
+            <ProductCard
+              key={cake.id}
+              cake={cake}
+              className="h-auto w-[calc((100%-1rem)/1.6)] shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3.75rem)/4)]"
+              showAddToCart={false}
+              showWishlist={false}
+            />
+          ))}
+        </ScrollStrip>
+      </div>
     </SectionShell>
   );
 }
@@ -1031,6 +1033,17 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
     el.scrollBy({ left: direction * el.clientWidth * 0.85, behavior: "smooth" });
   };
 
+  /*
+    INSIDE THE STRIP, not straddling its edge.
+
+    They sat at `left-0 -translate-x-1/2`, half outside — which is how the
+    layout draws them, and which on a phone pushed 2px past the window on
+    five rows at once and gave the whole page a horizontal scrollbar.
+    Measured at 360, 390 and 430: scrollWidth 2px over the viewport.
+
+    A carousel arrow overlapping the first card is ordinary; a page that
+    slides sideways is not.
+  */
   const arrow =
     "absolute top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-md";
 
@@ -1048,7 +1061,7 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
           type="button"
           onClick={() => step(-1)}
           aria-label="Previous"
-          className={cn(arrow, "left-0 -translate-x-1/2")}
+          className={cn(arrow, "left-1")}
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -1058,7 +1071,7 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
           type="button"
           onClick={() => step(1)}
           aria-label="Next"
-          className={cn(arrow, "right-0 translate-x-1/2")}
+          className={cn(arrow, "right-1")}
         >
           <ChevronRight className="size-4" />
         </button>

@@ -289,8 +289,11 @@ describe("every product row offers a way in to more of itself", () => {
      * this row had to scroll past four products to find the way in. On the
      * heading line it is where they are looking.
      *
-     * The phone keeps it below — there is no room beside a centred heading at
-     * that width, and a link nobody can reach is worse than one below the fold.
+     * THE PHONE NO LONGER KEEPS A SECOND COPY BELOW. It used to, because the
+     * heading was centred and there was no room beside it at that width. The
+     * heading ranges left now and the link sits opposite it at every width,
+     * so the duplicate is gone — and this asserts it stays gone, because two
+     * links to the same place in one band is what it was a workaround for.
      */
     const renderer = code("features/cms-sections/homepage-section-renderer.tsx");
     /*
@@ -298,19 +301,19 @@ describe("every product row offers a way in to more of itself", () => {
 
       This looked the grid up by its exact class string — `mt-8 grid gap-6
       sm:grid-cols-2` — so tightening the page's spacing broke a test about
-      where a LINK sits. The grid is the thing that draws the cards; its
-      margin is nobody's business here.
+      where a LINK sits. Then it looked for `<ProductCard key={cake.id}` and
+      broke again when the call went multi-line. It matches the ELEMENT now.
     */
-    const grid = renderer.indexOf("<ProductCard key={cake.id}");
-    // The inline button became a shared `ViewAllLink`, so the thing to find
-    // on the heading line is the component, not the condition it replaced.
-    const heading = renderer.lastIndexOf("<ViewAllLink", grid);
+    const card = renderer.search(/<ProductCard[\s>]/);
+    expect(card, "the homepage draws no product cards").toBeGreaterThan(-1);
 
-    expect(grid, "the product grid is gone").toBeGreaterThan(-1);
+    const heading = renderer.lastIndexOf("<ViewAllLink", card);
     expect(heading, "the view-all is no longer on the heading row").toBeGreaterThan(-1);
-    expect(heading).toBeLessThan(grid);
-    // And the one that remains below the grid is phone-only.
-    expect(renderer).toMatch(/className="mt-\d+ text-center sm:hidden"/);
+    expect(heading).toBeLessThan(card);
+
+    expect(renderer, "the phone-only duplicate link is back").not.toMatch(
+      /text-center sm:hidden/,
+    );
   });
 });
 
