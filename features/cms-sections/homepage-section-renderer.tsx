@@ -408,7 +408,35 @@ const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
  * second call to action competing with the cards under it. One component so
  * the product rails, the tabbed rails and the blog row cannot drift apart.
  */
-function ViewAllLink({ href, label }: { href: string; label: string }) {
+/**
+ * The tint a view-all pill takes on each band.
+ *
+ * Measured off the layout this follows: its pink band carries a pink
+ * button, its cream band a yellow one, its two blue bands blue ones. The
+ * rule holds in all four, and a neutral pill on a tinted band is the one
+ * thing none of them does — on a tinted ground the pale grey it used to
+ * wear reads as a disabled control rather than the way in.
+ *
+ * A white or cream band keeps that grey, which is what the same layout does
+ * over its own untinted rows.
+ */
+const VIEW_ALL_TONES: Partial<Record<SectionBackground, string>> = {
+  "panel-rose": "bg-band-rose-strong",
+  "panel-mint": "bg-band-mint-strong",
+  "panel-sand": "bg-band-sand-strong",
+  "panel-sky": "bg-band-sky-strong",
+};
+
+function ViewAllLink({
+  href,
+  label,
+  on,
+}: {
+  href: string;
+  label: string;
+  /** The band it sits on, so it can take that band's colour. */
+  on?: SectionBackground;
+}) {
   if (!href || !label) return null;
   return (
     <Link
@@ -420,7 +448,10 @@ function ViewAllLink({ href, label }: { href: string; label: string }) {
         set and the text centred in it rather than the padding being grown,
         so the pill does not get taller on the desktop rows where it is fine.
       */
-      className="flex min-h-9 shrink-0 items-center rounded-md bg-cream-200 px-3.5 text-xs font-semibold tracking-wider text-foreground uppercase"
+      className={cn(
+        "flex min-h-9 shrink-0 items-center rounded-md px-3.5 text-xs font-semibold tracking-wider text-foreground uppercase",
+        (on && VIEW_ALL_TONES[on]) ?? "bg-cream-200",
+      )}
     >
       {label}
     </Link>
@@ -940,7 +971,7 @@ function ProductGridSection(
             align="left"
             className="mb-0 min-w-0"
           />
-          {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} /> : null}
+          {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} /> : null}
         </div>
       </ScrollReveal>
       {/*
@@ -1249,7 +1280,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
             </div>
           </div>
           <div className="shrink-0 pb-2.5">
-            <ViewAllLink href={railCtaHref} label={railCtaLabel} />
+            <ViewAllLink href={railCtaHref} label={railCtaLabel} on={props.section.background} />
           </div>
         </div>
       </ScrollReveal>
@@ -1468,7 +1499,7 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
           className="mb-0"
         />
         <div className="hidden flex-1 justify-end sm:flex">
-          <ViewAllLink href={ctaHref} label={ctaLabel} />
+          <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />
         </div>
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
@@ -1673,6 +1704,7 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
           <ViewAllLink
             href={contentString(c, "ctaHref")}
             label={contentString(c, "ctaLabel")}
+            on={props.section.background}
           />
         </div>
       </div>
@@ -1880,6 +1912,7 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
           <ViewAllLink
             href={contentString(c, "ctaHref")}
             label={contentString(c, "ctaLabel")}
+            on={props.section.background}
           />
         </div>
       ) : null}
