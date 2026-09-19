@@ -30,7 +30,7 @@ const PAGES = [
   { name: "homepage", path: "/store" },
   { name: "collections", path: "/store/collections" },
   { name: "cart", path: "/store/cart" },
-  { name: "search", path: "/store/search?q=cake" },
+  { name: "search", path: "/store/collections?q=cake" },
   { name: "contact", path: "/store/contact" },
 ];
 
@@ -52,7 +52,20 @@ for (const target of PAGES) {
 
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto(target.path);
+      /*
+        THE STATUS IS CHECKED, and it was not.
+
+        This swept a list of paths and measured whatever came back. Delete a
+        route from that list and Next serves the ROOT 404 — header-less, a
+        few hundred pixels tall, and of course it does not scroll sideways.
+        Sixteen widths of green for a page that no longer exists, which is
+        exactly what happened when the search page was retired.
+      */
+      const answer = await page.goto(target.path);
+      expect(
+        answer?.status(),
+        `${target.name} answered ${answer?.status()} at ${target.path}`,
+      ).toBeLessThan(400);
       await page.waitForTimeout(500);
 
       const seen = await page.evaluate(() => {

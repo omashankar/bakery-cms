@@ -127,15 +127,6 @@ function seedRoutes(): SeoRouteEntry[] {
       ["terms of service"]
     ),
     route(
-      "store-search",
-      routes.store.search,
-      "Search",
-      "Search Cakes",
-      "Search cakes, flavours, and categories across our bakery catalog.",
-      ["search cakes"],
-      true
-    ),
-    route(
       "store-thank-you",
       routes.store.thankYou,
       "Thank You",

@@ -8,7 +8,6 @@ export { ProductDetailPage } from "./pages/product-detail-page";
 export { ContactPage } from "./pages/contact-page";
 
 export { FaqPage } from "./pages/faq-page";
-export { SearchPage } from "./pages/search-page";
 export { PrivacyPage } from "./pages/privacy-page";
 export { TermsPage } from "./pages/terms-page";
 export { ThankYouPage } from "./pages/thank-you-page";

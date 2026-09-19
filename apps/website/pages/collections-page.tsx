@@ -51,6 +51,13 @@ const PAGE_SIZE = 8;
 
 interface CollectionsPageProps {
   categorySlug?: string;
+  /**
+   * What the shop's customer typed into the header, straight off the URL.
+   *
+   * Blank is the ordinary case and means 'browse everything' — which is
+   * what the header's phone icon and the drawer's row both do.
+   */
+  initialSearch?: string;
   /** Catalogue fetched on the server, so the grid renders into the HTML. */
   catalog: LandingProduct[];
   /**
@@ -81,6 +88,7 @@ interface CollectionsPageProps {
 
 export function CollectionsPage({
   categorySlug: categorySlugProp,
+  initialSearch = "",
   catalog,
   categories: categoriesFromShop,
   collection,
@@ -164,9 +172,27 @@ export function CollectionsPage({
    * the boxes do not vanish as the customer uses them.
    */
   const optionFacets = useMemo(() => getFilterOptionFacets(inCategory), [inCategory]);
-  const [filters, setFilters] = useState<CollectionFilters>(() =>
-    defaultCollectionFilters(collectionPriceCeiling(catalog)),
-  );
+  const [filters, setFilters] = useState<CollectionFilters>(() => ({
+    ...defaultCollectionFilters(collectionPriceCeiling(catalog)),
+    search: initialSearch,
+  }));
+  /**
+   * RE-SEEDED, NOT JUST SEEDED, AND THIS IS THE WHOLE TRAP.
+   *
+   * The initialiser above runs ONCE. Searching from the header a second
+   * time is a same-route navigation — /store/collections?q=a to ?q=b — so
+   * this component does not remount, the initialiser does not run again,
+   * and the second search would quietly show the first search's results.
+   *
+   * It passes a first manual test and fails the second, which is the worst
+   * shape a bug can have. The page this replaces had exactly this effect
+   * for exactly this reason.
+   */
+  useEffect(() => {
+    setFilters((current) =>
+      current.search === initialSearch ? current : { ...current, search: initialSearch },
+    );
+  }, [initialSearch]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   /**
@@ -343,8 +369,16 @@ export function CollectionsPage({
                 </div>
               </div>
 
+              {/*
+                THE TERM IS ECHOED, because this page is now where a search
+                lands. Without it the only trace of what was typed is the
+                input itself, and a customer who scrolls past it cannot tell
+                a short list from a broken one.
+              */}
               <p className="mb-4 text-sm text-muted-foreground">
-                {`Showing ${paginated.length} of ${filtered.length} ${labels.productWordPlural.toLowerCase()}`}
+                {filters.search.trim()
+                  ? `Showing ${paginated.length} of ${filtered.length} ${labels.productWordPlural.toLowerCase()} for “${filters.search.trim()}”`
+                  : `Showing ${paginated.length} of ${filtered.length} ${labels.productWordPlural.toLowerCase()}`}
               </p>
 
               {/* Named, so it reads as one group of related links rather than

@@ -36,7 +36,6 @@ export const routes = {
 
     contact: "/store/contact",
     faq: "/store/faq",
-    search: "/store/search",
     privacy: "/store/privacy",
     terms: "/store/terms",
     thankYou: "/store/thank-you",

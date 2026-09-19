@@ -144,7 +144,6 @@ describe("robots, sitemap and every storefront page", () => {
       "app/(storefront)/store/contact/page.tsx",
       "app/(storefront)/store/faq/page.tsx",
       "app/(storefront)/store/privacy/page.tsx",
-      "app/(storefront)/store/search/page.tsx",
       "app/(storefront)/store/terms/page.tsx",
       "app/(storefront)/store/thank-you/page.tsx",
 

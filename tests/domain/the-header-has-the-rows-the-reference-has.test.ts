@@ -119,20 +119,44 @@ describe("the search box", () => {
   it("is a real box in the header, not a link to another page", () => {
     const navbar = code(NAVBAR);
 
-    expect(navbar).toMatch(/<form[\s\S]{0,200}action=\{routes\.store\.search\}/);
+    expect(navbar).toMatch(/<form[\s\S]{0,200}action=\{routes\.store\.collections\}/);
     expect(navbar).toContain('name="q"');
   });
 
   it("submits by GET to the page that already reads it", () => {
     /**
-     * A plain form, so it works before hydration and with JavaScript off — and
-     * because the search page reads `q` from the query string, this is a
-     * navigation to a page that exists rather than a second search
-     * implementation to keep in step.
+     * A plain form, so it works before hydration and with JavaScript off.
+     *
+     * IT USED TO POST TO A SEARCH PAGE OF ITS OWN, and the shop asked for
+     * that page to go: it drew a second search box, five hardcoded bakery
+     * words under "Popular:", and a grid the collections page already draws.
+     * The results land on the collections page now, which is where a
+     * customer can narrow them further.
+     *
+     * The far end has to READ `q`, and that is the half that fails silently:
+     * a form pointed at a page that ignores the parameter looks perfectly
+     * well and searches nothing.
      */
-    const searchPage = code("apps/website/pages/search-page.tsx");
+    const route = code("app/(storefront)/store/collections/page.tsx");
 
-    expect(searchPage).toContain('searchParams.get("q")');
+    expect(route, "the collections route does not take a query").toContain(
+      "q?: string",
+    );
+    expect(route, "the query never reaches the page").toContain("initialSearch={q");
+  });
+
+  it("and the page it lands on re-reads the query on every search", () => {
+    /**
+     * THE TRAP THE OLD PAGE HAD ALREADY SOLVED. The collections page seeds
+     * its filters from a lazy initialiser, which runs ONCE. Searching a
+     * second time is a same-route navigation — ?q=a to ?q=b — so nothing
+     * remounts and the second search would show the first search's results.
+     *
+     * It passes a first manual test and fails the second.
+     */
+    const page = code("apps/website/pages/collections-page.tsx");
+
+    expect(page, "the query is never re-seeded").toContain("}, [initialSearch]);");
   });
 
   it("says the shop's own line when it has one, and a generic one otherwise", () => {
@@ -196,7 +220,7 @@ describe("the search box", () => {
      * was the accurate half of the intent; the classes were the bug.
      */
     const navbar = code(NAVBAR);
-    const at = navbar.indexOf('href={routes.store.search} aria-label="Search"');
+    const at = navbar.indexOf('href={routes.store.collections} aria-label="Search"');
     expect(at, "the phone search icon is gone").toBeGreaterThan(-1);
     const icon = navbar.slice(at - 400, at);
 

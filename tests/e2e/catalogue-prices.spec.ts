@@ -89,7 +89,7 @@ test.describe("what a catalogue card says a cake costs", () => {
       } else {
         // Not on the first page of the grid — search for it instead, rather
         // than passing on an assertion that never ran.
-        await page.goto(`/store/search?q=${encodeURIComponent(target!.name)}`);
+        await page.goto(`/store/collections?q=${encodeURIComponent(target!.name)}`);
         const found = page.locator("article").filter({ hasText: target!.name }).first();
         await expect(found).toBeVisible();
         await expect(found.getByRole("button", { name: /out of stock/i })).toBeDisabled();

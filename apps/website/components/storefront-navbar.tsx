@@ -328,7 +328,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         */}
         {showSearch ? (
           <form
-            action={routes.store.search}
+            action={routes.store.collections}
             /*
               FROM sm, NOT FROM lg.
 
@@ -397,7 +397,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 what it says and what it does.
               */
               className="flex text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:hidden"
-              render={<Link href={routes.store.search} aria-label="Search" />}
+              render={<Link href={routes.store.collections} aria-label="Search" />}
             >
               <Search className="size-5" />
             </Button>
@@ -790,7 +790,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             </div>
             {showSearch ? (
               <Link
-                href={routes.store.search}
+                href={routes.store.collections}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
               >

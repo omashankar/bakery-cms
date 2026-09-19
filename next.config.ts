@@ -146,6 +146,21 @@ const nextConfig: NextConfig = {
        */
       { source: "/", destination: "/store", permanent: false },
       { source: "/landing", destination: "/platform", permanent: true },
+      /*
+        THE SEARCH PAGE IS GONE; THE RESULTS ARE ON THE COLLECTIONS PAGE.
+
+        It was a page whose whole content was a second search box, a row of
+        five hardcoded bakery words, and a grid the collections page already
+        draws. The shop asked for the header box to land on results directly.
+
+        Next forwards the query string to the destination, so an indexed or
+        bookmarked /store/search?q=chocolate arrives as
+        /store/collections?q=chocolate and still finds what it went for.
+
+        Permanent: the page is not coming back, and the old address should
+        stop being fetched.
+      */
+      { source: "/store/search", destination: "/store/collections", permanent: true },
       { source: "/admin/website", destination: "/admin/settings", permanent: true },
       { source: "/admin/website/homepage", destination: "/admin/builders/homepage", permanent: true },
       { source: "/admin/website/header", destination: "/admin/header", permanent: true },
