@@ -46,9 +46,27 @@ export function ContactPage({
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
+          {/*
+            `min-w-0` ON BOTH COLUMNS, and it is not tidying.
+
+            A grid item's default min-width is `auto`: it will not shrink
+            below the intrinsic width of what is inside it. Below lg this
+            grid is one column, and a single auto column is sized by the
+            WIDEST item in it — so one stubborn child drags the other out
+            with it. At 320px the page ran 31px past the window.
+
+            THE ASIDE IS THE STUBBORN ONE, and that is worth writing down
+            because the browser blames the wrong element. What measured
+            over-wide was the form card and the heading, paragraph and
+            labels inside it — all of them merely stretched to a column the
+            aside had already widened. Removing this class from the form
+            alone changes nothing; removing it from the aside alone brings
+            the whole 31px back. Both carry it, because either one could
+            become the widest.
+          */}
           <div className="grid items-start gap-8 lg:grid-cols-[1.35fr_1fr]">
             {/* Form */}
-            <ScrollReveal className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+            <ScrollReveal className="min-w-0 rounded-2xl border border-border bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-bold sm:text-2xl">Send us a message</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Fill in the details below and our team will get back to you within 24 hours.
@@ -59,7 +77,7 @@ export function ContactPage({
             </ScrollReveal>
 
             {/* Info + map */}
-            <ScrollReveal delay={120} className="space-y-6">
+            <ScrollReveal delay={120} className="min-w-0 space-y-6">
               <div className="rounded-2xl border border-border bg-cream-100 p-6 sm:p-7">
                 <h2 className="font-heading text-lg font-bold">Get in Touch</h2>
                 {/*

@@ -293,11 +293,23 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           Mounted only when the shop has an active delivery zone — with none,
           the only answer the panel could give is that nothing covers you,
           which is a claim about the shop rather than a fact about its zone
-          list. Hidden below sm, where the row has no width for it and the
-          same check is a tap away in the drawer.
+          list.
+
+          FROM lg, AND IT USED TO SAY sm. The note here claimed the same
+          check was 'a tap away in the drawer', and it was not — nothing
+          rendered it there, so below 640 a customer had no way to ask
+          whether the shop delivers to them at all. It is in the drawer now,
+          which is what makes this line safe to move.
+
+          It moved because the row could not hold everything. At 640 this
+          pill is 183px of a 592px row, and the search box beside it was
+          being squeezed to ZERO — its 24px of margin was all that was left
+          of it — while the row still overran the window by 2px and gave the
+          whole page a sideways scrollbar. Measured at 640 and 641, nowhere
+          else.
         */}
         {chrome.hasDeliveryZones ? (
-          <div className="ml-auto hidden sm:block lg:ml-3 lg:shrink-0">
+          <div className="ml-auto hidden lg:ml-3 lg:block lg:shrink-0">
             <DeliveryLocationButton />
           </div>
         ) : null}
@@ -417,7 +429,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             ) : null}
           </Button>
           {signedIn ? (
-            <div className="ml-1 hidden sm:flex">
+            <div className="ml-1 hidden md:flex">
               <AccountMenu
                 name={customerName}
                 phone={customerPhone}
@@ -429,7 +441,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               />
             </div>
           ) : (
-            <div className="ml-0.5 hidden sm:flex">
+            <div className="ml-0.5 hidden md:flex">
               <GuestMenu />
             </div>
           )}
@@ -639,6 +651,27 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-background lg:hidden"
         >
           <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobile navigation">
+            {/*
+              WHERE THE ORDER IS GOING, AND IT IS FIRST FOR A REASON.
+
+              The header's own pill is lg-and-up — 183px is most of a
+              tablet's header row — and the note beside it had claimed for
+              some time that the same check was 'a tap away in the drawer'.
+              It was not: nothing rendered it here, so every phone customer
+              had to reach a product page to find out whether the shop
+              delivers to them.
+
+              FIRST, because this opens a panel DOWNWARDS. Sat in the middle
+              of the drawer it did open — and at 390x900 the panel landed at
+              937..969, past both the fold and the drawer's own scroll box,
+              so a customer tapped it and saw nothing happen. Measured, not
+              guessed: it looked fine in the markup.
+            */}
+            {chrome.hasDeliveryZones ? (
+              <div className="mb-2 border-b border-border pb-3">
+                <DeliveryLocationButton />
+              </div>
+            ) : null}
             {homeRow ? (
               <Link
                 href={homeRow.href}
@@ -765,6 +798,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 Search
               </Link>
             ) : null}
+
 
             {/*
               THE UTILITY ROW, WHICH THE PHONE COULD NOT REACH AT ALL.
