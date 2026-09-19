@@ -67,8 +67,9 @@ import {
   getHomepageOffers,
 } from "@/features/products/lib/homepage-catalog";
 import { layoutSpacing } from "@/constants/spacing";
-import { heroCopySideOf, heroSlidesFor } from "./lib/section-utils";
-import type { HomepageSectionInstance, SectionBackground } from "@/types/homepage-builder";
+import { heroCopySideOf, heroSlidesFor, sectionAlignOf } from "./lib/section-utils";
+import type { HomepageSectionInstance, SectionBackground, SectionAlign
+} from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -558,6 +559,7 @@ function HeroSection(props: HomepageSectionRendererProps) {
 
 function OurMenuSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 8);
   const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
 
@@ -580,6 +582,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div
         className={cn(
@@ -819,6 +822,7 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
 
 function CategoriesSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 6);
   const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
 
@@ -828,6 +832,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          align={align}
         />
       </ScrollReveal>
       {/*
@@ -893,6 +898,7 @@ function ProductGridSection(
   }
 ) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "left");
   const labels = useBusinessLabels();
   const maxCount = contentNumber(c, "maxCount", 4);
   const ctaHref = contentString(c, "ctaHref");
@@ -914,6 +920,7 @@ function ProductGridSection(
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          align={align}
         />
         {/*
           The advice has to match how the row actually chooses.
@@ -964,15 +971,17 @@ function ProductGridSection(
         cards.
       */}
       <ScrollReveal>
-        <div className="flex items-center justify-between gap-4">
-          <SectionHeader
-            overline={contentString(c, "overline")}
-            title={contentString(c, "title")}
-            align="left"
-            className="mb-0 min-w-0"
-          />
-          {props.showCta ? <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} /> : null}
-        </div>
+        <SectionHeadingRow
+          align={align}
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          className="items-center"
+          trailing={
+            props.showCta ? (
+              <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />
+            ) : null
+          }
+        />
       </ScrollReveal>
       {/*
         THE ROW SCROLLS, with the arrow the layout puts on it — and the arrow
@@ -1020,6 +1029,86 @@ const whyIcons = { Award, Leaf, Truck, Palette } as const;
  * `categoryRails` the open category row uses — one answer to "what is in
  * this category", not a second one that can drift.
  */
+/**
+ * A HEADING WITH A CONTROL BESIDE IT, at whichever edge the shop chose.
+ *
+ * WHY THIS IS NOT JUST A CLASS ON THE HEADING. `SectionHeader` centres with
+ * `mx-auto text-center`, and neither does anything to a flex child that hugs
+ * its own text — which is what the heading is in every row that carries a
+ * view-all pill. Measured: at 1280 the product rows' heading is 178px wide in
+ * a 1216px band, so `text-center` centres text inside a 178px box and moves
+ * nothing. A setting that appears to do nothing is worse than no setting.
+ *
+ * So the ROW changes shape instead, and the three shapes are these:
+ *
+ *   left / right — the heading takes the free space (`flex-1`) and its own
+ *     text-align puts the words at one end of it. The pill stays where it
+ *     was. For `left` this is pixel-identical to the two-item row that was
+ *     here before: `justify-between` already put a hugging heading at the
+ *     start.
+ *
+ *   centre — a MIRROR of the pill's box goes in front of the heading, so the
+ *     heading is centred on the BAND rather than on the space left over
+ *     beside the pill. Without it a centred heading sits half the pill's
+ *     width to the left of true centre, and only when the shop has filled
+ *     the view-all link in — the same section would centre correctly with
+ *     the link blank, which is not a difference anyone could attribute.
+ *
+ * The centre shape is not invented here: it is exactly what the blog row was
+ * already built from, which is the one band on this page that centres a
+ * heading over a pill today.
+ */
+function SectionHeadingRow({
+  align,
+  overline,
+  title,
+  trailing,
+  className,
+  headerClassName,
+  trailingClassName,
+}: {
+  align: SectionAlign;
+  overline?: string;
+  title: string;
+  trailing?: React.ReactNode;
+  className?: string;
+  headerClassName?: string;
+  trailingClassName?: string;
+}) {
+  const centred = align === "center";
+  return (
+    <div className={cn("flex justify-between gap-4", className)}>
+      {centred ? <div className="hidden flex-1 sm:block" aria-hidden="true" /> : null}
+      <SectionHeader
+        overline={overline}
+        title={title}
+        align={align}
+        className={cn("mb-0 min-w-0", !centred && "flex-1", headerClassName)}
+      />
+      {/*
+        THE MIRROR IS DRAWN EVEN WHEN THERE IS NOTHING TO PUT IN IT.
+
+        Centring here is two equal boxes either side of a heading that hugs
+        its text. With no trailing control the second box was skipped, which
+        left `justify-between` with a grown spacer and a hugging heading — and
+        `justify-between` puts the last item at the END. Measured on the
+        tabbed rail: centre and right both landed the heading at 1082..1224,
+        the same place, and centre was silently right.
+      */}
+      {centred || trailing ? (
+        <div
+          className={cn(
+            "flex justify-end",
+            centred ? "flex-1" : "shrink-0",
+            trailingClassName,
+          )}
+        >
+          {trailing}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 /**
  * A ROW THAT SCROLLS. The arrows are the exception, not the way through.
  *
@@ -1143,6 +1232,7 @@ function ScrollStrip({ children }: { children: React.ReactNode }) {
 
 function TabbedRailSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "left");
   const declared = renderableRows(parseListField(c, "tabs")).filter((tab) =>
     Boolean(tab.categorySlug),
   );
@@ -1232,14 +1322,36 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
           lift themselves off the line with their own padding rather than
           sitting on it too.
         */}
+        {/*
+          A HEADING THAT IS NOT RANGED LEFT LEAVES THE TAB GROUP.
+
+          It has to. Inside the group the heading is a flex child beside the
+          tab strip, so it hugs its own text — measured, setting this band to
+          centre or to right moved the heading exactly 0px, both times. A
+          dropdown that does nothing is worse than one not offered.
+
+          Only when the shop has asked for it, so every tabbed rail already
+          published — none of which carries this key — keeps the row it was
+          published with, to the pixel.
+        */}
+        {align === "left" ? null : (
+          <SectionHeadingRow
+            align={align}
+            overline={contentString(c, "overline")}
+            title={contentString(c, "title")}
+            className="mb-4"
+          />
+        )}
         <div className="flex items-end justify-between gap-x-4 border-b border-border sm:gap-x-6">
           <div className="flex min-w-0 flex-col items-start gap-y-2 sm:flex-row sm:items-end sm:gap-x-5 sm:gap-y-0">
-            <SectionHeader
-              overline={contentString(c, "overline")}
-              title={contentString(c, "title")}
-              align="left"
-              className="mb-0 shrink-0 pb-0 sm:pb-2.5"
-            />
+            {align === "left" ? (
+              <SectionHeader
+                overline={contentString(c, "overline")}
+                title={contentString(c, "title")}
+                className="mb-0 shrink-0 pb-0 sm:pb-2.5"
+                align="left"
+              />
+            ) : null}
             {/*
               The tabs scroll sideways rather than wrapping: four tabs on a
               phone wrap to two lines and move the grid down the page every
@@ -1353,6 +1465,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
 
 function PromoCollageSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const cards = renderableRows(parseListField(c, "cards"));
 
   if (cards.length === 0) return null;
@@ -1362,6 +1475,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       {/*
         `auto-rows-fr` so a wide card and the small ones beside it line up,
@@ -1458,6 +1572,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
  */
 function SeoProseSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "left");
   const blocks = renderableRows(parseListField(c, "blocks"));
   const [open, setOpen] = useState(false);
 
@@ -1470,8 +1585,8 @@ function SeoProseSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        align="left"
         className="mb-4"
+        align={align}
       />
       <div className="space-y-4">
         {shown.map((block, index) => (
@@ -1512,6 +1627,7 @@ function SeoProseSection(props: HomepageSectionRendererProps) {
 /** A row of the shop's own articles. Empty is not a band. */
 function BlogCardsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const posts = renderableRows(parseListField(c, "posts"));
   const ctaHref = contentString(c, "ctaHref");
   const ctaLabel = contentString(c, "ctaLabel");
@@ -1520,18 +1636,18 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props}>
-      {/* The link sits on the heading line, the same as every product row. */}
-      <div className="flex items-end justify-between gap-4">
-        <div className="hidden flex-1 sm:block" aria-hidden="true" />
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          className="mb-0"
-        />
-        <div className="hidden flex-1 justify-end sm:flex">
-          <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />
-        </div>
-      </div>
+      {/*
+        The link sits on the heading line, the same as every product row —
+        and on this one the pill has always been desktop-only.
+      */}
+      <SectionHeadingRow
+        align={align}
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        className="items-end"
+        trailingClassName="hidden sm:flex"
+        trailing={<ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />}
+      />
       <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {posts.map((post, index) => {
           const body = (
@@ -1628,6 +1744,7 @@ const BANNER_ROW = {
 
 function BannerGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "left");
   const banners = renderableRows(parseListField(c, "banners"));
   /*
     ONE COLUMN ON A PHONE, whichever shape the shop picked.
@@ -1647,7 +1764,7 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
-        align="left"
+        align={align}
       />
       <div
         className={cn(
@@ -1734,6 +1851,7 @@ function startingPriceOf(price: number | undefined): number | null {
 
 function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const items = renderableRows(parseListField(c, "items"));
 
   if (items.length === 0) return null;
@@ -1782,11 +1900,30 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
           className="mb-0"
+          align={align}
         />
         <div
           className={cn(
             "flex",
-            hasHeading
+            /*
+              OUT OF THE FLOW SO A CENTRED HEADING CAN CENTRE ON THE BAND,
+              which is the whole reason this row is built the way it is — in
+              the flow the heading centres on the space LEFT OVER and sits
+              visibly off-centre.
+
+              BUT NOT UNDER A HEADING RANGED RIGHT. Out of the flow reserves
+              nothing, so a right-ranged heading ran straight underneath the
+              link: measured at 1280, the text ended at 1248 and so did the
+              band. A fixed 7rem of padding was tried and is worse — in the
+              builder's 624px preview that reserve is a fifth of the row, and
+              it pushed the heading from centre back to the LEFT of centre.
+              Measured: -8px where the setting asked for +87.
+
+              So for that one setting the link goes back in the flow, under
+              the heading at the right-hand edge, which is where a link under
+              a right-ranged heading belongs anyway.
+            */
+            hasHeading && align !== "right"
               ? "mt-4 justify-center sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:items-center"
               : "justify-end",
           )}
@@ -1923,6 +2060,7 @@ const STRIP_FLIP_MS = 360;
 
 function BannerStripSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "left");
   /*
     Capped here as well as in the editor. The editor's limit stops an admin
     adding a fourth; it does nothing about a fourth that is already stored,
@@ -1992,19 +2130,19 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
   return (
     <SectionShell {...props}>
       {hasHeader ? (
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <SectionHeader
-            overline={contentString(c, "overline")}
-            title={contentString(c, "title")}
-            align="left"
-            className="mb-0 min-w-0"
-          />
-          <ViewAllLink
-            href={contentString(c, "ctaHref")}
-            label={contentString(c, "ctaLabel")}
-            on={props.section.background}
-          />
-        </div>
+        <SectionHeadingRow
+          align={align}
+          overline={contentString(c, "overline")}
+          title={contentString(c, "title")}
+          className="mb-6 items-center"
+          trailing={
+            <ViewAllLink
+              href={contentString(c, "ctaHref")}
+              label={contentString(c, "ctaLabel")}
+              on={props.section.background}
+            />
+          }
+        />
       ) : null}
       {/*
         PAUSES WHEN SOMEBODY IS THERE.
@@ -2145,6 +2283,7 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
 
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const tiles = renderableRows(parseListField(c, "tiles"));
 
   if (tiles.length === 0) return null;
@@ -2172,6 +2311,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div className={cn("mt-6 grid gap-4 sm:gap-5", columnClass)}>
         {tiles.map((tile, index) => {
@@ -2205,6 +2345,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
 
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   /**
    * The cards, from the section's own content.
    *
@@ -2224,6 +2365,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((item, index) => {
@@ -2254,6 +2396,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
 
 function TestimonialsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const items = props.testimonials
     ? selectStorefrontTestimonials(props.testimonials)
     : getStorefrontTestimonials();
@@ -2275,6 +2418,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {items.map((item) => (
@@ -2305,6 +2449,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
 
 function GallerySection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   /**
    * The shop's own photographs, or no grid.
    *
@@ -2321,6 +2466,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          align={align}
         />
       </ScrollReveal>
       <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -2386,6 +2532,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
 
 function FaqSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxItems = contentNumber(c, "maxItems", 6);
   const items = props.faqs
     ? selectStorefrontFaqs(props.faqs)
@@ -2398,6 +2545,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
           <SectionHeader
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
+            align={align}
           />
         </ScrollReveal>
         <ScrollReveal delay={100}>
@@ -2458,6 +2606,7 @@ function CtaSection(props: HomepageSectionRendererProps) {
 
 function PromoBannerSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 2);
   /**
    * The list is SELECTED here, not trusted from the caller.
@@ -2484,6 +2633,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2">
         {banners.map((banner) => (
@@ -2515,6 +2665,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
 
 function OffersSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 3);
   // The shop's live coupons, read on the server. This row used to map the
   // hardcoded `specialOffers`, so it advertised BDAY20 whether or not the coupon
@@ -2532,6 +2683,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          align={align}
         />
         <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No active coupons, so this section is hidden on the live homepage. Add
@@ -2546,6 +2698,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        align={align}
       />
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
         {offers.map((offer) => (
@@ -2590,6 +2743,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
 
 function InstagramSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 6);
   /**
    * The shop's own posts, or no strip.
@@ -2653,6 +2807,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
             there is no handle, rather than left as a bare "@".
           */
           description={handle ? `@${handle}` : ""}
+          align={align}
         />
       </ScrollReveal>
       <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

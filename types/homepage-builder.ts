@@ -101,6 +101,16 @@ export type HomepageSectionType =
  */
 export type HeroCopySide = "left" | "right";
 
+/**
+ * Which edge a section's heading sits against.
+ *
+ * NOT ONE DEFAULT. Eleven section types are drawn left today and twelve
+ * centred, so the fallback belongs to the call site rather than to this
+ * type — a single module-level default would silently re-align eleven
+ * bands on every page already published.
+ */
+export type SectionAlign = "left" | "center" | "right";
+
 export type SectionFieldType =
   | "text"
   | "textarea"

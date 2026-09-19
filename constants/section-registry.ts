@@ -416,11 +416,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         The description is blank: the tiles are captioned already.
       */
       title: "Shop by category",
+      align: "",
       maxCount: 8,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max categories shown", type: "number" },
     ],
   },
@@ -443,6 +455,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       */
       overline: "",
       title: "",
+      align: "",
       ctaLabel: "",
       ctaHref: routes.store.collections,
       maxCount: 2,
@@ -450,6 +463,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "ctaLabel", label: "Button label", type: "text" },
       { key: "ctaHref", label: "Button link", type: "url" },
       { key: "maxCount", label: "Max banners shown", type: "number" },
@@ -475,6 +499,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       maxCount: 4,
       maxTabs: 0,
       source: "",
@@ -486,6 +511,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} per tab", type: "number" },
       {
         /*
@@ -560,11 +596,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       cards: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       {
         key: "cards",
         label: "Cards",
@@ -614,12 +662,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       columns: 4,
       tiles: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "columns", label: "Tiles per row", type: "number" },
       {
         key: "tiles",
@@ -656,11 +716,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       blocks: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       {
         key: "blocks",
         label: "Paragraphs",
@@ -681,6 +753,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       ctaLabel: "",
       ctaHref: "",
       posts: "[]",
@@ -688,6 +761,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
       {
@@ -732,12 +816,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       columns: "",
       banners: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       {
         /*
           TWO SHAPES OF BAND, from one section.
@@ -809,6 +905,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       ctaLabel: "",
       ctaHref: "",
       priceLabel: "Starting from",
@@ -817,6 +914,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
       {
@@ -893,6 +1001,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       ctaLabel: "",
       ctaHref: "",
       // The thinner one, so a band already on the page keeps its shape.
@@ -902,6 +1011,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       // Blank, like every other band's. A link nobody wrote is not a link.
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
@@ -971,11 +1091,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Browse by Occasion",
       title: "Featured Categories",
+      align: "",
       maxCount: 6,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max categories shown", type: "number" },
     ],
   },
@@ -993,6 +1125,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         that stays says only which row this is.
       */
       title: "Featured",
+      align: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -1000,6 +1133,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       /*
         The way IN to more of this row.
@@ -1021,6 +1165,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "What's Hot",
       title: "Trending Now",
+      align: "",
       // A claim about what everyone is talking about, for a shop with no
       // way to know and nothing behind the sentence.
       maxCount: 4,
@@ -1030,6 +1175,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       // Same two the other rows carry — blank renders no button.
       { key: "ctaLabel", label: "View-all label", type: "text" },
@@ -1044,6 +1200,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Customer Favourites",
       title: "Best Sellers",
+      align: "",
       maxCount: 4,
       ctaLabel: "",
       ctaHref: "",
@@ -1051,6 +1208,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       // Same two the other rows carry — blank renders no button.
       { key: "ctaLabel", label: "View-all label", type: "text" },
@@ -1065,11 +1233,23 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Limited Time",
       title: "Special Offers",
+      align: "",
       maxCount: 3,
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max offers shown", type: "number" },
     ],
   },
@@ -1093,6 +1273,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "",
       title: "",
+      align: "",
       maxCount: 4,
       categorySlug: "",
       ctaLabel: "",
@@ -1108,6 +1289,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
@@ -1121,6 +1313,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Personalised",
       title: "Photo Cakes",
+      align: "",
       // The section is a bakery one and keeps its name. The description was
       // still a claim about taste ("delicious") made in the shop's voice.
       maxCount: 4,
@@ -1136,6 +1329,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
@@ -1158,6 +1362,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       */
       overline: "",
       title: "Eggless Collection",
+      align: "",
       maxCount: 4,
       /*
         BLANK, like every other row. It shipped naming the trade, and the
@@ -1171,6 +1376,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
@@ -1184,6 +1400,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "This Season",
       title: "Seasonal Collection",
+      align: "",
       maxCount: 4,
       /*
         BLANK, like every other row. It shipped naming the trade, and the
@@ -1197,6 +1414,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "maxCount", label: "Max {products} shown", type: "number" },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
@@ -1213,6 +1441,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       // its own.
       overline: "",
       title: "Why Choose Us",
+      align: "",
     },
     fields: [
       {
@@ -1244,6 +1473,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
     ],
   },
   {
@@ -1254,10 +1494,22 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Love Letters",
       title: "What Our Customers Say",
+      align: "",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
     ],
   },
   {
@@ -1268,6 +1520,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Sweet Inspiration",
       title: "Gallery",
+      align: "",
       // The pictures are the shop's own; the sentence over them named a
       // trade that may not be.
       /*
@@ -1317,6 +1570,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "ctaLabel", label: "Button label", type: "text" },
       { key: "ctaHref", label: "Button link", type: "url" },
       { key: "maxCount", label: "Max photos on the homepage", type: "number" },
@@ -1330,6 +1594,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     defaultContent: {
       overline: "Follow Us",
       title: "On Instagram",
+      align: "",
       // No handle or URL seeded on purpose: left unset, the section uses the
       // shop's own Instagram from Settings → Social. Baking the demo account in
       // here meant a shop that had configured its real profile still advertised
@@ -1365,6 +1630,17 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       { key: "instagramHandle", label: "Instagram handle", type: "text" },
       { key: "instagramUrl", label: "Instagram URL", type: "url" },
       { key: "maxCount", label: "Max posts shown", type: "number" },

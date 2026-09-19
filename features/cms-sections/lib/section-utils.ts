@@ -2,6 +2,7 @@
 import type {
   HeroCopySide,
   HomepageSectionInstance,
+  SectionAlign,
 } from "@/types/homepage-builder";
 
 /**
@@ -14,6 +15,28 @@ export function heroCopySideOf(
   content: HomepageSectionInstance["content"],
 ): HeroCopySide {
   return content.copySide === "right" ? "right" : "left";
+}
+
+/**
+ * Which edge the shop asked this heading to sit against.
+ *
+ * THE FALLBACK IS THE CALLER'S, and that is the whole reason this takes
+ * one. Eleven section types draw their heading left and twelve draw it
+ * centred; every layout published before this key existed carries no
+ * `align` at all, so the fallback is not an edge case — it is what every
+ * band on every live page is using. A default baked in here would move
+ * eleven of them.
+ *
+ * An unrecognised value is not a request for something else.
+ */
+export function sectionAlignOf(
+  content: HomepageSectionInstance["content"],
+  fallback: SectionAlign,
+): SectionAlign {
+  const value = content.align;
+  return value === "left" || value === "center" || value === "right"
+    ? value
+    : fallback;
 }
 
 /**

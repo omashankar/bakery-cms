@@ -1,10 +1,11 @@
+import type { SectionAlign } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
 
 interface SectionHeaderProps {
   overline?: string;
   title: string;
   description?: string;
-  align?: "left" | "center";
+  align?: SectionAlign;
   className?: string;
 }
 
@@ -46,7 +47,19 @@ export function SectionHeader({
     <div
       className={cn(
         "mb-6 space-y-1.5",
+        /*
+          CENTRE CLAMPS AND RIGHT DOES NOT, which is deliberate rather than
+          an oversight. `max-w-2xl` is there so a centred line does not run
+          the full width of a 1440px band and stop reading as a heading; a
+          right-aligned one is already anchored to an edge and a clamp would
+          only pull it off that edge.
+
+          Neither class moves anything on its own when this header is a flex
+          child that hugs its text — which is where most of the headings on
+          this page live. `SectionHeadingRow` is what gives them the room.
+        */
         align === "center" && "mx-auto max-w-2xl text-center",
+        align === "right" && "text-right",
         className
       )}
     >
