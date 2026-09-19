@@ -66,6 +66,7 @@ import {
 import { layoutSpacing } from "@/constants/spacing";
 import { heroCopySideOf, heroSlidesFor, sectionAlignOf } from "./lib/section-utils";
 import {
+  RECENTLY_VIEWED_MAX,
   RECENTLY_VIEWED_UPDATED_EVENT,
   getRecentlyViewedProducts,
 } from "@/apps/website/lib/recently-viewed";
@@ -2922,7 +2923,16 @@ function RecentlyViewedSection(props: HomepageSectionRendererProps) {
     contentString(c, "title"),
   );
   const align = sectionAlignOf(c, "left");
-  const maxCount = contentNumber(c, "maxCount", 8);
+  /*
+    CLAMPED TO THE CEILING. The browser only ever keeps
+    RECENTLY_VIEWED_MAX slugs — truncated on the way in as well as on the
+    way out — so a shop typing twelve into the box would be promised twelve
+    and shown eight, with nothing on the screen to explain the difference.
+  */
+  const maxCount = Math.min(
+    RECENTLY_VIEWED_MAX,
+    contentNumber(c, "maxCount", RECENTLY_VIEWED_MAX),
+  );
   const catalogue = props.catalog;
   const [seen, setSeen] = useState<LandingProduct[]>([]);
 

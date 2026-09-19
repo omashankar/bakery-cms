@@ -2,7 +2,16 @@ import { safeSetItem } from "@/lib/safe-storage";
 import type { LandingProduct } from "@/constants/landing-data";
 
 const STORAGE_KEY = "bakery-cms-recently-viewed";
-const MAX_ITEMS = 8;
+/**
+ * THE MOST THIS BROWSER EVER REMEMBERS.
+ *
+ * Exported because it is a CEILING, not a preference: the slugs are
+ * truncated on the way in as well as on the way out, so a band asking for
+ * twelve can never be given twelve however its own box is set. A number box
+ * that promises more than this can ever deliver is a box that lies.
+ */
+export const RECENTLY_VIEWED_MAX = 8;
+const MAX_ITEMS = RECENTLY_VIEWED_MAX;
 
 export const RECENTLY_VIEWED_UPDATED_EVENT = "bakery-recently-viewed-updated";
 

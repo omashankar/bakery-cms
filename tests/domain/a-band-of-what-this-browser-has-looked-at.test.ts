@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import { RECENTLY_VIEWED_MAX } from "@/apps/website/lib/recently-viewed";
 
 /**
  * THE ONLY BAND ON THE HOMEPAGE THAT IS DIFFERENT FOR EVERY VISITOR.
@@ -139,6 +140,25 @@ describe("a band of what this browser has looked at", () => {
     );
   });
 
+  it("and never promises more rows than the browser keeps", () => {
+    /*
+      THE BOX LIED ABOVE EIGHT. `writeSlugs` truncates on the way IN and
+      `getRecentlyViewedProducts` again on the way out, so a shop typing
+      twelve into Max shown was promised twelve and shown eight, with nothing
+      on the screen to explain the four that never came.
+
+      Clamped in the band AND named in the label, because either alone leaves
+      half the lie standing.
+    */
+    expect(RECENTLY_VIEWED_MAX, "the ceiling moved").toBe(8);
+
+    const body = band();
+    expect(body, "the band takes the box at its word").toContain("Math.min(");
+    expect(body, "the band does not clamp to the ceiling").toContain("RECENTLY_VIEWED_MAX,");
+
+    const box = entry!.fields.find((f) => f.key === "maxCount");
+    expect(box!.label, "the box does not say what its ceiling is").toContain("8");
+  });
   it("and suggests no wording the shop did not choose", () => {
     /*
       The title ships filled because a band with no heading whose contents

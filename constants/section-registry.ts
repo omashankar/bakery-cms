@@ -1376,7 +1376,12 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "ctaLabel", label: "View-all label", type: "text" },
       { key: "ctaHref", label: "View-all link", type: "url" },
-      { key: "maxCount", label: "Max shown", type: "number" },
+      /*
+        THE CEILING IS IN THE LABEL because it is not this band's to raise:
+        a browser only ever keeps eight, so a box reading twelve would
+        promise four that can never arrive.
+      */
+      { key: "maxCount", label: "Max shown (up to 8)", type: "number" },
     ],
   },
   {
