@@ -67,7 +67,18 @@ export function selectHomepageCategories(
     image?: string;
     cakeCount?: number;
   }[],
-  maxCount = 6
+  maxCount = 6,
+  /**
+   * A CATEGORY WITH NO PICTURE IS DROPPED — unless the caller is building
+   * the list a shop PICKS from.
+   *
+   * The band draws a picture per tile, so a pictureless category in the
+   * automatic row is a blank box nobody asked for. But a shop choosing
+   * which categories to feature must be able to choose any of them: this
+   * shop has eleven and three carry no picture, and a picker that silently
+   * omitted them would look like the three had been deleted.
+   */
+  options: { requirePicture?: boolean } = {},
 ): LandingCategory[] {
   const published = products.filter((cake) => cake.status === "published");
   return categories
@@ -98,7 +109,7 @@ export function selectHomepageCategories(
           ).length,
         }) satisfies LandingCategory
     )
-    .filter((category) => category.image)
+    .filter((category) => options.requirePicture === false || category.image)
     .slice(0, maxCount);
 }
 

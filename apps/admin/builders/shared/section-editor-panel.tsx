@@ -225,6 +225,21 @@ function ListField({
                     value={row[column.key] ?? ""}
                     onChange={(event) => updateRow(index, column.key, event.target.value)}
                   >
+                    {/*
+                      A BLANK CHOICE, FIRST, AND ONLY WHEN NOTHING IS PICKED.
+
+                      A new row starts every column at "", which matches no
+                      option — so the browser showed the FIRST category with
+                      nothing stored behind it. A shop reads that as a pick it
+                      has made, saves, and the band renders nothing for a row
+                      it believes it filled in.
+
+                      It disappears once something is chosen, so it cannot be
+                      picked back by accident.
+                    */}
+                    {row[column.key] ? null : (
+                      <option value="">Choose…</option>
+                    )}
                     {(column.options ?? []).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}

@@ -69,6 +69,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { adminCategories } from "@/features/products/lib/catalog-options";
+import { CATALOG_UPDATED_EVENT } from "@/features/catalog/lib/catalog-repository";
 import { cn } from "@/lib/utils";
 
 type ConfirmAction =
@@ -106,7 +107,29 @@ export function HomepageBuilderPage() {
    * the one choke point where an entry is resolved, so both the Add Section
    * list and the editor panel get the same filled options.
    */
-  const optionSources = useMemo(() => ({ categories: adminCategories() }), []);
+  /**
+   * READ AGAIN WHEN THE CATALOGUE CHANGES, not once and for ever.
+   *
+   * This was a `useMemo` with empty deps over a localStorage read. Two
+   * things make that the wrong shape. The page is server-rendered before it
+   * hydrates, and with no window `loadCatalogStore` hands back the SHIPPED
+   * demo catalogue — so the first dropdown every shop saw was somebody
+   * else's categories. And `CatalogServerSync` fills that cache from the
+   * server in a mount effect, firing CATALOG_UPDATED_EVENT, which nothing
+   * on this screen was listening for: a shop that added a category found
+   * the picker still offering the old list until a full reload.
+   */
+  const [categoryOptions, setCategoryOptions] = useState(adminCategories);
+  useEffect(() => {
+    const sync = () => setCategoryOptions(adminCategories());
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+  }, []);
+  const optionSources = useMemo(
+    () => ({ categories: categoryOptions }),
+    [categoryOptions],
+  );
   const resolveEntry = useCallback(
     (type: HomepageSectionType) => {
       const entry = getRegistryEntry(type);

@@ -133,6 +133,15 @@ export interface HomepageSectionRendererProps {
    * category sections fall back to the browser catalogue.
    */
   categories?: LandingCategory[];
+  /**
+   * EVERY category, for the bands a shop has picked by hand.
+   *
+   * `categories` is the automatic row — pictureless ones dropped, the rest
+   * capped at twelve. A picked one has to render whether or not it carries
+   * a picture and wherever it sits in the catalogue, or a shop picks a
+   * category and nothing appears.
+   */
+  categoryChoices?: LandingCategory[];
   /** Raw testimonials + faq read on the server (absent in the builder preview). */
   testimonials?: Testimonial[];
   faqs?: FaqItem[];
@@ -554,11 +563,59 @@ function HeroSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/**
+ * WHICH CATEGORIES A BAND SHOWS, AND IN WHAT ORDER.
+ *
+ * With nothing picked this is what it always was: the first `maxCount` of
+ * the automatic row. The shop asked to choose instead, so a non-empty pick
+ * list wins outright and `maxCount` stops applying — a shop that picks eight
+ * with the box still reading six would otherwise lose two of its own choices
+ * with nothing to explain it.
+ *
+ * A MAP, NOT A FILTER. This shop has two categories sharing the slug
+ * `seasonal`; resolving a pick with `.filter(c => c.slug === slug)` draws it
+ * twice, under the same React key.
+ *
+ * A PICK WHOSE CATEGORY IS GONE IS DROPPED. The alternative is a tile
+ * captioned with a raw slug under a count of zero — a claim about a shop
+ * that no longer sells the thing. The picker only ever offers live
+ * categories, so this is the after-a-deletion case rather than the usual one.
+ *
+ * THE ROWS ARE READ BY THE BAND, not in here. A list parsed inside a helper
+ * renders correctly and still fails the round-trip guard, and the guard is
+ * right to insist: a band that does not name its own list is a band nobody
+ * can see is reading one.
+ */
+function categoriesForBand(
+  rows: ReturnType<typeof renderableRows>,
+  props: HomepageSectionRendererProps,
+  maxCount: number,
+): LandingCategory[] {
+  const picks = rows.filter((row) => String(row.categorySlug ?? "").trim());
+  if (picks.length === 0) {
+    return (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
+  }
+
+  const bySlug = new Map<string, LandingCategory>();
+  for (const category of props.categoryChoices ?? props.categories ?? []) {
+    if (!bySlug.has(category.slug)) bySlug.set(category.slug, category);
+  }
+
+  return picks.flatMap((row) => {
+    const found = bySlug.get(String(row.categorySlug ?? "").trim());
+    if (!found) return [];
+    const label = String(row.label ?? "").trim();
+    const image = String(row.image ?? "").trim();
+    return [{ ...found, name: label || found.name, image: image || found.image }];
+  });
+}
+
 function OurMenuSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 8);
-  const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
+  const picks = renderableRows(parseListField(c, "picks"));
+  const items = categoriesForBand(picks, props, maxCount);
 
   if (items.length === 0) return null;
 
@@ -819,13 +876,15 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
 
 function CategoriesSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const labels = useBusinessLabels();
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
   );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 6);
-  const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
+  const picks = renderableRows(parseListField(c, "picks"));
+  const items = categoriesForBand(picks, props, maxCount);
 
   return (
     <SectionShell {...props} noReveal>
@@ -874,7 +933,14 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
             </div>
             <div className="p-3">
               <p className="truncate text-sm font-medium">{category.name}</p>
-              <p className="text-xs text-muted-foreground">{category.count} cakes</p>
+              {/*
+                THE SHOP'S OWN WORD. This said `cakes` for every shop running
+                this CMS — the same fault the headings and the buttons on this
+                page were cleaned of.
+              */}
+              <p className="text-xs text-muted-foreground">
+                {category.count} {labels.productWordPlural.toLowerCase()}
+              </p>
             </div>
           </Link>
         ))}

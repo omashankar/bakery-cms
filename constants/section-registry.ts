@@ -418,6 +418,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Shop by category",
       align: "",
       maxCount: 8,
+      picks: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
@@ -434,6 +435,49 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         ],
       },
       { key: "maxCount", label: "Max categories shown", type: "number" },
+      {
+        /*
+          WHICH CATEGORIES, AND IN WHAT ORDER — the shop's choice.
+
+          Empty is the band as it always was: the first few of the shop's
+          own categories, whichever they happen to be. Pick one or more and
+          the band shows exactly those, in the order they sit here, and the
+          count box above stops applying — a shop that picks eight with that
+          box reading six would otherwise lose two of its own choices with
+          nothing to explain it.
+
+          The picture and the name are OVERRIDES, blank by default: the
+          category's own are used unless the shop writes something else.
+          They earn their place because a category can be in the catalogue
+          with no picture at all — three of this shop's eleven are — and a
+          band that draws a picture per tile has nothing to draw for those.
+        */
+        key: "picks",
+        label: "Categories shown",
+        type: "list",
+        emptyHint: "Nothing picked — the band shows the shop's first few categories.",
+        itemFields: [
+          {
+            key: "categorySlug",
+            label: "Category",
+            type: "select",
+            // Filled from the shop's own catalogue when the editor renders.
+            optionsFrom: "categories",
+          },
+          {
+            key: "label",
+            label: "Name (leave blank for the category's own)",
+            type: "text",
+          },
+          {
+            key: "image",
+            label: "Picture (leave blank for the category's own)",
+            type: "url",
+            isImage: true,
+            hint: "600 x 450",
+          },
+        ],
+      },
     ],
   },
   {
@@ -1114,6 +1158,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       title: "Featured Categories",
       align: "",
       maxCount: 6,
+      picks: "[]",
     },
     fields: [
       { key: "overline", label: "Overline", type: "text" },
@@ -1130,6 +1175,49 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         ],
       },
       { key: "maxCount", label: "Max categories shown", type: "number" },
+      {
+        /*
+          WHICH CATEGORIES, AND IN WHAT ORDER — the shop's choice.
+
+          Empty is the band as it always was: the first few of the shop's
+          own categories, whichever they happen to be. Pick one or more and
+          the band shows exactly those, in the order they sit here, and the
+          count box above stops applying — a shop that picks eight with that
+          box reading six would otherwise lose two of its own choices with
+          nothing to explain it.
+
+          The picture and the name are OVERRIDES, blank by default: the
+          category's own are used unless the shop writes something else.
+          They earn their place because a category can be in the catalogue
+          with no picture at all — three of this shop's eleven are — and a
+          band that draws a picture per tile has nothing to draw for those.
+        */
+        key: "picks",
+        label: "Categories shown",
+        type: "list",
+        emptyHint: "Nothing picked — the band shows the shop's first few categories.",
+        itemFields: [
+          {
+            key: "categorySlug",
+            label: "Category",
+            type: "select",
+            // Filled from the shop's own catalogue when the editor renders.
+            optionsFrom: "categories",
+          },
+          {
+            key: "label",
+            label: "Name (leave blank for the category's own)",
+            type: "text",
+          },
+          {
+            key: "image",
+            label: "Picture (leave blank for the category's own)",
+            type: "url",
+            isImage: true,
+            hint: "600 x 450",
+          },
+        ],
+      },
     ],
   },
   {

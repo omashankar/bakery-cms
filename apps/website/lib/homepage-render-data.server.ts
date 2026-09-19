@@ -40,6 +40,15 @@ export interface HomepageRenderData {
   flaggedCategoryRails: Awaited<ReturnType<typeof getHomepageRails>>["flaggedCategoryRails"];
   banners: Banner[];
   categories: ReturnType<typeof selectHomepageCategories>;
+  /**
+   * EVERY category, for the bands a shop has picked by hand.
+   *
+   * `categories` above is the automatic row: pictureless ones dropped and
+   * the rest capped. A picked category has to render whether or not it has
+   * a picture and whether or not it sits in the first twelve — otherwise a
+   * shop picks one and nothing appears, with nothing to explain it.
+   */
+  categoryChoices: ReturnType<typeof selectHomepageCategories>;
   testimonials: Testimonial[];
   faqs: FaqItem[];
   instagram: Awaited<ReturnType<typeof getStorefrontInstagram>>;
@@ -137,6 +146,14 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
       products,
       (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
       ROW_CAP,
+    ),
+    categoryChoices: selectHomepageCategories(
+      products,
+      (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
+      // A shop cannot pick from a list it cannot see; 200 is a ceiling on a
+      // payload, not a limit anybody is expected to reach.
+      200,
+      { requirePicture: false },
     ),
     testimonials: publishedOnly(testimonialsRaw as Testimonial[] | null),
     faqs: publishedOnly(faqsRaw as FaqItem[] | null),
