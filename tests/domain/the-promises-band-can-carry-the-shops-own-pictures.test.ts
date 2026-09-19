@@ -163,7 +163,7 @@ describe("the promises band carries the shop's own pictures", () => {
       apart — the comments are stripped from `band()`, so the `?` and `:` of
       the branch are not reliable anchors.
     */
-    const strings = [...band().matchAll(/"mt-6 grid [^"]*"/g)].map((m) => m[0]);
+    const strings = [...band().matchAll(/"grid gap-\d[^"]*"/g)].map((m) => m[0]);
     const panel = strings.find((s) => s.includes("bg-band-sand"));
     const cards = strings.find((s) => !s.includes("bg-band-sand"));
 

@@ -31,8 +31,16 @@ describe("a section heading with nothing in it", () => {
   it("renders nothing at all, rather than an empty band", () => {
     const source = code(HEADER);
 
+    /*
+      THE SAME RULE, NOW NAMED. It was three booleans inlined here; the bands
+      below this one have to ask the same question before they hold a gap open
+      for a heading, so it moved into `sectionHeaderDraws` and this component
+      reads it too. Behaviour unchanged — see the cases in
+      tests/domain/a-blank-heading-leaves-no-gap.test.ts, which exercise the
+      helper directly rather than reading it out of the file.
+    */
     expect(source).toMatch(
-      /if \(!hasOverline && !hasTitle && !hasDescription\) return null;/,
+      /if \(!sectionHeaderDraws\(overline, title, description\)\) return null;/,
     );
   });
 

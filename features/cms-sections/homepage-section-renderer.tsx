@@ -21,7 +21,7 @@ import {
   Truck,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
-import { SectionHeader } from "@/components/shared/section-header";
+import { SectionHeader, sectionHeaderDraws } from "@/components/shared/section-header";
 import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import {
@@ -819,6 +819,10 @@ function StoreLocatorSection(props: HomepageSectionRendererProps) {
 
 function CategoriesSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 6);
   const items = (props.categories ?? getHomepageCategories(maxCount)).slice(0, maxCount);
@@ -843,7 +847,7 @@ function CategoriesSection(props: HomepageSectionRendererProps) {
         The storefront this is drawn from draws the same thing at about
         200px: a row of small pictures you scan, not six posters.
       */}
-      <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      <StaggerReveal className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6")}>
         {items.map((category) => (
           <Link
             key={category.id}
@@ -895,6 +899,10 @@ function ProductGridSection(
   }
 ) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "left");
   const labels = useBusinessLabels();
   const maxCount = contentNumber(c, "maxCount", 4);
@@ -928,7 +936,7 @@ function ProductGridSection(
           read. An admin following this could look for a tick that does not
           exist and conclude the builder was broken.
         */}
-        <div className="mt-8 rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8">
+        <div className={cn(hasHeading && "mt-8", "rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8")}>
           {CATEGORY_ROWS.has(props.section.type) ? (
             <>
               Nothing is filed under this category yet, so the row stays hidden
@@ -1461,6 +1469,10 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
 
 function PromoCollageSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const cards = renderableRows(parseListField(c, "cards"));
 
@@ -1479,7 +1491,7 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
         component — the reference's three-wide-then-five-small band is one
         grid, not two.
       */}
-      <div className="mt-6 grid gap-4 sm:gap-5 auto-rows-fr sm:grid-cols-2 lg:grid-cols-4">
+      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 auto-rows-fr sm:grid-cols-2 lg:grid-cols-4")}>
         {cards.map((card, index) => {
           const body = (
             <>
@@ -2279,6 +2291,10 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
 
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const tiles = renderableRows(parseListField(c, "tiles"));
 
@@ -2309,7 +2325,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align={align}
       />
-      <div className={cn("mt-6 grid gap-4 sm:gap-5", columnClass)}>
+      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5", columnClass)}>
         {tiles.map((tile, index) => {
           const body = (
             <>
@@ -2341,6 +2357,10 @@ function TileGridSection(props: HomepageSectionRendererProps) {
 
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   /**
    * The cards, from the section's own content.
@@ -2371,6 +2391,15 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
       />
       <div
         className={cn(
+          /*
+            THE TOP MARGIN BELONGS TO THE HEADING, not to the panel. It is
+            here to sit against the heading's own `mb-6`; with a blank
+            heading — which this band on this shop's page has — there is
+            nothing to sit against and it becomes 24px of air above the
+            panel that is not there below it. Measured at 1440: 48px above,
+            24px below, which is what the shop drew a box around.
+          */
+          hasHeading && "mt-6",
           strip
             ? /*
                 ONE PANEL, NOT FOUR CARDS. The shape the shop held up puts the
@@ -2392,8 +2421,8 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
                 rgb(250,248,244) — near enough to white that the band did
                 not read as one at all.
               */
-              "mt-6 grid gap-6 rounded-[1.25rem] bg-band-sand px-6 py-6 sm:gap-8 sm:px-12 sm:py-8 md:grid-cols-2 xl:grid-cols-4"
-            : "mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4",
+              "grid gap-6 rounded-[1.25rem] bg-band-sand px-6 py-6 sm:gap-8 sm:px-12 sm:py-8 md:grid-cols-2 xl:grid-cols-4"
+            : "grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4",
         )}
       >
         {items.map((item, index) => {
@@ -2473,6 +2502,10 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
 
 function TestimonialsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const items = props.testimonials
     ? selectStorefrontTestimonials(props.testimonials)
@@ -2497,7 +2530,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align={align}
       />
-      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
+      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-3")}>
         {items.map((item) => (
           <article
             key={item.id}
@@ -2526,6 +2559,10 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
 
 function GallerySection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   /**
    * The shop's own photographs, or no grid.
@@ -2546,7 +2583,7 @@ function GallerySection(props: HomepageSectionRendererProps) {
           align={align}
         />
       </ScrollReveal>
-      <StaggerReveal className="mt-6 grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+      <StaggerReveal className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4")}>
         {photos.map((photo, index) => {
           const src = photo.image;
           // An untouched column is "" from the editor, not undefined, so `??`
@@ -2609,6 +2646,10 @@ function GallerySection(props: HomepageSectionRendererProps) {
 
 function FaqSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const maxItems = contentNumber(c, "maxItems", 6);
   const items = props.faqs
@@ -2626,7 +2667,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
           />
         </ScrollReveal>
         <ScrollReveal delay={100}>
-          <Accordion className="mt-8 space-y-3">
+          <Accordion className={cn(hasHeading && "mt-8", "space-y-3")}>
             {items.slice(0, maxItems).map((faq) => (
               <AccordionItem
                 key={faq.id}
@@ -2683,6 +2724,10 @@ function CtaSection(props: HomepageSectionRendererProps) {
 
 function PromoBannerSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 2);
   /**
@@ -2712,7 +2757,7 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align={align}
       />
-      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2">
+      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-2")}>
         {banners.map((banner) => (
           <Link
             key={banner.id}
@@ -2742,6 +2787,10 @@ function PromoBannerSection(props: HomepageSectionRendererProps) {
 
 function OffersSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 3);
   // The shop's live coupons, read on the server. This row used to map the
@@ -2762,7 +2811,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
           title={contentString(c, "title")}
           align={align}
         />
-        <p className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+        <p className={cn(hasHeading && "mt-8", "rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground")}>
           No active coupons, so this section is hidden on the live homepage. Add
           one under Commerce → Coupons and it appears here.
         </p>
@@ -2777,7 +2826,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align={align}
       />
-      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-3">
+      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-3")}>
         {offers.map((offer) => (
           <article
             key={offer.id}
@@ -2820,6 +2869,10 @@ function OffersSection(props: HomepageSectionRendererProps) {
 
 function InstagramSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
+  const hasHeading = sectionHeaderDraws(
+    contentString(c, "overline"),
+    contentString(c, "title"),
+  );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 6);
   /**
@@ -2887,7 +2940,7 @@ function InstagramSection(props: HomepageSectionRendererProps) {
           align={align}
         />
       </ScrollReveal>
-      <StaggerReveal className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <StaggerReveal className={cn(hasHeading && "mt-8", "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6")}>
         {posts.map((post, index) => (
           <a
             key={`${post.image}-${index}`}

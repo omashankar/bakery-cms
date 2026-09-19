@@ -9,6 +9,28 @@ interface SectionHeaderProps {
   className?: string;
 }
 
+/**
+ * WILL THIS HEADING DRAW ANYTHING?
+ *
+ * Asked by every band that puts a top margin on whatever follows the
+ * heading. That margin exists to sit against the heading's own `mb-6`, and
+ * with a blank heading it has nothing to sit against — so it becomes 24px
+ * of air at the top of a band that has none at the foot. Four bands on this
+ * shop's page are in exactly that state; measured at 1440, 48px above and
+ * 24px below.
+ *
+ * Exported from here rather than written out at each band, because the rule
+ * for what counts as a heading lives in the component below and the two
+ * drifting apart is the whole fault in a subtler form.
+ */
+export function sectionHeaderDraws(
+  overline?: string,
+  title?: string,
+  description?: string,
+): boolean {
+  return Boolean(overline?.trim() || title?.trim() || description?.trim());
+}
+
 export function SectionHeader({
   overline,
   title,
@@ -32,7 +54,9 @@ export function SectionHeader({
   const hasTitle = Boolean(title?.trim());
   const hasDescription = Boolean(description?.trim());
 
-  if (!hasOverline && !hasTitle && !hasDescription) return null;
+  // The same question the bands below ask before they hold a gap open for
+  // this heading. Asked here so the two cannot disagree.
+  if (!sectionHeaderDraws(overline, title, description)) return null;
 
   /*
     SIZED FOR A ROW, not for the top of a page.
