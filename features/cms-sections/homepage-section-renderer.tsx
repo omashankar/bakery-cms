@@ -2357,6 +2357,12 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
    * Empty renders no section — a heading over nothing is worse than nothing.
    */
   const items = renderableRows(parseListField(c, "items"));
+  /*
+    `renderableRows`, NOT `photoRows`. A tile with no picture is a tile with
+    an icon, which is what this band drew before it could take pictures at
+    all — dropping picture-less rows would silently delete them.
+  */
+  const strip = contentString(c, "layout").trim() === "strip";
 
   if (items.length === 0) return null;
 
@@ -2367,25 +2373,73 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
         title={contentString(c, "title")}
         align={align}
       />
-      <div className="mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={cn(
+          strip
+            ? /*
+                ONE PANEL, NOT FOUR CARDS. The shape the shop held up puts the
+                four points inside a single tinted band with no border round
+                each one — the points read as one promise in four parts rather
+                than as four things to compare.
+              */
+              "mt-6 grid gap-6 rounded-2xl bg-cream-100 p-6 sm:grid-cols-2 sm:gap-8 sm:p-8 lg:grid-cols-4"
+            : "mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4",
+        )}
+      >
         {items.map((item, index) => {
           const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
+          const picture = (item.image ?? '').trim();
+          /*
+            THE SHOP'S OWN PICTURE WINS. Drawn as a circle because that is
+            the shape the layout gives it, and `object-cover` so a square
+            export fills it — the editor asks for a square, and a picture
+            that is not one is cropped rather than squashed.
+          */
+          const badge = picture ? (
+            <span
+              className={cn(
+                "relative block shrink-0 overflow-hidden rounded-full bg-cream-100",
+                strip ? "size-14" : "mb-4 size-12",
+              )}
+            >
+              <SafeImage src={picture} alt="" />
+            </span>
+          ) : (
+            <span
+              className={cn(
+                "flex shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700",
+                strip ? "size-14 rounded-full" : "mb-4 size-12",
+              )}
+            >
+              <Icon className={strip ? "size-6" : "size-5"} />
+            </span>
+          );
+
           return (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-xl border border-border bg-card p-5"
+              className={cn(
+                strip
+                  ? "flex items-center gap-3 sm:gap-4"
+                  : "rounded-xl border border-border bg-card p-5",
+              )}
             >
-              <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-                <Icon className="size-5" />
+              {badge}
+              <div className={strip ? "min-w-0" : undefined}>
+                {item.title ? (
+                  <p className="font-heading font-semibold">{item.title}</p>
+                ) : null}
+                {item.description ? (
+                  <p
+                    className={cn(
+                      "text-sm leading-relaxed text-muted-foreground",
+                      !strip && "mt-1.5",
+                    )}
+                  >
+                    {item.description}
+                  </p>
+                ) : null}
               </div>
-              {item.title ? (
-                <p className="font-heading font-semibold">{item.title}</p>
-              ) : null}
-              {item.description ? (
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {item.description}
-                </p>
-              ) : null}
             </div>
           );
         })}

@@ -1442,6 +1442,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       overline: "",
       title: "Why Choose Us",
       align: "",
+      layout: "",
     },
     fields: [
       {
@@ -1457,8 +1458,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
         emptyHint: "No cards — this section will not appear on the page.",
         itemFields: [
           {
+            /*
+              A PICTURE INSTEAD OF THE ICON, when the shop has one.
+
+              The four icons below are what this band has always drawn and
+              they stay: a shop with nothing to upload still gets a finished
+              row. But the layout this is drawn from uses small illustrations,
+              and there is no icon set that will ever match a shop
+              illustration — so the picture wins wherever there is one.
+            */
+            key: "image",
+            label: "Picture (used instead of the icon)",
+            type: "url",
+            isImage: true,
+            hint: "144 x 144 — square, and drawn as a circle",
+          },
+          {
             key: "icon",
-            label: "Icon",
+            label: "Icon (when there is no picture)",
             type: "select",
             options: [
               { label: "Award", value: "Award" },
@@ -1467,12 +1484,37 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
               { label: "Palette", value: "Palette" },
             ],
           },
-          { key: "title", label: "Title", type: "text", placeholder: "Premium Ingredients" },
+          /*
+            NO PLACEHOLDER. This one said "Premium Ingredients" — food, and
+            a claim — and three of the four labels that had to be cleaned off
+            this page were typed straight out of a placeholder.
+          */
+          { key: "title", label: "Title", type: "text" },
           { key: "description", label: "Description", type: "text" },
         ],
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      {
+        /*
+          TWO SHAPES, and the cards are the one that ships.
+
+          Cards is what this band has always been: four bordered boxes, the
+          picture above the words. The strip is the shape the shop held up —
+          one tinted panel with the four points laid across it, picture
+          beside the words rather than over them, and no border round each.
+
+          It ships blank so the band already published keeps the shape it
+          was published with.
+        */
+        key: "layout",
+        label: "Shape",
+        type: "select",
+        options: [
+          { label: "Cards", value: "" },
+          { label: "One strip", value: "strip" },
+        ],
+      },
       {
         key: "align",
         label: "Title position",
