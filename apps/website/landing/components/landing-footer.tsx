@@ -24,8 +24,8 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
   return (
     <footer className="border-t border-border surface-cream">
       <div className={cn(layoutSpacing.container, "py-14")}>
-        <div className="grid gap-10 lg:grid-cols-12">
-          <div className="space-y-4 lg:col-span-4">
+        <div className="grid gap-10 lg:grid-cols-[1.6fr_3fr]">
+          <div className="space-y-4">
             {/* The same mark the header renders. This used to be its own copy
                 of the markup, which is how the footer missed logo support
                 entirely and derived its letter from the name instead of the
@@ -37,9 +37,16 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                 siteName={brandInfo.name}
               />
             </Link>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              {brandInfo.description}
-            </p>
+            {/*
+              NOTHING AT ALL for a shop that has not written one. This used
+              to fall through to the shipped bakery sentence, which meant
+              every shop published it as its own until somebody noticed.
+            */}
+            {brandInfo.description ? (
+              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+                {brandInfo.description}
+              </p>
+            ) : null}
             {/* No row at all when there is nothing to show. An admin who turns
                 every profile off means "we are not on social", and the row used
                 to fall back to the demo accounts. */}
@@ -64,8 +71,17 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             ) : null}
           </div>
 
+          {/*
+            EVERYTHING BUT THE BRAND, IN A GRID THAT WRAPS.
+
+            Two across from `sm` so a tablet is not the phone's single tall
+            column, four from `lg`, and a shop that adds a third link column
+            starts a second row instead of overflowing the first.
+          */}
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+
           {footerSettings.columns.map((column) => (
-            <div key={column.id} className="space-y-4 lg:col-span-2">
+            <div key={column.id} className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">{column.title}</h4>
               <ul className="space-y-2.5">
                 {column.links.map((link) => (
@@ -104,7 +120,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           */}
           {footerSettings.showContact &&
           (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
-            <div className="space-y-4 lg:col-span-2">
+            <div className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">Contact</h4>
               {/*
                 A row per detail the shop actually publishes. These used to
@@ -120,16 +136,30 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     {contactInfo.address}
                   </li>
                 ) : null}
+                {/*
+                  TAPPABLE, not printed. These were plain text, so a customer
+                  reading the footer on a phone — which is most of them — had
+                  to select a number by hand and paste it into the dialler.
+                  The address stays text: a map lives on the Contact page and
+                  guessing at a geo: URL from a typed line is a guess.
+                */}
                 {contactInfo.phone ? (
                   <li className="flex items-center gap-2">
                     <Phone className="size-4 shrink-0 text-bakery-700" />
-                    {contactInfo.phone}
+                    <a
+                      href={`tel:${contactInfo.phone.replace(/[^+\d]/g, "")}`}
+                      className="hover:text-foreground"
+                    >
+                      {contactInfo.phone}
+                    </a>
                   </li>
                 ) : null}
                 {contactInfo.email ? (
                   <li className="flex items-center gap-2">
                     <Mail className="size-4 shrink-0 text-bakery-700" />
-                    {contactInfo.email}
+                    <a href={`mailto:${contactInfo.email}`} className="break-all hover:text-foreground">
+                      {contactInfo.email}
+                    </a>
                   </li>
                 ) : null}
               </ul>
@@ -142,7 +172,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             be empty — and a heading over nothing is its own claim.
           */}
           {footerSettings.showHours && businessHours.length > 0 ? (
-            <div className="space-y-4 lg:col-span-2">
+            <div className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">Opening Hours</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {businessHours.map((item, index) => (
@@ -161,6 +191,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
               </ul>
             </div>
           ) : null}
+          </div>
         </div>
 
         {/* Location map intentionally omitted here — it lives on the Contact page. */}

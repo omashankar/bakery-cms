@@ -273,8 +273,23 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       hasDeliveryZones,
       brand: {
         name,
-        tagline: general.siteTagline || brandInfo.tagline,
-        description: general.siteDescription || brandInfo.description,
+        /*
+          `chosen`, NOT `||`, and for the reason the address and the hours
+          below already use it.
+
+          `defaultGeneralSettings` is CREATED holding these two strings, so
+          the fallback was never reached and never needed to be: the stored
+          value WAS the shipped sentence. Every shop that had not rewritten
+          the box published "Freshly baked cakes, pastries and confections,
+          made to order." under its own logo — including the florists and
+          gift shops `businessType: "other"` exists to serve.
+
+          Empty now, which is the honest state for a shop that has not said
+          anything about itself yet. The footer already draws nothing for a
+          blank one.
+        */
+        tagline: chosen(general.siteTagline, brandInfo.tagline),
+        description: chosen(general.siteDescription, brandInfo.description),
       },
       // The same rule the social block ten lines below already follows, and for
       // the same reason. Deactivating every social link is a deliberate "we are
