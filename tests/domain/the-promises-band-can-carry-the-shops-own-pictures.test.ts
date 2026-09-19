@@ -123,8 +123,16 @@ describe("the promises band carries the shop's own pictures", () => {
     expect(body, "the shape is never read").toContain(
       'contentString(c, "layout").trim() === "strip"',
     );
-    // The strip is one tinted panel; the cards are four bordered boxes.
-    expect(body, "the strip has no panel of its own").toContain("rounded-2xl bg-cream-100");
+    /*
+      The strip is one tinted panel; the cards are four bordered boxes.
+
+      `band-sand` and not `cream-100`, measured: the tint being copied is a
+      warm butter the eye reads as a panel, and `--cream-100` is
+      rgb(250,248,244) — near enough to white that the band did not read as a
+      band at all.
+    */
+    expect(body, "the strip has no panel of its own").toContain("bg-band-sand");
+    expect(body.includes("bg-cream-100"), "the panel is near-white again").toBe(false);
     expect(body, "the cards lost their border").toContain(
       '"rounded-xl border border-border bg-card p-5"',
     );
@@ -132,6 +140,69 @@ describe("the promises band carries the shop's own pictures", () => {
     expect(body, "the strip does not lay its points sideways").toContain(
       '"flex items-center gap-3 sm:gap-4"',
     );
+  });
+
+  it("and the strip never splits where the split makes a point worse", () => {
+    /*
+      MEASURED IN A BROWSER AT TEN WIDTHS, both shapes, pictures on.
+
+      The strip puts the picture BESIDE the words, so every split takes 84px
+      off the words before it halves what is left. Splitting on the same
+      breakpoints as the cards — `sm` then `lg` — left the words 148px wide at
+      640 and 108px at 1024, against the 194px a 390px phone gives them. Two
+      of the four points wrapped to a third line at 1024 and the row went
+      ragged, 68px beside 87px.
+
+      Waiting for `md` and then `xl` holds the words at 194px everywhere
+      except 1280, where four across leaves 172. The cards are untouched: they
+      stack the words UNDER the picture, so a narrow column costs them far
+      less, and they are what is already published.
+    */
+    /*
+      Each shape's own class string, picked out by the tint that tells them
+      apart — the comments are stripped from `band()`, so the `?` and `:` of
+      the branch are not reliable anchors.
+    */
+    const strings = [...band().matchAll(/"mt-6 grid [^"]*"/g)].map((m) => m[0]);
+    const panel = strings.find((s) => s.includes("bg-band-sand"));
+    const cards = strings.find((s) => !s.includes("bg-band-sand"));
+
+    expect(panel, "the strip's own classes are gone").toBeTruthy();
+    expect(cards, "the cards' own classes are gone").toBeTruthy();
+
+    expect(panel!, "the strip splits on a small tablet again").not.toContain("sm:grid-cols-2");
+    expect(panel!, "the strip never reaches two across").toContain("md:grid-cols-2");
+    expect(panel!, "the strip goes four across too early").not.toContain("lg:grid-cols-4");
+    expect(panel!, "the strip never reaches four across").toContain("xl:grid-cols-4");
+
+    // And the cards keep the steps they were published with.
+    expect(cards!, "the cards' own steps moved").toContain("sm:grid-cols-2");
+    expect(cards!, "the cards' own steps moved").toContain("lg:grid-cols-4");
+  });
+
+  it("and no section makes the shop scroll past a list to reach its heading", () => {
+    /*
+      THE SHOP FOUND THIS ONE: "iski title setting bottom me he use upar dalo".
+
+      This band's editor opened with the Cards list — four rows, each with a
+      picture box, a title and a line under it — and the band's OWN heading
+      boxes sat underneath all of it. The more points a shop adds, the further
+      its own title moves down the screen.
+
+      Checked across the whole registry rather than on this band alone: three
+      sections had it (`why-us`, `gallery`, `instagram`), and the next section
+      with a list would have had it too.
+    */
+    const buried: string[] = [];
+    for (const section of HOMEPAGE_SECTION_REGISTRY) {
+      const keys = section.fields.map((f) => f.key);
+      const heading = keys.findIndex((k) => k === "overline" || k === "title");
+      const list = section.fields.findIndex((f) => f.type === "list");
+      if (heading < 0 || list < 0) continue;
+      if (list < heading) buried.push(`${section.type}: ${keys.join(", ")}`);
+    }
+
+    expect(buried, `${buried.length} sections bury their heading under a list`).toEqual([]);
   });
 
   it("suggests no wording of its own, anywhere", () => {

@@ -2377,8 +2377,22 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
                 four points inside a single tinted band with no border round
                 each one — the points read as one promise in four parts rather
                 than as four things to compare.
+
+                MEASURED AGAINST THAT LAYOUT rather than guessed. Its panel
+                is 1540 wide and 162 tall with a 24px corner, 90px of air
+                inside each end and a 78px picture — which, scaled to this
+                page's 1216px column, is a 24px corner, about 71px of air
+                and a 62px picture. The air is taken at 48 rather than 71
+                because this column is narrower than the one being copied:
+                at 71 the four points get 269px each against that layout's
+                340, and they start wrapping where it does not.
+
+                `band-sand` and not `cream-100`: the tint being copied is a
+                warm butter the eye reads as a panel, and cream-100 is
+                rgb(250,248,244) — near enough to white that the band did
+                not read as one at all.
               */
-              "mt-6 grid gap-6 rounded-2xl bg-cream-100 p-6 sm:grid-cols-2 sm:gap-8 sm:p-8 lg:grid-cols-4"
+              "mt-6 grid gap-6 rounded-[1.25rem] bg-band-sand px-6 py-6 sm:gap-8 sm:px-12 sm:py-8 md:grid-cols-2 xl:grid-cols-4"
             : "mt-6 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4",
         )}
       >
@@ -2407,7 +2421,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
             <span
               className={cn(
                 "relative block shrink-0 overflow-hidden rounded-full",
-                strip ? "size-16" : "mb-4 size-14",
+                strip ? "size-[4.25rem]" : "mb-4 size-14",
               )}
             >
               <SafeImage src={picture} alt="" />
@@ -2431,8 +2445,18 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
                 {item.description ? (
                   <p
                     className={cn(
-                      "text-sm leading-relaxed text-muted-foreground",
-                      !strip && "mt-1.5",
+                      /*
+                        DARK AND TIGHT IN THE STRIP, quiet and airy in the
+                        cards. In the layout being copied the second line is
+                        the same near-black as the first and sits about 6px
+                        under it — the two read as one sentence broken in
+                        half, which is why every point there is two lines.
+                        Muted grey at `leading-relaxed` read as a caption
+                        under a heading instead.
+                      */
+                      strip
+                        ? "text-sm leading-snug text-foreground/75"
+                        : "mt-1.5 text-sm leading-relaxed text-muted-foreground",
                     )}
                   >
                     {item.description}

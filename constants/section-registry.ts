@@ -1445,6 +1445,39 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       layout: "",
     },
     fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        /*
+          TWO SHAPES, and the cards are the one that ships.
+
+          Cards is what this band has always been: four bordered boxes, the
+          picture above the words. The strip is the shape the shop held up —
+          one tinted panel with the four points laid across it, picture
+          beside the words rather than over them, and no border round each.
+
+          It ships blank so the band already published keeps the shape it
+          was published with.
+        */
+        key: "layout",
+        label: "Shape",
+        type: "select",
+        options: [
+          { label: "Cards", value: "" },
+          { label: "One strip", value: "strip" },
+        ],
+      },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
       {
         /**
          * The four cards were a hardcoded array inside the renderer: "Over six
@@ -1480,39 +1513,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
           */
           { key: "title", label: "Title", type: "text" },
           { key: "description", label: "Description", type: "text" },
-        ],
-      },
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      {
-        /*
-          TWO SHAPES, and the cards are the one that ships.
-
-          Cards is what this band has always been: four bordered boxes, the
-          picture above the words. The strip is the shape the shop held up —
-          one tinted panel with the four points laid across it, picture
-          beside the words rather than over them, and no border round each.
-
-          It ships blank so the band already published keeps the shape it
-          was published with.
-        */
-        key: "layout",
-        label: "Shape",
-        type: "select",
-        options: [
-          { label: "Cards", value: "" },
-          { label: "One strip", value: "strip" },
-        ],
-      },
-      {
-        key: "align",
-        label: "Title position",
-        type: "select",
-        options: [
-          { label: "Default (center)", value: "" },
-          { label: "Left", value: "left" },
-          { label: "Center", value: "center" },
-          { label: "Right", value: "right" },
         ],
       },
     ],
@@ -1571,6 +1571,22 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 8,
     },
     fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
+      { key: "ctaLabel", label: "Button label", type: "text" },
+      { key: "ctaHref", label: "Button link", type: "url" },
+      { key: "maxCount", label: "Max photos on the homepage", type: "number" },
       {
         /**
          * The shop's OWN photographs.
@@ -1599,22 +1615,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
           { key: "tag", label: "Tag", type: "text", placeholder: "Wedding" },
         ],
       },
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      {
-        key: "align",
-        label: "Title position",
-        type: "select",
-        options: [
-          { label: "Default (center)", value: "" },
-          { label: "Left", value: "left" },
-          { label: "Center", value: "center" },
-          { label: "Right", value: "right" },
-        ],
-      },
-      { key: "ctaLabel", label: "Button label", type: "text" },
-      { key: "ctaHref", label: "Button link", type: "url" },
-      { key: "maxCount", label: "Max photos on the homepage", type: "number" },
     ],
   },
   {
@@ -1633,6 +1633,22 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       maxCount: 6,
     },
     fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (center)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
+      { key: "instagramHandle", label: "Instagram handle", type: "text" },
+      { key: "instagramUrl", label: "Instagram URL", type: "url" },
+      { key: "maxCount", label: "Max posts shown", type: "number" },
       {
         /**
          * The shop's own posts, if it wants to show any.
@@ -1659,22 +1675,6 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
           },
         ],
       },
-      { key: "overline", label: "Overline", type: "text" },
-      { key: "title", label: "Title", type: "text" },
-      {
-        key: "align",
-        label: "Title position",
-        type: "select",
-        options: [
-          { label: "Default (center)", value: "" },
-          { label: "Left", value: "left" },
-          { label: "Center", value: "center" },
-          { label: "Right", value: "right" },
-        ],
-      },
-      { key: "instagramHandle", label: "Instagram handle", type: "text" },
-      { key: "instagramUrl", label: "Instagram URL", type: "url" },
-      { key: "maxCount", label: "Max posts shown", type: "number" },
     ],
   },
   {
