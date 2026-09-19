@@ -9,6 +9,7 @@ import {
   Heart,
   HelpCircle,
   Images,
+  History,
   LayoutGrid,
   Leaf,
   Mail,
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, LucideIcon> = {
   Sparkles,
+  History,
   LayoutGrid,
   Star: Award,
   TrendingUp,

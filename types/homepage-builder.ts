@@ -73,6 +73,14 @@ export type HomepageSectionType =
   | "banner-grid"
   | "category-price-cards"
   | "banner-strip"
+  /**
+   * The products THIS BROWSER has opened — not content the shop writes.
+   *
+   * Every other band on this page is the same for everybody. This one is
+   * different for each visitor and empty for a new one, which is why it
+   * draws nothing until there is something to draw.
+   */
+  | "recently-viewed"
   | "category-rail"
   | "photo-cakes"
   | "eggless"

@@ -1,3 +1,4 @@
+import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { getStorefrontInstagram } from "./storefront-social.server";
 import { getStorefrontLocation } from "./storefront-location.server";
 import { getStorefrontTrust } from "./storefront-trust.server";
@@ -49,6 +50,17 @@ export interface HomepageRenderData {
    * shop picks one and nothing appears, with nothing to explain it.
    */
   categoryChoices: ReturnType<typeof selectHomepageCategories>;
+  /**
+   * THE SHOP'S PUBLISHED CATALOGUE, for the band that draws what this
+   * browser has looked at.
+   *
+   * Those are slugs in localStorage and nothing else — resolving them needs
+   * the shop's own records, and the browser has none: the product cache is
+   * filled only inside the admin. `getRecentlyViewedProducts` takes the
+   * catalogue as a required argument for exactly this reason, and the cart
+   * page already passes it the same way.
+   */
+  catalog: Awaited<ReturnType<typeof getStorefrontProductCards>>;
   testimonials: Testimonial[];
   faqs: FaqItem[];
   instagram: Awaited<ReturnType<typeof getStorefrontInstagram>>;
@@ -102,6 +114,7 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     bannersRaw,
     products,
     catalog,
+    storefrontCards,
     testimonialsRaw,
     faqsRaw,
     instagram,
@@ -115,6 +128,10 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     getContent("banners"),
     getProducts(),
     getCatalog(),
+    // The shop's published cards, for the band that draws what this browser
+    // has looked at. Those are slugs and nothing else; resolving them needs
+    // the shop's own records, and a customer's browser has none.
+    getStorefrontProductCards(),
     getContent("testimonials"),
     getContent("faq"),
     // The shop's real Instagram, for the same reason: the gallery section used
@@ -147,6 +164,7 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
       (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
       ROW_CAP,
     ),
+    catalog: storefrontCards,
     categoryChoices: selectHomepageCategories(
       products,
       (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],

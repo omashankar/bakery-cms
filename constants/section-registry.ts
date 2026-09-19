@@ -1335,6 +1335,51 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      WHAT THIS BROWSER HAS LOOKED AT — the only band on this page that is
+      different for every visitor.
+
+      It has no content of its own to write: the products come from the
+      slugs this browser stored while somebody was reading, resolved against
+      the shop's own records. A visitor who has looked at nothing sees no
+      band at all, which is most first visits.
+
+      The title ships filled because a band with no heading whose contents
+      change per visitor is unreadable, and `Recently viewed` claims nothing
+      and is true of any trade. The way-in link ships blank like every other.
+    */
+    type: "recently-viewed",
+    label: "Recently Viewed",
+    icon: "History",
+    defaultBackground: "cream",
+    defaultContent: {
+      overline: "",
+      title: "Recently viewed",
+      align: "",
+      ctaLabel: "",
+      ctaHref: "",
+      maxCount: 8,
+    },
+    fields: [
+      { key: "overline", label: "Overline", type: "text" },
+      { key: "title", label: "Title", type: "text" },
+      {
+        key: "align",
+        label: "Title position",
+        type: "select",
+        options: [
+          { label: "Default (left)", value: "" },
+          { label: "Left", value: "left" },
+          { label: "Center", value: "center" },
+          { label: "Right", value: "right" },
+        ],
+      },
+      { key: "ctaLabel", label: "View-all label", type: "text" },
+      { key: "ctaHref", label: "View-all link", type: "url" },
+      { key: "maxCount", label: "Max shown", type: "number" },
+    ],
+  },
+  {
     type: "offers",
     label: "Special Offers",
     icon: "Tag",

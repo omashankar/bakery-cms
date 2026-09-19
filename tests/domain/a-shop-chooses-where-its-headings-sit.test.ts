@@ -10,11 +10,11 @@ import { sectionAlignOf } from "@/features/cms-sections/lib/section-utils";
  *
  * TWO THINGS HAVE TO BE TRUE AT ONCE and they pull against each other:
  *
- *   1. every page already published must look EXACTLY as it did. Eleven
- *      section types draw their heading left and twelve draw it centred, and
+ *   1. every page already published must look EXACTLY as it did. Twelve
+ *      section types draw their heading left and thirteen draw it centred, and
  *      not one layout in the database carries this key — so the blank path is
  *      not an edge case, it is what every band on every live page is using.
- *      A single shared default would have re-aligned eleven of them.
+ *      A single shared default would have re-aligned twelve of them.
  *
  *   2. the control must actually move something. On nine of the section types
  *      the heading is a flex child that hugs its own text, and `text-center`
@@ -34,7 +34,7 @@ const codeOf = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
 /**
- * The eleven that are drawn left today.
+ * The twelve that are drawn left today.
  *
  * Written out rather than derived, because deriving it from the renderer
  * would make this list agree with whatever the renderer happens to say — and
@@ -44,6 +44,8 @@ const LEFT = [
   "tabbed-rail", "seo-prose", "banner-grid", "banner-strip",
   "featured-cakes", "trending", "best-sellers", "category-rail",
   "photo-cakes", "eggless", "seasonal",
+  // The band that draws what a browser has looked at, added later.
+  "recently-viewed",
 ];
 
 /** The four that draw their heading themselves and are not in scope. */
@@ -55,7 +57,7 @@ describe("a shop chooses where its headings sit", () => {
       entry.fields.some((f) => f.key === "align"),
     ).map((entry) => entry.type);
 
-    expect(withControl.length, "the control is on the wrong number of sections").toBe(23);
+    expect(withControl.length, "the control is on the wrong number of sections").toBe(24);
     for (const type of LEFT) {
       expect(withControl, `${type} cannot choose`).toContain(type);
     }
@@ -86,13 +88,13 @@ describe("a shop chooses where its headings sit", () => {
   it("and the blank option comes first, and says what blank means", () => {
     /*
       THE BUILDER SHOWS options[0] FOR A VALUE IT HAS NOT GOT, and never
-      writes it. So if the first option were "Left", every one of the twelve
+      writes it. So if the first option were "Left", every one of the thirteen
       centred sections would show "Left" in the dropdown while drawing
       centred — the editor lying about a page it has not touched. The
       registry already warns about this next to `copySide`.
 
-      And blank does not mean the same thing twice: eleven sections are left
-      by default and twelve centred, so the label has to say which.
+      And blank does not mean the same thing twice: twelve sections are left
+      by default and thirteen centred, so the label has to say which.
     */
     for (const entry of HOMEPAGE_SECTION_REGISTRY) {
       const field = entry.fields.find((f) => f.key === "align");
@@ -144,7 +146,7 @@ describe("a shop chooses where its headings sit", () => {
 
   it("and resolves it from the section's own fallback, per function", () => {
     /*
-      ELEVEN LEFT, TWELVE CENTRED. One shared default is the single change
+      TWELVE LEFT, THIRTEEN CENTRED. One shared default is the single change
       that would break the promise this whole file is about, and it is a
       one-word edit that reads as tidying.
     */
@@ -152,7 +154,7 @@ describe("a shop chooses where its headings sit", () => {
     const calls = [...src.matchAll(/sectionAlignOf\(c, "(left|center)"\)/g)].map((m) => m[1]);
 
     expect(calls.length, "the fallbacks have moved or gone").toBeGreaterThanOrEqual(18);
-    expect(calls.filter((v) => v === "left").length, "the left-hand sections").toBe(5);
+    expect(calls.filter((v) => v === "left").length, "the left-hand sections").toBe(6);
     expect(calls.filter((v) => v === "center").length, "the centred sections").toBe(13);
   });
 
