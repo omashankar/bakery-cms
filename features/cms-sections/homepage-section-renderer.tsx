@@ -2297,6 +2297,13 @@ function TileGridSection(props: HomepageSectionRendererProps) {
   );
   const align = sectionAlignOf(c, "center");
   const tiles = renderableRows(parseListField(c, "tiles"));
+  /*
+    THE CARD IS THE SHAPE THE SHOP HELD UP: the picture in a bordered box
+    at 4:3, and the label in a tinted bar along the foot of it rather than
+    loose on the page below. Plain is what this band has always drawn and
+    is what every grid already published is still using.
+  */
+  const card = contentString(c, "shape").trim() === "card";
 
   if (tiles.length === 0) return null;
 
@@ -2329,25 +2336,53 @@ function TileGridSection(props: HomepageSectionRendererProps) {
         {tiles.map((tile, index) => {
           const body = (
             <>
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+              <div
+                className={cn(
+                  "relative overflow-hidden bg-muted",
+                  card
+                    ? /*
+                        4:3, AND THE CORNERS ONLY AT THE TOP. The picture is
+                        the top half of one card, so rounding its foot would
+                        cut a notch out of the bar underneath it.
+                      */
+                      "aspect-[4/3] rounded-t-xl"
+                    : "aspect-square rounded-xl",
+                )}
+              >
                 <SafeImage src={tile.image ?? ""} alt={tile.label ?? ""} />
               </div>
               {tile.label ? (
-                <p className="mt-2 text-center text-sm font-medium">{tile.label}</p>
+                <p
+                  className={cn(
+                    card
+                      ? "flex min-h-12 items-center justify-center bg-cream-100 px-3 py-2.5 text-center text-sm font-semibold"
+                      : "mt-2 text-center text-sm font-medium",
+                  )}
+                >
+                  {tile.label}
+                </p>
               ) : null}
             </>
           );
 
+          /*
+            THE CARD IS THE TILE ITSELF, so the border and the clip belong
+            to whichever element wraps it — a link when the shop gave the
+            tile one, a plain box when it did not.
+          */
+          const shell = cn(
+            "group/tile",
+            card && "block overflow-hidden rounded-xl border border-border bg-card",
+          );
+
           return tile.href ? (
-            <Link
-              key={`${tile.label}-${index}`}
-              href={tile.href}
-              className="group/tile"
-            >
+            <Link key={`${tile.label}-${index}`} href={tile.href} className={shell}>
               {body}
             </Link>
           ) : (
-            <div key={`${tile.label}-${index}`}>{body}</div>
+            <div key={`${tile.label}-${index}`} className={shell}>
+              {body}
+            </div>
           );
         })}
       </div>

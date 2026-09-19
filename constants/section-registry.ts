@@ -663,6 +663,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       overline: "",
       title: "",
       align: "",
+      shape: "",
       columns: 4,
       tiles: "[]",
     },
@@ -680,6 +681,26 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
           { label: "Right", value: "right" },
         ],
       },
+      {
+        /*
+          TWO SHAPES OF TILE.
+
+          Plain is what this band has always drawn: a square picture with
+          the label under it on the page's own background. A card is what
+          the layout the shop held up draws — the picture in a bordered
+          box, wider than it is tall, with the label in a tinted bar
+          along the foot of it.
+
+          Blank is plain, so every grid already published keeps its shape.
+        */
+        key: "shape",
+        label: "Tile shape",
+        type: "select",
+        options: [
+          { label: "Plain", value: "" },
+          { label: "Card", value: "card" },
+        ],
+      },
       { key: "columns", label: "Tiles per row", type: "number" },
       {
         key: "tiles",
@@ -692,7 +713,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Picture",
             type: "url",
             isImage: true,
-            hint: "600 x 600 — square",
+            hint: "Plain: 600 x 600 square · Card: 600 x 450",
           },
           { key: "label", label: "Label", type: "text" },
           { key: "href", label: "Link", type: "url" },
