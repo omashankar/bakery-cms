@@ -99,3 +99,87 @@ test("is absent until the visitor has looked at something, then fills", async ({
     "the band reads the browser during render:\n  " + hydration.join("\n  "),
   ).toEqual([]);
 });
+
+test("and is drawn like every other product row on the page", async ({ page }) => {
+  /*
+    THE SHOP ASKED FOR IT TO MATCH THE BAND ABOVE, and measuring is what
+    found the two places it did not: it sat on a cream band where the picture
+    tiles above it sit on white, and its cards started 0px under the heading
+    where every other product row leaves 24.
+
+    Compared against the rows themselves rather than against a number, so a
+    change to the house spacing moves them all together or fails here.
+  */
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto("/store/collections");
+  await page.waitForTimeout(1500);
+  const opened = await page.evaluate(() =>
+    [
+      ...new Set(
+        [...document.querySelectorAll('a[href^="/store/cakes/"]')].map((a) =>
+          a.getAttribute("href"),
+        ),
+      ),
+    ].slice(0, 3),
+  );
+  for (const href of opened) {
+    await page.goto(href!);
+    await page.waitForTimeout(900);
+  }
+
+  await page.goto("/store");
+  await page.evaluate(async () => {
+    for (let y = 0; y < document.body.scrollHeight; y += 500) {
+      window.scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+  });
+  await page.waitForTimeout(2000);
+
+  const rows = await page.evaluate(() => {
+    const out: { id: string; gap: number }[] = [];
+    for (const band of document.querySelectorAll("[data-section-id]")) {
+      const heading = band.querySelector("h2");
+      const strip = band.querySelector("div.snap-x");
+      const card = strip?.children[0];
+      if (!heading || !card) continue;
+      out.push({
+        id: band.getAttribute("data-section-id") ?? "?",
+        gap: Math.round(
+          card.getBoundingClientRect().top - heading.getBoundingClientRect().bottom,
+        ),
+      });
+    }
+    return out;
+  });
+
+  const band = rows.find((row) => row.id.startsWith("recently-viewed"));
+  expect(band, "the band did not draw, so nothing was compared").toBeTruthy();
+
+  /*
+    THE TABBED RAIL IS EXCLUDED AND SAYS SO. Its heading shares a row with the
+    tab strip, so its cards start below both — measured at 35 against the
+    others' 24. It is a different shape, not a different spacing.
+
+    And the others agree to within a pixel rather than exactly: 24 and 25 both
+    appear, which is sub-pixel layout rather than two decisions.
+  */
+  const others = rows.filter(
+    (row) => !row.id.startsWith("recently-viewed") && !row.id.startsWith("tabbed-rail"),
+  );
+  expect(others.length, "there is no other row to compare against").toBeGreaterThan(1);
+
+  const house = Math.min(...others.map((row) => row.gap));
+  const strays = others.filter((row) => Math.abs(row.gap - house) > 2);
+  expect(
+    strays.map((row) => `${row.id} ${row.gap}`),
+    "the rows this is being matched against do not agree among themselves",
+  ).toEqual([]);
+
+  expect(
+    Math.abs(band!.gap - house),
+    `the band leaves ${band!.gap}px under its heading and the other rows leave ${house}`,
+  ).toBeLessThanOrEqual(2);
+});

@@ -71,7 +71,7 @@ import {
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
-import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
+import { recordRecentlyViewedProduct } from "@/features/products/lib/recently-viewed";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import type { LandingProduct } from "@/constants/landing-data";
 import { Badge } from "@/components/ui/badge";

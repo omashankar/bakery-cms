@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
-import { RECENTLY_VIEWED_MAX } from "@/apps/website/lib/recently-viewed";
+import { RECENTLY_VIEWED_MAX } from "@/features/products/lib/recently-viewed";
 
 /**
  * THE ONLY BAND ON THE HOMEPAGE THAT IS DIFFERENT FOR EVERY VISITOR.

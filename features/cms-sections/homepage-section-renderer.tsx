@@ -69,7 +69,7 @@ import {
   RECENTLY_VIEWED_MAX,
   RECENTLY_VIEWED_UPDATED_EVENT,
   getRecentlyViewedProducts,
-} from "@/apps/website/lib/recently-viewed";
+} from "@/features/products/lib/recently-viewed";
 import type { HomepageSectionInstance, SectionBackground, SectionAlign
 } from "@/types/homepage-builder";
 import type { FaqItem, Testimonial } from "@/types/content";
@@ -2985,8 +2985,16 @@ function RecentlyViewedSection(props: HomepageSectionRendererProps) {
           }
         />
       </ScrollReveal>
-      <ScrollStrip>
-        {cakes.map((cake) => (
+      {/*
+        THE SAME 24px EVERY OTHER PRODUCT ROW PUTS UNDER ITS HEADING.
+
+        Measured across the page: trending, photo-cakes and featured all sit
+        at 24; this band had 0, so its cards started against the words. The
+        gap belongs to the heading, so it goes when there is none.
+      */}
+      <div className={cn(hasHeading && "mt-6")}>
+        <ScrollStrip>
+          {cakes.map((cake) => (
           <ProductCard
             key={cake.id}
             cake={cake}
@@ -2995,7 +3003,8 @@ function RecentlyViewedSection(props: HomepageSectionRendererProps) {
             showWishlist={false}
           />
         ))}
-      </ScrollStrip>
+        </ScrollStrip>
+      </div>
     </SectionShell>
   );
 }

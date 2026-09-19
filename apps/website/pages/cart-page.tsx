@@ -66,7 +66,7 @@ import {
   removeSavedForLaterItem,
   SAVED_FOR_LATER_UPDATED_EVENT,
 } from "@/features/cart/lib/saved-for-later";
-import { getRecentlyViewedProducts } from "@/apps/website/lib/recently-viewed";
+import { getRecentlyViewedProducts } from "@/features/products/lib/recently-viewed";
 import { addToWishlist } from "@/apps/website/lib/wishlist";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
