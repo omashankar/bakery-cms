@@ -52,19 +52,42 @@ describe("the promises band carries the shop's own pictures", () => {
     expect(picture!.hint ?? "", "nothing says what size to export").toContain("144 x 144");
   });
 
-  it("and keeps the icon for a point that has no picture", () => {
+  it("and offers no icon at all any more", () => {
     /*
-      NOT A REPLACEMENT. A shop with nothing to upload still gets a finished
-      row — which is what this band has always given. The icon list is the
-      same four it has always offered.
-    */
-    const icon = tileFields().find((f) => f.key === "icon");
+      THE SHOP ASKED FOR THEM GONE, and the reasoning is worth keeping: the
+      layout this band is drawn from uses small illustrations, and four line
+      icons are not a smaller version of that. They are a different thing that
+      happens to fit the box.
 
-    expect(icon, "the icon has been dropped").toBeTruthy();
-    expect(icon!.options?.map((o) => o.value)).toEqual(["Award", "Leaf", "Truck", "Palette"]);
-    expect(band(), "the picture does not fall back to the icon").toContain(
-      "picture ? (",
-    );
+      It costs something, and the cost is not hidden: the four points already
+      published on this page were all icon-only, so each draws no circle until
+      a picture is uploaded for it.
+    */
+    expect(
+      tileFields().some((f) => f.key === "icon"),
+      "the icon choice is back",
+    ).toBe(false);
+
+    const body = band();
+    expect(body.includes("whyIcons"), "the icon map is back").toBe(false);
+    expect(body.includes("<Icon "), "an icon is still drawn").toBe(false);
+  });
+
+  it("and draws no circle at all for a point with no picture", () => {
+    /*
+      NOT AN EMPTY DISC. A blank circle beside two lines of text reads as a
+      picture that failed to load — a worse thing to publish than two lines on
+      their own, and on this page it would have read that way four times over
+      until the shop uploaded anything.
+    */
+    const body = band();
+    const at = body.indexOf("const badge = picture ?");
+    expect(at, "the badge is gone").toBeGreaterThan(-1);
+
+    expect(
+      body.slice(at, at + 600),
+      "an empty circle is drawn where there is no picture",
+    ).toContain(") : null;");
   });
 
   it("and never drops a point for having no picture", () => {

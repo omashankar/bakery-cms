@@ -1468,21 +1468,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
               illustration — so the picture wins wherever there is one.
             */
             key: "image",
-            label: "Picture (used instead of the icon)",
+            label: "Picture",
             type: "url",
             isImage: true,
-            hint: "144 x 144 — square, and drawn as a circle",
-          },
-          {
-            key: "icon",
-            label: "Icon (when there is no picture)",
-            type: "select",
-            options: [
-              { label: "Award", value: "Award" },
-              { label: "Leaf", value: "Leaf" },
-              { label: "Truck", value: "Truck" },
-              { label: "Palette", value: "Palette" },
-            ],
+            hint: "144 x 144 — square, on a transparent or white background; it is drawn as a circle",
           },
           /*
             NO PLACEHOLDER. This one said "Premium Ingredients" — food, and

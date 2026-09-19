@@ -5,14 +5,12 @@ import Link from "next/link";
 import { SafeImage } from "@/components/shared/safe-image";
 import {
   ArrowRight,
-  Award,
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
   Camera,
   Clock,
   Heart,
-  Leaf,
   Mail,
   MapPin,
   Phone,
@@ -21,7 +19,6 @@ import {
   Store,
   Tag,
   Truck,
-  Palette,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader } from "@/components/shared/section-header";
@@ -1006,7 +1003,6 @@ function ProductGridSection(
   );
 }
 
-const whyIcons = { Award, Leaf, Truck, Palette } as const;
 
 /**
  * The shop's own promo cards — image, words, its own button.
@@ -2387,33 +2383,36 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
         )}
       >
         {items.map((item, index) => {
-          const Icon = whyIcons[item.icon as keyof typeof whyIcons] ?? Award;
-          const picture = (item.image ?? '').trim();
+          const picture = (item.image ?? "").trim();
           /*
-            THE SHOP'S OWN PICTURE WINS. Drawn as a circle because that is
-            the shape the layout gives it, and `object-cover` so a square
-            export fills it — the editor asks for a square, and a picture
-            that is not one is cropped rather than squashed.
+            THE SHOP'S OWN PICTURE, AND NOTHING ELSE.
+
+            This band used to offer a choice of four lucide icons and the
+            shop asked for them gone: the layout it is drawn from uses small
+            illustrations, and four line icons are not a smaller version of
+            that — they are a different thing that happens to fit the box.
+
+            A point with no picture draws NO circle rather than an empty
+            one. An empty disc beside two lines reads as a picture that
+            failed to load, which is a worse thing to publish than two lines
+            on their own.
+
+            `object-cover` inside a round mask, so a square export fills it
+            and anything else is cropped rather than squashed. And no tint
+            behind it: the artwork this is for carries its own background,
+            and a cream disc under a transparent PNG puts a colour the shop
+            never chose behind the shop's own illustration.
           */
           const badge = picture ? (
             <span
               className={cn(
-                "relative block shrink-0 overflow-hidden rounded-full bg-cream-100",
-                strip ? "size-14" : "mb-4 size-12",
+                "relative block shrink-0 overflow-hidden rounded-full",
+                strip ? "size-16" : "mb-4 size-14",
               )}
             >
               <SafeImage src={picture} alt="" />
             </span>
-          ) : (
-            <span
-              className={cn(
-                "flex shrink-0 items-center justify-center rounded-xl bg-cream-100 text-bakery-700",
-                strip ? "size-14 rounded-full" : "mb-4 size-12",
-              )}
-            >
-              <Icon className={strip ? "size-6" : "size-5"} />
-            </span>
-          );
+          ) : null;
 
           return (
             <div
