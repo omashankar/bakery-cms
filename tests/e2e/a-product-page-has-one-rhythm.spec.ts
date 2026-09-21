@@ -157,6 +157,164 @@ test("and the price block does not read back what the ticks already show", async
   );
 });
 
+test("and every control in the column shares one left and one right edge", async ({ page }) => {
+  /*
+    THREE DIFFERENT RIGHT-HAND EDGES DOWN ONE SHORT STACK. The message box and
+    the photo upload ran the full width of the column, the Add to Cart row ran
+    the full width, and the PIN-code field stopped at 384px because it had been
+    given `sm:max-w-sm` to leave room for an answer beside it. Seen on its own
+    that row was fine; seen with the rest of the column it was the one thing out
+    of line, which is the first thing the eye finds and the last thing it can
+    un-see.
+
+    Measured on the BLOCKS, not on a class name: a ragged edge is a fact about
+    where things are drawn, and any number of different classes produce it.
+    Zero-height children are skipped — several are `lg:hidden` — because a
+    hidden box reports edges that mean nothing.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(2500);
+
+  const edges = await page.evaluate(() => {
+    const column = document.querySelectorAll("main .grid > div")[1];
+    if (!column) return null;
+    return [...column.children]
+      .map((node) => ({ node, box: node.getBoundingClientRect() }))
+      .filter((entry) => entry.box.height > 1)
+      .map((entry) => ({
+        left: Math.round(entry.box.left),
+        right: Math.round(entry.box.right),
+        what:
+          (entry.node.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 30) ||
+          entry.node.tagName.toLowerCase(),
+      }));
+  });
+
+  expect(edges, "the product page has no right-hand column").not.toBeNull();
+  expect(edges!.length, "the column has too few blocks to line up").toBeGreaterThan(4);
+
+  const lefts = [...new Set(edges!.map((entry) => entry.left))];
+  const rights = [...new Set(edges!.map((entry) => entry.right))];
+
+  expect(
+    lefts,
+    `blocks start at ${lefts.length} different left edges: ` +
+      edges!.map((e) => `${e.left} ${e.what}`).join(" | "),
+  ).toHaveLength(1);
+  expect(
+    rights,
+    `blocks end at ${rights.length} different right edges: ` +
+      edges!.map((e) => `${e.right} ${e.what}`).join(" | "),
+  ).toHaveLength(1);
+});
+
+test("and Add to Cart is the biggest thing a customer can press", async ({ page }) => {
+  /*
+    It was the same height as the field above it, in a column where the tallest
+    control was a message box. The reference storefront makes it plainly the
+    largest — it is the one press the whole page is arranged around, and a
+    primary action that matches its neighbours is a primary action only by
+    colour.
+
+    Compared against the controls around it rather than against 56px, so a
+    change to the house sizing moves them together or fails here.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(2500);
+
+  const sizes = await page.evaluate(() => {
+    const grid = document.querySelectorAll("main .grid")[0];
+    const add = [...(grid?.querySelectorAll("button") ?? [])].find((node) =>
+      /add to cart|update cart|out of stock/i.test(node.textContent ?? ""),
+    );
+    const others = [...(grid?.querySelectorAll("input, textarea") ?? [])]
+      .map((node) => Math.round(node.getBoundingClientRect().height))
+      .filter((height) => height > 1);
+    return {
+      add: add ? Math.round(add.getBoundingClientRect().height) : 0,
+      tallestOther: others.length ? Math.max(...others) : 0,
+    };
+  });
+
+  expect(sizes.add, "there is no Add to Cart button").toBeGreaterThan(0);
+  expect(
+    sizes.add,
+    `Add to Cart is ${sizes.add}px and the tallest field beside it is ${sizes.tallestOther}px`,
+  ).toBeGreaterThanOrEqual(sizes.tallestOther);
+});
+
+test("and the offers are read at the page's own volume, not in a dashed box", async ({ page }) => {
+  /*
+    THE OFFERS ARE THE REASON SOMEBODY ADDS A SECOND ITEM, and they were the
+    quietest block on the page: a dashed, tinted panel with the heading AND
+    every line inside it painted in the brand brown at caption weight.
+
+    A dashed border is what a browser and every design system use for something
+    PROVISIONAL — a drop target, a placeholder — so the one block that says
+    "here is money off" read as the least settled thing on the screen. And
+    colouring the lines as well as the heading made the offers quieter than the
+    product description below them.
+
+    THE BULLETS ARE COMPARED AGAINST THE PAGE'S OWN BODY TEXT rather than
+    against a hex value, so a change to the shop's palette moves both together
+    or fails here. That is the assertion that catches "made quiet again",
+    which no screenshot of a passing build would show.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(2500);
+
+  const offers = await page.evaluate(() => {
+    const heading = [...document.querySelectorAll("p")].find((node) =>
+      /available offers/i.test(node.textContent ?? ""),
+    );
+    if (!heading?.parentElement) return null;
+    const block = heading.parentElement;
+    const style = getComputedStyle(block);
+    const line = block.querySelector("li span:last-child");
+    /*
+      The PAGE'S OWN text colour, read off `<body>` rather than off the first
+      paragraph in `main`. That paragraph turned out to be a muted caption —
+      the tax note under the price — so comparing against it asserted that the
+      offers were as quiet as the quietest thing on the page, which is the
+      opposite of the point.
+    */
+    const body = document.body;
+    return {
+      lines: block.querySelectorAll("li").length,
+      borderStyle: style.borderTopStyle,
+      borderWidth: Math.round(parseFloat(style.borderTopWidth)),
+      background: style.backgroundColor,
+      lineColour: line ? getComputedStyle(line).color : "",
+      bodyColour: body ? getComputedStyle(body).color : "",
+      lineSize: line ? Math.round(parseFloat(getComputedStyle(line).fontSize)) : 0,
+    };
+  });
+
+  if (!offers || offers.lines === 0) {
+    test.skip(true, "this shop is advertising no offers, so there is nothing to draw");
+    return;
+  }
+
+  expect(offers.borderStyle, "the offers are back inside a dashed box").not.toBe("dashed");
+  expect(offers.borderWidth, "the offers are back inside a box").toBe(0);
+  expect(
+    ["rgba(0, 0, 0, 0)", "transparent"],
+    `the offers sit on a tinted panel: ${offers.background}`,
+  ).toContain(offers.background);
+
+  expect(
+    offers.lineColour,
+    `the offers are set in ${offers.lineColour} while the page reads in ${offers.bodyColour}`,
+  ).toBe(offers.bodyColour);
+  expect(offers.lineSize, `an offer is set at ${offers.lineSize}px`).toBeGreaterThanOrEqual(14);
+});
+
 test("and the price is the largest figure on it, not the name", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 1000 });

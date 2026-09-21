@@ -7,7 +7,7 @@ import {
   Check,
   Heart,
   ImageUp,
-  Tag,
+  Percent,
   ShoppingBag,
   ThumbsUp,
   Truck,
@@ -1349,32 +1349,6 @@ export function ProductDetailPage({
                 ones, and there is one option system instead of two.
               */}
 
-              {cake.allowsMessage !== false ? (
-                /*
-                  TWO ROWS, NOT THREE, and the label is gone.
-
-                  It was a labelled three-row box, which is a paragraph's worth
-                  of space for something that is written on a cake — the whole
-                  control was taller than the price, the size buttons and the
-                  toggles put together. The placeholder already says what goes
-                  in it, in the shop's own example, so the label above was the
-                  same words twice; `aria-label` keeps them for anyone who
-                  cannot see the placeholder.
-
-                  Still a textarea rather than an input: a message runs onto a
-                  second line more often than not, and a single line that
-                  scrolls sideways hides what has already been typed.
-                */
-                <Textarea
-                  id="product-message"
-                  aria-label="Message on this order"
-                  placeholder='Message on this order — e.g. "Happy Birthday!"'
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  rows={2}
-                />
-              ) : null}
-
               {/*
                 The photo a photo cake is printed with.
 
@@ -1462,6 +1436,41 @@ export function ProductDetailPage({
                     onProblem={(problem) => toast.error(problem)}
                   />
                 </div>
+              ) : null}
+
+              {cake.allowsMessage !== false ? (
+                /*
+                  TWO ROWS, NOT THREE, and the label is gone.
+
+                  It was a labelled three-row box, which is a paragraph's worth
+                  of space for something that is written on a cake — the whole
+                  control was taller than the price, the size buttons and the
+                  toggles put together. The placeholder already says what goes
+                  in it, in the shop's own example, so the label above was the
+                  same words twice; `aria-label` keeps them for anyone who
+                  cannot see the placeholder.
+
+                  Still a textarea rather than an input: a message runs onto a
+                  second line more often than not, and a single line that
+                  scrolls sideways hides what has already been typed.
+                */
+                <Textarea
+                  id="product-message"
+                  aria-label="Message on this order"
+                  placeholder='Message on this order — e.g. "Happy Birthday!"'
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={1}
+                  /*
+                    `min-h-12`, not `h-12`: the shared Textarea floors itself at
+                    `min-h-16` and a height cannot override a minimum, which is
+                    why setting one changed nothing. The component also carries
+                    `field-sizing-content`, so lowering the floor gives the best
+                    of both — one line high beside the other controls, growing
+                    as a longer message is typed rather than hiding it.
+                  */
+                  className="min-h-12 py-3"
+                />
               ) : null}
 
               {/*
@@ -1575,7 +1584,7 @@ export function ProductDetailPage({
                   onClick={handleWishlist}
                   aria-pressed={wishlisted}
                   aria-label={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
-                  className="shrink-0 px-4"
+                  className="h-14 w-14 shrink-0 p-0"
                 >
                   <Heart
                     className={cn("size-5", wishlisted && "fill-bakery-700 text-bakery-700")}
@@ -1584,7 +1593,7 @@ export function ProductDetailPage({
                 <Button
                   size="lg"
                   variant="bakery"
-                  className="flex-1"
+                  className="h-14 flex-1 text-base font-semibold"
                   disabled={isOutOfStock}
                   onClick={() => handleAddToCart(false)}
                 >
@@ -1598,16 +1607,44 @@ export function ProductDetailPage({
                 </p>
               ) : null}
 
+              {/*
+                THE OFFERS ARE NOT A PANEL, and the words are not decoration.
+
+                This was a dashed, tinted box with the heading AND every line
+                inside it painted `text-bakery-700` — brown on cream, at the
+                weight of a caption. Two things went wrong with that. A dashed
+                border is the border browsers and design systems use for
+                something provisional, a drop target or a placeholder, so the
+                one block on the page that says "here is money off" read as the
+                least settled thing on it. And colouring the LINES as well as
+                the heading made the offers quieter than the product
+                description below them, which is the opposite of what they are
+                for — they are the reason somebody adds a second item.
+
+                So: no box, and the offers set in the page's own text colour at
+                the page's own size. The heading keeps the brand colour, since
+                that is what marks the block as a block now that nothing draws
+                one around it.
+              */}
               {offers.length > 0 ? (
-                <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
-                    <Tag className="size-4" />
+                <div>
+                  <p className="flex items-center gap-2 font-semibold text-bakery-700">
+                    {/*
+                      A PER CENT SIGN, not a luggage tag. Both are conventional
+                      for this, and the reference storefront uses the per cent —
+                      but the reason to prefer it is that a tag is also the icon
+                      this repo uses for a product's category chip, and two
+                      unrelated things on one page should not share a glyph.
+                    */}
+                    <Percent className="size-4 shrink-0" aria-hidden="true" />
                     Available offers
                   </p>
-                  <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                  <ul className="mt-3 space-y-2 text-sm text-foreground">
                     {offers.map((offer) => (
-                      <li key={offer} className="flex gap-2">
-                        <span aria-hidden className="text-bakery-700">•</span>
+                      <li key={offer} className="flex gap-2.5">
+                        <span aria-hidden className="text-bakery-700">
+                          •
+                        </span>
                         <span>{offer}</span>
                       </li>
                     ))}

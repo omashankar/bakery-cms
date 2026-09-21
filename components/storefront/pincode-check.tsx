@@ -105,7 +105,22 @@ export function PincodeCheck({ className }: { className?: string }) {
         : "border-destructive";
 
   return (
-    <div className={cn("flex w-full min-w-0 flex-col gap-x-4 gap-y-2 sm:flex-row sm:items-start", className)}>
+    /*
+      THE FIELD IS AS WIDE AS EVERY OTHER CONTROL IN THIS COLUMN, and the
+      answer sits UNDER it.
+
+      It was `sm:max-w-sm` with the answer beside it, which is what the shop
+      asked for when it was looking at this row on its own. Seen with the rest
+      of the column it was the one thing out of line: the message box and the
+      upload run the full width, the Add to Cart row runs the full width, and
+      this stopped at 384px — three different right-hand edges down one short
+      stack, which is the first thing the eye finds and cannot un-see.
+
+      Alignment wins because it is about the whole column and "beside" was
+      about one row. They genuinely cannot both hold: a field level with the
+      others leaves nothing to its right to put an answer in.
+    */
+    <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
@@ -125,7 +140,7 @@ export function PincodeCheck({ className }: { className?: string }) {
       */}
       <form
         className={cn(
-          "flex h-11 w-full min-w-0 overflow-hidden rounded-md border bg-card sm:max-w-sm",
+          "flex h-12 w-full min-w-0 overflow-hidden rounded-md border bg-card",
           outline,
         )}
         onSubmit={(event) => {
@@ -204,17 +219,16 @@ export function PincodeCheck({ className }: { className?: string }) {
       </form>
 
       {/*
-        BESIDE THE FIELD, not under it, which is what the shop asked for and is
-        also what keeps the row from growing: an answer below pushed Add to Cart
-        down the moment it appeared, so the button a customer was reaching for
-        moved as they read. It drops below on a phone, where there is no room
-        for two columns.
+        UNDER THE FIELD, because the field is now level with every other
+        control in this column and has nothing to its right. It still must not
+        push Add to Cart down as it appears — the button a customer is reaching
+        for should not move while they read — so the gap below is reserved by
+        the row spacing rather than created by the answer.
       */}
       <DeliveryAnswer
         result={result}
         pincode={entered}
         loading={checking}
-        className="sm:pt-2.5"
       />
     </div>
   );
