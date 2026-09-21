@@ -102,12 +102,32 @@ describe("search and the filter panel read the same words", () => {
      * ticking "Heart" in the sidebar found the cake and typing "Heart" into
      * search found nothing. Both run over the same card projection, where
      * `description` is empty — so option labels are most of what a card has.
+     *
+     * THIS USED TO CHECK THAT BOTH COPIES SAID IT, which is as much as a test
+     * can do while there ARE two copies: it pinned the six field names in one
+     * file and the same six in the other, and would have gone on passing while
+     * a seventh was added to one of them. The copy is gone — the filter calls
+     * `searchHaystack` — so the two cannot disagree at all, and what is left to
+     * check is that the sharing is real rather than that the duplicate matches.
+     *
+     * The header's suggestion dropdown is the third reader of it now, and the
+     * one where drift would show worst: a row offered and then not findable by
+     * the page behind Enter.
      */
     const search = code("features/products/lib/product-catalog.ts");
     const filters = code("apps/website/lib/collection-filters.ts");
 
     expect(search).toContain("...(cake.optionLabels ?? [])");
-    expect(filters).toContain("cake.optionLabels ?? []");
+    expect(search, "the haystack is not shareable").toContain(
+      "export function searchHaystack(",
+    );
+    expect(filters, "the filter stopped using the shared haystack").toContain(
+      "searchHaystack(cake).includes(query)",
+    );
+    expect(
+      filters.includes("cake.optionLabels ?? []"),
+      "the filter has grown its own copy of the haystack again",
+    ).toBe(false);
   });
 });
 

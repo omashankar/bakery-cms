@@ -1,4 +1,5 @@
 import type { LandingProduct } from "@/constants/landing-data";
+import { searchHaystack } from "@/features/products/lib/product-catalog";
 
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
@@ -540,23 +541,23 @@ export function applyCollectionFilters(
 
   let result = cakes.filter((cake) => {
     if (query) {
-      // Same haystack as the search page, and for the same reason: this filter
-      // runs on the card projection, where `description` is deliberately blank.
-      // A third of this predicate could never match, while the flavours and
-      // occasions the customer actually types were sitting unused in the same
-      // payload.
-      const haystack = [
-        cake.name,
-        cake.category,
-        cake.description,
-        ...(cake.optionLabels ?? []),
-        ...(cake.flavours ?? []),
-        ...(cake.occasions ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(query)) return false;
+      /*
+        THE SAME FUNCTION AS THE HEADER'S DROPDOWN, not the same six field
+        names written out a second time.
+
+        This was a copy, and its own comment — "Same haystack as the search
+        page" — was the only thing holding the two together. That is a promise
+        a person has to keep by hand every time either side gains a field, and
+        `optionLabels` is the one that got away: it was added here and not
+        there, so ticking "Heart" in the sidebar found a cake that typing
+        "Heart" into the box did not.
+
+        This is the page the header search lands on, so the two agreeing is
+        not tidiness. A dropdown row a customer taps Enter past has to be
+        findable by the page underneath it, and now it is by construction:
+        the dropdown ranks on top of this predicate rather than beside it.
+      */
+      if (!searchHaystack(cake).includes(query)) return false;
     }
 
     if (cake.price < filters.priceMin || cake.price > filters.priceMax) return false;

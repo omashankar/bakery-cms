@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState } from "react";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { navIcon } from "@/config/nav-icons";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,11 @@ import {
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import {
+  MIN_SUGGEST_CHARS,
+  type ProductSuggestion,
+} from "@/features/products/lib/product-suggestions";
 import { cn } from "@/lib/utils";
 
 interface StorefrontNavbarProps {
@@ -51,6 +56,209 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [showSearch] = useState(chrome.showSearch);
   const [searchPlaceholder] = useState(chrome.searchPlaceholder);
   const [cta] = useState(chrome.cta);
+
+  /* ------------------------------------------------------------------ *
+   * THE SEARCH BOX ANSWERS WHILE THE CUSTOMER IS STILL TYPING.
+   *
+   * It submitted, and that was all it did: type, press Enter, wait for a
+   * page. Every shop these customers already use answers before the Enter,
+   * and the reason is not decoration — somebody who types three letters and
+   * sees the thing they came for goes straight to it, and somebody who sees
+   * nothing types two more letters and guesses again.
+   *
+   * THE FORM STILL WORKS EXACTLY AS IT DID. This is added on top of a native
+   * GET, never in place of it: Enter with nothing highlighted submits the
+   * form and lands on the results page, which is what happens with
+   * JavaScript off, before hydration, and for anyone who ignores the
+   * dropdown entirely. Only Enter with a row highlighted is intercepted.
+   * ------------------------------------------------------------------ */
+  const pathname = usePathname();
+  const router = useRouter();
+  const [term, setTerm] = useState("");
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  /** -1 is "nothing highlighted", which is the state Enter must submit in. */
+  const [activeRow, setActiveRow] = useState(-1);
+  /** Phones have no room for the box, so the icon reveals one. */
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+  const searchFormRef = useRef<HTMLFormElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * Answers already paid for, for this page's lifetime only.
+   *
+   * Backspacing is most of what typing in a search box is, and without this
+   * every deleted character is a fresh request for an answer the browser had
+   * a moment ago. Deliberately NOT a cache header on the endpoint: a shop
+   * that unpublishes a product should stop suggesting it on the next page
+   * load, not when a CDN decides to let go.
+   */
+  const suggestCache = useRef(new Map<string, ProductSuggestion[]>());
+  const suggestListId = useId();
+
+  /*
+    180ms, not the hook's default 300.
+
+    A dropdown is read between keystrokes, so the delay is felt directly in a
+    way an admin list filter is not — 300 reads as the box thinking about it.
+    It is still long enough that "chocolate" costs one request rather than
+    nine, which is the whole reason the debounce is here.
+  */
+  const debouncedTerm = useDebouncedValue(term, 180);
+
+  /**
+   * NEW ROWS ARRIVE WITH NOTHING HIGHLIGHTED, always, in one render.
+   *
+   * This was an effect on `[suggestions]` that reset the highlight afterwards,
+   * and "afterwards" is the whole problem: between the rows changing and the
+   * effect running there is a render in which `activeRow` still points into
+   * the list that has just been replaced. A customer who has walked down to
+   * row four and then types one more letter is, for that render, highlighting
+   * whichever product has landed in position four of a different list — and
+   * Enter opens it.
+   *
+   * Setting both together makes that window impossible rather than short, and
+   * costs one render instead of two on every keystroke.
+   */
+  const showSuggestions = (rows: ProductSuggestion[]) => {
+    setSuggestions(rows);
+    setActiveRow(-1);
+  };
+
+  useEffect(() => {
+    const query = debouncedTerm.trim();
+    if (query.length < MIN_SUGGEST_CHARS) {
+      showSuggestions([]);
+      return;
+    }
+
+    const key = query.toLowerCase();
+    const remembered = suggestCache.current.get(key);
+    if (remembered) {
+      showSuggestions(remembered);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/products/suggest?q=${encodeURIComponent(query)}`, {
+      signal: controller.signal,
+    })
+      .then((answer) => (answer.ok ? answer.json() : null))
+      .then((body: { data?: unknown } | null) => {
+        const rows = Array.isArray(body?.data) ? (body.data as ProductSuggestion[]) : [];
+        suggestCache.current.set(key, rows);
+        showSuggestions(rows);
+      })
+      .catch((error: unknown) => {
+        /*
+          A KEYSTROKE ABORTS THE LAST REQUEST, which is not a failure and must
+          not clear anything — the rows on screen belong to what is still in
+          the box. A real failure must clear, though, because the alternative
+          is the previous query's products sitting under a different word.
+        */
+        if ((error as { name?: string })?.name === "AbortError") return;
+        showSuggestions([]);
+      });
+
+    return () => controller.abort();
+  }, [debouncedTerm]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onPointerDown = (event: Event) => {
+      if (!searchFormRef.current?.contains(event.target as Node)) setPanelOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [panelOpen]);
+
+  useEffect(() => {
+    setPanelOpen(false);
+    setPhoneSearchOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (phoneSearchOpen) searchInputRef.current?.focus();
+  }, [phoneSearchOpen]);
+
+  /**
+   * THE BOX SHOWS WHAT WAS SEARCHED FOR, on the page the search landed on.
+   *
+   * It did not. A customer searched "butterscotch", arrived at a results page
+   * saying "Showing 3 of 27 for butterscotch", and found the header box empty
+   * above it — so refining the search meant typing the whole word again.
+   *
+   * Seeded through the updater rather than assigned, and that is not a style
+   * choice: this runs after hydration, and anything already typed into the
+   * box before then — by a fast customer or by a test — would otherwise be
+   * thrown away by a stale query string.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const searched = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
+    if (!searched) return;
+    setTerm((typed) => (typed ? typed : searched));
+  }, [pathname]);
+
+  const openSuggestion = (row: ProductSuggestion) => {
+    setPanelOpen(false);
+    setPhoneSearchOpen(false);
+    router.push(routes.store.cake(row.slug));
+  };
+
+  const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      /*
+        PREVENTED, AND THE REASON IS THE BROWSER, NOT THIS CODE.
+
+        `type="search"` is not a plain text box: Chrome and Safari EMPTY it
+        when Escape is pressed. So dismissing the suggestions also threw away
+        what the customer had typed — they pressed Escape to get the list off
+        the screen and lost the word they were halfway through. Measured, not
+        reasoned about: the probe pressed Escape and then Enter, and the form
+        submitted `?q=` with nothing in it.
+
+        The field stays `type="search"` deliberately — it is what puts the
+        clear button in the box and what a phone keyboard reads to draw a
+        Search key instead of Return.
+      */
+      event.preventDefault();
+      setPanelOpen(false);
+      setActiveRow(-1);
+      return;
+    }
+    if (event.key === "Enter") {
+      // ONLY when a row is highlighted. Otherwise the form submits, which is
+      // the behaviour everything else in this box depends on.
+      const picked = panelOpen && activeRow >= 0 ? suggestions[activeRow] : undefined;
+      if (!picked) return;
+      event.preventDefault();
+      openSuggestion(picked);
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (suggestions.length === 0) return;
+
+    // Prevented so the caret does not jump to either end of the box while
+    // the customer is walking the list.
+    event.preventDefault();
+    setPanelOpen(true);
+    setActiveRow((current) => {
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      const next = current + step;
+      // Past the last row comes "nothing highlighted", not the first row:
+      // Enter there submits the search, which is where a customer walking
+      // off the end of six suggestions is trying to get to.
+      if (next >= suggestions.length) return -1;
+      if (next < -1) return suggestions.length - 1;
+      return next;
+    });
+  };
+
+  const suggestionsShowing = panelOpen && suggestions.length > 0;
 
   /**
    * The two rows the navbar renders as something other than a plain link.
@@ -79,7 +287,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [signedIn, setSignedIn] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -271,7 +478,14 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             room for it. The base height is what a phone gets; the two survive
             together because they are different breakpoints.
           */
-          "flex h-16 items-center justify-between gap-2 lg:h-[88px] lg:gap-4"
+          /*
+            `relative` so the phone's search band has something to hang from.
+            It is the row the band drops out of, and `top-full` measures from
+            the nearest positioned ancestor — without this that is the sticky
+            header itself on some pages and the page box on others, which put
+            the band over the row on one and halfway down the hero on another.
+          */
+          "relative flex h-16 items-center justify-between gap-2 lg:h-[88px] lg:gap-4"
         )}
       >
         {/*
@@ -342,27 +556,165 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               content without it, and this one sits between a shop name of
               unknown length and an icon cluster.
             */
-            className="mx-3 hidden min-w-0 max-w-xl flex-1 items-center sm:flex lg:mx-6"
+            className={cn(
+              "mx-3 min-w-0 max-w-2xl flex-1 items-center sm:flex lg:mx-6",
+              /*
+                AND ON A PHONE IT IS A BAND UNDER THE ROW, not a box in it.
+
+                Below 640 the row holds a logo, a cart and a menu button and
+                genuinely has no width left — that is why there is an icon
+                there instead. But the icon used to be a LINK to the
+                collections page, so a phone customer tapping the one search
+                control in the header got an unfiltered grid and no box to
+                type in: the control named Search could not search.
+
+                So the same form drops below the row when the icon is tapped.
+                One form, not two — the alternative was a second <form> with
+                a second input and a second copy of every keyboard handler,
+                and the two would drift the way the two search haystacks did.
+              */
+              phoneSearchOpen
+                ? "absolute inset-x-0 top-full z-40 mx-0 flex max-w-none border-b border-border bg-card px-4 py-2.5 sm:static sm:mx-3 sm:max-w-2xl sm:border-0 sm:bg-transparent sm:p-0 lg:mx-6"
+                : "hidden",
+            )}
+            ref={searchFormRef}
             role="search"
           >
+            {/*
+              THE MAGNIFIER SITS ON THE LEFT, AND IS STILL THE SUBMIT.
+
+              It was a round pill with the icon on the right, which reads as
+              a button with a text field bolted to it. Every shop a customer
+              already uses puts the glass first, ahead of the words, so the
+              icon is the label for the box rather than the control at the
+              end of it — and this is the shape the shop asked for.
+
+              Keeping it a `type="submit"` rather than dropping in a plain
+              <Search /> is the part that is easy to lose: it is the only
+              way to run a search with a pointer, and the only one at all
+              before the page hydrates or with JavaScript off. Decorative on
+              the left would take that away from every one of those.
+            */}
             <div className="relative w-full">
+              <button
+                type="submit"
+                aria-label="Search"
+                className="absolute left-1 top-1 flex size-9 items-center justify-center rounded-md text-muted-foreground"
+              >
+                <Search className="size-[1.125rem]" />
+              </button>
               <input
                 type="search"
                 name="q"
+                ref={searchInputRef}
+                value={term}
+                onChange={(event) => {
+                  setTerm(event.target.value);
+                  setPanelOpen(true);
+                }}
+                onFocus={() => setPanelOpen(true)}
+                onKeyDown={onSearchKeyDown}
                 placeholder={
                   searchPlaceholder ||
                   `Search ${labels.productWordPlural.toLowerCase()}…`
                 }
                 aria-label="Search"
-                className="h-10 w-full rounded-full border border-input bg-cream-50 pl-4 pr-11 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                /*
+                  Combobox semantics, which this repo had none of to copy.
+                  `autoComplete="off"` is not decoration either: the browser's
+                  own history dropdown draws over this one, so without it a
+                  returning customer sees two stacked lists, only one of which
+                  knows what the shop sells.
+                */
+                role="combobox"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-expanded={suggestionsShowing}
+                aria-controls={suggestListId}
+                aria-activedescendant={
+                  activeRow >= 0 ? `${suggestListId}-${activeRow}` : undefined
+                }
+                className="h-11 w-full rounded-lg border border-input bg-cream-50 pl-11 pr-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
-              <button
-                type="submit"
-                aria-label="Search"
-                className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-cream-100 hover:text-bakery-700"
-              >
-                <Search className="size-4" />
-              </button>
+
+              {/*
+                THE ANSWERS, WHILE THE CUSTOMER IS STILL TYPING.
+
+                Inside the form on purpose, and the click-outside listener
+                tests for exactly that: a panel mounted as a sibling would be
+                outside the form's subtree, the pointer-down that begins a tap
+                on a row would close the panel, and the click would land on
+                whatever the page moved underneath it. That bug is invisible
+                on a desktop with a fast mouse and constant on a phone.
+
+                Rows are real links, so the middle-click and the long-press
+                that open a product in a new tab both work. Enter is handled
+                on the input above rather than here, because the row is not
+                what has focus — the box is, all the way through.
+              */}
+              {suggestionsShowing ? (
+                <div
+                  id={suggestListId}
+                  role="listbox"
+                  aria-label="Search suggestions"
+                  className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+                >
+                  {suggestions.map((row, index) => (
+                    <Link
+                      key={row.slug}
+                      id={`${suggestListId}-${index}`}
+                      role="option"
+                      aria-selected={index === activeRow}
+                      href={routes.store.cake(row.slug)}
+                      onClick={() => {
+                        setPanelOpen(false);
+                        setPhoneSearchOpen(false);
+                      }}
+                      onMouseEnter={() => setActiveRow(index)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2",
+                        index === activeRow && "bg-cream-100",
+                      )}
+                    >
+                      {/*
+                        A SQUARE THAT IS ALWAYS THERE, filled or not. A row
+                        whose product has no picture would otherwise be
+                        narrower than the five above it, and the names would
+                        step sideways as the list changed under the typing.
+                      */}
+                      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-cream-50 text-xs font-semibold text-muted-foreground">
+                        {row.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={row.image}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          row.name.slice(0, 1).toUpperCase()
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-foreground">
+                          {row.name}
+                        </span>
+                        {/*
+                          The category, and nothing at all when the product
+                          has none. An "in" with a blank after it is the shop
+                          telling a customer something it does not know.
+                        */}
+                        {row.category ? (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            in {row.category}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </form>
         ) : null}
@@ -397,9 +749,21 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 what it says and what it does.
               */
               className="flex text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:hidden"
-              render={<Link href={routes.store.collections} aria-label="Search" />}
+              /*
+                IT OPENS THE BOX. IT USED TO LEAVE THE PAGE.
+
+                `<Link href={routes.store.collections}>` — a control labelled
+                Search that navigated to the unfiltered grid and offered
+                nothing to type into. The shop said so directly: the search
+                icon was still being sent to collections. It is the ONLY
+                search control a phone has, and this shop's customers are on
+                phones, so it was the majority experience of searching here.
+              */
+              aria-label="Search"
+              aria-expanded={phoneSearchOpen}
+              onClick={() => setPhoneSearchOpen((open) => !open)}
             >
-              <Search className="size-5" />
+              {phoneSearchOpen ? <X className="size-5" /> : <Search className="size-5" />}
             </Button>
           ) : null}
           <Button
@@ -789,14 +1153,28 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               )}
             </div>
             {showSearch ? (
-              <Link
-                href={routes.store.collections}
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
+              /*
+                THE DRAWER'S SEARCH ROW, which was the same broken promise as
+                the icon above it: a link to the unfiltered collections grid,
+                labelled Search, with nothing to type into at the other end.
+
+                It closes the drawer and opens the box — the same box, the
+                same suggestions. A button rather than a link because nothing
+                is being navigated to any more, and a link that does not
+                navigate is a link a customer cannot open in a new tab and a
+                screen reader announces wrongly.
+              */
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  setPhoneSearchOpen(true);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-cream-100"
               >
                 <Search className="size-4" />
                 Search
-              </Link>
+              </button>
             ) : null}
 
 

@@ -78,8 +78,22 @@ export function getProductBySlug(slug: string): LandingProduct | undefined {
  * the sidebar found the cake, typing “Heart” into search found nothing. Both
  * run over the same card projection, where `description` is empty, so option
  * labels are most of what a card has to match on.
+ *
+ * EXPORTED BECAUSE IT WAS COPIED, and the copies had already started to rot.
+ * This list of six fields was written out three times — here, inline inside
+ * `applyCollectionFilters`, and again in the admin's global search — and the
+ * comment on the second one said "Same haystack as the search page", which is
+ * a promise a human has to keep by hand. It was kept, and then `optionLabels`
+ * was added to one of them and not the other.
+ *
+ * It matters more now than it did, because the header's suggestion dropdown
+ * is a THIRD reader of it and the one place the drift would be worst: a row
+ * offered in the dropdown that the results page then cannot find is the shop
+ * showing a customer a product and losing it when they press Enter. The
+ * dropdown ranks on top of this function rather than beside it, so anything
+ * it suggests is something the page it leads to will also match.
  */
-function searchHaystack(cake: LandingProduct): string {
+export function searchHaystack(cake: LandingProduct): string {
   return [
     cake.name,
     cake.category,

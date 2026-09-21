@@ -218,14 +218,57 @@ describe("the search box", () => {
      * 640px and showed it on tablets — so a phone had no search control in
      * the header at all, under a comment saying "phones only". The comment
      * was the accurate half of the intent; the classes were the bug.
+     *
+     * FOUND BY THE PHONE ICON'S HANDLER, not by the link it used to be. This
+     * guard read `href={routes.store.collections} aria-label="Search"` — so
+     * it pinned in place the exact thing the shop then asked to have removed,
+     * and the only way to satisfy the shop was to fail this test.
      */
     const navbar = code(NAVBAR);
-    const at = navbar.indexOf('href={routes.store.collections} aria-label="Search"');
+    const at = navbar.indexOf("setPhoneSearchOpen((open) => !open)");
     expect(at, "the phone search icon is gone").toBeGreaterThan(-1);
-    const icon = navbar.slice(at - 400, at);
+    const icon = navbar.slice(at - 700, at);
 
     expect(icon, "the icon is hidden on phones again").toContain("sm:hidden");
     expect(icon).not.toContain("sm:flex");
+  });
+
+  it("and tapping it gives a phone somewhere to type, rather than a page", () => {
+    /**
+     * THE SHOP REPORTED THIS ONE. The single search control a phone has was
+     * `<Link href={routes.store.collections}>` — it left the page and landed
+     * on the unfiltered grid, with nothing to type into at the other end. A
+     * control labelled Search that cannot search.
+     *
+     * Two guards, because either alone passes for the wrong reason: that no
+     * search control still navigates to a bare collections page, and that the
+     * form the icon reveals is the SAME form the desktop uses. A second form
+     * with a second input would pass a "there is a box on a phone" test while
+     * duplicating every keyboard handler in this file — the two search
+     * haystacks in this codebase are what that drift looks like a year on.
+     */
+    const navbar = code(NAVBAR);
+
+    expect(
+      navbar.includes('href={routes.store.collections} aria-label="Search"'),
+      "the phone search icon navigates to the collections page again",
+    ).toBe(false);
+    /*
+      The drawer row was the same broken promise and is checked by what it is
+      now, not by what it is not: `href={routes.store.collections}` is still
+      legitimately in this file twice — the form posts to it and the nav band
+      links to it — so a blanket ban on the string would be a guard that can
+      only be satisfied by breaking the header.
+    */
+    const drawer = navbar.slice(navbar.indexOf('id="storefront-mobile-nav"'));
+    expect(drawer, "the drawer has no Search row at all").toContain("setPhoneSearchOpen(true)");
+
+    expect((navbar.match(/<form/g) ?? []).length, "there is a second search form").toBe(1);
+    expect(
+      (navbar.match(/type="search"/g) ?? []).length,
+      "there is a second search input",
+    ).toBe(1);
+    expect(navbar, "the form has no phone state at all").toContain("phoneSearchOpen");
   });
 });
 
