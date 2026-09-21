@@ -247,6 +247,71 @@ test("and Add to Cart is the biggest thing a customer can press", async ({ page 
   ).toBeGreaterThanOrEqual(sizes.tallestOther);
 });
 
+test("and the photo viewer leaves nothing but the photo", async ({ page }) => {
+  /*
+    A PHOTOGRAPH IS JUDGED AGAINST WHAT SURROUNDS IT. The viewer used the house
+    dialog dim of 45%, which left the shop's own cream and brown showing through
+    — so a customer inspecting a cake was comparing it to the page rather than
+    to nothing. Every other dialog on this site is a form or a message, where
+    45% is right because it says the page is still there; this one is a viewer,
+    where the job is the opposite.
+
+    MEASURED, NOT READ OFF A CLASS. `overlayClassName` is a prop that a later
+    change to `DialogContent` could stop forwarding without anything failing to
+    compile, and a test that greps for "bg-black/85" would pass while the dim
+    it names never reached the screen. So this samples the pixels: it
+    screenshots a strip of the header, decodes it in the page and averages it,
+    with the viewer shut and again with it open.
+
+    Measured at the time of writing: 212 of 255 becomes 45. That is also the
+    check that corrected me — the scaled-down screenshot looked as though the
+    header was still lit, and it was not.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(3000);
+
+  const strip = { x: 20, y: 25, width: 200, height: 40 };
+  const brightnessOf = async () => {
+    const shot = await page.screenshot({ clip: strip });
+    return page.evaluate(async (data: string) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${data}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let total = 0;
+      for (let at = 0; at < pixels.length; at += 4) {
+        total += (pixels[at]! + pixels[at + 1]! + pixels[at + 2]!) / 3;
+      }
+      return Math.round(total / (pixels.length / 4));
+    }, shot.toString("base64"));
+  };
+
+  const lit = await brightnessOf();
+  expect(lit, `the header is already dark at ${lit}, so this measures nothing`).toBeGreaterThan(
+    150,
+  );
+
+  const opener = page.locator('button[aria-label^="Zoom"]').first();
+  await expect(opener, "the product photo does not open a viewer").toBeVisible();
+  await opener.click();
+  await page.waitForTimeout(1200);
+
+  await expect(page.locator('[role="dialog"]'), "the viewer did not open").toBeVisible();
+
+  const dimmed = await brightnessOf();
+  expect(
+    dimmed,
+    `the page behind the viewer is at ${dimmed} of 255, where it was ${lit}`,
+  ).toBeLessThan(70);
+});
+
 test("and the offers are read at the page's own volume, not in a dashed box", async ({ page }) => {
   /*
     THE OFFERS ARE THE REASON SOMEBODY ADDS A SECOND ITEM, and they were the

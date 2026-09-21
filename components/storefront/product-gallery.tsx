@@ -264,7 +264,24 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
-        <DialogContent className="border-border p-2 sm:max-w-4xl sm:p-3" showCloseButton>
+        {/*
+          NEARLY BLACK BEHIND IT, and wider than the house dialog.
+
+          A photograph is judged against whatever surrounds it. At the shared
+          45% the shop's own cream and brown still showed through and the
+          product was being compared to them — which is fine for a form, where
+          the dim's job is to say the page is still there, and wrong for a
+          viewer, where the job is to leave nothing but the picture. The
+          reference storefront's viewer is almost black for the same reason.
+
+          `overlayClassName` rather than a change to `DialogOverlay`: every
+          other dialog on this site is a form or a message and wants the 45%.
+        */}
+        <DialogContent
+          className="border-border p-2 sm:max-w-5xl sm:p-3"
+          overlayClassName="bg-black/85 dark:bg-black/85"
+          showCloseButton
+        >
           <DialogTitle className="sr-only">{productName}</DialogTitle>
           <div className="relative aspect-square overflow-hidden rounded-xl bg-cream-100">
             <OptimizedImage
