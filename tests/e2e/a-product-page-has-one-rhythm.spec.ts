@@ -247,6 +247,92 @@ test("and Add to Cart is the biggest thing a customer can press", async ({ page 
   ).toBeGreaterThanOrEqual(sizes.tallestOther);
 });
 
+test("and the magnifier shows more of the photo, not the same photo bigger", async ({ page }) => {
+  /*
+    THE PANEL WAS FED THE PAGE'S OWN COPY. It shows a slice at 2.5x across 416
+    CSS pixels — 832 device pixels on most screens — and this shop's photographs
+    are delivered at 600. Measured before the fix: a 240-pixel slice filling
+    832, a 3.47x upscale. Not a closer look; the same photograph with its edges
+    smeared, at the moment a customer is deciding whether to trust it.
+
+    TWO THINGS ARE CHECKED AND BOTH MATTER. The panel must carry two background
+    layers — the big file over the small one — so it is filled the instant it
+    appears and sharpens when the larger arrives, rather than showing an empty
+    card for the length of a fetch. And the top layer must actually decode
+    wider than the one the page rendered, which is the part a URL-shaped
+    assertion would miss: `magnifiableImageUrl` can return a longer string that
+    the CDN answers at the same size.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(3000);
+
+  const photo = page.locator('button[aria-label^="Zoom"]').first();
+  await expect(photo, "the product has no photo to magnify").toBeVisible();
+
+  const box = (await photo.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.waitForTimeout(2500);
+
+  const panel = await page.evaluate(async () => {
+    const node = document.querySelector('[data-testid="zoom-panel"]');
+    if (!node) return null;
+    const layers = [...getComputedStyle(node).backgroundImage.matchAll(/url\("?(.*?)"?\)/g)].map(
+      (match) => match[1]!,
+    );
+    const widthOf = async (src: string) => {
+      const image = new Image();
+      image.src = src;
+      await image.decode().catch(() => {});
+      return image.naturalWidth;
+    };
+    const onPage = document.querySelector("main img") as HTMLImageElement | null;
+    return {
+      layers: layers.length,
+      sameUrl: layers.length === 2 && layers[0] === layers[1],
+      big: layers[0] ? await widthOf(layers[0]) : 0,
+      base: layers[1] ? await widthOf(layers[1]) : 0,
+      rendered: onPage?.naturalWidth ?? 0,
+    };
+  });
+
+  expect(panel, "no magnifier appeared on hover").not.toBeNull();
+  expect(
+    panel!.layers,
+    "the panel draws one layer, so the first hover shows an empty card while it loads",
+  ).toBe(2);
+
+  /*
+    A SHOP MAY HAVE UPLOADED A SMALL PHOTOGRAPH, and then there is nothing
+    bigger to fetch — `c_limit` stops Cloudinary inventing it, which is right.
+    Two of this shop's own uploads are 735px. So the assertion is "no smaller
+    than the base, and big enough to be worth magnifying at all", not a fixed
+    number that would fail on honest data.
+  */
+  expect(panel!.big, "the magnified layer did not load").toBeGreaterThan(0);
+  expect(
+    panel!.big,
+    `the magnifier came back with ${panel!.big}px where the page already has ${panel!.base}px`,
+  ).toBeGreaterThanOrEqual(panel!.base);
+
+  /*
+    A DIFFERENT URL, and this is the assertion that actually holds the change
+    up. `big >= base` is satisfied by feeding the panel the SAME file twice —
+    measured: reverting the fix and leaving both layers pointing at the page's
+    own copy kept this test green until this line existed.
+
+    Why not `big > base`: two of this shop's own uploads are 735px originals,
+    so the larger request comes back the same size and `c_limit` is right to
+    refuse to invent the difference. What can always be asserted is that the
+    panel asked for its own copy rather than reusing the page's.
+  */
+  expect(
+    panel!.sameUrl,
+    "the magnifier is fed the page's own copy, so it can only ever upscale it",
+  ).toBe(false);
+});
+
 test("and the photo viewer leaves nothing but the photo", async ({ page }) => {
   /*
     A PHOTOGRAPH IS JUDGED AGAINST WHAT SURROUNDS IT. The viewer used the house

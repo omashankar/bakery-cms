@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
+import { magnifiableImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
@@ -112,6 +113,16 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
 
   /** The same repair `OptimizedImage` applies, for the CSS background below. */
   const magnifiedSrc = fixBrokenImageUrl(activeImage);
+  /**
+   * The same photograph, asked for at a size worth magnifying.
+   *
+   * The panel shows a slice at 2.5x across 416 CSS pixels — 832 device pixels
+   * on most screens — and the page's own copy of this picture is 600 or 736
+   * wide. That was a 3.47x upscale: not a closer look, just the same photograph
+   * with its edges smeared, at the exact moment a customer is deciding whether
+   * to trust it. Requested only here, and only fetched when somebody hovers.
+   */
+  const magnifiedLarge = magnifiableImageUrl(magnifiedSrc);
   /** The lens is the slice the panel is showing, so it is 1/zoom of the photo. */
   const lensSize = 100 / HOVER_ZOOM;
   const lensEdge = (value: number) =>
@@ -255,7 +266,18 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             data-testid="zoom-panel"
             className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-card bg-no-repeat shadow-lg lg:block"
             style={{
-              backgroundImage: `url("${magnifiedSrc}")`,
+              /*
+                TWO LAYERS, THE BIG ONE OVER THE SMALL ONE.
+
+                CSS paints the first background over the second, and the second
+                is the file the page has already downloaded — so the panel is
+                filled the instant it appears, softly, and sharpens the moment
+                the larger version lands. One layer would have shown an empty
+                card on the first hover for as long as the fetch took, which on
+                a phone is exactly when somebody is deciding whether this shop
+                is worth their money.
+              */
+              backgroundImage: `url("${magnifiedLarge}"), url("${magnifiedSrc}")`,
               backgroundSize: `${HOVER_ZOOM * 100}%`,
               backgroundPosition: `${lens.x * 100}% ${lens.y * 100}%`,
             }}

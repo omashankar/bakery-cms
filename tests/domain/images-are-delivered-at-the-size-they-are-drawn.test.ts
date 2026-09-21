@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { optimizedImageUrl } from "@/lib/image-url";
+import { magnifiableImageUrl, optimizedImageUrl } from "@/lib/image-url";
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -103,6 +103,79 @@ describe("the surfaces that draw the shop's images", () => {
       "layouts/auth-layout.tsx",
     ]) {
       expect(source(file), file).toMatch(/optimizedImageUrl\([^)]*\{\s*(?:width|height):/);
+    }
+  });
+});
+
+/**
+ * THE OTHER DIRECTION: a photograph big enough to be magnified.
+ *
+ * `optimizedImageUrl` above exists to stop a shop shipping a 1254px file for a
+ * 16px favicon. This is its mirror — the product page's hover panel shows a
+ * slice of a photograph at 2.5x across 416 CSS pixels, which is 832 device
+ * pixels on most screens, and the copy the page renders is 600 wide on this
+ * shop's Unsplash photographs.
+ *
+ * Measured on the live page before the fix: a 240-pixel slice filling 832
+ * device pixels, a 3.47x upscale. That is not a closer look at anything; it is
+ * the same photograph with its edges smeared, at the moment a customer is
+ * deciding whether to trust it. After: 1.04x on six of this shop's eight
+ * products, and 2.83x on the two whose stored original is only 735px — a limit
+ * of what the shop uploaded, not of this code, and `c_limit` is what keeps
+ * Cloudinary from inventing the difference.
+ */
+describe("magnifiableImageUrl", () => {
+  it("asks Unsplash for a bigger file, by rewriting the size it was already asked for", () => {
+    expect(
+      magnifiableImageUrl("https://images.unsplash.com/photo-123?w=600&h=600&fit=crop"),
+    ).toBe("https://images.unsplash.com/photo-123?w=2000&h=2000&fit=crop");
+  });
+
+  it("and leaves a bare Unsplash URL alone, because that is already the original", () => {
+    /*
+      No `w` and no `h` means nobody asked for a size, so the delivered file is
+      the full-resolution one and there is nothing bigger to ask for. Adding
+      parameters here would make it SMALLER.
+    */
+    const bare = "https://images.unsplash.com/photo-123";
+    expect(magnifiableImageUrl(bare)).toBe(bare);
+  });
+
+  it("and asks Cloudinary through the same transform the rest of the site uses", () => {
+    const url = magnifiableImageUrl(
+      "https://res.cloudinary.com/demo-cloud/image/upload/v1787403425/bakery-cms/abc123.png",
+    );
+    expect(url).toContain("f_auto,q_auto,w_2000,c_limit");
+    /*
+      `c_limit` is load-bearing: it tells Cloudinary to shrink to fit and never
+      to enlarge. Two of this shop's own uploads are 735px, and a magnifier that
+      asked Cloudinary to invent the other 1265 would return a bigger file that
+      is no sharper — the shop paying for pixels that carry nothing.
+    */
+    expect(url).not.toContain("c_scale");
+    expect(url).not.toContain("c_fill");
+  });
+
+  it("and halves the figure it is given, because the Cloudinary helper doubles", () => {
+    // `optimizedImageUrl` multiplies by two for retina. Passing 2000 straight
+    // through would ask for 4000 and bill the shop for pixels no screen draws.
+    expect(magnifiableImageUrl("https://res.cloudinary.com/c/image/upload/v1/a.png", 1200))
+      .toContain("w_1200");
+  });
+
+  it("and returns any other host untouched", () => {
+    /*
+      The same refusal the rest of this file makes. An admin may paste a URL
+      from anywhere, and guessing at another CDN's parameters produces a broken
+      image rather than a bigger one — the magnifier then shows what the page
+      already had, which is the honest fallback.
+    */
+    for (const url of [
+      "https://cdn.example.com/cake.jpg",
+      "https://example.com/a.png?w=600",
+      "",
+    ]) {
+      expect(magnifiableImageUrl(url)).toBe(url);
     }
   });
 });
