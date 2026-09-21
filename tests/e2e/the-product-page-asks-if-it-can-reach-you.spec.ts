@@ -78,11 +78,18 @@ test("the product page answers a PIN code in the shop's own words", async ({ pag
     const form = input?.closest("form");
     const button = form?.querySelector('button[type="submit"]');
     if (!input || !form || !button) return null;
+    /*
+      MEASURED AGAINST WHATEVER IS DIRECTLY BEFORE IT, not against the input.
+      A clear button sits between the two once something has been typed, so
+      input-to-Check reads 6px and this failed for a control that was perfectly
+      joined — the gap it was reporting was the clear button.
+    */
+    const before = button.previousElementSibling ?? input;
     const f = form.getBoundingClientRect();
-    const i = input.getBoundingClientRect();
+    const p = before.getBoundingClientRect();
     const b = button.getBoundingClientRect();
     return {
-      between: Math.round(b.left - i.right),
+      between: Math.round(b.left - p.right),
       flushRight: Math.round(f.right - b.right),
       sameHeight: Math.abs(f.height - b.height) <= 2,
     };
@@ -101,12 +108,23 @@ test("the product page answers a PIN code in the shop's own words", async ({ pag
   await page.click(`form:has(${BOX}) button[type="submit"]`);
   await page.waitForTimeout(900);
 
-  const answer = await page.evaluate((sel) => {
+  const hit = await page.evaluate((sel) => {
     const form = document.querySelector(sel)?.closest("form");
-    return (form?.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim();
+    return {
+      text: (form?.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim(),
+      border: getComputedStyle(form as Element).borderTopColor,
+    };
   }, BOX);
+  const answer = hit.text;
 
-  expect(answer, `nothing was said about ${zone.pincode}`).toContain("Deliver");
+  /*
+    THE CODE IS REPEATED BACK, which is not decoration. A customer who meant
+    324001, typed 324010 and read a bare "yes" finds out at checkout; one who
+    reads the code they did not type finds out now.
+  */
+  expect(answer, `nothing was said about ${zone.pincode}`).toContain(
+    `Yes, we have delivery at ${zone.pincode}`,
+  );
   expect(
     answer,
     `the answer does not name the zone the shop matched: ${answer}`,
@@ -124,20 +142,114 @@ test("the product page answers a PIN code in the shop's own words", async ({ pag
   await page.click(`form:has(${BOX}) button[type="submit"]`);
   await page.waitForTimeout(900);
 
-  const miss = await page.evaluate((sel) => {
+  const missed = await page.evaluate((sel) => {
     const form = document.querySelector(sel)?.closest("form");
-    return (form?.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim();
+    return {
+      text: (form?.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim(),
+      border: getComputedStyle(form as Element).borderTopColor,
+    };
   }, BOX);
+  const miss = missed.text;
 
-  expect(miss, "an uncovered code still reads as covered").not.toContain("Deliver");
+  expect(miss, "an uncovered code still reads as covered").not.toContain("Yes, we have delivery");
   expect(miss, "nothing at all was said about an uncovered code").toContain(
-    "No delivery area covers this PIN code",
+    "No, we have not covered 999999",
   );
+  /*
+    "YET" IS DOING REAL WORK and is not filler: it is what makes this a
+    statement about the shop's zone LIST, which it can change this afternoon,
+    rather than about the shop.
+  */
+  expect(miss, "the answer reads as permanent").toContain("yet");
   /*
     The claim the wording exists to avoid. Checked by its shape rather than by
     one sentence, so a rewrite that means the same thing still fails.
   */
   expect(miss.toLowerCase()).not.toMatch(/we (do not|don't|cannot|can't) deliver/);
+
+  /*
+    ---- AND THE ANSWER IS NEVER THE COLOUR ALONE -------------------------
+
+    The field's border turns green or red, which the shop asked for and which
+    is worth having — but about one man in twelve cannot tell those two apart,
+    so the border is a SECOND signal. The words above already carry the answer;
+    this checks the colours actually differ, so the two signals do not quietly
+    collapse into one.
+  */
+  expect(
+    hit.border,
+    `a covered and an uncovered code draw the same border: ${hit.border}`,
+  ).not.toBe(missed.border);
+});
+
+test("and the row never pushes the page sideways, answered or not", async ({ page, request }) => {
+  /*
+    IT DID, AT 320. An `<input>`'s intrinsic width comes from its `size`
+    attribute, which defaults to twenty characters — about 211px here. The
+    column this row sits in is a GRID item, and a grid item's automatic minimum
+    is its own min-content, so the column refused to go below 28 (the icon) +
+    211 + 93 (the Check button) = 332. At a 320px window the track is 288, so
+    the column overhung by 44 and the whole page gained a sideways scrollbar.
+
+    `min-w-0` did not cure it and looked like it should: it lets the input
+    shrink as a flex ITEM, so the field was never the thing overflowing while
+    the column's minimum was still being computed from the same twenty
+    characters. Checked both before and after an answer renders, because the
+    answer is a second column at ≥640 and a second row below it.
+
+    A FRESH CONTEXT PER WIDTH, or this measures the wrong thing: a checked code
+    is SAVED, so the next page load starts with the field filled and a clear
+    button beside it — which is a different, wider control than the one a first
+    visitor sees.
+  */
+  test.setTimeout(240_000);
+  const zones = await zonesOf(request);
+  const zone = zones.find((row) => row.isActive !== false && row.pincode);
+
+  const href = await (async () => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    return aProduct(page);
+  })();
+
+  for (const width of [320, 375, 640, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto(href);
+    await page.waitForTimeout(3000);
+
+    /*
+      A checked code is SAVED, so without this the second width starts with the
+      field filled and a clear button beside it — a different, wider control
+      than the one a first visitor sees, and not the one that overflowed.
+    */
+    await page.evaluate(() => {
+      try {
+        window.localStorage.clear();
+      } catch {
+        /* a private window has none to clear */
+      }
+    });
+    await page.reload();
+    await page.waitForTimeout(3000);
+
+    await expect(
+      page.locator(BOX),
+      `${width}px: the delivery check is not on the page`,
+    ).toBeVisible();
+
+    const empty = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(empty, `${width}px: the page scrolls sideways before anything is typed`).toBe(0);
+
+    await page.fill(BOX, zone?.pincode ?? "999999");
+    await page.click(`form:has(${BOX}) button[type="submit"]`);
+    await page.waitForTimeout(800);
+
+    const answered = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(answered, `${width}px: the answer pushes the page sideways`).toBe(0);
+  }
 });
 
 test("and what was checked there is what the header already knows", async ({ page, request }) => {

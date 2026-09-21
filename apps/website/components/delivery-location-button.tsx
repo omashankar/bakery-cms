@@ -171,7 +171,7 @@ export function DeliveryLocationButton() {
             this wording is how two screens come to tell somebody two different
             things about whether an order can reach them.
           */}
-          <DeliveryAnswer result={result} loading={loading} className="mt-3" />
+          <DeliveryAnswer result={result} pincode={entered} loading={loading} className="mt-3" />
         </div>
       ) : null}
     </div>

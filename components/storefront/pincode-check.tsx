@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
@@ -89,8 +89,23 @@ export function PincodeCheck({ className }: { className?: string }) {
     }
   };
 
+  /*
+    THE BORDER CARRIES THE ANSWER TOO, and it is deliberately a SECOND signal
+    rather than the only one. Green and red alone would say nothing to a
+    customer who cannot tell them apart — roughly one man in twelve — so the
+    tick, the cross and the sentence beside them each carry the same answer on
+    their own. The colour is what makes it readable at a glance for everyone
+    else.
+  */
+  const outline =
+    result === null
+      ? "border-input focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
+      : result.served
+        ? "border-green-600"
+        : "border-destructive";
+
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("flex w-full min-w-0 flex-col gap-x-4 gap-y-2 sm:flex-row sm:items-start", className)}>
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
@@ -109,7 +124,10 @@ export function PincodeCheck({ className }: { className?: string }) {
         the way every other input on this page lights itself.
       */}
       <form
-        className="flex h-11 w-full overflow-hidden rounded-md border border-input bg-card focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
+        className={cn(
+          "flex h-11 w-full min-w-0 overflow-hidden rounded-md border bg-card sm:max-w-sm",
+          outline,
+        )}
         onSubmit={(event) => {
           event.preventDefault();
           check();
@@ -127,15 +145,55 @@ export function PincodeCheck({ className }: { className?: string }) {
           onChange={(event) => {
             setEntered(normalizePincode(event.target.value));
             // The old answer belonged to the old code. Left up, it reads as the
-            // answer to what is in the box now.
+            // answer to what is in the box now — and so does a green border.
             setResult(null);
           }}
           inputMode="numeric"
           autoComplete="postal-code"
           aria-label="PIN code"
           placeholder="Enter PIN code to check delivery"
+          /*
+            `size={1}`, AND IT IS NOT ABOUT THE RENDERED WIDTH — the CSS below
+            sets that. `size` sets an input's INTRINSIC width, and its default
+            of 20 characters made this field's min-content about 211px. The
+            column it sits in is a GRID item, whose automatic minimum is its
+            own min-content, so the column refused to go narrower than
+            28 (the icon) + 211 + 93 (the Check button) = 332 — and at a 320px
+            window, where the track is 288, it simply overhung by 44 and gave
+            the whole page a sideways scrollbar.
+
+            `min-w-0` on the input does not cure that: it lets the input shrink
+            as a FLEX item, which is why the field itself was never the thing
+            overflowing, while the column's min-content was still computed from
+            the same twenty characters. Measured: 28px of sideways scroll at
+            320 with this absent, 0 with it, and no change at all at 375 and
+            above, where the track was already wider than 332.
+          */
+          size={1}
           className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground"
         />
+        {/*
+          A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
+          typed by thumb are six digits to delete by thumb, and a customer who
+          got a red border has every reason to want the box empty at once.
+
+          `type="button"`, or it submits the form it sits inside — the default
+          for a button in a form is submit, and the bug that produces is a
+          clear that checks the code it has just erased.
+        */}
+        {entered ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEntered("");
+              setResult(null);
+            }}
+            aria-label="Clear PIN code"
+            className="mr-1 shrink-0 self-center rounded-full p-1 text-muted-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={!entered}
@@ -145,7 +203,19 @@ export function PincodeCheck({ className }: { className?: string }) {
         </button>
       </form>
 
-      <DeliveryAnswer result={result} loading={checking} />
+      {/*
+        BESIDE THE FIELD, not under it, which is what the shop asked for and is
+        also what keeps the row from growing: an answer below pushed Add to Cart
+        down the moment it appeared, so the button a customer was reaching for
+        moved as they read. It drops below on a phone, where there is no room
+        for two columns.
+      */}
+      <DeliveryAnswer
+        result={result}
+        pincode={entered}
+        loading={checking}
+        className="sm:pt-2.5"
+      />
     </div>
   );
 }
