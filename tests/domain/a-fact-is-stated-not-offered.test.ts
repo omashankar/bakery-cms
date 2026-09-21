@@ -243,17 +243,29 @@ describe("what the page shows", () => {
 
   it("does not say it twice", () => {
     /**
-     * The grey line under the price prints every answered group, and a
+     * The grey line under the price printed every answered group, and a
      * statement is answered from the first paint — so the cake said "Eggless"
      * as a tick and "Egg preference: Eggless" forty pixels above it. The same
      * duplication the serving line was deleted for.
+     *
+     * THE WHOLE LINE HAS SINCE GONE, at the shop's request, so this case is no
+     * longer about one group being filtered out of it. It kept a second
+     * assertion — that "Shape: Round" was still printed — which was there to
+     * prove the fix had removed a statement rather than the readout; with the
+     * readout gone that assertion was pinning the very thing the shop asked to
+     * remove, and was the only reason this file went red.
+     *
+     * What is worth keeping is the rule underneath: the page states a fact
+     * once. So both halves are checked as absences now, and the tick itself is
+     * checked as a presence — otherwise "says nothing at all" would pass.
      */
     const text = render().textContent ?? "";
 
     expect(text).not.toContain("Egg preference: Eggless");
-    // The choice beside it still appears there, so this is not the whole line
-    // being dropped.
-    expect(text).toContain("Shape: Round");
+    expect(text, "the readout under the price is back").not.toContain("Shape: Round");
+    // …and the fact is still stated, once, where the customer reads it.
+    expect(text).toContain("Eggless");
+    expect(text).toContain("Shape");
   });
 
   it("never prints a price beside the fact, because the price above contains it", () => {

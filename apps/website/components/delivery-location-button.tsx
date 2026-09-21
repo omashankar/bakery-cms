@@ -5,6 +5,7 @@ import { MapPin, Pencil, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
@@ -16,7 +17,6 @@ import {
   type DeliveryLookup,
 } from "@/features/commerce/lib/delivery-location";
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
-import { formatCurrency } from "@/utils/format";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
 
@@ -161,47 +161,17 @@ export function DeliveryLocationButton() {
             </Button>
           </form>
 
-          {loading ? (
-            <p className="mt-3 text-sm text-muted-foreground">Checking…</p>
-          ) : result === null ? null : result.served ? (
-            <div className="mt-3 space-y-1 text-sm">
-              {/*
-                Three facts, each from the matched zone's own record, and each
-                shown only when the zone actually carries it. A zone with no
-                name, no days and no charge prints one line saying it is served
-                — which is all the shop has said.
-              */}
-              <p className="font-medium text-foreground">
-                {result.zoneName ? `Delivered in ${result.zoneName}` : "We deliver here"}
-              </p>
-              {result.minDeliveryDays !== null ? (
-                <p className="text-muted-foreground">
-                  {result.minDeliveryDays <= 0
-                    ? "Same-day delivery available"
-                    : result.minDeliveryDays === 1
-                      ? "From the next day"
-                      : `From ${result.minDeliveryDays} days ahead`}
-                </p>
-              ) : null}
-              {result.charge !== null ? (
-                <p className="text-muted-foreground">
-                  {result.charge > 0
-                    ? `Delivery ${formatCurrency(result.charge)}`
-                    : "Free delivery"}
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            /*
-              NOT SERVED, said as narrowly as it is known. "No delivery area
-              covers this PIN code" is a fact about the shop's own zone list.
-              "We do not deliver to you" is a claim about the shop, and a shop
-              that takes that order by phone would be calling it a liar.
-            */
-            <p className="mt-3 text-sm text-muted-foreground">
-              No delivery area covers this PIN code yet.
-            </p>
-          )}
+          {/*
+            THE SAME ANSWER THE PRODUCT PAGE GIVES, from the same component.
+
+            All of this — the three facts read off the matched zone, and the
+            careful "no delivery area covers this PIN code yet" for a miss —
+            used to be written out here. The product page now asks the same
+            question in the same place a customer decides, and a second copy of
+            this wording is how two screens come to tell somebody two different
+            things about whether an order can reach them.
+          */}
+          <DeliveryAnswer result={result} loading={loading} className="mt-3" />
         </div>
       ) : null}
     </div>

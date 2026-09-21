@@ -17,6 +17,7 @@ import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
+import { PincodeCheck } from "@/components/storefront/pincode-check";
 import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
 import {
   emptyPhotoPrintDraft,
@@ -77,7 +78,6 @@ import type { LandingProduct } from "@/constants/landing-data";
 import { Badge } from "@/components/ui/badge";
 import { productTrustIcon } from "@/config/product-trust-icons";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -496,13 +496,6 @@ export function ProductDetailPage({
    * one keystroke apart, which is why a test mounts this page, adds to the cart
    * and asserts the fact is still on the line.
    */
-  const chosenSummary = useMemo(() => {
-    const stated = new Set(statementGroups.map(({ group }) => group.id));
-    return formatVariantSummary(
-      visibleVariantGroups.filter((group) => !stated.has(group.id)),
-      visibleSelections,
-    );
-  }, [statementGroups, visibleVariantGroups, visibleSelections]);
 
 
   /**
@@ -1106,9 +1099,21 @@ export function ProductDetailPage({
                   shop still pays tier 0's price. It shows no size now, which
                   is what switching the module off asks for.
                 */}
-                {chosenSummary.length > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{chosenSummary.join(" · ")}</p>
-                ) : null}
+                {/*
+                  "Eggless · Heart shape" stood here, under the price, and the
+                  shop asked for it gone.
+
+                  It was a readout of what the customer had just ticked, three
+                  inches above the ticks themselves — so the page answered a
+                  question nobody had asked and did it in a second voice. The
+                  controls are the record: a ticked box is already showing what
+                  is chosen, and a line repeating it can only ever agree with
+                  them or be wrong.
+
+                  `variantSummary` is untouched and is a different thing: it is
+                  what goes on the CART LINE, where the kitchen and the invoice
+                  need it because the controls are not there to read.
+                */}
               </div>
 
               {/* Only offered when this cake actually comes in several flavours. */}
@@ -1345,16 +1350,29 @@ export function ProductDetailPage({
               */}
 
               {cake.allowsMessage !== false ? (
-                <div className="space-y-2">
-                  <Label htmlFor="product-message">Message on this order</Label>
-                  <Textarea
-                    id="product-message"
-                    placeholder='e.g. "Happy Birthday!"'
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    rows={3}
-                  />
-                </div>
+                /*
+                  TWO ROWS, NOT THREE, and the label is gone.
+
+                  It was a labelled three-row box, which is a paragraph's worth
+                  of space for something that is written on a cake — the whole
+                  control was taller than the price, the size buttons and the
+                  toggles put together. The placeholder already says what goes
+                  in it, in the shop's own example, so the label above was the
+                  same words twice; `aria-label` keeps them for anyone who
+                  cannot see the placeholder.
+
+                  Still a textarea rather than an input: a message runs onto a
+                  second line more often than not, and a single line that
+                  scrolls sideways hides what has already been typed.
+                */
+                <Textarea
+                  id="product-message"
+                  aria-label="Message on this order"
+                  placeholder='Message on this order — e.g. "Happy Birthday!"'
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={2}
+                />
               ) : null}
 
               {/*
@@ -1464,6 +1482,20 @@ export function ProductDetailPage({
                 it, because a cart in somebody's browser from before this
                 deploy still has values in it and carts do not expire.
               */}
+
+              {/*
+                CAN IT REACH ME — the last question before committing, asked
+                where the shop's reference storefront asks it: under the
+                message, above Add to Cart.
+
+                A customer who adds to cart, fills in an address and is told at
+                checkout that no zone covers their PIN code has spent five
+                minutes to be turned away, and they do not generally come back
+                to try a different product. This mounts nothing at all for a
+                shop that has not set its zones up — see `PincodeCheck`, where
+                that gate is the reason it reads the list on mount.
+              */}
+              <PincodeCheck />
 
               {/*
                 A Quantity stepper stood to the left of these buttons.

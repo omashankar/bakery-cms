@@ -91,6 +91,72 @@ test("the buying column is spaced by one number, not by whatever each block brou
   ).toEqual([]);
 });
 
+test("and the price block does not read back what the ticks already show", async ({ page }) => {
+  /*
+    "Eggless · Heart shape" sat under the price — a readout of what the customer
+    had just ticked, three inches above the ticks themselves. The shop asked for
+    it gone: the controls are the record, and a line repeating them can only
+    ever agree with them or be wrong.
+
+    TICKED FIRST, AND THE TICK IS PROVEN, or this passes on a page where nothing
+    was selected and the line would not have drawn anyway. The price moving is
+    the proof: these options carry a surcharge, so a changed figure means the
+    selection really landed.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(2500);
+
+  const priceNow = () =>
+    page.evaluate(() => {
+      const column = document.querySelectorAll("main .grid > div")[1];
+      const span = [...(column?.querySelectorAll("span") ?? [])].find((node) =>
+        /^[₹$€£]\s?[\d,]/.test((node.textContent ?? "").trim()),
+      );
+      return (span?.textContent ?? "").trim();
+    });
+
+  const before = await priceNow();
+  const toggles = page.locator('main [role="checkbox"]');
+  const count = await toggles.count();
+  if (count === 0) {
+    test.skip(true, "this product offers no tickable option to select");
+    return;
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    await toggles.nth(index).click({ force: true }).catch(() => {});
+    await page.waitForTimeout(500);
+  }
+
+  const ticked = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('main [role="checkbox"]')].filter(
+        (node) => node.getAttribute("data-state") === "checked" || node.getAttribute("aria-checked") === "true",
+      ).length,
+  );
+  if (ticked === 0) {
+    test.skip(true, "no option could be ticked, so there is nothing to read back");
+    return;
+  }
+
+  expect(await priceNow(), "ticking an option did not move the price").not.toBe(before);
+
+  const block = await page.evaluate(() => {
+    const column = document.querySelectorAll("main .grid > div")[1];
+    return (column?.children[1]?.textContent ?? "").replace(/\s+/g, " ").trim();
+  });
+
+  /*
+    The shape rather than one phrase: any "A · B" list of the option labels is
+    the same readout however it is worded.
+  */
+  expect(block, `the price block reads back the selection: "${block}"`).not.toMatch(
+    /[A-Za-z]\s·\s[A-Za-z]/,
+  );
+});
+
 test("and the price is the largest figure on it, not the name", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 1000 });

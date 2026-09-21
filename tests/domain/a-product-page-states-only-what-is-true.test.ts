@@ -223,10 +223,30 @@ describe("a product that is sold one way says so by saying nothing", () => {
   });
 
   it("still renders the option the shop DID configure", () => {
-    const { html, unmount } = render(CHARGER);
+    /**
+     * CHECKED BY THE OPTION, NOT BY THE GROUP'S NAME, and the difference is
+     * what this group actually renders as. "Cable length" has two options —
+     * "1 m" free and default, "2 m" at +₹200 — which `resolveBlockRender` calls
+     * an ADD-ON: one tick labelled with the thing being added, not a heading
+     * over a row of buttons. A tick prints its option's label and nothing else,
+     * deliberately, so the group's name was never on this page except in the
+     * grey readout under the price — and the shop has since asked for that
+     * readout to go.
+     *
+     * So the old `toContain("Cable length")` was passing on the readout while
+     * appearing to check the control. The tick is asserted as an element rather
+     * than as text, because "2 m" alone would pass on any stray mention.
+     */
+    const { html, container, unmount } = render(CHARGER);
     try {
-      expect(html).toContain("Cable length");
       expect(html).toContain("2 m");
+      expect(
+        container.querySelectorAll('[data-slot="checkbox"]').length,
+        "the shop's one configured option renders no control",
+      ).toBeGreaterThan(0);
+      // And the charge it carries is named on the tick, since it is NOT yet in
+      // the price above — the mirror of why a stated fact never prints one.
+      expect(html).toContain("200");
     } finally {
       unmount();
     }
