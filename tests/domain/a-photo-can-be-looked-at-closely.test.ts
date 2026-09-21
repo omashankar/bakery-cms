@@ -117,6 +117,45 @@ describe("the magnifier that follows a mouse", () => {
     expect(lens?.style.top).toBe("55%");
   });
 
+  it("dims what it is NOT showing, rather than what it is", () => {
+    /**
+     * The lens carried a 20% white tint, which is backwards: it greyed the one
+     * part of the photograph the panel is enlarging and left everything else at
+     * full strength, so the eye was pulled towards exactly what the customer
+     * was not looking at. On a dark chocolate cake that tint was also almost
+     * invisible, which is how it survived — the shop noticed before any test
+     * did.
+     *
+     * The wash is a box-shadow with a spread far larger than the photograph,
+     * which paints AROUND the element and never over it: one box, instead of
+     * four divs that would have to stay in step with each other.
+     *
+     * Read off the inline style, because a Tailwind arbitrary class did not
+     * survive that framework's shadow variables — the commas inside the colour
+     * broke it, the computed value came back as two empty shadows, and nothing
+     * painted at all while the markup looked right.
+     */
+    const view = render(["/a.jpg"]);
+    hover(view, FRAME * 0.5, FRAME * 0.5);
+    const lens = view.lens();
+
+    /*
+      `0(px)?` three times: jsdom hands back the inline string verbatim while a
+      real browser normalises every length to `px`, so a pattern written for
+      either one alone passes in one place and fails in the other.
+    */
+    expect(lens?.style.boxShadow, "the lens paints no wash around itself").toMatch(
+      /0(px)? 0(px)? 0(px)? 9999px/,
+    );
+    expect(lens?.style.boxShadow).toContain("rgba(255, 255, 255, 0.55)");
+
+    /* …and nothing over the slice being magnified, by style or by class. */
+    expect(lens?.style.backgroundColor ?? "", "the lens is tinted again").toBe("");
+    expect(lens?.className ?? "", "the lens is tinted again by a class").not.toMatch(
+      /bg-(white|black)\//,
+    );
+  });
+
   it("keeps the lens inside the photo at the corners", () => {
     /**
      * Centring alone puts half the lens outside the picture in every corner,

@@ -105,7 +105,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
    */
   if (!activeImage) {
     return (
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100">
+      <div className="relative aspect-square w-full overflow-hidden border border-border bg-cream-100">
         <OptimizedImage src="" alt={productName} fill className="object-cover" />
       </div>
     );
@@ -157,7 +157,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
           onClick={() => setZoomOpen(true)}
           onPointerMove={trackPointer}
           onPointerLeave={() => setLens(null)}
-          className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
+          className="group relative block aspect-square w-full overflow-hidden border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
           aria-label={`Zoom ${labels.productWord.toLowerCase()} image`}
         >
           {badge ? (
@@ -183,12 +183,36 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             <span
               aria-hidden
               data-testid="zoom-lens"
-              className="pointer-events-none absolute hidden border-2 border-bakery-700/70 bg-white/20 lg:block"
+              /*
+                THE DIM IS OUTSIDE THE LENS, NOT INSIDE IT.
+
+                It was `bg-white/20` over the lens, which is backwards: it
+                greyed the one part of the photograph the panel is showing and
+                left the rest at full strength, so the eye was pulled towards
+                everything that was NOT being magnified. On a dark chocolate
+                cake that 20% was also nearly invisible, which is how it went
+                unnoticed — the shop saw it before the measurement did.
+
+                `box-shadow` with a spread far larger than the photograph paints
+                a wash over everything around this element and nothing over the
+                element itself, so one box dims three sides and four corners
+                without four more divs to keep in sync. The button clips it.
+              */
+              className="pointer-events-none absolute hidden border-2 border-white/80 lg:block"
               style={{
                 width: `${lensSize}%`,
                 height: `${lensSize}%`,
                 left: `${lensEdge(lens.x)}%`,
                 top: `${lensEdge(lens.y)}%`,
+                /*
+                  IN THE STYLE, NOT A CLASS, and measured rather than assumed.
+                  `shadow-[0_0_0_9999px_rgba(255,255,255,0.55)]` composes through
+                  Tailwind's shadow variables and the commas inside the colour do
+                  not survive it: the computed `box-shadow` came back as two
+                  empty shadows and the dim never painted. Written here it is
+                  one value the browser reads directly.
+                */
+                boxShadow: "0 0 0 9999px rgba(255, 255, 255, 0.55)",
               }}
             />
           ) : (
@@ -230,7 +254,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                 aria-label={`Show image ${index + 1} of ${images.length}`}
                 aria-current={activeIndex === index}
                 className={cn(
-                  "relative aspect-square overflow-hidden rounded-xl border bg-cream-100 transition-premium lg:w-full lg:shrink-0",
+                  "relative aspect-square overflow-hidden border bg-cream-100 transition-premium lg:w-full lg:shrink-0",
                   activeIndex === index
                     ? "border-bakery-700 ring-2 ring-bakery-200"
                     : "border-border hover:border-bakery-300"
@@ -264,7 +288,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
           <div
             aria-hidden
             data-testid="zoom-panel"
-            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-card bg-no-repeat shadow-lg lg:block xl:w-[38rem]"
+            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] border border-border bg-card bg-no-repeat shadow-lg lg:block xl:w-[38rem]"
             style={{
               /*
                 TWO LAYERS, THE BIG ONE OVER THE SMALL ONE.

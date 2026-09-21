@@ -364,6 +364,51 @@ test("and the magnifier shows more of the photo, not the same photo bigger", asy
   ).toBeLessThanOrEqual(0);
 });
 
+test("and the photographs have square corners, all of them", async ({ page }) => {
+  /*
+    THE SHOP ASKED FOR THE ROUNDING OFF, and the reason to test it is that the
+    three places it lives are easy to fix one at a time: the photograph itself,
+    the thumbnails beside it, and the magnifier panel. Round the panel while the
+    picture it magnifies is square and the two stop looking like the same
+    photograph — which is precisely the comparison a customer is making.
+
+    Measured rather than grepped for a class: `rounded-*` can arrive from a
+    shared component, a design token or a parent, and what matters is what the
+    browser draws.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(3000);
+
+  const photo = page.locator('button[aria-label^="Zoom"]').first();
+  await expect(photo, "the product has no photo").toBeVisible();
+
+  const box = (await photo.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.waitForTimeout(1800);
+
+  const corners = await page.evaluate(() => {
+    const radiusOf = (node: Element | null) =>
+      node ? Math.round(parseFloat(getComputedStyle(node).borderTopLeftRadius)) : null;
+    return {
+      photo: radiusOf(document.querySelector('button[aria-label^="Zoom"]')),
+      thumb: radiusOf(document.querySelector('button[aria-label^="Show image"]')),
+      panel: radiusOf(document.querySelector('[data-testid="zoom-panel"]')),
+    };
+  });
+
+  expect(corners.photo, "the photograph has rounded corners again").toBe(0);
+  expect(corners.panel, "the magnifier panel has rounded corners again").toBe(0);
+  /*
+    `null` is honest here rather than a failure: a product with one photograph
+    draws no rail, and this spec opens whichever product the shop lists first.
+  */
+  if (corners.thumb !== null) {
+    expect(corners.thumb, "the thumbnails have rounded corners again").toBe(0);
+  }
+});
+
 test("and the photo viewer leaves nothing but the photo", async ({ page }) => {
   /*
     A PHOTOGRAPH IS JUDGED AGAINST WHAT SURROUNDS IT. The viewer used the house
