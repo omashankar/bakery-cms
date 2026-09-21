@@ -599,6 +599,29 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               <button
                 type="submit"
                 aria-label="Search"
+                /*
+                  AN EMPTY BOX MEANS "PUT THE CURSOR HERE", NOT "SEARCH FOR
+                  NOTHING".
+
+                  The shop reported this: clicking the magnifier still landed
+                  on the collections page. It did — the button submits, and a
+                  submit with an empty field is a GET to
+                  `/store/collections?q=`, which is the unfiltered grid. So the
+                  one control that looks most like "search" was the last one
+                  still behaving like the link this work set out to remove.
+
+                  Prevented only when there is nothing to search for, so a
+                  click with a word in the box submits exactly as it did. And
+                  it stays `type="submit"`: with JavaScript off this handler
+                  never runs, the form posts, and the customer reaches the
+                  results page rather than a dead icon.
+                */
+                onClick={(event) => {
+                  if (term.trim() !== "") return;
+                  event.preventDefault();
+                  setPhoneSearchOpen(true);
+                  searchInputRef.current?.focus();
+                }}
                 className="absolute left-1 top-1 flex size-9 items-center justify-center rounded-md text-muted-foreground"
               >
                 <Search className="size-[1.125rem]" />

@@ -3,10 +3,7 @@ import { withErrorHandler } from "@/lib/server/http/errors";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
-import {
-  getStorefrontProductCards,
-  getStorefrontProducts,
-} from "@/features/products/data/products-service";
+import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import {
   MIN_SUGGEST_CHARS,
   SUGGESTION_LIMIT,
@@ -81,32 +78,19 @@ export const suggestProductsController = withErrorHandler(async (request: Reques
   if (ctx.ip) rateLimit(`product-suggest:ip:${ctx.ip}`, { limit: 240, windowMs: 60_000 });
 
   /*
-    THE CARDS, AND THEIR OTHER PHOTOGRAPHS PUT BACK.
+    RANKED ON THE CARD PROJECTION, not on the fuller product, and deliberately.
 
-    Ranking runs on the CARD projection and not on the fuller product, and
-    that is deliberate: the card is what `applyCollectionFilters` matches on,
-    so ranking on anything else would let this suggest a product the results
-    page then cannot find. `optionLabels` — a sixth of that predicate — exists
-    only on the card.
+    The card is what `applyCollectionFilters` matches on, so ranking against
+    anything else would let this suggest a product the results page then cannot
+    find. `optionLabels` — a sixth of that predicate — exists only on the card.
 
-    But the card keeps `image` and drops `images`, and `image` is whatever
-    happens to be first in the array. On this shop one product's first image
-    is 114,243 characters of inlined base64 with two perfectly good hosted
-    photographs sitting behind it, so a dropdown reading only `image` would
-    either ship a 114 KB row or draw no thumbnail at all for it.
-
-    Handing the array back lets the picker skip the inline one and use the
-    next. This is scoped to suggestions ON PURPOSE. The same blob ships on the
-    homepage today, roughly three times per visit, and that is worth fixing —
-    but at the upload that stored it, not by quietly changing which photograph
-    a shop's product page leads with.
+    An earlier version also read the full products here, to hand the suggestion
+    builder each product's whole image array so it could skip an inlined one
+    and use the next. That was removed once the images were actually looked at:
+    the array is the shop's GALLERY, not sizes of one photograph, so "the next
+    one" is a different picture. A product whose first image will not fit gets
+    no thumbnail rather than somebody else's.
   */
-  const [cards, products] = await Promise.all([
-    getStorefrontProductCards(),
-    getStorefrontProducts(),
-  ]);
-  const albums = new Map(products.map((product) => [product.slug, product.images ?? []]));
-  const rankable = cards.map((card) => ({ ...card, images: albums.get(card.slug) ?? [] }));
-
-  return ok(suggestProducts(query, rankable, SUGGESTION_LIMIT), "Suggestions");
+  const cards = await getStorefrontProductCards();
+  return ok(suggestProducts(query, cards, SUGGESTION_LIMIT), "Suggestions");
 });

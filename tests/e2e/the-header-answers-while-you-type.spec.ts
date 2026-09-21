@@ -159,6 +159,53 @@ test("a row opens that product, and Enter still lands on the results page", asyn
   ).toBe("chocolate");
 });
 
+test("the magnifier in an empty box puts the cursor there, it does not leave the page", async ({
+  page,
+}) => {
+  /*
+    THE SHOP REPORTED THIS ONE TWICE, and the second time with an arrow drawn
+    at the icon, because the first fix was aimed at the wrong control. The
+    phone icon and the drawer row had both been moved off the collections page
+    — and the magnifier INSIDE the box had not, because it is a submit button
+    and a submit with an empty field is a GET to `/store/collections?q=`.
+
+    So the control that looks most like "search" was the last one still
+    behaving like the link this whole change set out to remove: click it with
+    nothing typed and the shop takes you to its unfiltered grid.
+
+    BOTH HALVES ARE CHECKED. Preventing the submit outright would break the
+    only way to run a search with a pointer, so the guard has to prove that a
+    click WITH a word in the box still reaches the results page. That is the
+    half a careless fix silently breaks.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await expect(page.locator(BOX)).toBeVisible();
+
+  const magnifier = page.locator('header form[role="search"] button[type="submit"]');
+
+  /* ---- nothing typed ---------------------------------------------------- */
+  await magnifier.click();
+  await page.waitForTimeout(1500);
+
+  expect(page.url(), "the magnifier still navigates to the collections page").not.toContain(
+    "/store/collections",
+  );
+  expect(
+    await page.evaluate((sel) => document.activeElement === document.querySelector(sel), BOX),
+    "the magnifier did nothing at all — no cursor, no page",
+  ).toBe(true);
+
+  /* ---- and with a word in it -------------------------------------------- */
+  await page.fill(BOX, "velvet");
+  await magnifier.click();
+  await page.waitForURL(/[?&]q=/, { timeout: 30_000 });
+  expect(page.url(), "the magnifier no longer runs a search at all").toContain(
+    "/store/collections?q=velvet",
+  );
+});
+
 test("Escape puts the list away without throwing away the typing", async ({ page }) => {
   /*
     A `type="search"` field is not a plain text box: Chrome and Safari EMPTY it

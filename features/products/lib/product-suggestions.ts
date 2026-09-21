@@ -70,30 +70,31 @@ export const SUGGESTION_LIMIT = 6;
 export const MIN_SUGGEST_CHARS = 2;
 
 /**
- * The picture for a suggestion row, WHICH IS NOT ALWAYS `images[0]`.
+ * The product's OWN first picture, or none — never a different one.
  *
- * A product's first image can be an inline `data:` URI — this shop has one,
- * 114,243 characters of base64 sitting where a URL belongs, with two perfectly
- * good hosted images behind it in the same array. Handing that to a dropdown
- * would put 114 KB into a response that is otherwise about two kilobytes, on
- * every keystroke that matched it.
+ * A product's first image can be an inline `data:` URI. This shop has one:
+ * 114,243 characters of base64 sitting where a URL belongs, which would put
+ * 114 KB into a response whose other five rows come to about two kilobytes
+ * between them. So an inline blob is refused, and the row draws the product's
+ * initial instead — a row that reads fine, rather than one that costs fifty
+ * times what the rest of the list costs together.
  *
- * So: the first image that is a reference to somewhere rather than a copy of
- * the bytes. A product whose only image is inline gets no thumbnail here and
- * the dropdown draws its initial instead — a row that reads fine, rather than
- * a row that costs fifty times what the other five cost together.
+ * WHAT IT MUST NOT DO IS REACH FOR THE NEXT IMAGE, and this function did until
+ * the images were actually looked at. The array is not several sizes of one
+ * photograph; it is the shop's gallery, and the other entries are DIFFERENT
+ * PICTURES. On the very product this was written for, images[1] and images[2]
+ * are stock photographs of a woman with shopping bags — so "fall back to the
+ * next one" put a stranger in a headscarf under the words "Ring Ceremony
+ * Special Cake". A missing thumbnail is a gap; a wrong one is the shop telling
+ * a customer that this is what they are buying.
  *
- * This deliberately does NOT change what the product card shows anywhere else.
- * That same 114 KB ships on the homepage today and is a real problem worth
- * fixing at its source, in the admin's upload path, not by quietly swapping
- * which photograph a shop's product page leads with.
+ * The real repair is at the other end — that photograph belongs in the image
+ * host like every other, and once it is there this returns it like any other.
  */
 function thumbnailFor(product: LandingProduct): string {
-  const images = [...(product.images ?? []), product.image];
-  const hosted = images.find(
-    (src) => typeof src === "string" && src.trim() !== "" && !src.startsWith("data:"),
-  );
-  return hosted ?? "";
+  const primary = product.image ?? product.images?.[0] ?? "";
+  if (typeof primary !== "string" || primary.trim() === "") return "";
+  return primary.startsWith("data:") ? "" : primary;
 }
 
 /** Where in a string a word begins, for the "word starts with it" rank. */

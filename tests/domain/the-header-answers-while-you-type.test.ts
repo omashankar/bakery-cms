@@ -243,42 +243,48 @@ describe("what the header offers while a customer types", () => {
     expect(Object.keys(row!).sort()).toEqual(["category", "image", "name", "slug"]);
   });
 
-  it("and refuses to put an inlined image in a suggestion", () => {
+  it("and refuses an inlined image without substituting a different one", () => {
     /*
       THIS SHOP HAS ONE. `ring-ceremony-special-cake` stores 114,243 characters
-      of base64 where a URL belongs, with two perfectly good hosted photographs
-      behind it in the same array. A dropdown reading `images[0]` would put
-      114 KB into a response whose other five rows come to about two.
+      of base64 where a URL belongs. A dropdown reading it would put 114 KB
+      into a response whose other five rows come to about two, so it is refused
+      and the row draws the product's initial instead.
 
-      A product whose ONLY image is inline gets no thumbnail and the row draws
-      its initial — a row that reads fine, rather than a row that costs fifty
-      times what the rest of the list costs together.
+      THE SECOND HALF IS THE ONE THAT WAS NEARLY SHIPPED WRONG. The first
+      version fell through to `images[1]`, on the assumption that the array
+      holds sizes of one photograph. It does not — it is the shop's gallery,
+      and the other entries are DIFFERENT PICTURES. On that very product
+      images[1] and images[2] are stock photographs of a woman with shopping
+      bags; downloading them is what settled it. So the fallback put a stranger
+      in a headscarf under the words "Ring Ceremony Special Cake".
+
+      A missing thumbnail is a gap. A wrong one is the shop telling a customer
+      that this is the thing they are buying.
     */
     const inline = "data:image/jpeg;base64," + "A".repeat(2000);
+    const ringCake = (images: string[]) => ({
+      ...CATALOGUE[0]!,
+      slug: "ring-cake",
+      name: "Ring Cake",
+      image: images[0]!,
+      images,
+    });
 
-    const withBackup = suggestProducts("ring", [
-      {
-        ...CATALOGUE[0]!,
-        slug: "ring-cake",
-        name: "Ring Cake",
-        image: inline,
-        images: [inline, "https://cdn.example.com/ring.webp"],
-      },
-    ]);
-    expect(withBackup[0]!.image, "the inlined blob reached the dropdown").toBe(
-      "https://cdn.example.com/ring.webp",
-    );
+    expect(
+      suggestProducts("ring", [ringCake([inline, "https://cdn.example.com/other-thing.webp"])])[0]!
+        .image,
+      "a different photograph was substituted for the one that would not fit",
+    ).toBe("");
 
-    const inlineOnly = suggestProducts("ring", [
-      {
-        ...CATALOGUE[0]!,
-        slug: "ring-cake",
-        name: "Ring Cake",
-        image: inline,
-        images: [inline],
-      },
-    ]);
-    expect(inlineOnly[0]!.image, "a product with only an inline image ships it").toBe("");
+    expect(
+      suggestProducts("ring", [ringCake([inline])])[0]!.image,
+      "a product with only an inline image ships it",
+    ).toBe("");
+
+    // …and a hosted first image is used exactly as stored.
+    expect(
+      suggestProducts("ring", [ringCake(["https://cdn.example.com/ring.webp", inline])])[0]!.image,
+    ).toBe("https://cdn.example.com/ring.webp");
   });
 
   it("and NEVER offers a product the results page cannot find", () => {
@@ -355,7 +361,7 @@ describe("the endpoint that answers the box", () => {
     */
     const source = read(CONTROLLER);
     const refusal = source.indexOf("query.length < MIN_SUGGEST_CHARS");
-    const readsProducts = source.indexOf("await Promise.all([");
+    const readsProducts = source.indexOf("await getStorefrontProductCards()");
 
     expect(refusal, "the blank-query guard is gone").toBeGreaterThan(-1);
     expect(readsProducts, "the endpoint reads no products at all").toBeGreaterThan(-1);
