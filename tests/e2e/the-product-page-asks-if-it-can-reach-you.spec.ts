@@ -205,6 +205,17 @@ test("and the row never pushes the page sideways, answered or not", async ({ pag
   test.setTimeout(240_000);
   const zones = await zonesOf(request);
   const zone = zones.find((row) => row.isActive !== false && row.pincode);
+  if (!zone) {
+    /*
+      THE ROW IS NOT SUPPOSED TO EXIST FOR A SHOP WITH NO ZONES, so there is
+      nothing here to measure — and this guard goes quiet with it, which is
+      worth knowing rather than discovering later. The reason is printed for
+      exactly that: a silent green run and "this shop has no zones" look
+      identical from the outside.
+    */
+    test.skip(true, "this shop has no active zone, so the row does not render at all");
+    return;
+  }
 
   const href = await (async () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
