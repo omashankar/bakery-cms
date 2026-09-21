@@ -68,6 +68,13 @@ async function inspect(page: import("@playwright/test").Page) {
       headingCount: headings.length,
       headingText: (headings[0]?.textContent ?? "").trim(),
       headingPx: headings[0] ? Math.round(parseFloat(getComputedStyle(headings[0]).fontSize)) : 0,
+      /*
+        Measured, not read off a class name. `sr-only` is a set of rules that a
+        later `className` can undo without removing the word from the markup,
+        so a guard looking for "sr-only" would pass over a heading that is back
+        on the screen at 36px.
+      */
+      headingDrawn: headings[0] ? Math.round(headings[0].getBoundingClientRect().height) > 1 : false,
       bannerCount: banded.length,
       overflow: document.documentElement.scrollWidth - window.innerWidth,
     };
@@ -102,22 +109,37 @@ test("every page keeps its trail and its heading, and none of them wears a banne
     expect(seen.crumbFontPx, `${name}: the trail is set at ${seen.crumbFontPx}px`)
       .toBeLessThanOrEqual(14);
 
-    /* ---- and the page is still named ----------------------------------- */
+    /* ---- and the page is still NAMED, without being captioned ---------- */
     expect(seen.headingCount, `${name}: it has ${seen.headingCount} h1 elements`).toBe(1);
     expect(seen.headingText.length, `${name}: its heading is empty`).toBeGreaterThan(0);
-    expect(seen.headingPx, `${name}: the heading is ${seen.headingPx}px, banner-sized again`)
-      .toBeLessThanOrEqual(32);
+    /*
+      BOTH HALVES, or this passes whichever way it breaks. The shop asked for
+      the heading and its blurb to go — "Our Collections" over a grid of
+      collections said nothing the trail above it had not just said. But a page
+      with no `<h1>` is a page a search engine cannot name and a screen-reader
+      user cannot skim, and neither of them is looking at the layout that was
+      tidied. So it is in the document and it draws nothing.
+    */
+    expect(
+      seen.headingDrawn,
+      `${name}: the heading is printed again at ${seen.headingPx}px`,
+    ).toBe(false);
 
     expect(seen.overflow, `${name}: the page scrolls sideways`).toBe(0);
   }
 });
 
-test("and a product page keeps the h1 it never draws", async ({ page }) => {
+test("and a product still shows its name, even though its heading does not", async ({ page }) => {
   /*
-    THE ONE THAT CANNOT BE CHECKED BY LOOKING. The product's name is set beside
-    the photograph, so printing it again above would be the same words twice —
-    the heading is therefore `sr-only`. It is still the page's only `<h1>`, and
-    losing it costs nothing a person can see and everything a crawler reads.
+    EVERY page now keeps an undrawn `<h1>`, so the first test covers most of
+    this. What only the product page can answer is the other half: the name a
+    customer reads has to still be SOMEWHERE, drawn by the column beside the
+    photograph rather than by the heading.
+
+    That is the failure this catches and the one above cannot. "The h1 exists
+    and is invisible" is satisfied just as happily by a page that shows the
+    product's name nowhere at all — a page of a photograph, a price and a
+    button, for something the customer can no longer identify.
   */
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });

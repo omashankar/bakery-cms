@@ -1359,7 +1359,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
       <StorePageHeader
         title="Checkout"
-        description="Complete your delivery details and place your order."
         breadcrumbs={[
           { label: "Cart", href: routes.store.cart },
           { label: "Checkout" },

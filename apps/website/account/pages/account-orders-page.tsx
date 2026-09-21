@@ -131,7 +131,6 @@ export function AccountOrdersPage() {
   return (
     <AccountShell
       title="My Orders"
-      description="View and track all your orders."
       breadcrumbs={[{ label: "Orders" }]}
     >
       {orders === null ? (

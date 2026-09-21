@@ -61,7 +61,6 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
     <>
       <StorePageHeader
         title="Wishlist"
-        description={`Save ${labels.productWordPlural.toLowerCase()} you love for later.`}
         breadcrumbs={[{ label: "Wishlist" }]}
       />
       <section className={layoutSpacing.sectionY}>

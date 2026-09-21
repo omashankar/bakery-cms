@@ -271,19 +271,6 @@ export function CollectionsPage({
     <>
       <StorePageHeader
         title={heading ? heading.name : labels.collectionsTitle}
-        description={
-          // The owner's OWN words when they wrote some. A collection is a
-          // pitch — "Everything you need for Diwali, under one roof" — and
-          // replacing it with a generated "Browse our …" throws away the one
-          // sentence they came to this screen to write.
-          collection?.description?.trim()
-            ? collection.description
-            : heading
-              ? // “freshly baked”, under a category heading, in a shop that
-                // may sell chargers. The name is the shop’s own already.
-                `Browse our ${heading.name.toLowerCase()}.`
-              : labels.collectionsSubtitle
-        }
         breadcrumbs={[
           { label: "Collections", href: routes.store.collections },
           ...(heading ? [{ label: heading.name }] : []),

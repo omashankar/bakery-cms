@@ -134,7 +134,6 @@ export function AccountAddressesPage() {
   return (
     <AccountShell
       title="Saved Addresses"
-      description="Manage delivery addresses for faster checkout."
       breadcrumbs={[{ label: "Addresses" }]}
     >
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">

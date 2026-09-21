@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatAddress } from "@/features/orders/lib/address-format";
 
@@ -177,7 +177,6 @@ export function OrderDetailPage() {
       <>
         <StorePageHeader
           title="Order Not Found"
-          description="We couldn't find an order with that number."
           breadcrumbs={[
             { label: "Track Order", href: routes.store.orderTrack },
             { label: "Not Found" },
@@ -204,7 +203,6 @@ export function OrderDetailPage() {
     <>
       <StorePageHeader
         title={`Order ${order.orderNumber}`}
-        description={`Placed on ${formatDate(order.placedAt)}`}
         breadcrumbs={[
           { label: "Track Order", href: routes.store.orderTrack },
           { label: order.orderNumber },

@@ -948,7 +948,6 @@ export function ProductDetailPage({
           { label: "Collections", href: routes.store.collections },
           { label: cake.name },
         ]}
-        className="[&_h1]:sr-only"
       />
 
       <section className={cn(layoutSpacing.sectionY, "pb-24 lg:pb-16")}>

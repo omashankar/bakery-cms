@@ -71,7 +71,6 @@ function StandardTemplate({ page, preview }: { page: CmsPage; preview: boolean }
       ) : null}
       <StorePageHeader
         title={page.title}
-        description={page.description}
         breadcrumbs={[{ label: page.title }]}
       />
       <section className={layoutSpacing.sectionY}>
@@ -154,7 +153,6 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
       ) : null}
       <StorePageHeader
         title={page.title}
-        description={page.description}
         breadcrumbs={[{ label: page.title }]}
       />
 

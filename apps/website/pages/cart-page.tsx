@@ -308,7 +308,6 @@ export function CartPage({ catalog = [] }: CartPageProps) {
     <>
       <StorePageHeader
         title={itemCount > 0 ? `Shopping Cart (${itemCount})` : "Shopping Cart"}
-        description="Review your items, gift options, and saved picks before checkout."
         breadcrumbs={[{ label: "Cart" }]}
       />
 

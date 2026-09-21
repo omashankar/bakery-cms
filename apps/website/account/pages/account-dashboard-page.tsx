@@ -101,7 +101,6 @@ export function AccountDashboardPage() {
   return (
     <AccountShell
       title="My Profile"
-      description="Manage your personal details and quick access to your activity."
     >
       {/* Personal Information */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">

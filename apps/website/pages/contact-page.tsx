@@ -40,7 +40,6 @@ export function ContactPage({
     <>
       <StorePageHeader
         title="Contact Us"
-        description="We would love to help with your next celebration."
         breadcrumbs={[{ label: "Contact" }]}
       />
 

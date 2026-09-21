@@ -66,7 +66,6 @@ export function TrackOrderPage() {
     <>
       <StorePageHeader
         title="Track Your Order"
-        description="Enter your order number and email to see live delivery status, ETA, and route preview."
         breadcrumbs={[{ label: "Track Order" }]}
       />
 

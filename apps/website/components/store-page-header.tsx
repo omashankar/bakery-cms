@@ -11,44 +11,52 @@ interface Crumb {
 }
 
 interface StorePageHeaderProps {
+  /** Kept in the document as the page's `<h1>`, and never drawn. See below. */
   title: string;
-  description?: string;
   breadcrumbs?: Crumb[];
   className?: string;
 }
 
 /**
- * WHERE YOU ARE, AND WHAT THIS PAGE IS.
+ * WHERE YOU ARE. NOTHING ELSE.
  *
- * THE BAND IS GONE. This was a tinted, bordered block — `bg-cream-100`,
- * `border-b`, 32 to 40px of padding — carrying a breadcrumb, a 36px heading
- * and a blurb. On sixteen pages that was about 150px of chrome standing
- * between the header and anything a customer came for, and on a phone it was
- * most of the first screen.
+ * This was a tinted, bordered band — `bg-cream-100`, a border underneath, 32 to
+ * 40px of padding — holding a breadcrumb, a 36px heading and a blurb. On
+ * sixteen pages that was about 150px of furniture standing between the header
+ * and anything a customer came for, and on a phone it was most of the first
+ * screen. The band went first; the shop then pointed at the heading and the
+ * blurb and asked for those to go too.
  *
- * The shop pointed at the storefront it is drawn from: the same trail, set
- * plainly on the page, small and grey, with no box around it. So the content
- * is the same and the furniture is gone — the title still sits here, just at
- * a size that belongs to a page rather than to a banner.
+ * WHAT THE HEADING WAS ACTUALLY SAYING is why that is right rather than merely
+ * shorter. "Our Collections" sat above a grid of collections. "Shopping Cart"
+ * sat above a cart. "Contact Us" sat above a contact form. The breadcrumb one
+ * line above says the same word, and the page below says it by being itself —
+ * so the heading was a caption on something already captioned, and the blurb
+ * under it ("Browse everything we sell by category") was this software
+ * narrating the shop's own page back to it.
  *
- * `Breadcrumb` from `components/ui` is not used any more, and that is
- * deliberate rather than an oversight. It brings a nav landmark, an ordered
- * list and its own type scale, and this is four words and a chevron; the admin
- * still uses it, where a trail can run four levels deep and the landmark earns
- * its keep. The `aria-label` and `aria-current` below are the parts that
- * actually matter to a screen reader, and they are kept.
+ * THE H1 STAYS IN THE DOCUMENT, AND THAT IS NOT A LOOPHOLE. A page with no
+ * `<h1>` is a page a search engine cannot name and a screen-reader user cannot
+ * skim — the heading is how both of them answer "what is this page", and
+ * neither of them is looking at the layout the shop just tidied. So it is
+ * present, correct, and `sr-only`. The product page has needed exactly this
+ * arrangement all along, because its name is drawn beside the photograph; now
+ * every page has it, and that page no longer needs a special class.
  *
- * THE HEADING IS NEVER OPTIONAL, even where it is not drawn. The product page
- * passes `[&_h1]:sr-only` because the name is already set beside the
- * photograph — but this is that page's only `<h1>`, and a product page without
- * one is a page a search engine cannot name.
+ * THE BLURB IS GONE RATHER THAN HIDDEN. It was prose, not structure, so there
+ * is nothing for a crawler to lose — and the one instance that was the shop's
+ * own words rather than ours, a CMS page's description, already reaches search
+ * engines as that page's meta description (`store/pages/[slug]/page.tsx`).
+ * Hiding it would have left a prop that renders nothing, which is how a field
+ * ends up being written, validated, carried through three layers and shown to
+ * nobody.
+ *
+ * `Breadcrumb` from `components/ui` is not used here, deliberately: it brings a
+ * nav landmark, an ordered list and its own type scale, and this is four words
+ * and a chevron. The admin keeps it, where a trail runs four levels deep. The
+ * `aria-label` and the `aria-current` are the parts a screen reader needs.
  */
-export function StorePageHeader({
-  title,
-  description,
-  breadcrumbs = [],
-  className,
-}: StorePageHeaderProps) {
+export function StorePageHeader({ title, breadcrumbs = [], className }: StorePageHeaderProps) {
   const trail = [{ label: "Home", href: routes.store.home }, ...breadcrumbs];
 
   return (
@@ -64,10 +72,9 @@ export function StorePageHeader({
                 ) : null}
                 {isLast || !item.href ? (
                   /*
-                    `aria-current` on the last crumb, and no link on it. It is
-                    the page being read — a link to here is a link to nowhere,
-                    and the trail's whole job is to say which of these words is
-                    the one you are standing on.
+                    No link on the last crumb: it is the page being read, and a
+                    link to here goes nowhere. `aria-current` is what says which
+                    of these words is the one you are standing on.
                   */
                   <span aria-current="page" className="truncate">
                     {item.label}
@@ -83,12 +90,7 @@ export function StorePageHeader({
         </ol>
       </nav>
 
-      <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-        {title}
-      </h1>
-      {description ? (
-        <p className="mt-2 max-w-2xl text-muted-foreground">{description}</p>
-      ) : null}
+      <h1 className="sr-only">{title}</h1>
     </div>
   );
 }
