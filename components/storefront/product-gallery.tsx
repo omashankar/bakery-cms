@@ -122,7 +122,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
    * with its edges smeared, at the exact moment a customer is deciding whether
    * to trust it. Requested only here, and only fetched when somebody hovers.
    */
-  const magnifiedLarge = magnifiableImageUrl(magnifiedSrc);
+  const magnifiedLarge = magnifiableImageUrl(magnifiedSrc, 2400);
   /** The lens is the slice the panel is showing, so it is 1/zoom of the photo. */
   const lensSize = 100 / HOVER_ZOOM;
   const lensEdge = (value: number) =>
@@ -264,7 +264,7 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
           <div
             aria-hidden
             data-testid="zoom-panel"
-            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-card bg-no-repeat shadow-lg lg:block"
+            className="pointer-events-none absolute top-0 left-full z-30 ml-4 hidden aspect-square w-[26rem] rounded-2xl border border-border bg-card bg-no-repeat shadow-lg lg:block xl:w-[38rem]"
             style={{
               /*
                 TWO LAYERS, THE BIG ONE OVER THE SMALL ONE.

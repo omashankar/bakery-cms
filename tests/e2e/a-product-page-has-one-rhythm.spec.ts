@@ -331,6 +331,37 @@ test("and the magnifier shows more of the photo, not the same photo bigger", asy
     panel!.sameUrl,
     "the magnifier is fed the page's own copy, so it can only ever upscale it",
   ).toBe(false);
+
+  /*
+    AND IT IS WORTH LOOKING AT. The panel was 416px against a 656px photograph
+    — 0.63 of it — where the reference storefront's is about the same size as
+    the picture it magnifies, and a magnifier smaller than its subject reads as
+    a thumbnail rather than a closer look.
+
+    Compared against the photograph rather than against a pixel count, because
+    the column widths change with the viewport: measured at 1024, 1280, 1440
+    and 1920 the panel runs 0.93 to 1.06 of the image, and never reaches the
+    right-hand edge of the window.
+  */
+  const beside = await page.evaluate(() => {
+    const photo = document.querySelector('button[aria-label^="Zoom"]')?.getBoundingClientRect();
+    const node = document.querySelector('[data-testid="zoom-panel"]')?.getBoundingClientRect();
+    if (!photo || !node) return null;
+    return {
+      ratio: node.width / photo.width,
+      pastEdge: Math.round(node.right - window.innerWidth),
+    };
+  });
+
+  expect(beside, "the panel vanished before it could be measured").not.toBeNull();
+  expect(
+    beside!.ratio,
+    `the magnifier is ${beside!.ratio.toFixed(2)} of the photograph it magnifies`,
+  ).toBeGreaterThan(0.85);
+  expect(
+    beside!.pastEdge,
+    `the magnifier runs ${beside!.pastEdge}px past the right edge of the window`,
+  ).toBeLessThanOrEqual(0);
 });
 
 test("and the photo viewer leaves nothing but the photo", async ({ page }) => {
