@@ -950,7 +950,34 @@ export function ProductDetailPage({
         ]}
       />
 
-      <section className={cn(layoutSpacing.sectionY, "pb-24 lg:pb-16")}>
+      {/*
+        THE TOP OF THIS PAGE IS NOT A SECTION BREAK.
+
+        `sectionY` is the house rhythm for a page of one subject with air
+        around it, and it puts 64px above the photograph on a phone and 96px on
+        a desktop. That was right while a tinted band with a heading in it stood
+        between here and the header — the air separated two blocks. The band is
+        gone, so all that padding now sits under a single line of breadcrumb and
+        reads as the page failing to start: measured at 1440, 96px of nothing
+        between "Red Velvet Classic" in the trail and the photograph of it.
+
+        The storefront this is drawn from leaves about 30. The bottom is
+        untouched — that gap is between the page and the footer, where the
+        house rhythm is still what it is for.
+      */}
+      {/*
+        EVERY BREAKPOINT THE RHYTHM DECLARES, not just the unprefixed one.
+
+        `sectionY` is `py-16 sm:py-20 lg:py-24`, and tailwind-merge treats a
+        prefixed utility as a different group from a bare one — so `pt-6` beats
+        `py-16` and leaves `sm:py-20` standing. Measured: 25px above the
+        photograph at 390, 32 at 1024, and 80 at 768, where a tablet got the
+        gap this change was removing while the phone and the desktop did not.
+        A `sm:` override is what makes it one number.
+      */}
+      <section
+        className={cn(layoutSpacing.sectionY, "pt-6 pb-24 sm:pt-6 lg:pt-8 lg:pb-16")}
+      >
         <div className={layoutSpacing.container}>
           <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
             {/*
@@ -990,7 +1017,16 @@ export function ProductDetailPage({
                   the name says what the thing is, and the customer arrived
                   through the category in the first place.
                 */}
-                <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
+                {/*
+                  SMALLER THAN THE PRICE, which is the change. It was 36px
+                  against a price of 30 — so the loudest thing on the page was
+                  the name of the product a customer had just clicked the name
+                  of, and the number they came to find was the quieter of the
+                  two. The storefront this is drawn from sets the name at about
+                  28 and the price at about 40, and that ordering is the point
+                  rather than the exact figures.
+                */}
+                <h2 className="font-heading text-2xl font-bold sm:text-3xl">{cake.name}</h2>
                 {cake.rating ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <StarRating rating={cake.rating} size="md" showValue />
@@ -1014,8 +1050,27 @@ export function ProductDetailPage({
                 */}
               </div>
 
-              <div className="rounded-xl border border-border bg-cream-50 p-4">
-                <PriceDisplay price={displayPrice} compareAtPrice={displayCompareAt} />
+              {/*
+                THE PRICE IS NOT A CARD.
+
+                It sat in a tinted, bordered box — which is how this page said
+                "here is a panel about money" when what a customer wants is to
+                read the number. A box also has to be sized, and it was sized
+                for three lines of small print; with the tax note and the chosen
+                options inside it, the figure itself was the smallest thing in
+                its own container.
+
+                Set on the page instead, at `lg`, which makes it the largest
+                figure on the screen — larger than the product's name above it.
+                The struck-through original and the green percentage were
+                already built into `PriceDisplay` and needed nothing.
+              */}
+              <div>
+                <PriceDisplay
+                  price={displayPrice}
+                  compareAtPrice={displayCompareAt}
+                  size="lg"
+                />
                 {/*
                   THE OPPOSITE OF WHAT THE REFERENCE SAYS, because it is what
                   this pipeline does.
@@ -1069,7 +1124,25 @@ export function ProductDetailPage({
               */}
 
               {modules.weight ? (
-                <div className="contents" data-gate-weight>
+                /*
+                  NOT `display: contents`, AND THAT IS THE SPACING BUG.
+
+                  This wrapper exists to carry `data-gate-weight` for the module
+                  gate, and `contents` was chosen so it would not "affect the
+                  layout". It affects the layout precisely by not existing:
+                  `space-y-6` on the column is `> * + *`, applying a top margin
+                  to each direct child — and a `display: contents` element
+                  cannot take a margin, so the rule resolved against a box that
+                  paints nothing and the gap was simply dropped.
+
+                  Measured before the fix at 1440: the Size buttons ended at
+                  523px and the "Shape" label began at 552, where every other
+                  pair in this column is 24 apart — and "Eggless" sat 10px under
+                  the Shape buttons, close enough to read as part of them. A
+                  plain `<div>` takes the margin and the rhythm is one number
+                  again.
+                */
+                <div data-gate-weight>
                   <OptionGroup
                     label={sizeAxisLabel}
                     count={weightOptions.length}
@@ -1135,7 +1208,8 @@ export function ProductDetailPage({
                 shop arranged them.
               */}
               {choiceGroups.map((group) => (
-                <div key={group.id} className="contents" {...gatesFor(group)}>
+                /* A plain div, for the same reason as the weight gate above. */
+                <div key={group.id} {...gatesFor(group)}>
                   <OptionGroup label={group.name} count={group.options.length}>
                     <div className="flex flex-wrap gap-2">
                       {group.options.map((option) => (
@@ -1404,7 +1478,17 @@ export function ProductDetailPage({
                 customer who edits a line of three must not have it silently
                 reset to one because the control that set it has gone.
               */}
-              <div className="flex flex-wrap items-center justify-end gap-4">
+              {/*
+                PHONES ONLY NOW. On a desktop this button has moved into the
+                Add to Cart row below, where the reference storefront puts it:
+                a square heart, then the button, on one line.
+
+                It stayed a labelled button here because a phone's Add to Cart
+                lives in the fixed bar at the foot of the screen, so there is no
+                row for it to join — and an unlabelled heart floating on its own
+                above the options is a control with nothing to explain it.
+              */}
+              <div className="flex flex-wrap items-center justify-end gap-4 lg:hidden">
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={handleWishlist}>
                     <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
@@ -1437,7 +1521,34 @@ export function ProductDetailPage({
                 moment the cutoff passes, so it can never sit there having run
                 out.
               */}
-              <div className="hidden flex-wrap gap-3 lg:flex">
+              <div className="hidden items-center gap-3 lg:flex">
+                {/*
+                  THE HEART SITS BESIDE THE BUTTON, not on a line of its own
+                  above it. It was a labelled "Wishlist" pill pushed to the
+                  right-hand edge, three rows up — the smallest control in the
+                  column, in the emptiest part of it, above the largest one.
+
+                  Square and unlabelled here because the button beside it says
+                  what this row is for, which is what makes the icon readable
+                  on its own. `aria-label` carries the words for anyone who
+                  cannot see it, and it says which way the tap goes rather than
+                  naming the list: "Save" and "Saved" are different actions, and
+                  a control whose label never changes has already told a screen
+                  reader the wrong thing once it is filled in.
+                */}
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  onClick={handleWishlist}
+                  aria-pressed={wishlisted}
+                  aria-label={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
+                  className="shrink-0 px-4"
+                >
+                  <Heart
+                    className={cn("size-5", wishlisted && "fill-bakery-700 text-bakery-700")}
+                  />
+                </Button>
                 <Button
                   size="lg"
                   variant="bakery"
