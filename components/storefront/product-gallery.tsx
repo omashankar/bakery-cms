@@ -2,7 +2,7 @@
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ZoomIn } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -157,7 +157,15 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
           onClick={() => setZoomOpen(true)}
           onPointerMove={trackPointer}
           onPointerLeave={() => setLens(null)}
-          className="group relative block aspect-square w-full overflow-hidden border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
+          /*
+            `cursor-zoom-in`, NOT the hand a button gets by default.
+
+            The hand says "this navigates". This magnifies where it is, and on
+            a click opens the picture full size — the browser has a cursor that
+            means exactly that, and it also tells somebody who has not moved yet
+            what is about to happen.
+          */
+          className="group relative block aspect-square w-full cursor-zoom-in overflow-hidden border border-border bg-cream-100 lg:min-w-0 lg:flex-1"
           aria-label={`Zoom ${labels.productWord.toLowerCase()} image`}
         >
           {badge ? (
@@ -215,16 +223,17 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                 boxShadow: "0 0 0 9999px rgba(255, 255, 255, 0.55)",
               }}
             />
-          ) : (
-            /*
-              The magnifying-glass hint hides while the magnifier is running. It
-              is an invitation, and it stops being one the moment it has been
-              accepted.
-            */
-            <div className="absolute right-4 bottom-4 rounded-lg border border-border bg-white/95 p-2 text-bakery-700">
-              <ZoomIn className="size-4" />
-            </div>
-          )}
+          ) : null}
+          {/*
+            A MAGNIFYING-GLASS BADGE SAT IN THE BOTTOM-RIGHT CORNER, and the
+            shop asked for it gone.
+
+            It was an invitation to hover, which the cursor now issues on its
+            own: `cursor-zoom-in` says the same thing, over the whole picture
+            rather than in one corner of it, and without covering part of the
+            product to do so. A badge that only tells you what the cursor
+            already told you is a sticker on a photograph the shop paid to take.
+          */}
         </button>
 
         {images.length > 1 ? (

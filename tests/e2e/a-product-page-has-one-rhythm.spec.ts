@@ -409,6 +409,89 @@ test("and the photographs have square corners, all of them", async ({ page }) =>
   }
 });
 
+test("and nothing from the buy column is drawn on top of the magnifier", async ({ page }) => {
+  /*
+    THE SHOP SAW TWO LITTLE SQUARES FLOATING ON THE MAGNIFIED PHOTOGRAPH: the
+    option tickboxes in the column beside it, painting straight through the
+    panel.
+
+    It was not a z-index that was merely too low. `position: sticky` creates a
+    stacking context whatever its z-index is, and the gallery sits inside a
+    sticky wrapper — so the panel's `z-30` only ever competed with the gallery's
+    own children, and the wrapper itself then sat at `auto` against the text
+    column, where document order decides and the text column comes second. The
+    fix is a z-index on the WRAPPER, and the kind of thing that is easy to undo
+    later while every class still looks deliberate.
+
+    READ AS PAINT ORDER, not as a number. `elementsFromPoint` is the browser's
+    own answer to "what is on top here" — but it obeys `pointer-events`, and
+    the panel is `pointer-events-none` so that a hand moving towards Add to
+    Cart is never caught by a magnifier about to vanish. So the test turns that
+    off for the length of one measurement and puts it straight back. A z-index
+    assertion would pass on the exact bug this is about.
+  */
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(await anyProduct(page));
+  await page.waitForTimeout(3000);
+
+  const photo = page.locator('button[aria-label^="Zoom"]').first();
+  await expect(photo, "the product has no photo to magnify").toBeVisible();
+
+  const box = (await photo.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.waitForTimeout(1800);
+
+  const order = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="zoom-panel"]') as HTMLElement | null;
+    if (!panel) return null;
+    const under = panel.getBoundingClientRect();
+
+    /* Anything in the buy column that the panel now covers. */
+    const covered = [...document.querySelectorAll("main .grid > div:nth-child(2) *")].filter(
+      (node) => {
+        const at = node.getBoundingClientRect();
+        return (
+          at.width > 4 &&
+          at.height > 4 &&
+          at.left > under.left &&
+          at.right < under.right &&
+          at.top > under.top &&
+          at.bottom < under.bottom
+        );
+      },
+    );
+    if (covered.length === 0) return { covered: 0, onTop: [] as string[] };
+
+    panel.style.pointerEvents = "auto";
+    const onTop = covered
+      .map((node) => {
+        const at = node.getBoundingClientRect();
+        const first = document.elementFromPoint(
+          Math.round(at.left + at.width / 2),
+          Math.round(at.top + at.height / 2),
+        );
+        return first === panel || panel.contains(first)
+          ? null
+          : `${first?.tagName ?? "?"} ${(node.textContent ?? "").trim().slice(0, 20)}`;
+      })
+      .filter(Boolean) as string[];
+    panel.style.pointerEvents = "none";
+
+    return { covered: covered.length, onTop };
+  });
+
+  expect(order, "the magnifier did not appear").not.toBeNull();
+  expect(
+    order!.covered,
+    "the magnifier covers nothing, so this measures nothing",
+  ).toBeGreaterThan(0);
+  expect(
+    order!.onTop,
+    `drawn on top of the magnifier: ${order!.onTop.join(", ")}`,
+  ).toEqual([]);
+});
+
 test("and the photo viewer leaves nothing but the photo", async ({ page }) => {
   /*
     A PHOTOGRAPH IS JUDGED AGAINST WHAT SURROUNDS IT. The viewer used the house

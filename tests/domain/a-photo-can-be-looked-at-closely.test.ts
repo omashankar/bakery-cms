@@ -225,13 +225,26 @@ describe("the magnifier that follows a mouse", () => {
     expect(view.lens()?.className).toContain("pointer-events-none");
   });
 
-  it("drops the magnifying-glass hint once the magnifier is up", () => {
-    // It is an invitation, and it stops being one the moment it is accepted.
+  it("invites a hover with the cursor, not with a badge on the photograph", () => {
+    /**
+     * A magnifying-glass badge sat in the bottom-right corner, hiding while the
+     * magnifier ran — an invitation that withdrew once accepted, which was the
+     * right behaviour for the wrong control. The shop asked for it gone.
+     *
+     * `cursor-zoom-in` says the same thing over the WHOLE picture rather than
+     * in one corner of it, and without covering part of a photograph the shop
+     * paid to take. It also says it before the pointer has moved, which the
+     * badge could not.
+     *
+     * Both halves, or this passes for a gallery that invites nothing at all:
+     * no badge, AND the cursor that replaced it.
+     */
     const view = render(["/a.jpg"]);
-    expect(view.hint()).not.toBeNull();
 
-    hover(view, FRAME / 2, FRAME / 2);
-    expect(view.hint()).toBeNull();
+    expect(view.hint(), "the magnifying-glass badge is back on the photograph").toBeNull();
+    expect(view.photo?.className ?? "", "nothing tells a pointer what this does").toContain(
+      "cursor-zoom-in",
+    );
   });
 });
 

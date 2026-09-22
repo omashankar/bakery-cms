@@ -980,7 +980,23 @@ export function ProductDetailPage({
               third of the way down, so a customer reading the ingredients could
               no longer see what they were reading about.
             */}
-            <div className="lg:sticky lg:top-24">
+            {/*
+              `z-20` BECAUSE `sticky` MAKES THIS A STACKING CONTEXT.
+
+              The magnifier panel is `absolute z-30` inside the gallery, and it
+              was being drawn UNDER the option tickboxes in the column beside
+              it — the shop saw two little squares floating on the magnified
+              photograph. Not a z-index that was too low: `position: sticky`
+              creates a stacking context whatever its z-index is, so the
+              panel's 30 only ever competed with the gallery's own children,
+              and this whole box then sat at `auto` against the text column,
+              where document order wins and the text column comes second.
+
+              A z-index here lifts the context itself. 20 is deliberately below
+              the sticky header's 50 and the phone's fixed cart bar at 40 —
+              this has to rise above one column, not above the shop.
+            */}
+            <div className="lg:sticky lg:top-24 lg:z-20">
               <ProductGallery
                 images={galleryImages}
                 productName={cake.name}
