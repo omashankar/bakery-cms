@@ -310,12 +310,27 @@ export function PhotoPrintEditor({
       honest answer is to hold the door until it has answered.
     */
     <Dialog open={open} onOpenChange={(next) => (next || !working) && onOpenChange(next)}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Fit your photo in the frame</DialogTitle>
+      {/*
+        `p-0`, with the padding pushed into the three bands below.
+
+        The header, the working area and the buttons each want their own, and
+        the reference storefront's editor is built the same way: a tinted title
+        strip edge to edge, the frame on plain white under it, and the buttons
+        on a strip of their own at the bottom. Padding on the dialog itself
+        makes all three float in a box and leaves the title with nothing to sit
+        on.
+      */}
+      <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-4xl">
+        <DialogHeader className="border-b border-border bg-cream-50 px-6 py-4">
+          {/*
+            Centred, because this dialog has one subject and it is the frame
+            below. A left-aligned title over a centred picture reads as the
+            heading of a form.
+          */}
+          <DialogTitle className="text-center text-base">Fit your photo in the frame</DialogTitle>
         </DialogHeader>
 
-        <div className="gap-6 sm:grid sm:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="gap-6 px-6 py-6 sm:grid sm:grid-cols-[minmax(0,1fr)_18rem]">
           {/*
             A CIRCLE, because the printed area is one. The file itself is
             square with white corners — which is what the shop's printer wants
@@ -328,7 +343,7 @@ export function PhotoPrintEditor({
             rounding the box instead only worked while every print was round.
           */}
           <div
-            className="relative mx-auto mb-5 w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card sm:mb-0"
+            className="relative mx-auto mb-5 w-full max-w-xl overflow-hidden bg-card sm:mb-0"
             style={{ aspectRatio: `${previewBox.width} / ${previewBox.height}` }}
           >
             <canvas
@@ -498,7 +513,7 @@ export function PhotoPrintEditor({
           </Tabs>
         </div>
 
-        <DialogFooter className="items-center">
+        <DialogFooter className="items-center border-t border-border bg-cream-50 px-6 py-4">
           <Button
             type="button"
             variant="ghost"
