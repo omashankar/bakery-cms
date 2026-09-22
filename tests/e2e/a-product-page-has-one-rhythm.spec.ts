@@ -58,18 +58,45 @@ test("the buying column is spaced by one number, not by whatever each block brou
       reports a top equal to its neighbour's, which would read as a 0px gap and
       fail a test about spacing for a reason that has nothing to do with it.
     */
-    const drawn = [...column.children]
-      .map((node) => ({ node, box: node.getBoundingClientRect() }))
-      .filter((entry) => entry.box.height > 1);
+    /*
+      INSIDE THE BUYING GROUP TOO, not only at the top level.
+
+      The five controls were moved into one `max-w-sm` wrapper so they could be
+      narrower than the title and the price above them. That turned five
+      measured children into one — and the gaps BETWEEN them, which is where
+      the `display: contents` bug lived, stopped being looked at. A guard that
+      quietly measures less after a refactor is worse than no guard, because
+      the number it reports still looks healthy.
+    */
+    const group = [...column.children].find((child) =>
+      [...child.querySelectorAll("button")].some((button) =>
+        /add to cart|update cart|out of stock/i.test(button.textContent ?? ""),
+      ),
+    );
+
+    const drawnIn = (node: Element) =>
+      [...node.children]
+        .map((child) => ({ node: child, box: child.getBoundingClientRect() }))
+        .filter((entry) => entry.box.height > 1);
+
+    const drawn = [
+      ...drawnIn(column).filter((entry) => entry.node !== group),
+      ...(group ? drawnIn(group) : []),
+    ];
 
     const gaps: { after: string; gap: number }[] = [];
-    for (let i = 1; i < drawn.length; i += 1) {
-      gaps.push({
-        after: (drawn[i - 1]!.node.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40),
-        gap: Math.round(drawn[i]!.box.top - (drawn[i - 1]!.box.top + drawn[i - 1]!.box.height)),
-      });
-    }
-    return { count: drawn.length, gaps };
+    const measure = (list: typeof drawn) => {
+      for (let i = 1; i < list.length; i += 1) {
+        gaps.push({
+          after: (list[i - 1]!.node.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40),
+          gap: Math.round(list[i]!.box.top - (list[i - 1]!.box.top + list[i - 1]!.box.height)),
+        });
+      }
+    };
+    measure(drawnIn(column));
+    if (group) measure(drawnIn(group));
+
+    return { count: drawn.length, gaps, grouped: Boolean(group) };
   });
 
   expect(rhythm, "the product page has no right-hand column").not.toBeNull();
@@ -157,57 +184,102 @@ test("and the price block does not read back what the ticks already show", async
   );
 });
 
-test("and every control in the column shares one left and one right edge", async ({ page }) => {
+test("and the fields line up with each other, narrower than what is read", async ({ page }) => {
   /*
-    THREE DIFFERENT RIGHT-HAND EDGES DOWN ONE SHORT STACK. The message box and
-    the photo upload ran the full width of the column, the Add to Cart row ran
-    the full width, and the PIN-code field stopped at 384px because it had been
-    given `sm:max-w-sm` to leave room for an answer beside it. Seen on its own
-    that row was fine; seen with the rest of the column it was the one thing out
-    of line, which is the first thing the eye finds and the last thing it can
-    un-see.
+    TWO RULES, AND THEY ARE NOT THE SAME RULE.
 
-    Measured on the BLOCKS, not on a class name: a ragged edge is a fact about
-    where things are drawn, and any number of different classes produce it.
-    Zero-height children are skipped — several are `lg:hidden` — because a
-    hidden box reports edges that mean nothing.
+    Everything in this column starts at one left edge — a ragged left is the
+    first thing an eye finds and the last it can un-see, and it was ragged on
+    the right once: the message box and the upload ran the full column, the
+    Add to Cart row ran the full column, and the PIN-code field stopped at
+    384px because it had been narrowed to leave room for an answer beside it.
+
+    But the RIGHT edge is deliberately two widths now. The shop asked for the
+    things a customer FILLS IN to be narrower than the things they READ: a
+    single-line message box 656px wide is two thirds of a metre on a laptop,
+    and a PIN-code field with 500px of white between the digits and the button
+    reads as a mistake. The title, the price and the weight pills keep the full
+    column; the five controls share one narrower edge among themselves.
+
+    So: one left edge for all of them, at most two right edges overall, and the
+    controls agreeing with each other. Measured on the BLOCKS rather than on a
+    class name — any number of classes produce a ragged edge — and zero-height
+    children are skipped, because several are `lg:hidden` and a hidden box
+    reports edges that mean nothing.
   */
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto(await anyProduct(page));
   await page.waitForTimeout(2500);
 
-  const edges = await page.evaluate(() => {
+  const seen = await page.evaluate(() => {
     const column = document.querySelectorAll("main .grid > div")[1];
     if (!column) return null;
-    return [...column.children]
-      .map((node) => ({ node, box: node.getBoundingClientRect() }))
-      .filter((entry) => entry.box.height > 1)
-      .map((entry) => ({
-        left: Math.round(entry.box.left),
-        right: Math.round(entry.box.right),
-        what:
-          (entry.node.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 30) ||
-          entry.node.tagName.toLowerCase(),
-      }));
+
+    const drawn = (node: Element) =>
+      [...node.children]
+        .map((child) => ({ child, box: child.getBoundingClientRect() }))
+        .filter((entry) => entry.box.height > 1)
+        .map((entry) => ({
+          left: Math.round(entry.box.left),
+          right: Math.round(entry.box.right),
+          what:
+            (entry.child.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 30) ||
+            entry.child.tagName.toLowerCase(),
+        }));
+
+    /*
+      The controls are found by CONTAINING Add to Cart, not by a class: the
+      wrapper is an implementation detail and the button is the thing everyone
+      agrees is a buying control.
+    */
+    const group = [...column.children].find((child) =>
+      [...child.querySelectorAll("button")].some((button) =>
+        /add to cart|update cart|out of stock/i.test(button.textContent ?? ""),
+      ),
+    );
+
+    return {
+      column: drawn(column),
+      controls: group ? drawn(group) : [],
+      columnWidth: Math.round(column.getBoundingClientRect().width),
+      groupWidth: group ? Math.round(group.getBoundingClientRect().width) : 0,
+    };
   });
 
-  expect(edges, "the product page has no right-hand column").not.toBeNull();
-  expect(edges!.length, "the column has too few blocks to line up").toBeGreaterThan(4);
+  expect(seen, "the product page has no right-hand column").not.toBeNull();
+  expect(seen!.column.length, "the column has too few blocks to line up").toBeGreaterThan(4);
+  expect(seen!.controls.length, "the buying controls are not grouped").toBeGreaterThan(2);
 
-  const lefts = [...new Set(edges!.map((entry) => entry.left))];
-  const rights = [...new Set(edges!.map((entry) => entry.right))];
-
+  const lefts = [...new Set(seen!.column.map((entry) => entry.left))];
   expect(
     lefts,
     `blocks start at ${lefts.length} different left edges: ` +
-      edges!.map((e) => `${e.left} ${e.what}`).join(" | "),
+      seen!.column.map((e) => `${e.left} ${e.what}`).join(" | "),
   ).toHaveLength(1);
+
+  const columnRights = [...new Set(seen!.column.map((entry) => entry.right))];
   expect(
-    rights,
-    `blocks end at ${rights.length} different right edges: ` +
-      edges!.map((e) => `${e.right} ${e.what}`).join(" | "),
+    columnRights.length,
+    `blocks end at ${columnRights.length} different right edges: ` +
+      seen!.column.map((e) => `${e.right} ${e.what}`).join(" | "),
+  ).toBeLessThanOrEqual(2);
+
+  const controlRights = [...new Set(seen!.controls.map((entry) => entry.right))];
+  expect(
+    controlRights,
+    `the fields end at ${controlRights.length} different right edges: ` +
+      seen!.controls.map((e) => `${e.right} ${e.what}`).join(" | "),
   ).toHaveLength(1);
+
+  /*
+    And narrower than the column, which is the whole point — without this the
+    two rules above are satisfied by every block being full width again.
+  */
+  expect(
+    seen!.groupWidth,
+    `the fields are ${seen!.groupWidth}px in a ${seen!.columnWidth}px column`,
+  ).toBeLessThan(seen!.columnWidth);
 });
 
 test("and Add to Cart is the biggest thing a customer can press", async ({ page }) => {

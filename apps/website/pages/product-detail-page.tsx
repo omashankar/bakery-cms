@@ -1366,262 +1366,281 @@ export function ProductDetailPage({
               */}
 
               {/*
-                The photo a photo cake is printed with.
+                THE BUYING CONTROLS ARE THEIR OWN COLUMN, and a narrower one.
 
-                This kept the file NAME in local state and nothing else — never
-                uploaded, never on the cart line, never on the order. The bakery
-                received an order for a photo cake with no photo and no sign one
-                had been chosen, after the customer had watched themselves
-                attach it and paid the photo surcharge.
+                They ran the full width of the text column, which is 656px at
+                1440 — a single-line message box two thirds of a metre wide on
+                a laptop, and a PIN-code field with 500px of empty white
+                between the digits and the button. The shop's reference keeps
+                this group at about 380 and lets the title, the price and the
+                weight pills above it run the full column, which is right:
+                those are things to READ and these are things to FILL IN, and
+                a field wider than the answer it wants reads as a mistake.
 
-                It now uploads to `/api/uploads/photo-cake`, which takes NO
-                sign-in — asking for a phone number before somebody has bought
-                anything is where people leave, and checkout still asks. It
-                checks the magic bytes rather than the browser’s word for the
-                type, caps the size, refuses cross-site posts, budgets what it
-                accepts, and deletes any photo no order or draft claims.
-
-                This comment said “requires a signed-in customer” for a commit
-                after that stopped being true — directly above the control it
-                describes.
+                `max-w-sm` is 384px and does nothing below that, so a phone
+                still gets the full width it needs. The `space-y-6` is the
+                column's own rhythm carried inside, so wrapping these five
+                into one child does not change the gaps between them.
               */}
-              {showPhotoUpload ? (
-                <div className="space-y-2" data-gate-photo>
-                  {/*
-                    ONE control, and it opens an editor.
-
-                    It was a bare file input: whatever the camera produced
-                    went to the shop at whatever crop, and nobody — customer
-                    or baker — saw what would be printed until it was. A
-                    round print area cuts the corners off a rectangular
-                    photograph, so the customer is the only person who can
-                    say which corners are the expendable ones.
-                  */}
-                  <button
-                    type="button"
-                    onClick={() => setPhotoEditorOpen(true)}
-                    className="flex w-full items-center gap-3 rounded-md border border-input bg-card px-3 py-2.5 text-left transition-premium hover:border-bakery-300"
-                  >
-                    {photoUrl ? (
-                      <>
-                        <span className="relative size-9 shrink-0 overflow-hidden rounded-full border border-border">
-                          <OptimizedImage
-                            src={photoUrl}
-                            alt=""
-                            fill
-                            className="object-cover"
-                            sizes="36px"
-                          />
-                        </span>
-                        <span className="text-sm font-medium">Photo added</span>
-                        <span className="ml-auto text-sm font-medium text-bakery-700">
-                          Change photo or name
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <ImageUp className="size-5 shrink-0 text-bakery-700" />
-                        <span className="text-sm font-medium">Upload photo and write name</span>
-                      </>
-                    )}
-                  </button>
-                  {photoUploading ? (
-                    <p className="text-xs text-muted-foreground">Uploading your photo…</p>
-                  ) : photoUrl ? (
-                    <p className="flex items-center gap-1.5 text-xs text-green-700">
-                      <Check className="size-3.5" />
-                      Photo attached — it will reach the shop with your order.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Fit it in the frame, and add a name if you want one.
-                    </p>
-                  )}
-
-                  <PhotoPrintEditor
-                    open={photoEditorOpen}
-                    onOpenChange={setPhotoEditorOpen}
-                    file={photoFile}
-                    onFileChange={setPhotoFile}
-                    draft={photoDraft}
-                    onDraftChange={setPhotoDraft}
-                    shape={cake.photoFrameShape}
-                    busy={photoUploading}
-                    attachedUrl={photoUrl}
-                    onUse={(chosen) => void handlePhotoReady(chosen)}
-                    onProblem={(problem) => toast.error(problem)}
-                  />
-                </div>
-              ) : null}
-
-              {cake.allowsMessage !== false ? (
-                /*
-                  TWO ROWS, NOT THREE, and the label is gone.
-
-                  It was a labelled three-row box, which is a paragraph's worth
-                  of space for something that is written on a cake — the whole
-                  control was taller than the price, the size buttons and the
-                  toggles put together. The placeholder already says what goes
-                  in it, in the shop's own example, so the label above was the
-                  same words twice; `aria-label` keeps them for anyone who
-                  cannot see the placeholder.
-
-                  Still a textarea rather than an input: a message runs onto a
-                  second line more often than not, and a single line that
-                  scrolls sideways hides what has already been typed.
-                */
-                <Textarea
-                  id="product-message"
-                  aria-label="Message on this order"
-                  placeholder='Message on this order — e.g. "Happy Birthday!"'
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  rows={1}
-                  /*
-                    `min-h-12`, not `h-12`: the shared Textarea floors itself at
-                    `min-h-16` and a height cannot override a minimum, which is
-                    why setting one changed nothing. The component also carries
-                    `field-sizing-content`, so lowering the floor gives the best
-                    of both — one line high beside the other controls, growing
-                    as a longer message is typed rather than hiding it.
-                  */
-                  className="min-h-12 py-3"
-                />
-              ) : null}
-
-              {/*
-                A Delivery date and a Delivery time stood here.
-
-                Removed at the shop's request: when a cake arrives is settled
-                AFTER the cart, not before it. Checkout asks the same two
-                questions, refuses to move on without an answer, and its
-                answer already won — `resolveEstimatedDelivery` says so in as
-                many words: “the slot chosen at checkout is the promise made
-                to the customer, so it takes precedence over dates picked per
-                item on the product page.” So this pair set a value that the
-                checkout then overrode, on a page the customer visits once per
-                cake and a decision they make once per order.
-
-                New lines carry no date. The FIELDS stay on the cart line and
-                the order item, and the cart still prints one when it finds
-                it, because a cart in somebody's browser from before this
-                deploy still has values in it and carts do not expire.
-              */}
-
-              {/*
-                CAN IT REACH ME — the last question before committing, asked
-                where the shop's reference storefront asks it: under the
-                message, above Add to Cart.
-
-                A customer who adds to cart, fills in an address and is told at
-                checkout that no zone covers their PIN code has spent five
-                minutes to be turned away, and they do not generally come back
-                to try a different product. This mounts nothing at all for a
-                shop that has not set its zones up — see `PincodeCheck`, where
-                that gate is the reason it reads the list on mount.
-              */}
-              <PincodeCheck />
-
-              {/*
-                A Quantity stepper stood to the left of these buttons.
-
-                Removed at the shop's request: the cart has one, and it is the
-                screen a customer is on when they think about how many. Adding
-                from a grid card never offered the question either, so the
-                product page was the only place that asked it.
-
-                The VALUE stays. `quantity` is still state, still sent with the
-                line, and still restored by the edit-a-cart-line path — a
-                customer who edits a line of three must not have it silently
-                reset to one because the control that set it has gone.
-              */}
-              {/*
-                PHONES ONLY NOW. On a desktop this button has moved into the
-                Add to Cart row below, where the reference storefront puts it:
-                a square heart, then the button, on one line.
-
-                It stayed a labelled button here because a phone's Add to Cart
-                lives in the fixed bar at the foot of the screen, so there is no
-                row for it to join — and an unlabelled heart floating on its own
-                above the options is a control with nothing to explain it.
-              */}
-              <div className="flex flex-wrap items-center justify-end gap-4 lg:hidden">
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleWishlist}>
-                    <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
-                    Wishlist
-                  </Button>
-                  {/*
-                    A Share button stood beside Wishlist. Removed at the
-                    shop's request — every browser this page runs in already
-                    has one, and the page has a canonical URL for it to use.
-                  */}
-                </div>
-              </div>
-
-              {/*
-                ONE button, where there were two.
-
-                "Buy Now" added the same line as "Add to Cart" and then pushed
-                to the cart — the same action, differently worded, sitting
-                beside it in the loudest place on the page. Two primary CTAs
-                make a customer choose between them before they can do the one
-                thing they came to do, and the difference between the pair was
-                a navigation they can make for themselves; the header cart
-                count and the toast both already point the way.
-              */}
-              {/*
-                Under the button, because it is about the button.
-
-                Null until the browser has a clock — the server does not know
-                what time it is where the customer is — and null again the
-                moment the cutoff passes, so it can never sit there having run
-                out.
-              */}
-              <div className="hidden items-center gap-3 lg:flex">
+              <div className="w-full max-w-sm space-y-6">
                 {/*
-                  THE HEART SITS BESIDE THE BUTTON, not on a line of its own
-                  above it. It was a labelled "Wishlist" pill pushed to the
-                  right-hand edge, three rows up — the smallest control in the
-                  column, in the emptiest part of it, above the largest one.
+                  The photo a photo cake is printed with.
 
-                  Square and unlabelled here because the button beside it says
-                  what this row is for, which is what makes the icon readable
-                  on its own. `aria-label` carries the words for anyone who
-                  cannot see it, and it says which way the tap goes rather than
-                  naming the list: "Save" and "Saved" are different actions, and
-                  a control whose label never changes has already told a screen
-                  reader the wrong thing once it is filled in.
+                  This kept the file NAME in local state and nothing else — never
+                  uploaded, never on the cart line, never on the order. The bakery
+                  received an order for a photo cake with no photo and no sign one
+                  had been chosen, after the customer had watched themselves
+                  attach it and paid the photo surcharge.
+
+                  It now uploads to `/api/uploads/photo-cake`, which takes NO
+                  sign-in — asking for a phone number before somebody has bought
+                  anything is where people leave, and checkout still asks. It
+                  checks the magic bytes rather than the browser’s word for the
+                  type, caps the size, refuses cross-site posts, budgets what it
+                  accepts, and deletes any photo no order or draft claims.
+
+                  This comment said “requires a signed-in customer” for a commit
+                  after that stopped being true — directly above the control it
+                  describes.
                 */}
-                <Button
-                  type="button"
-                  size="lg"
-                  variant="outline"
-                  onClick={handleWishlist}
-                  aria-pressed={wishlisted}
-                  aria-label={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
-                  className="h-14 w-14 shrink-0 p-0"
-                >
-                  <Heart
-                    className={cn("size-5", wishlisted && "fill-bakery-700 text-bakery-700")}
+                {showPhotoUpload ? (
+                  <div className="space-y-2" data-gate-photo>
+                    {/*
+                      ONE control, and it opens an editor.
+
+                      It was a bare file input: whatever the camera produced
+                      went to the shop at whatever crop, and nobody — customer
+                      or baker — saw what would be printed until it was. A
+                      round print area cuts the corners off a rectangular
+                      photograph, so the customer is the only person who can
+                      say which corners are the expendable ones.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => setPhotoEditorOpen(true)}
+                      className="flex w-full items-center gap-3 rounded-md border border-input bg-card px-3 py-2.5 text-left transition-premium hover:border-bakery-300"
+                    >
+                      {photoUrl ? (
+                        <>
+                          <span className="relative size-9 shrink-0 overflow-hidden rounded-full border border-border">
+                            <OptimizedImage
+                              src={photoUrl}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="36px"
+                            />
+                          </span>
+                          <span className="text-sm font-medium">Photo added</span>
+                          <span className="ml-auto text-sm font-medium text-bakery-700">
+                            Change photo or name
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageUp className="size-5 shrink-0 text-bakery-700" />
+                          <span className="text-sm font-medium">Upload photo and write name</span>
+                        </>
+                      )}
+                    </button>
+                    {photoUploading ? (
+                      <p className="text-xs text-muted-foreground">Uploading your photo…</p>
+                    ) : photoUrl ? (
+                      <p className="flex items-center gap-1.5 text-xs text-green-700">
+                        <Check className="size-3.5" />
+                        Photo attached — it will reach the shop with your order.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Fit it in the frame, and add a name if you want one.
+                      </p>
+                    )}
+
+                    <PhotoPrintEditor
+                      open={photoEditorOpen}
+                      onOpenChange={setPhotoEditorOpen}
+                      file={photoFile}
+                      onFileChange={setPhotoFile}
+                      draft={photoDraft}
+                      onDraftChange={setPhotoDraft}
+                      shape={cake.photoFrameShape}
+                      busy={photoUploading}
+                      attachedUrl={photoUrl}
+                      onUse={(chosen) => void handlePhotoReady(chosen)}
+                      onProblem={(problem) => toast.error(problem)}
+                    />
+                  </div>
+                ) : null}
+
+                {cake.allowsMessage !== false ? (
+                  /*
+                    TWO ROWS, NOT THREE, and the label is gone.
+
+                    It was a labelled three-row box, which is a paragraph's worth
+                    of space for something that is written on a cake — the whole
+                    control was taller than the price, the size buttons and the
+                    toggles put together. The placeholder already says what goes
+                    in it, in the shop's own example, so the label above was the
+                    same words twice; `aria-label` keeps them for anyone who
+                    cannot see the placeholder.
+
+                    Still a textarea rather than an input: a message runs onto a
+                    second line more often than not, and a single line that
+                    scrolls sideways hides what has already been typed.
+                  */
+                  <Textarea
+                    id="product-message"
+                    aria-label="Message on this order"
+                    placeholder='Message on this order — e.g. "Happy Birthday!"'
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    rows={1}
+                    /*
+                      `min-h-12`, not `h-12`: the shared Textarea floors itself at
+                      `min-h-16` and a height cannot override a minimum, which is
+                      why setting one changed nothing. The component also carries
+                      `field-sizing-content`, so lowering the floor gives the best
+                      of both — one line high beside the other controls, growing
+                      as a longer message is typed rather than hiding it.
+                    */
+                    className="min-h-12 py-3"
                   />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="bakery"
-                  className="h-14 flex-1 text-base font-semibold"
-                  disabled={isOutOfStock}
-                  onClick={() => handleAddToCart(false)}
-                >
-                  <ShoppingBag className="size-4" />
-                  {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
-                </Button>
+                ) : null}
+
+                {/*
+                  A Delivery date and a Delivery time stood here.
+
+                  Removed at the shop's request: when a cake arrives is settled
+                  AFTER the cart, not before it. Checkout asks the same two
+                  questions, refuses to move on without an answer, and its
+                  answer already won — `resolveEstimatedDelivery` says so in as
+                  many words: “the slot chosen at checkout is the promise made
+                  to the customer, so it takes precedence over dates picked per
+                  item on the product page.” So this pair set a value that the
+                  checkout then overrode, on a page the customer visits once per
+                  cake and a decision they make once per order.
+
+                  New lines carry no date. The FIELDS stay on the cart line and
+                  the order item, and the cart still prints one when it finds
+                  it, because a cart in somebody's browser from before this
+                  deploy still has values in it and carts do not expire.
+                */}
+
+                {/*
+                  CAN IT REACH ME — the last question before committing, asked
+                  where the shop's reference storefront asks it: under the
+                  message, above Add to Cart.
+
+                  A customer who adds to cart, fills in an address and is told at
+                  checkout that no zone covers their PIN code has spent five
+                  minutes to be turned away, and they do not generally come back
+                  to try a different product. This mounts nothing at all for a
+                  shop that has not set its zones up — see `PincodeCheck`, where
+                  that gate is the reason it reads the list on mount.
+                */}
+                <PincodeCheck />
+
+                {/*
+                  A Quantity stepper stood to the left of these buttons.
+
+                  Removed at the shop's request: the cart has one, and it is the
+                  screen a customer is on when they think about how many. Adding
+                  from a grid card never offered the question either, so the
+                  product page was the only place that asked it.
+
+                  The VALUE stays. `quantity` is still state, still sent with the
+                  line, and still restored by the edit-a-cart-line path — a
+                  customer who edits a line of three must not have it silently
+                  reset to one because the control that set it has gone.
+                */}
+                {/*
+                  PHONES ONLY NOW. On a desktop this button has moved into the
+                  Add to Cart row below, where the reference storefront puts it:
+                  a square heart, then the button, on one line.
+
+                  It stayed a labelled button here because a phone's Add to Cart
+                  lives in the fixed bar at the foot of the screen, so there is no
+                  row for it to join — and an unlabelled heart floating on its own
+                  above the options is a control with nothing to explain it.
+                */}
+                <div className="flex flex-wrap items-center justify-end gap-4 lg:hidden">
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={handleWishlist}>
+                      <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
+                      Wishlist
+                    </Button>
+                    {/*
+                      A Share button stood beside Wishlist. Removed at the
+                      shop's request — every browser this page runs in already
+                      has one, and the page has a canonical URL for it to use.
+                    */}
+                  </div>
+                </div>
+
+                {/*
+                  ONE button, where there were two.
+
+                  "Buy Now" added the same line as "Add to Cart" and then pushed
+                  to the cart — the same action, differently worded, sitting
+                  beside it in the loudest place on the page. Two primary CTAs
+                  make a customer choose between them before they can do the one
+                  thing they came to do, and the difference between the pair was
+                  a navigation they can make for themselves; the header cart
+                  count and the toast both already point the way.
+                */}
+                {/*
+                  Under the button, because it is about the button.
+
+                  Null until the browser has a clock — the server does not know
+                  what time it is where the customer is — and null again the
+                  moment the cutoff passes, so it can never sit there having run
+                  out.
+                */}
+                <div className="hidden items-center gap-3 lg:flex">
+                  {/*
+                    THE HEART SITS BESIDE THE BUTTON, not on a line of its own
+                    above it. It was a labelled "Wishlist" pill pushed to the
+                    right-hand edge, three rows up — the smallest control in the
+                    column, in the emptiest part of it, above the largest one.
+
+                    Square and unlabelled here because the button beside it says
+                    what this row is for, which is what makes the icon readable
+                    on its own. `aria-label` carries the words for anyone who
+                    cannot see it, and it says which way the tap goes rather than
+                    naming the list: "Save" and "Saved" are different actions, and
+                    a control whose label never changes has already told a screen
+                    reader the wrong thing once it is filled in.
+                  */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="outline"
+                    onClick={handleWishlist}
+                    aria-pressed={wishlisted}
+                    aria-label={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
+                    className="h-14 w-14 shrink-0 p-0"
+                  >
+                    <Heart
+                      className={cn("size-5", wishlisted && "fill-bakery-700 text-bakery-700")}
+                    />
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="bakery"
+                    className="h-14 flex-1 text-base font-semibold"
+                    disabled={isOutOfStock}
+                    onClick={() => handleAddToCart(false)}
+                  >
+                    <ShoppingBag className="size-4" />
+                    {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
+                  </Button>
+                </div>
+                {commerce.sameDayCutoff && timeLeft ? (
+                  <p className="text-center text-sm font-medium text-bakery-700">
+                    {timeLeft} hours left for today&apos;s delivery
+                  </p>
+                ) : null}
               </div>
-              {commerce.sameDayCutoff && timeLeft ? (
-                <p className="text-center text-sm font-medium text-bakery-700">
-                  {timeLeft} hours left for today&apos;s delivery
-                </p>
-              ) : null}
 
               {/*
                 THE OFFERS ARE NOT A PANEL, and the words are not decoration.
