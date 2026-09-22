@@ -310,12 +310,12 @@ export function PhotoPrintEditor({
       honest answer is to hold the door until it has answered.
     */
     <Dialog open={open} onOpenChange={(next) => (next || !working) && onOpenChange(next)}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Fit your photo in the frame</DialogTitle>
         </DialogHeader>
 
-        <div className="gap-5 sm:grid sm:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="gap-6 sm:grid sm:grid-cols-[minmax(0,1fr)_18rem]">
           {/*
             A CIRCLE, because the printed area is one. The file itself is
             square with white corners — which is what the shop's printer wants
@@ -328,7 +328,7 @@ export function PhotoPrintEditor({
             rounding the box instead only worked while every print was round.
           */}
           <div
-            className="relative mx-auto mb-5 w-full max-w-sm overflow-hidden rounded-lg border border-border bg-card sm:mb-0"
+            className="relative mx-auto mb-5 w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card sm:mb-0"
             style={{ aspectRatio: `${previewBox.width} / ${previewBox.height}` }}
           >
             <canvas

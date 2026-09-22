@@ -266,6 +266,7 @@ describe("what gets painted, and in what order", () => {
       quadraticCurveTo: () => calls.push("quad"),
       bezierCurveTo: () => calls.push("bezier"),
       closePath: () => calls.push("closePath"),
+      fill: () => calls.push("fill"),
       stroke: () => calls.push("stroke"),
       clip: () => calls.push("clip"),
       translate: (x: number, y: number) => calls.push(`translate:${x},${y}`),
@@ -328,6 +329,60 @@ describe("what gets painted, and in what order", () => {
 
     expect(calls).toContain("fillRect:0,0,400,400");
     expect(at(calls, "drawImage")).toBe(-1);
+  });
+
+  it("fills the empty frame, so its shape is visible before anything is in it", () => {
+    /**
+     * A hairline outline on white is a sketch: it reads as decoration, and
+     * somebody opening this for the first time has to work out that the line
+     * is where their photograph will go. A filled silhouette says it without a
+     * sentence.
+     *
+     * ON SCREEN ONLY — `guide` is what separates the preview from the file the
+     * shop receives, and a tint baked into the export would be printed on the
+     * cake.
+     */
+    const { painter, calls } = recorder();
+    paintPhotoFrame(painter, { ...round(400), guide: true }, null, emptyPhotoPrintDraft);
+
+    expect(calls).toContain("fill");
+    /*
+      `indexOf`, not the `at` helper above: that one matches on a PREFIX, so
+      "fill" finds the `fillRect` that lays the white ground several calls
+      earlier and the ordering assertion reads backwards. Measured — it
+      reported index 1 against a clip at 4.
+    */
+    const fillAt = calls.indexOf("fill");
+    // After the clip is released, with the outline, not inside the photo pass.
+    expect(fillAt).toBeGreaterThan(at(calls, "clip"));
+    expect(fillAt).toBeLessThan(calls.indexOf("stroke"));
+  });
+
+  it("and stops filling it the moment there is a photograph to judge", () => {
+    /**
+     * THE HALF THAT WOULD RUIN IT. The fill is painted after the clip is
+     * released, so it is not bounded by the frame's own clip — left
+     * unconditional it would lay a grey wash over the photograph the customer
+     * is trying to look at, on every redraw, for as long as the dialog is open.
+     */
+    const { painter, calls } = recorder();
+    paintPhotoFrame(painter, { ...round(400), guide: true }, SQUARE, emptyPhotoPrintDraft);
+
+    expect(at(calls, "drawImage"), "no photograph was drawn, so this proves nothing")
+      .toBeGreaterThan(-1);
+    expect(calls, "the guide tint is painted over the photograph").not.toContain("fill");
+    // …and the outline is still drawn, because the cut line still has to show.
+    expect(calls).toContain("stroke");
+  });
+
+  it("and never fills the file the shop receives", () => {
+    // No `guide`, so no tint and no outline: the export carries the photograph
+    // and the white ground, and nothing that was only ever an instruction.
+    const { painter, calls } = recorder();
+    paintPhotoFrame(painter, round(400), null, emptyPhotoPrintDraft);
+
+    expect(calls).not.toContain("fill");
+    expect(calls).not.toContain("stroke");
   });
 
   it("puts the lettering over the photograph, not under it", () => {
@@ -607,6 +662,7 @@ describe("what is painted, on which canvas, and what leaves for the shop", () =>
       quadraticCurveTo: () => calls.push("quad"),
       bezierCurveTo: () => calls.push("bezier"),
       closePath: () => calls.push("closePath"),
+      fill: () => calls.push("fill"),
       stroke: () => calls.push("stroke"),
       clip: () => calls.push("clip"),
       translate: (x: number, y: number) => calls.push(`translate:${x},${y}`),

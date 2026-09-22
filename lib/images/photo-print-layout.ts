@@ -22,13 +22,21 @@ export type { PhotoFrameShapeId };
 export const OUTPUT_PX = 2400;
 
 /**
- * How big the preview's backing store is; the box it draws into is smaller.
+ * How big the preview's backing store is.
  *
- * The frame is capped at 24rem of CSS, so this is drawn DOWN rather than up —
- * the right way round for judging a crop, though it does mean the preview is
- * softer than the print on a dense screen rather than sharper.
+ * It was 512, on the reasoning that the frame was capped at 24rem of CSS so the
+ * canvas was being drawn DOWN — the right way round for judging a crop. That
+ * cap has since gone up: the dialog and its preview were enlarged to match the
+ * storefront this is drawn from, and the box is now about 550 CSS pixels, which
+ * is 1100 on the dense screens most of these customers use. A 512 backing store
+ * filling 1100 is a 2.15x upscale of the very thing a customer is squinting at
+ * to decide whether their child's face is in the middle of the heart.
+ *
+ * 1024 puts it back under 1:1 at that size. It is four times the pixels to
+ * repaint on every slider drag, which is worth it here and nowhere else: this
+ * canvas exists for exactly one judgement and the dialog is open for seconds.
  */
-export const PREVIEW_PX = 512;
+export const PREVIEW_PX = 1024;
 
 /**
  * How many characters fit on a printed frame.
@@ -136,6 +144,17 @@ export interface FramePainter {
   arc(x: number, y: number, radius: number, start: number, end: number): void;
   rect(x: number, y: number, width: number, height: number): void;
   clip(): void;
+  /**
+   * Fills the current path — used once, to show the frame's shape before a
+   * photograph has been chosen.
+   *
+   * This interface is deliberately the SMALLEST set of canvas calls this module
+   * makes, so the tests can drive it with a recorder rather than a real canvas
+   * and assert what was drawn. Every method added here is one more the recorder
+   * has to answer, which is why the list grows a line at a time and not by
+   * widening it to `CanvasRenderingContext2D`.
+   */
+  fill(): void;
   stroke(): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
@@ -405,6 +424,13 @@ const GROUND = "#ffffff";
 
 /** The cut line, drawn on the preview only. */
 const GUIDE = "rgba(0,0,0,0.28)";
+/**
+ * The tint that shows the shape before a photograph is chosen.
+ *
+ * Light enough that it never competes with the photograph that replaces it,
+ * dark enough to read as a filled shape rather than a smudge on the paper.
+ */
+const GUIDE_FILL = "rgba(0,0,0,0.07)";
 
 export interface PaintedFrame extends FrameBox {
   shape: PhotoFrameShape;
@@ -477,6 +503,26 @@ export function paintPhotoFrame(
     painter.save();
     painter.beginPath();
     shape.outline(painter, width, height);
+
+    /*
+      FILLED WHILE THE FRAME IS EMPTY, outlined once it is not.
+
+      A hairline heart on white is a sketch: it reads as decoration, and a
+      customer opening this for the first time has to work out that the line is
+      where their photograph is going. A filled silhouette says it without a
+      sentence — this is the shape, this is how much of it you get. The
+      storefront this is drawn from does the same, and it is the one part of
+      that dialog that needs no reading at all.
+
+      Only while empty. Once a photograph is placed, the fill would paint over
+      the very thing being judged — so past this point the outline alone marks
+      the edge, which is all it has to do.
+    */
+    if (!image) {
+      painter.fillStyle = GUIDE_FILL;
+      painter.fill();
+    }
+
     painter.strokeStyle = GUIDE;
     painter.lineWidth = Math.max(1, Math.min(width, height) / 256);
     painter.stroke();
