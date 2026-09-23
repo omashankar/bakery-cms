@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { storefrontHeading } from "@/constants/typography";
 
 /**
  * The checkout's address, plus the two things only the book has.
@@ -216,7 +217,7 @@ export function AccountAddressesPage() {
         </div>
 
         <div className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className="font-heading text-lg font-bold text-foreground">
+          <h2 className={cn(storefrontHeading.card, "text-foreground")}>
             {editingId ? "Edit address" : "Add new address"}
           </h2>
           <div className="mt-1 h-px bg-border" />

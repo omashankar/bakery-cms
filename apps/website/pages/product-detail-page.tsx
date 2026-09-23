@@ -76,6 +76,7 @@ import { getRecommendedProducts } from "@/apps/website/lib/recommended-products"
 import { recordRecentlyViewedProduct } from "@/features/products/lib/recently-viewed";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import type { LandingProduct } from "@/constants/landing-data";
+import { storefrontHeading } from "@/constants/typography";
 import { Badge } from "@/components/ui/badge";
 import { productTrustIcon } from "@/config/product-trust-icons";
 import { Button } from "@/components/ui/button";
@@ -945,33 +946,17 @@ export function ProductDetailPage({
       />
 
       {/*
-        THE TOP OF THIS PAGE IS NOT A SECTION BREAK.
+        ROOM FOR THE BAR THAT FLOATS OVER THE FOOT OF THIS PAGE, and nothing
+        else.
 
-        `sectionY` is the house rhythm for a page of one subject with air
-        around it, and it puts 64px above the photograph on a phone and 96px on
-        a desktop. That was right while a tinted band with a heading in it stood
-        between here and the header — the air separated two blocks. The band is
-        gone, so all that padding now sits under a single line of breadcrumb and
-        reads as the page failing to start: measured at 1440, 96px of nothing
-        between "Red Velvet Classic" in the trail and the photograph of it.
-
-        The storefront this is drawn from leaves about 30. The bottom is
-        untouched — that gap is between the page and the footer, where the
-        house rhythm is still what it is for.
+        The top of the page used to be overridden here too — `sectionY` put
+        96px between a single line of breadcrumb and the photograph, and this
+        was the one page that did anything about it. It is the house rhythm
+        now, so the override is down to the one thing that is true here and
+        nowhere else: Add to Cart is fixed to the bottom of a phone screen, and
+        without a floor under the page it covers the last thing on it.
       */}
-      {/*
-        EVERY BREAKPOINT THE RHYTHM DECLARES, not just the unprefixed one.
-
-        `sectionY` is `py-16 sm:py-20 lg:py-24`, and tailwind-merge treats a
-        prefixed utility as a different group from a bare one — so `pt-6` beats
-        `py-16` and leaves `sm:py-20` standing. Measured: 25px above the
-        photograph at 390, 32 at 1024, and 80 at 768, where a tablet got the
-        gap this change was removing while the phone and the desktop did not.
-        A `sm:` override is what makes it one number.
-      */}
-      <section
-        className={cn(layoutSpacing.sectionY, "pt-6 pb-24 sm:pt-6 lg:pt-8 lg:pb-16")}
-      >
+      <section className={cn(layoutSpacing.sectionY, "pb-24 lg:pb-16")}>
         <div className={layoutSpacing.container}>
           <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
             {/*
@@ -1036,7 +1021,7 @@ export function ProductDetailPage({
                   28 and the price at about 40, and that ordering is the point
                   rather than the exact figures.
                 */}
-                <h2 className="font-heading text-2xl font-bold sm:text-3xl">{cake.name}</h2>
+                <h2 className={storefrontHeading.page}>{cake.name}</h2>
                 {cake.rating ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <StarRating rating={cake.rating} size="md" showValue />
@@ -2055,12 +2040,12 @@ export function ProductDetailPage({
           {related.length > 0 ? (
             <div className="mt-16 border-t border-border pt-16">
               <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
-                <h2 className="font-heading text-2xl font-bold">You May Also Like</h2>
+                <h2 className={storefrontHeading.row}>You May Also Like</h2>
                 <Button variant="ghost" render={<Link href={routes.store.collections} />}>
                   View all
                 </Button>
               </ScrollReveal>
-              <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <StaggerReveal className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 {related.map((item) => (
                   <ProductCard key={item.id} cake={item} />
                 ))}

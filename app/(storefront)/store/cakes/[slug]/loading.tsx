@@ -15,7 +15,7 @@ import { layoutSpacing } from "@/constants/spacing";
 export default function Loading() {
   return (
     <StoreLoadingShell>
-      <div className={`${layoutSpacing.container} py-8`}>
+      <div className={`${layoutSpacing.container} ${layoutSpacing.sectionY}`}>
         <Skeleton className="h-3.5 w-56" />
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2">

@@ -72,6 +72,7 @@ import { addToWishlist } from "@/apps/website/lib/wishlist";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -803,7 +804,7 @@ function SavedForLaterSection({
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-4">
-        <h2 className="font-heading text-lg font-semibold">Saved for later</h2>
+        <h2 className={storefrontHeading.card}>Saved for later</h2>
         <p className="text-sm text-muted-foreground">
           Items you saved without losing your customization.
         </p>

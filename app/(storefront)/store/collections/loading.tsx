@@ -20,7 +20,7 @@ export default function Loading() {
   return (
     <StoreLoadingShell>
       <StoreHeaderSkeleton />
-      <div className={`${layoutSpacing.container} py-10`}>
+      <div className={`${layoutSpacing.container} ${layoutSpacing.sectionY}`}>
         <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
           <Skeleton className="hidden h-[28rem] rounded-xl lg:block" />
           <div className="space-y-6">

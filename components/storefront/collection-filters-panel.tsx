@@ -22,6 +22,7 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { cn } from "@/lib/utils";
+import { storefrontHeading } from "@/constants/typography";
 
 interface CollectionFiltersPanelProps {
   filters: CollectionFilters;
@@ -171,7 +172,7 @@ export function CollectionFiltersPanel({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-bakery-700" />
-          <h2 className="font-heading text-base font-semibold">Filters</h2>
+          <h2 className={storefrontHeading.card}>Filters</h2>
         </div>
         <Button
           type="button"

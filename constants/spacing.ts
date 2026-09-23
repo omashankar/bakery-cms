@@ -44,12 +44,28 @@ export const layoutSpacing = {
   /**
    * A WHOLE PAGE of something — checkout, the cart, a product, a CMS page.
    *
-   * Twenty-odd pages draw from this, and they are each one subject with air
-   * around it. The homepage is not: it is a stack of twenty bands, and at
-   * this rhythm it ran to 11,325px with 96px of nothing between every row.
-   * That band spacing is `bandY` below.
+   * Twenty-odd pages draw from this. It was `py-16 sm:py-20 lg:py-24`, on the
+   * reasoning that each of them is one subject and wants air around it — and
+   * that reasoning survived the thing that actually decides the number, which
+   * is what sits directly above.
+   *
+   * WHAT SITS ABOVE IS THE BREADCRUMB TRAIL. Every one of these pages is
+   * headed by a thin trail and nothing else; the band and the page title that
+   * used to fill that space were taken out. So the 96px was no longer air
+   * around a heading, it was a gap between a trail and the first thing on the
+   * page — measured at 1440, the trail ended at 178 and the first product card
+   * began at 475, nearly three hundred pixels of white on a catalogue page.
+   *
+   * The product page was brought to this rhythm on its own and the number
+   * below is the one that was settled there: 24 at the top, 32 from `lg`, and
+   * 64 at the foot before the footer. Written here rather than repeated as an
+   * override on every page, because an override has to be remembered — and the
+   * proof that it will not be is that for months exactly one page carried it.
+   *
+   * The homepage does not draw from this: it is a stack of twenty bands, and
+   * its rhythm is `bandY` below.
    */
-  sectionY: "py-16 sm:py-20 lg:py-24",
+  sectionY: "pt-6 pb-16 lg:pt-8",
   /**
    * ONE BAND of a homepage that has twenty of them.
    *

@@ -8,6 +8,7 @@ import {
 } from "@/apps/website/lib/settings";
 import type { StorefrontContact } from "@/apps/website/lib/storefront-contact.server";
 import { layoutSpacing } from "@/constants/spacing";
+import { storefrontHeading } from "@/constants/typography";
 
 interface ContactPageProps {
   defaultSubject?: string;
@@ -66,7 +67,7 @@ export function ContactPage({
           <div className="grid items-start gap-8 lg:grid-cols-[1.35fr_1fr]">
             {/* Form */}
             <ScrollReveal className="min-w-0 rounded-2xl border border-border bg-card p-6 sm:p-8">
-              <h2 className="font-heading text-xl font-bold sm:text-2xl">Send us a message</h2>
+              <h2 className={storefrontHeading.card}>Send us a message</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Fill in the details below and our team will get back to you within 24 hours.
               </p>
@@ -78,7 +79,7 @@ export function ContactPage({
             {/* Info + map */}
             <ScrollReveal delay={120} className="min-w-0 space-y-6">
               <div className="rounded-2xl border border-border bg-cream-100 p-6 sm:p-7">
-                <h2 className="font-heading text-lg font-bold">Get in Touch</h2>
+                <h2 className={storefrontHeading.card}>Get in Touch</h2>
                 {/*
                   Only what the shop actually publishes.
 
@@ -152,7 +153,7 @@ export function ContactPage({
               */}
               {businessHours.length > 0 ? (
               <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
-                <h2 className="font-heading text-lg font-bold">Opening Hours</h2>
+                <h2 className={storefrontHeading.card}>Opening Hours</h2>
                 <ul className="mt-5 space-y-3 text-sm">
                   {businessHours.map((item, index) => (
                     <li

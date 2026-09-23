@@ -67,6 +67,7 @@ import {
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
+import { storefrontHeading } from "@/constants/typography";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
 import {
   clearUnconfirmedOrder,
@@ -1384,7 +1385,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     and only one of them is still asked here. The when moved to
                     Personalize, so this says the one thing it now does.
                   */}
-                  <h2 className="font-heading text-lg font-semibold">Delivery address</h2>
+                  <h2 className={storefrontHeading.card}>Delivery address</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Where should we deliver your order?
                   </p>
@@ -1715,7 +1716,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               {step === 2 ? (
                 <div className="space-y-6">
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                    <h2 className="font-heading text-lg font-semibold">Personalize your order</h2>
+                    <h2 className={storefrontHeading.card}>Personalize your order</h2>
 
                     <div className="mt-5 space-y-4">
                       {deliveryTiers.length > 0 ? (
@@ -1993,7 +1994,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               {step === 3 ? (
                 <div className="space-y-6">
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                    <h2 className="font-heading text-lg font-semibold">Payment method</h2>
+                    <h2 className={storefrontHeading.card}>Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Pay securely online, or choose Cash on Delivery.
                     </p>
@@ -2035,7 +2036,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                   </div>
 
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                    <h2 className="font-heading text-lg font-semibold">Review & confirm</h2>
+                    <h2 className={storefrontHeading.card}>Review & confirm</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Please verify your details before placing the order.
                     </p>

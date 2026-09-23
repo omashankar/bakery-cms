@@ -421,7 +421,7 @@ export function CollectionsPage({
               ) : (
                 <StaggerReveal
                   key={`${categorySlug}-${currentPage}`}
-                  className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                  className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3"
                 >
                   {paginated.map((cake) => (
                     <ProductCard key={cake.id} cake={cake} />

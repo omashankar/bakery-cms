@@ -81,7 +81,12 @@ test.describe("browsing a category", () => {
     // Scoped to the pill group. An earlier version counted every link on the
     // page, so unrelated links to a collection made it fail for a reason that
     // had nothing to do with the pills.
-    const pills = page.getByRole("navigation", { name: "Categories" });
+    // EXACT, because an accessible name matches on a SUBSTRING by default and
+    // the header has carried a "Shop categories" band since the reference
+    // header shipped — so this locator has resolved to two navigations, and the
+    // test has been red on a strict-mode violation, ever since. Nothing about
+    // the pills was wrong; the locator was reading the header as well.
+    const pills = page.getByRole("navigation", { name: "Categories", exact: true });
     await expect(pills).toBeVisible();
 
     // Every category the shop has, offered. Checked by name so a rename shows.

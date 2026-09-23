@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
 import { toast } from "sonner";
 
@@ -75,7 +76,7 @@ export function TrackOrderPage() {
             <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <div className="mb-6 flex items-center gap-2">
                 <PackageSearch className="size-5 text-bakery-700" />
-                <h2 className="font-heading text-lg font-semibold">Find your order</h2>
+                <h2 className={storefrontHeading.card}>Find your order</h2>
               </div>
 
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>

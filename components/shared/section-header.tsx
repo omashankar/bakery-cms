@@ -1,5 +1,6 @@
 import type { SectionAlign } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
+import { storefrontHeading } from "@/constants/typography";
 
 interface SectionHeaderProps {
   overline?: string;
@@ -110,7 +111,7 @@ export function SectionHeader({
         note was written about.
       */}
       {hasTitle && (
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
+        <h2 className={cn(storefrontHeading.row, "text-foreground")}>
           {title}
         </h2>
       )}

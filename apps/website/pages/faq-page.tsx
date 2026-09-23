@@ -14,6 +14,7 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs, selectStorefrontFaqs } from "@/features/content/lib/storefront-content";
 import { getStorefrontContactInfo } from "@/apps/website/lib/settings";
@@ -147,7 +148,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                 <span className="flex size-12 items-center justify-center rounded-2xl bg-card text-bakery-700 shadow-sm">
                   <MessageCircle className="size-6" />
                 </span>
-                <h2 className="mt-5 font-heading text-xl font-bold sm:text-2xl">
+                <h2 className={cn("mt-5", storefrontHeading.card)}>
                   Still have questions?
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">

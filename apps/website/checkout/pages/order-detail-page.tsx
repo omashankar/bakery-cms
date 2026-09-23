@@ -20,6 +20,7 @@ import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
@@ -250,7 +251,7 @@ export function OrderDetailPage() {
                 <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                   <div className="flex items-center gap-2">
                     <Package className="size-5 text-bakery-700" />
-                    <h2 className="font-heading text-lg font-semibold">Order timeline</h2>
+                    <h2 className={storefrontHeading.card}>Order timeline</h2>
                   </div>
                   {/* The booked day, like the card above it — these two
                       disagreed for every shop west of UTC. Absent entirely on a
@@ -279,7 +280,7 @@ export function OrderDetailPage() {
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-5 text-bakery-700" />
-                  <h2 className="font-heading text-lg font-semibold">Delivery address</h2>
+                  <h2 className={storefrontHeading.card}>Delivery address</h2>
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{order.address.fullName}</p>

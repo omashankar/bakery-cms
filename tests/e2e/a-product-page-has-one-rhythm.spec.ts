@@ -22,7 +22,7 @@ import { expect, test } from "@playwright/test";
  * on the page was the name of the product the customer had just clicked the
  * name of, and the number they came to find was the quieter of the two.
  *
- * THE TOP. `sectionY` is `py-16 sm:py-20 lg:py-24`, and tailwind-merge treats a
+ * THE TOP. `sectionY` was `py-16 sm:py-20 lg:py-24`, and tailwind-merge treats a
  * prefixed utility as a different group from a bare one — so an unprefixed
  * `pt-6` override left `sm:py-20` standing and a tablet kept 80px of the gap
  * that phones and desktops had lost. Checked at every width for that reason.

@@ -9,6 +9,8 @@
  * render it too. That matters — most of what goes inside one of these is text
  * the server already has.
  */
+import { storefrontHeading } from "@/constants/typography";
+
 export function DetailSection({
   title,
   id,
@@ -20,7 +22,7 @@ export function DetailSection({
 }) {
   return (
     <section id={id} className="border-t border-border pt-6">
-      <h2 className="font-heading text-lg font-bold">{title}</h2>
+      <h2 className={storefrontHeading.card}>{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );

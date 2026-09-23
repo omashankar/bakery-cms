@@ -401,7 +401,8 @@ describe("which half of a banner the words sit in", () => {
 describe("the banner band's edges", () => {
   it("cancels the section padding at every breakpoint, not just the base one", () => {
     /**
-     * The shell's own padding is `py-16 sm:py-20 lg:py-24` — three classes.
+     * The shell's own padding is `bandY` — `py-4 sm:py-5 lg:py-6`, three
+     * classes, and three is the point rather than the numbers.
      * tailwind-merge resolves a conflict only within the same breakpoint, so
      * a bare `py-0` cancelled the base and left 80px at sm and 96px at lg: a
      * white gap above a band whose whole purpose is to start where the header

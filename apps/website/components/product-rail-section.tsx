@@ -5,6 +5,7 @@ import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import type { LandingProduct } from "@/constants/landing-data";
+import { storefrontHeading } from "@/constants/typography";
 import { routes } from "@/constants/routes";
 
 interface ProductRailSectionProps {
@@ -30,7 +31,7 @@ export function ProductRailSection({
     <section className={className}>
       <ScrollReveal className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h2 className="font-heading text-2xl font-bold">{title}</h2>
+          <h2 className={storefrontHeading.row}>{title}</h2>
           {description ? (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           ) : null}

@@ -55,3 +55,32 @@ export const typographyPresets = {
   overline: "text-xs font-semibold uppercase tracking-widest text-muted-foreground",
   label: "text-sm font-medium leading-none",
 } as const;
+
+/**
+ * THE THREE HEADINGS A STOREFRONT PAGE ACTUALLY HAS.
+ *
+ * `typographyPresets` above is keyed on HTML levels, h1 to h6, and nothing on
+ * the storefront draws from it — only the design-system page that displays it.
+ * So it documents a scale the shop does not use: its `h2` is 30px rising to
+ * 36, where the row heading over every grid on the homepage is 24 rising to 28.
+ *
+ * These are keyed on the JOB instead, because that is what a page picks by, and
+ * the drift this replaces was entirely pages picking a size rather than a role.
+ * Measured before the change, on four storefront pages: the same card heading
+ * appeared at 18px semibold in the cart and the four checkout steps, at 18px
+ * BOLD on Contact, and at 20px rising to 24 on Contact and FAQ — three weights
+ * and sizes for one thing, two of them on a single page, a few hundred pixels
+ * apart.
+ *
+ * `row` is the size `SectionHeader` settled on after the shop asked four times
+ * for its homepage to draw closer, and that component now reads it from here,
+ * so the homepage and the pages behind it cannot part company again.
+ */
+export const storefrontHeading = {
+  /** The name of the thing the whole page is about. */
+  page: "font-heading text-2xl font-bold tracking-tight sm:text-3xl",
+  /** Over a grid or a rail: a little larger than the product names beneath it. */
+  row: "font-heading text-2xl font-bold tracking-tight sm:text-[1.75rem] sm:leading-tight",
+  /** Inside a bordered box — a form, a panel, a step of checkout. */
+  card: "font-heading text-lg font-semibold",
+} as const;
