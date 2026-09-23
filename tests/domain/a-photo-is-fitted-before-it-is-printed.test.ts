@@ -1298,8 +1298,15 @@ describe("the outline a product is printed inside", () => {
     expect(trace(frameShape("square"), 400, 400)).toEqual(["rect:0,0,400,400"]);
     // …and a heart, which is a drawing rather than a formula: four curves at
     // the very least, starting from the notch at the top rather than a corner.
+    //
+    // Where that notch SITS is not asserted here. It was, as the literal
+    // 63.16 — and retuning the drawing broke this test, which is about the
+    // list of shapes, over a number that belongs to the heart. The geometry
+    // has its own file now: the-heart-is-the-same-on-both-sides.
     const heart = trace(frameShape("heart"), 400, 400);
-    expect(heart[0]).toMatch(/^moveTo:200,63[.]16/);
+    const opens = /^moveTo:200,([\d.]+)$/.exec(heart[0] ?? "");
+    expect(opens, `the heart opens with ${heart[0]}, not on the centre line`).not.toBeNull();
+    expect(Number(opens![1]), "the heart should open at the notch, near the top").toBeLessThan(160);
     expect(heart.filter((call) => call === "bezier").length).toBeGreaterThan(3);
     expect(heart).toContain("closePath");
     expect(heart).not.toContain("rect:0,0,400,400");

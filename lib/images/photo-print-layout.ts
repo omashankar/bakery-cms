@@ -180,19 +180,44 @@ export interface PhotoFrameShape {
 }
 
 /**
+ * The notch between the two lobes: where the outline begins and ends.
+ *
+ * Named because it is written TWICE — once as the `moveTo` that opens the path
+ * and once as the last curve's endpoint. A heart whose two ends do not meet is
+ * closed by `closePath` with a straight line drawn across the notch, which is
+ * not a thing anybody would look at and call a bug in a number.
+ */
+const HEART_NOTCH = 0.1175;
+
+/**
  * A heart, as fractions of its box.
  *
- * Six segments of the classic canvas heart, normalised out of the 110×95 box it
- * is usually written in so it fills whatever it is handed. Magic numbers, and
- * unavoidably so — a heart is a drawing, not a formula.
+ * Six cubics, mirrored down the middle: curve 1 pairs with 6, 2 with 5, 3 with
+ * 4, each the other read backwards with x flipped. That symmetry is the whole
+ * specification, and it is worth stating because it was once broken by a single
+ * digit — one control point 2/44 out of place leaned the notch 2% of the
+ * frame's width, about eleven pixels at the size this is actually drawn.
+ *
+ * The numbers themselves were FITTED, not drawn: the shape a shop asked for was
+ * supplied as a mask, and these are the control points that minimise the
+ * mismatch against it — 0.3% of the heart's area, over a search started from
+ * thirty-two different notches. That matters because the obvious search finds a
+ * notch that is a SLIT: widening the cleft costs area everywhere before it pays
+ * any back, so a descent that only goes downhill stays in the crack it landed
+ * in and produces a heart that is right everywhere except the one place the eye
+ * goes first.
+ *
+ * Magic numbers, unavoidably — a heart is a drawing, not a formula — but the
+ * drawing they came from is `.data/probe/refit-multistart.mjs`, and the claim
+ * they have to keep is symmetry, which is testable and tested.
  */
 const HEART: [number, number, number, number, number, number][] = [
-  [0.5, 0.126, 0.4545, 0, 0.2727, 0],
-  [0, 0, 0, 0.3947, 0, 0.3947],
-  [0, 0.5789, 0.1818, 0.8105, 0.5, 1],
-  [0.8182, 0.8105, 1, 0.5789, 1, 0.3947],
-  [1, 0.3947, 1, 0, 0.7273, 0],
-  [0.5909, 0, 0.5, 0.126, 0.5, 0.1579],
+  [0.4754, 0.08, 0.3901, 0, 0.2923, 0],
+  [0, 0, 0, 0.3343, 0, 0.3169],
+  [0, 0.6643, 0.28, 0.8088, 0.5, 1],
+  [0.72, 0.8088, 1, 0.6643, 1, 0.3169],
+  [1, 0.3343, 1, 0, 0.7077, 0],
+  [0.6099, 0, 0.5246, 0.08, 0.5, HEART_NOTCH],
 ];
 
 /**
@@ -236,7 +261,7 @@ export const PHOTO_FRAME_SHAPES: PhotoFrameShape[] = [
     label: "Heart",
     ratio: 1,
     outline: (painter, width, height) => {
-      painter.moveTo(width / 2, height * 0.1579);
+      painter.moveTo(width / 2, height * HEART_NOTCH);
       for (const [ax, ay, bx, by, x, y] of HEART) {
         painter.bezierCurveTo(
           ax * width,
