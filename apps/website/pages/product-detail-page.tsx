@@ -19,6 +19,7 @@ import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PincodeCheck } from "@/components/storefront/pincode-check";
 import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
+import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import {
   emptyPhotoPrintDraft,
   type PhotoPrintDraft,
@@ -1422,15 +1423,7 @@ export function ProductDetailPage({
                     >
                       {photoUrl ? (
                         <>
-                          <span className="relative size-9 shrink-0 overflow-hidden rounded-full border border-border">
-                            <OptimizedImage
-                              src={photoUrl}
-                              alt=""
-                              fill
-                              className="object-cover"
-                              sizes="36px"
-                            />
-                          </span>
+                          <FrameThumbnail src={photoUrl} shape={cake.photoFrameShape} />
                           <span className="text-sm font-medium">Photo added</span>
                           <span className="ml-auto text-sm font-medium text-bakery-700">
                             Change photo or name
@@ -1443,6 +1436,16 @@ export function ProductDetailPage({
                         </>
                       )}
                     </button>
+                    {/*
+                      NOTHING under the button when there is nothing to say.
+
+                      The line here read "Fit it in the frame, and add a name if
+                      you want one" — which is what the button above it already
+                      says, in the same number of words, one line higher. Two of
+                      the three states are still worth a line: an upload in
+                      flight, and the confirmation that the photo reached the
+                      shop, which is the only place that fact appears at all.
+                    */}
                     {photoUploading ? (
                       <p className="text-xs text-muted-foreground">Uploading your photo…</p>
                     ) : photoUrl ? (
@@ -1450,11 +1453,7 @@ export function ProductDetailPage({
                         <Check className="size-3.5" />
                         Photo attached — it will reach the shop with your order.
                       </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Fit it in the frame, and add a name if you want one.
-                      </p>
-                    )}
+                    ) : null}
 
                     <PhotoPrintEditor
                       open={photoEditorOpen}

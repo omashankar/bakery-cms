@@ -334,6 +334,51 @@ export function frameSize(shape: PhotoFrameShape, longSide: number): FrameBox {
     : { width: Math.round(longSide * shape.ratio), height: longSide };
 }
 
+/**
+ * The same outline, as an SVG path, in FRACTIONS of the box.
+ *
+ * Every screen that shows back the photograph a customer fitted was showing it
+ * in a circle, because a circle is what `rounded-full` costs nothing to draw.
+ * On a heart product that crops the lobes off the thing the customer just spent
+ * a minute positioning, and on a mug wrap it throws away two thirds of it.
+ *
+ * Fractions rather than pixels so it can go straight into a clip path with
+ * `clipPathUnits="objectBoundingBox"` — the browser then scales it to whatever
+ * box it is put on, which is what lets one 36px thumbnail and one 40px one
+ * share a definition.
+ *
+ * Built by RUNNING THE SHAPE'S OWN `outline`, not by writing the path out a
+ * second time. The whole promise of this module is that the preview and the
+ * printed file cannot disagree; a hand-copied path for the thumbnail would be a
+ * third drawing of the same shape, free to drift from both.
+ */
+export function framePathData(shape: PhotoFrameShape): string {
+  const parts: string[] = [];
+  const n = (value: number) => Number(value.toFixed(5));
+
+  const recorder: Partial<FramePainter> = {
+    moveTo: (x, y) => parts.push(`M${n(x)},${n(y)}`),
+    bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) =>
+      parts.push(`C${n(c1x)},${n(c1y)} ${n(c2x)},${n(c2y)} ${n(x)},${n(y)}`),
+    rect: (x, y, width, height) =>
+      parts.push(`M${n(x)},${n(y)}H${n(x + width)}V${n(y + height)}H${n(x)}Z`),
+    /*
+      SVG has no circle command, and one arc cannot close a full turn — the
+      start and end points would coincide and nothing is drawn. Two halves.
+    */
+    arc: (x, y, radius) =>
+      parts.push(
+        `M${n(x - radius)},${n(y)}` +
+          `A${n(radius)},${n(radius)} 0 1 0 ${n(x + radius)},${n(y)}` +
+          `A${n(radius)},${n(radius)} 0 1 0 ${n(x - radius)},${n(y)}Z`,
+      ),
+    closePath: () => parts.push("Z"),
+  };
+
+  shape.outline(recorder as FramePainter, 1, 1);
+  return parts.join(" ");
+}
+
 /* ───────────────────────────── what goes where ──────────────────────────── */
 
 /** How many more characters the frame will take. Never negative. */

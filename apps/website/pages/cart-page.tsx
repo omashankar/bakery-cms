@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
+import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -213,6 +214,24 @@ export function CartPage({ catalog = [] }: CartPageProps) {
       quantity: item.quantity,
     }));
   }, [items, catalog]);
+  /**
+   * Which outline each line's photograph was fitted to.
+   *
+   * Off the catalogue the server already sends for the stock check, NOT off a
+   * new field on the cart line: a line carries its photo as a URL and nothing
+   * else, and every extra thing it carries has to be threaded by hand through
+   * the quote, the order, the invoice and half a dozen lists between here and
+   * a saved order. A slug and a catalogue answer the same question for free.
+   *
+   * A line whose product is not in the catalogue — or a page that was sent no
+   * catalogue at all — gets `undefined`, which is the round frame every photo
+   * product used before there was a choice.
+   */
+  const frameBySlug = useMemo(
+    () => new Map(catalog.map((product) => [product.slug, product.photoFrameShape])),
+    [catalog],
+  );
+
   const couponCheck = useMemo(
     () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
     [coupon, couponLines],
@@ -461,15 +480,11 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                           */}
                           {item.photoUrl ? (
                             <span className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-                              <span className="size-10 shrink-0 overflow-hidden rounded border border-border bg-cream-100">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={item.photoUrl}
-                                  alt=""
-                                  className="size-full object-cover"
-                                  loading="lazy"
-                                />
-                              </span>
+                              <FrameThumbnail
+                                src={item.photoUrl}
+                                shape={frameBySlug.get(item.productSlug)}
+                                size={40}
+                              />
                               Your photo, to be printed on it
                             </span>
                           ) : null}

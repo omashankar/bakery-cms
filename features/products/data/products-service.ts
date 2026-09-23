@@ -261,6 +261,21 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     rating: product.rating,
     reviewCount: product.reviewCount,
     inStock: product.inStock,
+    /**
+     * The outline a photo product prints in — one short string, or nothing.
+     *
+     * No card renders it. The CART does: a line carries the photograph the
+     * customer fitted as a bare URL, and the only way to show it back in the
+     * shape it will be printed is to look the shape up by slug against this
+     * catalogue, which that page is already handed for the stock check. The
+     * alternative is a new field on the cart line, which has to be threaded by
+     * hand through the quote, the order, the invoice and the lists between
+     * them — a great deal of surface for a value the server already knows.
+     *
+     * It costs nothing on the wire for the products that are not photo
+     * products: `undefined` does not serialise.
+     */
+    photoFrameShape: product.photoFrameShape,
     description: "", // required by the type; never rendered on a card
     /**
      * THE ANSWER, not the groups it came from.
