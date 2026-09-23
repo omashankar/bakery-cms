@@ -152,3 +152,84 @@ test("and its frame shows the shape before a photograph is chosen", async ({ pag
     `the empty frame is ${shade!.middle} against a ground of ${shade!.corner} — the shape is invisible`,
   ).toBeLessThan(shade!.corner - 5);
 });
+
+test("and the answer sits at the foot of the panel it was decided in", async ({ page }) => {
+  /*
+    A BAR ACROSS THE DIALOG IS THE WRONG PLACE FOR THE ANSWER.
+
+    Every decision on this screen — which photo, how big, where the name sits —
+    is made in the narrow right-hand panel. Closing the dialog with a full-width
+    footer put "Use this photo" level with the bottom of the picture and the
+    width of the dialog away from the slider that was just moved: the eye leaves
+    the panel, crosses the photograph and comes back to press it.
+
+    Measured against the TAB STRIP rather than against a pixel count, because
+    the strip is the panel: if the pair is exactly as wide as the strip above
+    it, the pair is in the panel, at every width, on any size of screen.
+  */
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  const href = await aPhotoProduct(page);
+  if (!href) {
+    test.skip(true, "this shop sells no product that prints a photograph");
+    return;
+  }
+
+  for (const width of [390, 1024]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto(href);
+    await page.waitForTimeout(2600);
+    await page.getByText(OPENER).first().click();
+    await page.waitForTimeout(1400);
+
+    const seen = await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (!dialog) return null;
+      const strip = dialog.querySelector('[role="tablist"]')?.getBoundingClientRect();
+      const find = (re: RegExp) =>
+        [...dialog.querySelectorAll("button")]
+          .find((node) => re.test(node.textContent ?? ""))
+          ?.getBoundingClientRect();
+      const use = find(/use this photo|sending/i);
+      const cancel = find(/^cancel$/i);
+      const again = find(/start again/i);
+      if (!strip || !use || !cancel || !again) return null;
+      return {
+        dialog: Math.round(dialog.getBoundingClientRect().width),
+        strip: Math.round(strip.width),
+        stripLeft: Math.round(strip.left),
+        pairSpan: Math.round(Math.max(use.right, cancel.right) - Math.min(use.left, cancel.left)),
+        pairLeft: Math.round(Math.min(use.left, cancel.left)),
+        widthGap: Math.round(Math.abs(use.width - cancel.width)),
+        rowGap: Math.round(Math.abs(use.top - cancel.top)),
+        againIsAbove: again.bottom <= Math.min(use.top, cancel.top) + 1,
+      };
+    });
+
+    expect(seen, `${width}px: the editor did not open, or lost a button`).not.toBeNull();
+
+    /* Two equal halves of one row — not a right-aligned run of three. */
+    expect(seen!.widthGap, `${width}px: Cancel and Use this photo differ by ${seen!.widthGap}px`)
+      .toBeLessThanOrEqual(1);
+    expect(seen!.rowGap, `${width}px: Cancel and Use this photo are not on one row`)
+      .toBeLessThanOrEqual(1);
+
+    /*
+      THE CLAIM THAT CATCHES THE FOOTER COMING BACK. A bar across the dialog is
+      the full 896px wide; the panel is 288.
+    */
+    expect(
+      Math.abs(seen!.pairSpan - seen!.strip),
+      `${width}px: the pair spans ${seen!.pairSpan}px against a ${seen!.strip}px panel, in a ${seen!.dialog}px dialog — it is a bar, not the foot of the panel`,
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(seen!.pairLeft - seen!.stripLeft),
+      `${width}px: the pair starts ${seen!.pairLeft}px in, the panel at ${seen!.stripLeft}px`,
+    ).toBeLessThanOrEqual(2);
+
+    /* "Start again" is a way back, not a third answer beside the other two. */
+    expect(seen!.againIsAbove, `${width}px: "Start again" shares the row with the answer`)
+      .toBe(true);
+  }
+});

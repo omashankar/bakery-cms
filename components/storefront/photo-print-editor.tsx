@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -510,32 +509,56 @@ export function PhotoPrintEditor({
                 {...PHOTO_RANGES.rotation}
               />
             </TabsContent>
+            {/*
+              THE TWO ANSWERS SIT AT THE FOOT OF THE PANEL THEY BELONG TO, not
+              on a bar across the whole dialog.
+
+              A bar under a 576px picture puts "Use this photo" level with the
+              bottom of the frame and the width of the dialog away from the
+              sliders that were just moved, so the eye leaves the panel,
+              crosses the picture and comes back. Every decision on this screen
+              is made in this column; the answer belongs at the end of it.
+
+              A plain gap, NOT `mt-auto` against a stretched column. Measured:
+              the panel is the taller of the two cells for a round frame, so
+              pinning changed nothing at all — and for the portrait frame, where
+              the picture IS taller, it would have dragged the pair 100px below
+              the slider that was just moved, which is the fault this whole
+              change exists to remove.
+            */}
+            <div className="space-y-3 pt-6">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onDraftChange({ ...emptyPhotoPrintDraft, name: draft.name })}
+                className="-ml-2 text-muted-foreground"
+              >
+                <RotateCcw className="size-4" />
+                Start again
+              </Button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={working}
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                {/*
+                  Disabled until there is a photograph, because there is nothing
+                  to flatten without one — and a name alone is not a thing this
+                  control promises to print.
+                */}
+                <Button type="button" onClick={() => void flatten()} disabled={!image || working}>
+                  {working ? "Sending…" : "Use this photo"}
+                </Button>
+              </div>
+            </div>
           </Tabs>
         </div>
-
-        <DialogFooter className="items-center border-t border-border bg-cream-50 px-6 py-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onDraftChange({ ...emptyPhotoPrintDraft, name: draft.name })}
-            className="mr-auto text-muted-foreground"
-          >
-            <RotateCcw className="size-4" />
-            Start again
-          </Button>
-          <Button type="button" variant="outline" disabled={working} onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          {/*
-            Disabled until there is a photograph, because there is nothing to
-            flatten without one — and a name alone is not a thing this control
-            promises to print.
-          */}
-          <Button type="button" onClick={() => void flatten()} disabled={!image || working}>
-            {working ? "Sending…" : "Use this photo"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
