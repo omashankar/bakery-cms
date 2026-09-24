@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { collectionsWithProduct } from "@/features/catalog/lib/catalog-repository";
+import { collectionsWithProduct } from "@/features/catalog/lib/catalog-utils";
 import type { ProductCollection } from "@/types/product";
 
 /**
@@ -120,5 +120,35 @@ describe("ticking a collection on a product form", () => {
 
     expect(changed).toBe(0);
     expect(next[0]?.productIds).toEqual(["p1"]);
+  });
+});
+
+describe("and when the product is deleted altogether", () => {
+  it("comes out of every collection that listed it", () => {
+    /*
+      A collection holds its members as ids of its own — that is what lets a
+      shop curate an ORDER — and the price of storing them there is that they
+      outlive what they point at. The storefront filters a dangling id on read,
+      so no customer was ever shown a hole; what it did was make a group of
+      five quietly list four, for ever, with nothing to tell the owner why.
+
+      The server cascade calls this with NOTHING wanted, which is the same rule
+      read the other way round: take this product out everywhere.
+    */
+    const { next, changed } = collectionsWithProduct(
+      [collection("best", ["keep", "doomed"]), collection("other", ["doomed"])],
+      "doomed",
+      [],
+    );
+
+    expect(changed).toBe(2);
+    expect(next[0]?.productIds).toEqual(["keep"]);
+    expect(next[1]?.productIds).toEqual([]);
+  });
+
+  it("and touches nothing when no collection held it", () => {
+    const rows = [collection("best", ["other"])];
+
+    expect(collectionsWithProduct(rows, "doomed", []).changed).toBe(0);
   });
 });

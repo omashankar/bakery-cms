@@ -7,6 +7,7 @@ import type {
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
+  collectionsWithProduct,
   defaultCatalogStore,
   defaultCategories,
   defaultCollections,
@@ -360,35 +361,6 @@ export async function deleteCollections(ids: string[]): Promise<WriteResult<numb
  * function, so what it decides can be tested without a browser, a cache or a
  * server, which is the half of this that has rules worth pinning.
  */
-export function collectionsWithProduct(
-  collections: readonly ProductCollection[],
-  productId: string,
-  collectionIds: readonly string[],
-): { next: ProductCollection[]; changed: number } {
-  const wanted = new Set(collectionIds);
-  let changed = 0;
-
-  const next = collections.map((collection) => {
-    const ids = collection.productIds ?? [];
-    const has = ids.includes(productId);
-    const should = wanted.has(collection.id);
-    /*
-      UNTOUCHED when nothing changes, and the identity matters: each section is
-      a replace-all write, so a collection rebuilt for no reason is a curated
-      order rewritten by a product save that had nothing to do with it.
-    */
-    if (has === should) return collection;
-
-    changed += 1;
-    return {
-      ...collection,
-      /* Appended, never inserted — see the note on the caller. */
-      productIds: should ? [...ids, productId] : ids.filter((id) => id !== productId),
-    };
-  });
-
-  return { next, changed };
-}
 
 export async function setProductCollections(
   productId: string,
