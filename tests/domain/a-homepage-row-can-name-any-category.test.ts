@@ -115,8 +115,14 @@ describe("the frozen bakery rows go through the same builder", () => {
      */
     const rails = code("features/products/lib/homepage-rails.ts");
 
-    expect(rails).toContain('eggless: () => buildCategoryRail("eggless"');
-    expect(rails).toContain('seasonal: () => buildCategoryRail("seasonal"');
+    /*
+      The CALL, not the line it is written on. This pinned
+      `eggless: () => buildCategoryRail("eggless"` and went red when the
+      argument list grew and the arrow wrapped — a change that did not touch
+      what either row selects.
+    */
+    expect(rails).toContain('buildCategoryRail("eggless"');
+    expect(rails).toContain('buildCategoryRail("seasonal"');
   });
 
   it("and the closed union is still there for layouts already published", () => {
@@ -217,11 +223,23 @@ describe("the builder offers the shop's own categories", () => {
 });
 
 describe("the row reaches the page", () => {
-  it("the server builds one rail per category and hands them over", () => {
+  it("the server builds one rail per slug a row can name, and hands them over", () => {
+    /*
+      EVERY SLUG, not every category. A row is stored as a slug with no record
+      of which of the three lists the shop put it in — so when this shop's
+      catalogue was rebuilt and "birthday" became an occasion rather than a
+      category, the homepage's Birthday row had no rail here and drew nothing,
+      while the page its "View all" opens still held nineteen products.
+    */
     const service = code("features/products/data/products-service.ts");
 
     expect(service).toContain("categoryRails");
-    expect(service).toContain("buildCategoryRail(category.slug");
+    expect(service).toContain("railSlugs");
+    for (const list of ["categories", "occasions", "collections"]) {
+      expect(service, `${list} are not among the slugs a row may name`).toMatch(
+        new RegExp(`railSlugs[\\s\\S]{0,400}${list}`),
+      );
+    }
   });
 
   it("and the renderer draws it from that, with no browser fallback", () => {

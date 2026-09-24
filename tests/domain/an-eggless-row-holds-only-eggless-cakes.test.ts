@@ -293,7 +293,8 @@ describe("the section the shop already has stored", () => {
     expect(rails.length).toBeGreaterThan(200);
     expect(rails).toContain('"eggless"');
     expect(rails).toContain("categorySlugs()");
-    expect(rails).toContain("buildHomepageProducts(source, maxCount, products, all, names, categories)");
+    /* The call, not its exact argument list — which has since grown. */
+    expect(rails).toMatch(/buildHomepageProducts\(\s*source,\s*maxCount,\s*products,\s*all,\s*names,\s*categories/);
     /**
      * And the open sibling, built in the same place from the same list.
      *
@@ -303,7 +304,7 @@ describe("the section the shop already has stored", () => {
      * flag had in the first place.
      */
     expect(rails).toContain("categoryRails");
-    expect(rails).toContain("buildCategoryRail(category.slug");
+    expect(rails).toContain("buildCategoryRail(slug,");
   });
 
   it("tells the admin to file a product, not to set a flag that is gone", () => {

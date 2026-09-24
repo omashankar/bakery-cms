@@ -85,6 +85,47 @@ async function categorySlugs(): Promise<{ name: string; slug: string }[]> {
 }
 
 /**
+ * The shop's occasion slugs, so a homepage row can point at one.
+ *
+ * A row is stored as a SLUG and nothing else, and the shop decides which of the
+ * three lists that slug lives in. This one exists because "birthday" moved:
+ * it was a category, the catalogue was rebuilt so that categories say what a
+ * thing IS, and the homepage's Birthday row went silent while
+ * /store/collections/birthday — which falls back to the occasion — still held
+ * nineteen products.
+ */
+async function occasionSlugs(): Promise<{ slug: string }[]> {
+  try {
+    const catalog = await getCatalog();
+    return ((catalog.occasions ?? []) as Array<{ slug: string }>).map((row) => ({
+      slug: row.slug,
+    }));
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
+  }
+}
+
+/**
+ * The shop's curated groups, for a homepage row that points at one.
+ *
+ * Slug and membership only — a row needs to know which products are in the
+ * group, and nothing else about it. Same request-cached read as the categories
+ * above, so asking for both costs one.
+ */
+async function collectionMembership(): Promise<{ slug: string; productIds?: string[] }[]> {
+  try {
+    const catalog = await getCatalog();
+    return ((catalog.collections ?? []) as Array<{ slug: string; productIds?: string[] }>).map(
+      (group) => ({ slug: group.slug, productIds: group.productIds }),
+    );
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
+  }
+}
+
+/**
  * The product collection, read AT MOST ONCE per request.
  *
  * Five readers here take the whole list — `getProducts`, `getProductById`,
@@ -510,10 +551,12 @@ export async function getHomepageRails(maxCount = 8): Promise<{
     Record<HomepageProductSource, Record<string, LandingProduct[]>>
   >;
 }> {
-  const [products, names, categories, modules] = await Promise.all([
+  const [products, names, categories, collections, occasions, modules] = await Promise.all([
     readProductsOnce(),
     categoryNames(),
     categorySlugs(),
+    collectionMembership(),
+    occasionSlugs(),
     readModuleSettings(),
   ]);
   const all = products
@@ -532,19 +575,41 @@ export async function getHomepageRails(maxCount = 8): Promise<{
   const rails = Object.fromEntries(
     sources.map((source) => [
       source,
-      buildHomepageProducts(source, maxCount, products, all, names, categories).map((product) =>
+      buildHomepageProducts(source, maxCount, products, all, names, categories, collections).map((product) =>
         toCard(product, modules),
       ),
     ])
   ) as Record<HomepageProductSource, LandingProduct[]>;
 
-  // Every category, including ones with nothing in them: an empty rail is
-  // what tells the builder the row it is previewing has no products, rather
-  // than leaving the section to look like it failed to load.
+  /*
+    EVERY SLUG A ROW COULD NAME, from all three lists.
+
+    This was categories only, and a row is stored as a slug with no record of
+    which list the shop put it in — so the day the catalogue was rebuilt and
+    "birthday" became an occasion rather than a category, the homepage's
+    Birthday row had no entry here and rendered nothing, while the page its
+    "View all" opens still held nineteen products. The row and the page it
+    advertises have to agree.
+
+    Duplicates collapse: a slug in two lists gets one entry, resolved by
+    `buildCategoryRail` in the same order the route uses.
+
+    Empty rails are kept, including for slugs with nothing in them — that is
+    what tells the builder the row it is previewing has no products, rather
+    than leaving the section looking like it failed to load.
+  */
+  const railSlugs = [
+    ...new Set([
+      ...(categories ?? []).map((row) => row.slug),
+      ...(occasions ?? []).map((row) => row.slug),
+      ...(collections ?? []).map((row) => row.slug),
+    ]),
+  ].filter(Boolean);
+
   const categoryRails = Object.fromEntries(
-    (categories ?? []).map((category) => [
-      category.slug,
-      buildCategoryRail(category.slug, maxCount, all, all, categories).map((product) =>
+    railSlugs.map((slug) => [
+      slug,
+      buildCategoryRail(slug, maxCount, all, all, categories, collections).map((product) =>
         toCard(product, modules),
       ),
     ]),

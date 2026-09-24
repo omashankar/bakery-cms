@@ -227,7 +227,12 @@ describe("what the shop loses, stated rather than discovered", () => {
     // And the helper it now calls really does select by category — asserted on
     // the comment-stripped source, so the docblock above it cannot satisfy this.
     expect(declared, "buildCategoryRail no longer selects by category").toMatch(
-      /export function buildCategoryRail[\s\S]{0,600}filterProductsByCategory/,
+      /*
+        The window was 600 characters, and the function grew past it when it
+        learned to resolve a collection and an occasion as well — none of which
+        changed that a category is still how it selects.
+      */
+      /export function buildCategoryRail[\s\S]{0,2600}filterProductsByCategory/,
     );
     expect(rails).toContain('"eggless",');
   });

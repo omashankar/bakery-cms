@@ -4,7 +4,11 @@ import {
   getPublishedStorefrontProducts,
   type TaxonomyNames,
 } from "@/features/products/lib/product-mapper";
-import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
+import {
+  filterProductsByCategory,
+  productsInCollection,
+  productsTaggedForOccasion,
+} from "@/features/products/lib/product-catalog";
 
 /**
  * Homepage rail selection.
@@ -89,13 +93,59 @@ export function buildCategoryRail(
   adminMapped: LandingProduct[],
   all: LandingProduct[],
   categories?: { name: string; slug: string }[],
+  /**
+   * The shop's curated groups, so a row can point at one.
+   *
+   * Optional, and absent simply means a slug that names a collection finds
+   * nothing here — which is what happened before this existed.
+   */
+  collections?: { slug: string; productIds?: string[] }[],
 ): LandingProduct[] {
+  /**
+   * COLLECTION, THEN CATEGORY, THEN OCCASION — the same order
+   * /store/collections/<slug> resolves in, and for the same reason: a row on
+   * the homepage and the page its "View all" opens have to hold the same
+   * products, or the row is advertising a page that does not match it.
+   *
+   * This was category only, and the day the shop's catalogue stopped filing
+   * products under occasion-shaped categories the homepage's Birthday row went
+   * empty while /store/collections/birthday — which resolves the occasion —
+   * still held nineteen. Two answers to one slug, on two screens one click
+   * apart.
+   */
+  const collection = collections?.find((group) => group.slug === slug);
+  if (collection) {
+    /*
+      `productsInCollection` walks the IDS, and that is the point: the order of
+      a collection IS its content — a shop puts its best seller first — and a
+      `filter` over the catalogue would hand back catalogue order instead,
+      quietly discarding the one thing the shop curated. The page behind this
+      row uses the same function for the same reason.
+    */
+    const merged = mergeWithCatalog(
+      productsInCollection(adminMapped, collection.productIds ?? []),
+      productsInCollection(all, collection.productIds ?? []),
+    );
+    if (merged.length > 0) return merged.slice(0, maxCount);
+  }
+
   const admin = filterProductsByCategory(adminMapped, slug, categories);
-  const merged = mergeWithCatalog(
+  const byCategory = mergeWithCatalog(
     admin,
     filterProductsByCategory(all, slug, categories),
   );
-  return merged.slice(0, maxCount);
+  if (byCategory.length > 0) return byCategory.slice(0, maxCount);
+
+  /*
+    Last, and only when nothing else claimed the slug — a category and an
+    occasion may share one, and the category is what a row labelled with a
+    category name should hold.
+  */
+  const byOccasion = mergeWithCatalog(
+    productsTaggedForOccasion(adminMapped, slug),
+    productsTaggedForOccasion(all, slug),
+  );
+  return byOccasion.slice(0, maxCount);
 }
 
 function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
@@ -139,6 +189,14 @@ export function buildHomepageProducts(
    * Seasonal happened to work only because its name IS its slug.
    */
   categories?: { name: string; slug: string }[],
+  /**
+   * The shop's curated groups, so a row can point at one.
+   *
+   * Threaded through for the same reason `categories` is: only the catalogue
+   * knows which products a collection holds, and a row whose slug names one
+   * would otherwise come back empty while the page it links to is full.
+   */
+  collections?: { slug: string; productIds?: string[] }[],
   /**
    * Return the SELECTION, not a full grid.
    *
@@ -205,8 +263,10 @@ export function buildHomepageProducts(
     // shop adds are one implementation. `maxCount` is applied again by the
     // caller below; passing it here changes nothing and keeps the helper
     // honest about its own contract.
-    eggless: () => buildCategoryRail("eggless", maxCount, adminMapped, all, categories),
-    seasonal: () => buildCategoryRail("seasonal", maxCount, adminMapped, all, categories),
+    eggless: () =>
+      buildCategoryRail("eggless", maxCount, adminMapped, all, categories, collections),
+    seasonal: () =>
+      buildCategoryRail("seasonal", maxCount, adminMapped, all, categories, collections),
   };
 
   const matched = sourceMatchers[source]();
@@ -232,8 +292,18 @@ export function matchHomepageSource(
   all: LandingProduct[],
   names?: TaxonomyNames,
   categories?: { name: string; slug: string }[],
+  collections?: { slug: string; productIds?: string[] }[],
 ): LandingProduct[] {
-  return buildHomepageProducts(source, Number.POSITIVE_INFINITY, adminProducts, all, names, categories, true);
+  return buildHomepageProducts(
+    source,
+    Number.POSITIVE_INFINITY,
+    adminProducts,
+    all,
+    names,
+    categories,
+    collections,
+    true,
+  );
 }
 
 function padRail(

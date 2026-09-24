@@ -1,6 +1,6 @@
 import type { LandingProduct, LandingCategory, LandingOffer } from "@/constants/landing-data";
 import { categoriesOf, loadProducts } from "@/features/products/lib/products-repository";
-import { getCategories } from "@/features/catalog/lib/catalog-repository";
+import { getCategories, getCollections } from "@/features/catalog/lib/catalog-repository";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
@@ -49,6 +49,9 @@ export function getHomepageProducts(
     // Same reason as the server path: a category slug cannot be recovered
     // from the name, so the row needs the shop own list to resolve it.
     getCategories(),
+    // And its collections, for a row whose slug names a curated group rather
+    // than a type — /seasonal is one on this shop.
+    getCollections(),
   );
 }
 
