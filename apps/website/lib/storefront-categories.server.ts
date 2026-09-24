@@ -71,27 +71,27 @@ export async function getStorefrontOccasions(): Promise<
     const catalog = await getCatalog();
     const rows = (catalog.occasions ?? []) as { id: string; name: string; slug: string }[];
     /**
-     * Deduped against the CATEGORIES too, not just against each other.
+     * Deduped within this list only.
      *
-     * These three lists share one address space — /store/collections/<slug>
-     * resolves against categories OR occasions OR collections — and this shop's
-     * catalogue has a category AND an occasion at `birthday`, at `wedding` and
-     * at `anniversary`. Offering both put the same three pages in the menu
-     * twice, side by side in adjacent columns under two different names, from
-     * the moment the occasion column started reading real data.
+     * It used to be deduped against the CATEGORIES as well, and that was right
+     * while the two shared one address: /store/collections/<slug> resolved
+     * against categories OR occasions, so a shop with a "Birthday Cakes"
+     * category and a "Birthday" occasion — this one has that, and the same at
+     * wedding and anniversary — had the identical page listed twice in the
+     * menu under two different words. Categories won because they are the
+     * column the menu is built around.
      *
-     * A category and an occasion at one address resolve to the SAME page, so
-     * the second row is never a different destination — it is the same link
-     * with a different word on it. Categories win because they are the column
-     * the menu is built around and the list the shop maintains first.
+     * An occasion has its own address now. The two rows are two destinations,
+     * and hiding one of them here is what kept this shop's Birthday occasion —
+     * nineteen products — from ever being shown as a set. Dropping the dedup is
+     * the point of that route, not a side effect of it.
      */
-    const taken = new Set((await getStorefrontCategories()).map((category) => category.slug));
     const bySlug = new Map<string, { id: string; name: string; slug: string }>();
     for (const { id, name, slug } of rows) {
       // First row wins within the list, as everywhere else: a second row with
       // the same slug is unreachable and must not be offered as though it were
       // not.
-      if (slug && !taken.has(slug) && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug });
+      if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug });
     }
     return [...bySlug.values()];
   } catch {

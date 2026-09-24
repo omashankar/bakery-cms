@@ -141,24 +141,27 @@ describe("a shop with nothing of its own is shown nothing of anyone else's", () 
 
 describe("one address is offered once, whichever list it came from", () => {
   /**
-   * THE DEFECT THIS FILE'S FIRST VERSION SHIPPED.
+   * THE RULE, AND THE DAY IT CHANGED.
    *
-   * Categories, occasions and collections share ONE address space:
-   * /store/collections/<slug> resolves against all three. This shop's catalogue
+   * Categories, occasions and collections USED TO share one address space:
+   * /store/collections/<slug> resolved against all three. This shop's catalogue
    * has a category AND an occasion at `birthday`, at `wedding` and at
    * `anniversary` — so the moment the occasion column started reading real
    * data, the Shop menu offered the same three pages twice, side by side in
-   * adjacent columns under two different names.
+   * adjacent columns under two different names, and this block was written to
+   * stop it.
    *
-   * Nothing caught it. React keys are scoped per array and the two columns are
-   * two arrays, so there was no warning; the e2e guard literally named "the
+   * Nothing had caught it. React keys are scoped per array and the two columns
+   * are two arrays, so there was no warning; the e2e guard literally named "the
    * shop menu links each category once" checked per `<ul>`, and the two columns
    * are two `<ul>`s; and the domain test that shipped with the change asserted
    * only that occasions ARRIVE.
    *
-   * A category and an occasion at one slug resolve to the same page. The second
-   * row is not another destination — it is the same link with a different word
-   * on it.
+   * OCCASIONS HAVE THEIR OWN ADDRESS NOW — /store/occasions/<slug> — so the two
+   * rows are two destinations and hiding one of them is what kept this shop's
+   * Birthday occasion, nineteen products, from ever being shown as a set. The
+   * cross-list rule is therefore gone and the within-list one stays: a second
+   * row at one slug is still unreachable, whichever list it is in.
    */
   const catalog = {
     categories: [
@@ -182,16 +185,22 @@ describe("one address is offered once, whichever list it came from", () => {
     return mod.getStorefrontOccasions();
   }
 
-  it("drops an occasion whose page a category already offers", async () => {
+  it("keeps an occasion whose slug a category also uses", async () => {
+    /*
+      The two are different pages: /store/collections/birthday is the category
+      and /store/occasions/birthday is the occasion. Dropping the second is
+      dropping the only way to the occasion's own products, which on this
+      shop's data is nineteen of them against the category's four.
+    */
     const rows = await occasions();
 
-    expect(rows.map((row) => row.slug)).not.toContain("birthday");
+    expect(rows.map((row) => row.slug)).toContain("birthday");
   });
 
-  it("and keeps the ones that are a page of their own", async () => {
+  it("and offers every occasion the shop made", async () => {
     const rows = await occasions();
 
-    expect(rows.map((row) => row.slug)).toEqual(["corporate"]);
+    expect(rows.map((row) => row.slug)).toEqual(["birthday", "corporate"]);
   });
 
   it("and still drops a second row at the same slug within its own list", async () => {
@@ -203,6 +212,6 @@ describe("one address is offered once, whichever list it came from", () => {
     const rows = await occasions();
 
     expect(rows.filter((row) => row.slug === "corporate")).toHaveLength(1);
-    expect(rows[0]?.name).toBe("Corporate");
+    expect(rows.find((row) => row.slug === "corporate")?.name).toBe("Corporate");
   });
 });

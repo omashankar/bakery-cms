@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
+import type { WriteResult } from "@/lib/write-result";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 // The shop's own currency. The weight modifier printed a hardcoded ₹ while
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
+  deleteCollections,
   deleteOccasions,
   loadCatalogStore,
   resetCatalogStore,
@@ -260,7 +262,26 @@ export function CatalogAdminPage() {
       );
       if (!ok) return;
     }
-    const remove = activeTab === "categories" ? deleteCategories : deleteOccasions;
+    /*
+      KEYED ON THE TAB, not an either/or.
+
+      This was `activeTab === "categories" ? deleteCategories : deleteOccasions`,
+      written when there were two tabs. Collections arrived as a third and fell
+      into the else — so selecting a collection and pressing Delete filtered the
+      OCCASIONS list by a collection's id, matched nothing, wrote the occasions
+      back unchanged, and reported "Deleted 0 items". `deleteCollections` was
+      written at the same time as the tab and has never been called.
+
+      A map rather than a chain, because the next tab added to this screen will
+      be a missing key here — a crash in development — and not a silent write to
+      whichever list the else happened to name.
+    */
+    const removers: Record<CatalogTab, (ids: string[]) => Promise<WriteResult<number>>> = {
+      categories: deleteCategories,
+      occasions: deleteOccasions,
+      collections: deleteCollections,
+    };
+    const remove = removers[activeTab];
 
     const { value: count, persisted } = await remove(selectedIds);
     refresh();

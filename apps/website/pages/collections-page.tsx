@@ -11,6 +11,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   filterProductsByCategory,
   productsInCollection,
+  productsTaggedForOccasion,
 } from "@/features/products/lib/product-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
@@ -84,6 +85,23 @@ interface CollectionsPageProps {
     description?: string;
     productIds: string[];
   };
+  /**
+   * The OCCASION this URL resolved to, when it resolved to one.
+   *
+   * A third source for the same listing engine, on the same footing as a
+   * collection. It exists because an occasion and a category could not both
+   * have a page: they shared `/store/collections/<slug>` and the listing
+   * there ORs the two, so this shop's "Birthday" occasion — 19 products — was
+   * merged into "Birthday Cakes" and shown under the category's name.
+   *
+   * A MATCH, not a list: membership is tagged on the product, so unlike a
+   * collection there is no curated order to preserve and nothing to walk.
+   */
+  occasion?: {
+    name: string;
+    slug: string;
+    description?: string;
+  };
 }
 
 export function CollectionsPage({
@@ -92,6 +110,7 @@ export function CollectionsPage({
   catalog,
   categories: categoriesFromShop,
   collection,
+  occasion,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
   /**
@@ -113,16 +132,20 @@ export function CollectionsPage({
   // pills are passed too: a category's slug and its name are edited
   // independently, so only this list can say which product belongs to which
   // route — "Birthday Cakes" lives at /birthday here.
-  const inCategory = useMemo(
-    () =>
-      collection
-        ? // A collection is a LIST, not a match. `productsInCollection`
-          // walks the ids so the owner's order survives and a product that
-          // merely shares the name is not swept in.
-          productsInCollection(catalog, collection.productIds)
-        : filterProductsByCategory(catalog, categorySlug || undefined, categoryPills),
-    [catalog, categorySlug, categoryPills, collection],
-  );
+  const inCategory = useMemo(() => {
+    // A collection is a LIST, not a match. `productsInCollection` walks the
+    // ids so the owner's order survives and a product that merely shares the
+    // name is not swept in.
+    if (collection) return productsInCollection(catalog, collection.productIds);
+    /*
+      An occasion matches the product's own tags, and ONLY those — not the
+      category that happens to share its slug. `filterProductsByCategory` ORs
+      the two, which is right at the old address and wrong here: the point of
+      this page is to show what the shop tagged for this occasion.
+    */
+    if (occasion) return productsTaggedForOccasion(catalog, occasion.slug);
+    return filterProductsByCategory(catalog, categorySlug || undefined, categoryPills);
+  }, [catalog, categorySlug, categoryPills, collection, occasion]);
 
   const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
   /**
@@ -132,7 +155,7 @@ export function CollectionsPage({
    * used to key off `activeCategory` independently — four places to forget.
    * A collection comes first because the route resolves it first.
    */
-  const heading = collection ?? activeCategory;
+  const heading = collection ?? occasion ?? activeCategory;
   /**
    * The top of the price slider, from the shop's OWN catalogue.
    *

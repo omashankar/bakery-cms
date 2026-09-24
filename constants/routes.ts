@@ -31,6 +31,21 @@ export const routes = {
     home: "/store",
     collections: "/store/collections",
     collection: (slug: string) => `/store/collections/${slug}`,
+    /**
+     * AN OCCASION HAS ITS OWN ADDRESS, and that is the whole difference.
+     *
+     * Occasions used to live at `/store/collections/<slug>` alongside
+     * categories and collections, and the listing there ORs the two: a slug
+     * matched a category's products and an occasion's tags together. So a shop
+     * with a "Birthday Cakes" category and a "Birthday" occasion — which this
+     * one has, along with Wedding and Anniversary — could not have a page for
+     * either. One address, one merged grid, and the category's name on top of
+     * it; the occasion had 19 products and no way to show its own.
+     *
+     * The old address still resolves, unchanged. This is a second door, not a
+     * move: every link written before today still works.
+     */
+    occasion: (slug: string) => `/store/occasions/${slug}`,
     cake: (slug: string) => `/store/cakes/${slug}`,
 
 

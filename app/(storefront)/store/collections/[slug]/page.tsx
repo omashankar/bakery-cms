@@ -4,6 +4,7 @@ import { getStorefrontProductCards } from "@/features/products/data/products-ser
 import {
   getStorefrontCategories,
   getStorefrontCollections,
+  getStorefrontOccasions,
 } from "@/apps/website/lib/storefront-categories.server";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 
@@ -12,10 +13,11 @@ interface PageProps {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const [{ slug }, categories, collections, labels] = await Promise.all([
+  const [{ slug }, categories, collections, occasions, labels] = await Promise.all([
     params,
     getStorefrontCategories(),
     getStorefrontCollections(),
+    getStorefrontOccasions(),
     getServerLabels(),
   ]);
   /**
@@ -32,7 +34,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // added used to get the generic "Collection" in its <title> and a renamed one
   // kept the old name there long after the page itself had changed.
   const category = categories.find((item) => item.slug === slug);
-  const named = collection ?? category;
+  /*
+    And an OCCASION last, for a slug neither of the other two claims.
+
+    Occasions have their own address now, so this is the backward-compatible
+    tail of the old one: a shop that published /store/collections/diwali when
+    Diwali was only ever an occasion still has that link answer, and answer
+    with the occasion's name rather than the generic one.
+  */
+  const occasion = occasions.find((item) => item.slug === slug);
+  const named = collection ?? category ?? occasion;
 
   return {
     title: named ? named.name : "Collection",
@@ -50,16 +61,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function Page({ params }: PageProps) {
-  const [{ slug }, catalog, categories, collections] = await Promise.all([
+  const [{ slug }, catalog, categories, collections, occasions] = await Promise.all([
     params,
     getStorefrontProductCards(),
     getStorefrontCategories(),
     getStorefrontCollections(),
+    getStorefrontOccasions(),
   ]);
 
   // Resolved here rather than in the page, so the client component receives a
   // decision rather than three lists and the rule for choosing between them.
   const collection = collections.find((item) => item.slug === slug);
+  /*
+    An occasion answers only for a slug NO category claims.
+
+    The category wins because this is the category's address — it is where
+    every pill, every menu row and every card links — and because the listing
+    behind it no longer folds occasion tags in, so a category page here is the
+    category and nothing else. An occasion that shares the slug has its own
+    page at /store/occasions/<slug>; one that does not share it would
+    otherwise have lost the address it was reachable at before today.
+  */
+  const category = categories.find((item) => item.slug === slug);
+  const occasion =
+    collection || category ? undefined : occasions.find((item) => item.slug === slug);
 
   return (
     <CollectionsPage
@@ -75,6 +100,7 @@ export default async function Page({ params }: PageProps) {
             }
           : undefined
       }
+      occasion={occasion ? { name: occasion.name, slug: occasion.slug } : undefined}
     />
   );
 }

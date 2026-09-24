@@ -147,6 +147,35 @@ export function productsInCollection(
     .filter((product): product is LandingProduct => Boolean(product));
 }
 
+/**
+ * The products a shop TAGGED for one occasion, and nothing else.
+ *
+ * This is the whole of what an occasion means, and it used to be folded into
+ * `filterProductsByCategory` below instead — that function OR'd occasion tags
+ * into every category page, so on this shop's data "Birthday Cakes", a
+ * category of four products, listed nineteen. One address, one grid, and the
+ * category's name on it; neither the category nor the occasion could be seen.
+ *
+ * Separating them is what gives each a page. Two callers now: this one for
+ * `/store/occasions/<slug>`, and the collections route when a slug turns out
+ * to be an occasion rather than a category, so links written before the second
+ * address existed still land on the right products.
+ *
+ * Matched on the SLUGIFIED NAME rather than on the id, because a card carries
+ * occasion names — `product-mapper` resolves the ids on the way out — and the
+ * route carries a slug. The same rule `filterProductsByCategory` uses, for the
+ * same reason.
+ */
+export function productsTaggedForOccasion(
+  catalog: readonly LandingProduct[],
+  occasionSlug: string,
+): LandingProduct[] {
+  const slug = slugify(occasionSlug);
+  return catalog.filter((product) =>
+    (product.occasions ?? []).some((occasion) => slugify(occasion) === slug),
+  );
+}
+
 export function filterProductsByCategory(
   cakes: LandingProduct[],
   categorySlug?: string,
@@ -193,33 +222,39 @@ export function filterProductsByCategory(
         )
       : membership(cake).some((name) => slugify(name) === slug);
 
-  /**
-   * Occasion categories match the cake's OCCASION TAGS.
-   *
-   * These used to be guessed from flavour whitelists and name regexes — a
-   * "birthday" page showed every chocolate, classic, premium, fruit and
-   * international cake in the shop, whether or not the baker had tagged it for
-   * birthdays, and "pastries" was a regex over the cake's name. `product-mapper`
-   * already carries the real tags, and its own comment records why guessing was
-   * wrong for exactly this: "a cake tagged Wedding was missed unless it happened
-   * to say so in prose, and anything mentioning it in passing was included."
-   */
-  const byOccasion = (cake: LandingProduct) =>
-    (cake.occasions ?? []).some((occasion) => slugify(occasion) === slug);
+  /*
+    OCCASION TAGS USED TO BE OR'd IN HERE, and are not any more.
+
+    The reasoning was sound while a slug had one page: /store/collections/<slug>
+    resolved against categories and occasions alike, so folding both in meant
+    nobody landed on an empty grid. What it actually produced, on this shop's
+    own data, was a category page that was not about its category —
+    "Birthday Cakes" holds FOUR products and its page listed nineteen, because
+    the "Birthday" occasion has nineteen and shares the slug. Wedding was three
+    against four; Anniversary two against three. The category, the thing that
+    says what a product IS, could not be seen on its own page.
+
+    An occasion has its own address now — /store/occasions/<slug>, and
+    `productsTaggedForOccasion` above is what answers it. The old address still
+    resolves an occasion too: the route falls back to it when a slug is not a
+    category, so a link written before today still lands on the right products.
+
+    This function is also what the homepage's category rows and price cards use,
+    and they change with it, which is the intent: a row labelled with a category
+    should hold that category.
+  */
 
   /**
    * Two categories are properties of the cake rather than a taxonomy entry, and
    * the shop tags them on the product itself. Kept because they are real
-   * fields, unlike the keyword guessing above.
+   * fields, unlike the keyword guessing this function once did.
    */
   const byAttribute = (cake: LandingProduct) => {
     if (slug === "photo-cakes" || slug === "photo") return cake.allowsPhotoUpload === true;
     return false;
   };
 
-  return cakes.filter(
-    (cake) => byCategory(cake) || byOccasion(cake) || byAttribute(cake),
-  );
+  return cakes.filter((cake) => byCategory(cake) || byAttribute(cake));
 }
 
 /**

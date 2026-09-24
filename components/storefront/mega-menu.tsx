@@ -161,9 +161,11 @@ export function MegaMenu({
     : fallbackCategories;
   const occasions = (shopOccasions ?? []).map((occasion) => ({
     label: occasion.name,
-    // The same route a category slug resolves through — an occasion tag
-    // has always matched at /store/collections/<slug>.
-    href: routes.store.collection(occasion.slug),
+    // Its OWN page now. This was `routes.store.collection(occasion.slug)`,
+    // where a category with the same slug answered instead — so this shop's
+    // Birthday, Wedding and Anniversary rows opened the category of that name
+    // and the occasion's own products were never shown as a set.
+    href: routes.store.occasion(occasion.slug),
   }));
   // The first of the shop's own categories that has a picture. Nothing to show
   // is a real answer — the menu is complete without this card.
@@ -377,9 +379,10 @@ export function MobileShopLinks({
    * use. Adding it here rather than only fixing the desktop source is the
    * point: a menu that differs by screen size is two menus.
    */
+  // The phone menu is the same menu; see the note on its desktop twin above.
   const occasions = (shopOccasions ?? []).map((occasion) => ({
     label: occasion.name,
-    href: routes.store.collection(occasion.slug),
+    href: routes.store.occasion(occasion.slug),
   }));
   /**
    * The shop's own columns become the shop's own SECTIONS here.
