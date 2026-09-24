@@ -5,6 +5,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   COLLECTION_PRICE_FLOOR,
   defaultCollectionFilters,
@@ -97,6 +98,8 @@ export function CollectionFiltersPanel({
   idPrefix = "",
   className,
 }: CollectionFiltersPanelProps) {
+  /* The shop may call an occasion a festival, a season, a moment. */
+  const labels = useBusinessLabels();
   const weights = sizeOptions;
   const flavours = flavourOptions;
   const occasions = occasionOptions;
@@ -194,7 +197,7 @@ export function CollectionFiltersPanel({
           empty list reads as something that failed to load, and this box was
           the only one still drawn unconditionally. */}
       {occasions.length > 0 ? (
-      <FilterGroup title="Occasion">
+      <FilterGroup title={labels.occasionWord}>
         {occasions.map((occasion) => (
           <FilterCheckbox
             key={occasion}

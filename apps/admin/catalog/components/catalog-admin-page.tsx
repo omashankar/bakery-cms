@@ -42,7 +42,7 @@ import {
   productsLeftUnfiled,
 } from "@/features/products/lib/products-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
-import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { useBusinessLabels, type ShopLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_STORE: CatalogStore = {
   categories: [],
@@ -51,32 +51,54 @@ const EMPTY_STORE: CatalogStore = {
   updatedAt: "",
 };
 
-const tabs: Array<{
+/**
+ * THE SHOP'S OWN WORDS FOR ITS OWN THREE LISTS.
+ *
+ * These were module-level constants holding "Categories", "Occasions" and
+ * "Collections" — hardcoded English on the one screen whose whole job is
+ * letting a shop describe its goods, while the word for the goods themselves
+ * has been configurable since the labels shipped. A phone shop files under
+ * Brands; a florist sells for Festivals.
+ *
+ * A FUNCTION of the labels rather than a constant, because the labels arrive
+ * after mount and change when the shop edits them. The ids are untouched:
+ * `categories` is still the tab id, the route and the database section, and
+ * renaming any of those from here is how a label becomes a migration.
+ */
+function tabsFor(labels: ShopLabels): Array<{
   id: CatalogTab;
   label: string;
   singular: string;
-}> = [
-  { id: "categories", label: "Categories", singular: "Category" },
-  { id: "occasions", label: "Occasions", singular: "Occasion" },
-  { id: "collections", label: "Collections", singular: "Collection" },
-];
+}> {
+  return [
+    { id: "categories", label: labels.categoryWordPlural, singular: labels.categoryWord },
+    { id: "occasions", label: labels.occasionWordPlural, singular: labels.occasionWord },
+    { id: "collections", label: labels.collectionWordPlural, singular: labels.collectionWord },
+  ];
+}
 
 // Tab bar order — includes a Themes placeholder (design-theme data model comes later).
-const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> = [
-  { id: "categories", label: "Categories" },
-  { id: "occasions", label: "Occasions" },
-  { id: "collections", label: "Collections" },
+function tabBarFor(
+  labels: ShopLabels,
+): Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> {
+  return [
+  { id: "categories", label: labels.categoryWordPlural },
+  { id: "occasions", label: labels.occasionWordPlural },
+  { id: "collections", label: labels.collectionWordPlural },
   { id: "themes", label: "Themes", soon: true },
   /*
     A Weights tab stood here. Sizes are typed on the product now — a shop-wide
     list forced one product's sizes onto every other, and editing it changed
     nothing a customer could see once products stopped deriving from it.
   */
-];
+  ];
+}
 
 export function CatalogAdminPage() {
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
+  const tabs = tabsFor(labels);
+  const tabBar = tabBarFor(labels);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
   const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
@@ -292,7 +314,10 @@ export function CatalogAdminPage() {
     const orphans = orphanCount();
     if (orphans > 0) {
       const noun = orphans === 1 ? `${labels.productWord.toLowerCase()} is` : `${labels.productWordPlural.toLowerCase()} are`;
-      const which = selectedIds.length === 1 ? "category" : "categories";
+      const which =
+        selectedIds.length === 1
+          ? labels.categoryWord.toLowerCase()
+          : labels.categoryWordPlural.toLowerCase();
       const ok = window.confirm(
         `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
           "That is every category they are filed under, so they will be left " +

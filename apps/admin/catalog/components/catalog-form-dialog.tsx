@@ -243,9 +243,9 @@ export function CatalogFormDialog({
   }
 
   const titles: Record<CatalogTab, string> = {
-    categories: "Category",
-    occasions: "Occasion",
-    collections: "Collection",
+    categories: labels.categoryWord,
+    occasions: labels.occasionWord,
+    collections: labels.collectionWord,
   };
 
   /**

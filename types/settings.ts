@@ -293,6 +293,13 @@ export interface LabelOverrides {
   collectionsSubtitle?: string;
   productWord?: string;
   productWordPlural?: string;
+  /* What this shop files products under — see the note in business-labels. */
+  categoryWord?: string;
+  categoryWordPlural?: string;
+  occasionWord?: string;
+  occasionWordPlural?: string;
+  collectionWord?: string;
+  collectionWordPlural?: string;
   /**
    * The title over the whole product description block.
    *

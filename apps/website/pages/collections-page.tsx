@@ -295,7 +295,13 @@ export function CollectionsPage({
       <StorePageHeader
         title={heading ? heading.name : labels.collectionsTitle}
         breadcrumbs={[
-          { label: "Collections", href: routes.store.collections },
+          /*
+            The page this points at is headed `collectionsTitle`, which a shop
+            can change — and this said "Collections" regardless, so a shop that
+            renamed its shop-all page got a trail leading to a word that is
+            nowhere on the page it opens.
+          */
+          { label: labels.collectionsTitle, href: routes.store.collections },
           ...(heading ? [{ label: heading.name }] : []),
         ]}
       />

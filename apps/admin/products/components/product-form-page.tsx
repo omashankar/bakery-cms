@@ -1001,7 +1001,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 ) : null}
 
                 <div className="space-y-2">
-                  <Label>Occasions</Label>
+                  <Label>{labels.occasionWordPlural}</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {catalogLists.occasions.map((occasion) => (
                       <label
@@ -1032,7 +1032,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 */}
                 {catalogLists.collections.length > 0 ? (
                   <div className="space-y-2">
-                    <Label>Collections</Label>
+                    <Label>{labels.collectionWordPlural}</Label>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {catalogLists.collections.map((collection) => (
                         <label

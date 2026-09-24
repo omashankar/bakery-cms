@@ -345,6 +345,87 @@ export function GeneralSettingsPage() {
               </p>
 
               {/*
+                THE THREE THINGS A PRODUCT IS FILED UNDER, in the shop's words.
+
+                The Catalog screen offered "Categories", "Occasions" and
+                "Collections" as fixed English while the word for the goods
+                themselves was editable two boxes up. A phone shop files under
+                Brands, a florist sells for Festivals, a bookshop curates Staff
+                Picks — and none of them were choosing between three nouns.
+
+                Each pair is singular and plural, for the same reason the
+                product nouns are two fields: pluralising is an English rule and
+                a shop typing Shreni or Mithai has to be able to correct it.
+                No guess is filled in here — there is no one box these three
+                follow from, and a wrong guess in six boxes is worse than six
+                empty ones showing their defaults.
+              */}
+              <p className="pt-2 text-sm font-medium sm:col-span-2">
+                What do you file your {labels.productWordPlural.toLowerCase()} under?
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="categoryWord">One group of similar things</Label>
+                <Input
+                  id="categoryWord"
+                  value={wording.categoryWord ?? ""}
+                  onChange={(e) => editWording({ categoryWord: e.target.value })}
+                  placeholder={labels.categoryWord}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="categoryWordPlural">And more than one?</Label>
+                <Input
+                  id="categoryWordPlural"
+                  value={wording.categoryWordPlural ?? ""}
+                  onChange={(e) => editWording({ categoryWordPlural: e.target.value })}
+                  placeholder={labels.categoryWordPlural}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="occasionWord">One event or moment you sell for</Label>
+                <Input
+                  id="occasionWord"
+                  value={wording.occasionWord ?? ""}
+                  onChange={(e) => editWording({ occasionWord: e.target.value })}
+                  placeholder={labels.occasionWord}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="occasionWordPlural">And more than one?</Label>
+                <Input
+                  id="occasionWordPlural"
+                  value={wording.occasionWordPlural ?? ""}
+                  onChange={(e) => editWording({ occasionWordPlural: e.target.value })}
+                  placeholder={labels.occasionWordPlural}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="collectionWord">One list you put together yourself</Label>
+                <Input
+                  id="collectionWord"
+                  value={wording.collectionWord ?? ""}
+                  onChange={(e) => editWording({ collectionWord: e.target.value })}
+                  placeholder={labels.collectionWord}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="collectionWordPlural">And more than one?</Label>
+                <Input
+                  id="collectionWordPlural"
+                  value={wording.collectionWordPlural ?? ""}
+                  onChange={(e) => editWording({ collectionWordPlural: e.target.value })}
+                  placeholder={labels.collectionWordPlural}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Wording only — your web addresses and saved data never change.
+                Blank uses the words above.
+              </p>
+
+              {/*
                 These two were the half that had no input.
                 `labelOverrides` has always carried four fields — the type, the
                 Zod schema, the merge and the hydrate all handle them — and only

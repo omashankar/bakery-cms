@@ -283,6 +283,21 @@ export const labelOverridesSchema = z.object({
   productWord: z.string().trim().optional(),
   productWordPlural: z.string().trim().optional(),
   descriptionHeading: z.string().trim().optional(),
+  /*
+    THE THREE LISTS A PRODUCT IS FILED UNDER, named here or dropped silently.
+
+    This object has no `.passthrough()` — deliberately, so a typo is refused
+    rather than stored — which means a field the type declares and this does
+    not is stripped on write while the API answers 200. That is the failure
+    this repo has hit four times, and adding the six boxes to the settings
+    form without adding them here would have been the fifth.
+  */
+  categoryWord: z.string().trim().optional(),
+  categoryWordPlural: z.string().trim().optional(),
+  occasionWord: z.string().trim().optional(),
+  occasionWordPlural: z.string().trim().optional(),
+  collectionWord: z.string().trim().optional(),
+  collectionWordPlural: z.string().trim().optional(),
 });
 
 /** section name -> its schema, used by the controller to validate PUT bodies. */

@@ -34,6 +34,29 @@ export interface BusinessLabels {
   /** Title over the whole product description block. */
   descriptionHeading: string;
   /**
+   * WHAT THIS SHOP CALLS THE THREE THINGS IT FILES PRODUCTS UNDER.
+   *
+   * "Category", "Occasion" and "Collection" were hardcoded English, on a screen
+   * whose entire job is letting a shop describe its own goods — while the word
+   * for the goods themselves has been configurable all along. A phone shop
+   * files under Brands, a florist sells for Festivals, a bookshop curates
+   * Staff Picks. None of them are choosing between three fixed nouns.
+   *
+   * Singular AND plural stored, for the same reason `productWordPlural` is a
+   * field rather than a guess: the rules are English ones and a shop typing
+   * Shreni or Mithai gets a wrong guess it must be able to correct.
+   *
+   * WORDING ONLY. The route is still /store/occasions, the tab id is still
+   * "occasions", and the database section is still `occasions` — renaming any
+   * of those from here is how a label becomes a migration.
+   */
+  categoryWord: string;
+  categoryWordPlural: string;
+  occasionWord: string;
+  occasionWordPlural: string;
+  collectionWord: string;
+  collectionWordPlural: string;
+  /**
    * The catalog icon in the admin sidebar and empty states.
    *
    * ONE neutral icon for every shop. It was a per-trade Lucide component, which
@@ -50,6 +73,12 @@ export const DEFAULT_LABELS: BusinessLabels = {
   productWord: "Product",
   productWordPlural: "Products",
   descriptionHeading: "Product Description",
+  categoryWord: "Category",
+  categoryWordPlural: "Categories",
+  occasionWord: "Occasion",
+  occasionWordPlural: "Occasions",
+  collectionWord: "Collection",
+  collectionWordPlural: "Collections",
   productIcon: Package,
 };
 
@@ -152,6 +181,12 @@ export interface ResolvedLabels {
   productWord: string;
   productWordPlural: string;
   descriptionHeading: string;
+  categoryWord: string;
+  categoryWordPlural: string;
+  occasionWord: string;
+  occasionWordPlural: string;
+  collectionWord: string;
+  collectionWordPlural: string;
 }
 
 /**
@@ -186,6 +221,12 @@ export function resolveLabels(
     productWord,
     productWordPlural: overrides.productWordPlural?.trim() || base.productWordPlural,
     descriptionHeading: overrides.descriptionHeading?.trim() || base.descriptionHeading,
+    categoryWord: overrides.categoryWord?.trim() || base.categoryWord,
+    categoryWordPlural: overrides.categoryWordPlural?.trim() || base.categoryWordPlural,
+    occasionWord: overrides.occasionWord?.trim() || base.occasionWord,
+    occasionWordPlural: overrides.occasionWordPlural?.trim() || base.occasionWordPlural,
+    collectionWord: overrides.collectionWord?.trim() || base.collectionWord,
+    collectionWordPlural: overrides.collectionWordPlural?.trim() || base.collectionWordPlural,
   };
 }
 

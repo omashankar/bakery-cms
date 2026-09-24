@@ -940,7 +940,7 @@ export function ProductDetailPage({
       <StorePageHeader
         title={cake.name}
         breadcrumbs={[
-          { label: "Collections", href: routes.store.collections },
+          { label: labels.collectionsTitle, href: routes.store.collections },
           { label: cake.name },
         ]}
       />
