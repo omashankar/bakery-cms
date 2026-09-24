@@ -29,7 +29,6 @@ import {
   matchHomepageSource,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
-import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
 
 /**
  * Async product data access — the API the rest of the app should use on the server.
@@ -639,6 +638,21 @@ export async function getHomepageRails(maxCount = 8): Promise<{
     the first twelve bestsellers" — which is the same shape of silent wrong
     answer as taking a starting price off a capped rail.
   */
+  /*
+    AND OVER ALL THREE LISTS, like the plain rails above.
+
+    This cut the flag list by CATEGORY alone, which is the same fault the plain
+    rails had: a tab is stored as a slug with no record of which list the shop
+    put it in. Measured after this shop's catalogue was rebuilt — its
+    Bestsellers band has tabs for Birthday, Pastries and Anniversary, and two of
+    the three drew NOTHING, because birthday and anniversary had become
+    occasions and this map had no entry for either. A band headed Bestsellers
+    showing an empty tab is worse than no band.
+
+    `buildCategoryRail` rather than `filterProductsByCategory`, so the cut
+    resolves a slug the way the page behind the tab does: collection, then
+    category, then occasion.
+  */
   const FLAG_SOURCES: HomepageProductSource[] = ["featured", "trending", "best-sellers"];
   const flaggedCategoryRails: Partial<
     Record<HomepageProductSource, Record<string, LandingProduct[]>>
@@ -649,15 +663,12 @@ export async function getHomepageRails(maxCount = 8): Promise<{
       (product) => toCard(product, modules),
     );
 
-    const byCategory: Record<string, LandingProduct[]> = {};
-    for (const category of categories ?? []) {
-      const cut = filterProductsByCategory(flagged, category.slug, categories).slice(
-        0,
-        maxCount,
-      );
-      if (cut.length) byCategory[category.slug] = cut;
+    const bySlug: Record<string, LandingProduct[]> = {};
+    for (const slug of railSlugs) {
+      const cut = buildCategoryRail(slug, maxCount, flagged, flagged, categories, collections);
+      if (cut.length) bySlug[slug] = cut;
     }
-    if (Object.keys(byCategory).length) flaggedCategoryRails[source] = byCategory;
+    if (Object.keys(bySlug).length) flaggedCategoryRails[source] = bySlug;
   }
 
   return {

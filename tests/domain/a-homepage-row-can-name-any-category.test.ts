@@ -242,6 +242,33 @@ describe("the row reaches the page", () => {
     }
   });
 
+  it("and a row cut by a FLAG reads the same three lists", () => {
+    /*
+      THE HALF THAT WAS MISSED. `flaggedCategoryRails` — what a tabbed row uses
+      when it is headed Bestsellers rather than named after a list — cut the
+      flag pool by CATEGORY alone. Measured after this shop's catalogue was
+      rebuilt: its Bestsellers band has tabs for Birthday, Pastries and
+      Anniversary, and two of the three drew NOTHING, because birthday and
+      anniversary had become occasions and the map had no entry for either. A
+      band headed Bestsellers showing an empty tab is worse than no band.
+
+      Pinned as "it goes through `buildCategoryRail`", because that function is
+      where the collection-then-category-then-occasion order lives and is
+      tested. A cut written any other way is a second answer to one question.
+    */
+    const service = code("features/products/data/products-service.ts");
+
+    expect(service).toContain("flaggedCategoryRails");
+    expect(
+      service,
+      "the flagged cut does not walk railSlugs, so a tab naming an occasion or a collection finds nothing",
+    ).toMatch(/flaggedCategoryRails[\s\S]{0,1200}for \(const slug of railSlugs\)/);
+    expect(
+      service,
+      "the flagged cut resolves a slug its own way instead of through buildCategoryRail",
+    ).toMatch(/for \(const slug of railSlugs\)[\s\S]{0,300}buildCategoryRail\(slug/);
+  });
+
   it("and the renderer draws it from that, with no browser fallback", () => {
     /**
      * `railFor` falls back to `getHomepageProducts`, which takes one of the six
