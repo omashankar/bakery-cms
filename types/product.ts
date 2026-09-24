@@ -295,18 +295,63 @@ export interface ProductWeight {
   serves?: string;
 }
 
-export interface ProductCategory extends BaseEntity {
+/**
+ * What every row of the catalog carries, whichever of the three lists it is in.
+ *
+ * Categories, occasions and collections had name, slug and nothing else in
+ * common — so a shop could not switch one off without deleting it, and the
+ * order they appeared in was the order somebody happened to create them. Both
+ * are things every one of the three needs and none of them had.
+ *
+ * BOTH OPTIONAL, and that is load-bearing rather than lazy. These lists are
+ * stored as Mixed and read with `.lean()`, so a row written before today comes
+ * back without either field; a required one would make every existing row fail
+ * its own type. The readers below supply the defaults — present and unset means
+ * ON, and unset order means "wherever it already was".
+ */
+export interface CatalogRow extends BaseEntity {
   name: string;
   slug: string;
+  /**
+   * Off the storefront without being deleted.
+   *
+   * Absent means ON. A shop that has never seen this switch has every row
+   * showing, which is what it had before the switch existed — the alternative
+   * is an upgrade that empties the menu.
+   */
+  isActive?: boolean;
+  /**
+   * Where the row sits among its siblings. Lower first.
+   *
+   * Absent sorts after everything numbered, in the order stored — so a shop
+   * that orders three rows out of eleven gets those three at the top and the
+   * rest untouched, rather than a list that reshuffles itself.
+   */
+  sortOrder?: number;
+}
+
+export interface ProductCategory extends CatalogRow {
   description?: string;
   image?: string;
+  /**
+   * @deprecated A denormalised count that nothing keeps in step, and named for
+   * one trade besides. The admin already counts the real products and the
+   * homepage stopped trusting this after a seed typed a number that was wrong.
+   */
   cakeCount?: number;
 }
 
 
-export interface ProductOccasion extends BaseEntity {
-  name: string;
-  slug: string;
+/**
+ * WHAT a product is FOR — Birthday, Diwali, a housewarming.
+ *
+ * Not a category, which says what the product IS, and not a collection, which
+ * is a list somebody wrote. Optional on a product and many per product, and it
+ * has its own address: /store/occasions/<slug>.
+ */
+export interface ProductOccasion extends CatalogRow {
+  description?: string;
+  image?: string;
 }
 
 /**
@@ -327,11 +372,18 @@ export interface ProductOccasion extends BaseEntity {
  * when a product is deleted. That is tolerated and filtered on read, the same
  * way `product-mapper` already tolerates a deleted category id.
  */
-export interface ProductCollection extends BaseEntity {
-  name: string;
-  slug: string;
+export interface ProductCollection extends CatalogRow {
   description?: string;
   image?: string;
+  /**
+   * How this group decides what is in it.
+   *
+   * Only "manual" exists, and every stored row is one — the field is here so
+   * that adding a rule-driven group later is a new value rather than a
+   * migration of every reader. Absent means manual, for the rows written
+   * before the field.
+   */
+  type?: "manual" | "dynamic";
   productIds: string[];
 }
 

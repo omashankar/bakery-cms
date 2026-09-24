@@ -4,7 +4,7 @@ import type {
   ProductCollection,
   ProductOccasion,
 } from "@/types/product";
-import type { CatalogStore } from "@/types/catalog";
+import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
   defaultCatalogStore,
@@ -335,6 +335,58 @@ export async function deleteCollections(ids: string[]): Promise<WriteResult<numb
   const next = store.collections.filter((item) => !ids.includes(item.id));
   const { persisted } = await updateStore(store, { collections: next });
   return { value: persisted ? store.collections.length - next.length : 0, persisted };
+}
+
+/**
+ * Move ONE row up or down within its list, and write the order down.
+ *
+ * Order used to be whatever order the rows were created in, which is the one
+ * thing a shop cannot change without deleting and recreating a row — and
+ * deleting a category leaves every product filed under it pointing at nothing.
+ *
+ * NUMBERS THE WHOLE LIST, not just the pair that moved. `sortOrder` is optional
+ * and most rows have never had one, so swapping two numbers where neither
+ * exists writes 0 and 1 onto two rows and leaves the other nine unnumbered —
+ * which the reader sorts AFTER them, so a row moved down would jump to the top.
+ * Writing every index makes the stored order and the shown order the same list.
+ *
+ * The shown order is what it renumbers, not the stored array: the reader sorts
+ * and de-dupes before the admin ever sees a row, so renumbering the raw array
+ * would move whichever rows the shop is not looking at.
+ */
+export async function moveCatalogRow(
+  section: CatalogTab,
+  id: string,
+  direction: -1 | 1,
+): Promise<WriteResult<boolean>> {
+  const store = await hydratedStore();
+  if (!store) return { value: false, persisted: false };
+
+  /*
+    The three lists hold three different shapes and this only touches what they
+    share, so it works on the common one and puts the rows back untyped. The
+    alternative is the same twenty lines written out three times.
+  */
+  const rows = store[section] as { id: string; sortOrder?: number }[];
+  const shown = [...rows].sort((a, b) => {
+    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+    if (left !== right) return left - right;
+    return rows.indexOf(a) - rows.indexOf(b);
+  });
+
+  const at = shown.findIndex((row) => row.id === id);
+  const to = at + direction;
+  /* The ends are not an error — the button is simply disabled there. */
+  if (at < 0 || to < 0 || to >= shown.length) return { value: false, persisted: false };
+
+  [shown[at], shown[to]] = [shown[to]!, shown[at]!];
+
+  const next = shown.map((row, index) => ({ ...row, sortOrder: index }));
+  const { persisted } = await updateStore(store, {
+    [section]: next,
+  } as Partial<CatalogStore>);
+  return { value: persisted, persisted };
 }
 
 export function getCategoryById(id: string): ProductCategory | undefined {

@@ -7,8 +7,7 @@ import {
   Plus,
   RotateCcw,
   Tags,
-  Trash2,
-} from "lucide-react";
+  Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import {
   FilterPanel,
@@ -29,6 +28,7 @@ import {
   deleteCategories,
   deleteCollections,
   deleteOccasions,
+  moveCatalogRow,
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
@@ -141,14 +141,41 @@ export function CatalogAdminPage() {
      * have fallen into the else — so the Collections tab would have listed
      * occasions, searched them, and offered to delete them.
      */
-    const list: { id: string; name: string; slug: string }[] = {
+    /*
+      `isActive` and `sortOrder` are what the three lists share besides a name,
+      and this screen shows both — a Hidden marker and the two arrows — so they
+      belong in the shape it narrows to.
+    */
+    const list: {
+      id: string;
+      name: string;
+      slug: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }[] = {
       categories: store.categories,
       occasions: store.occasions,
       collections: store.collections,
     }[activeTab];
 
-    if (!query) return list;
-    return list.filter(
+    /*
+      SORTED THE WAY THE SHOP IS, or the arrows would appear to do nothing.
+
+      The storefront reads these lists through `offeredRows`, which orders by
+      `sortOrder` and puts an unnumbered row last. This screen read the stored
+      array. `moveCatalogRow` happens to write the two in agreement, so they
+      would not have drifted today — but a screen that manages an order has to
+      show that order rather than one that matches it by construction.
+    */
+    const ordered = [...list].sort((a, b) => {
+      const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+      const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+      if (left !== right) return left - right;
+      return list.indexOf(a) - list.indexOf(b);
+    });
+
+    if (!query) return ordered;
+    return ordered.filter(
       (item) =>
         item.name.toLowerCase().includes(query) || item.slug.toLowerCase().includes(query),
     );
@@ -239,6 +266,20 @@ export function CatalogAdminPage() {
   function orphanCount(): number {
     if (activeTab !== "categories") return 0;
     return productsLeftUnfiled(publishedProducts, selectedIds).length;
+  }
+
+  /**
+   * Move one row up or down its list.
+   *
+   * The repository renumbers the WHOLE list rather than swapping two values,
+   * because most rows have never carried a `sortOrder` — see the note there.
+   * Nothing is reported on success: the list redraws with the row in its new
+   * place, which is the feedback. A refused write is worth a word.
+   */
+  async function handleMove(id: string, direction: -1 | 1) {
+    const { persisted } = await moveCatalogRow(activeTab, id, direction);
+    refresh();
+    if (!persisted) reportWrite(false, "Order saved");
   }
 
   async function handleDelete() {
@@ -477,7 +518,7 @@ export function CatalogAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => {
+                  {items.map((item, index) => {
                     const id = item.id;
                     const label = item.name;
                     const slug = item.slug;
@@ -504,22 +545,63 @@ export function CatalogAdminPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-foreground">{label}</p>
+                          <p className="font-medium text-foreground">
+                            {label}
+                            {/*
+                              A row switched off still appears HERE — this is
+                              where the shop manages it — and says so, because
+                              the alternative is an owner looking at a row that
+                              is on this screen and not on their shop with
+                              nothing to explain the difference.
+                            */}
+                            {item.isActive === false ? (
+                              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                Hidden
+                              </span>
+                            ) : null}
+                          </p>
                           {slug ? (
                             <p className="text-xs text-muted-foreground">/{slug}</p>
                           ) : null}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{detail}</td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            onClick={() => openEdit(id)}
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </Button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {/*
+                              Disabled at the ends rather than hidden, so the
+                              rows do not change width as you move one down a
+                              long list.
+                            */}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              disabled={!canWrite || index === 0}
+                              aria-label={`Move ${label} up`}
+                              onClick={() => void handleMove(id, -1)}
+                            >
+                              <ChevronUp className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              disabled={!canWrite || index === items.length - 1}
+                              aria-label={`Move ${label} down`}
+                              onClick={() => void handleMove(id, 1)}
+                            >
+                              <ChevronDown className="size-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8"
+                              onClick={() => openEdit(id)}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -551,6 +633,11 @@ export function CatalogAdminPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">
                         {label}
+                        {item.isActive === false ? (
+                          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            Hidden
+                          </span>
+                        ) : null}
                       </p>
                       {detail ? (
                         <p className="truncate text-xs text-muted-foreground">{detail}</p>

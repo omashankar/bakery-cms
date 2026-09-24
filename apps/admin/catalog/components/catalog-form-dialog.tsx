@@ -16,6 +16,7 @@ import {
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type {
   ProductCategory,
   ProductCollection,
@@ -40,17 +41,28 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 /**
- * EVERY row a new slug has to be unique against — not just this tab's.
+ * Every row a new slug has to be unique against — THE ONES THAT SHARE ITS
+ * ADDRESS, and no others.
  *
- * These three lists share one web address space:
- * `filterProductsByCategory` resolves /store/collections/<slug> against
- * categories OR occasions, and now collections too. This was per-section, so
- * an occasion could take a category's slug — and three of the four shipped
- * occasions did exactly that. The page then shows the union of both, and
- * nothing anywhere says why.
+ * This used to be all three lists at once, and that was right when there was
+ * one address space: /store/collections/<slug> resolved against categories,
+ * occasions and collections alike, so two rows at one slug meant one page
+ * answering for both and nothing anywhere saying why.
+ *
+ * Occasions have their own address now — /store/occasions/<slug> — and leaving
+ * the check as it was made this shop's catalogue UNEDITABLE: the occasion
+ * "Birthday" holds `/birthday`, so opening the category "Birthday Cakes" and
+ * pressing Save answered "already used by Birthday" for a slug it had held all
+ * along. Three of the four occasions collide that way, and the same for
+ * wedding and anniversary on the category side.
+ *
+ * So the rule follows the addresses. Categories and collections still share
+ * one — the collections route resolves a collection first, then a category —
+ * and an occasion now only has to be unique among occasions.
  */
-function existingSlugs(): { id: string; name: string; slug: string }[] {
-  return [...getCategories(), ...getOccasions(), ...getCollections()];
+function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
+  if (tab === "occasions") return getOccasions();
+  return [...getCategories(), ...getCollections()];
 }
 
 interface CatalogFormDialogProps {
@@ -74,6 +86,14 @@ export function CatalogFormDialog({
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  /**
+   * Whether the shop is offering this row at all.
+   *
+   * Starts TRUE for a new row and for a stored one that has never carried the
+   * field — absent means on, everywhere that reads it, so a catalogue written
+   * before this switch existed keeps showing everything it showed.
+   */
+  const [isActive, setIsActive] = useState(true);
   /** Collections only — ORDERED, because the order is the curation. */
   const [productIds, setProductIds] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState("");
@@ -85,6 +105,7 @@ export function CatalogFormDialog({
       setSlug("");
       setDescription("");
       setImage("");
+      setIsActive(true);
       setProductIds([]);
       setProductSearch("");
       return;
@@ -97,6 +118,7 @@ export function CatalogFormDialog({
         setSlug(item.slug);
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
+        setIsActive(item.isActive !== false);
       }
 
     } else if (tab === "occasions") {
@@ -104,6 +126,9 @@ export function CatalogFormDialog({
       if (item) {
         setName(item.name);
         setSlug(item.slug);
+        setDescription(item.description ?? "");
+        setImage(item.image ?? "");
+        setIsActive(item.isActive !== false);
       }
     } else if (tab === "collections") {
       const item = getCollections().find((entry) => entry.id === itemId);
@@ -112,6 +137,7 @@ export function CatalogFormDialog({
         setSlug(item.slug);
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
+        setIsActive(item.isActive !== false);
         setProductIds(item.productIds ?? []);
       }
     }
@@ -152,7 +178,7 @@ export function CatalogFormDialog({
      * The row being edited is excluded, or saving it without touching the slug
      * would refuse itself.
      */
-    const clash = findSlugClash(existingSlugs(), finalSlug, itemId);
+    const clash = findSlugClash(existingSlugs(tab), finalSlug, itemId);
     if (clash) {
       toast.error(`"${finalSlug}" is already used by ${clash.name}`, {
         description:
@@ -167,6 +193,7 @@ export function CatalogFormDialog({
         slug: finalSlug,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
+        isActive,
       };
       if (isEdit && itemId) {
         const { persisted } = await updateCategory(itemId, payload);
@@ -182,6 +209,7 @@ export function CatalogFormDialog({
         slug: finalSlug,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
+        isActive,
         // Sent whatever it holds, including empty — a shop legitimately
         // names the group first and fills it second.
         productIds,
@@ -197,6 +225,9 @@ export function CatalogFormDialog({
       const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
+        description: description.trim() || undefined,
+        image: image.trim() || undefined,
+        isActive,
       };
       if (isEdit && itemId) {
         const { persisted } = await updateOccasion(itemId, payload);
@@ -279,12 +310,14 @@ export function CatalogFormDialog({
 
           {/*
             Description and picture belong to anything a customer LANDS on.
-            An occasion is a tag; a category and a collection are both pages
-            with a heading, so the gate is "not occasions" rather than a list
-            that has to grow every time a section is added.
+
+            This was gated on "not occasions", because an occasion was a tag
+            rather than a page — true while it had no address of its own. It
+            has one now, /store/occasions/<slug>, with a heading and a grid
+            under it like the other two. So all three carry the same two
+            fields and there is no gate left to keep in step.
           */}
-          {tab !== "occasions" ? (
-            <>
+          <>
               <div className="space-y-2">
                 <Label htmlFor="catalog-description">Description</Label>
                 <textarea
@@ -319,8 +352,30 @@ export function CatalogFormDialog({
                 Same treatment as the other controls that decided nothing:
                 the input goes, the stored field stays.
               */}
-            </>
-          ) : null}
+          </>
+
+          {/*
+            SWITCHED OFF IS NOT DELETED.
+
+            Deleting a category leaves every product filed under it pointing at
+            an id nothing resolves — the confirm on the list behind this dialog
+            says so, and three of this shop's products are already in that
+            state. A shop that wants a row off its storefront for a season
+            wants this instead, and until now had only the destructive one.
+
+            Absent means ON wherever this is read, so a row stored before the
+            switch existed keeps showing. Only an explicit off hides anything.
+          */}
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Show on the shop</p>
+              <p className="text-xs text-muted-foreground">
+                Off hides it from the menu and from its own page. Nothing is
+                deleted, and anything filed under it keeps its place.
+              </p>
+            </div>
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+          </div>
 
           {/*
             THE ONE GENUINELY NEW CONTROL — filling a group from its own side.

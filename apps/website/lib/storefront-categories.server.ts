@@ -36,13 +36,62 @@ import { getCatalog } from "@/features/catalog/server/catalog.service";
  * bug there, which is the argument for fixing it at the source: the next
  * consumer should not have to find out too.
  */
+/**
+ * The rows a shop is OFFERING, in the order it put them.
+ *
+ * Three things, together, because all three readers below need all three and
+ * doing them separately is how they drifted: each list had its own copy of the
+ * dedupe and only one of them was a named function.
+ *
+ *  - SWITCHED OFF rows are dropped. `isActive` is optional, and absent means
+ *    ON — a shop that has never seen the switch has every row showing, which
+ *    is what it had before the switch existed. Only an explicit `false` hides
+ *    anything.
+ *  - ORDERED by `sortOrder`, lowest first. A row with none sorts after every
+ *    numbered one and otherwise keeps its stored position, so a shop that
+ *    orders three rows out of eleven gets those three at the top and the rest
+ *    exactly where they were.
+ *  - DEDUPED by slug, first row wins. A second row at one slug is unreachable
+ *    — the resolver takes the first — so returning it offers a link that does
+ *    not go where its label says.
+ *
+ * Sorted BEFORE the dedupe, so that when two rows share a slug the one the
+ * shop ordered first is the one kept, rather than whichever was created first.
+ */
+function offeredRows<T extends { slug?: string; isActive?: boolean; sortOrder?: number }>(
+  rows: readonly T[],
+): T[] {
+  const live = rows.filter((row) => row.isActive !== false);
+
+  const ordered = [...live].sort((a, b) => {
+    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+    if (left !== right) return left - right;
+    /* Equal, or both unset: the stored order stands. */
+    return live.indexOf(a) - live.indexOf(b);
+  });
+
+  const bySlug = new Map<string, T>();
+  for (const row of ordered) {
+    if (row.slug && !bySlug.has(row.slug)) bySlug.set(row.slug, row);
+  }
+  return [...bySlug.values()];
+}
+
 export async function getStorefrontCategories(): Promise<
   { id: string; name: string; slug: string; image?: string }[]
 > {
   try {
     const catalog = await getCatalog();
-    const rows = (catalog.categories ?? []) as { id: string; name: string; slug: string; image?: string }[];
-    return dedupeBySlug(rows);
+    const rows = (catalog.categories ?? []) as {
+      id: string;
+      name: string;
+      slug: string;
+      image?: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }[];
+    return offeredRows(rows).map(({ id, name, slug, image }) => ({ id, name, slug, image }));
   } catch {
     return [];
   }
@@ -69,7 +118,13 @@ export async function getStorefrontOccasions(): Promise<
 > {
   try {
     const catalog = await getCatalog();
-    const rows = (catalog.occasions ?? []) as { id: string; name: string; slug: string }[];
+    const rows = (catalog.occasions ?? []) as {
+      id: string;
+      name: string;
+      slug: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }[];
     /**
      * Deduped within this list only.
      *
@@ -86,14 +141,7 @@ export async function getStorefrontOccasions(): Promise<
      * nineteen products — from ever being shown as a set. Dropping the dedup is
      * the point of that route, not a side effect of it.
      */
-    const bySlug = new Map<string, { id: string; name: string; slug: string }>();
-    for (const { id, name, slug } of rows) {
-      // First row wins within the list, as everywhere else: a second row with
-      // the same slug is unreachable and must not be offered as though it were
-      // not.
-      if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug });
-    }
-    return [...bySlug.values()];
+    return offeredRows(rows).map(({ id, name, slug }) => ({ id, name, slug }));
   } catch {
     return [];
   }
@@ -125,29 +173,13 @@ export async function getStorefrontCollections(): Promise<
       description?: string;
       image?: string;
       productIds?: string[];
+      isActive?: boolean;
+      sortOrder?: number;
     }[];
-    const bySlug = new Map<string, (typeof rows)[number] & { productIds: string[] }>();
-    for (const row of rows) {
-      // Same first-row-wins rule as the categories above: a second row with
-      // the same slug is simply unreachable, so it must not be returned as
-      // though it were.
-      if (row.slug && !bySlug.has(row.slug)) {
-        bySlug.set(row.slug, { ...row, productIds: row.productIds ?? [] });
-      }
-    }
-    return [...bySlug.values()];
+    return offeredRows(rows).map((row) => ({ ...row, productIds: row.productIds ?? [] }));
   } catch {
     return [];
   }
 }
 
-/** First row wins, and a row with no slug is not a category anyone can reach. */
-function dedupeBySlug(
-  rows: { id: string; name: string; slug: string; image?: string }[],
-): { id: string; name: string; slug: string; image?: string }[] {
-  const bySlug = new Map<string, { id: string; name: string; slug: string; image?: string }>();
-  for (const { id, name, slug, image } of rows) {
-    if (slug && !bySlug.has(slug)) bySlug.set(slug, { id, name, slug, image });
-  }
-  return [...bySlug.values()];
-}
+
