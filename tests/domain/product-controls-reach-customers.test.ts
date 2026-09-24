@@ -8,6 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/features/catalog/lib/catalog-repository", () => ({
   getCategories: () => [],
   getOccasions: () => [],
+  // catalog-options re-exports all three now, and a mock that omits one fails
+  // the import rather than the assertion.
+  getCollections: () => [],
   getCategoryById: () => undefined,
   getCategoryByName: () => undefined,
   getWeightOptions: () => [

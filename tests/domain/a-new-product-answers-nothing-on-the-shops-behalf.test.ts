@@ -108,7 +108,7 @@ describe("publishing asks for what publishing needs", () => {
     // Every other list on this form explains itself when empty — "No options
     // yet", "No rows means it is sold in one size". This one opened onto
     // nothing, with no way to tell broken from yours-to-set-up.
-    expect(form).toContain("adminCategories().length === 0 ?");
+    expect(form).toContain("catalogLists.categories.length === 0 ?");
     expect(form).toContain("No categories yet. Add them under Catalog");
   });
 });

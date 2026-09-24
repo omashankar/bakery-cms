@@ -338,6 +338,89 @@ export async function deleteCollections(ids: string[]): Promise<WriteResult<numb
 }
 
 /**
+ * Put one product in exactly these collections, and in no others.
+ *
+ * MEMBERSHIP STILL LIVES ON THE COLLECTION. There is no `collectionIds` on a
+ * product and this does not add one: two copies of one fact drift, and the
+ * cost of keeping them in step is paid on every screen that writes either. So
+ * the product form edits the same `productIds` the Catalog screen does, from
+ * the other end — which is what makes both directions the same edit rather
+ * than two features that agree by hand.
+ *
+ * ADDED AT THE END, never inserted. The order of `productIds` IS the curation
+ * — a shop puts its best seller first — so a product ticked on its own form
+ * joins the back of the queue rather than displacing whatever the shop put at
+ * the front. Removing takes it out and leaves the rest in order.
+ *
+ * ONE write for every collection that changed, and none for the ones that did
+ * not: each section is a replace-all, so touching a collection the owner did
+ * not mean to touch is how a curated order gets rewritten by a product save.
+ *
+ * The reconciliation itself is `collectionsWithProduct` below — a pure
+ * function, so what it decides can be tested without a browser, a cache or a
+ * server, which is the half of this that has rules worth pinning.
+ */
+export function collectionsWithProduct(
+  collections: readonly ProductCollection[],
+  productId: string,
+  collectionIds: readonly string[],
+): { next: ProductCollection[]; changed: number } {
+  const wanted = new Set(collectionIds);
+  let changed = 0;
+
+  const next = collections.map((collection) => {
+    const ids = collection.productIds ?? [];
+    const has = ids.includes(productId);
+    const should = wanted.has(collection.id);
+    /*
+      UNTOUCHED when nothing changes, and the identity matters: each section is
+      a replace-all write, so a collection rebuilt for no reason is a curated
+      order rewritten by a product save that had nothing to do with it.
+    */
+    if (has === should) return collection;
+
+    changed += 1;
+    return {
+      ...collection,
+      /* Appended, never inserted — see the note on the caller. */
+      productIds: should ? [...ids, productId] : ids.filter((id) => id !== productId),
+    };
+  });
+
+  return { next, changed };
+}
+
+export async function setProductCollections(
+  productId: string,
+  collectionIds: readonly string[],
+): Promise<WriteResult<number>> {
+  const store = await hydratedStore();
+  if (!store) return { value: 0, persisted: false };
+
+  const { next, changed } = collectionsWithProduct(store.collections, productId, collectionIds);
+  /* Nothing to say to the server, and nothing to roll back if it refuses. */
+  if (changed === 0) return { value: 0, persisted: true };
+
+  const { persisted } = await updateStore(store, { collections: next });
+  return { value: persisted ? changed : 0, persisted };
+}
+
+/**
+ * Which collections hold this product. The read half of the pair above.
+ *
+ * Reads the CACHE rather than waiting for hydration, because it answers a
+ * render: the product form draws its ticks from this on first paint and again
+ * whenever the catalog event fires. A cold cache means no ticks for a moment,
+ * which the sync then corrects — the same way the category and occasion lists
+ * on that form already behave.
+ */
+export function collectionsHolding(productId: string): string[] {
+  return getCollections()
+    .filter((collection) => (collection.productIds ?? []).includes(productId))
+    .map((collection) => collection.id);
+}
+
+/**
  * Move ONE row up or down within its list, and write the order down.
  *
  * Order used to be whatever order the rows were created in, which is the one

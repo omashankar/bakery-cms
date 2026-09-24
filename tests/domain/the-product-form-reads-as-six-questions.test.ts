@@ -109,7 +109,7 @@ describe("every field is still on the form, under the heading it belongs to", ()
     expect(form).not.toContain('htmlFor="shortDescription"');
     // Category and occasions had a tab of their own called "Classification".
     expect(tabOf('htmlFor="category"')).toBe("basics");
-    expect(tabOf("adminOccasions()")).toBe("basics");
+    expect(tabOf("<Label>Occasions</Label>")).toBe("basics");
   });
 
   it("puts what it costs and how many under Price & stock", () => {

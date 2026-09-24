@@ -107,7 +107,7 @@ describe("what a shop is asked, in the order it decides it", () => {
      */
     const name = form.indexOf('htmlFor="name"');
     const category = form.indexOf('htmlFor="category"');
-    const occasions = form.indexOf("adminOccasions()");
+    const occasions = form.indexOf("<Label>Occasions</Label>");
     const slug = form.indexOf('htmlFor="slug"');
 
     expect(name).toBeLessThan(category);
@@ -116,7 +116,7 @@ describe("what a shop is asked, in the order it decides it", () => {
   });
 
   it("keeps all four on Basics", () => {
-    for (const marker of ['htmlFor="name"', 'htmlFor="category"', "adminOccasions()", 'htmlFor="slug"']) {
+    for (const marker of ['htmlFor="name"', 'htmlFor="category"', "<Label>Occasions</Label>", 'htmlFor="slug"']) {
       expect(tabOf(form, marker), marker).toBe("basics");
     }
   });
@@ -124,7 +124,7 @@ describe("what a shop is asked, in the order it decides it", () => {
   it("divides what it IS from where it LIVES", () => {
     // The rule used to cut the name off from the category — the one pair a shop
     // names in the same breath.
-    const rule = form.indexOf("<Separator />", form.indexOf("adminOccasions()"));
+    const rule = form.indexOf("<Separator />", form.indexOf("<Label>Occasions</Label>"));
     expect(rule).toBeGreaterThan(0);
     expect(rule).toBeLessThan(form.indexOf('htmlFor="slug"'));
   });

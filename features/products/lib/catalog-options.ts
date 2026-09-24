@@ -2,6 +2,7 @@
 import type { ProductWeight } from "@/types/product";
 import {
   getCategories,
+  getCollections,
   getOccasions,
   getCategoryById,
   getCategoryByName,
@@ -9,6 +10,7 @@ import {
 
 export const adminCategories = getCategories;
 export const adminOccasions = getOccasions;
+export const adminCollections = getCollections;
 
 /*
   `getDefaultWeights` stood here: the shop-wide Catalog sizes, priced from a

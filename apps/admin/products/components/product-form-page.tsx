@@ -23,9 +23,16 @@ import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/c
 import type { ProductFormData, EntityStatus } from "@/types";
 import {
   adminCategories,
+  adminCollections,
   adminOccasions,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
+import { reportWrite } from "@/apps/admin/lib/report-write";
+import {
+  CATALOG_UPDATED_EVENT,
+  collectionsHolding,
+  setProductCollections,
+} from "@/features/catalog/lib/catalog-repository";
 import { slugify, slugOrFallback } from "@/features/products/lib/product-utils";
 import {
   createEmptyProductForm,
@@ -224,6 +231,54 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     return () => window.removeEventListener(SEO_UPDATED_EVENT, sync);
   }, []);
 
+  /**
+   * THE SHOP'S OWN LISTS, HELD IN STATE — not read during render.
+   *
+   * `adminCategories()` and the two beside it read localStorage, and this form
+   * called them straight from its JSX. On a cold browser that cache holds the
+   * SHIPPED SEED, and `CatalogServerSync` replaces it with the shop's real
+   * catalogue shortly after mount — but nothing here re-rendered when it did,
+   * so the form spent the whole visit offering the demo taxonomy.
+   *
+   * It went unnoticed for categories and occasions because the seed has some
+   * of each, so the boxes looked populated and merely listed the wrong rows.
+   * The seed has NO collections, so the section built on the same read simply
+   * did not appear — which is how the staleness finally became visible.
+   *
+   * The homepage builder already does exactly this, with the same event.
+   */
+  const [catalogLists, setCatalogLists] = useState(() => ({
+    categories: adminCategories(),
+    occasions: adminOccasions(),
+    collections: adminCollections(),
+  }));
+
+  useEffect(() => {
+    const sync = () =>
+      setCatalogLists({
+        categories: adminCategories(),
+        occasions: adminOccasions(),
+        collections: adminCollections(),
+      });
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+  }, []);
+
+  /**
+   * WHICH COLLECTIONS HOLD THIS PRODUCT, kept beside the form rather than in it.
+   *
+   * Not part of `ProductFormData`: membership lives on the collection, in its
+   * own `productIds`, and there is no `collectionIds` on a product. Putting
+   * one there would be a second copy of one fact, and the cost of keeping two
+   * copies in step is paid on every screen that writes either.
+   *
+   * So this is the same list the Catalog screen edits, read from the other
+   * end and written back after the product is saved — which is what makes
+   * both directions the same edit instead of two features that agree by hand.
+   */
+  const [collectionIds, setCollectionIds] = useState<string[]>([]);
+
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
 
@@ -251,6 +306,54 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       cancelled = true;
     };
   }, [mode, cakeId, router]);
+
+  /**
+   * The collections this product is already in.
+   *
+   * Read from the catalog CACHE, and read again when the catalog changes —
+   * `CatalogServerSync` replaces a cold cache with the server's copy shortly
+   * after mount, and without the listener this form would draw its ticks from
+   * the demo seed for the whole visit. That is the same failure the Catalog
+   * screen had and fixed with the same event.
+   *
+   * Add mode leaves it empty: a product that does not exist yet is in nothing.
+   */
+  useEffect(() => {
+    if (mode !== "edit" || !cakeId) return;
+
+    const read = () => setCollectionIds(collectionsHolding(cakeId));
+    read();
+    window.addEventListener(CATALOG_UPDATED_EVENT, read);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, read);
+  }, [mode, cakeId]);
+
+  /**
+   * Put the product in exactly the collections that are ticked.
+   *
+   * SEPARATE FROM THE PRODUCT WRITE, and after it, because they are two
+   * documents: the product is a row of its own and membership lives in the
+   * catalog. A failure here leaves the product saved and its membership not,
+   * which is worth a word — the alternative is a silent half-save, and the
+   * owner would have no way to tell which half.
+   */
+  async function saveCollectionMembership(productId: string) {
+    const { persisted } = await setProductCollections(productId, collectionIds);
+    /*
+      REPORTED THROUGH THE SHARED REPORTER, not with a `toast.error` of its
+      own. "Collections were not saved" is a claim about the VALUE, and the
+      most likely reason a write is refused here is that the admin's session
+      ended — which needs the opposite response: sign in again, not check the
+      input and retry. `reportWrite` asks who was asking first.
+
+      Called only on failure, because the form announces its own success and a
+      second toast saying the same thing twice is noise.
+    */
+    if (!persisted) {
+      reportWrite(false, "Collections saved", {
+        failure: `The ${productLower} was saved, but its collections were not`,
+      });
+    }
+  }
 
   /**
    * Anything typed and not yet saved.
@@ -354,6 +457,12 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           : current.filter((item) => item !== id),
       };
     });
+  }
+
+  function toggleCollection(id: string, checked: boolean) {
+    setCollectionIds((prev) =>
+      checked ? [...prev, id] : prev.filter((item) => item !== id),
+    );
   }
 
   function toggleOccasion(id: string, checked: boolean) {
@@ -584,10 +693,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
     try {
       if (mode === "add") {
-        await createProductRequest(payload);
+        /*
+          The id comes back from the create, and it has to: a product that
+          does not exist yet cannot be in a list of products. So membership is
+          written second, with the id the server just minted.
+        */
+        const created = await createProductRequest(payload);
+        await saveCollectionMembership(created.id);
         toast.success(SAVED_MESSAGE[status]);
       } else if (cakeId) {
         await updateProductRequest(cakeId, payload);
+        await saveCollectionMembership(cakeId);
         setSavedStatus(payload.status);
         setBaseline(JSON.stringify(payload));
         // The form's own copy too, so the badge and the button labels cannot
@@ -775,13 +891,13 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       draft be parked, which is the same rule the price follows.
                     */}
                     <option value="">Choose a category…</option>
-                    {adminCategories().map((category) => (
+                    {catalogLists.categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
                     ))}
                   </AdminSelect>
-                  {adminCategories().length === 0 ? (
+                  {catalogLists.categories.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
                       No categories yet. Add them under Catalog, then come back —
                       a {productLower} needs one before it can go on the shop.
@@ -801,11 +917,11 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   hidden entirely until a category is chosen, because "also" has
                   no meaning before there is a first one.
                 */}
-                {form.categoryId && adminCategories().length > 1 ? (
+                {form.categoryId && catalogLists.categories.length > 1 ? (
                   <div className="space-y-2">
                     <Label>Also show it under (optional)</Label>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {adminCategories()
+                      {catalogLists.categories
                         .filter((category) => category.id !== form.categoryId)
                         .map((category) => (
                           <label
@@ -887,7 +1003,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 <div className="space-y-2">
                   <Label>Occasions</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {adminOccasions().map((occasion) => (
+                    {catalogLists.occasions.map((occasion) => (
                       <label
                         key={occasion.id}
                         className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
@@ -903,6 +1019,42 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     ))}
                   </div>
                 </div>
+
+                {/*
+                  THE SAME LIST THE CATALOG SCREEN FILLS, from the other end.
+
+                  A collection could only be filled from inside itself, which
+                  is the right way round for building a Diwali row out of forty
+                  products and the wrong way round for the one moment a shop
+                  actually thinks about it — naming a new product and saying
+                  where it belongs. Both ends now edit `productIds`; nothing is
+                  copied onto the product.
+                */}
+                {catalogLists.collections.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Collections</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {catalogLists.collections.map((collection) => (
+                        <label
+                          key={collection.id}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={collectionIds.includes(collection.id)}
+                            onCheckedChange={(checked) =>
+                              toggleCollection(collection.id, checked === true)
+                            }
+                          />
+                          {collection.name}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      A collection is a group you curate — Best Sellers, New
+                      Arrivals. Ticking one adds this to the end of it.
+                    </p>
+                  </div>
+                ) : null}
 
                 {/*
                   THE RULE SITS HERE NOW.
