@@ -17,7 +17,6 @@ export const defaultCategories: ProductCategory[] = [
     name: category.name,
     slug: category.slug,
     image: category.image,
-    cakeCount: category.count,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   })),

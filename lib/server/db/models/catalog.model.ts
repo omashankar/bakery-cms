@@ -4,14 +4,22 @@ import { applyBaseTransform } from "./_transform";
 
 /**
  * Catalog — a SINGLETON document (one per install), keyed by `key`. Holds the
- * master lists that products reference: categories, flavours, occasions and
- * weight options. Items are stored as Mixed (validated by Zod on write) since
- * they are small value objects, mirroring how settings stores `social`.
+ * three master lists a product is filed against: categories, occasions and
+ * collections. Items are stored as Mixed (validated by Zod on write) since they
+ * are small value objects, mirroring how settings stores `social`.
+ *
+ * `flavours` and `weights` were declared here too. Both had already been taken
+ * out of the code — a flavour became a word typed on the product, and sizes
+ * moved onto the product because a shop-wide list is the wrong shape for a shop
+ * that sells more than one kind of thing — and neither has been read since. The
+ * declarations were what kept the rows alive in the database, where they sat
+ * for months answering nothing. `scripts/the-catalog-drops-what-nothing-reads.mjs`
+ * removed them; this is what stops `default: []` putting them back on the next
+ * write.
  */
 const catalogSchema = new mongoose.Schema({
   key: { type: String, default: "singleton", unique: true, index: true },
   categories: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  flavours: { type: [mongoose.Schema.Types.Mixed], default: [] },
   occasions: { type: [mongoose.Schema.Types.Mixed], default: [] },
   /**
    * Declared, or every collection a shop creates is dropped on write while
@@ -20,7 +28,6 @@ const catalogSchema = new mongoose.Schema({
    * on — the failure this repo has hit four times.
    */
   collections: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
 });
 
 applyBaseTransform(catalogSchema);

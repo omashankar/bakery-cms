@@ -65,7 +65,6 @@ export function selectHomepageCategories(
     name: string;
     slug: string;
     image?: string;
-    cakeCount?: number;
   }[],
   maxCount = 6,
   /**

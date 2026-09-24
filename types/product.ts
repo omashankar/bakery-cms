@@ -330,15 +330,18 @@ export interface CatalogRow extends BaseEntity {
   sortOrder?: number;
 }
 
+/*
+  `cakeCount` stood here: a stored number of products per category. It was
+  denormalised, nothing kept it in step, and it was named for one trade in a
+  CMS meant to sell anything. The admin counted the real published products
+  instead, and the homepage stopped reading the stored value after a seed typed
+  one that was wrong — it advertised "48 cakes" under Birthday in a shop that
+  held 25 products in total. This shop's own data had "Engagement Cake — 10"
+  against a category holding one.
+*/
 export interface ProductCategory extends CatalogRow {
   description?: string;
   image?: string;
-  /**
-   * @deprecated A denormalised count that nothing keeps in step, and named for
-   * one trade besides. The admin already counts the real products and the
-   * homepage stopped trusting this after a seed typed a number that was wrong.
-   */
-  cakeCount?: number;
 }
 
 
