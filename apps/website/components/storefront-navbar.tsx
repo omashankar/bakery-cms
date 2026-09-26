@@ -39,6 +39,34 @@ import {
 } from "@/features/products/lib/product-suggestions";
 import { cn } from "@/lib/utils";
 
+/**
+ * HOW FAR THE PAGE MOVES BEFORE THE BAND ANSWERS AT ALL.
+ *
+ * At lg the header is an 88px bar with a 46px category band under it, and
+ * about 28px more when the shop has written a utility row — so 200 is past
+ * the whole of it either way. Under that the customer is still looking at
+ * the top of the page, and a band that leaves while they are still at the
+ * top reads as something breaking rather than as room being made.
+ */
+const BAND_HOLDS_UNTIL = 200;
+
+/**
+ * HOW FAR A SCROLL HAS TO TURN BACK BEFORE THE BAND ANSWERS IT.
+ *
+ * Measured from the turning point, not from the last frame, so a customer
+ * 900px down who jitters a pixel each way has travelled one pixel and
+ * nothing moves. 48 is under a wheel notch, so a deliberate flick upwards
+ * still brings the band back at once.
+ *
+ * It is deliberately MORE than the band's own 46px. Taking the band away
+ * makes the document 46px shorter, and the browser answers that by moving
+ * the scroll position itself — clamping at the foot of the page, and scroll
+ * anchoring everywhere else. That is the page moving, not the customer, and
+ * on its own it can never cross this number. The settling tick in the
+ * handler is the other half of that guard, and the deterministic half.
+ */
+const BAND_ANSWERS_AFTER = 48;
+
 interface StorefrontNavbarProps {
   chrome: StorefrontChrome;
 }
@@ -288,6 +316,16 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [scrolled, setScrolled] = useState(false);
+  /*
+    THE HANDLES THE SCROLL EFFECT WRITES THROUGH.
+
+    `scrolledRef` mirrors the state above so the effect can tell a real flip
+    from a repeat without naming `scrolled` as a dependency — which would
+    tear the listener down, and forget where the customer had scrolled to,
+    every time the shadow turned over.
+  */
+  const navBandRef = useRef<HTMLDivElement>(null);
+  const scrolledRef = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
@@ -364,11 +402,130 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
 
   useBodyScrollLock(mobileOpen);
 
+  /*
+    A COLLAPSED BAND IS OUT OF THE TAB ORDER, so focus arriving anywhere in
+    the header brings it back. Without this a keyboard customer who has
+    scrolled cannot reach the categories at all — the rows are display:none
+    and there is nothing to tab to.
+
+    Named, not an arrow written inline on the element: `=>` in the header's
+    opening tag truncates the slice `the-nav-band-is-a-band.test.ts` reads
+    up to the first `>`, and that test would fail on correct code.
+  */
+  const showBand = () => {
+    if (navBandRef.current) navBandRef.current.dataset.collapsed = "false";
+  };
+
+  /**
+   * THE BAND GOES UP WHEN THE PAGE GOES DOWN. THE BAR DOES NOT MOVE.
+   *
+   * 134px of a 900px window is a lot of header to keep pinned over a page
+   * four and a half thousand pixels long, so the category band steps out of
+   * the way while the customer is reading and comes back the moment they
+   * scroll up. The bar with the logo, the search and the cart stays where it
+   * is throughout — that is the half of this header a customer would miss.
+   *
+   * DIRECTION, not depth. A customer who has stopped to read has not asked
+   * for anything to move, and a band that came back at a fixed offset would
+   * appear and disappear at the same place every time they passed it.
+   *
+   * NOTHING HERE IS REACT STATE. The band is hidden by a `data-collapsed`
+   * attribute written straight onto the node, so scrolling this page end to
+   * end re-renders this component exactly as often as it did before: when
+   * the shadow turns over, and not otherwise. That matters — the component
+   * is twelve hundred lines and draws up to eleven menu subtrees.
+   */
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    let frame = 0;
+    /** The turning point a reversal is measured from. */
+    let anchor = Math.max(0, window.scrollY);
+    let collapsed = false;
+    /** The tick after a change belongs to the change — see the constant. */
+    let settling = false;
+
+    // A new page starts with the band open, whatever the last one ended on.
+    if (navBandRef.current) navBandRef.current.dataset.collapsed = "false";
+
+    const setCollapsed = (next: boolean) => {
+      const band = navBandRef.current;
+      if (!band || next === collapsed) return;
+      collapsed = next;
+      settling = true;
+      band.dataset.collapsed = next ? "true" : "false";
+    };
+
+    const settle = () => {
+      frame = 0;
+      const y = Math.max(0, window.scrollY);
+
+      /*
+        The shadow, which is the only thing here that is state — and the only
+        edge left under the bar once the band's hairline has gone.
+      */
+      const wantsShadow = y > 8;
+      if (wantsShadow !== scrolledRef.current) {
+        scrolledRef.current = wantsShadow;
+        setScrolled(wantsShadow);
+      }
+
+      const band = navBandRef.current;
+      if (!band) return;
+
+      if (settling) {
+        /*
+          The page just changed height and the browser moved the scroll
+          position to match. That is not the customer scrolling.
+        */
+        settling = false;
+        anchor = y;
+        return;
+      }
+
+      // At the top of the page the band is simply there.
+      if (y <= BAND_HOLDS_UNTIL) {
+        anchor = y;
+        setCollapsed(false);
+        return;
+      }
+
+      /*
+        AN OPEN MENU, OR A KEYBOARD INSIDE THE BAND, HOLDS IT OPEN.
+
+        The panel is `absolute` but it is still a DOM descendant of the band,
+        and :hover matches an ancestor of whatever the pointer is over — so
+        this one test covers a pointer anywhere in an open 640px panel.
+        Without it, wheeling over a panel deletes it from under the pointer.
+
+        :focus-within is the same question for a keyboard. Hiding an element
+        that contains the focused link drops focus to the body.
+      */
+      if (band.matches(":hover") || band.matches(":focus-within")) {
+        anchor = y;
+        return;
+      }
+
+      // Still going the way it was going: move the turning point with it.
+      if (collapsed ? y > anchor : y < anchor) {
+        anchor = y;
+        return;
+      }
+
+      if (Math.abs(y - anchor) < BAND_ANSWERS_AFTER) return;
+      anchor = y;
+      setCollapsed(!collapsed);
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(settle);
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -396,6 +553,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   return (
     <>
     <header
+      onFocus={showBand}
       className={cn(
         /*
           A SHADOW ON SCROLL, not a border.
@@ -885,7 +1043,17 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           A hairline above AND below, which is what closes it as a band. The
           header's own border moved to a shadow so they do not stack.
         */
-        className="hidden border-y border-border bg-cream-100 lg:block"
+        /*
+          `lg:data-[collapsed=true]:hidden` and not a React `hidden` class:
+          the attribute is written on the node by the scroll effect, so the
+          band leaves and returns without re-rendering the component. It is
+          inert below lg — the band is already `hidden` there and the only
+          rule keyed off the attribute is an `lg:` one — which is what makes
+          "the phone header does not change" provable rather than asserted.
+        */
+        className="hidden border-y border-border bg-cream-100 lg:block lg:data-[collapsed=true]:hidden"
+        data-collapsed="false"
+        ref={navBandRef}
       >
         <nav
           className={cn(layoutSpacing.container, "flex items-center gap-1 py-1.5")}
