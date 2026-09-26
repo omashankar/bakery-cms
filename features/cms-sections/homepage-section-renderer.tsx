@@ -257,6 +257,7 @@ function SectionShell({
   className,
   noReveal,
   fullBleed,
+  panelClassName,
 }: HomepageSectionRendererProps & {
   children: React.ReactNode;
   className?: string;
@@ -280,6 +281,21 @@ function SectionShell({
    * with no units involved.
    */
   fullBleed?: boolean;
+  /**
+   * A layer for the PANEL, applied after its tone.
+   *
+   * For a gradient, a ring or a shadow over whichever background the shop has
+   * chosen — never for a background of its own. `cn` is twMerge, so a `bg-*`
+   * here would outrank the tone and leave the Background dropdown doing
+   * nothing, which is the bug three sections in this file already shipped
+   * once. A gradient composes instead of replacing: `bg-[linear-gradient(...)]`
+   * sets `background-image`, and the tone's `background-color` still shows
+   * through every transparent stop.
+   *
+   * Ignored unless the background is a `panel-*` tone, because there is no
+   * panel otherwise.
+   */
+  panelClassName?: string;
 }) {
   /**
    * The Background setting, and the ONLY place a section background is decided.
@@ -369,7 +385,9 @@ function SectionShell({
       ) : (
         <div className={layoutSpacing.container}>
           {panel ? (
-            <div className={cn("rounded-2xl px-4 py-6 sm:px-6 sm:py-8", panelTone)}>
+            <div
+              className={cn("rounded-2xl px-4 py-6 sm:px-6 sm:py-8", panelTone, panelClassName)}
+            >
               {revealOnScroll ? <ScrollReveal>{children}</ScrollReveal> : children}
             </div>
           ) : revealOnScroll ? (
@@ -2476,7 +2494,31 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
   ] as const;
 
   return (
-    <SectionShell {...props}>
+    <SectionShell
+      {...props}
+      /*
+        A WASH OVER THE TONE, not instead of it.
+
+        One flat fill is what the first cut of this looked like beside the
+        reference: a rectangle of paint. The reference is lighter where the
+        clock sits and deeper at the far end, and that GRADIENT is the part
+        worth taking — its greens and blues are not.
+
+        Every stop is either `transparent` or one of the shop's own tokens,
+        and `background-image` sits over the tone's `background-color`
+        rather than replacing it. So whichever of the six backgrounds the
+        shop picks in the dropdown is still the colour underneath, and this
+        only shapes the light on it. `--background` is the shop's palest
+        surface and `--primary` its brand colour; at 8% the second is a
+        suggestion of weight at the end of the strip, not a second fill.
+
+        Angled from the top-left because that is where the eye starts and
+        where the digits are. A ring rather than a border: `ring` draws
+        inside the rounded corner, so it cannot leave the 1px notch a
+        `border` leaves on a `rounded-2xl` box at some zoom levels.
+      */
+      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] ring-1 ring-border/50"
+    >
       {/*
         NO `bg-*` HERE, and that is the point: SectionShell applies the
         Background setting BEFORE this className, so a colour passed here

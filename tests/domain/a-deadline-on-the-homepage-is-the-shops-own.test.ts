@@ -178,3 +178,56 @@ describe("the words it ships", () => {
     }
   });
 });
+
+describe("the wash on the card", () => {
+  /**
+   * `panelClassName` MAKES AN OLD TRAP EASIER TO FALL INTO.
+   *
+   * `SectionShell` applies it after the panel's tone, and `cn` is twMerge — so
+   * a flat `bg-*` passed through it wins, and the shop's Background dropdown
+   * silently stops doing anything. Three sections in this file shipped exactly
+   * that once; one showed "White" in the builder while rendering cream.
+   *
+   * A gradient is safe, and is the whole point: `bg-[linear-gradient(...)]`
+   * sets `background-image`, so the tone's `background-color` still shows
+   * through every transparent stop. Proven in a browser too — swapping the
+   * tone class on the live card moves the computed background-color and
+   * leaves the gradient untouched.
+   */
+  it("never carries a flat colour, which would make the Background dropdown inert", () => {
+    const source = code(RENDERER);
+    const uses = [...source.matchAll(/panelClassName="([^"]*)"/g)].map((m) => m[1]);
+
+    expect(uses.length, "nothing passes panelClassName any more").toBeGreaterThan(0);
+
+    for (const value of uses) {
+      for (const token of value.split(/\s+/).filter(Boolean)) {
+        if (!token.startsWith("bg-")) continue;
+        expect(
+          token.startsWith("bg-[") && /gradient\(/.test(token),
+          `panelClassName carries "${token}", which outranks the tone and leaves the Background dropdown doing nothing`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("is built from the shop's own tokens, not from colours chosen here", () => {
+    const source = code(RENDERER);
+    const value = /panelClassName="([^"]*)"/.exec(source)?.[1] ?? "";
+
+    expect(value, "no wash is passed at all").toContain("gradient(");
+    // The reference's own greens and blues come back in exactly this shape.
+    expect(value, "a colour was written into the wash").not.toMatch(
+      /#[0-9a-fA-F]{3,8}|rgb\(|hsl\(/,
+    );
+    expect(value, "the wash does not read a single shop token").toMatch(/var\(--/);
+  });
+
+  it("and the shell puts it after the tone, or it would be painted over", () => {
+    const source = code(RENDERER);
+    expect(
+      source.indexOf("panelTone, panelClassName"),
+      "the panel no longer layers the two in that order",
+    ).toBeGreaterThan(-1);
+  });
+});
