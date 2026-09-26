@@ -14,12 +14,28 @@ import { connect } from "./shop-state";
  * Only a browser can settle this: the source holds both branches either way.
  */
 
+/**
+ * WHAT THE PAGE SAYS, not what it carries.
+ *
+ * `body.textContent` includes every <script>, and this page ships its whole
+ * RSC payload in one — so the old reads matched strings no customer can see.
+ * The coupon minimum "On orders over ₹10,000" is the one that was measured:
+ * present in `textContent`, absent from `innerText`, and reported to the shop
+ * as a sentence on its homepage that is not on its homepage.
+ *
+ * `innerText` is a strict subset, so nothing here can newly fail because of
+ * this; it can only stop passing for the wrong reason.
+ */
+async function renderedText(page: import("@playwright/test").Page): Promise<string> {
+  return page.evaluate(() => (document.body as HTMLElement).innerText);
+}
+
 test("shows the review score the shop actually has", async ({ page }) => {
   const db = await connect();
   const approved = await db.collection("reviews").find({ status: "approved" }).toArray();
 
   await page.goto("/store");
-  const body = (await page.locator("body").textContent()) ?? "";
+  const body = await renderedText(page);
 
   // Neither branch may borrow the demo brand's figures.
   expect(body, "the hero still advertises the invented review count").not.toContain("2000+ reviews");
@@ -66,7 +82,7 @@ test("promises the delivery speed the shop is set to", async ({ page }) => {
   );
 
   await page.goto("/store");
-  const body = (await page.locator("body").textContent()) ?? "";
+  const body = await renderedText(page);
 
   expect(body, "the trust bar still says the shop delivers today").not.toContain(
     "Order today, get today",
@@ -88,16 +104,45 @@ test("promises the delivery speed the shop is set to", async ({ page }) => {
     );
   }
 
-  // And it states the speed it can actually manage. Spelled out rather than
-  // imported: pulling in the helper drags the browser-only settings modules
-  // into this node context, which cannot resolve them.
+  /**
+   * AND ANY SPEED IT DOES STATE IS THE ONE IT CAN MANAGE — there may be none.
+   *
+   * This required the promise to be PRESENT, and it passed for six days on a
+   * page that does not show it: `body.textContent` includes the RSC payload,
+   * and "Same-day delivery" was sitting in that and nowhere a customer could
+   * read it. Reading `innerText` instead turned it red at once, which is the
+   * only reason this was ever found.
+   *
+   * The surface it wanted is gone: `d7ded01` took the hero's delivery-facts
+   * strip off at the shop's request and `heroTrustBarFor` — the only thing
+   * that rendered the tile — has had no caller since. So the guard becomes
+   * the one that survives, the same shape as the two cases beside it: a
+   * promise printed here is the shop's own, or it is not printed.
+   *
+   * All three phrasings are scanned rather than just the right one, which is
+   * what makes this able to fail: on a shop with lead time 0, finding
+   * "Next-day delivery" is the bug, and asserting only on the expected string
+   * would sail past it.
+   */
+  const promises = [
+    "Same-day delivery",
+    "Next-day delivery",
+    ...Array.from({ length: 30 }, (_, n) => `Delivery from ${n + 2} days ahead`),
+  ];
   const expected =
     leadDays <= 0
       ? "Same-day delivery"
       : leadDays === 1
         ? "Next-day delivery"
         : `Delivery from ${leadDays} days ahead`;
-  expect(body, `the page does not state "${expected}"`).toContain(expected);
+
+  for (const promise of promises) {
+    if (promise === expected) continue;
+    expect(
+      body,
+      `the page promises "${promise}" where this shop's lead time of ${leadDays} means "${expected}"`,
+    ).not.toContain(promise);
+  }
 });
 
 test("states the free-delivery threshold from settings, not a constant", async ({ page }) => {
@@ -109,7 +154,7 @@ test("states the free-delivery threshold from settings, not a constant", async (
   );
 
   await page.goto("/store");
-  const body = (await page.locator("body").textContent()) ?? "";
+  const body = await renderedText(page);
 
   /**
    * THE FREE-DELIVERY TILE IS NOT ON THIS PAGE, AND THE WORDS ARE NOT ITS OWN.
@@ -159,7 +204,7 @@ test("no longer advertises the demo brand's unverifiable boasts", async ({ page 
    * and no section rather than someone else's past.
    */
   await page.goto("/store");
-  const body = (await page.locator("body").textContent()) ?? "";
+  const body = await renderedText(page);
 
   for (const boast of [
     "1M+",
