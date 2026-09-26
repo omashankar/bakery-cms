@@ -67,6 +67,30 @@ const BAND_HOLDS_UNTIL = 200;
  */
 const BAND_ANSWERS_AFTER = 48;
 
+/**
+ * HOW LONG THE BAND TAKES TO GO, AND THE CLIP THAT TRAVELS WITH IT.
+ *
+ * The band's height is what animates — that is the whole point, because the
+ * 46px it gives back is what the page below moves by, and a page that jumps
+ * 46px is what the shop was looking at before this. Animating a height needs
+ * `overflow: hidden`, or the rows inside spill out of a box that is no longer
+ * tall enough to hold them.
+ *
+ * And `overflow: hidden` on this element CLIPS THE MEGA-MENU PANEL, which is
+ * 640px, hangs below the band by design, and is a DOM descendant of it. So the
+ * clip is not a permanent class: it is switched on for the length of the
+ * slide and off again. Safe to do, because the band refuses to move at all
+ * while the pointer is inside it — so no panel can be open when the clip
+ * goes on.
+ *
+ * A TIMER RATHER THAN `transitionend`. Under `prefers-reduced-motion` there
+ * is no transition, so no event ever fires, and the clip would stay on for
+ * the rest of the session with every dropdown cut off at the band's edge.
+ * A timer always fires; 60ms past the duration covers a late frame.
+ */
+const BAND_SLIDE_MS = 200;
+const BAND_CLIP_MS = BAND_SLIDE_MS + 60;
+
 interface StorefrontNavbarProps {
   chrome: StorefrontChrome;
 }
@@ -442,6 +466,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     let collapsed = false;
     /** The tick after a change belongs to the change — see the constant. */
     let settling = false;
+    /** The clip that is on while the band is in motion, and off otherwise. */
+    let clip = 0;
 
     // A new page starts with the band open, whatever the last one ended on.
     if (navBandRef.current) navBandRef.current.dataset.collapsed = "false";
@@ -452,6 +478,14 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       collapsed = next;
       settling = true;
       band.dataset.collapsed = next ? "true" : "false";
+
+      // The clip travels with the slide, in both directions — see the constant.
+      band.dataset.animating = "true";
+      if (clip) clearTimeout(clip);
+      clip = window.setTimeout(() => {
+        clip = 0;
+        band.dataset.animating = "false";
+      }, BAND_CLIP_MS);
     };
 
     const settle = () => {
@@ -524,6 +558,11 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (frame) cancelAnimationFrame(frame);
+      /*
+        Left running, this fires against a node from the page that has gone
+        and leaves the next page's band clipped.
+      */
+      if (clip) clearTimeout(clip);
     };
   }, [pathname]);
 
@@ -1044,21 +1083,53 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           header's own border moved to a shadow so they do not stack.
         */
         /*
-          `lg:data-[collapsed=true]:hidden` and not a React `hidden` class:
-          the attribute is written on the node by the scroll effect, so the
-          band leaves and returns without re-rendering the component. It is
-          inert below lg — the band is already `hidden` there and the only
-          rule keyed off the attribute is an `lg:` one — which is what makes
-          "the phone header does not change" provable rather than asserted.
+          IT SLIDES, AND THE PAGE BELOW RIDES WITH IT.
+
+          `grid-rows-[1fr]` to `[0fr]` rather than a height in pixels: the
+          band is 46px today, but a shop that gives a nav row a badge makes it
+          taller, and a hard-coded height would animate to the wrong place on
+          that shop's storefront with nothing to say why. The fraction asks
+          for "as tall as the content" and needs no number.
+
+          The two hairlines are in the transition as well. Left out, they
+          stayed at 1px each while the band between them went to nothing, so
+          the slide finished on a 2px line that then blinked away.
+
+          Written as data attributes on the node rather than React state, so
+          scrolling this page end to end does not re-render a component that
+          draws up to eleven menu subtrees. Inert below lg: the band is
+          already `hidden` there and every rule keyed off the attributes is
+          an `lg:` one, which is what makes "the phone header does not
+          change" provable rather than asserted.
+
+          `motion-reduce` because this is motion a customer can ask not to
+          have; with it the band goes straight to its new size.
         */
-        className="hidden border-y border-border bg-cream-100 lg:block lg:data-[collapsed=true]:hidden"
+        className="hidden lg:grid grid-rows-[1fr] border-y border-border bg-cream-100 transition-[grid-template-rows,border-top-width,border-bottom-width] duration-200 ease-out motion-reduce:transition-none lg:data-[collapsed=true]:grid-rows-[0fr] lg:data-[collapsed=true]:border-y-0 lg:data-[collapsed=true]:overflow-hidden lg:data-[animating=true]:overflow-hidden"
         data-collapsed="false"
         ref={navBandRef}
       >
         <nav
-          className={cn(layoutSpacing.container, "flex items-center gap-1 py-1.5")}
+          /*
+            `min-h-0` IS WHAT LETS THE BAND CLOSE AT ALL, AND THE PADDING HAD
+            TO MOVE FOR THE SAME REASON.
+
+            A grid item's automatic minimum size is its CONTENT size, so the
+            row above went to `0fr` and stopped at 44 of its 46 pixels.
+            `min-height: 0` lifts that floor — and then it stopped at 12,
+            which is this row's own `py-1.5` top and bottom: padding is part
+            of the box and does not shrink with it. Both measured, because a
+            band that closes to 44px and a band that closes to 12px look like
+            an animation that does not work rather than like a floor.
+
+            So the padding sits on the row INSIDE, which the grid does not
+            measure, and this element carries nothing but the column. The
+            spill that allows is what the band's own clip is for.
+          */
+          className={cn(layoutSpacing.container, "min-h-0")}
           aria-label="Shop categories"
         >
+        <div className="flex items-center gap-1 py-1.5">
         {bandRows.map((item, index) => {
           const isActive =
             pathname === item.href ||
@@ -1183,6 +1254,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             </div>
           );
         })}
+        </div>
         </nav>
       </div>
       ) : null}

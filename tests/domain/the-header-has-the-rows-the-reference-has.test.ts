@@ -303,8 +303,22 @@ describe("the nav is its own full-width strip", () => {
     // and `bg-cream-50` is a colour the reference restyle changes.
     const at = navbar.indexOf("data-nav-band");
     expect(at, "the nav band lost its marker").toBeGreaterThan(-1);
+    const band = navbar.slice(at, at + 200);
 
-    expect(navbar.slice(at, at + 200)).toContain("lg:block");
+    /*
+      HIDDEN ON A PHONE, AND SHOWN SOMEHOW FROM lg — not `lg:block`.
+
+      This read `toContain("lg:block")`, and `block` was never the point: the
+      case is that a phone gets no band. The band became a grid so its height
+      could animate from `1fr` to `0fr` when it slides out of the way, which
+      turned this red on code that hides it from phones exactly as before.
+
+      Both halves are asserted, because `hidden` alone passes for a band that
+      is hidden everywhere and the `lg:` rule alone passes for one that is on
+      a phone too.
+    */
+    expect(band, "the band is not hidden by default, so a phone gets one").toContain("hidden");
+    expect(band, "the band is never shown from lg").toMatch(/lg:(block|grid|flex)\b/);
   });
 });
 
