@@ -2531,7 +2531,7 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         at its static position in the initial containing block and escapes
         every `overflow: hidden` on the way up.
       */}
-      <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
+      <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:gap-8">
         {/*
           THE FACT, ONCE, AND NOT TICKING.
 
