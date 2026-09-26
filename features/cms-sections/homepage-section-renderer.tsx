@@ -2508,10 +2508,20 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         <p className="sr-only">
           Same-day orders close at {cutoff} today — {parts.spoken}.
         </p>
-        <div className="flex shrink-0 items-center gap-2" aria-hidden="true">
+        <div className="flex shrink-0 items-center gap-2.5" aria-hidden="true">
           {boxes.map(([label, value]) => (
             <span
               key={label}
+              /*
+                THE LABEL SITS UNDER THE BOX, not in it.
+
+                Both were inside a 64px tile and the longest of the three
+                rendered as "URS" — measured in a screenshot, not guessed. The
+                reference stacks them, and it is the arrangement that actually
+                fits: the box only has to hold two digits, so it can be bigger
+                while the strip gets shorter.
+              */
+              className="flex flex-col items-center"
               /*
                 `bg-primary` + `text-primary-foreground`: appearance-tokens.ts
                 sets `--primary` to the shop's own colour and
@@ -2531,18 +2541,33 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
                 repaints three glyphs and reflows nothing — which is why
                 `prefers-reduced-motion` has nothing here to suppress.
               */
-              className="flex w-16 flex-col items-center rounded-xl bg-primary px-2 py-2 text-primary-foreground"
             >
-              <span className="font-heading text-xl leading-none font-bold tabular-nums sm:text-2xl">
+              <span
+                /*
+                  A SQUARE, and `grid place-items-center` rather than padding,
+                  so all three are identical whatever two digits land in them.
+                  `tabular-nums` and the fixed size are what keep this the one
+                  thing on the homepage that does not move: a "1" is narrower
+                  than a "0", and without them the boxes breathe once a second
+                  and the line beside them shuffles.
+                */
+                className="grid size-14 place-items-center rounded-xl bg-primary font-heading text-2xl leading-none font-bold tabular-nums text-primary-foreground sm:size-16 sm:text-3xl"
+              >
                 {value}
               </span>
-              <span className="mt-1 text-[0.625rem] leading-none font-semibold tracking-widest uppercase">
+              <span className="mt-1.5 text-[0.625rem] leading-none font-semibold tracking-[0.12em] uppercase text-muted-foreground">
                 {label}
               </span>
             </span>
           ))}
         </div>
-        <p className="min-w-0 font-heading text-lg leading-snug font-bold sm:flex-1 sm:text-xl">
+        {/*
+          THE SENTENCE IS THE BAND, which is what the reference gets right and
+          the first cut of this did not: at `text-lg` beside three boxes it
+          read as a caption for them. It is the only thing here that says what
+          is closing.
+        */}
+        <p className="min-w-0 font-heading text-xl leading-snug font-bold text-balance sm:flex-1 sm:text-2xl lg:text-3xl">
           {headline}
         </p>
         {/*

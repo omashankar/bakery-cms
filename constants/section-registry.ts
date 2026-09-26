@@ -1173,14 +1173,24 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     label: "Same-day countdown",
     icon: "Clock",
     /*
-      CREAM, which is `--surface-cream` and follows the shop's own Appearance
-      surface colour. Not one of the four `panel-*` tones: those draw
-      `--band-rose/mint/sand/sky`, which `appearanceCssVariables` does not
-      write, so a shop on a cool palette would get a band of warm butter it
-      cannot change. A shop can still pick a tone from the Background
-      dropdown; the shipped default is the one its own palette drives.
+      A PANEL TONE, because in this renderer that word does not mean a colour
+      — it means a SHAPE. `SectionShell` draws any `panel-*` background as a
+      rounded card inset in the page's column, and any other background as a
+      flat full-width stripe. The reference is a card, and so is every band
+      around this one on this shop's page.
+
+      It shipped as `cream` on the argument that `--band-*` is not written by
+      `appearanceCssVariables` and so cannot follow a shop's palette. That is
+      true and it was the wrong trade: `--surface-cream` on this shop is a
+      hair off white, so the band had no edges at all, and the four bands
+      above and below it are already `panel-rose`, `panel-sky` and
+      `panel-mint`. A band that cannot be seen is worse than one whose tint
+      is fixed — and the tint is not fixed to the shop, only to the four
+      choices in the Background dropdown, which is where it belongs.
+
+      `sand` because the other three are each already in use on this page.
     */
-    defaultBackground: "cream",
+    defaultBackground: "panel-sand",
     defaultContent: {
       /*
         BLANK, and here that is load-bearing rather than tidy.
