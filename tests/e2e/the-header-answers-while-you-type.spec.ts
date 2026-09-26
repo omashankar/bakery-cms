@@ -258,7 +258,25 @@ test("and a phone gets a box to type in, where it used to get a page", async ({ 
 
   /* ---- and it is the same box, with the same suggestions ----------------- */
   await page.type(BOX, "choc", { delay: 45 });
-  await page.waitForTimeout(1400);
+
+  /*
+    A RETRYING ASSERTION BEFORE THE COUNT, which the desktop cases above
+    already had and this one did not.
+
+    It read the row count straight after a fixed 1400ms wait. Measured on an
+    idle machine the rows arrive 428ms after the last keystroke, twice over —
+    so the wait is three times what it needs, and this still went red whenever
+    anything else was running on the machine, reporting the shop's phone search
+    as broken when it was not. The four cases above never did, because every
+    one of them waits on the panel with `toBeVisible()` first, which retries.
+
+    The count stays: a visible panel means `suggestions.length > 0`, so this
+    is the assertion that a phone is offered rows and not merely a box.
+  */
+  await expect(
+    page.locator(PANEL),
+    "a phone was offered no suggestion panel at all",
+  ).toBeVisible();
   expect(await page.locator(ROW).count(), "a phone gets no suggestions").toBeGreaterThan(0);
 
   /* ---- and none of it pushes the page sideways -------------------------- */
