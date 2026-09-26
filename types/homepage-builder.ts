@@ -74,6 +74,18 @@ export type HomepageSectionType =
   | "category-price-cards"
   | "banner-strip"
   /**
+   * How long is left to order for delivery today — and nothing otherwise.
+   *
+   * The only band on this page whose content is a NUMBER the shop stores
+   * rather than words it writes: every digit comes from
+   * `commerce.sameDayCutoff`, which is the field `isPastSameDayCutoff` already
+   * refuses an order against. A countdown with nothing enforcing it is a
+   * pressure tactic, so this one draws nothing at all unless there is a real
+   * window open — and it is the only band here that takes ITSELF off the page
+   * when it stops being true, because a deadline cannot be baked into artwork.
+   */
+  | "same-day-countdown"
+  /**
    * The products THIS BROWSER has opened — not content the shop writes.
    *
    * Every other band on this page is the same for everybody. This one is

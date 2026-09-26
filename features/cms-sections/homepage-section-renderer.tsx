@@ -40,6 +40,7 @@ import type {
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
+import { countdownParts } from "@/features/orders/lib/delivery-date";
 import type { Banner } from "@/types/media";
 import {
   limitRows,
@@ -80,6 +81,7 @@ import { toast } from "sonner";
 import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 import { formatCurrency } from "@/utils/format";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 
 export interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
@@ -191,6 +193,22 @@ export interface HomepageSectionRendererProps {
   trust?: {
     freeDeliveryThreshold: number;
     deliveryPromise: string;
+    /**
+     * `HH:MM` when same-day orders really close today, or "" — the countdown
+     * band's only number.
+     *
+     * A HAND-WRITTEN COPY of the field on `StorefrontTrust`, like the three
+     * beside it, and not an import: `domainStaysPure` forbids this file from
+     * reaching into apps/website, where that interface lives. Nothing links
+     * the two but the `{...data}` spread in store-home-content.tsx, so both
+     * are edited together and tsc connects them at that call site.
+     *
+     * REQUIRED, so the server cannot forget to send it — but read defensively
+     * at the one place that uses it, because this object also arrives as JSON
+     * from /api/builders/homepage/preview-data and a response a browser
+     * cached before this field existed comes without it.
+     */
+    sameDayCutoff: string;
     rating: { count: number; average: number } | null;
   } | null;
   selected?: boolean;
@@ -2365,6 +2383,201 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/**
+ * HOW LONG IS LEFT TO ORDER FOR TODAY — or nothing at all.
+ *
+ * Three boxes of digits, the shop's own line, its own way in. The shape came
+ * from a layout the shop held up; the deadline comes from the shop. A
+ * countdown is the most persuasive thing that can go on a page and the
+ * cheapest to fake, so every digit here is derived from
+ * `commerce.sameDayCutoff` — the field `isPastSameDayCutoff` already refuses
+ * an order against.
+ *
+ * SEVEN WAYS IT DRAWS NOTHING, each a state a real shop is in:
+ *
+ *   - `trust` is undefined: there are no server props at all, which is the
+ *     builder preview between mount and its fetch landing;
+ *   - `trust` is null: the settings read failed;
+ *   - the shop named no cutoff, which is the shipped default and therefore
+ *     every fresh install;
+ *   - the stored string is not a time;
+ *   - the shop's lead time is above 0 days, so there is no same-day window to
+ *     close — decided on the server by `sameDayCutoffFor`, which sends "", so
+ *     the browser never learns the lead time and cannot re-derive this wrong;
+ *   - today's cutoff has gone. `timeLeftToday` answers null for that on its
+ *     own and it is asked again every second, so the band removes ITSELF at
+ *     the cutoff rather than standing there telling somebody to hurry for a
+ *     delivery they can no longer have;
+ *   - the shop has not written the line beside the clock.
+ *
+ * On the live page every one of those is the same `null`, returned BEFORE
+ * `SectionShell` is constructed — so there is no padded empty stripe and no
+ * gap, just one band fewer on a page whose rhythm is padding. In the builder
+ * each says which one it is, because a shop that adds this band and sees an
+ * empty screen cannot tell "waiting" from "broken" — the bargain
+ * `RecentlyViewedSection` already strikes.
+ */
+function SameDayCountdownSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  /*
+    FROM THE SERVER, AND FROM NOWHERE ELSE.
+
+    Not `getCommerceSettings()`, which is the browser's settings cache and
+    falls back to the SHIPPED defaults — and the shipped `sameDayCutoff` is
+    "", so that would read as "no countdown" on a shop that has one and would
+    ignore `deliveryLeadDays` entirely. `sameDayCutoffFor` on the server has
+    already refused to hand over a cutoff for a shop that cannot deliver
+    today.
+
+    `?? ""` on a field the type says is always there, deliberately: `trust`
+    crosses a JSON boundary to reach the builder preview, and
+    `undefined.trim()` is a blank admin screen rather than a missing band.
+  */
+  const cutoff = (props.trust?.sameDayCutoff ?? "").trim();
+  const headline = contentString(c, "headline").trim();
+
+  /*
+    CALLED BEFORE ANY EARLY RETURN, and called HERE rather than in
+    `HomepageSectionRenderer`. In the switch, every one of the nine bands on
+    the page mounts its own copy of that component, so the hook would tick and
+    re-render all nine once a second. After a `return null` it would be a
+    conditional hook, which is a different bug from the one being avoided.
+  */
+  const parts = countdownParts(useSameDayCountdown(cutoff));
+
+  if (!parts || !headline) {
+    if (!props.interactive) return null;
+    /*
+      THE BUILDER IS TOLD WHICH ONE IT IS, ordered by how hard each is to find
+      from here: the settings screen is a different page, the headline box is
+      six inches to the left.
+    */
+    return (
+      <SectionShell {...props}>
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-relaxed text-muted-foreground">
+          {props.trust === undefined
+            ? "Reading this shop’s settings…"
+            : props.trust === null
+              ? "This shop’s settings could not be read, so there is no deadline behind this band. It draws nothing on the live page rather than a made-up one."
+              : !cutoff
+                ? "Set Settings → Commerce → “Same-day orders close at”, and keep the delivery lead time at 0 days. Without both there is no same-day window, so this band draws nothing at all on the live page."
+                : !headline
+                  ? "Write the line that sits beside the clock, in the box on the left. Boxes of digits with nothing saying what is closing is not something to publish, so the band stays hidden until it is written."
+                  : `Same-day orders closed at ${cutoff}, so this band is drawing nothing until midnight. Nothing is broken and nothing is hidden: a countdown that has run out would be telling somebody to hurry for a delivery they can no longer have.`}
+        </p>
+      </SectionShell>
+    );
+  }
+
+  const boxes = [
+    ["Hours", parts.hours],
+    ["Minutes", parts.minutes],
+    ["Seconds", parts.seconds],
+  ] as const;
+
+  return (
+    <SectionShell {...props}>
+      {/*
+        NO `bg-*` HERE, and that is the point: SectionShell applies the
+        Background setting BEFORE this className, so a colour passed here
+        outranks it and the dropdown goes inert — three sections in this file
+        did exactly that, and one showed "White" in the builder while
+        rendering cream.
+
+        `relative` is load-bearing rather than styling: Tailwind's `sr-only`
+        is `position: absolute`, and with no positioned ancestor it lays out
+        at its static position in the initial containing block and escapes
+        every `overflow: hidden` on the way up.
+      */}
+      <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
+        {/*
+          THE FACT, ONCE, AND NOT TICKING.
+
+          A region that changes every second is either announced every second
+          — 3,600 interruptions an hour, which makes the rest of the page
+          unreachable — or never. So the digits are hidden and one sentence
+          stands for them. It leads with the TIME, which never changes, and
+          `spoken` drops the seconds so even that half stays true for a
+          minute. No `aria-live` anywhere, and no `role="timer"`: both leave a
+          live region in the markup for a later edit to switch on.
+
+          The cutoff is read out as the shop typed it. A 12-hour rendering
+          would be this software's second opinion about a time somebody
+          already chose how to write.
+        */}
+        <p className="sr-only">
+          Same-day orders close at {cutoff} today — {parts.spoken}.
+        </p>
+        <div className="flex shrink-0 items-center gap-2" aria-hidden="true">
+          {boxes.map(([label, value]) => (
+            <span
+              key={label}
+              /*
+                `bg-primary` + `text-primary-foreground`: appearance-tokens.ts
+                sets `--primary` to the shop's own colour and
+                `--primary-foreground` to `readableInkOn(primaryColor)`, so
+                the ink is contrast-checked per shop rather than chosen once
+                here. Not `bg-bakery-900` (every `--bakery-*` step is derived
+                from the same primary, so a pale brand gives a pale box and
+                the digits vanish), not `variant="bakery"`'s `text-white`
+                (welded, and unreadable on a light primary), and not
+                `--cream-50`, which is literally #ffffff and pinned there by
+                decree.
+
+                A FIXED WIDTH AND TABULAR DIGITS, because otherwise this band
+                is the only thing on the homepage that moves. A "1" is
+                narrower than a "0", so without both the boxes breathe once a
+                second and the line beside them shuffles. With them, a tick
+                repaints three glyphs and reflows nothing — which is why
+                `prefers-reduced-motion` has nothing here to suppress.
+              */
+              className="flex w-16 flex-col items-center rounded-xl bg-primary px-2 py-2 text-primary-foreground"
+            >
+              <span className="font-heading text-xl leading-none font-bold tabular-nums sm:text-2xl">
+                {value}
+              </span>
+              <span className="mt-1 text-[0.625rem] leading-none font-semibold tracking-widest uppercase">
+                {label}
+              </span>
+            </span>
+          ))}
+        </div>
+        <p className="min-w-0 font-heading text-lg leading-snug font-bold sm:flex-1 sm:text-xl">
+          {headline}
+        </p>
+        {/*
+          THE EXISTING PILL, not a new button. `ViewAllLink` already draws
+          nothing without both a label and a link, already takes the band's
+          own tone, already clears 36px, and — unlike `<Button>`, whose
+          default variant carries `hover:bg-primary/90` — has no hover effect,
+          which is a standing rule here. The reference's big blue rectangle is
+          not reproducible honestly: the only second colour available is the
+          accent, and `readableInkOn` is not applied to it, so a shop picking
+          a pale accent would get an illegible button.
+        */}
+        <ViewAllLink
+          href={contentString(c, "ctaHref")}
+          label={contentString(c, "ctaLabel")}
+          on={props.section.background}
+        />
+      </div>
+
+      {/*
+        SAYS SO WHILE IT IS WORKING, not only once it has gone. An admin who
+        opens the builder in the morning would otherwise never learn that this
+        band leaves the page at lunchtime. Reads the real cutoff, so it cannot
+        drift from the setting, and only the builder ever renders it.
+      */}
+      {props.interactive ? (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Only you can see this line. Same-day orders close at {cutoff}, so this
+          band draws nothing on the live page from then until midnight.
+        </p>
+      ) : null}
+    </SectionShell>
+  );
+}
+
 function TileGridSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const hasHeading = sectionHeaderDraws(
@@ -3343,6 +3556,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <BannerGridSection {...props} />;
     case "banner-strip":
       return <BannerStripSection {...props} />;
+    case "same-day-countdown":
+      return <SameDayCountdownSection {...props} />;
     case "category-price-cards":
       return <CategoryPriceCardsSection {...props} />;
     case "tile-grid":

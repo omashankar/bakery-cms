@@ -1149,6 +1149,73 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    /*
+      THE SHOP'S CLOSING TIME FOR TODAY, COUNTING DOWN.
+
+      The shape came from a layout the shop held up: three boxes of digits, a
+      line beside them, a way in at the end. Nothing else did — not its
+      colours, not its sentence, not its button's words.
+
+      There is exactly ONE number behind this band, Settings → Commerce →
+      "Same-day orders close at", and it is the same field
+      `isPastSameDayCutoff` refuses an order against. That is the whole
+      difference between a deadline and a tactic: something else in this
+      system enforces it. There is no box here to type a number into,
+      deliberately — one would be a second copy of the setting, free to drift
+      from the one checkout honours.
+
+      NO `align`, and it is not an omission. This band has no section heading
+      — its words sit INSIDE the strip beside the digits — so there is nothing
+      for a heading position to move. Same reason `hero`, `store-locator`,
+      `newsletter` and `cta` have no control either.
+    */
+    type: "same-day-countdown",
+    label: "Same-day countdown",
+    icon: "Clock",
+    /*
+      CREAM, which is `--surface-cream` and follows the shop's own Appearance
+      surface colour. Not one of the four `panel-*` tones: those draw
+      `--band-rose/mint/sand/sky`, which `appearanceCssVariables` does not
+      write, so a shop on a cool palette would get a band of warm butter it
+      cannot change. A shop can still pick a tone from the Background
+      dropdown; the shipped default is the one its own palette drives.
+    */
+    defaultBackground: "cream",
+    defaultContent: {
+      /*
+        BLANK, and here that is load-bearing rather than tidy.
+
+        The band draws nothing until this is written, because three boxes
+        reading 06 / 02 / 40 with no sentence beside them is a timer that does
+        not say what is closing — the reference's pressure tactic with the
+        words taken out. And it cannot be seeded: whatever goes here is a
+        promise about this shop's own day, and a bakery, a florist and a gift
+        shop close theirs for different reasons.
+      */
+      headline: "",
+      // Blank like every other band's. A link nobody wrote is not a link, and
+      // the pill does not draw without both halves.
+      ctaLabel: "",
+      ctaHref: "",
+    },
+    fields: [
+      {
+        /*
+          THE WARNING IS IN THE LABEL, because a `hint` on a text field is
+          never rendered: section-editor-panel.tsx passes `hint` only to
+          `PhotoField` and to image columns of a list. All twelve hints in
+          this file today are on image fields, which is why nobody has
+          noticed. "Max shown (up to 8)" already does this.
+        */
+        key: "headline",
+        label: "Line beside the clock — the band stays hidden until you write it",
+        type: "text",
+      },
+      { key: "ctaLabel", label: "Button label", type: "text" },
+      { key: "ctaHref", label: "Button link", type: "url" },
+    ],
+  },
+  {
     type: "categories",
     label: "Featured Categories",
     icon: "LayoutGrid",

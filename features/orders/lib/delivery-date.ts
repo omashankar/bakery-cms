@@ -179,6 +179,19 @@ export function isPastTimeSlot(
 }
 
 /**
+ * `HH:MM` on a 24-hour clock — the one format the admin's cutoff field writes.
+ *
+ * ONE COPY, because three functions in this file now read the same stored
+ * string, and a regex that drifts between them is a cutoff counted down to at
+ * one time and enforced at another. Two further copies live outside this file
+ * — the admin field's own check and `commerceSchema` — and those guard a
+ * WRITE, which is a different job from reading one back.
+ *
+ * No `g` flag, so it carries no `lastIndex` and is safe to share.
+ */
+const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/**
  * Has the shop stopped taking orders for today?
  *
  * `commerce.sameDayCutoff` is the shop's own answer to “how late can somebody
@@ -199,8 +212,164 @@ export function isPastSameDayCutoff(
   if (!chosen || !cutoff) return false;
   if (chosen !== todayAsDateString(now)) return false;
 
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(cutoff.trim());
+  const match = HH_MM.exec(cutoff.trim());
   if (!match) return false;
 
   return minutesIntoDay(now) >= Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * How long is left before same-day orders close, as `HH:MM:SS`.
+ *
+ * MOVED HERE UNCHANGED from apps/website/lib/product-details.ts. It had to
+ * move: `domainStaysPure` (eslint.config.mjs, `ignores: []`, with the note
+ * that nothing under features/ has ever had a legitimate exemption) forbids
+ * anything under features/ from importing an app's UI layer, and the homepage
+ * section renderer — a domain module — now draws the same countdown. The
+ * alternative was a second copy of the arithmetic, which is how one shop ends
+ * up publishing two deadlines that disagree.
+ *
+ * It belonged here anyway: `isPastSameDayCutoff` directly above is the same
+ * stored string read for the other half of the job, ENFORCEMENT, and the two
+ * were sitting in different layers.
+ *
+ * A pure function of the cutoff and the clock, so the arithmetic can be
+ * tested without waiting for a second to pass. Null means say nothing, and
+ * there are three ways to get it: the shop has named no cutoff, the string is
+ * not a time, or today's has already gone. That last one matters most — a
+ * countdown that has run out is worse than none, because it is still on the
+ * page telling a customer to hurry for a delivery they can no longer have.
+ */
+export function timeLeftToday(cutoff: string, now: Date): string | null {
+  const match = HH_MM.exec(cutoff.trim());
+  if (!match) return null;
+
+  const closes = new Date(now);
+  closes.setHours(Number(match[1]), Number(match[2]), 0, 0);
+
+  const seconds = Math.floor((closes.getTime() - now.getTime()) / 1000);
+  if (seconds <= 0) return null;
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+}
+
+/**
+ * The cutoff worth counting down to, or "" — the shop's TWO facts in one place.
+ *
+ * A cutoff on its own is not a deadline. `deliveryLeadDays` decides whether
+ * today can be ordered at all, and on a shop with a lead time of 1 a stored
+ * 14:00 is about when TOMORROW'S orders close — a different sentence. A band
+ * counting down to it would be promising a delivery the shop's own date picker
+ * refuses. The product page has had exactly that bug since its countdown
+ * shipped: it reads `sameDayCutoff` and never consults the lead time.
+ *
+ * A bad FORMAT is refused here too, not just downstream. The reader would
+ * refuse it anyway, but a server that knowingly ships a string it has already
+ * judged unusable is one edit away from somebody interpolating it into copy.
+ *
+ * Collapsed into ONE string rather than shipping both numbers to the browser,
+ * so a second reader cannot re-derive the rule differently. "" means draw
+ * nothing, and every caller treats it that way.
+ */
+export function sameDayCutoffFor(cutoff: string | undefined, leadDays: number): string {
+  if (!Number.isFinite(leadDays) || leadDays > 0) return "";
+  const named = (cutoff ?? "").trim();
+  return HH_MM.test(named) ? named : "";
+}
+
+/**
+ * `new Date()` as the SHOP'S clock reads it, not the visitor's.
+ *
+ * "14:00" means 14:00 where the shop is. Run on the browser's clock, somebody
+ * in London ordering for family in Kota is shown four and a half hours that do
+ * not exist — and on a gifting storefront that customer is the business, not
+ * the edge case. `general.timezone` is already stored and already filtered
+ * through `getActiveLocale`, so nothing new has to be invented to know this.
+ *
+ * A WALL CLOCK, not an instant, and the one exception to this file's header.
+ * That header forbids `Date` arithmetic because a DELIVERY DATE is a calendar
+ * string with no instant behind it, and every attempt to reason about one with
+ * `Date` smuggled in a timezone. This is the opposite problem: a duration
+ * between two moments on one clock face. The returned Date's LOCAL getters
+ * read the shop's hour, minute and second and its absolute value is
+ * meaningless — which is exactly what `timeLeftToday` needs, because it only
+ * ever compares the Date against a copy of itself with the hours replaced.
+ * Both sides sit in the same frame, so the difference is the true wall-clock
+ * difference. Same "arithmetic device, in and out, never read back through a
+ * getter that cares" the header already allows for `addDays`.
+ *
+ * An unusable timezone cannot arrive from `getActiveLocale`, which filters it
+ * — but a caller passing one straight through would take the page down from
+ * inside a render, so the visitor's own clock is the fallback. That is the OLD
+ * behaviour: wrong for a distant visitor rather than fatal for everyone.
+ */
+export function shopClockNow(timezone: string, now: Date = new Date()): Date {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(now);
+
+    const read = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value);
+
+    const wall = new Date(
+      read("year"),
+      read("month") - 1,
+      read("day"),
+      read("hour"),
+      read("minute"),
+      read("second"),
+      0,
+    );
+    return Number.isNaN(wall.getTime()) ? now : wall;
+  } catch {
+    return now;
+  }
+}
+
+/**
+ * The same answer split into the boxes a countdown draws, plus the one
+ * sentence a screen reader is given.
+ *
+ * Parsed back out of `HH:MM:SS` rather than computed a second time, so there
+ * is one piece of arithmetic behind both the product page's line and the
+ * homepage's band. Strict about the shape deliberately: anything that is not
+ * that format is null and the band draws nothing — never three boxes reading
+ * `NaN`, which is what a `slice()` on a changed format would give.
+ *
+ * `spoken` DROPS THE SECONDS. A sentence that changes every second is either
+ * never announced or unusable; this one is never announced (the region is not
+ * live — see the band), and what is left stays true for a minute rather than
+ * for a tick.
+ */
+export function countdownParts(
+  left: string | null,
+): { hours: string; minutes: string; seconds: string; spoken: string } | null {
+  const match = left ? /^(\d{2}):([0-5]\d):([0-5]\d)$/.exec(left) : null;
+  if (!match) return null;
+
+  const [, hours, minutes, seconds] = match;
+  const say = (value: string, unit: string) =>
+    `${Number(value)} ${Number(value) === 1 ? unit : `${unit}s`}`;
+
+  return {
+    hours,
+    minutes,
+    seconds,
+    spoken:
+      Number(hours) > 0
+        ? `${say(hours, "hour")} ${say(minutes, "minute")} left`
+        : Number(minutes) > 0
+          ? `${say(minutes, "minute")} left`
+          : // "0 minutes left" is not what 40 seconds is.
+            "less than a minute left",
+  };
 }

@@ -45,11 +45,12 @@ import { markReviewHelpfulRequest } from "@/features/reviews/lib/reviews-api";
 import { getHelpfulMarks, rememberHelpfulMark } from "@/features/reviews/lib/helpful-marks";
 import {
   getProductGalleryImages,
-  timeLeftToday,
   getProductReviews,
   getDeliveryPromise,
   type ProductReview,
 } from "@/apps/website/lib/product-details";
+import { sameDayCutoffFor } from "@/features/orders/lib/delivery-date";
+import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 import {
   calculateProductUnitPrice,
   formatVariantSummary,
@@ -441,7 +442,16 @@ export function ProductDetailPage({
    * out is worse than none, because it is still telling somebody to hurry
    * for a delivery they can no longer have.
    */
-  const [timeLeft, setTimeLeft] = useState<string | null>(null);
+  /*
+    THE SAME HOOK THE HOMEPAGE BAND MOUNTS, and the gate came with it. This
+    page showed the countdown whenever a cutoff was stored, so a shop with
+    `deliveryLeadDays: 1` and an old 14:00 still in its document said "hours
+    left for today's delivery" under the buy button while the trust bar said
+    "Next-day delivery". `sameDayCutoffFor` answers that once, for both
+    surfaces, and the hook reads the SHOP's clock rather than the visitor's.
+  */
+  const closesAt = sameDayCutoffFor(commerce.sameDayCutoff, commerce.deliveryLeadDays);
+  const timeLeft = useSameDayCountdown(closesAt);
 
   const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -598,19 +608,6 @@ export function ProductDetailPage({
    * mean a link that can assert a size or an option the shop does not sell.
    */
   const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
-
-  useEffect(() => {
-    const cutoff = commerce.sameDayCutoff;
-    // No clearing here: the render is gated on the cutoff as well, so a shop
-    // that empties the field stops showing a countdown without this effect
-    // having to write state to say so.
-    if (!cutoff) return;
-
-    const tick = () => setTimeLeft(timeLeftToday(cutoff, new Date()));
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, [commerce.sameDayCutoff]);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
@@ -1619,7 +1616,7 @@ export function ProductDetailPage({
                     {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
                   </Button>
                 </div>
-                {commerce.sameDayCutoff && timeLeft ? (
+                {timeLeft ? (
                   <p className="text-center text-sm font-medium text-bakery-700">
                     {timeLeft} hours left for today&apos;s delivery
                   </p>

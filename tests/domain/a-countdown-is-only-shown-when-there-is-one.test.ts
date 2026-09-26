@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { timeLeftToday } from "@/apps/website/lib/product-details";
+import { sameDayCutoffFor, timeLeftToday } from "@/features/orders/lib/delivery-date";
 
 /**
  * "07:55:24 hours left for today's delivery" is the most persuasive line on the
@@ -102,5 +102,30 @@ describe("the note under the photo", () => {
     expect(
       commerceSchema.safeParse({ ...defaultCommerceSettings, sameDayCutoff: "" }).success,
     ).toBe(true);
+  });
+});
+
+describe("the cutoff worth counting down to", () => {
+  it("is nothing for a shop whose earliest delivery is not today", () => {
+    /*
+      THE BUG THE PRODUCT PAGE SHIPPED WITH. A shop that set a 14:00 cutoff and
+      later moved to next-day delivery still has the 14:00 in its document, and
+      the page read it straight — "hours left for today's delivery" under the
+      buy button, on a shop whose own date picker will not offer today.
+    */
+    expect(sameDayCutoffFor("14:00", 0)).toBe("14:00");
+    expect(sameDayCutoffFor("14:00", 1)).toBe("");
+    expect(sameDayCutoffFor("14:00", 3)).toBe("");
+    // Unreadable reads as next-day, never as same-day: the safe direction.
+    expect(sameDayCutoffFor("14:00", Number.NaN)).toBe("");
+  });
+
+  it("is nothing when the string is not a time, before it is ever sent", () => {
+    // Refused twice — here, and again by `timeLeftToday` if it arrives anyway.
+    for (const bad of ["5pm", "17:70", "24:00", "9:00", "17", "", "   "]) {
+      expect(sameDayCutoffFor(bad, 0), bad).toBe("");
+    }
+    expect(sameDayCutoffFor("  14:00  ", 0)).toBe("14:00");
+    expect(sameDayCutoffFor(undefined, 0)).toBe("");
   });
 });
