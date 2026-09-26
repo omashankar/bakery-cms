@@ -373,3 +373,45 @@ export function countdownParts(
             "less than a minute left",
   };
 }
+
+/**
+ * WHICH UNITS THE CLOCK SHOWS — and which ones is itself part of the fact.
+ *
+ * A fixed hours/minutes/seconds triple carries a "00" for most of the day: a
+ * cell whose entire content is the ABSENCE of a unit, given the same width and
+ * the same weight as the ones that mean something. It also puts SECONDS on the
+ * page six hours out, where a digit changes 3,600 times before anything a
+ * customer can act on has changed at all.
+ *
+ * ONE RULE: drop the leading units that are still zero, then keep at most two.
+ * 05:12:09 reads hours and minutes, 00:12:09 reads minutes and seconds, and
+ * 00:00:09 reads seconds alone. So the LEADING cell is never "00" — a trailing
+ * one still can be, and should: "01 hours 00 minutes" is a reading, where "00
+ * hours" is a unit that is not there.
+ *
+ * `timeLeftToday` returns null at or past the cutoff, so `countdownParts` is
+ * non-null only while at least one unit is non-zero and `findIndex` cannot
+ * miss. `Math.max(…, 0)` is insurance against a later change there: -1 would
+ * slice to an empty clock, which is a band of digits with no digits in it.
+ *
+ * HERE RATHER THAN IN THE BAND, beside `spoken`, which has carried the same
+ * three words since it was written — so the rule can be asserted without a DOM,
+ * and mutated red, which a className scanned out of a source file cannot be.
+ */
+export function countdownCells(parts: {
+  hours: string;
+  minutes: string;
+  seconds: string;
+}): readonly (readonly [string, string])[] {
+  const units = [
+    ["Hours", parts.hours],
+    ["Minutes", parts.minutes],
+    ["Seconds", parts.seconds],
+  ] as const;
+
+  const lead = Math.max(
+    units.findIndex(([, value]) => Number(value) > 0),
+    0,
+  );
+  return units.slice(lead, lead + 2);
+}

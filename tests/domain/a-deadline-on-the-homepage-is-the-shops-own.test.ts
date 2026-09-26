@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { countdownParts, shopClockNow, timeLeftToday } from "@/features/orders/lib/delivery-date";
+import {
+  countdownCells,
+  countdownParts,
+  shopClockNow,
+  timeLeftToday,
+} from "@/features/orders/lib/delivery-date";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 
 /**
@@ -176,6 +181,77 @@ describe("the words it ships", () => {
         `  ${entry!.icon},`,
       );
     }
+  });
+});
+
+describe("which units the clock shows", () => {
+  const labels = (left: string) =>
+    countdownCells(countdownParts(left)!).map(([label]) => label);
+  const shown = (left: string) =>
+    countdownCells(countdownParts(left)!).map(([, value]) => value);
+
+  it("drops the units that are not there yet, and keeps two", () => {
+    expect(labels("05:12:09")).toEqual(["Hours", "Minutes"]);
+    expect(shown("05:12:09")).toEqual(["05", "12"]);
+
+    expect(labels("00:12:09")).toEqual(["Minutes", "Seconds"]);
+    expect(shown("00:12:09")).toEqual(["12", "09"]);
+  });
+
+  it("and narrows to one in the last minute, rather than reading “00”", () => {
+    /*
+      THE CASE A BRANCH ON HOURS ALONE GETS WRONG. `Number(parts.hours) > 0`
+      is false here too, so an hours-only rule pairs Minutes with Seconds and
+      draws "00 MINUTES | 09 SECONDS" — the dead cell the two-unit clock
+      exists to remove, in the one minute of the day it is most visible.
+    */
+    expect(labels("00:00:09")).toEqual(["Seconds"]);
+    expect(shown("00:00:09")).toEqual(["09"]);
+  });
+
+  it("never leads with a zero, at any second of a same-day window", () => {
+    /*
+      EVERY REACHABLE STATE, not three chosen ones: `timeLeftToday` can return
+      any second from 23:59:59 down to 00:00:01, and refuses zero.
+    */
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const bad: string[] = [];
+    for (let total = 1; total <= 24 * 3600; total += 1) {
+      const left = `${pad(Math.floor(total / 3600))}:${pad(
+        Math.floor(total / 60) % 60,
+      )}:${pad(total % 60)}`;
+      const parts = countdownParts(left);
+      if (!parts) continue;
+      const cells = countdownCells(parts);
+      /*
+        COLLECTED, NOT ASSERTED PER ITERATION. 86,400 `expect` calls take long
+        enough to time this file out when the suite runs under contention —
+        which is a flake, and a flake on a guard is worse than no guard.
+      */
+      if (cells.length < 1 || cells.length > 2 || Number(cells[0][1]) === 0) {
+        bad.push(`${left} -> ${cells.map(([l, v]) => `${v} ${l}`).join(" | ")}`);
+      }
+    }
+    expect(bad.slice(0, 5), "seconds the clock reads wrong").toEqual([]);
+    expect(bad).toHaveLength(0);
+  });
+
+  it("and a trailing zero stays, because it is a reading", () => {
+    // "01 hours 00 minutes" is an hour left. "00 hours" is a unit that is not
+    // there — which is the one this drops, and the only one.
+    expect(shown("01:00:30")).toEqual(["01", "00"]);
+    expect(labels("01:00:30")).toEqual(["Hours", "Minutes"]);
+  });
+
+  it("is read by the band rather than re-derived inside it", () => {
+    /*
+      The rule is pure and tested above; this only pins that the band is the
+      thing using it. An inline branch on `parts.hours` would pass every case
+      above — they would be testing a function nothing calls.
+    */
+    const body = band();
+    expect(body).toContain("countdownCells(parts)");
+    expect(body).not.toMatch(/parts\.hours\s*[)>=!]/);
   });
 });
 

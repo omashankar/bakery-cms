@@ -40,7 +40,10 @@ import type {
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
-import { countdownParts } from "@/features/orders/lib/delivery-date";
+import {
+  countdownCells,
+  countdownParts,
+} from "@/features/orders/lib/delivery-date";
 import type { Banner } from "@/types/media";
 import {
   limitRows,
@@ -2487,11 +2490,36 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
     );
   }
 
-  const boxes = [
-    ["Hours", parts.hours],
-    ["Minutes", parts.minutes],
-    ["Seconds", parts.seconds],
-  ] as const;
+  /*
+    WHICH UNITS ARE SHOWN IS ITSELF PART OF THE FACT — and the rule that
+    decides is in `delivery-date.ts`, beside the arithmetic it reads.
+
+    Not here, and that is the point: a branch written inline can only be
+    guarded by scanning this file for the shape of its own source, which is a
+    test that passes for the very regression it names. `countdownCells` is
+    pure, takes the three strings and returns the cells, so the rule can be
+    asserted at 00:00:09 and mutated red without a browser.
+
+    What it does: drops the leading zero units, keeps at most two. Above an
+    hour that is hours and minutes; inside the last hour, minutes and seconds,
+    which is the only stretch of the day where a second is the difference
+    between an order landing today and not; inside the last minute, seconds
+    alone. A previous cut of this branched on `parts.hours` only, which read
+    "00 MINUTES | 40 SECONDS" for the final minute — the exact dead cell the
+    two-unit clock exists to remove.
+
+    NOT A COUNT THAT GROWS OR REDDENS as the time goes. It changes RESOLUTION
+    rather than volume: the same colour, the same weight, different units. A
+    band that gets louder as it empties is a pressure tactic wearing a fact's
+    clothes, and this shop has had that scrubbed off its pages twice.
+
+    NOTE WHAT THIS IS NOT: it does not make the digits and `parts.spoken`
+    agree. `spoken` never says seconds at all — "12 minutes left" while the
+    cells read MINUTES | SECONDS — and that is deliberate on its side, because
+    a sentence that is only announced once has to stay true for longer than a
+    tick. Two renderings of one fact at two resolutions, not a mismatch.
+  */
+  const cells = countdownCells(parts);
 
   return (
     <SectionShell
@@ -2517,7 +2545,7 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         inside the rounded corner, so it cannot leave the 1px notch a
         `border` leaves on a `rounded-2xl` box at some zoom levels.
       */
-      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] ring-1 ring-border/50"
+      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] ring-1 ring-border"
     >
       {/*
         NO `bg-*` HERE, and that is the point: SectionShell applies the
@@ -2530,8 +2558,18 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         is `position: absolute`, and with no positioned ancestor it lays out
         at its static position in the initial containing block and escapes
         every `overflow: hidden` on the way up.
+
+        THREE ACROSS FROM `md`, NOT `sm`, and that is measured rather than
+        taste. At a 640px viewport the container is `sm:px-6` and the panel
+        another 24 a side, so the row has 544px; the clock takes ~177 and the
+        button ~137, with two 32px gaps. That leaves the sentence — the only
+        thing here that says WHAT is closing — about 166px at 24px type, which
+        is seven characters a line. 640-767 is every small tablet and every
+        1280 window at 200% zoom, and stacked is already the correct answer
+        one pixel below it. At 768 the same sum gives ~293px, which holds a
+        headline over two lines.
       */}
-      <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:gap-8">
+      <div className="relative flex flex-col items-center gap-4 text-center md:flex-row md:justify-between md:gap-8">
         {/*
           THE FACT, ONCE, AND NOT TICKING.
 
@@ -2550,58 +2588,130 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         <p className="sr-only">
           Same-day orders close at {cutoff} today — {parts.spoken}.
         </p>
-        <div className="flex shrink-0 items-center gap-2.5" aria-hidden="true">
-          {boxes.map(([label, value]) => (
-            <span
-              key={label}
-              /*
-                THE LABEL SITS UNDER THE BOX, not in it.
+        <div
+          className="flex shrink-0 flex-col items-center gap-2"
+          aria-hidden="true"
+        >
+          {/*
+            ONE INSTRUMENT, NOT TWO LOOSE NUMBERS.
 
-                Both were inside a 64px tile and the longest of the three
-                rendered as "URS" — measured in a screenshot, not guessed. The
-                reference stacks them, and it is the arrangement that actually
-                fits: the box only has to hold two digits, so it can be bigger
-                while the strip gets shorter.
-              */
-              className="flex flex-col items-center"
-              /*
-                `bg-primary` + `text-primary-foreground`: appearance-tokens.ts
-                sets `--primary` to the shop's own colour and
-                `--primary-foreground` to `readableInkOn(primaryColor)`, so
-                the ink is contrast-checked per shop rather than chosen once
-                here. Not `bg-bakery-900` (every `--bakery-*` step is derived
-                from the same primary, so a pale brand gives a pale box and
-                the digits vanish), not `variant="bakery"`'s `text-white`
-                (welded, and unreadable on a light primary), and not
-                `--cream-50`, which is literally #ffffff and pinned there by
-                decree.
+            The tiles floated with 10px of band between them, so they read as
+            separate figures rather than one reading — the reference has the
+            same problem and answers it with nothing. A single shell split by a
+            hairline says the parts belong together, and it is the STRUCTURE
+            saying it rather than a colon, which is punctuation borrowed off a
+            stopwatch.
 
-                A FIXED WIDTH AND TABULAR DIGITS, because otherwise this band
-                is the only thing on the homepage that moves. A "1" is
-                narrower than a "0", so without both the boxes breathe once a
-                second and the line beside them shuffles. With them, a tick
-                repaints three glyphs and reflows nothing — which is why
-                `prefers-reduced-motion` has nothing here to suppress.
-              */
-            >
+            THE COLUMN COUNT FOLLOWS THE CELLS, because in the last minute
+            there is one. `grid-cols-2` with a single child leaves half the
+            shell empty and `divide-x` draws on `:not(:last-child)`, so the
+            one cell would sit in a lopsided box with no divider in it. Both
+            class names are written out rather than built from a template, so
+            Tailwind's scanner can see them.
+
+            `inline-grid` + `grid-cols-2` rather than two fixed squares: an
+            auto-width inline grid takes the max-content of its widest cell and
+            gives both columns that, so the two cells are identical without a
+            magic number, and neither can clip its label at a larger base font or
+            under browser zoom. That is worth more here than a fixed width: the
+            longest label is what sizes a cell, and a shop's own heading font
+            decides how long that is.
+
+            MEASURED COST of not fixing it: the shell is 177.2px while the
+            labels are HOURS|MINUTES and 186.8px while they are MINUTES|SECONDS,
+            because "Seconds" is the wider word. So the clock block moves 6.6px
+            once a day, at the one tick where the reading changes anyway — and
+            0px on every other tick of the day, which is the number that
+            matters and is measured below. `shrink-0` stops the flex row
+            squeezing it.
+
+            `bg-primary` + `text-primary-foreground`: appearance-tokens.ts sets
+            `--primary` to the shop's own colour and `--primary-foreground` to
+            `readableInkOn(primaryColor)`, so the ink is contrast-checked per
+            shop rather than chosen once here. Not `bg-bakery-900` (every
+            `--bakery-*` step is derived from the same primary, so a pale brand
+            gives a pale box and the digits vanish), not `variant="bakery"`'s
+            `text-white` (welded, and unreadable on a light primary), and not
+            `--cream-50`, which is literally #ffffff and pinned there by decree.
+
+            The divider and the unit labels are that same ink at 25% and 80%,
+            for the same reason: a border colour picked here would be a hairline
+            on one shop's primary and invisible on another's. Measured on four
+            primaries — the shop's #6f4e37, a pale #f4e3c3 where
+            `readableInkOn` flips to dark ink, a near-black #14110d and the Ink
+            preset's #1f2a44 — the labels come out 5.48, 6.17, 12.11 and 9.62
+            to 1, so the weakest of them still clears AA for body text; the
+            divider lands 1.60-2.23, which is a separator rather than a seam.
+            At 15% the pale case was 1.31 and effectively absent.
+          */}
+          <div
+            className={cn(
+              "inline-grid divide-x divide-primary-foreground/25 rounded-xl bg-primary text-primary-foreground",
+              cells.length === 1 ? "grid-cols-1" : "grid-cols-2",
+            )}
+          >
+            {cells.map(([label, value]) => (
               <span
-                /*
-                  A SQUARE, and `grid place-items-center` rather than padding,
-                  so all three are identical whatever two digits land in them.
-                  `tabular-nums` and the fixed size are what keep this the one
-                  thing on the homepage that does not move: a "1" is narrower
-                  than a "0", and without them the boxes breathe once a second
-                  and the line beside them shuffles.
-                */
-                className="grid size-14 place-items-center rounded-xl bg-primary font-heading text-2xl leading-none font-bold tabular-nums text-primary-foreground sm:size-16 sm:text-3xl"
+                key={label}
+                className="flex flex-col items-center gap-1 px-4 py-3"
               >
-                {value}
+                {/*
+                  `tabular-nums` and an equal-column grid are what keep this the
+                  one thing on the homepage that does not move: a "1" is
+                  narrower than a "0", and without them the cells breathe once a
+                  second and the line beside them shuffles. A tick repaints two
+                  glyphs and reflows nothing, which is why
+                  `prefers-reduced-motion` has nothing here to suppress.
+
+                  `lg:text-3xl` RATHER THAN `sm:`, so the digits step up with
+                  the sentence instead of before it. They stepped at `sm` while
+                  the headline was still `text-2xl`, which meant that in the
+                  tightest three-across range the clock outweighed the only thing
+                  on the band that says what is closing. Now they are 24px
+                  together and 30px together.
+
+                  AND NO BIGGER. Dropping to two cells left room to grow them and
+                  they are not taking it: the sentence is the band, and digits
+                  above it in the type scale would turn the shop's own line back
+                  into a caption for a timer.
+                */}
+                <span className="font-heading text-2xl leading-none font-bold tabular-nums lg:text-3xl">
+                  {value}
+                </span>
+                <span className="text-[0.625rem] leading-none font-semibold tracking-[0.12em] uppercase text-primary-foreground/80">
+                  {label}
+                </span>
               </span>
-              <span className="mt-1.5 text-[0.625rem] leading-none font-semibold tracking-[0.12em] uppercase text-muted-foreground">
-                {label}
-              </span>
-            </span>
-          ))}
+            ))}
+          </div>
+          {/*
+            WHAT CLOSES, AND WHEN — the half of the fact the page never showed.
+
+            "04 : 55" does not say what runs out or at what time, and the shop's
+            headline beside it need not mention either. The sr-only sentence
+            above says both. So the SIGHTED reader was the one getting less,
+            from a band whose entire case is that the deadline is real and
+            checkable.
+
+            NO NEW WORDS, and that is deliberate under a rule that says wording
+            is the shop's: "Same-day orders close at" is the label on the
+            Settings -> Commerce field this figure is read from, verbatim, and
+            the opening of the sr-only sentence. The figure is `cutoff` itself,
+            printed as the shop typed it — a 12-hour rendering would be this
+            software's second opinion about a time somebody already chose how to
+            write.
+
+            Inside the `aria-hidden` block on purpose: the spoken version stays
+            ONE sentence instead of being read out, then read out again.
+
+            `text-muted-foreground` is fixed in globals.css rather than written
+            by appearance-tokens, and so is every `--band-*` tone, so this
+            pairing holds whatever palette a shop picks and in dark mode — where
+            `--muted-foreground` is #e4d5c2 on a #383021 sand.
+          */}
+          <p className="text-[0.6875rem] leading-none font-semibold tracking-[0.04em] text-muted-foreground">
+            Same-day orders close at {cutoff}
+          </p>
         </div>
         {/*
           THE SENTENCE IS THE BAND, which is what the reference gets right and
@@ -2609,7 +2719,7 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
           read as a caption for them. It is the only thing here that says what
           is closing.
         */}
-        <p className="min-w-0 font-heading text-xl leading-snug font-bold text-balance sm:flex-1 sm:text-2xl lg:text-3xl">
+        <p className="min-w-0 font-heading text-xl leading-snug font-bold text-balance sm:text-2xl md:flex-1 lg:text-3xl">
           {headline}
         </p>
 {/*
@@ -2641,7 +2751,25 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
               there is, and the label here is 13px type so padding could not
               reach it either.
             */
-            className="flex min-h-11 shrink-0 items-center rounded-lg bg-primary px-6 text-sm font-bold tracking-wider text-primary-foreground uppercase"
+            /*
+              AND A FOCUS RING THE KEYBOARD CAN SEE. It is the only focusable
+              thing in the band and it had nothing of its own: Tailwind's base
+              layer sets `outline-ring/50` on `*` and never sets a width, so a
+              keyboard user got whatever the UA chose to draw over a solid
+              `bg-primary`.
+
+              `outline-foreground` rather than the `outline-ring`/`ring-ring`
+              habit everywhere else in this repo: `--ring` is
+              `appearanceCssVariables`' ACCENT, a shop-chosen colour that on
+              this shop is #d4a373 — about 1.9:1 on the sand band, i.e. no ring
+              at all on exactly the pale palettes that need one. `--foreground`
+              is fixed in globals.css (#2d2d2d light, #faf8f4 dark) and so are
+              the four `--band-*` tones, so this is a visible 2px on all six
+              backgrounds, in both themes, on any palette. `outline` rather than
+              `ring`, because `ring` is a box-shadow and would need a matching
+              `ring-offset-color` not to sit flush against the button.
+            */
+            className="flex min-h-11 max-w-full shrink-0 items-center justify-center rounded-lg bg-primary px-6 text-center text-sm font-bold tracking-wider text-primary-foreground uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           >
             {contentString(c, "ctaLabel")}
           </Link>
@@ -2657,7 +2785,10 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
       {props.interactive ? (
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Only you can see this line. Same-day orders close at {cutoff}, so this
-          band draws nothing on the live page from then until midnight.
+          band draws nothing on the live page from then until midnight. The clock
+          shows hours and minutes until the last hour, minutes and seconds inside
+          it, and seconds alone in the last minute — so the first cell is never a
+          “00”.
         </p>
       ) : null}
     </SectionShell>
