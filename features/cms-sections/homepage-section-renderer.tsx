@@ -2570,21 +2570,40 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         <p className="min-w-0 font-heading text-xl leading-snug font-bold text-balance sm:flex-1 sm:text-2xl lg:text-3xl">
           {headline}
         </p>
-        {/*
-          THE EXISTING PILL, not a new button. `ViewAllLink` already draws
-          nothing without both a label and a link, already takes the band's
-          own tone, already clears 36px, and — unlike `<Button>`, whose
-          default variant carries `hover:bg-primary/90` — has no hover effect,
-          which is a standing rule here. The reference's big blue rectangle is
-          not reproducible honestly: the only second colour available is the
-          accent, and `readableInkOn` is not applied to it, so a shop picking
-          a pale accent would get an illegible button.
+{/*
+          A BUTTON, NOT THE ROW PILL — and this band is the reason the two
+          differ. `ViewAllLink` is quiet on purpose: at the end of a heading
+          it labels the row beneath it rather than competing with the cards.
+          There are no cards beneath this one. It is a sentence with a
+          deadline on it, and the control at the end is the only thing to
+          press. On a sand band the pill also comes out
+          `bg-band-sand-strong` — sand on sand, which is the low-contrast
+          result the reference gets its punch by avoiding.
+
+          `bg-primary` joins the tiles rather than introducing a third
+          colour, and `--primary-foreground` is `readableInkOn(primaryColor)`,
+          so the ink is contrast-checked per shop instead of chosen here. Not
+          `<Button>`: its default variant carries `hover:bg-primary/90`, and
+          no hover is a standing rule on this shop.
+
+          NOTHING WITHOUT BOTH HALVES, the same rule `ViewAllLink` keeps: a
+          label with no destination is a button that does not work, and a
+          destination with no label is a blank box.
         */}
-        <ViewAllLink
-          href={contentString(c, "ctaHref")}
-          label={contentString(c, "ctaLabel")}
-          on={props.section.background}
-        />
+        {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+          <Link
+            href={contentString(c, "ctaHref")}
+            /*
+              `min-h-11` rather than padding alone: measured at 390px the row
+              pill came out 31px tall, under every target-size guideline
+              there is, and the label here is 13px type so padding could not
+              reach it either.
+            */
+            className="flex min-h-11 shrink-0 items-center rounded-lg bg-primary px-6 text-sm font-bold tracking-wider text-primary-foreground uppercase"
+          >
+            {contentString(c, "ctaLabel")}
+          </Link>
+        ) : null}
       </div>
 
       {/*
