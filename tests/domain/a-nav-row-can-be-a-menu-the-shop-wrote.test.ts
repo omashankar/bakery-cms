@@ -334,3 +334,85 @@ describe("a row the shop wants noticed", () => {
     expect(admin).toContain("Object.keys(NAV_ICONS)");
   });
 });
+
+describe("the row the drawer forgot", () => {
+  it("hands the phone the Collections menu the shop wrote", () => {
+    /**
+     * A MENU THAT DIFFERS BY SCREEN SIZE IS TWO MENUS.
+     *
+     * The Collections row is filtered out of the drawer's map — it has its
+     * own block above it, because it is the row every shop already has — and
+     * that block passed the taxonomy and never the row's own `menu`. So a
+     * shop that wrote its own columns saw them on a desktop and the fallback
+     * on a phone, which is the device this shop's customers use.
+     *
+     * The guard beside this one stayed green throughout, because it requires
+     * `groups={item.menu}` and the OTHER rows satisfy it. This asserts the
+     * exception by name.
+     */
+    const navbar = code("apps/website/components/storefront-navbar.tsx");
+    const drawer = navbar.slice(navbar.indexOf('id="storefront-mobile-nav"'));
+
+    expect(drawer, "the phone still gets the taxonomy instead").toContain(
+      "groups={collectionsRow.menu}",
+    );
+  });
+
+  it("and a menu link's badge has a box to type it in", () => {
+    /**
+     * FOUR LAYERS WERE THERE AND THE FIFTH WAS MISSING.
+     *
+     * `badge` is on `MegaMenuLinkItem`, passes the validator and is drawn in
+     * the panel and in the drawer — and there was no control anywhere in the
+     * Header screen, so only a hand-edited document could ever set one. A
+     * field nobody can fill is not a feature.
+     *
+     * Scoped to the LINK row rather than the file: the nav ROW has had a
+     * badge box for a while, so a file-wide search passes for exactly the
+     * regression this names.
+     */
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+
+    /*
+      THE WINDOW AROUND THE LINK ROW'S OWN BOX.
+
+      Slicing from `patchGroupLinks` looks right and is not: the first
+      occurrence is the helper's definition near the top of the file, so the
+      slice covers the nav ROW's badge writer too — and that one spells the
+      value identically. Mutating the LINK writer left the row's copy
+      satisfying the match, and this case passed for the regression it names.
+      Caught by mutation.
+
+      The aria-label belongs to the link row alone, so the writer is looked
+      for in the JSX immediately before it.
+    */
+    const named = admin.indexOf("linkIndex + 1} badge");
+    expect(named, "the badge box has no accessible name").toBeGreaterThan(-1);
+    const linkBadgeBox = admin.slice(Math.max(0, named - 700), named);
+
+    expect(linkBadgeBox, "an emptied badge box stores an empty string").toContain(
+      "badge: e.target.value || undefined",
+    );
+    expect(linkBadgeBox, "the badge box does not read the link's own value").toContain(
+      "link.badge ?? \"\"",
+    );
+  });
+
+  it("and the same stored word is not shouted in one place and not the other", () => {
+    /**
+     * The badge renders in FIVE places across two files — the trigger, both
+     * panel columns, the band’s plain row and the drawer’s copy — and two of
+     * them had no `uppercase`, so a shop typing "2 Hour" got "2 Hour" on the
+     * nav row and "2 HOUR" in the panel three pixels beneath it.
+     *
+     * Counted rather than searched: a `toContain` passes while four of the
+     * five are right, which is the state this was in.
+     */
+    const menu = code("components/storefront/mega-menu.tsx");
+    const navbar = code("apps/website/components/storefront-navbar.tsx");
+    const shouted = /text-\[10px\] font-semibold uppercase/g;
+
+    expect((menu.match(shouted) ?? []).length, "a badge in the panel is not uppercase").toBe(3);
+    expect((navbar.match(shouted) ?? []).length, "a badge in the band is not uppercase").toBe(2);
+  });
+});

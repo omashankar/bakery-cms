@@ -739,6 +739,43 @@ export function HeaderAdminPage() {
                               placeholder="/store/collections/..."
                               aria-label={`${group.heading} link ${linkIndex + 1} URL`}
                             />
+                            {/*
+                              THE WORD BESIDE A LINK.
+
+                              `badge` has existed on a menu link in the type,
+                              the validator and BOTH renderers since the menu
+                              did, with no box anywhere to type it in — a field
+                              only a hand-edited document could ever set. The
+                              four layers were all there; the fifth nobody
+                              counts is a control.
+
+                              This is also the whole of a reference header's
+                              little coloured tick, done in a way that carries
+                              its own meaning: a mark cannot say WHY it is
+                              there and a screen reader never receives it,
+                              while a word the shop chose reaches everybody,
+                              in the shop's own brand colour.
+
+                              `size={1}` on this repo's recorded lesson about
+                              inputs in a shared row, and a max width so the
+                              two fields that matter keep theirs.
+                            */}
+                            <Input
+                              size={1}
+                              className="max-w-[7rem]"
+                              value={link.badge ?? ""}
+                              onChange={(e) =>
+                                patchGroupLinks(item.id, group.id, (links) =>
+                                  links.map((entry) =>
+                                    entry.id === link.id
+                                      ? { ...entry, badge: e.target.value || undefined }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              placeholder="Badge"
+                              aria-label={`${group.heading} link ${linkIndex + 1} badge`}
+                            />
                             <Button
                               size="icon"
                               variant="ghost"

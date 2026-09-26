@@ -1129,7 +1129,27 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           className={cn(layoutSpacing.container, "min-h-0")}
           aria-label="Shop categories"
         >
-        <div className="flex items-center gap-1 py-1.5">
+        {/*
+          `flex-wrap` BECAUSE ELEVEN ROWS DO NOT FIT.
+
+          At 12px uppercase with 0.08em tracking, `px-3` a row and a chevron
+          on each menu row, eleven labels come to roughly 1,195px against the
+          960px column this band has at lg. Flex items do not shrink below
+          min-content — for a single uppercase word that is the whole word —
+          so without this the BAND hands the page a horizontal scrollbar, at
+          exactly the row count the Header screen is about to reach. It does
+          nothing until then.
+
+          It must be `flex-wrap` and not `overflow-x-auto`: an overflow
+          container clips its absolutely positioned descendants, so a scroller
+          here would cut every mega panel off at the band's own height.
+
+          `py-1.5` stays on THIS row, which is why the panels still hang from
+          their own triggers: move it and `top-full` would resolve 6px below
+          `.group`, the pointer would leave the group on its way down, and the
+          menu would shut mid-travel.
+        */}
+        <div className="flex flex-wrap items-center gap-1 py-1.5">
         {bandRows.map((item, index) => {
           const isActive =
             pathname === item.href ||
@@ -1137,13 +1157,38 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           /**
            * WHICH EDGE THE PANEL HANGS FROM.
            *
-           * The panel is 640px and the band's content column is 960px at lg,
-           * so a trigger in the second half of the row pushed a left-anchored
-           * panel past the window and gave the storefront a horizontal
-           * scrollbar. Decided from position rather than measured, because
-           * measuring means reading layout during render.
+           * `index >= floor(n/2)` assumed the band was FULL of rows, and it is
+           * wrong in the opposite direction for a short one. Home is not in
+           * the band, so a shop with Home and Collections visible has
+           * `bandRows.length === 1`: `0 >= floor(1/2)` is true, its one menu
+           * is anchored `right-0` to a trigger whose right edge is about 170px
+           * from the left of the window, and the rest of the panel sits
+           * off-screen to the LEFT — unreachable. Measured on this shop before
+           * the fix: left edge at -469px, so 469 of 640px were gone.
+           *
+           * Off-screen LEFT adds nothing to `scrollWidth` in LTR, which is why
+           * no guard in this repo ever went red for it, including the one that
+           * exists to catch a panel leaving the window.
+           *
+           * Right-anchoring is only safe once the trigger's RIGHT edge is at
+           * least a panel's width along the band. With rows at about 110px and
+           * a panel of 27rem or less — see `panelShape`; 40rem is the
+           * three-column case and is the one this arithmetic does not cover —
+           * that is the fourth row onwards, which `floor(n/2)` reaches from six
+           * rows up. Below six, every panel opens under its own trigger, where
+           * it belongs.
+           *
+           * Still decided from position rather than measured, because measuring
+           * means reading layout during render. Note the interaction with
+           * `flex-wrap` above: once the band wraps, `index` stops tracking x at
+           * all and a row at the head of the second line can still be
+           * right-anchored. That is the residual, and it is written down rather
+           * than fixed because the band does not wrap until about nine rows.
            */
-          const align = index >= Math.floor(bandRows.length / 2) ? "right" : "left";
+          const align =
+            bandRows.length >= 6 && index >= Math.floor(bandRows.length / 2)
+              ? "right"
+              : "left";
           const divider = item.dividerBefore && index > 0 ? (
             /* A divider before the FIRST row separates it from nothing. */
             <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
@@ -1246,7 +1291,12 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 {RowIcon ? <RowIcon className="size-4" /> : null}
                 {item.label}
                 {item.badge ? (
-                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-700">
+                  /* `uppercase`, like the drawer's copy of this badge and
+                     like both of the panel's. The same stored word read two
+                     ways along one row. A plain comment rather than a JSX one: inside
+                     a ternary arm a JSX expression container would be a second
+                     child with no fragment round it. */
+                  <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
                     {item.badge}
                   </span>
                 ) : null}
@@ -1316,6 +1366,22 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             {collectionsRow ? (
               <MobileShopLinks
                 label={collectionsRow.label}
+                /*
+                  THE SHOP'S OWN COLUMNS REACH THE PHONE TOO.
+
+                  This row is filtered out of the map below, and nothing here
+                  passed its `menu` — so a shop that wrote its own columns on
+                  the Collections row saw them on a desktop and the taxonomy
+                  fallback on a phone. The row the admin's own copy singles out
+                  as the exception was the one row whose authored menu never
+                  arrived, and the guard that requires `groups={item.menu}` in
+                  the drawer stayed green on the OTHER rows.
+
+                  `MobileShopLinks` already prefers authored groups over the
+                  taxonomy, exactly as the desktop does, so this needs nothing
+                  else.
+                */
+                groups={collectionsRow.menu}
                 categories={chrome.categories}
                 occasions={chrome.occasions}
                 onNavigate={() => setMobileOpen(false)}

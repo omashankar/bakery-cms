@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { panelShape } from "@/components/storefront/mega-menu";
+
 /**
  * THE BAND A CUSTOMER COULD NOT SEE.
  *
@@ -204,10 +206,44 @@ describe("the menu panel's own edges", () => {
      * the content column is 960px — so a trigger more than 320px along, which
      * is the fourth row of a seven-row nav, pushed the panel past the window
      * and gave the whole storefront a horizontal scrollbar.
+     *
+     * THE CAP STAYED; THE LITERAL WENT. The width is now chosen from what the
+     * panel is about to draw, with 40rem — the 640px this always was — as the
+     * ceiling, so no shop's panel is wider than it used to be. Asserting the
+     * old string here would pin a number the file no longer writes.
      */
     const menu = code(MENU);
     expect(menu, "the panel is a fixed width again").not.toContain("w-[640px]");
-    expect(menu).toContain("w-[min(640px,calc(100vw-2rem))]");
+    expect(menu, "the panel lost its window cap").toContain("calc(100vw-2rem)");
+  });
+
+  it("and is only as wide as the columns it has to hold", () => {
+    /**
+     * ASSERTED BY RETURN VALUE, not by the text of a className — which is the
+     * check that passes for a file that computes a width and never applies
+     * it. Every one of these numbers goes red if `LINK_COLUMN_REM` is
+     * flattened back to one width, while a `toContain` on the class strings
+     * would not: they are all still in the source.
+     *
+     * The bug being pinned is not the panel being too narrow. It is one group
+     * rendering as a single 592px column inside a 640px card, because
+     * `auto-fit` collapses the tracks it has no items for and `1fr` takes
+     * the space — which is what a brand-new shop's menu, holding one link,
+     * looked like.
+     */
+    expect(panelShape(1).width, "one column still opens a 640px card").toContain("15rem");
+    expect(panelShape(1).columns).toBe(1);
+    expect(panelShape(2).width).toContain("27rem");
+    expect(panelShape(2).columns).toBe(2);
+
+    // Three is the ceiling, and the ceiling is exactly what it always was.
+    expect(panelShape(3).width).toContain("40rem");
+    expect(panelShape(9).width, "a fourth group widened the panel").toContain("40rem");
+    expect(panelShape(9).columns, "more than three tracks in one row").toBe(3);
+
+    // The picture card is 200px plus the grid's gap, and still clamps.
+    expect(panelShape(1, true).width).toContain("29rem");
+    expect(panelShape(3, true).width).toContain("40rem");
   });
 
   it("and hangs from whichever edge keeps it on screen", () => {
@@ -217,6 +253,28 @@ describe("the menu panel's own edges", () => {
     const band = bandOf(code(NAVBAR));
     expect(band, "every panel still hangs from the left").toContain("align={align}");
     expect(band).toMatch(/index >= Math\.floor\(bandRows\.length \/ 2\)/);
+  });
+
+  it("and a short band opens its menu under its own trigger", () => {
+    /**
+     * THE ONE THAT WAS BROKEN WHILE THE CASE ABOVE STAYED GREEN.
+     *
+     * `index >= floor(n/2)` assumed a full band. Home is not in the band, so
+     * a shop with Home and Collections visible has one row: `0 >= floor(1/2)`
+     * is true, its only menu is anchored `right-0` to a trigger near the left
+     * edge, and the panel opens off-screen to the LEFT. Measured on this
+     * shop's own storefront before the fix — left edge at -469px, 469 of
+     * 640px unreachable.
+     *
+     * Nothing caught it because off-screen LEFT adds nothing to
+     * `scrollWidth` in LTR, so even the guard that exists to catch a panel
+     * leaving the window could not see it. This is the source half; the
+     * browser half is tests/e2e/a-menu-opens-inside-the-window.spec.ts.
+     */
+    const band = bandOf(code(NAVBAR));
+    expect(band, "a one-row band right-anchors its only panel again").toMatch(
+      /bandRows\.length >= 6 &&/,
+    );
   });
 });
 

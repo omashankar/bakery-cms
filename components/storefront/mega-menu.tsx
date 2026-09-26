@@ -139,6 +139,81 @@ function rowIcon(name?: string) {
   return Icon ? <Icon className="size-4" /> : null;
 }
 
+/**
+ * HOW WIDE THE PANEL IS, AND HOW MANY COLUMNS IT DRAWS.
+ *
+ * The panel was a flat 640px whatever it held, and `auto-fit` COLLAPSES the
+ * tracks it has no items for while `1fr` absorbs the space — so one group came
+ * out as a single 592px column: a short heading over a few links, stretched
+ * across a hover card two thirds the width of the band. A brand-new shop's
+ * menu is exactly that, holding one link. The compact first dropdown a
+ * reference header has is the same defect from the other end — the width did
+ * not know what was in it.
+ *
+ * THREE COLUMNS IS THE CEILING AND 40rem IS ITS WIDTH — exactly the 640px this
+ * has always been, so no shop's panel gets WIDER than it is today. That is
+ * deliberate: `align` in storefront-navbar picks an edge from the trigger's
+ * position, and it was measured against this envelope. A fourth group wraps
+ * onto a second row, which is what `auto-fit` already did at this width.
+ *
+ * STATIC CLASS STRINGS, not a template literal: Tailwind extracts class names
+ * by reading the source, so `w-[min(${rem}rem,…)]` compiles to no CSS at all.
+ *
+ * Pure and exported so the sizes are asserted by what this RETURNS rather than
+ * by the text of a className — which is a check that passes for a file that
+ * computes a width and never applies it.
+ */
+const PANEL_WIDTH: Record<number, string> = {
+  15: "w-[min(15rem,calc(100vw-2rem))]",
+  27: "w-[min(27rem,calc(100vw-2rem))]",
+  29: "w-[min(29rem,calc(100vw-2rem))]",
+  40: "w-[min(40rem,calc(100vw-2rem))]",
+};
+/** One link column, two, three. `p-6` leaves 192 / 384 / 592px inside. */
+const LINK_COLUMN_REM: Record<number, number> = { 1: 15, 2: 27, 3: 40 };
+/** The picture card is a fixed 200px plus the grid's own 24px gap. */
+const CARD_REM = 14;
+const PANEL_MAX_REM = 40;
+
+export function panelShape(
+  linkColumns: number,
+  hasCard = false,
+): { columns: number; width: string } {
+  const columns = Math.min(Math.max(Math.trunc(linkColumns) || 1, 1), 3);
+  const rem = Math.min(
+    PANEL_MAX_REM,
+    LINK_COLUMN_REM[columns] + (hasCard ? CARD_REM : 0),
+  );
+  return { columns, width: PANEL_WIDTH[rem] };
+}
+
+/** One track per group the shop wrote, up to three. */
+const AUTHORED_GRID: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+};
+
+/**
+ * The taxonomy grid, counted from what actually RENDERS.
+ *
+ * This was `lg:grid-cols-[1fr_1fr_200px]` — three fixed tracks whether or not
+ * the occasion column and the picture card were drawn. On a shop with neither,
+ * the 592px inside the card went 172 to the one column of links and 420 to two
+ * empty tracks. It is the same bug as the authored branch's, in its widest
+ * form, on the branch that has live users.
+ *
+ * The `lg:` prefix went with it and nothing is lost: this component renders
+ * only inside `[data-nav-band]`, which is hidden below lg. The phone menu is
+ * `MobileShopLinks` in the navbar.
+ */
+const TAXONOMY_GRID: Record<string, string> = {
+  "1": "grid-cols-1",
+  "1-card": "grid-cols-[minmax(0,1fr)_200px]",
+  "2": "grid-cols-2",
+  "2-card": "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_200px]",
+};
+
 export function MegaMenu({
   isActive,
   label = "Shop",
@@ -171,6 +246,20 @@ export function MegaMenu({
   // is a real answer — the menu is complete without this card.
   const withPicture = (shopCategories ?? []).find((category) => category.image?.trim());
   const featured = withPicture?.image ? { ...withPicture, image: withPicture.image } : null;
+  /*
+    THE COLUMNS THIS PANEL IS ABOUT TO DRAW.
+
+    The link column always draws; the occasion column only when the shop keeps
+    occasions. Written this way and NOT as `occasions.length > 0 ? 1 : 0`
+    deliberately: that exact string is this menu's render guard and the
+    phone's, and the-shop-menu-lists-the-shop.test.ts counts it at exactly two
+    — so the natural spelling reddens a correct change.
+  */
+  const taxonomyColumns = [1, occasions.length].filter(Boolean).length;
+  const { columns, width } =
+    authored.length > 0
+      ? panelShape(authored.length)
+      : panelShape(taxonomyColumns, Boolean(featured));
   return (
     <div className="group relative">
       <Link
@@ -201,7 +290,10 @@ export function MegaMenu({
         {rowIcon(icon)}
         {label}
         {badge ? (
-          <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-700">
+          /* `uppercase`, like the badge on a plain row's twin and like the two
+             inside the panel below. Without it the same stored word read "2
+             Hour" on the trigger and "2 HOUR" three pixels under it. */
+          <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
             {badge}
           </span>
         ) : null}
@@ -209,14 +301,31 @@ export function MegaMenu({
       </Link>
 
       <div
+        data-mega-panel
         className={cn(
           /*
             NEVER WIDER THAN THE WINDOW, and hung from whichever edge keeps
             it inside. A fixed 640px pinned to `left-0` overflows the moment
             its trigger is more than 320px along the band — which at lg, with
             a seven-row nav, is the fourth row onwards.
+
+            The first number comes from `panelShape` now and is never MORE
+            than the 40rem this always was: a panel holding one column is
+            15rem. So the window cap and the `align` choice next door keep
+            exactly the envelope they were measured against, and the shapes
+            that used to sit inside a 640px card with 350px of air no longer
+            do.
+
+            `data-mega-panel` because the e2e spec that wants this element
+            looked it up by `[class*="w-[640px]"]`, which has matched nothing
+            since the width gained a `min()`. A marker cannot go stale the way
+            a class string does — the same reason `data-nav-band` exists.
+
+            `invisible` is load-bearing and not decoration: `visibility:
+            hidden` is what keeps a closed panel's links out of the tab order.
           */
-          "pointer-events-none invisible absolute top-full z-50 w-[min(640px,calc(100vw-2rem))] pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100",
+          "pointer-events-none invisible absolute top-full z-50 pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100",
+          width,
           align === "right" ? "right-0" : "left-0"
         )}
       >
@@ -225,13 +334,15 @@ export function MegaMenu({
             /*
               THE SHOP'S OWN COLUMNS.
 
-              `auto-fit` rather than a fixed column count: a shop writes two
-              groups or six, and a grid that assumes three leaves a hole or
-              squeezes. The panel is a fixed 640px wide, so a minimum column
-              keeps four groups from becoming four unreadable slivers — they
-              wrap onto a second row instead.
+              AN EXPLICIT COUNT, not `auto-fit`. The premise of the note that
+              was here — "the panel is a fixed 640px wide" — is what was
+              wrong: `auto-fit` collapses the tracks it has no items for and
+              `1fr` takes the space, so one group was one 592px column inside
+              a 640px card. The count and the width above come from one call,
+              so they cannot disagree; a fourth group wraps onto a second row,
+              which is what `auto-fit` already did at this width.
             */
-            <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+            <div className={cn("grid gap-6", AUTHORED_GRID[columns])}>
               {authored.map((group) => (
                 <div key={group.id}>
                   <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -258,7 +369,12 @@ export function MegaMenu({
               ))}
             </div>
           ) : (
-          <div className="grid gap-6 lg:grid-cols-[1fr_1fr_200px]">
+          <div
+            className={cn(
+              "grid gap-6",
+              TAXONOMY_GRID[featured ? `${taxonomyColumns}-card` : `${taxonomyColumns}`],
+            )}
+          >
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Shop by Category
