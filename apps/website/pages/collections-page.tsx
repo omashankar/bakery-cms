@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SearchX, X } from "lucide-react";
+import { ArrowDownUp, ChevronDown, IndianRupee, SearchX, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -57,6 +57,20 @@ const PAGE_SIZE = 24;
 
 /** How many numbered slots the pagination draws before it starts eliding. */
 const PAGE_SLOTS = 7;
+
+/**
+ * The sort options, once.
+ *
+ * The cell shows the chosen one as text and the hidden `<select>` lists them
+ * all; written twice they drift, and the visible word stops matching what is
+ * actually sorting.
+ */
+const SORT_LABELS: Record<CollectionFilters["sort"], string> = {
+  popular: "Popular",
+  name: "Name",
+  "price-asc": "Price: low to high",
+  "price-desc": "Price: high to low",
+};
 
 /**
  * The page numbers to draw, with `null` where the run breaks.
@@ -381,9 +395,14 @@ export function CollectionsPage({
     matters only when a filter or a search is on, and "10 of 10" is noise.
   */
   const narrowed = filtered.length !== inCategory.length;
+  /*
+    IN PARENTHESES, beside the name rather than under it — the shape the shop
+    marked. It reads as an aside to the title instead of a second statement,
+    which is what "Showing 8 of 10 products" on its own line used to be.
+  */
   const countLine = narrowed
-    ? `${filtered.length} of ${inCategory.length} ${labels.productWordPlural.toLowerCase()}`
-    : `${inCategory.length} ${labels.productWordPlural.toLowerCase()}`;
+    ? `(${filtered.length} of ${inCategory.length} ${labels.productWordPlural.toLowerCase()})`
+    : `(${inCategory.length} ${labels.productWordPlural.toLowerCase()})`;
   // Nothing here at all, versus nothing that matches what was ticked. "Try
   // adjusting your filters" is useless advice when no filter is the reason.
   const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
@@ -484,8 +503,13 @@ export function CollectionsPage({
                 left column is one line and the old baseline alignment pinned
                 it to the floor of the strip.
               */}
-              <div className="mb-5 flex flex-col gap-3 rounded-xl bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+              {/*
+                SQUARE, not rounded, and flat against the column — the strip
+                the shop marked has no corners and no shadow. It is a band of
+                controls rather than a card sitting on the page.
+              */}
+              <div className="mb-5 flex flex-col gap-0 bg-muted sm:flex-row sm:items-stretch sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
                   <h1 className={heading ? storefrontHeading.page : "sr-only"}>{pageTitle}</h1>
                   <p className="text-sm text-muted-foreground">{countLine}</p>
                   {filters.search.trim() ? (
@@ -529,12 +553,40 @@ export function CollectionsPage({
                   that looks finished and filters nothing is worse than an
                   absent one.
                 */}
-                <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-0 sm:divide-x sm:divide-border">
+                <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:flex sm:shrink-0 sm:border-t-0 sm:border-l">
                   {priceBands.length > 0 ? (
-                    <label className="flex min-w-0 flex-col gap-0.5 sm:pr-3">
-                      <span className="text-[11px] font-medium text-muted-foreground">
-                        Filter by price
+                    <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                      <IndianRupee
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground"
+                      />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                          Filter by price
+                        </span>
+                        {/*
+                          THE VALUE IS THE VISIBLE THING, and the select above
+                          it is stripped of its own chrome so the divider
+                          between cells is what separates them — a bordered
+                          box inside a bordered strip is two frames round one
+                          control.
+
+                          The native `<select>` is kept and simply made
+                          transparent rather than replaced with a listbox: it
+                          brings the keyboard, the phone's own picker and the
+                          label association for nothing, and none of that is
+                          worth rebuilding for a chevron.
+                        */}
+                        <span className="truncate text-sm font-semibold text-bakery-700">
+                          {activeBand >= 0
+                            ? priceBands[activeBand].label
+                            : `All ${labels.productWordPlural.toLowerCase()}`}
+                        </span>
                       </span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="ml-auto size-4 shrink-0 text-muted-foreground"
+                      />
                       <select
                         value={activeBand}
                         onChange={(event) => {
@@ -546,7 +598,7 @@ export function CollectionsPage({
                             priceMax: band ? band.max : priceCeiling,
                           });
                         }}
-                        className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="absolute inset-0 size-full cursor-pointer opacity-0"
                       >
                         <option value={-1}>All {labels.productWordPlural.toLowerCase()}</option>
                         {priceBands.map((band, index) => (
@@ -558,8 +610,23 @@ export function CollectionsPage({
                     </label>
                   ) : null}
 
-                  <label className="flex min-w-0 flex-col gap-0.5 sm:px-3">
-                    <span className="text-[11px] font-medium text-muted-foreground">Sort by</span>
+                  <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                    <ArrowDownUp
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground"
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                        Sort by
+                      </span>
+                      <span className="truncate text-sm font-semibold text-bakery-700">
+                        {SORT_LABELS[filters.sort]}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="ml-auto size-4 shrink-0 text-muted-foreground"
+                    />
                     <select
                       value={filters.sort}
                       onChange={(event) =>
@@ -568,14 +635,15 @@ export function CollectionsPage({
                           sort: event.target.value as CollectionFilters["sort"],
                         })
                       }
-                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="absolute inset-0 size-full cursor-pointer opacity-0"
                     >
                       {/* The word is the label above now — "Sort: Popular"
-                          inside a box headed "Sort by" said it twice. */}
-                      <option value="popular">Popular</option>
-                      <option value="name">Name</option>
-                      <option value="price-asc">Price: low to high</option>
-                      <option value="price-desc">Price: high to low</option>
+                          inside a cell headed "Sort by" said it twice. */}
+                      {(Object.keys(SORT_LABELS) as CollectionFilters["sort"][]).map((key) => (
+                        <option key={key} value={key}>
+                          {SORT_LABELS[key]}
+                        </option>
+                      ))}
                     </select>
                   </label>
 

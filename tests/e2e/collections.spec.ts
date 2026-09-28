@@ -64,7 +64,7 @@ test.describe("browsing a category", () => {
     */
     await expect(page.getByText(/\b[1-9]\d* [a-z]+\b/i).first()).toBeVisible();
     const countLine = await page
-      .getByText(/^(?:[1-9]\d* of )?[1-9]\d* [a-z]+$/i)
+      .getByText(/^\((?:[1-9]\d* of )?[1-9]\d* [a-z]+\)$/i)
       .first()
       .textContent();
     expect(countLine, "the bar states no count at all").toMatch(/[1-9]\d*/);
