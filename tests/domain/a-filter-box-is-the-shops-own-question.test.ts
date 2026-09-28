@@ -574,7 +574,7 @@ describe("both panels are wired, and to the category being shown", () => {
     "utf8",
   );
 
-  it("hands the boxes to the one panel there is", () => {
+  it("does not mount the panel at all, and the page says so", () => {
     /*
       ONE MOUNT NOW, and that is the change rather than a casualty of it.
 
@@ -589,8 +589,22 @@ describe("both panels are wired, and to the category being shown", () => {
       mount and forgetting the other, and a count still catches that if a
       second mount ever comes back half-wired.
     */
-    expect(page.split("optionFacets={optionFacets}").length - 1).toBe(1);
-    expect(page.split('idPrefix="').length - 1).toBe(1);
+    /*
+      ZERO MOUNTS. The shop asked four times for the reference's bar — a page
+      name, a count, a price band and a sort — and for no other filters, and
+      marked it in red. So the facet panel came off this page.
+
+      The COMPONENT is still in the repo and still tested by the cases above:
+      `getFilterOptionFacets`, the spelling folding and the option matcher are
+      all live, so remounting it is one JSX block rather than a rebuild. That
+      is what this pins — the page does not mount it, and the machinery it
+      would need has not rotted.
+    */
+    expect(page.split("optionFacets={optionFacets}").length - 1).toBe(0);
+    expect(page.split('idPrefix="').length - 1).toBe(0);
+    expect(page, "the page still builds facets nothing draws").not.toContain(
+      "<CollectionFiltersPanel",
+    );
   });
 
   it("builds them from the category on screen, not the whole shop", () => {
@@ -645,9 +659,16 @@ describe("both panels are wired, and to the category being shown", () => {
     expect(page).toContain("flavours: flavourOptions");
     expect(page).toContain("occasions: occasionOptions");
     expect(page).toContain("applyCollectionFilters(inCategory, shownFilters)");
-    expect(page).toContain("countActiveFilters(shownFilters, priceCeiling)");
-    // One mount since the sidebar went — see "hands the boxes" above.
-    expect(page.split("filters={shownFilters}").length - 1).toBe(1);
+    /*
+      `countActiveFilters` went with the panel: it counted ticks for the door's
+      "Filters (3)" badge and there is no door. The price band still narrows
+      through the same `applyCollectionFilters` asserted above, which is the
+      line that matters — one engine, whatever drives it.
+    */
+    expect(page.split("filters={shownFilters}").length - 1).toBe(0);
+    expect(page, "the band sets the same two numbers the panel used to").toContain(
+      "priceMin: band ? band.min : 0",
+    );
   });
 });
 

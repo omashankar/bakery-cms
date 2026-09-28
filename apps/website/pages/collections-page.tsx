@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, SearchX, SlidersHorizontal, X } from "lucide-react";
+import { SearchX, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
-import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -17,12 +16,12 @@ import type { LandingProduct } from "@/constants/landing-data";
 import {
   applyCollectionFilters,
   collectionPriceCeiling,
-  countActiveFilters,
   defaultCollectionFilters,
   getFilterFlavourOptions,
   getFilterOccasionOptions,
   getFilterOptionFacets,
   getFilterWeightOptions,
+  priceBandsFor,
   pruneOptionSelections,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
@@ -30,14 +29,6 @@ import { categories as demoCategories } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
 import { storefrontHeading } from "@/constants/typography";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -289,7 +280,6 @@ export function CollectionsPage({
       current.search === initialSearch ? current : { ...current, search: initialSearch },
     );
   }, [initialSearch]);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   /**
    * The shared hook, not a local copy of it.
@@ -354,6 +344,18 @@ export function CollectionsPage({
   const pageWindow = paginationWindow(totalPages, currentPage);
 
   /*
+    THE BANDS THIS PAGE CAN FILL, from the products in view rather than from
+    the reference's fixed slices. Measured: its "499 and below / 500-999 /
+    1000-1499 / 1500-2499 / 2500+" holds 0, 10, 12, 2 and 3 of this
+    catalogue, so the first option would never match anything. Quartiles put
+    roughly a quarter behind each band on any shop, at any size.
+  */
+  const priceBands = useMemo(() => priceBandsFor(inCategory), [inCategory]);
+  const activeBand = priceBands.findIndex(
+    (band) => filters.priceMin === band.min && filters.priceMax === band.max,
+  );
+
+  /*
     WHAT THIS PAGE IS CALLED, and it is the source's own name until the shop
     writes something else. `labels.collectionsTitle` is the shop-all fallback
     and is the shop's word, not this file's.
@@ -382,7 +384,6 @@ export function CollectionsPage({
   const countLine = narrowed
     ? `${filtered.length} of ${inCategory.length} ${labels.productWordPlural.toLowerCase()}`
     : `${inCategory.length} ${labels.productWordPlural.toLowerCase()}`;
-  const activeFilterCount = countActiveFilters(shownFilters, priceCeiling);
   // Nothing here at all, versus nothing that matches what was ticked. "Try
   // adjusting your filters" is useless advice when no filter is the reason.
   const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
@@ -457,7 +458,33 @@ export function CollectionsPage({
                 they sit under the grid now, where chrome belongs on a page
                 whose job is the grid.
               */}
-              <div className="mb-5 flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+              {/*
+                ONE STRIP, which is the shape the shop pointed at.
+
+                It was plain type on the page with a hairline under it, and on
+                the shop-all page — where the heading is `sr-only` — that left
+                a visible hole with the count stranded at the bottom of it.
+                Measured: a 76px bar whose left column began 43px down and was
+                20px tall.
+
+                TINTED AND ROUNDED, WITHOUT THE BREADCRUMB IN IT. That is not
+                a detail: `a-page-says-where-it-is-without-a-banner.spec.ts`
+                calls a block a banner only when it is tinted AND
+                border-closed AND `node.contains(crumb)`. The trail stays
+                above, outside this box, exactly as it is on the layout the
+                shop held up — so the strip is a control bar and not the band
+                that was taken off sixteen pages.
+
+                `bg-muted` rather than a cream: `--cream-50` is literally
+                #ffffff and `--cream-100` is the shop's own surface, so on a
+                page already sitting on the surface colour neither would show
+                an edge at all.
+
+                `items-center`, not `items-end`: with the heading hidden the
+                left column is one line and the old baseline alignment pinned
+                it to the floor of the strip.
+              */}
+              <div className="mb-5 flex flex-col gap-3 rounded-xl bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                   <h1 className={heading ? storefrontHeading.page : "sr-only"}>{pageTitle}</h1>
                   <p className="text-sm text-muted-foreground">{countLine}</p>
@@ -483,8 +510,55 @@ export function CollectionsPage({
 
                 {/* `grid-cols-[1fr_auto]` on a phone: the sort takes the room
                     and the door sizes to its own words. */}
-                <div className="grid grid-cols-[1fr_auto] items-end gap-2 sm:flex sm:shrink-0">
-                  <label className="flex min-w-0 flex-col gap-0.5">
+                {/*
+                  TWO CELLS, DIVIDED, and nothing else — which is what the
+                  shop asked for four times and drew a box round.
+
+                  The facet panel that used to sit behind a Filters door is
+                  gone from this page. I put the case for keeping it and they
+                  said no extra filters at all; it is their shop. The
+                  component is still in the repo, unrouted, because this is a
+                  layout decision and deleting it would take the option
+                  folding and its tests with it.
+
+                  A THIRD CELL, "Delivery date", IS NOT HERE and that is
+                  deliberate. Nothing on this shop could answer it: no
+                  delivery tier is configured, no product carries one, and the
+                  lead time is 0 days — so every date is available for every
+                  product and the control would narrow nothing, ever. A filter
+                  that looks finished and filters nothing is worse than an
+                  absent one.
+                */}
+                <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-0 sm:divide-x sm:divide-border">
+                  {priceBands.length > 0 ? (
+                    <label className="flex min-w-0 flex-col gap-0.5 sm:pr-3">
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        Filter by price
+                      </span>
+                      <select
+                        value={activeBand}
+                        onChange={(event) => {
+                          const index = Number(event.target.value);
+                          const band = priceBands[index];
+                          updateFilters({
+                            ...filters,
+                            priceMin: band ? band.min : 0,
+                            priceMax: band ? band.max : priceCeiling,
+                          });
+                        }}
+                        className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <option value={-1}>All {labels.productWordPlural.toLowerCase()}</option>
+                        {priceBands.map((band, index) => (
+                          <option key={band.label} value={index}>
+                            {band.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  <label className="flex min-w-0 flex-col gap-0.5 sm:px-3">
                     <span className="text-[11px] font-medium text-muted-foreground">Sort by</span>
                     <select
                       value={filters.sort}
@@ -505,60 +579,6 @@ export function CollectionsPage({
                     </select>
                   </label>
 
-                  <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-                    <DialogTrigger
-                      render={
-                        <Button variant="outline" className="h-11 px-3">
-                          <SlidersHorizontal className="size-4" />
-                          Filters
-                          {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                        </Button>
-                      }
-                    />
-                    <DialogContent className="max-h-[85vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Filters</DialogTitle>
-                      </DialogHeader>
-                      {/*
-                        THE SEARCH BOX LIVES HERE NOW, first, because it is the
-                        broadest filter on the page and it was the only one
-                        outside the panel. `size={1}` because an input's
-                        default `size=20` sets its flex item's min-content, so
-                        `min-w-0` alone still overflows a 390px dialog.
-                      */}
-                      <div className="relative">
-                        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          size={1}
-                          className="h-11 pl-9"
-                          placeholder={`Search ${labels.productWordPlural.toLowerCase()}...`}
-                          value={filters.search}
-                          onChange={(event) =>
-                            updateFilters({ ...filters, search: event.target.value })
-                          }
-                        />
-                      </div>
-                      <CollectionFiltersPanel
-                        filters={shownFilters}
-                        priceCeiling={priceCeiling}
-                        sizeOptions={sizeOptions}
-                        flavourOptions={flavourOptions}
-                        occasionOptions={occasionOptions}
-                        optionFacets={optionFacets}
-                        idPrefix="sheet-"
-                        onChange={(next) => {
-                          updateFilters(next);
-                        }}
-                        className="border-0 p-0 shadow-none"
-                      />
-                      <Button
-                        className="h-11 w-full"
-                        onClick={() => setMobileFiltersOpen(false)}
-                      >
-                        Apply Filters
-                      </Button>
-                    </DialogContent>
-                  </Dialog>
                 </div>
               </div>
 

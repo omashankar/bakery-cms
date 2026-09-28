@@ -103,6 +103,73 @@ export const COLLECTION_PRICE_FLOOR = 5000;
  * slider's maximum `cake.price > filters.priceMax` is false for every cake in
  * the catalogue. A ceiling below the highest price silently hides it again.
  */
+/** One band in the price dropdown: a label and the range it stands for. */
+export interface PriceBand {
+  label: string;
+  min: number;
+  /** `Infinity` for the open top band. */
+  max: number;
+}
+
+/**
+ * THE PRICE BANDS THIS SHOP'S OWN CATALOGUE SUPPORTS.
+ *
+ * The reference storefront offers fixed slices — "499 and below", "500-999",
+ * "1000-1499", "1500-2499", "2500 and above". Copied here they would be
+ * wrong: measured against this catalogue those five buckets hold 0, 10, 12, 2
+ * and 3, so the first option is permanently empty and twenty-two of
+ * twenty-seven products sit in two of them. A florist's would land somewhere
+ * else again, and a shop selling tiered cakes at 19,000 somewhere else
+ * entirely.
+ *
+ * QUARTILES, so each band holds roughly a quarter of what is on the page and
+ * every one of them narrows something. The cuts are then rounded to a number
+ * a customer would recognise — 999 reads as "under 1,000" — and rounding can
+ * collide two cuts into one, so duplicates and any cut outside the real range
+ * are dropped rather than drawn as an empty option.
+ *
+ * Pure, and over the products IN VIEW rather than the whole shop: a category
+ * of premium cakes should not offer a band its own page cannot fill.
+ */
+export function priceBandsFor(cakes: { price: number }[]): PriceBand[] {
+  const prices = cakes
+    .map((cake) => cake.price)
+    .filter((price) => Number.isFinite(price) && price > 0)
+    .sort((a, b) => a - b);
+
+  // Under four products there is nothing to quarter; one band is no band.
+  if (prices.length < 4) return [];
+
+  const round = (value: number) => {
+    for (const step of [100, 250, 500, 1000, 2500, 5000]) {
+      if (value <= step * 20) return Math.round(value / step) * step;
+    }
+    return Math.round(value / 10000) * 10000;
+  };
+
+  const low = prices[0];
+  const high = prices[prices.length - 1];
+  const cuts = [...new Set([0.25, 0.5, 0.75].map((f) => round(prices[Math.floor((prices.length - 1) * f)])))]
+    .filter((cut) => cut > low && cut <= high)
+    .sort((a, b) => a - b);
+
+  if (cuts.length === 0) return [];
+
+  const money = (value: number) => value.toLocaleString("en-IN");
+  const bands: PriceBand[] = [];
+  let from = 0;
+  for (const cut of cuts) {
+    bands.push({
+      label: from === 0 ? `Under ₹${money(cut)}` : `₹${money(from)} – ₹${money(cut - 1)}`,
+      min: from,
+      max: cut - 1,
+    });
+    from = cut;
+  }
+  bands.push({ label: `₹${money(from)} and above`, min: from, max: Infinity });
+  return bands;
+}
+
 export function collectionPriceCeiling(cakes: { price: number }[]): number {
   const highest = cakes.reduce(
     (max, cake) => (Number.isFinite(cake.price) ? Math.max(max, cake.price) : max),

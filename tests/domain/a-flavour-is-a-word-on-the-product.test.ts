@@ -361,7 +361,13 @@ describe("both filter panels get the list", () => {
       listing page's slim bar; the dialog is the only mount, so the laptop and
       the phone cannot disagree about the Flavour group by construction.
     */
-    expect(page.split("flavourOptions={flavourOptions}").length - 1).toBe(1);
+    /*
+      ZERO, because the listing page no longer mounts the filter panel at all
+      — the shop asked for the reference's bar and no other filters. The
+      flavour list itself is still built and still asserted below; what has
+      gone is the surface that drew it.
+    */
+    expect(page.split("flavourOptions={flavourOptions}").length - 1).toBe(0);
     /**
      * `inCategory`, not `catalog` — the products ON THE PAGE.
      *

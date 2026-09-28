@@ -74,27 +74,23 @@ test.describe("browsing a category", () => {
     await page.goto("/store/collections");
 
     /*
-      THE PANEL IS BEHIND A DOOR NOW, on every width.
+      THE PRICE CONTROL IS A BAND NOW, in the bar.
 
-      It used to be a 240px sidebar on a laptop and a dialog on a phone — two
-      mounts of one component, which is why `idPrefix` exists. The shop asked
-      for the reference's slim bar and the sidebar went, so the panel is
-      reached the same way everywhere and this case has to open it.
+      It was a slider in a 240px sidebar; the shop asked for the reference's
+      bar and for no other filters, so the panel came off this page and price
+      is one dropdown of catalogue-derived bands.
 
-      What is being checked has not changed: at the top of its range the
-      slider must not read as a limit. "Up to Rs19,000" beside an unfiltered
-      grid tells a customer they are seeing a subset when they are seeing
-      everything.
+      What is being checked has not changed: with nothing chosen the control
+      must not read as a limit. A grid showing everything under a box saying
+      "Under Rs900" tells a customer they are seeing a subset when they are
+      not.
     */
-    /* The door first, while it is still reachable — the open dialog covers it. */
-    const door = page.getByRole("button", { name: /^filters/i }).first();
+    const price = page.getByLabel(/filter by price/i);
+    await expect(price).toBeVisible();
     expect(
-      await door.textContent(),
-      "the Filters button counts a filter nobody set",
-    ).not.toMatch(/\(\d+\)/);
-
-    await door.click();
-    await expect(page.getByText(/any price/i).first()).toBeVisible();
+      await price.inputValue(),
+      "the price control starts on a band nobody chose",
+    ).toBe("-1");
   });
 
   test("offers the shop's own categories, not the ones that shipped", async ({ page }) => {
@@ -143,21 +139,34 @@ test.describe("browsing a category", () => {
     await expect(page.locator('a[href^="/store/cakes/"]').first()).toBeVisible();
 
     /*
-      THROUGH THE DOOR, because the 240px sidebar this used to reach into went
-      when the shop asked for the reference's slim bar. One mount now, on
-      every width, which is also the end of the duplicate-id class of bug
-      `idPrefix` was added for.
-    */
-    await page.getByRole("button", { name: /^filters/i }).first().click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+      THE BAND, not the slider. Same question: does choosing a price actually
+      narrow the grid, or does the control move and the page ignore it.
 
-    // Driven by the keyboard. `fill()` sets the DOM value without firing the
-    // change React listens for, so the slider read 19,000 and this test passed
-    // or failed for reasons that had nothing to do with filtering. Home takes
-    // the range input to its minimum through a real input event.
-    const slider = page.getByLabel(/maximum price/i).first();
-    await slider.press("Home");
-    await expect(slider, "the slider did not actually move").toHaveValue("0");
+      `selectOption` fires the change React listens for — the old `fill()` on
+      the slider did not, which is why that version passed or failed for
+      reasons unrelated to filtering.
+    */
+    const before = await page.locator('a[href^="/store/cakes/"]').count();
+    expect(before, "no products to narrow").toBeGreaterThan(1);
+
+    /*
+      WAIT FOR HYDRATION BEFORE TOUCHING THE CONTROL.
+
+      The select is server-rendered, so Playwright can change it before React
+      has attached its onChange — and React then re-renders from state and
+      puts the value back. The control looks broken and is not; the test was.
+      Waiting on the load state is what the rest of this file does.
+    */
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(800);
+
+    const price = page.getByLabel(/filter by price/i);
+    // The first real band — the cheapest quarter of what is on this page.
+    await price.selectOption("0");
+    await expect(price, "the price control did not actually move").toHaveValue("0");
+
+    const after = await page.locator('a[href^="/store/cakes/"]').count();
+    expect(after, "choosing a price band changed nothing").toBeLessThan(before);
 
     // Nothing costs nothing, so this genuinely empties the page — and the page
     // must say so, rather than falling back to showing the whole catalogue.
@@ -167,12 +176,15 @@ test.describe("browsing a category", () => {
     // long as labels have existed — so on this shop, whose override is
     // "products", the assertion failed and reported that an emptied page has
     // no empty state when it has one.
-    /* Close the panel to read the page it emptied. */
-    await page.getByRole("button", { name: /^apply filters$/i }).click();
-    await expect(page.getByRole("dialog")).toBeHidden();
-
-    await expect(page.getByText(new RegExp(`no ${productsWord} found`, "i"))).toBeVisible();
-    await expect(page.getByRole("button", { name: /clear filters/i })).toBeVisible();
+    /*
+      NO EMPTY-STATE HALF ANY MORE, and that is a property of the new control
+      rather than something dropped. The slider could be dragged to zero,
+      which matched nothing; a band is built from the prices on the page, so
+      every one of them holds at least one product by construction. The empty
+      state is still reachable by search and is still asserted where that is
+      the subject.
+    */
+    void productsWord;
   });
 });
 
