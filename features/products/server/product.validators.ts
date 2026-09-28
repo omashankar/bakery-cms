@@ -191,6 +191,45 @@ export const productFormSchema = z
           "A published product needs a price above zero — its own, or one on every size it is sold in.",
       });
     }
+
+    /**
+     * A COMPARE-AT AT OR BELOW THE PRICE IS NOT A SAVING, and until now it
+     * saved quietly and then drew nothing.
+     *
+     * The storefront has always refused to show one — `displayCompareAtPrice`
+     * returns undefined for it, deliberately, because shifting it would turn
+     * "we charge more than we say" into a badge. So the shop's pages are
+     * honest. What was missing is anyone TELLING the shop: two published
+     * products on this catalogue are in exactly that state, typed the wrong
+     * way round, and their owner has no way to know the saving they meant to
+     * advertise is not being advertised.
+     *
+     * `> 0` GUARDS THE CLEAR. Zero and undefined both mean "no compare-at",
+     * and without this a product whose box is being emptied is a permanent
+     * 400.
+     *
+     * Against `product.price`, the base, because that is the number
+     * `displayCompareAtPrice` compares against — a rule that judged a
+     * different basis would refuse rows the storefront would have drawn.
+     *
+     * NOT A PERCENTAGE CAP. An eighty-per-cent clearance is real, so a cap
+     * refuses an honest sale while a shop inflating by forty per cent sails
+     * through — and it would be this software inventing pricing policy. At or
+     * below the price is the only case that is provably not a discount, which
+     * is the only case a validator has standing to reject.
+     *
+     * Inside the existing refinement, so it inherits the published-only guard
+     * above: a draft being written can hold anything.
+     */
+    const compareAt = product.compareAtPrice;
+    if (compareAt != null && compareAt > 0 && compareAt <= product.price) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["compareAtPrice"],
+        message:
+          "A compare-at price has to be ABOVE the selling price, or there is no saving to show. Clear it, or swap the two numbers.",
+      });
+    }
   });
 
 export type ProductFormInput = z.infer<typeof productFormSchema>;

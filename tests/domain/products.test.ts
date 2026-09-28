@@ -246,13 +246,40 @@ describe("mapAdminProductToStorefront", () => {
     expect(mapped.category).toBe("");
   });
 
-  it("derives the badge with Featured winning over Bestseller and Trending", () => {
+  it("derives the badge from the strongest claim the shop made", () => {
+    /**
+     * THE ORDER WAS FEATURED FIRST, and this case recorded that without ever
+     * saying why — there was no reason written down, because there was not
+     * one.
+     *
+     * "Featured" is a CMS word: it means "put this somewhere", and the shop
+     * says it to itself. "Bestseller" is a claim about what customers did,
+     * and the shop says it to customers. A product ticked both was showing
+     * the weaker of the two on its card.
+     *
+     * One badge either way — the card already carries a photograph, a name, a
+     * price, sometimes a struck-through price and sometimes a rating, and a
+     * second badge on one picture is decoration.
+     *
+     * Measured on this shop when it changed: the three flags are disjoint —
+     * 1 featured, 7 bestsellers, 1 trending — so nothing on screen moved. It
+     * moves for the first shop that ticks two.
+     */
     const base = form({ slug: "badged" });
 
     expect(
       mapAdminProductToStorefront(
         createProduct({ ...base, slug: "b1", isFeatured: true, isBestSeller: true, isTrending: true })
       ).badge
+    ).toBe("Bestseller");
+    // Trending beats Featured for the same reason: it is about customers.
+    expect(
+      mapAdminProductToStorefront(
+        createProduct({ ...base, slug: "b1b", isFeatured: true, isTrending: true })
+      ).badge
+    ).toBe("Trending");
+    expect(
+      mapAdminProductToStorefront(createProduct({ ...base, slug: "b1c", isFeatured: true })).badge
     ).toBe("Featured");
     expect(
       mapAdminProductToStorefront(

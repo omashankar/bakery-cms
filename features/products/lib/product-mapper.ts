@@ -94,12 +94,27 @@ export function mapAdminProductToStorefront(
     categoryIds: cake.categoryIds,
     deliveryTierIds: cake.deliveryTierIds,
     occasions,
-    badge: cake.isFeatured
-      ? "Featured"
-      : cake.isBestSeller
-        ? "Bestseller"
-        : cake.isTrending
-          ? "Trending"
+    /**
+     * THE STRONGEST CLAIM THE SHOP MADE, and "Featured" is the weakest of the
+     * three.
+     *
+     * One badge, because the card already carries a photograph, a name, a
+     * price, sometimes a struck-through price and sometimes a rating, and a
+     * second badge on one picture is decoration. But the ORDER was wrong:
+     * `isFeatured` is a CMS word meaning "put this somewhere", `isBestSeller`
+     * is a claim about what customers did, and a product ticked both was
+     * showing the weaker of the two.
+     *
+     * Measured on this catalogue the three flags are disjoint — 1 featured, 7
+     * bestsellers, 1 trending — so nothing on screen changes today. It changes
+     * for the first shop that ticks two.
+     */
+    badge: cake.isBestSeller
+      ? "Bestseller"
+      : cake.isTrending
+        ? "Trending"
+        : cake.isFeatured
+          ? "Featured"
           : undefined,
     rating: cake.rating,
     reviewCount: cake.reviewCount,

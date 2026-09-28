@@ -72,6 +72,8 @@ import type { PhotoFrameShapeId } from "@/types/product";
 import { ProductDescriptionBlocksFields } from "./product-description-blocks-fields";
 import { ProductVariantManager } from "./product-variant-manager";
 import { resolveBlockRender } from "@/features/products/lib/variant-utils";
+import { displayCompareAtPrice } from "@/features/products/lib/product-pricing";
+import { formatCurrency } from "@/utils/format";
 
 interface ProductFormPageProps {
   mode: "add" | "edit";
@@ -169,6 +171,21 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
+
+  /*
+    THE COMPARE-AT, AS TYPED AND AS THE CARD WOULD DRAW IT.
+
+    `compareAtShown` runs the number through the SAME function the storefront
+    card calls, so the admin cannot come to disagree with the shop's own
+    pages about what is being advertised. It is undefined for a compare-at at
+    or below the price, which is exactly the case the shop could not see.
+  */
+  const compareAtTyped = Number(form.compareAtPrice) > 0 ? Number(form.compareAtPrice) : 0;
+  const compareAtShown = displayCompareAtPrice(
+    form.price,
+    compareAtTyped || undefined,
+    form.price,
+  );
   /**
    * The speeds this shop offers, read once.
    *
@@ -608,6 +625,25 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       if (namedSizes.length === 0 && form.price <= 0) {
         toast.error("Set a base price before publishing", {
           description: `Price & stock, at the top. Save as a draft to keep this ${productLower} while you decide.`,
+        });
+        return;
+      }
+
+      /*
+        THE BROWSER SAYS IT, because the wire cannot.
+
+        `productFormSchema` refuses this now, and the save handler catches a
+        server error into a bare `toast.error(error.message)` with no
+        path-to-field mapping anywhere in this file — so on its own the
+        refusal reads as "could not save" with nothing marked, on a field the
+        owner may not have touched. This is the repo's own pattern for a
+        cross-field rule: check here, and name the tab.
+      */
+      if (compareAtTyped && compareAtTyped <= form.price) {
+        toast.error("The compare-at price is not above the price", {
+          description: `${formatCurrency(compareAtTyped)} is not above ${formatCurrency(
+            form.price,
+          )}, so there is no saving to show. Price & stock, at the top — clear it or swap the two.`,
         });
         return;
       }
@@ -1157,9 +1193,17 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       value={form.compareAtPrice ?? ""}
                       onChange={(e) =>
                         patchForm({
-                          compareAtPrice: e.target.value
-                            ? Number(e.target.value)
-                            : undefined,
+                          /*
+                            `"0"` IS TRUTHY, so the old test stored a zero and
+                            a shop clearing this box by typing over it left one
+                            behind. Zero and absent mean the same thing here —
+                            no compare-at — and only one of them should ever
+                            reach the wire.
+                          */
+                          compareAtPrice:
+                            Number(e.target.value) > 0
+                              ? Number(e.target.value)
+                              : undefined,
                         })
                       }
                     />
@@ -1168,6 +1212,34 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       It has to be higher than the base price — at or below it there
                       is no saving to show, so nothing is shown.
                     </p>
+                    {/*
+                      THE REAL NUMBERS, WHILE THEY ARE BEING TYPED.
+
+                      The sentence above states the rule; this says what this
+                      product will actually do. Two of this shop's published
+                      products hold a compare-at BELOW their price — typed the
+                      wrong way round — and nothing anywhere told anyone: the
+                      storefront quietly draws no saving, which looks exactly
+                      like not having set one.
+
+                      Read through `displayCompareAtPrice`, the same function
+                      the card calls, rather than repeating its comparison
+                      here — a second copy is how the admin and the storefront
+                      come to disagree about what a shop is advertising.
+                    */}
+                    {compareAtShown ? (
+                      <p className="text-xs font-medium text-bakery-700">
+                        {`Customers see ${formatCurrency(form.price)}, was ${formatCurrency(
+                          compareAtShown,
+                        )} — ${Math.round(((compareAtShown - form.price) / compareAtShown) * 100)}% off`}
+                      </p>
+                    ) : compareAtTyped ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {`${formatCurrency(compareAtTyped)} is not above ${formatCurrency(
+                          form.price,
+                        )}, so no saving would be shown.`}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
