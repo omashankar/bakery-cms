@@ -15,6 +15,14 @@ interface StorePageHeaderProps {
   title: string;
   breadcrumbs?: Crumb[];
   className?: string;
+  /**
+   * The page renders the heading itself, so this one draws none.
+   *
+   * For a page that prints its own name — the listing page does, in its bar
+   * — because two level-one headings with the same words is what a screen
+   * reader reads twice.
+   */
+  titleOwnedByPage?: boolean;
 }
 
 /**
@@ -56,7 +64,12 @@ interface StorePageHeaderProps {
  * and a chevron. The admin keeps it, where a trail runs four levels deep. The
  * `aria-label` and the `aria-current` are the parts a screen reader needs.
  */
-export function StorePageHeader({ title, breadcrumbs = [], className }: StorePageHeaderProps) {
+export function StorePageHeader({
+  title,
+  breadcrumbs = [],
+  className,
+  titleOwnedByPage = false,
+}: StorePageHeaderProps) {
   const trail = [{ label: "Home", href: routes.store.home }, ...breadcrumbs];
 
   return (
@@ -90,7 +103,20 @@ export function StorePageHeader({ title, breadcrumbs = [], className }: StorePag
         </ol>
       </nav>
 
-      <h1 className="sr-only">{title}</h1>
+      {/*
+        ONE h1 PER PAGE, AND THE PAGE MAY OWN IT.
+
+        This always drew an `sr-only` h1, which was right while the trail was
+        the only thing naming the page. The listing page now prints the name
+        in its own bar, so both were rendering and the document had TWO level-
+        one headings with the same words — measured, not guessed. A screen
+        reader's heading list read the page twice.
+
+        The page keeps the `title` prop either way, because it is still what
+        the trail's last crumb says and what a caller passes; this only
+        decides who renders the heading element.
+      */}
+      {titleOwnedByPage ? null : <h1 className="sr-only">{title}</h1>}
     </div>
   );
 }

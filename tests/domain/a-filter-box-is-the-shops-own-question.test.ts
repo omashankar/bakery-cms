@@ -574,11 +574,23 @@ describe("both panels are wired, and to the category being shown", () => {
     "utf8",
   );
 
-  it("hands the boxes to the sidebar and to the sheet", () => {
-    // Wiring only the first is invisible on a laptop and leaves every phone
-    // without the filters.
-    expect(page.split("optionFacets={optionFacets}").length - 1).toBe(2);
-    expect(page.split('idPrefix="').length - 1).toBe(2);
+  it("hands the boxes to the one panel there is", () => {
+    /*
+      ONE MOUNT NOW, and that is the change rather than a casualty of it.
+
+      This counted TWO because the panel was mounted twice — a
+      `hidden lg:block` sidebar and the dialog — which is also why
+      `idPrefix` exists: two identical ids in one document, and a
+      `<Label htmlFor>` binds to whichever came first. The 240px sidebar
+      went when the shop asked for the reference's slim bar, so the dialog
+      is the only mount and the phone and the laptop are the same surface.
+
+      Still a COUNT and not a `toContain`: the original bug was wiring one
+      mount and forgetting the other, and a count still catches that if a
+      second mount ever comes back half-wired.
+    */
+    expect(page.split("optionFacets={optionFacets}").length - 1).toBe(1);
+    expect(page.split('idPrefix="').length - 1).toBe(1);
   });
 
   it("builds them from the category on screen, not the whole shop", () => {
@@ -634,7 +646,8 @@ describe("both panels are wired, and to the category being shown", () => {
     expect(page).toContain("occasions: occasionOptions");
     expect(page).toContain("applyCollectionFilters(inCategory, shownFilters)");
     expect(page).toContain("countActiveFilters(shownFilters, priceCeiling)");
-    expect(page.split("filters={shownFilters}").length - 1).toBe(2);
+    // One mount since the sidebar went — see "hands the boxes" above.
+    expect(page.split("filters={shownFilters}").length - 1).toBe(1);
   });
 });
 

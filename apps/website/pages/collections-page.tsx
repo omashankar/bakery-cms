@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, SearchX, SlidersHorizontal } from "lucide-react";
+import { Search, SearchX, SlidersHorizontal, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { CollectionFiltersPanel } from "@/components/storefront/collection-filters-panel";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -28,6 +28,7 @@ import {
 } from "@/apps/website/lib/collection-filters";
 import { categories as demoCategories } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -48,7 +50,58 @@ import {
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 8;
+/**
+ * TWENTY-FOUR, and the number is the grid rather than a preference.
+ *
+ * It was eight, which is two rows of four, three of three and four of two —
+ * a third of one screen at 1440. Twenty-four divides by 2, 3 and 4, so the
+ * last row is full at every breakpoint this grid uses instead of leaving one
+ * card stranded beside two gaps.
+ *
+ * The owner's own correction is behind this: do not size the page to the 27
+ * products here today. At eight, a shop with three hundred asks its customer
+ * to press Next thirty-seven times.
+ */
+const PAGE_SIZE = 24;
+
+/** How many numbered slots the pagination draws before it starts eliding. */
+const PAGE_SLOTS = 7;
+
+/**
+ * The page numbers to draw, with `null` where the run breaks.
+ *
+ * Exported and pure so the shape is asserted by what it RETURNS rather than
+ * by counting anchors in a rendered page — a check that passes for a
+ * component that computes a window and renders every page anyway.
+ *
+ * First and last always, the current page with one neighbour either side, and
+ * an ellipsis across each gap. Under eight pages there is no gap to make, so
+ * every page is drawn and the function is the identity it used to be.
+ */
+export function paginationWindow(total: number, current: number): (number | null)[] {
+  const pages = Math.max(1, Math.trunc(total) || 1);
+  if (pages <= PAGE_SLOTS) return Array.from({ length: pages }, (_, i) => i + 1);
+
+  const here = Math.min(Math.max(Math.trunc(current) || 1, 1), pages);
+  const wanted = new Set([1, pages, here, here - 1, here + 1]);
+  /*
+    The ends keep their width when the cursor is near them, so the control
+    does not shrink from seven slots to five as a customer walks to page 2.
+  */
+  if (here <= 3) [2, 3, 4].forEach((n) => wanted.add(n));
+  if (here >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((n) => wanted.add(n));
+
+  const shown = [...wanted].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+
+  const out: (number | null)[] = [];
+  let previous = 0;
+  for (const page of shown) {
+    if (previous && page - previous > 1) out.push(null);
+    out.push(page);
+    previous = page;
+  }
+  return out;
+}
 
 interface CollectionsPageProps {
   categorySlug?: string;
@@ -278,6 +331,27 @@ export function CollectionsPage({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageWindow = paginationWindow(totalPages, currentPage);
+
+  /*
+    WHAT THIS PAGE IS CALLED, and it is the source's own name until the shop
+    writes something else. `labels.collectionsTitle` is the shop-all fallback
+    and is the shop's word, not this file's.
+  */
+  const pageTitle = heading ? heading.name : labels.collectionsTitle;
+
+  /*
+    THE COUNT, AND THE SECOND NUMBER ONLY WHILE SOMETHING IS NARROWING.
+
+    This read "Showing 8 of 10 products", which answered a question about
+    pagination nobody asked and made a ten-product category look like a
+    failing search. The total is what a customer wants; the filtered figure
+    matters only when a filter or a search is on, and "10 of 10" is noise.
+  */
+  const narrowed = filtered.length !== inCategory.length;
+  const countLine = narrowed
+    ? `${filtered.length} of ${inCategory.length} ${labels.productWordPlural.toLowerCase()}`
+    : `${inCategory.length} ${labels.productWordPlural.toLowerCase()}`;
   const activeFilterCount = countActiveFilters(shownFilters, priceCeiling);
   // Nothing here at all, versus nothing that matches what was ticked. "Try
   // adjusting your filters" is useless advice when no filter is the reason.
@@ -294,6 +368,8 @@ export function CollectionsPage({
     <>
       <StorePageHeader
         title={heading ? heading.name : labels.collectionsTitle}
+        /* This page prints the name in its own bar — see the slim bar below. */
+        titleOwnedByPage
         breadcrumbs={[
           /*
             The page this points at is headed `collectionsTitle`, which a shop
@@ -308,37 +384,101 @@ export function CollectionsPage({
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
-          <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
-            <CollectionFiltersPanel
-              filters={shownFilters}
-              priceCeiling={priceCeiling}
-              sizeOptions={sizeOptions}
-              flavourOptions={flavourOptions}
-              occasionOptions={occasionOptions}
-              optionFacets={optionFacets}
-              idPrefix="side-"
-              onChange={updateFilters}
-              className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
-            />
+          {/*
+            ONE COLUMN, AND THE FILTERS ARE A DOOR RATHER THAN A WALL.
 
+            The panel was mounted TWICE — a `hidden lg:block` sidebar here and
+            the dialog below — which is the whole reason `idPrefix` exists: two
+            identical ids in one document, and a `<Label htmlFor>` binds to
+            whichever came first, so a tap on a phone could toggle a checkbox
+            nobody could see. One mount ends that class of bug, gives the grid
+            the entire content column — four cards across instead of three —
+            and makes the phone and the laptop the same page.
+
+            NOTHING IS DELETED. Every group still filters, from the dialog. The
+            shop complained about WHERE the filters are, not that they exist.
+
+            The inner bare <div> stays on purpose: prettier is not a dependency
+            here, so dropping a nesting level means re-indenting about 180 lines
+            of a CRLF file by hand and burying this change in whitespace.
+          */}
+          <div>
             <div>
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative max-w-md flex-1">
-                  <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder={`Search ${labels.productWordPlural.toLowerCase()}...`}
-                    value={filters.search}
-                    onChange={(event) =>
-                      updateFilters({ ...filters, search: event.target.value })
-                    }
-                  />
+              {/*
+                THE SLIM BAR — the page's name, its real count, and the two
+                controls a buyer who arrived from a menu reaches for. One row
+                from sm, two below it.
+
+                NOT A BAND, and that is a requirement rather than a taste:
+                `a-page-says-where-it-is-without-a-banner.spec.ts` finds the
+                banner this page used to wear by what it LOOKED like — a
+                tinted, border-closed, full-width block carrying the trail —
+                so plain type on the page's own ground with one hairline under
+                it is the only shape that passes.
+
+                THE HEADING IS DRAWN ONLY WHERE THE ROUTE NAMED SOMETHING. On
+                the shop-all page `heading` is undefined and it stays
+                `sr-only`, because that same spec asserts the heading is not
+                drawn there — and because "Our Collections" over a grid of
+                collections is the caption on something already captioned.
+
+                Four bands became one: the search row, the count line, the
+                pill nav and the 240px sidebar column. The pills are not gone;
+                they sit under the grid now, where chrome belongs on a page
+                whose job is the grid.
+              */}
+              <div className="mb-5 flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h1 className={heading ? storefrontHeading.page : "sr-only"}>{pageTitle}</h1>
+                  <p className="text-sm text-muted-foreground">{countLine}</p>
+                  {filters.search.trim() ? (
+                    /*
+                      THE TERM, AS A CHIP THAT CAN BE TAKEN OFF. The search box
+                      moved into the dialog, so without this the only trace of
+                      what was typed is behind a door, and a customer who
+                      scrolls past cannot tell a short list from a broken one.
+                      `after:-inset-2` makes a 32px chip a 48px target.
+                    */
+                    <button
+                      type="button"
+                      onClick={() => updateFilters({ ...filters, search: "" })}
+                      className="relative inline-flex h-8 items-center gap-1 rounded-full border border-border bg-muted px-2.5 text-xs text-foreground after:absolute after:-inset-2 after:content-['']"
+                    >
+                      {`“${filters.search.trim()}”`}
+                      <X aria-hidden="true" className="size-3" />
+                      <span className="sr-only">Clear this search</span>
+                    </button>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* `grid-cols-[1fr_auto]` on a phone: the sort takes the room
+                    and the door sizes to its own words. */}
+                <div className="grid grid-cols-[1fr_auto] items-end gap-2 sm:flex sm:shrink-0">
+                  <label className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">Sort by</span>
+                    <select
+                      value={filters.sort}
+                      onChange={(event) =>
+                        updateFilters({
+                          ...filters,
+                          sort: event.target.value as CollectionFilters["sort"],
+                        })
+                      }
+                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {/* The word is the label above now — "Sort: Popular"
+                          inside a box headed "Sort by" said it twice. */}
+                      <option value="popular">Popular</option>
+                      <option value="name">Name</option>
+                      <option value="price-asc">Price: low to high</option>
+                      <option value="price-desc">Price: high to low</option>
+                    </select>
+                  </label>
+
                   <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                     <DialogTrigger
                       render={
-                        <Button variant="outline" className="lg:hidden">
+                        <Button variant="outline" className="h-11 px-3">
                           <SlidersHorizontal className="size-4" />
                           Filters
                           {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
@@ -349,6 +489,25 @@ export function CollectionsPage({
                       <DialogHeader>
                         <DialogTitle>Filters</DialogTitle>
                       </DialogHeader>
+                      {/*
+                        THE SEARCH BOX LIVES HERE NOW, first, because it is the
+                        broadest filter on the page and it was the only one
+                        outside the panel. `size={1}` because an input's
+                        default `size=20` sets its flex item's min-content, so
+                        `min-w-0` alone still overflows a 390px dialog.
+                      */}
+                      <div className="relative">
+                        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          size={1}
+                          className="h-11 pl-9"
+                          placeholder={`Search ${labels.productWordPlural.toLowerCase()}...`}
+                          value={filters.search}
+                          onChange={(event) =>
+                            updateFilters({ ...filters, search: event.target.value })
+                          }
+                        />
+                      </div>
                       <CollectionFiltersPanel
                         filters={shownFilters}
                         priceCeiling={priceCeiling}
@@ -362,58 +521,16 @@ export function CollectionsPage({
                         }}
                         className="border-0 p-0 shadow-none"
                       />
-                      <Button className="w-full" onClick={() => setMobileFiltersOpen(false)}>
+                      <Button
+                        className="h-11 w-full"
+                        onClick={() => setMobileFiltersOpen(false)}
+                      >
                         Apply Filters
                       </Button>
                     </DialogContent>
                   </Dialog>
-                  <select
-                    value={filters.sort}
-                    onChange={(event) =>
-                      updateFilters({
-                        ...filters,
-                        sort: event.target.value as CollectionFilters["sort"],
-                      })
-                    }
-                    className="h-8 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    <option value="popular">Sort: Popular</option>
-                    <option value="name">Sort: Name</option>
-                    <option value="price-asc">Sort: Price Low–High</option>
-                    <option value="price-desc">Sort: Price High–Low</option>
-                  </select>
                 </div>
               </div>
-
-              {/*
-                THE TERM IS ECHOED, because this page is now where a search
-                lands. Without it the only trace of what was typed is the
-                input itself, and a customer who scrolls past it cannot tell
-                a short list from a broken one.
-              */}
-              <p className="mb-4 text-sm text-muted-foreground">
-                {filters.search.trim()
-                  ? `Showing ${paginated.length} of ${filtered.length} ${labels.productWordPlural.toLowerCase()} for “${filters.search.trim()}”`
-                  : `Showing ${paginated.length} of ${filtered.length} ${labels.productWordPlural.toLowerCase()}`}
-              </p>
-
-              {/* Named, so it reads as one group of related links rather than
-                  a loose row of anchors. */}
-              <nav aria-label="Categories" className="mb-8 flex flex-wrap gap-2">
-                <CategoryPill
-                  label="All"
-                  active={!categorySlug}
-                  href={routes.store.collections}
-                />
-                {categoryPills.map((cat) => (
-                  <CategoryPill
-                    key={cat.id}
-                    label={cat.name}
-                    active={categorySlug === cat.slug}
-                    href={routes.store.collection(cat.slug)}
-                  />
-                ))}
-              </nav>
 
               {paginated.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-cream-50 py-16 text-center">
@@ -450,7 +567,22 @@ export function CollectionsPage({
               ) : (
                 <StaggerReveal
                   key={`${categorySlug}-${currentPage}`}
-                  className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                  /*
+                    TWO ON A PHONE, FOUR AT xl.
+
+                    One column at 390 put ZERO cards fully on the first screen
+                    — the card is ~430px tall and the header takes 64. Two
+                    173px cards is the whole reason the grid changed at the
+                    bottom end, and the sidebar leaving is the reason it can
+                    change at the top.
+
+                    FOUR AT xl AND NOT AT lg, deliberately. A 1440 window at
+                    200% browser zoom reports a 720px viewport, which lands on
+                    `md` — two readable columns — instead of four 180px ones.
+                    No zoom media query can do that; the breakpoint choice is
+                    the whole mechanism.
+                  */
+                  className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-4"
                 >
                   {paginated.map((cake) => (
                     <ProductCard key={cake.id} cake={cake} />
@@ -470,20 +602,38 @@ export function CollectionsPage({
                         }}
                       />
                     </PaginationItem>
-                    {Array.from({ length: totalPages }).map((_, index) => (
-                      <PaginationItem key={index}>
-                        <PaginationLink
-                          href="#"
-                          isActive={currentPage === index + 1}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setPage(index + 1);
-                          }}
-                        >
-                          {index + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
+                    {/*
+                      SEVEN SLOTS, NOT ONE PER PAGE.
+
+                      `Array.from({ length: totalPages })` draws every page.
+                      At 24 a page that is fine at 27 products and is 125
+                      anchors wrapping five lines at 3,000 — which is the size
+                      this software is sold to run, and the owner's correction
+                      was not to size this page to today's catalogue.
+
+                      First and last always, the current page with a neighbour
+                      either side, and an ellipsis where the run breaks.
+                    */}
+                    {pageWindow.map((slot, index) =>
+                      slot === null ? (
+                        <PaginationItem key={`gap-${index}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={slot}>
+                          <PaginationLink
+                            href="#"
+                            isActive={currentPage === slot}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setPage(slot);
+                            }}
+                          >
+                            {slot}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
                     <PaginationItem>
                       <PaginationNext
                         href="#"
@@ -496,6 +646,37 @@ export function CollectionsPage({
                   </PaginationContent>
                 </Pagination>
               ) : null}
+
+              {/*
+                THE SIBLING CATEGORIES, UNDER THE GRID.
+
+                They were a row of eight pills above it, which is what the
+                shop was looking at when they said the page does not look
+                like the reference — and the reference has none, because its
+                categories live in the header menu. Ours live there too now.
+
+                NOT DELETED, though. `collections.spec.ts` asserts this
+                navigation is visible with one link per real shop category and
+                no duplicate hrefs, and it is a real way around for somebody
+                who has reached the end of a category and wants the next one.
+                Moving it answers the complaint; deleting it would turn a
+                working test red for nothing.
+              */}
+              <nav aria-label="Categories" className="mt-12 flex flex-wrap gap-2 border-t border-border pt-6">
+                <CategoryPill
+                  label="All"
+                  active={!categorySlug}
+                  href={routes.store.collections}
+                />
+                {categoryPills.map((cat) => (
+                  <CategoryPill
+                    key={cat.id}
+                    label={cat.name}
+                    active={categorySlug === cat.slug}
+                    href={routes.store.collection(cat.slug)}
+                  />
+                ))}
+              </nav>
             </div>
           </div>
         </div>
@@ -517,9 +698,18 @@ function CategoryPill({
     <Link
       href={href}
       className={cn(
-        "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",
+        /*
+          `min-h-11` rather than `py-1.5`: the row measured 30px, and these
+          are links a thumb aims at on a phone.
+
+          `text-primary-foreground` rather than a welded `text-white`:
+          `--primary-foreground` is `readableInkOn(primaryColor)`, so the ink
+          is contrast-checked against whatever brand colour the shop picks.
+          White on a pale brand is the failure this token exists to stop.
+        */
+        "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-premium",
         active
-          ? "border-bakery-700 bg-bakery-700 text-white shadow-sm"
+          ? "border-bakery-700 bg-bakery-700 text-primary-foreground shadow-sm"
           : "border-border bg-card text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
       )}
     >

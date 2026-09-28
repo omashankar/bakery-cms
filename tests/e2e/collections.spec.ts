@@ -51,17 +51,49 @@ test.describe("browsing a category", () => {
     const cards = page.locator('a[href^="/store/cakes/"]');
     await expect(cards.first(), "the wedding cakes were filtered off their own page").toBeVisible();
 
-    // And they are the expensive ones — the count line is the shop's own claim
-    // about how many it is showing.
-    await expect(page.getByText(/showing [1-9]\d* of [1-9]\d*/i)).toBeVisible();
+    /*
+      And they are the expensive ones — the count is the shop's own claim
+      about how many it has.
+
+      IT USED TO READ "Showing 8 of 10", and that said two things, one of them
+      about pagination, which nobody asked. The bar prints the TOTAL, and the
+      second number only while a filter or a search is narrowing — so a
+      category with nothing filtered now reads "4 products". The assertion
+      follows the wording and keeps the claim: a real, non-zero count is on
+      the page.
+    */
+    await expect(page.getByText(/\b[1-9]\d* [a-z]+\b/i).first()).toBeVisible();
+    const countLine = await page
+      .getByText(/^(?:[1-9]\d* of )?[1-9]\d* [a-z]+$/i)
+      .first()
+      .textContent();
+    expect(countLine, "the bar states no count at all").toMatch(/[1-9]\d*/);
   });
 
   test("does not claim a filter is active when the slider is at the top", async ({ page }) => {
     await page.goto("/store/collections");
 
-    // The desktop panel labels the slider's position. At the top it must not
-    // read as a limit — "Up to ₹19,000" next to an unfiltered grid says the
-    // customer is being shown a subset when they are not.
+    /*
+      THE PANEL IS BEHIND A DOOR NOW, on every width.
+
+      It used to be a 240px sidebar on a laptop and a dialog on a phone — two
+      mounts of one component, which is why `idPrefix` exists. The shop asked
+      for the reference's slim bar and the sidebar went, so the panel is
+      reached the same way everywhere and this case has to open it.
+
+      What is being checked has not changed: at the top of its range the
+      slider must not read as a limit. "Up to Rs19,000" beside an unfiltered
+      grid tells a customer they are seeing a subset when they are seeing
+      everything.
+    */
+    /* The door first, while it is still reachable — the open dialog covers it. */
+    const door = page.getByRole("button", { name: /^filters/i }).first();
+    expect(
+      await door.textContent(),
+      "the Filters button counts a filter nobody set",
+    ).not.toMatch(/\(\d+\)/);
+
+    await door.click();
     await expect(page.getByText(/any price/i).first()).toBeVisible();
   });
 
@@ -110,6 +142,15 @@ test.describe("browsing a category", () => {
     await page.goto("/store/collections/wedding");
     await expect(page.locator('a[href^="/store/cakes/"]').first()).toBeVisible();
 
+    /*
+      THROUGH THE DOOR, because the 240px sidebar this used to reach into went
+      when the shop asked for the reference's slim bar. One mount now, on
+      every width, which is also the end of the duplicate-id class of bug
+      `idPrefix` was added for.
+    */
+    await page.getByRole("button", { name: /^filters/i }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+
     // Driven by the keyboard. `fill()` sets the DOM value without firing the
     // change React listens for, so the slider read 19,000 and this test passed
     // or failed for reasons that had nothing to do with filtering. Home takes
@@ -126,6 +167,10 @@ test.describe("browsing a category", () => {
     // long as labels have existed — so on this shop, whose override is
     // "products", the assertion failed and reported that an emptied page has
     // no empty state when it has one.
+    /* Close the panel to read the page it emptied. */
+    await page.getByRole("button", { name: /^apply filters$/i }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+
     await expect(page.getByText(new RegExp(`no ${productsWord} found`, "i"))).toBeVisible();
     await expect(page.getByRole("button", { name: /clear filters/i })).toBeVisible();
   });

@@ -399,7 +399,13 @@ function FilterCheckbox({
   onCheckedChange: (checked: boolean) => void;
 } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className="flex items-center gap-2" {...rest}>
+    /*
+      THE ROW IS THE TARGET, not the 16px box. The Label is already part of
+      it — `htmlFor` makes tapping the word toggle the tick — so raising the
+      row to 44px costs no layout and gives the whole line to a thumb. Raising
+      the box instead would leave a 44px square beside a 20px word.
+    */
+    <div className="flex min-h-11 items-center gap-2" {...rest}>
       <Checkbox
         id={id}
         checked={checked}

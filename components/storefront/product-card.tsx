@@ -167,7 +167,14 @@ export function ProductCard({
             src={cake.image}
             alt={cake.name}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            /*
+              THE GRID CHANGED, so this had to. It claimed 25vw from 1024 up
+              where the grid was three across, and 50vw below 640 where the
+              grid was ONE — so the browser fetched a half-width file for a
+              full-width card on every phone. The listing grid is now 2 / 3 at
+              md / 4 at xl, and these are those widths.
+            */
+            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
             className="object-cover"
           />
         </Link>
@@ -181,7 +188,14 @@ export function ProductCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="absolute top-2.5 right-2.5 border border-border bg-card/95 shadow-sm"
+            /*
+              `size-7` is 28px and every guideline asks for 44. The pseudo
+              element grows the HIT AREA by 8px a side without moving the
+              circle a customer sees, which is why it is `after:` rather than
+              padding: padding would make the button itself 44px and the card
+              would gain a visibly larger blob.
+            */
+            className="absolute top-2.5 right-2.5 border border-border bg-card/95 shadow-sm after:absolute after:-inset-2 after:content-['']"
             onClick={handleWishlist}
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
@@ -273,7 +287,9 @@ export function ProductCard({
             <Button
               type="button"
               variant="bakery"
-              className="h-10 w-full"
+              // 40px was under the 44 every guideline asks for, on the one
+            // control on this card that takes money.
+            className="h-11 w-full"
               disabled={outOfStock}
               onClick={handleAddToCart}
             >

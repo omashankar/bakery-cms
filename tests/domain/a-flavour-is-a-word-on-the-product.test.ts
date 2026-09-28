@@ -356,7 +356,12 @@ describe("both filter panels get the list", () => {
       "utf8",
     );
 
-    expect(page.split("flavourOptions={flavourOptions}").length - 1).toBe(2);
+    /*
+      ONE, not two. The `hidden lg:block` sidebar this counted went with the
+      listing page's slim bar; the dialog is the only mount, so the laptop and
+      the phone cannot disagree about the Flavour group by construction.
+    */
+    expect(page.split("flavourOptions={flavourOptions}").length - 1).toBe(1);
     /**
      * `inCategory`, not `catalog` — the products ON THE PAGE.
      *
