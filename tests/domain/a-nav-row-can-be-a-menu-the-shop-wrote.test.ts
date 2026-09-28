@@ -193,9 +193,16 @@ describe("both menus draw it, and the shop that wrote none is untouched", () => 
     const menu = code("components/storefront/mega-menu.tsx");
 
     expect(menu).toContain("authored.length > 0 ? (");
-    // The fallback columns are still there, under the authored branch.
-    expect(menu).toContain("Shop by Category");
-    expect(menu).toContain("Shop by Occasion");
+    /*
+      The fallback columns are still there, under the authored branch — and
+      asserted by the NOUN THEY READ rather than by an English literal, which
+      is what made this pair fail a correct change. A shop that calls its
+      categories Brands reads Brands here; nothing in this component may type
+      the word.
+    */
+    expect(menu).toContain("Shop by {words.categoryWord}");
+    expect(menu).toContain("Shop by {words.occasionWord}");
+    expect(menu).toContain("Shop by {words.collectionWord}");
   });
 
   it("and the menu's own trigger goes where the row goes", () => {

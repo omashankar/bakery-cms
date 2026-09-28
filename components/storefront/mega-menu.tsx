@@ -55,6 +55,26 @@ export interface ShopOccasion {
   slug: string;
 }
 
+/** One curated group, as the server resolved it. */
+export interface ShopCollection {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+/**
+ * The nouns this menu heads its columns with — see StorefrontChrome.menuWords.
+ *
+ * A structural type and not `ResolvedLabels`, so `useBusinessLabels()` still
+ * satisfies it for a caller rendering this component with no props.
+ */
+export interface MenuWords {
+  productWordPlural: string;
+  categoryWord: string;
+  occasionWord: string;
+  collectionWord: string;
+}
+
 interface MegaMenuProps {
   isActive?: boolean;
   /** Where the menu's own trigger goes — this nav row's href. */
@@ -70,6 +90,24 @@ interface MegaMenuProps {
    * is worse than no heading.
    */
   occasions?: ShopOccasion[];
+  /**
+   * The shop's CURATED groups — the third axis.
+   *
+   * Two fixed columns over a catalogue with three addressable axes meant the
+   * one axis a shop assembles BY HAND was the one its menu could not show.
+   * Empty hides the column outright, exactly as the occasion column above
+   * already does.
+   */
+  collections?: ShopCollection[];
+  /**
+   * The shop's own nouns, resolved on the SERVER.
+   *
+   * Optional, falling through to `useBusinessLabels` so this component is
+   * still renderable with no props — but the navbar always passes it, and
+   * the hook must not decide: it seeds the defaults and syncs after mount,
+   * so a shop with its own word would be served the default in the HTML.
+   */
+  words?: MenuWords;
   /**
    * THE SHOP'S OWN COLUMNS, when it has written any.
    *
@@ -212,6 +250,20 @@ const TAXONOMY_GRID: Record<string, string> = {
   "1-card": "grid-cols-[minmax(0,1fr)_200px]",
   "2": "grid-cols-2",
   "2-card": "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_200px]",
+  /*
+    THE THIRD AXIS.
+
+    Absent, this lookup returns `undefined`, `cn` drops it, and the panel
+    collapses to ONE implicit column stacking all three lists — silently,
+    because `panelShape` still reports a correct-looking 40rem. The width and
+    the grid come from two different maps, which is the "computes a width and
+    never applies it" failure the note above already names, and the e2e next
+    door measures the panel for being too WIDE so it would stay green.
+
+    No "3-card", deliberately: `hasCard` is false at three columns. Those two
+    facts must move together or this map needs the key in the same edit.
+  */
+  "3": "grid-cols-3",
 };
 
 export function MegaMenu({
@@ -219,6 +271,8 @@ export function MegaMenu({
   label = "Shop",
   categories: shopCategories,
   occasions: shopOccasions,
+  collections: shopCollections,
+  words: serverWords,
   groups,
   href = routes.store.collections,
   highlight,
@@ -242,6 +296,25 @@ export function MegaMenu({
     // and the occasion's own products were never shown as a set.
     href: routes.store.occasion(occasion.slug),
   }));
+  /*
+    The SERVER's nouns win. `useFallbackCategories` above still uses the hook
+    and must keep doing so — the guard slices this file on that function's
+    name — but a HEADING resolved after mount would be the default in the
+    HTML and the shop's word one paint later, inside a panel that is
+    `invisible` until hover. Nobody would see the swap, which is why nobody
+    would catch it.
+  */
+  const clientWords = useBusinessLabels();
+  const words = serverWords ?? clientWords;
+  const collections = (shopCollections ?? []).map((group) => ({
+    label: group.name,
+    /*
+      Resolved collection-FIRST at this address, and the chrome has already
+      dropped any category whose slug a collection claimed — so the two lists
+      arriving here are disjoint.
+    */
+    href: routes.store.collection(group.slug),
+  }));
   // The first of the shop's own categories that has a picture. Nothing to show
   // is a real answer — the menu is complete without this card.
   const withPicture = (shopCategories ?? []).find((category) => category.image?.trim());
@@ -255,11 +328,25 @@ export function MegaMenu({
     phone's, and the-shop-menu-lists-the-shop.test.ts counts it at exactly two
     — so the natural spelling reddens a correct change.
   */
-  const taxonomyColumns = [1, occasions.length].filter(Boolean).length;
+  const taxonomyColumns = [1, occasions.length, collections.length].filter(Boolean).length;
+  /*
+    THE CARD GOES WHEN THE THIRD COLUMN ARRIVES.
+
+    `panelShape(3, true)` clamps to the SAME 40rem as `panelShape(3)` — the
+    ceiling swallows the card's 14rem — so asking for both does not widen the
+    panel, it narrows every column to about 107px, which does not hold
+    "Chocolate Cakes". And the width would still look right in the source.
+
+    Nothing is lost that this menu does not already say: the card is the FIRST
+    category with a photograph, which is the first row of column one. The
+    duplicate-links spec records finding exactly that — it "reported
+    /store/collections/cream-cakes as a duplicate of itself".
+  */
+  const hasCard = Boolean(featured) && taxonomyColumns < 3;
   const { columns, width } =
     authored.length > 0
       ? panelShape(authored.length)
-      : panelShape(taxonomyColumns, Boolean(featured));
+      : panelShape(taxonomyColumns, hasCard);
   return (
     <div className="group relative">
       <Link
@@ -372,12 +459,12 @@ export function MegaMenu({
           <div
             className={cn(
               "grid gap-6",
-              TAXONOMY_GRID[featured ? `${taxonomyColumns}-card` : `${taxonomyColumns}`],
+              TAXONOMY_GRID[hasCard ? `${taxonomyColumns}-card` : `${taxonomyColumns}`],
             )}
           >
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Shop by Category
+                Shop by {words.categoryWord}
               </p>
               <ul className="space-y-2">
                 {categories.map((item) => (
@@ -397,10 +484,33 @@ export function MegaMenu({
             {occasions.length > 0 ? (
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Shop by Occasion
+                Shop by {words.occasionWord}
               </p>
               <ul className="space-y-2">
                 {occasions.map((item) => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="block rounded-md px-2 py-1.5 text-sm text-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            ) : null}
+            {/* The third axis. Hidden when the shop keeps no collections —
+                the same rule the column above follows, and for the same
+                reason: a heading over an empty list reads as something that
+                failed to load. */}
+            {collections.length > 0 ? (
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Shop by {words.collectionWord}
+              </p>
+              <ul className="space-y-2">
+                {collections.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
@@ -423,7 +533,7 @@ export function MegaMenu({
               category existed. It is the only part of this menu that was still
               inventing something after the category links were fixed.
             */}
-            {featured ? (
+            {hasCard && featured ? (
               <Link
                 href={routes.store.collection(featured.slug)}
                 className="group/card overflow-hidden rounded-xl border border-border bg-cream-50"
@@ -470,12 +580,18 @@ export function MobileShopLinks({
   label = "Shop",
   categories: shopCategories,
   occasions: shopOccasions,
+  collections: shopCollections,
+  words: serverWords,
   groups,
 }: {
   onNavigate?: () => void;
   label?: string;
   categories?: ShopCategory[];
   occasions?: ShopOccasion[];
+  /** The same third axis the desktop draws — see MegaMenu. */
+  collections?: ShopCollection[];
+  /** The same nouns, from the same chrome field — see MegaMenu. */
+  words?: MenuWords;
   /** The shop's own columns, when it wrote any — see MegaMenu. */
   groups?: MegaMenuGroup[];
 }) {
@@ -500,6 +616,20 @@ export function MobileShopLinks({
     label: occasion.name,
     href: routes.store.occasion(occasion.slug),
   }));
+  /*
+    The third axis reaches the phone in the same breath as the other two. A
+    menu that differs by screen size is two menus, and this component shipped
+    with no occasion column at all once already.
+
+    IDENTICAL EXPRESSIONS to the desktop twin's, deliberately — that is what
+    makes the href-parity guard below mean something.
+  */
+  const collections = (shopCollections ?? []).map((group) => ({
+    label: group.name,
+    href: routes.store.collection(group.slug),
+  }));
+  const clientWords = useBusinessLabels();
+  const words = serverWords ?? clientWords;
   /**
    * The shop's own columns become the shop's own SECTIONS here.
    *
@@ -544,6 +674,14 @@ export function MobileShopLinks({
       <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
+      {/* A HEADING OVER THE CATEGORIES TOO.
+          They sat bare under the nav row's own label while the occasions
+          below them had one — so the phone already labelled one axis and not
+          the other, and a third would have made that three lists with
+          one-and-a-bit headings. */}
+      <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Shop by {words.categoryWord}
+      </p>
       {categories.map((item) => (
         <Link
           key={item.href}
@@ -557,9 +695,26 @@ export function MobileShopLinks({
       {occasions.length > 0 ? (
         <>
           <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Shop by Occasion
+            Shop by {words.occasionWord}
           </p>
           {occasions.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </>
+      ) : null}
+      {collections.length > 0 ? (
+        <>
+          <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Shop by {words.collectionWord}
+          </p>
+          {collections.map((item) => (
             <Link
               key={item.href}
               href={item.href}

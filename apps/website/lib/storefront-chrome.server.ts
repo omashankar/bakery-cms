@@ -4,8 +4,10 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import { getPublicZones } from "@/features/commerce/server/commerce.service";
 import {
   getStorefrontCategories,
+  getStorefrontCollections,
   getStorefrontOccasions,
 } from "./storefront-categories.server";
+import { resolveLabels, type ResolvedLabels } from "@/config/business-labels";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { defaultHeaderSettings, selectVisibleNavItems } from "@/features/site-layout/lib/header-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
@@ -35,6 +37,41 @@ export interface StorefrontChrome {
   categories: { id: string; name: string; slug: string; image?: string }[];
   /** The shop's own occasions, for the same menu's second column. */
   occasions: { id: string; name: string; slug: string }[];
+  /**
+   * The shop's CURATED groups, for the same menu's THIRD column.
+   *
+   * The catalogue separated three concepts — what a thing IS, what it is FOR,
+   * and which group somebody deliberately put it in — each with its own
+   * address, status and order. The header carried two of them, so the one
+   * axis a shop assembles BY HAND was the one its menu could not show.
+   *
+   * FREE. `getCatalog` is `cache()`d and the two reads above already take it,
+   * so this is a third caller of one memoised document, not a third round
+   * trip.
+   *
+   * NAME AND SLUG ONLY, never the stored row — see the projection below.
+   */
+  collections: { id: string; name: string; slug: string }[];
+  /**
+   * THE NOUNS THE MENU HEADS ITS COLUMNS WITH.
+   *
+   * They were hardcoded English — "Shop by Category" over a column a phone
+   * shop calls Brands — in a CMS whose admin has carried `categoryWord`,
+   * `occasionWord` and `collectionWord` for a while now. A shop filing under
+   * Brands read Brands in its admin and "Shop by Category" on its own site.
+   *
+   * A SERVER field and not `useBusinessLabels`: that hook seeds the neutral
+   * defaults and layers the shop's own in a `useEffect`, so the HTML would
+   * carry the default and the browser would swap it one paint later. The
+   * panel is `invisible` until hover, so nobody would ever SEE that flash —
+   * which is exactly why it would never be caught.
+   *
+   * FOUR of the eleven, not all of them: this rides on every route.
+   */
+  menuWords: Pick<
+    ResolvedLabels,
+    "productWordPlural" | "categoryWord" | "occasionWord" | "collectionWord"
+  >;
   /** General settings logo URL. Empty means "render the letter mark instead". */
   logo: string;
   logoLetter: string;
@@ -114,6 +151,23 @@ function firstLetterOf(siteName: string): string {
   return siteName.trim().charAt(0).toUpperCase();
 }
 
+/**
+ * The four the header draws, projected in ONE place.
+ *
+ * Through a helper rather than four literals twice over, so the happy path
+ * and the database-unreachable path cannot drift — the same argument
+ * `getServerLabels` makes for going through `resolveLabels` on its own
+ * failure branch.
+ */
+function menuWordsFrom(labels: ResolvedLabels): StorefrontChrome["menuWords"] {
+  return {
+    productWordPlural: labels.productWordPlural,
+    categoryWord: labels.categoryWord,
+    occasionWord: labels.occasionWord,
+    collectionWord: labels.collectionWord,
+  };
+}
+
 function fallbackChrome(): StorefrontChrome {
   return {
     siteName: brandInfo.name,
@@ -125,6 +179,12 @@ function fallbackChrome(): StorefrontChrome {
     // PIN code against, so the control does not appear.
     hasDeliveryZones: false,
     occasions: [],
+    // Same rule as the two lists above: a menu into a catalogue we cannot
+    // read is a menu of links to empty grids.
+    collections: [],
+    // Neutral wording, never blank. An empty noun renders a bare "Shop by"
+    // over the one row this path still draws.
+    menuWords: menuWordsFrom(resolveLabels()),
     logo: "",
     logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
@@ -181,6 +241,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       appearanceRaw,
       categories,
       occasions,
+      collectionRows,
       hasDeliveryZones,
     ] =
       await Promise.all([
@@ -192,6 +253,11 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         // In the SAME Promise.all — the note above records what a serial
         // await here cost the critical path of every storefront render.
         getStorefrontOccasions(),
+        // And the third axis, in the SAME round trip. `getCatalog` is
+        // `cache()`d and the two calls above have already taken it, so three
+        // concurrent callers are one document read — which is the whole
+        // reason a third column costs nothing on the checkout page.
+        getStorefrontCollections(),
         // And this one too, for the same reason.
         hasActiveDeliveryZones(),
       ]);
@@ -229,6 +295,41 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
 
     const activeSocial = social.filter((s) => s.isActive);
     const name = general.siteName || brandInfo.name;
+
+    /*
+      ALREADY RESOLVED. `getSettings` runs `withLabels`, which is
+      `resolveLabels(labelOverrides, businessType)` — so this is a field on a
+      value already in hand, not a second settings read and not a call to
+      `getServerLabels`. `resolveLabels()` covers only a settings document so
+      old it predates the field.
+    */
+    const labels = (settings.labels as ResolvedLabels | undefined) ?? resolveLabels();
+
+    /*
+      A GROUP WITH NOTHING IN IT IS A LINK TO AN EMPTY GRID.
+
+      `productIds.length` answers that without reading a single product,
+      which is the line that keeps the catalogue off the checkout page.
+    */
+    const groups = collectionRows.filter((row) => row.productIds.length > 0);
+
+    /*
+      AND A CATEGORY WHOSE ADDRESS A COLLECTION HAS TAKEN IS NOT OFFERED.
+
+      Both live at /store/collections/<slug> and the route resolves
+      COLLECTION first — collections/[slug]/page.tsx does it in the page and
+      repeats it in `generateMetadata` so the title and the grid cannot
+      describe different things. `offeredRows` dedupes WITHIN one list;
+      nothing deduped across two, because until now only one of the two was
+      in the header. At a shared slug the category row would be a link that
+      opens somebody else's page under the category's name.
+
+      No collision on this shop, and the admin's own check already merges
+      categories and collections before saving — so only rows stored before
+      that check can reach here. Two lines, and the alternative is a header
+      that lies.
+    */
+    const claimedByCollection = new Set(groups.map((row) => row.slug));
 
     return {
       siteName: name,
@@ -268,8 +369,24 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
        * different shops. The collections pills were moved onto the real
        * taxonomy already; this is the other half of that fix.
        */
-      categories,
+      categories: categories.filter((row) => !claimedByCollection.has(row.slug)),
       occasions,
+      /*
+        PROJECTED, never spread. `getStorefrontCollections` returns each row
+        whole — `description`, `image` and every member id — and this object
+        crosses the RSC wire into a client navbar on every storefront and
+        /account route, cart and checkout among them. Two groups here is
+        seven ids; one 500-product collection would be 500 ids in the
+        checkout payload to render a name. The categories reader next door
+        hand-picks its fields; this one does not, so the projection has to
+        happen here.
+      */
+      collections: groups.map(({ id, name: groupName, slug }) => ({
+        id,
+        name: groupName,
+        slug,
+      })),
+      menuWords: menuWordsFrom(labels),
       hasDeliveryZones,
       brand: {
         name,

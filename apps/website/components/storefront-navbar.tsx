@@ -1208,6 +1208,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   href={item.href}
                   categories={chrome.categories}
                   occasions={chrome.occasions}
+                  collections={chrome.collections}
+                  words={chrome.menuWords}
                   isActive={isActive}
                   highlight={item.highlight}
                   icon={item.icon}
@@ -1384,6 +1386,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 groups={collectionsRow.menu}
                 categories={chrome.categories}
                 occasions={chrome.occasions}
+                collections={chrome.collections}
+                words={chrome.menuWords}
                 onNavigate={() => setMobileOpen(false)}
               />
             ) : null}

@@ -296,10 +296,13 @@ describe("the customer's first paint", () => {
     // and makes a unit test depend on a database being up.
     vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
       getStorefrontCategories: async () => [],
-      // Both, or the Promise.all calls an undefined export and the whole
+      // ALL THREE, or the Promise.all calls an undefined export and the whole
       // chrome read falls to the outage path — which is what this case is
-      // distinguishing itself FROM.
+      // distinguishing itself FROM. This mock replaces the module, so every
+      // export the chrome reaches for has to be here; the count went from two
+      // to three when the menu gained its collections column.
       getStorefrontOccasions: async () => [],
+      getStorefrontCollections: async () => [],
     }));
 
     const { getStorefrontChrome } = await import(
