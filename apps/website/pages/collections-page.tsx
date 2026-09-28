@@ -123,7 +123,7 @@ interface CollectionsPageProps {
    * deleted one kept a pill that led nowhere. This shop has 13 categories and
    * the hardcoded list has 9.
    */
-  categories?: { id: string; name: string; slug: string }[];
+  categories?: { id: string; name: string; slug: string; headline?: string }[];
   /**
    * The CURATED group this URL resolved to, when it resolved to one.
    *
@@ -135,6 +135,12 @@ interface CollectionsPageProps {
    */
   collection?: {
     name: string;
+    /*
+      The shop's own phrase for this page, when it wrote one. On CatalogRow,
+      so a category, an occasion and a collection all carry it and the
+      listing page cannot head two of the three.
+    */
+    headline?: string;
     description?: string;
     productIds: string[];
   };
@@ -153,6 +159,12 @@ interface CollectionsPageProps {
   occasion?: {
     name: string;
     slug: string;
+    /*
+      The shop's own phrase for this page, when it wrote one. On CatalogRow,
+      so a category, an occasion and a collection all carry it and the
+      listing page cannot head two of the three.
+    */
+    headline?: string;
     description?: string;
   };
 }
@@ -173,7 +185,15 @@ export function CollectionsPage({
    */
   const categoryPills = useMemo(() => {
     const source = categoriesFromShop?.length ? categoriesFromShop : demoCategories;
-    const bySlug = new Map<string, { id: string; name: string; slug: string }>();
+    /*
+      `headline` rides along, optional, because the demo fallback has none —
+      the Map's type is what decides whether the shop's own phrase survives
+      the dedup, and a narrower one silently drops it.
+    */
+    const bySlug = new Map<
+      string,
+      { id: string; name: string; slug: string; headline?: string }
+    >();
     for (const category of source) {
       if (category.slug && !bySlug.has(category.slug)) bySlug.set(category.slug, category);
     }
@@ -338,7 +358,17 @@ export function CollectionsPage({
     writes something else. `labels.collectionsTitle` is the shop-all fallback
     and is the shop's word, not this file's.
   */
-  const pageTitle = heading ? heading.name : labels.collectionsTitle;
+  const pageTitle = heading
+    ? /*
+        THE SHOP'S OWN PHRASE IF IT WROTE ONE, else the row's name.
+
+        A category is filed as "Orchids" and the page selling them may be
+        headed "Orchid Flower Bouquets". `|| name` and not `?? name`, so a
+        headline saved as an empty string — which a cleared admin box sends —
+        falls back rather than heading the page with nothing.
+      */
+      (heading.headline?.trim() || heading.name)
+    : labels.collectionsTitle;
 
   /*
     THE COUNT, AND THE SECOND NUMBER ONLY WHILE SOMETHING IS NARROWING.

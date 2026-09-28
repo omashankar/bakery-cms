@@ -90,8 +90,22 @@ export async function getStorefrontCategories(): Promise<
       image?: string;
       isActive?: boolean;
       sortOrder?: number;
+      headline?: string;
     }[];
-    return offeredRows(rows).map(({ id, name, slug, image }) => ({ id, name, slug, image }));
+    /*
+      `headline` TRAVELS, and this projection is why it has to be added by
+      hand. Collections are spread whole further down, so a headline written
+      on a collection would have worked the day it shipped while the same
+      field on a category died here silently — the worst shape a bug can have,
+      because the feature looks half-built rather than broken.
+    */
+    return offeredRows(rows).map(({ id, name, slug, image, headline }) => ({
+      id,
+      name,
+      slug,
+      image,
+      headline,
+    }));
   } catch {
     return [];
   }
@@ -124,6 +138,7 @@ export async function getStorefrontOccasions(): Promise<
       slug: string;
       isActive?: boolean;
       sortOrder?: number;
+      headline?: string;
     }[];
     /**
      * Deduped within this list only.
@@ -141,7 +156,12 @@ export async function getStorefrontOccasions(): Promise<
      * nineteen products — from ever being shown as a set. Dropping the dedup is
      * the point of that route, not a side effect of it.
      */
-    return offeredRows(rows).map(({ id, name, slug }) => ({ id, name, slug }));
+    return offeredRows(rows).map(({ id, name, slug, headline }) => ({
+      id,
+      name,
+      slug,
+      headline,
+    }));
   } catch {
     return [];
   }

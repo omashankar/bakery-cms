@@ -328,6 +328,25 @@ export interface CatalogRow extends BaseEntity {
    * rest untouched, rather than a list that reshuffles itself.
    */
   sortOrder?: number;
+  /**
+   * What the listing page is HEADED, when the row's name is not the phrase.
+   *
+   * A category is filed as "Orchids" and the page selling them is headed
+   * "Orchid Flower Bouquets"; "White Chocolates" is filed once and the page
+   * reads "White Chocolates Online". The name is the taxonomy's word and this
+   * is the shop's, and a reference storefront writes a different one for every
+   * listing page it has.
+   *
+   * ON `CatalogRow` so a category, an occasion and a collection all get it
+   * from one declaration — the listing page draws all three and would
+   * otherwise head two of them and not the third.
+   *
+   * NO DEFAULT, anywhere. Absent means the page is headed by the row's own
+   * name, which is what it has always been. A generated phrase here would be
+   * this software writing a shop's page title for it, in a voice it never
+   * chose, on a page a customer lands on from a search engine.
+   */
+  headline?: string;
 }
 
 /*

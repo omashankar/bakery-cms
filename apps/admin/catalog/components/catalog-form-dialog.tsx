@@ -84,6 +84,7 @@ export function CatalogFormDialog({
   const isEdit = Boolean(itemId);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
   /**
@@ -103,6 +104,7 @@ export function CatalogFormDialog({
     if (!itemId) {
       setName("");
       setSlug("");
+      setHeadline("");
       setDescription("");
       setImage("");
       setIsActive(true);
@@ -116,6 +118,7 @@ export function CatalogFormDialog({
       if (item) {
         setName(item.name);
         setSlug(item.slug);
+        setHeadline(item.headline ?? "");
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
         setIsActive(item.isActive !== false);
@@ -126,6 +129,7 @@ export function CatalogFormDialog({
       if (item) {
         setName(item.name);
         setSlug(item.slug);
+        setHeadline(item.headline ?? "");
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
         setIsActive(item.isActive !== false);
@@ -135,6 +139,7 @@ export function CatalogFormDialog({
       if (item) {
         setName(item.name);
         setSlug(item.slug);
+        setHeadline(item.headline ?? "");
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
         setIsActive(item.isActive !== false);
@@ -191,6 +196,7 @@ export function CatalogFormDialog({
       const payload: Omit<ProductCategory, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
+        headline: headline.trim() || undefined,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
         isActive,
@@ -207,6 +213,7 @@ export function CatalogFormDialog({
       const payload: Omit<ProductCollection, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
+        headline: headline.trim() || undefined,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
         isActive,
@@ -225,6 +232,7 @@ export function CatalogFormDialog({
       const payload: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
         slug: finalSlug,
+        headline: headline.trim() || undefined,
         description: description.trim() || undefined,
         image: image.trim() || undefined,
         isActive,
@@ -301,6 +309,20 @@ export function CatalogFormDialog({
                 if (!isEdit) setSlug(slugify(e.target.value));
               }}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="catalog-headline">Page heading (optional)</Label>
+            <Input
+              id="catalog-headline"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder={name.trim() || "Leave blank to use the name above"}
+            />
+            <p className="text-xs text-muted-foreground">
+              What the listing page is headed. Leave it blank and the name above
+              is used.
+            </p>
           </div>
 
           <div className="space-y-2">

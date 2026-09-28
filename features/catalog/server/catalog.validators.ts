@@ -27,6 +27,14 @@ const catalogRow = z
     slug: z.string().trim().min(1, "Slug is required"),
     isActive: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
+    /*
+      NAMED, not left to `.passthrough()`.
+
+      Passthrough would store it either way, and that is the problem: a typo
+      in the key saves with a 200 and the page keeps drawing the row's name,
+      which is a bug with no symptom. Named, a typo is a 400 the admin sees.
+    */
+    headline: z.string().trim().optional(),
   })
   .passthrough();
 
