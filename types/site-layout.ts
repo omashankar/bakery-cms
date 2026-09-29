@@ -6,6 +6,39 @@ export interface MegaMenuLinkItem {
   href: string;
   /** An optional word beside it: "New", "2 Hour", "Bestseller". */
   badge?: string;
+  /**
+   * WHICH CATALOGUE ROW THIS LINK IS, when the shop picked it instead of
+   * typing it.
+   *
+   * `label` and `href` above are frozen strings and NOTHING in this repository
+   * fixes them up: `updateCategory` merges a patch and writes,
+   * `deleteCategories` filters the array and writes, and neither tells any
+   * consumer. So a hand-typed menu says "Cream Cakes" for ever after the shop
+   * renames it to "Fresh Cream", and opens an empty grid after the shop
+   * deletes it — the defect the taxonomy columns were just fixed for,
+   * reintroduced through a different door.
+   *
+   * With this set the server replaces `label` and `href` from the live row on
+   * every render, and DROPS the link when the row is gone. The two strings
+   * stay stored as a record of what was picked, so an unresolved link can
+   * still say which row it meant.
+   *
+   * AN ID AND NOT A SLUG: a slug is what a shop edits when it rewrites a
+   * page's address, and this has to survive that. The axis travels with it
+   * because a category and a collection share /store/collections/<slug> while
+   * an occasion has its own address — conflating those two was a real shipped
+   * bug, recorded in components/storefront/mega-menu.tsx.
+   *
+   * OPTIONAL, and absent on every link in every shop today: a link without it
+   * is exactly the link it has always been.
+   */
+  ref?: MenuLinkRef;
+}
+
+/** A pointer at one row of one of the three catalogue axes. */
+export interface MenuLinkRef {
+  axis: "category" | "occasion" | "collection";
+  id: string;
 }
 
 /**

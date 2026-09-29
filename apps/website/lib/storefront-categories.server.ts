@@ -1,4 +1,5 @@
 import { getCatalog } from "@/features/catalog/server/catalog.service";
+import { offeredRows } from "@/features/catalog/lib/catalog-utils";
 
 /**
  * The shop's own product categories, for the storefront's category pills.
@@ -36,47 +37,17 @@ import { getCatalog } from "@/features/catalog/server/catalog.service";
  * bug there, which is the argument for fixing it at the source: the next
  * consumer should not have to find out too.
  */
-/**
- * The rows a shop is OFFERING, in the order it put them.
- *
- * Three things, together, because all three readers below need all three and
- * doing them separately is how they drifted: each list had its own copy of the
- * dedupe and only one of them was a named function.
- *
- *  - SWITCHED OFF rows are dropped. `isActive` is optional, and absent means
- *    ON — a shop that has never seen the switch has every row showing, which
- *    is what it had before the switch existed. Only an explicit `false` hides
- *    anything.
- *  - ORDERED by `sortOrder`, lowest first. A row with none sorts after every
- *    numbered one and otherwise keeps its stored position, so a shop that
- *    orders three rows out of eleven gets those three at the top and the rest
- *    exactly where they were.
- *  - DEDUPED by slug, first row wins. A second row at one slug is unreachable
- *    — the resolver takes the first — so returning it offers a link that does
- *    not go where its label says.
- *
- * Sorted BEFORE the dedupe, so that when two rows share a slug the one the
- * shop ordered first is the one kept, rather than whichever was created first.
- */
-function offeredRows<T extends { slug?: string; isActive?: boolean; sortOrder?: number }>(
-  rows: readonly T[],
-): T[] {
-  const live = rows.filter((row) => row.isActive !== false);
+/*
+  THE RULE MOVED, AND THAT IS THE POINT.
 
-  const ordered = [...live].sort((a, b) => {
-    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
-    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
-    if (left !== right) return left - right;
-    /* Equal, or both unset: the stored order stands. */
-    return live.indexOf(a) - live.indexOf(b);
-  });
+  It lived here, server-only, so the ADMIN could not ask the same question —
+  and a screen that offers a switched-off row, or one whose slug somebody
+  else holds, hands the shop a link that looks saved and never appears. It is
+  one exported rule in the catalogue's own pure module now, read by this
+  reader and by the screen where a shop picks a link.
 
-  const bySlug = new Map<string, T>();
-  for (const row of ordered) {
-    if (row.slug && !bySlug.has(row.slug)) bySlug.set(row.slug, row);
-  }
-  return [...bySlug.values()];
-}
+  The three readers below call it exactly as they did.
+*/
 
 export async function getStorefrontCategories(): Promise<
   { id: string; name: string; slug: string; image?: string }[]

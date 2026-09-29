@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -19,11 +19,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { NAV_ICONS } from "@/config/nav-icons";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
+import {
+  CATALOG_UPDATED_EVENT,
+  getCategories,
+  getCollections,
+  getOccasions,
+} from "@/features/catalog/lib/catalog-repository";
+import {
+  CATALOG_HYDRATION_EVENT,
+  catalogHydrationStatus,
+} from "@/features/catalog/lib/catalog-api";
+import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
+import { routeForAxis } from "@/features/site-layout/lib/menu-links";
+import type { MenuAxes } from "@/features/site-layout/lib/menu-links";
 import type {
   HeaderNavItem,
   HeaderSettings,
   MegaMenuGroup,
   MegaMenuLinkItem,
+  MenuLinkRef,
 } from "@/types/site-layout";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
@@ -50,6 +66,30 @@ const EMPTY_OVERVIEW: HeaderOverview = {
   ctaEnabled: false,
 };
 
+/**
+ * A LINK ID THAT SURVIVES A LOOP.
+ *
+ * `Date.now()` was enough while links were added one at a time and is not
+ * enough now: the picker adds one per ticked box in a single loop, inside one
+ * millisecond. Duplicate ids are a React key collision and a delete button
+ * that removes the wrong row.
+ *
+ * Outside the component deliberately — a clock and a die are impure, and
+ * inside a component body `react-hooks/purity` is right to say so. The
+ * fallback is for a browser without `crypto.randomUUID`, which is an insecure
+ * context rather than an old browser; the counter keeps it unique within the
+ * page even when the clock does not move.
+ */
+let linksMade = 0;
+
+function newLinkId(): string {
+  linksMade += 1;
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `lnk-${crypto.randomUUID()}`;
+  }
+  return `lnk-${Date.now()}-${linksMade}`;
+}
+
 export function HeaderAdminPage() {
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same
@@ -74,6 +114,92 @@ export function HeaderAdminPage() {
     ensureHydrated: ensureSiteLayoutHydrated,
   });
   const [removeTarget, setRemoveTarget] = useState<HeaderNavItem | null>(null);
+
+  /**
+   * THE THREE LISTS, AND WHY THEY START EMPTY.
+   *
+   * This is a `"use client"` page and it is server-rendered first.
+   * `loadCatalogStore` answers `defaultCatalogStore` when there is no
+   * `window`, so seeding this state from the getters would put the SHIPPED
+   * DEMO taxonomy in the HTML — and then swap it for the shop's own on the
+   * first client render, which is a hydration mismatch and, worse, a moment
+   * where the boxes a shop could tick are somebody else's categories.
+   *
+   * Empty on the server, empty on the first client render, filled on mount.
+   * The picker stays disabled until the catalogue has actually arrived.
+   */
+  const [catalogLists, setCatalogLists] = useState<{
+    categories: ReturnType<typeof getCategories>;
+    occasions: ReturnType<typeof getOccasions>;
+    collections: ReturnType<typeof getCollections>;
+  }>({ categories: [], occasions: [], collections: [] });
+  const [catalogReady, setCatalogReady] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      setCatalogLists({
+        categories: getCategories(),
+        occasions: getOccasions(),
+        collections: getCollections(),
+      });
+      setCatalogReady(catalogHydrationStatus() === "ready");
+    };
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    window.addEventListener(CATALOG_HYDRATION_EVENT, sync);
+    return () => {
+      window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+      window.removeEventListener(CATALOG_HYDRATION_EVENT, sync);
+    };
+  }, []);
+
+  /**
+   * WHAT THE SHOP MAY PICK — the storefront's own rule, not this screen's.
+   *
+   * A switched-off row, an empty group, a duplicate slug and a category whose
+   * address a collection holds are all dropped by the server. Offering any of
+   * them here would hand the shop a link that saves, reads as saved, and
+   * never appears on the site. One rule, both ends.
+   */
+  const offered = useMemo(
+    () =>
+      offeredAxes({
+        categories: catalogLists.categories,
+        occasions: catalogLists.occasions,
+        collections: catalogLists.collections,
+      }),
+    [catalogLists],
+  );
+
+  /** The same three lists the server resolves against. */
+  const menuAxes: MenuAxes = useMemo(
+    () => ({
+      category: offered.categories,
+      occasion: offered.occasions,
+      collection: offered.collections,
+    }),
+    [offered],
+  );
+
+  /** The shop's own nouns for the three headings, never typed here. */
+  const labels = useBusinessLabels();
+
+  /** Which group the picker is open over, and what has been ticked in it. */
+  const [pickTarget, setPickTarget] = useState<{ navId: string; groupId: string } | null>(null);
+  const [picked, setPicked] = useState<MenuLinkRef[]>([]);
+
+  function togglePick(ref: MenuLinkRef) {
+    setPicked((prev) =>
+      prev.some((entry) => entry.axis === ref.axis && entry.id === ref.id)
+        ? prev.filter((entry) => !(entry.axis === ref.axis && entry.id === ref.id))
+        : [...prev, ref],
+    );
+  }
+
+  function closePicker() {
+    setPickTarget(null);
+    setPicked([]);
+  }
 
   const overview = useMemo(
     () => (hydration === "pending" ? EMPTY_OVERVIEW : getHeaderOverview(settings)),
@@ -174,7 +300,14 @@ export function HeaderAdminPage() {
       ...groups,
       {
         id: `grp-${Date.now()}`,
-        heading: "New group",
+        /*
+          EMPTY, not "New group". A heading is a column name in a live panel
+          and this software may not write one on the shop's behalf — the same
+          rule that keeps every other new field blank. The renderer draws no
+          heading at all when this is blank, so an unnamed column reads as a
+          plain list rather than as something half-finished.
+        */
+        heading: "",
         sortOrder: groups.length + 1,
         isVisible: true,
         links: [],
@@ -199,8 +332,63 @@ export function HeaderAdminPage() {
   function addLink(navId: string, groupId: string) {
     patchGroupLinks(navId, groupId, (links) => [
       ...links,
-      { id: `lnk-${Date.now()}`, label: "New link", href: "/store/collections" },
+      { id: newLinkId(), label: "New link", href: "/store/collections" },
     ]);
+  }
+
+  /** The row behind a picked link, or undefined once the shop deletes it. */
+  function rowFor(ref: MenuLinkRef) {
+    return menuAxes[ref.axis].find((row) => row.id === ref.id);
+  }
+
+  /**
+   * Every ticked box becomes a link that POINTS at its row.
+   *
+   * `label` and `href` are written too, and they are a record rather than the
+   * source of truth: the server rebuilds both from the live row on every
+   * render. They are what lets an unresolved link still say which row it
+   * meant.
+   */
+  function addPickedLinks() {
+    if (!pickTarget) return;
+    const { navId, groupId } = pickTarget;
+    const additions = picked.flatMap((ref) => {
+      const row = rowFor(ref);
+      if (!row) return [];
+      return [
+        {
+          id: newLinkId(),
+          label: row.name,
+          href: routeForAxis(ref.axis, row.slug),
+          ref: { axis: ref.axis, id: ref.id },
+        },
+      ];
+    });
+    if (additions.length > 0) {
+      patchGroupLinks(navId, groupId, (links) => [...links, ...additions]);
+      toast.message(
+        additions.length === 1 ? "1 link added" : `${additions.length} links added`,
+      );
+    }
+    closePicker();
+  }
+
+  /**
+   * TURN A PICKED LINK BACK INTO A TYPED ONE.
+   *
+   * The escape hatch, and the reason the picked row shows no input boxes: a
+   * box the server overwrites on every render is a lie. A shop that wants its
+   * own wording drops the pointer and types, knowing it has given up the
+   * rename and the delete following along.
+   */
+  function unlinkFromCatalog(navId: string, groupId: string, linkId: string) {
+    patchGroupLinks(navId, groupId, (links) =>
+      links.map((entry) => {
+        if (entry.id !== linkId) return entry;
+        const { ref: _dropped, ...rest } = entry;
+        return rest;
+      }),
+    );
   }
 
   function patchGroupLinks(
@@ -587,12 +775,55 @@ export function HeaderAdminPage() {
                     placeholder="Label"
                     aria-label={`Nav link ${index + 1} label`}
                   />
-                  <Input
-                    value={item.href}
-                    onChange={(e) => updateNav(item.id, { href: e.target.value })}
-                    placeholder="/store/..."
-                    aria-label={`Nav link ${index + 1} URL`}
-                  />
+                  {/*
+                    THE ROW'S OWN DESTINATION, PICKED OR TYPED.
+
+                    The picker below takes the URLs out of a row's MENU and
+                    left them in the row itself, which is the half that can
+                    still 404: there is no /store/occasions index, and the
+                    listing page parses only `category` and `q` — so a typed
+                    `?occasion=birthday` is a silently unfiltered grid.
+
+                    The box stays, because a row may point at a page, at the
+                    contact form or off the site entirely. The dropdown is
+                    for the three lists this software can address correctly.
+                  */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      value={item.href}
+                      onChange={(e) => updateNav(item.id, { href: e.target.value })}
+                      placeholder="/store/..."
+                      aria-label={`Nav link ${index + 1} URL`}
+                    />
+                    <select
+                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
+                      value=""
+                      disabled={!catalogReady}
+                      onChange={(e) => {
+                        if (e.target.value) updateNav(item.id, { href: e.target.value });
+                      }}
+                      aria-label={`Nav link ${index + 1} destination`}
+                    >
+                      <option value="">Or pick a page…</option>
+                      {(
+                        [
+                          ["category", labels.categoryWordPlural, offered.categories],
+                          ["occasion", labels.occasionWordPlural, offered.occasions],
+                          ["collection", labels.collectionWordPlural, offered.collections],
+                        ] as const
+                      ).map(([axis, heading, rows]) =>
+                        rows.length > 0 ? (
+                          <optgroup key={axis} label={heading}>
+                            {rows.map((row) => (
+                              <option key={row.id} value={routeForAxis(axis, row.slug)}>
+                                {row.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : null,
+                      )}
+                    </select>
+                  </div>
 
                   {/*
                     WHAT MAKES ONE ROW STAND OUT FROM THE OTHERS.
@@ -709,7 +940,71 @@ export function HeaderAdminPage() {
                           </Button>
                         </div>
 
-                        {group.links.map((link, linkIndex) => (
+                        {group.links.map((link, linkIndex) => {
+                          /*
+                            A PICKED LINK HAS NO BOXES TO TYPE IN.
+
+                            Its label and its address are rebuilt from the
+                            live catalogue row on every render, so an input
+                            here would be a box that silently discards what
+                            is typed into it. What the shop gets instead is
+                            what the link WILL say, and one button to give up
+                            the pointer and type after all.
+                          */
+                          const ref = link.ref;
+                          if (ref) {
+                            const row = rowFor(ref);
+                            return (
+                              <div key={link.id} className="flex items-center gap-2">
+                                <div className="flex min-w-0 flex-1 flex-col">
+                                  <span className="truncate text-sm font-medium">
+                                    {row ? row.name : link.label}
+                                  </span>
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {row
+                                      ? routeForAxis(ref.axis, row.slug)
+                                      : "No longer in the catalog — this link is not shown on the site"}
+                                  </span>
+                                </div>
+                                <Input
+                                  size={1}
+                                  className="max-w-[7rem]"
+                                  value={link.badge ?? ""}
+                                  onChange={(e) =>
+                                    patchGroupLinks(item.id, group.id, (links) =>
+                                      links.map((entry) =>
+                                        entry.id === link.id
+                                          ? { ...entry, badge: e.target.value || undefined }
+                                          : entry,
+                                      ),
+                                    )
+                                  }
+                                  placeholder="Badge"
+                                  aria-label={`${group.heading} catalog link ${linkIndex + 1} badge`}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => unlinkFromCatalog(item.id, group.id, link.id)}
+                                >
+                                  Type it instead
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    patchGroupLinks(item.id, group.id, (links) =>
+                                      links.filter((entry) => entry.id !== link.id),
+                                    )
+                                  }
+                                  aria-label={`Remove ${row ? row.name : link.label || "link"}`}
+                                >
+                                  <Trash2 className="size-4 text-destructive" />
+                                </Button>
+                              </div>
+                            );
+                          }
+                          return (
                           <div key={link.id} className="flex items-center gap-2">
                             <Input
                               value={link.label}
@@ -789,16 +1084,47 @@ export function HeaderAdminPage() {
                               <Trash2 className="size-4 text-destructive" />
                             </Button>
                           </div>
-                        ))}
+                          );
+                        })}
 
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => addLink(item.id, group.id)}
-                        >
-                          <Plus className="size-3.5" />
-                          Add link
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => addLink(item.id, group.id)}
+                          >
+                            <Plus className="size-3.5" />
+                            Add link
+                          </Button>
+                          {/*
+                            THE DOOR THIS MENU NEVER HAD.
+
+                            Every piece of a per-row menu has been here since
+                            it shipped — the type, the validator, both
+                            renderers — and it is empty on every row of every
+                            shop, because filling it meant hand-typing a label
+                            and an address per link. Ticking boxes is the
+                            difference between a feature and a feature nobody
+                            uses.
+
+                            Disabled until the catalogue has actually
+                            arrived: before that the only rows to offer are
+                            the shipped demo ones, and a link picked from
+                            those points at a row this shop does not have.
+                          */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!catalogReady}
+                            onClick={() => {
+                              setPicked([]);
+                              setPickTarget({ navId: item.id, groupId: group.id });
+                            }}
+                          >
+                            <Link2 className="size-3.5" />
+                            Pick from catalog
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -808,6 +1134,69 @@ export function HeaderAdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/*
+        ONE DIALOG FOR ALL THREE AXES, headed in the shop's own nouns.
+
+        A shop that files under Brands reads Brands here, because the heading
+        comes from the label system rather than from this file. And only rows
+        the storefront will actually offer are listed — the alternative is a
+        tick that saves, reads as saved, and never appears on the site.
+      */}
+      <Dialog open={Boolean(pickTarget)} onOpenChange={(open) => !open && closePicker()}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Pick from catalog</DialogTitle>
+            <DialogDescription>
+              A picked link follows the catalog: rename a row and the menu renames
+              with it, remove one and the link goes. Only rows the shop is showing
+              are listed here.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-4 overflow-y-auto">
+            {(
+              [
+                ["category", labels.categoryWordPlural, offered.categories],
+                ["occasion", labels.occasionWordPlural, offered.occasions],
+                ["collection", labels.collectionWordPlural, offered.collections],
+              ] as const
+            ).map(([axis, heading, rows]) =>
+              rows.length === 0 ? null : (
+                <div key={axis} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {heading}
+                  </p>
+                  {rows.map((row) => (
+                    <Label
+                      key={row.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm font-normal"
+                    >
+                      <Checkbox
+                        checked={picked.some(
+                          (entry) => entry.axis === axis && entry.id === row.id,
+                        )}
+                        onCheckedChange={() => togglePick({ axis, id: row.id })}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {routeForAxis(axis, row.slug)}
+                      </span>
+                    </Label>
+                  ))}
+                </div>
+              ),
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={closePicker}>
+              Cancel
+            </Button>
+            <Button onClick={addPickedLinks} disabled={picked.length === 0}>
+              {picked.length === 1 ? "Add 1 link" : `Add ${picked.length} links`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(removeTarget)}

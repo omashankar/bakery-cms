@@ -393,16 +393,32 @@ describe("the row the drawer forgot", () => {
       The aria-label belongs to the link row alone, so the writer is looked
       for in the JSX immediately before it.
     */
-    const named = admin.indexOf("linkIndex + 1} badge");
-    expect(named, "the badge box has no accessible name").toBeGreaterThan(-1);
-    const linkBadgeBox = admin.slice(Math.max(0, named - 700), named);
+    /*
+      EVERY ONE OF THEM, not the first.
 
-    expect(linkBadgeBox, "an emptied badge box stores an empty string").toContain(
-      "badge: e.target.value || undefined",
-    );
-    expect(linkBadgeBox, "the badge box does not read the link's own value").toContain(
-      "link.badge ?? \"\"",
-    );
+      There are two badge boxes in this screen now — a link the shop TYPED and
+      a link it PICKED from the catalogue — and `indexOf` pins whichever comes
+      first in the file. The other would be free to store "" or to read the
+      wrong value. Counting them and checking each is the difference between a
+      guard and a guard that happens to be looking at the right one.
+    */
+    const marks: number[] = [];
+    for (let at = admin.indexOf("linkIndex + 1} badge"); at > -1; ) {
+      marks.push(at);
+      at = admin.indexOf("linkIndex + 1} badge", at + 1);
+    }
+    expect(marks.length, "the badge box has no accessible name").toBeGreaterThan(0);
+
+    for (const named of marks) {
+      const linkBadgeBox = admin.slice(Math.max(0, named - 700), named);
+
+      expect(linkBadgeBox, "an emptied badge box stores an empty string").toContain(
+        "badge: e.target.value || undefined",
+      );
+      expect(linkBadgeBox, "the badge box does not read the link's own value").toContain(
+        "link.badge ?? \"\"",
+      );
+    }
   });
 
   it("and the same stored word is not shouted in one place and not the other", () => {

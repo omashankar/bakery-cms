@@ -432,9 +432,23 @@ export function MegaMenu({
             <div className={cn("grid gap-6", AUTHORED_GRID[columns])}>
               {authored.map((group) => (
                 <div key={group.id}>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {group.heading}
-                  </p>
+                  {/*
+                    A BLANK HEADING DRAWS NOTHING, rather than an empty
+                    paragraph and its margin — a heading-shaped gap above the
+                    links.
+
+                    This matters more than it looks. A new group's heading box
+                    now arrives EMPTY: this software may not type a column
+                    name on the shop's behalf, and "New group" appearing in a
+                    live panel is exactly that. So a shop that picks its links
+                    and never writes a heading gets a clean unheaded column,
+                    which is a real thing to want, instead of a gap.
+                  */}
+                  {group.heading.trim() ? (
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {group.heading}
+                    </p>
+                  ) : null}
                   <ul className="space-y-2">
                     {group.links.map((link) => (
                       <li key={link.id}>
@@ -645,9 +659,14 @@ export function MobileShopLinks({
         </p>
         {authored.map((group) => (
           <div key={group.id}>
-            <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-              {group.heading}
-            </p>
+            {/* The same rule as the desktop twin's — see the note there. A
+                fix that lands on one of these two renderers and not the
+                other is a defect this component has shipped twice. */}
+            {group.heading.trim() ? (
+              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                {group.heading}
+              </p>
+            ) : null}
             {group.links.map((link) => (
               <Link
                 key={link.id}

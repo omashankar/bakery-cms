@@ -168,3 +168,93 @@ export function collectionsWithProduct(
 
   return { next, changed };
 }
+
+/**
+ * The rows a shop is OFFERING, in the order it put them.
+ *
+ * Three things, together, because all three readers below need all three and
+ * doing them separately is how they drifted: each list had its own copy of the
+ * dedupe and only one of them was a named function.
+ *
+ *  - SWITCHED OFF rows are dropped. `isActive` is optional, and absent means
+ *    ON — a shop that has never seen the switch has every row showing, which
+ *    is what it had before the switch existed. Only an explicit `false` hides
+ *    anything.
+ *  - ORDERED by `sortOrder`, lowest first. A row with none sorts after every
+ *    numbered one and otherwise keeps its stored position, so a shop that
+ *    orders three rows out of eleven gets those three at the top and the rest
+ *    exactly where they were.
+ *  - DEDUPED by slug, first row wins. A second row at one slug is unreachable
+ *    — the resolver takes the first — so returning it offers a link that does
+ *    not go where its label says.
+ *
+ * Sorted BEFORE the dedupe, so that when two rows share a slug the one the
+ * shop ordered first is the one kept, rather than whichever was created first.
+ */
+export function offeredRows<T extends { slug?: string; isActive?: boolean; sortOrder?: number }>(
+  rows: readonly T[],
+): T[] {
+  const live = rows.filter((row) => row.isActive !== false);
+
+  const ordered = [...live].sort((a, b) => {
+    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+    if (left !== right) return left - right;
+    /* Equal, or both unset: the stored order stands. */
+    return live.indexOf(a) - live.indexOf(b);
+  });
+
+  const bySlug = new Map<string, T>();
+  for (const row of ordered) {
+    if (row.slug && !bySlug.has(row.slug)) bySlug.set(row.slug, row);
+  }
+  return [...bySlug.values()];
+}
+
+/**
+ * THE WHOLE RULE, ACROSS ALL THREE AXES — the one place that decides what a
+ * customer is offered, so an admin screen cannot offer what the storefront
+ * will drop.
+ *
+ * That was the shape of the defect this exists to prevent: the filters lived
+ * in three server-only places, so a picker built on the raw lists could hand
+ * a shop a switched-off category, an empty group or a slug somebody else
+ * holds, and the link would look saved and never appear.
+ *
+ * Beyond `offeredRows` on each list, two rules that only exist ACROSS lists:
+ *
+ *  - A GROUP WITH NOTHING IN IT is a link to an empty grid. Answered from
+ *    `productIds.length`, so no product is read.
+ *  - A CATEGORY WHOSE ADDRESS A COLLECTION HAS TAKEN is not offered. Both
+ *    live at /store/collections/<slug> and the route resolves COLLECTION
+ *    first, so that row would be a link opening somebody else's page under
+ *    the category's name.
+ *
+ * IDEMPOTENT: running it over lists that have already been through it changes
+ * nothing, which is what lets the storefront reader and the caller above it
+ * both go through the same rule without arguing about who ran it.
+ *
+ * Deliberately NOT answered here: an empty CATEGORY or OCCASION is still
+ * offered. Hiding those needs a count per row, and a count needs the product
+ * collection, which is the read the header exists to avoid.
+ */
+export function offeredAxes<
+  C extends { slug?: string; isActive?: boolean; sortOrder?: number },
+  O extends { slug?: string; isActive?: boolean; sortOrder?: number },
+  L extends { slug?: string; isActive?: boolean; sortOrder?: number; productIds?: string[] },
+>(input: {
+  categories: readonly C[];
+  occasions: readonly O[];
+  collections: readonly L[];
+}): { categories: C[]; occasions: O[]; collections: L[] } {
+  const collections = offeredRows(input.collections).filter(
+    (row) => (row.productIds ?? []).length > 0,
+  );
+  const claimed = new Set(collections.map((row) => row.slug).filter(Boolean));
+
+  return {
+    categories: offeredRows(input.categories).filter((row) => !claimed.has(row.slug)),
+    occasions: offeredRows(input.occasions),
+    collections,
+  };
+}

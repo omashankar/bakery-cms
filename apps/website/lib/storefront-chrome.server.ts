@@ -10,6 +10,8 @@ import {
 import { resolveLabels, type ResolvedLabels } from "@/config/business-labels";
 import { getSiteLayout } from "@/features/site-layout/server/site-layout.service";
 import { defaultHeaderSettings, selectVisibleNavItems } from "@/features/site-layout/lib/header-utils";
+import { resolveNavMenus } from "@/features/site-layout/lib/menu-links";
+import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
 import { defaultFooterSettings } from "@/features/site-layout/lib/footer-utils";
 import {
   brandInfo,
@@ -306,30 +308,45 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
     const labels = (settings.labels as ResolvedLabels | undefined) ?? resolveLabels();
 
     /*
-      A GROUP WITH NOTHING IN IT IS A LINK TO AN EMPTY GRID.
+      WHAT THE SHOP IS ACTUALLY OFFERING, across all three axes at once.
 
-      `productIds.length` answers that without reading a single product,
-      which is the line that keeps the catalogue off the checkout page.
-    */
-    const groups = collectionRows.filter((row) => row.productIds.length > 0);
+      A GROUP WITH NOTHING IN IT is a link to an empty grid, answered from
+      `productIds.length` without reading a single product — the line that
+      keeps the catalogue off the checkout page.
 
-    /*
-      AND A CATEGORY WHOSE ADDRESS A COLLECTION HAS TAKEN IS NOT OFFERED.
-
+      AND A CATEGORY WHOSE ADDRESS A COLLECTION HAS TAKEN is not offered.
       Both live at /store/collections/<slug> and the route resolves
       COLLECTION first — collections/[slug]/page.tsx does it in the page and
-      repeats it in `generateMetadata` so the title and the grid cannot
-      describe different things. `offeredRows` dedupes WITHIN one list;
-      nothing deduped across two, because until now only one of the two was
-      in the header. At a shared slug the category row would be a link that
-      opens somebody else's page under the category's name.
+      repeats it in `generateMetadata`, so the title and the grid cannot
+      describe different things. At a shared slug the category row would be a
+      link that opens somebody else's page under the category's name.
 
-      No collision on this shop, and the admin's own check already merges
-      categories and collections before saving — so only rows stored before
-      that check can reach here. Two lines, and the alternative is a header
-      that lies.
+      THROUGH THE SHARED RULE and not two filters written here, because the
+      admin screen where a shop PICKS a link has to ask the same question.
+      Three filters that live server-side only are three ways for that screen
+      to offer something this object then drops — a link that looks saved and
+      never appears.
     */
-    const claimedByCollection = new Set(groups.map((row) => row.slug));
+    const offered = offeredAxes({
+      categories,
+      occasions,
+      collections: collectionRows,
+    });
+
+    /*
+      The three lists a picked menu link may point into.
+
+      Built from `offered` rather than from the raw reads, so the resolver
+      cannot bring back a row this very object is not allowed to show. No unit
+      test on the pure resolver can catch that wiring being wrong, which is
+      why it is one expression here rather than three arguments at the call
+      site.
+    */
+    const menuAxes = {
+      category: offered.categories,
+      occasion: offered.occasions,
+      collection: offered.collections,
+    };
 
     return {
       siteName: name,
@@ -352,7 +369,18 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         label: header.ctaLabel?.trim() || defaultHeaderSettings.ctaLabel,
         href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
       },
-      navItems: selectVisibleNavItems(header.nav ?? []),
+      /*
+        RESOLVED FIRST, then filtered for visibility.
+
+        A link the shop PICKED carries which catalogue row it is; the label
+        and the address are rebuilt from the live row here, and a link whose
+        row is gone is dropped. A link the shop TYPED is returned untouched,
+        which is every link stored before today.
+
+        `utilityNav` below is deliberately not resolved: those rows render as
+        plain links on both screens, so a menu there would be dead code.
+      */
+      navItems: selectVisibleNavItems(resolveNavMenus(header.nav ?? [], menuAxes)),
       // The same filter and sort the main row gets: a hidden utility link is
       // hidden, and the order the shop set is the order it renders in.
       utilityNav: selectVisibleNavItems(header.utilityNav ?? []),
@@ -369,8 +397,8 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
        * different shops. The collections pills were moved onto the real
        * taxonomy already; this is the other half of that fix.
        */
-      categories: categories.filter((row) => !claimedByCollection.has(row.slug)),
-      occasions,
+      categories: offered.categories,
+      occasions: offered.occasions,
       /*
         PROJECTED, never spread. `getStorefrontCollections` returns each row
         whole — `description`, `image` and every member id — and this object
@@ -381,7 +409,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         hand-picks its fields; this one does not, so the projection has to
         happen here.
       */
-      collections: groups.map(({ id, name: groupName, slug }) => ({
+      collections: offered.collections.map(({ id, name: groupName, slug }) => ({
         id,
         name: groupName,
         slug,

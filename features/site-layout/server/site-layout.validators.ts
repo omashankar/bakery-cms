@@ -95,12 +95,37 @@ const seoSchema = z
  * hand-editable file through backup restore, and `links.map(...)` renders into
  * the storefront shell with no guard of its own.
  */
+/**
+ * The axis a picked link points into.
+ *
+ * `.strict()` rather than the `.passthrough()` of the rows around it: unlike
+ * those there is nothing here a later version could add without the resolver
+ * knowing about it, and a wrong `axis` has to be a 400 rather than a link
+ * that silently vanishes at render while the admin still shows it saved.
+ */
+const menuLinkRefSchema = z
+  .object({
+    axis: z.enum(["category", "occasion", "collection"]),
+    id: z.string().min(1),
+  })
+  .strict();
+
 const megaMenuLinkSchema = z
   .object({
     id: z.string().min(1),
     label: z.string(),
     href: z.string(),
     badge: z.string().optional(),
+    /*
+      OPTIONAL, never defaulted: absent means "the shop typed this link",
+      which is every link stored before today.
+
+      DECLARED, though the object around it is `.passthrough()` and would
+      store it either way. Passthrough stores what it is handed, and this
+      endpoint takes a hand-editable file through backup restore — an
+      `axis: "brand"` would save with a 200 and then resolve to nothing.
+    */
+    ref: menuLinkRefSchema.optional(),
   })
   .passthrough();
 
