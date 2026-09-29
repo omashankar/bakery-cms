@@ -6,6 +6,7 @@ import type { MegaMenuLink } from "@/constants/storefront-nav";
 import type { MegaMenuGroup } from "@/types/site-layout";
 import { navIcon } from "@/config/nav-icons";
 import { routes } from "@/constants/routes";
+import { groupDraws } from "@/features/site-layout/lib/menu-links";
 import { SafeImage } from "@/components/shared/safe-image";
 
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -149,6 +150,14 @@ interface MegaMenuProps {
    * the window and gave the whole storefront a horizontal scrollbar.
    */
   align?: "left" | "right";
+  /**
+   * THE ROW HAS NO DESTINATION OF ITS OWN — it exists to open this menu.
+   *
+   * The trigger becomes a `<button>`. NOT unconditional: every shop's
+   * Collections row still has its own page, and taking that away from them
+   * silently is not what this switch asked for.
+   */
+  menuOnly?: boolean;
 }
 
 /**
@@ -159,7 +168,9 @@ interface MegaMenuProps {
  */
 export function drawableGroups(groups?: MegaMenuGroup[]): MegaMenuGroup[] {
   return [...(groups ?? [])]
-    .filter((group) => group.isVisible !== false && group.links.length > 0)
+    // `groupDraws` and not the condition inline: the Header screen and
+    // `navRowOpensNothing` ask the same question and must get the same answer.
+    .filter(groupDraws)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
 
@@ -279,6 +290,7 @@ export function MegaMenu({
   icon,
   badge,
   align = "left",
+  menuOnly,
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
   const fallbackCategories = useFallbackCategories();
@@ -347,45 +359,92 @@ export function MegaMenu({
     authored.length > 0
       ? panelShape(authored.length)
       : panelShape(taxonomyColumns, hasCard);
+  /*
+    ONE DEFINITION FOR BOTH TRIGGERS — the branch below chooses the ELEMENT
+    and nothing else. Two copies of this markup is how the same stored word
+    read "2 Hour" on the trigger and "2 HOUR" three pixels under it.
+  */
+  const triggerClass = cn(
+    /*
+      UPPERCASE AND LETTER-SPACED, matching the plain rows beside it.
+
+      The transform is CSS, not a change to the stored string — the
+      label stays exactly what the shop typed in the Header screen, so
+      nothing about this is lossy.
+
+      Hover fills to cream-200 rather than cream-100, because the band
+      behind it is cream-100 now and a hover the same colour as its
+      own background is no hover at all.
+    */
+    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
+    highlight
+      ? "font-semibold text-bakery-700 hover:bg-cream-200"
+      : isActive
+        ? "bg-cream-200 text-bakery-700"
+        : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
+  );
+  const triggerInner = (
+    <>
+      {rowIcon(icon)}
+      {label}
+      {badge ? (
+        /* `uppercase`, like the badge on a plain row's twin and like the two
+           inside the panel below. Without it the same stored word read "2
+           Hour" on the trigger and "2 HOUR" three pixels under it. */
+        <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
+          {badge}
+        </span>
+      ) : null}
+      <ChevronDown className="size-3.5 transition-transform group-hover:rotate-180" />
+    </>
+  );
   return (
     <div className="group relative">
-      <Link
-        // The ROW's own destination. This was always the collections page,
-        // so a CAKES item and a GIFTS item would both have opened the same
-        // page — the menu is per nav row now, and each row has its own.
-        href={href}
-        className={cn(
-          /*
-            UPPERCASE AND LETTER-SPACED, matching the plain rows beside it.
+      {menuOnly ? (
+        /*
+          A BUTTON, BECAUSE THIS ROW GOES NOWHERE.
 
-            The transform is CSS, not a change to the stored string — the
-            label stays exactly what the shop typed in the Header screen, so
-            nothing about this is lossy.
+          A link that does not navigate is a link a customer cannot open in
+          a new tab and a screen reader announces wrongly — the same
+          reasoning the drawer's search row already carries in
+          storefront-navbar. `type="button"` because a typeless button
+          submits, and this renders inside a header that carries the search
+          form.
 
-            Hover fills to cream-200 rather than cream-100, because the band
-            behind it is cream-100 now and a hover the same colour as its
-            own background is no hover at all.
-          */
-          "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
-          highlight
-            ? "font-semibold text-bakery-700 hover:bg-cream-200"
-            : isActive
-              ? "bg-cream-200 text-bakery-700"
-              : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
-        )}
-      >
-        {rowIcon(icon)}
-        {label}
-        {badge ? (
-          /* `uppercase`, like the badge on a plain row's twin and like the two
-             inside the panel below. Without it the same stored word read "2
-             Hour" on the trigger and "2 HOUR" three pixels under it. */
-          <span className="rounded-full bg-bakery-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bakery-700">
-            {badge}
-          </span>
-        ) : null}
-        <ChevronDown className="size-3.5 transition-transform group-hover:rotate-180" />
-      </Link>
+          `data-mega-trigger` on BOTH arms: the browser spec finds the
+          band's triggers by it, and a marker cannot go stale the way a tag
+          name just did — the same reason `data-mega-panel` exists.
+
+          NO `aria-expanded` AND NO STATE, deliberately. The panel opens
+          from `group-hover` and `group-focus-within` in CSS and nothing
+          here knows whether it is open, so an `aria-expanded` would
+          announce "collapsed" over a panel a keyboard user is reading. A
+          silence is not a lie.
+
+          The keyboard path is unchanged and coherent: Tab onto this button
+          and `:focus-within` lifts the panel's `invisible`, which is what
+          puts its links into the tab order — Tab opens the menu, Tab again
+          walks into it. Escape wants the same state, and giving it that
+          means taking `:focus-within` out of CSS for EVERY row, including
+          every shop's Collections row and the window before this page
+          hydrates. Not in this change, and no row has Escape today.
+        */
+        <button type="button" data-mega-trigger className={triggerClass}>
+          {triggerInner}
+        </button>
+      ) : (
+        <Link
+          // The ROW's own destination. This was always the collections
+          // page, so a CAKES item and a GIFTS item would both have opened
+          // the same page — the menu is per nav row now, and each row has
+          // its own.
+          href={href}
+          data-mega-trigger
+          className={triggerClass}
+        >
+          {triggerInner}
+        </Link>
+      )}
 
       <div
         data-mega-panel

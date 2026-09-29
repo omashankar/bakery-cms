@@ -22,6 +22,7 @@ import { GuestMenu } from "@/apps/website/account/components/guest-menu";
 import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
+import { navRowOpensNothing } from "@/features/site-layout/lib/menu-links";
 import { getWishlistCount } from "@/apps/website/lib/wishlist";
 import {
   getCustomerDisplayName,
@@ -333,7 +334,18 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
    * first could not have it, and the control that promised otherwise did
    * nothing. Home is not: on desktop the logo is the way home.
    */
-  const bandRows = navItems.filter((item) => item.href !== routes.store.home);
+  const bandRows = navItems.filter((item) => item.href !== routes.store.home)
+    /*
+      A ROW THAT DECLARES ITSELF A MENU AND HAS NO MENU IS NOT SKIPPED, IT IS
+      NOT COUNTED.
+
+      `align` below is decided from `index` and `bandRows.length` and was
+      measured against real positions in the band — a phantom row shifts every
+      panel's anchor edge one place along, which is how the off-screen-left bug
+      happened. It is also what keeps the band from being two hairlines with
+      nothing between them.
+    */
+    .filter((item) => !navRowOpensNothing(item));
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -1210,6 +1222,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   occasions={chrome.occasions}
                   collections={chrome.collections}
                   words={chrome.menuWords}
+                  menuOnly={item.menuOnly}
                   isActive={isActive}
                   highlight={item.highlight}
                   icon={item.icon}
@@ -1244,6 +1257,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   label={item.label}
                   href={item.href}
                   groups={item.menu}
+                  menuOnly={item.menuOnly}
                   isActive={isActive}
                   highlight={item.highlight}
                   icon={item.icon}
@@ -1393,6 +1407,18 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             ) : null}
             {navItems
               .filter((item) => item.href !== routes.store.collections && item.href !== routes.store.home)
+              /*
+                THE SAME ROW, THE SAME ANSWER.
+
+                The branch below only asks whether a row HAS groups, so a row
+                the band dropped came back here as a working plain link — and a
+                menu that differs by screen size is two menus, on the screen
+                this shop's customers actually use.
+
+                Filtered rather than returned null, so the divider's own
+                `index > 0` does not count a row that is gone.
+              */
+              .filter((item) => !navRowOpensNothing(item))
               .map((item, index) => {
                 /*
                   The phone gets the same groups, for the reason this repo

@@ -105,6 +105,36 @@ export interface HeaderNavItem {
    * floating.
    */
   dividerBefore?: boolean;
+  /**
+   * THIS ROW IS A MENU AND NOTHING ELSE.
+   *
+   * A reference header's category rows carry no destination of their own:
+   * CAKES is not a page, it is the thing that opens the cake menu. The row
+   * says what it IS, and `href` above stays REQUIRED beside it. Three
+   * reasons, all of them lines already on disk:
+   *
+   * An OPTIONAL `href` makes "absent" mean both "deliberately menu-only" and
+   * "this document is malformed", and the validator can then no longer refuse
+   * the second — backup restore posts a hand-editable file to that endpoint.
+   *
+   * An optional `href` also throws every storefront page: the navbar's
+   * `collectionsRow` lookup misses, `bandRows` keeps the row, neither menu
+   * branch claims it, and it lands on `<Link href={undefined}>`. `next/link`
+   * requires `href`, and this header renders on every storefront and /account
+   * route, cart and checkout included.
+   *
+   * An EMPTY-STRING `href` makes `pathname.startsWith(item.href)` true on
+   * every page, so every marked row renders as the active one at once.
+   *
+   * So the destination is KEPT and inert: switch this off and the row's own
+   * page is still there. THE FLAG WINS wherever the two disagree, reconciled
+   * in exactly one place — `navRowOpensNothing` in
+   * features/site-layout/lib/menu-links.ts.
+   *
+   * Optional and absent on every row in every shop today — probed, not
+   * assumed: a row without it is exactly the row it has always been.
+   */
+  menuOnly?: boolean;
 }
 
 export interface HeaderSettings {

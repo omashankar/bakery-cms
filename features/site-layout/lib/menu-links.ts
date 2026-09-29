@@ -1,5 +1,10 @@
 import { routes } from "@/constants/routes";
-import type { HeaderNavItem, MegaMenuLinkItem, MenuLinkRef } from "@/types/site-layout";
+import type {
+  HeaderNavItem,
+  MegaMenuGroup,
+  MegaMenuLinkItem,
+  MenuLinkRef,
+} from "@/types/site-layout";
 
 /**
  * A MENU LINK CAN BE A ROW OF THE CATALOGUE RATHER THAN A STRING ABOUT ONE.
@@ -51,6 +56,49 @@ export interface MenuAxes {
  */
 export function routeForAxis(axis: MenuLinkRef["axis"], slug: string): string {
   return axis === "occasion" ? routes.store.occasion(slug) : routes.store.collection(slug);
+}
+
+/**
+ * DOES THIS GROUP DRAW?
+ *
+ * ONE condition with several readers: `drawableGroups` in both menus,
+ * `menuDraws` below, and the Header screen's own warning. Written out twice is
+ * the shape of every bug this menu has had — it shipped with an occasion
+ * column on the desktop and none on the phone and nothing went red.
+ *
+ * `isVisible !== false` is load-bearing and not tidiness: a group holding
+ * links but switched OFF draws nothing, so a check that only counts
+ * `links.length` blesses a row the storefront cannot draw.
+ */
+export function groupDraws(group: MegaMenuGroup): boolean {
+  return group.isVisible !== false && group.links.length > 0;
+}
+
+/** Whether a row's menu has anything at all to open. */
+export function menuDraws(menu?: readonly MegaMenuGroup[]): boolean {
+  return (menu ?? []).some(groupDraws);
+}
+
+/**
+ * A ROW THAT DECLARES ITSELF A MENU AND HAS NO MENU TO OPEN.
+ *
+ * THE ONE PLACE the two fields are reconciled, and the only place any consumer
+ * may ask the question. `menuOnly` beats `href` everywhere — a marked row
+ * never renders its destination — so the only disagreement left is a marked
+ * row with nothing to open. That row is neither a link nor a menu, and both
+ * renderers drop it.
+ *
+ * THE TAXONOMY ROW IS NOT ONE OF THEM. A row at the collections address with
+ * no groups of its own draws the shop's three axes, which IS a menu — so
+ * marking that row is the most useful thing a shop can do with the switch, and
+ * it needs no rule beyond the last line here. That works only because the row
+ * KEEPS its `href`, which is also why the navbar's taxonomy branch needs no
+ * change at all.
+ */
+export function navRowOpensNothing(item: HeaderNavItem): boolean {
+  if (!item.menuOnly) return false;
+  if (menuDraws(item.menu)) return false;
+  return item.href !== routes.store.collections;
 }
 
 /**

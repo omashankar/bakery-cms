@@ -171,6 +171,26 @@ const headerNavSchema = z
     icon: z.string().optional(),
     badge: z.string().optional(),
     dividerBefore: z.boolean().optional(),
+    /**
+     * THE ROW OPENS ITS MENU AND GOES NOWHERE.
+     *
+     * DECLARED, though the `.passthrough()` below would store it either way —
+     * the same reason `ref` and `showBannerStrip` are declared in this file.
+     * Left undeclared, a hand-edited restore file holding `menuOnly: "yes"`
+     * saves with a 200, and a string is truthy, so the row silently loses its
+     * destination with nothing on screen to say why.
+     *
+     * `href` above stays REQUIRED. This field is what a menu-only row IS; a
+     * missing `href` is a malformed document, and conflating the two would
+     * leave nothing able to refuse the second.
+     *
+     * NO REFINE REFUSES A ROW WITH NO MENU YET. This endpoint takes the whole
+     * header in one payload, so a 400 here would block a save the shop made
+     * to change its logo letter, and would refuse an entire backup restore
+     * over one unfinished row. The Header screen refuses it by name and both
+     * renderers draw nothing; the three read one predicate.
+     */
+    menuOnly: z.boolean().optional(),
   })
   .passthrough();
 

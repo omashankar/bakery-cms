@@ -32,7 +32,7 @@ import {
   catalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
 import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
-import { routeForAxis } from "@/features/site-layout/lib/menu-links";
+import { navRowOpensNothing, routeForAxis } from "@/features/site-layout/lib/menu-links";
 import type { MenuAxes } from "@/features/site-layout/lib/menu-links";
 import type {
   HeaderNavItem,
@@ -431,6 +431,26 @@ export function HeaderAdminPage() {
       toast.error("Every nav link needs a label and URL");
       return;
     }
+    /*
+      A ROW THAT ONLY OPENS A MENU AND HAS NO MENU IS NOTHING AT ALL.
+
+      Refused HERE and not in the schema: that endpoint takes the whole header
+      in one payload, so a 400 there would block a save made to change the logo
+      letter, and would refuse an entire backup restore over one half-built
+      row. This is the one place that knows WHICH row and can say so.
+
+      Named by its LABEL rather than counted — "one of your rows is wrong" is
+      not something a shop can act on with eleven rows on screen. The row card
+      warns before this, and both renderers draw nothing regardless, because a
+      restore never comes through here.
+    */
+    const openingNothing = settings.nav.find((item) => navRowOpensNothing(item));
+    if (openingNothing) {
+      toast.error(
+        `"${openingNothing.label.trim() || "This link"}" only opens a menu, and it has no menu yet — add a group, or switch it back to a page`,
+      );
+      return;
+    }
     if (!canSave) return;
     await runWrite(async () => {
       const { value: next, persisted } = await saveHeaderSettings(settings);
@@ -789,16 +809,24 @@ export function HeaderAdminPage() {
                     for the three lists this software can address correctly.
                   */}
                   <div className="grid gap-2 sm:grid-cols-2">
+                    {/*
+                      GREYED, NOT HIDDEN. Under this switch the address is kept
+                      and reused, so showing it unusable is the accurate
+                      rendering of "stored, not used" — hiding a stored value is
+                      how a shop comes to believe a field is gone while the
+                      database still holds it.
+                    */}
                     <Input
                       value={item.href}
                       onChange={(e) => updateNav(item.id, { href: e.target.value })}
                       placeholder="/store/..."
+                      disabled={Boolean(item.menuOnly)}
                       aria-label={`Nav link ${index + 1} URL`}
                     />
                     <select
                       className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
                       value=""
-                      disabled={!catalogReady}
+                      disabled={!catalogReady || Boolean(item.menuOnly)}
                       onChange={(e) => {
                         if (e.target.value) updateNav(item.id, { href: e.target.value });
                       }}
@@ -884,6 +912,28 @@ export function HeaderAdminPage() {
                       />
                       Separate it from the row before
                     </label>
+                    {/*
+                      THE ROW GOES NOWHERE — IT JUST OPENS.
+
+                      A reference header's category rows are not pages: CAKES
+                      is the thing that opens the cake menu. Beside Highlight
+                      and Divider because it is the same kind of decision about
+                      the same row, and `checked || undefined` like both of
+                      them so an untouched row stores nothing at all.
+
+                      The address above is KEPT, not cleared — switch this back
+                      off and the row's own page is still there.
+                    */}
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        checked={Boolean(item.menuOnly)}
+                        onCheckedChange={(checked) =>
+                          updateNav(item.id, { menuOnly: checked || undefined })
+                        }
+                        aria-label={`${item.label || "This link"} only opens its menu`}
+                      />
+                      This one only opens its menu — no page of its own
+                    </label>
                   </div>
 
                   {/*
@@ -902,9 +952,11 @@ export function HeaderAdminPage() {
                   <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium text-muted-foreground">
-                        {(item.menu ?? []).length === 0
-                          ? "Drop-down menu — none yet, so this is a plain link"
-                          : `Drop-down menu — ${(item.menu ?? []).length} group${(item.menu ?? []).length === 1 ? "" : "s"}`}
+                        {navRowOpensNothing(item)
+                          ? "Opens a menu only — but there is no menu yet, so this row will not appear in your header. Add a group below."
+                          : (item.menu ?? []).length === 0
+                            ? "Drop-down menu — none yet, so this is a plain link"
+                            : `Drop-down menu — ${(item.menu ?? []).length} group${(item.menu ?? []).length === 1 ? "" : "s"}`}
                       </p>
                       <Button size="sm" variant="outline" onClick={() => addGroup(item.id)}>
                         <Plus className="size-3.5" />

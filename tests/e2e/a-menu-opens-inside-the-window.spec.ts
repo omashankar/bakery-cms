@@ -33,9 +33,23 @@ test("every menu in the band opens inside the window", async ({ page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1200);
 
-    const triggers = page.locator("[data-nav-band] a").filter({ hasNotText: /^$/ });
+    /*
+      BY MARKER, NOT BY TAG.
+
+      `[data-nav-band] a` also matches every anchor inside every CLOSED panel:
+      the panel is a sibling inside `.group`, which is inside the band, and a
+      text filter does not exclude hidden elements. That worked only while
+      `nth(0)` happened to be a trigger. A row can now be a menu with no
+      destination of its own, and its trigger is a `<button>` — so the first
+      match would become a hidden panel link and `hover()` would block on the
+      visibility wait until it timed out.
+
+      `data-mega-trigger` is on both arms of that branch, so this finds the
+      row whichever element it turns out to be.
+    */
+    const triggers = page.locator("[data-nav-band] [data-mega-trigger]");
     const count = await triggers.count();
-    expect(count, `the band has no rows at ${width}`).toBeGreaterThan(0);
+    expect(count, `the band has no menus at ${width}`).toBeGreaterThan(0);
 
     for (let i = 0; i < count; i += 1) {
       const row = triggers.nth(i);
@@ -97,7 +111,7 @@ test("and is no wider than the columns it holds", async ({ page }) => {
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(1200);
 
-  await page.locator("[data-nav-band] a").first().hover();
+  await page.locator("[data-nav-band] [data-mega-trigger]").first().hover();
   await page.waitForTimeout(500);
 
   const seen = await page.evaluate(() => {
@@ -123,4 +137,63 @@ test("and is no wider than the columns it holds", async ({ page }) => {
   */
   expect(seen!.tracks, "the panel drew a different number of columns").toBeGreaterThan(0);
   expect(seen!.width, "the panel is wider than it has ever been").toBeLessThanOrEqual(640);
+});
+
+test("a menu opens from the keyboard, not only from a mouse", async ({ page }) => {
+  /**
+   * THE MECHANISM A MENU-ONLY ROW STANDS ON.
+   *
+   * A row can now declare that it has no page of its own, and its trigger is a
+   * `<button>` rather than a `<Link>`. That is safe only because the panel is
+   * revealed by `group-focus-within` as well as `group-hover` — a natively
+   * focusable element in the wrapper is enough, and nothing needs to know
+   * whether the panel is open.
+   *
+   * ONLY A BROWSER CAN SETTLE IT. jsdom implements neither `:hover` nor
+   * `:focus-within` styling, so a className assertion there is a file-text
+   * check with extra steps. The unit cases pin that the trigger IS a
+   * `<button>` with its marker; this pins that focusing a trigger reveals the
+   * panel and puts its links in the tab order.
+   *
+   * Driven against the row this shop already has, so nothing is written to the
+   * database to make the case possible.
+   */
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/store");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1200);
+
+  const trigger = page.locator("[data-nav-band] [data-mega-trigger]").first();
+  await expect(trigger, "the band has no menu to open").toBeVisible();
+
+  /* Focus, never hover — hovering would prove the other half. */
+  await trigger.focus();
+  await page.waitForTimeout(400);
+
+  const opened = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-mega-panel]")].some(
+      (node) => getComputedStyle(node).visibility === "visible",
+    ),
+  );
+  expect(opened, "focusing a menu trigger did not open its panel").toBe(true);
+
+  /*
+    AND THE LINKS ARE REACHABLE — one Tab from the trigger lands inside the
+    panel, not past it. `invisible` is what keeps a closed panel's links out
+    of the tab order, so this is the same fact read from the other end and it
+    fails for the same reason: remove the focus reveal and both halves go red
+    together. Measured, not assumed — there is no separate mutation that
+    reddens this line alone, and saying so is more useful than implying one.
+
+    WHAT THIS DOES NOT COVER: the row it drives is an ordinary one, whose
+    trigger is still a `<Link>`. That a menu-only row`s `<button>` is a real
+    focusable button is pinned in jsdom instead, by
+    a-nav-row-can-open-and-go-nowhere.test.ts. Proving the pair together needs
+    a marked row in the database, which no test here may write.
+  */
+  await page.keyboard.press("Tab");
+  const inside = await page.evaluate(() =>
+    Boolean(document.activeElement?.closest("[data-mega-panel]")),
+  );
+  expect(inside, "the panel opened but its links are not in the tab order").toBe(true);
 });
