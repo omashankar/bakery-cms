@@ -82,7 +82,6 @@ const EMPTY_OVERVIEW: HeaderOverview = {
   visibleLinks: 0,
   hiddenLinks: 0,
   searchEnabled: false,
-  ctaEnabled: false,
 };
 
 /**
@@ -706,7 +705,7 @@ export function HeaderAdminPage() {
   // effect, so on a hard load that read is still in flight and
   // `loadHeaderSettings()` answers with the DEMO NAVIGATION — and saving is a
   // replace-all, so one edit replaced the shop's entire storefront menu, its
-  // logo badge, its search toggle and its CTA with the demo set.
+  // logo badge and its search toggle with the demo set.
   const {
     value: settings,
     isDirty,
@@ -839,47 +838,6 @@ export function HeaderAdminPage() {
     setSettings((prev) => ({
       ...prev,
       nav: prev.nav.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    }));
-  }
-
-  /**
-   * The thin row above the main bar.
-   *
-   * Its own small writer set rather than a shared one parameterised by which
-   * list to touch: three short functions read more plainly than one that
-   * takes a key, and this screen already has that shape for `nav`.
-   */
-  function addUtilityItem() {
-    setSettings((prev) => ({
-      ...prev,
-      utilityNav: [
-        ...(prev.utilityNav ?? []),
-        {
-          id: `util-${Date.now()}`,
-          label: "New link",
-          href: "/store",
-          isVisible: true,
-          sortOrder: (prev.utilityNav ?? []).length + 1,
-        },
-      ],
-    }));
-  }
-
-  function updateUtility(id: string, patch: Partial<HeaderNavItem>) {
-    setSettings((prev) => ({
-      ...prev,
-      utilityNav: (prev.utilityNav ?? []).map((item) =>
-        item.id === id ? { ...item, ...patch } : item,
-      ),
-    }));
-  }
-
-  function removeUtility(id: string) {
-    setSettings((prev) => ({
-      ...prev,
-      utilityNav: (prev.utilityNav ?? [])
-        .filter((item) => item.id !== id)
-        .map((item, index) => ({ ...item, sortOrder: index + 1 })),
     }));
   }
 
@@ -1163,7 +1121,7 @@ export function HeaderAdminPage() {
       title="Header"
       description={
         hydration === "ready"
-          ? `${overview.visibleLinks} visible links · search ${overview.searchEnabled ? "on" : "off"} · CTA ${overview.ctaEnabled ? "on" : "off"}`
+          ? `${overview.visibleLinks} visible links · search ${overview.searchEnabled ? "on" : "off"}`
           : "Configure storefront top navigation, search, and CTA"
       }
       isDirty={isDirty}
@@ -1330,25 +1288,18 @@ export function HeaderAdminPage() {
               </div>
               <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">Show CTA button</p>
-                  <p className="text-xs text-muted-foreground">
-                    A button beside the cart, for whatever you want asked first.
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.showCta}
-                  onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, showCta: checked }))
-                  }
-                  aria-label="Show CTA button"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-                <div className="min-w-0">
                   <p className="text-sm font-medium">Show promo strip</p>
+                  {/*
+                    IT SAID THEY ALSO APPEAR ON THE HOMEPAGE. They do not.
+                    Probed: the published homepage has no Promo Banner section,
+                    and the Banner Grid section it does have draws its own
+                    separate list. This strip is the only place the Banners
+                    screen reaches a customer — which is why it stayed when the
+                    CTA and the top row went.
+                  */}
                   <p className="text-xs text-muted-foreground">
-                    Your active banners, above the header. They also appear in the
-                    homepage&rsquo;s Promo Banner section.
+                    Your active banners, in a strip above the header. This is the
+                    only place they appear.
                   </p>
                 </div>
                 <Switch
@@ -1359,93 +1310,6 @@ export function HeaderAdminPage() {
                   aria-label="Show promo strip"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cta-label">CTA label</Label>
-                <Input
-                  id="cta-label"
-                  value={settings.ctaLabel}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, ctaLabel: e.target.value }))}
-                  disabled={!settings.showCta}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cta-href">CTA link</Label>
-                <Input
-                  id="cta-href"
-                  value={settings.ctaHref}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, ctaHref: e.target.value }))}
-                  disabled={!settings.showCta}
-                  placeholder="/store/contact"
-                />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <CardTitle className="text-base">Top row</CardTitle>
-                <CardDescription>
-                  The thin row above your logo. Leave it empty and it does not appear.
-                </CardDescription>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={addUtilityItem}
-                className="w-full sm:w-auto"
-              >
-                <Plus className="size-4" />
-                Add link
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch
-                  checked={Boolean(settings.showCurrencyNote)}
-                  onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, showCurrencyNote: checked }))
-                  }
-                  aria-label="Show the currency"
-                />
-                Show which currency your prices are in
-              </label>
-              {(settings.utilityNav ?? []).length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No links yet — the row is hidden.
-                </p>
-              ) : (
-                (settings.utilityNav ?? []).map((item, index) => (
-                  <div key={item.id} className="flex items-center gap-2">
-                    <Input
-                      value={item.label}
-                      onChange={(e) => updateUtility(item.id, { label: e.target.value })}
-                      placeholder="Label"
-                      aria-label={`Top row link ${index + 1} label`}
-                    />
-                    <Input
-                      value={item.href}
-                      onChange={(e) => updateUtility(item.id, { href: e.target.value })}
-                      placeholder="/store/..."
-                      aria-label={`Top row link ${index + 1} URL`}
-                    />
-                    <Switch
-                      checked={item.isVisible}
-                      onCheckedChange={(checked) =>
-                        updateUtility(item.id, { isVisible: checked })
-                      }
-                      aria-label={`Show ${item.label || "link"}`}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => removeUtility(item.id)}
-                      aria-label={`Remove ${item.label || "link"}`}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))
-              )}
             </CardContent>
           </Card>
         </div>

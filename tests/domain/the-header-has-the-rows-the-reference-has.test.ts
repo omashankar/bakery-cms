@@ -31,87 +31,84 @@ const code = (path: string) =>
 
 const NAVBAR = "apps/website/components/storefront-navbar.tsx";
 
-describe("the utility row above the main bar", () => {
-  it("is a list the shop writes, validated like the nav below it", () => {
+describe("the row above the main bar, and the button beside the cart", () => {
+  /*
+    BOTH ARE GONE, at the shop's request, and both were LIVE when they went.
+
+    The thin row read "Currency · INR" on every page, and the header carried
+    an "Order Inquiry" button beside the cart. The shop crossed them out on
+    the Header screen and confirmed they should leave the site too.
+
+    Five cases used to pin that they worked. These pin that they are gone,
+    in every place they lived, so restoring any one part on its own turns
+    this red — a removal with no guard is how a removed thing comes back,
+    and these have form: a script once switched them off and they were on
+    again afterwards.
+  */
+  it("is gone from the stored shape, the defaults and the schema", () => {
+    const types = code("types/site-layout.ts");
+    expect(types, "the top row is offered again").not.toMatch(/^\s*utilityNav/m);
+    expect(types).not.toMatch(/^\s*showCurrencyNote/m);
+    expect(types, "the CTA is offered again").not.toMatch(/^\s*showCta/m);
+
+    expect("utilityNav" in defaultHeaderSettings, "a new shop gets a top row").toBe(false);
+    expect("showCta" in defaultHeaderSettings, "a new shop gets a CTA").toBe(false);
+
+    /*
+      AND THE SCHEMA DROPS THEM ON THE WAY IN. This endpoint takes a whole
+      document replace over a `.passthrough()` object, and the admin's form
+      is the defaults spread over a browser cache that still holds all five —
+      so without the transform the next save of the logo letter would write
+      them straight back over a cleaned database.
+    */
     const parsed = headerSchema.parse({
-      logoLetter: "",
+      logoLetter: "S",
       nav: [],
       utilityNav: [
-        { id: "u1", label: "Track Order", href: "/store/order/track", isVisible: true, sortOrder: 1 },
+        { id: "u1", label: "Track Order", href: "/t", isVisible: true, sortOrder: 1 },
       ],
       showCurrencyNote: true,
-    }) as { utilityNav?: { label: string }[]; showCurrencyNote?: boolean };
+      showCta: true,
+      ctaLabel: "Order Inquiry",
+      ctaHref: "/store/contact",
+    }) as Record<string, unknown>;
 
-    expect(parsed.utilityNav?.[0]?.label).toBe("Track Order");
-    expect(parsed.showCurrencyNote).toBe(true);
+    for (const key of [
+      "utilityNav",
+      "showCurrencyNote",
+      "showCta",
+      "ctaLabel",
+      "ctaHref",
+    ]) {
+      expect(key in parsed, `${key} survived the save`).toBe(false);
+    }
+    expect(parsed.logoLetter, "the transform took something it should not").toBe("S");
   });
 
-  it("ships EMPTY, so a shop that never opens the screen has no second row", () => {
-    /**
-     * Unlike `nav`, which is seeded from the shipped navigation because a shop
-     * cannot have no navigation at all. A seeded utility row would put Help and
-     * Corporate Gifts links on every storefront pointing at pages nobody wrote.
-     */
-    expect(defaultHeaderSettings.utilityNav).toEqual([]);
-    expect(defaultHeaderSettings.showCurrencyNote).toBe(false);
-  });
-
-  it("renders nothing at all when there is nothing in it", () => {
+  it("is gone from both screens, and the promo strip above it is NOT", () => {
     const navbar = code(NAVBAR);
+    expect(navbar, "the top row is drawn again").not.toContain("currencyNote");
+    expect(navbar).not.toContain("utilityNav");
+    expect(navbar, "the CTA is drawn again").not.toContain("chrome.cta");
 
-    expect(navbar).toContain("utilityNav.length > 0 || currencyNote");
-  });
-
-  it("hides a link the shop switched off, and keeps the order it set", () => {
-    /**
-     * The same `selectVisibleNavItems` the main row goes through. Reading the
-     * raw array here would make a hidden utility link visible and an ordered
-     * one arbitrary — the exact pair of bugs that filter was written for.
-     */
     const chrome = code("apps/website/lib/storefront-chrome.server.ts");
+    expect(chrome).not.toContain("showCurrencyNote");
+    expect(chrome).not.toContain("header.utilityNav");
 
-    expect(chrome).toContain("selectVisibleNavItems(header.utilityNav ?? [])");
-  });
-});
+    /*
+      THE ONE THING THAT MUST NOT HAVE GONE WITH THEM.
 
-describe("the currency line is a readout, not a switcher", () => {
-  /**
-   * Currency is ONE shop-wide setting published into a process-global locale;
-   * `formatCurrency` is synchronous across hundreds of call sites in two module
-   * graphs; and the payment gateway takes rupees only. A control that looked
-   * like a switcher would charge the customer in INR regardless — a lie with a
-   * dropdown on it.
-   *
-   * Saying which currency the prices are in is true and useful. That is what
-   * this is, and the test is here so nobody "finishes" it later.
-   */
-  it("prints the shop's own currency and offers no way to change it", () => {
-    const navbar = code(NAVBAR);
-    const chrome = code("apps/website/lib/storefront-chrome.server.ts");
-
-    expect(chrome).toContain("header.showCurrencyNote");
-    expect(chrome).toContain("general.currency");
-
-    /**
-     * THE WHOLE ROW, not the gap between two markers.
-     *
-     * It sliced from `currencyNote ? (` to `utilityNav.map` — two markers in
-     * a fixed order today, and `String.slice(a, b)` with b < a returns the
-     * empty string. Move the links above the readout, which is an ordinary
-     * layout change, and the guard passes by measuring nothing. Anchored on
-     * the row's own opening test and the next band instead, so it covers the
-     * readout wherever inside the row it sits.
-     */
-    const start = navbar.indexOf("utilityNav.length > 0 || currencyNote");
-    const end = navbar.indexOf("data-header-bar");
-    expect(start, "the utility row is gone").toBeGreaterThan(-1);
-    expect(end, "the main bar is gone").toBeGreaterThan(start);
-
-    const row = navbar.slice(start, end);
-    expect(row, "the readout is no longer in the row being checked").toContain(
-      "{currencyNote}",
+      The promo strip was crossed out too, and it STAYED — probed: the
+      published homepage has no Promo Banner section and the Banner Grid
+      section draws its own separate list, so the strip is the only place
+      this shop's two live offers reach a customer. Removing it would have
+      taken them off the site altogether.
+    */
+    expect(chrome, "the promo strip went too").toContain("showBannerStrip");
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+    expect(admin, "the shop can no longer switch the strip").toContain(
+      "settings.showBannerStrip",
     );
-    expect(row).not.toMatch(/<select|onChange|onClick/);
   });
 });
 

@@ -1182,8 +1182,14 @@ describe("the column the page is drawn in", () => {
 
     expect(spacing).toContain('container: "mx-auto w-full max-w-[1440px]');
     expect(navbar, "the header still fixes its own width").not.toContain("max-w-7xl");
-    // The three rows of the header: utility, main bar, category band.
-    expect((navbar.match(/layoutSpacing\.container/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    /*
+      TWO ROWS NOW, not three: the utility row above the bar went at the shop's
+      request, and with it one of the three uses of the shared column. What is
+      being pinned has not changed — every row the header still draws takes its
+      width from the same place as the bands below it, so widening the content
+      column cannot leave the logo lining up with nothing.
+    */
+    expect((navbar.match(/layoutSpacing\.container/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
   it("and the wide one is still wider than it", () => {

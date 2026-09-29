@@ -233,18 +233,29 @@ describe("what the server accepts", () => {
 });
 
 describe("controls that reached no customer", () => {
-  it("carries the header CTA through to the navbar", () => {
-    // A switch, a label and a link, stored and validated and summarised on the
-    // screen — and rendered nowhere. The card's own helper text said "Order
-    // inquiry button on desktop".
+  it("no longer has a header CTA at all, anywhere", () => {
+    /*
+      IT WENT, AT THE SHOP'S REQUEST — and it was live when it went: an
+      "Order Inquiry" button beside the cart on every storefront page.
+
+      This case used to pin that the switch, the label and the link reached
+      the navbar. It pins the opposite now, in all four places the feature
+      lived, so restoring any ONE of them on its own turns it red. A removal
+      with no guard is how a removed thing comes back.
+    */
     const chrome = code("apps/website/lib/storefront-chrome.server.ts");
-    expect(chrome).toMatch(/cta: \{ show: boolean; label: string; href: string \}/);
-    expect(chrome).toContain("header.showCta ?? defaultHeaderSettings.showCta");
+    expect(chrome, "the chrome carries a CTA again").not.toContain("showCta");
+    expect(chrome).not.toContain("ctaLabel");
 
     const navbar = code("apps/website/components/storefront-navbar.tsx");
-    expect(navbar).toContain("chrome.cta");
-    expect(navbar).toMatch(/\{cta\.show \? \(/);
-    expect(navbar).toContain("{cta.label}");
+    expect(navbar, "the navbar draws a CTA again").not.toContain("chrome.cta");
+    expect(navbar).not.toContain("cta.label");
+
+    const types = code("types/site-layout.ts");
+    expect(types, "the stored shape offers a CTA again").not.toMatch(/^\s*showCta/m);
+
+    const admin = code("apps/admin/header/components/header-admin-page.tsx");
+    expect(admin, "the Header screen offers a CTA again").not.toContain("settings.showCta");
   });
 
   it("drives the Collections row's own label and visibility", () => {

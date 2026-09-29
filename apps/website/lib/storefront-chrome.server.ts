@@ -82,21 +82,20 @@ export interface StorefrontChrome {
   searchPlaceholder: string;
   /** Draw the promo strip above the header at all. */
   showBannerStrip: boolean;
-  /**
-   * The header's call-to-action button.
-   *
-   * The admin screen has had a whole card for this — a switch, a label and a
-   * link — since before this type existed, and none of the three ever
-   * travelled: `StorefrontChrome` had no field and the navbar rendered no
-   * button. The screen said so twice, in the summary line and in the card's
-   * own helper text ("Order inquiry button on desktop").
-   */
-  cta: { show: boolean; label: string; href: string };
+  /*
+    GONE, AT THE SHOP'S REQUEST: the header's call-to-action button, the thin
+    row above the bar, and the currency note that was the only thing in it.
+
+    The button was live — "Order Inquiry", beside the cart — and the row read
+    "Currency · INR". Neither is offered any more and neither can be turned
+    back on: the switches are off the Header screen, the fields are off
+    `HeaderSettings`, and the schema drops them on every save.
+
+    The promo strip above them STAYS. It carries this shop's two live offers,
+    and the homepage's banner-grid section draws a different list, so removing
+    it would have taken them off the site altogether.
+  */
   navItems: HeaderNavItem[];
-  /** The thin row above the main bar; empty renders no row at all. */
-  utilityNav: HeaderNavItem[];
-  /** Print "Currency · INR" in that row — a readout, never a switcher. */
-  currencyNote: string;
   brand: { name: string; tagline: string; description: string };
   contact: { address: string; phone: string; email: string };
   businessHours: { day: string; hours: string }[];
@@ -192,14 +191,7 @@ function fallbackChrome(): StorefrontChrome {
     showSearch: defaultHeaderSettings.showSearch,
     showBannerStrip: defaultHeaderSettings.showBannerStrip ?? true,
     searchPlaceholder: "",
-    cta: {
-      show: defaultHeaderSettings.showCta,
-      label: defaultHeaderSettings.ctaLabel,
-      href: defaultHeaderSettings.ctaHref,
-    },
     navItems: selectVisibleNavItems(defaultHeaderSettings.nav),
-    utilityNav: [],
-    currencyNote: "",
     brand: { name: brandInfo.name, tagline: brandInfo.tagline, description: brandInfo.description },
     contact: {
       address: defaultContact.address,
@@ -363,12 +355,6 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       searchPlaceholder: (header.searchPlaceholder ?? "").trim(),
       showBannerStrip:
         header.showBannerStrip ?? defaultHeaderSettings.showBannerStrip ?? true,
-      cta: {
-        show: header.showCta ?? defaultHeaderSettings.showCta,
-        // An empty label would render a button with no accessible name.
-        label: header.ctaLabel?.trim() || defaultHeaderSettings.ctaLabel,
-        href: header.ctaHref?.trim() || defaultHeaderSettings.ctaHref,
-      },
       /*
         RESOLVED FIRST, then filtered for visibility.
 
@@ -377,16 +363,10 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         row is gone is dropped. A link the shop TYPED is returned untouched,
         which is every link stored before today.
 
-        `utilityNav` below is deliberately not resolved: those rows render as
-        plain links on both screens, so a menu there would be dead code.
+        There is one row of links now: the second row above the logo went at
+        the shop's request, and the CTA button beside the cart with it.
       */
       navItems: selectVisibleNavItems(resolveNavMenus(header.nav ?? [], menuAxes)),
-      // The same filter and sort the main row gets: a hidden utility link is
-      // hidden, and the order the shop set is the order it renders in.
-      utilityNav: selectVisibleNavItems(header.utilityNav ?? []),
-      currencyNote: header.showCurrencyNote
-        ? (general.currency ?? "").trim().toUpperCase()
-        : "",
       /**
        * The shop's own categories, for the header's Shop menu.
        *

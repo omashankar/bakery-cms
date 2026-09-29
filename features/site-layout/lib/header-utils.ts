@@ -1,5 +1,4 @@
 import { storefrontNav } from "@/constants/navigation";
-import { routes } from "@/constants/routes";
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 
 function nowIso(): string {
@@ -18,22 +17,9 @@ export const defaultHeaderSettings: HeaderSettings = {
    */
   logoLetter: "",
   showSearch: true,
-  showCta: true,
   // ON, so no shop loses the strip it has today. See the type's own note for
   // why it is a switch at all.
   showBannerStrip: true,
-  ctaLabel: "Order Inquiry",
-  ctaHref: routes.store.contact,
-  /**
-   * EMPTY. A shop that has not written a utility row does not get one.
-   *
-   * Unlike `nav`, which is seeded from `storefrontNav` because a shop cannot
-   * have no navigation at all, a second row is a thing a shop chooses to
-   * have. Seeding it would put Help and Corporate Gifts links on every
-   * storefront pointing at pages nobody has written.
-   */
-  utilityNav: [],
-  showCurrencyNote: false,
   nav: storefrontNav.map((item, index) => ({
     id: `nav-${index + 1}`,
     label: item.label,
@@ -60,7 +46,6 @@ export type HeaderOverview = {
   visibleLinks: number;
   hiddenLinks: number;
   searchEnabled: boolean;
-  ctaEnabled: boolean;
 };
 
 export function getHeaderOverview(settings: HeaderSettings): HeaderOverview {
@@ -70,7 +55,6 @@ export function getHeaderOverview(settings: HeaderSettings): HeaderOverview {
     visibleLinks,
     hiddenLinks: settings.nav.length - visibleLinks,
     searchEnabled: settings.showSearch,
-    ctaEnabled: settings.showCta,
   };
 }
 

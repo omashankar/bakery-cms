@@ -103,12 +103,9 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const [logo] = useState(chrome.logo);
   const [logoLetter] = useState(chrome.logoLetter);
   const [navItems] = useState(chrome.navItems);
-  const [utilityNav] = useState(chrome.utilityNav);
-  const [currencyNote] = useState(chrome.currencyNote);
   const labels = useBusinessLabels();
   const [showSearch] = useState(chrome.showSearch);
   const [searchPlaceholder] = useState(chrome.searchPlaceholder);
-  const [cta] = useState(chrome.cta);
 
   /* ------------------------------------------------------------------ *
    * THE SEARCH BOX ANSWERS WHILE THE CUSTOMER IS STILL TYPING.
@@ -620,56 +617,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       )}
     >
       {/*
-        THE UTILITY ROW.
-
-        Right-aligned, quiet, and hidden on phones — it is the row a customer
-        goes looking for rather than reads. Renders NOTHING when the shop has
-        written no links and asked for no currency note, which is every shop
-        until somebody opens the Header screen.
-      */}
-      {utilityNav.length > 0 || currencyNote ? (
-        <div className="hidden border-b border-border/60 bg-cream-50/40 lg:block">
-          {/* The same column as everything below it — see layoutSpacing. */}
-          <div
-            className={cn(
-              layoutSpacing.container,
-              "flex items-center justify-end gap-0 py-1.5 text-xs text-muted-foreground"
-            )}
-          >
-            {currencyNote ? (
-              <>
-                {/*
-                  A READOUT. Currency is one shop-wide setting published into
-                  a process-global locale and the gateway takes rupees only,
-                  so a control that looked like a switcher would charge in INR
-                  regardless. Saying which currency the prices are in is true.
-                */}
-                <span className="px-3">
-                  Currency · <span className="font-medium text-foreground">{currencyNote}</span>
-                </span>
-                {utilityNav.length > 0 ? (
-                  <span className="h-3 w-px bg-border" aria-hidden="true" />
-                ) : null}
-              </>
-            ) : null}
-            {utilityNav.map((item, index) => (
-              <span key={item.id} className="flex items-center">
-                {index > 0 ? (
-                  <span className="h-3 w-px bg-border" aria-hidden="true" />
-                ) : null}
-                <Link
-                  href={item.href}
-                  className="px-3 transition-premium hover:text-bakery-700"
-                >
-                  {item.label}
-                </Link>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/*
         `data-header-bar` is read by a test, and that is its whole job.
 
         The guard that proves the category strip sits BELOW this row used to
@@ -952,22 +899,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         ) : null}
 
         <div className="flex items-center gap-1 sm:gap-1.5">
-          {/*
-            The header CTA the admin has always been able to configure.
-            Its switch, label and link were stored, validated and shown in a
-            summary line — and rendered nowhere, so setting them changed
-            nothing a customer ever saw.
-          */}
-          {cta.show ? (
-            <Button
-              variant="bakery"
-              size="sm"
-              className="hidden lg:inline-flex"
-              render={<Link href={cta.href} />}
-            >
-              {cta.label}
-            </Button>
-          ) : null}
           {showSearch ? (
             <Button
               variant="ghost"
@@ -1537,35 +1468,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             ) : null}
 
 
-            {/*
-              THE UTILITY ROW, WHICH THE PHONE COULD NOT REACH AT ALL.
-
-              Its own band is `hidden … lg:block`, and nothing else rendered
-              it — so Track Order, Help, and whatever else a shop puts up
-              there existed only on a desktop. Those are exactly the rows a
-              customer goes looking for, and this shop's customers are on
-              phones.
-            */}
-            {utilityNav.length > 0 || currencyNote ? (
-              <div className="mt-2 space-y-1 border-t border-border pt-3">
-                {utilityNav.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-cream-100 hover:text-bakery-700"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-                {currencyNote ? (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">
-                    Currency ·{" "}
-                    <span className="font-medium text-foreground">{currencyNote}</span>
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
           </nav>
         </div>
       ) : null}

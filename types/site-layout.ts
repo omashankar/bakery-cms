@@ -150,9 +150,20 @@ export interface HeaderSettings {
    * the shop knows whether it has 5,000 of anything.
    */
   searchPlaceholder?: string;
-  showCta: boolean;
-  ctaLabel: string;
-  ctaHref: string;
+  /*
+    THE CTA BUTTON AND THE TOP ROW ARE GONE, at the shop's request:
+    `showCta`, `ctaLabel`, `ctaHref`, `utilityNav` and `showCurrencyNote`.
+
+    Both were LIVE when they went — an "Order Inquiry" button beside the cart
+    and a thin row reading "Currency · INR". Neither is offered any more and
+    neither can be turned back on from the admin.
+
+    A document stored before today still HAS all five: the header is one
+    Mongoose `Mixed` field and the schema is `.passthrough()`. They are dropped
+    on the way in by a transform in site-layout.validators, so the next save
+    cleans the document instead of writing them back, and restoring an old
+    backup still succeeds rather than failing.
+  */
   /**
    * The promo strip ABOVE the header, which draws the shop's active banners.
    *
@@ -169,29 +180,6 @@ export interface HeaderSettings {
    */
   showBannerStrip?: boolean;
   nav: HeaderNavItem[];
-  /**
-   * The thin row ABOVE the main bar — Help, Track Order, and whatever else
-   * the shop wants within reach of every page.
-   *
-   * The same shape as `nav` on purpose: it is the same thing, in a different
-   * place, and giving it its own type would mean a second editor, a second
-   * validator and a second render for no difference a shop can name.
-   *
-   * Optional and EMPTY by default, so a shop that never opens the screen has
-   * no second row — the header is exactly as it is today.
-   */
-  utilityNav?: HeaderNavItem[];
-  /**
-   * Whether the utility row prints the shop's currency.
-   *
-   * A READOUT, not a switcher. Currency is one shop-wide setting published
-   * into a process-global locale, `formatCurrency` is synchronous across
-   * hundreds of call sites, and the payment gateway takes rupees only — so a
-   * control that appeared to change it would charge the customer in INR
-   * anyway. Saying which currency the prices are in is true and useful; a
-   * dropdown would be neither.
-   */
-  showCurrencyNote?: boolean;
   updatedAt: string;
 }
 

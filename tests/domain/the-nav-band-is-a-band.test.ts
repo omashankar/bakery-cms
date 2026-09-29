@@ -346,15 +346,24 @@ describe("the phone drawer this band hides behind", () => {
     expect(drawer, "vh is measured against the taller chrome").toContain("dvh");
   });
 
-  it("carries the utility row, which the phone could not reach at all", () => {
-    // Its own band is `hidden … lg:block` and nothing else rendered it, so
-    // Track Order and Help existed only on a desktop — and those are exactly
-    // the rows a customer goes looking for.
+  it("no longer carries a utility row, because there is not one", () => {
+    /*
+      It used to, and that was the fix: the row's own band is
+      `hidden … lg:block`, so before the drawer drew it those links existed
+      only on a desktop.
+
+      The row itself went at the shop's request. Scoped to the DRAWER rather
+      than the file, so this stays a statement about the phone: if the row
+      comes back anywhere, the case in
+      the-header-has-the-rows-the-reference-has catches it, and if it comes
+      back HERE, this one does.
+    */
     const navbar = code(NAVBAR);
     const drawer = navbar.slice(navbar.indexOf('id="storefront-mobile-nav"'));
+    expect(drawer.length, "the drawer is gone").toBeGreaterThan(0);
 
-    expect(drawer).toContain("utilityNav.map");
-    expect(drawer).toContain("{currencyNote}");
+    expect(drawer, "the phone draws a utility row again").not.toContain("utilityNav");
+    expect(drawer).not.toContain("currencyNote");
   });
 });
 

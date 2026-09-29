@@ -200,9 +200,6 @@ export const headerSchema = z
     // Optional: blank and absent both mean "use the shop's own plural".
     searchPlaceholder: z.string().optional(),
     nav: z.array(headerNavSchema),
-    // The same row shape, so the same validator — see HeaderSettings.
-    utilityNav: z.array(headerNavSchema).optional(),
-    showCurrencyNote: z.boolean().optional(),
     /*
       Declared, because the schema is `.passthrough()` and the renderer reads
       this as `?? true`. Left undeclared, a stored "false" — a string, which
@@ -212,7 +209,31 @@ export const headerSchema = z
     */
     showBannerStrip: z.boolean().optional(),
   })
-  .passthrough();
+  .passthrough()
+  /*
+    THE FIVE KEYS THE HEADER NO LONGER HAS, DROPPED ON EVERY SAVE.
+
+    Nothing reads `showCta`, `ctaLabel`, `ctaHref`, `utilityNav` or
+    `showCurrencyNote` any more. But this endpoint takes a whole-document
+    replace and the object is `.passthrough()`, so whatever the browser posts
+    BECOMES the document — and the admin's form is the defaults spread over a
+    localStorage blob that still carries all five. Without this, the next save
+    of the logo letter would write them back over a cleaned database, and no
+    amount of cleaning it would stick.
+
+    A DROP, NOT A REFUSAL. A document stored before today still saves, so
+    restoring an old backup works and a shop can still change its logo letter.
+    A leftover `showCta: "yes"` is discarded rather than 400ing, which is the
+    right answer once there is no switch for a truthy string to turn on.
+
+    Spelled as a rest-destructure and NOT as an `Omit<>` annotation: `keyof`
+    an index-signature type is `string`, so `Omit` over a `.passthrough()`
+    output collapses the whole type and every caller that reads `parsed.nav`
+    stops compiling.
+  */
+  .transform(
+    ({ showCta, ctaLabel, ctaHref, utilityNav, showCurrencyNote, ...rest }) => rest,
+  );
 
 /**
  * `links` is what the footer actually renders, and it was unvalidated.
