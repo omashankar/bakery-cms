@@ -51,8 +51,14 @@ describe("the row above the main bar, and the button beside the cart", () => {
     expect(types).not.toMatch(/^\s*showCurrencyNote/m);
     expect(types, "the CTA is offered again").not.toMatch(/^\s*showCta/m);
 
-    expect("utilityNav" in defaultHeaderSettings, "a new shop gets a top row").toBe(false);
-    expect("showCta" in defaultHeaderSettings, "a new shop gets a CTA").toBe(false);
+    /*
+      Through a record, because the whole point is that these are no longer
+      members of the type — `in` on the typed object is a compile error for
+      the very reason this case is asserting.
+    */
+    const shipped = defaultHeaderSettings as unknown as Record<string, unknown>;
+    expect("utilityNav" in shipped, "a new shop gets a top row").toBe(false);
+    expect("showCta" in shipped, "a new shop gets a CTA").toBe(false);
 
     /*
       AND THE SCHEMA DROPS THEM ON THE WAY IN. This endpoint takes a whole

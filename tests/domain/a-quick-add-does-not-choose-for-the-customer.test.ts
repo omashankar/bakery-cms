@@ -119,32 +119,6 @@ describe("ordering again keeps the two cakes apart", () => {
   });
 });
 
-/** Mount a card and hand back its Add button. */
-function renderCard(cake: LandingProduct): { button: HTMLButtonElement; unmount: () => void } {
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-
-  act(() => {
-    root.render(createElement(ProductCard, { cake } as never));
-  });
-
-  const buttons = [...container.querySelectorAll("button")] as HTMLButtonElement[];
-  const button = buttons.find((element) =>
-    /Add to Cart|Choose options|Out of stock/i.test(element.textContent ?? ""),
-  );
-  if (!button) throw new Error("no add button rendered");
-
-  return {
-    button,
-    unmount: () => {
-      act(() => {
-        root.unmount();
-      });
-      container.remove();
-    },
-  };
-}
 
 /** A configurable product, with the shop's own resolution of its defaults. */
 const CHARGER: LandingProduct = {
@@ -156,11 +130,6 @@ const CHARGER: LandingProduct = {
   image: "/charger.jpg",
   category: "Chargers",
   inStock: true,
-  quickAdd: {
-    weight: "1 kg",
-    variantSelections: { "g-storage": "o-128" },
-    variantSummary: ["Storage: 128 GB"],
-  },
 };
 
 const BUN: LandingProduct = {
@@ -172,92 +141,52 @@ const BUN: LandingProduct = {
   image: "/bun.jpg",
   category: "Bakes",
   inStock: true,
-  quickAdd: {},
 };
 
-describe("a card add says which answer it gave", () => {
-  it("writes the shop's resolved choices onto the line", () => {
-    const { button, unmount } = renderCard(CHARGER);
-    try {
-      // One tap is kept. What changed is that the line now states what the
-      // server was always going to charge for.
-      expect(button.textContent).toContain("Add to Cart");
+describe("a card does not add to the cart at all now", () => {
+  /*
+    THE BUTTON WENT, at the shop's request — the card is a link and the
+    product page is where the selling happens.
 
+    So this stops describing what a card add committed to and pins that
+    there is no card add. RENDERED and not asserted through the source,
+    for the reason this file's own note at the top gives: the first version
+    of these cases called a predicate three times, never mounted the
+    component, and left the suite green when the guard inside ProductCard
+    was deleted.
+  */
+  it("renders no control that would add one, and touches no cart line", () => {
+    clearCart();
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(createElement(ProductCard, { cake: CHARGER } as never));
+    });
+
+    const buttons = [...container.querySelectorAll("button")];
+    expect(
+      buttons.map((b) => b.textContent ?? "").join(" | "),
+      "a card offers to add to the cart again",
+    ).not.toMatch(/add to cart/i);
+
+    /*
+      AND PRESSING WHAT IS LEFT DOES NOT BUY ANYTHING. The wishlist heart is
+      still there; a guard that only reads the words would pass if that
+      button quietly started adding to the cart.
+    */
+    for (const button of buttons) {
       act(() => {
         button.click();
       });
-
-      const [line] = getCartItems();
-      expect(line).toBeDefined();
-      expect(line.variantSelections).toEqual({ "g-storage": "o-128" });
-      expect(line.variantSummary).toEqual(["Storage: 128 GB"]);
-      expect(line.weight).toBe("1 kg");
-      expect(state.pushed).toEqual([]);
-    } finally {
-      unmount();
     }
-  });
+    expect(getCartItems(), "pressing a card put something in the cart").toHaveLength(0);
 
-  it("lands on the same cart line a product-page add with the same choices would", () => {
-    /**
-     * The identity matters: if the grid wrote a different line from the product
-     * page for the same choices, a customer adding one from each would get two
-     * rows of the same thing. `cartLineId` folds the selections in, so passing
-     * them is what makes the two agree.
-     */
-    const { button, unmount } = renderCard(CHARGER);
-    try {
-      act(() => {
-        button.click();
-      });
-      addToCart({
-        productSlug: "type-c-charger",
-        name: "65W Charger",
-        image: "/charger.jpg",
-        price: 1499,
-        quantity: 1,
-        weight: "1 kg",
-        variantSelections: { "g-storage": "o-128" },
-        variantSummary: ["Storage: 128 GB"],
-      });
-
-      expect(getCartItems()).toHaveLength(1);
-      expect(getCartItems()[0].quantity).toBe(2);
-    } finally {
-      unmount();
-    }
-  });
-
-  it("states nothing about a product that asks nothing", () => {
-    const { button, unmount } = renderCard(BUN);
-    try {
-      act(() => {
-        button.click();
-      });
-
-      const [line] = getCartItems();
-      expect(line.productSlug).toBe("plain-bun");
-      expect(line.variantSummary).toBeUndefined();
-      expect(line.weight).toBeUndefined();
-    } finally {
-      unmount();
-    }
-  });
-
-  it("still refuses an out-of-stock product", () => {
-    const { button, unmount } = renderCard({ ...CHARGER, inStock: false });
-    try {
-      expect(button.disabled).toBe(true);
-      expect(button.textContent).toContain("Out of stock");
-
-      act(() => {
-        button.click();
-      });
-
-      expect(getCartItems()).toHaveLength(0);
-    } finally {
-      unmount();
-    }
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
   });
 });
 

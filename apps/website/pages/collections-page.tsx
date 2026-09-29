@@ -420,16 +420,24 @@ export function CollectionsPage({
         title={heading ? heading.name : labels.collectionsTitle}
         /* This page prints the name in its own bar — see the slim bar below. */
         titleOwnedByPage
-        breadcrumbs={[
-          /*
-            The page this points at is headed `collectionsTitle`, which a shop
-            can change — and this said "Collections" regardless, so a shop that
-            renamed its shop-all page got a trail leading to a word that is
-            nowhere on the page it opens.
-          */
-          { label: labels.collectionsTitle, href: routes.store.collections },
-          ...(heading ? [{ label: heading.name }] : []),
-        ]}
+        /*
+          HOME › CHOCOLATES, not Home › Collections › Chocolates.
+
+          The shop-all page sat in the middle of every category's trail. It is
+          not a parent of this page — nothing led through it to get here, the
+          header's menu links straight to the category — so it was a step in a
+          journey nobody took, on the one line whose whole job is to say where
+          you are.
+
+          On the shop-all page itself it IS the page, so it stays there, and it
+          is named `collectionsTitle` rather than "Collections" because a shop
+          that renamed that page should not read a word it never wrote.
+        */
+        breadcrumbs={
+          heading
+            ? [{ label: heading.name }]
+            : [{ label: labels.collectionsTitle }]
+        }
       />
 
       <section className={layoutSpacing.sectionY}>

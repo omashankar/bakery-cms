@@ -3,13 +3,13 @@
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Heart, ShoppingBag, Star } from "lucide-react";
+import { Heart, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+/* Still the wishlist heart — only the buy button went. */
 import { Button } from "@/components/ui/button";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { addToCart } from "@/features/cart/lib/cart";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import {
   defaultProductUnitPrice,
@@ -29,16 +29,9 @@ interface ProductCardProps {
    * DEFAULTS TO SHOWN, so every surface that had it keeps it — the
    * wishlist, where adding to the cart is the entire point of the page, and
    * the collection and search grids, where a customer is already choosing.
-   *
-   * The homepage rows turn it off. A solid full-width button under every
-   * one of sixteen cards is the heaviest thing on that page, and the row it
-   * sits in is for browsing: the card itself is the link, and the product
-   * page is where the choices (weight, flavour, message) are made anyway.
-   * That is also how the layout this storefront is drawn from does it.
    */
-  showAddToCart?: boolean;
   /**
-   * The wishlist heart, which not every row wants either.
+   * The wishlist heart, which the rows still want.
    *
    * DEFAULTS TO SHOWN, so the collection grid, search and the wishlist
    * itself keep it. The homepage rows turn it off: the shop asked for it to
@@ -56,7 +49,6 @@ export function ProductCard({
   cake,
   variant = "default",
   className,
-  showAddToCart = true,
   showWishlist = true,
 }: ProductCardProps) {
   const labels = useBusinessLabels();
@@ -100,44 +92,6 @@ export function ProductCard({
    * unavailable.
    */
   const outOfStock = cake.inStock === false;
-
-  const handleAddToCart = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (outOfStock) {
-      toast.error(`This ${labels.productWord.toLowerCase()} is currently out of stock`);
-      return;
-    }
-    /**
-     * A card cannot ask a question — so it says which answer it gave.
-     *
-     * This added with no `variantSelections` and no size, and the server does
-     * not read that as "no choice": `calculateVariantAdjustment` falls back to
-     * each group's default option and `priceLine` to weight tier 0, and charges
-     * for both. So a grid add was always priced AS a set of choices; the cart
-     * line simply never said which, and the customer met "Egg preference:
-     * Regular" for the first time on their invoice.
-     *
-     * `quickAdd` is the shop's own resolution of those same defaults, built in
-     * `toCard` from the same helpers the pricing path uses. Passing it keeps the
-     * one-tap add and makes the line honest: the cart, the order, the invoice
-     * and the baker's email all now state what was committed to, and the
-     * customer can open the product page to change it.
-     */
-    addToCart({
-      productSlug: cake.slug,
-      name: cake.name,
-      image: cake.image,
-      price,
-      quantity: 1,
-      ...cake.quickAdd,
-    });
-    toast.success("Added to cart", {
-      description: cake.quickAdd?.variantSummary?.length
-        ? `${cake.name} — ${cake.quickAdd.variantSummary.join(" · ")}`
-        : cake.name,
-    });
-  };
 
   return (
     <article
@@ -273,35 +227,24 @@ export function ProductCard({
           </h3>
         </div>
 
-        <div className={cn("mt-auto", showAddToCart && "space-y-3")}>
-          {/*
-            THE PRICE HAS THE ROW TO ITSELF NOW.
+        {/*
+          NO BUY BUTTON ON A CARD, ANYWHERE. The shop asked for it, and the
+          card is the better argument: every choice that makes one of these a
+          thing somebody wants — size, flavour, a message, a photograph — is
+          made on the product page, and the card cannot ask. A grid add was
+          always priced AS a set of choices the customer had not seen, and
+          they met them for the first time on the invoice.
 
-            The rating used to sit at the other end of it. It has moved onto
-            the picture — where the shop asked for it, and where it leaves
-            this line to the price, the struck-through price and the
-            discount, which is already three things.
-          */}
+          It was 24 solid full-width buttons on the shop-all page. The card
+          itself is the link.
+        */}
+        <div className="mt-auto space-y-1">
           <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
-          {showAddToCart ? (
-            <Button
-              type="button"
-              variant="bakery"
-              // 40px was under the 44 every guideline asks for, on the one
-            // control on this card that takes money.
-            className="h-11 w-full"
-              disabled={outOfStock}
-              onClick={handleAddToCart}
-            >
-              <ShoppingBag className="size-4" />
-              {outOfStock ? "Out of stock" : "Add to Cart"}
-            </Button>
-          ) : outOfStock ? (
+          {outOfStock ? (
             /*
-              STILL SAYS SO. Without the button there is nothing else on the
-              card carrying this, and a customer who taps through to a
-              product page only to find it unavailable has been sent there
-              by us.
+              STILL SAYS SO. The button used to carry this, and without
+              something here a customer taps through to a product page to find
+              it unavailable — sent there by us, with the card giving no hint.
             */
             <p className="text-xs font-medium text-muted-foreground">Out of stock</p>
           ) : null}

@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductDetailPage } from "@/apps/website";
+import {
+  getStorefrontCategories,
+  getStorefrontCollections,
+  getStorefrontOccasions,
+} from "@/apps/website/lib/storefront-categories.server";
+import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
+import { routes } from "@/constants/routes";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   getProductBySlug,
@@ -137,7 +144,7 @@ export default async function Page(props: PageProps) {
   // Fetched on the server, so the first paint already carries real catalogue
   // data — previously this ran against localStorage, which the server does not
   // have, so SSR rendered seed data and the client swapped it on hydration.
-  const [cake, catalog, { modules }] = await Promise.all([
+  const [cake, catalog, { modules }, categories, occasions, collections] = await Promise.all([
     getStorefrontProductBySlug(slug),
     getStorefrontProductCards(),
     /**
@@ -151,11 +158,43 @@ export default async function Page(props: PageProps) {
      */
     getServerModules(),
 
+    /*
+      THE THREE AXES, for the breadcrumb's middle crumb.
+
+      In the SAME `Promise.all`, and free: `getCatalog` is `cache()`d and the
+      chrome rendering this page's header has already taken it, so these are
+      three more callers of one memoised document rather than three reads.
+
+      All three because `offeredAxes` needs them — a category whose address a
+      collection has claimed is not offered, and a crumb must not point at a
+      page that belongs to something else.
+    */
+    getStorefrontCategories(),
+    getStorefrontOccasions(),
+    getStorefrontCollections(),
   ]);
 
   if (!cake) {
     notFound();
   }
+
+  /*
+    WHICH CATEGORY THIS PRODUCT IS FILED UNDER, resolved to a real address.
+
+    By ID first — `categoryIds` holds every category a product is in, PRIMARY
+    FIRST — and by name only as a fallback, for a product written before that
+    array existed. Never by slugifying the name: this shop's "Chocolate Cakes"
+    lives at `chocolate`, so that would have linked to nothing.
+
+    Against the OFFERED list, so a switched-off category or one whose address
+    a collection has taken resolves to nothing and the trail is simply
+    Home › this cake. A crumb is a promise that a page is there.
+  */
+  const offered = offeredAxes({ categories, occasions, collections });
+  const primaryId = cake.categoryIds?.[0];
+  const row =
+    (primaryId ? offered.categories.find((entry) => entry.id === primaryId) : undefined) ??
+    offered.categories.find((entry) => entry.name === cake.category);
 
   return (
     <ProductDetailPage
@@ -164,6 +203,9 @@ export default async function Page(props: PageProps) {
       editLineId={editLineId}
       related={pickRelated(catalog, cake.slug, cake.category)}
       catalog={catalog}
+      categoryCrumb={
+        row ? { label: row.name, href: routes.store.collection(row.slug) } : undefined
+      }
     />
   );
 }

@@ -143,6 +143,14 @@ interface ProductDetailPageProps {
    */
   related: LandingProduct[];
   catalog: LandingProduct[];
+  /**
+   * This product's category, as a crumb — its name and its real address.
+   *
+   * Optional, and absent is a real answer: a product filed under nothing, or
+   * under a category the storefront is not offering, gets no middle crumb
+   * rather than one that leads somewhere empty.
+   */
+  categoryCrumb?: { label: string; href: string };
 }
 
 export function ProductDetailPage({
@@ -151,6 +159,7 @@ export function ProductDetailPage({
   editLineId,
   related: relatedFromServer,
   catalog,
+  categoryCrumb,
 }: ProductDetailPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
@@ -936,10 +945,27 @@ export function ProductDetailPage({
     <>
       <StorePageHeader
         title={cake.name}
-        breadcrumbs={[
-          { label: labels.collectionsTitle, href: routes.store.collections },
-          { label: cake.name },
-        ]}
+        /*
+          HOME › CHOCOLATES › THIS CAKE.
+
+          The middle crumb was the word "Collections" pointing at the shop-all
+          page — the same trail on every product in the shop, saying nothing
+          about where this one lives and offering a way back to a page the
+          customer had probably not come through.
+
+          It is the product's own category now, resolved on the SERVER against
+          the categories the storefront actually offers. Resolved there and not
+          here because the ADDRESS cannot be derived from the name: this shop
+          files cakes under "Chocolate Cakes" at the slug `chocolate`, so a
+          `slugify(cake.category)` would have linked to a page that is not
+          there.
+
+          Absent when nothing resolves — a switched-off category, one whose
+          address a collection has taken, a product filed nowhere — and the
+          trail is then Home › this cake, which is true. A crumb is a promise
+          that a page exists.
+        */
+        breadcrumbs={[...(categoryCrumb ? [categoryCrumb] : []), { label: cake.name }]}
       />
 
       {/*
