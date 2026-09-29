@@ -29,21 +29,30 @@ test("a nav row's menu is filled from the catalog, with no URL typed", async ({ 
   await page.waitForLoadState("networkidle");
 
   /*
-    The first row's menu section. Every row has one; the first is the one this
-    shop calls Home, and which row it is does not matter — what is being
-    checked is that a row can be given a menu at all.
+    ONE PRESS. This used to be four — add a link, find it, switch on "only
+    opens its menu", add a group — and every row's whole control panel was on
+    screen at once while you did it.
+
+    The row is created, marked as a menu, given one empty column and opened, so
+    the next thing in front of the shop is the box their own word goes in.
   */
-  const addGroup = page.getByRole("button", { name: /^add group$/i }).first();
-  await expect(addGroup, "no way to start a menu on a nav row").toBeVisible();
-  await addGroup.click();
+  const addDropdown = page.getByRole("button", { name: /add a drop-?down/i }).first();
+  await expect(addDropdown, "no way to start a menu on a nav row").toBeVisible();
+  await addDropdown.click();
 
   /*
-    A NEW GROUP ARRIVES UNNAMED. This software may not write a column heading
-    on the shop's behalf, and "New group" appearing in a live panel is exactly
-    that.
+    NEITHER THE ROW NOR THE COLUMN IS NAMED BY THIS SOFTWARE. Both boxes arrive
+    empty — the row's name and the column's heading are the shop's own words,
+    and "New link" or "New group" appearing on a live site is this CMS putting
+    words in their mouth.
   */
+  const rowName = page.getByPlaceholder(/Name this row/).last();
+  await expect(rowName).toBeVisible();
+  expect(await rowName.inputValue(), "the new row arrives pre-named").toBe("");
+  await rowName.fill("Cakes");
+
   const heading = page.getByPlaceholder("Group heading").first();
-  await expect(heading).toBeVisible();
+  await expect(heading, "the new row came with no column to fill").toBeVisible();
   expect(await heading.inputValue(), "a new column arrives pre-named").toBe("");
 
   const picker = page.getByRole("button", { name: /pick from catalog/i }).first();

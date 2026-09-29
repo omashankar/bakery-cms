@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Link2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { NAV_ICONS } from "@/config/nav-icons";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
@@ -32,8 +33,26 @@ import {
   catalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
 import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
-import { navRowOpensNothing, routeForAxis } from "@/features/site-layout/lib/menu-links";
-import type { MenuAxes } from "@/features/site-layout/lib/menu-links";
+import type {
+  ProductCategory,
+  ProductCollection,
+  ProductOccasion,
+} from "@/types/product";
+import { menuDraws, navRowOpensNothing, routeForAxis } from "@/features/site-layout/lib/menu-links";
+import type { MenuAxes, MenuAxisRow } from "@/features/site-layout/lib/menu-links";
+import type { ShopLabels } from "@/hooks/use-business-labels";
+
+/**
+ * The three lists a row may offer, after the storefront's own rule.
+ *
+ * Derived from the one place that decides it rather than restated, so a shape
+ * change there cannot leave this screen offering something the site drops.
+ */
+type OfferedAxes = ReturnType<typeof offeredAxes<
+  ProductCategory,
+  ProductOccasion,
+  ProductCollection
+>>;
 import type {
   HeaderNavItem,
   HeaderSettings,
@@ -90,6 +109,596 @@ function newLinkId(): string {
   return `lnk-${Date.now()}-${linksMade}`;
 }
 
+/**
+ * ONE ROW OF THE HEADER, AND EVERYTHING THAT CAN BE SET ON IT.
+ *
+ * Lifted out of the map it used to be written inline in. Two reasons, and
+ * the second is the load-bearing one:
+ *
+ * A row card carries seventeen controls and the screen draws six of them, so
+ * the component it lives in was a thousand lines of JSX that had to be read
+ * past to find anything else.
+ *
+ * And the guard in a-nav-row-can-be-a-menu-the-shop-wrote.test.ts windows
+ * seven hundred characters back from each badge box to check that it writes
+ * `undefined` for an empty word and reads the link's own value. At the old
+ * indentation the slack in that window was thirty-seven characters; wrapping
+ * the card in a disclosure where it stood would have added fifty and turned
+ * that guard red for code that was still correct. Out here every line is ten
+ * characters shorter.
+ */
+function NavRowCard({
+  item,
+  index,
+  rowCount,
+  totalRows,
+  labels,
+  offered,
+  catalogReady,
+  updateNav,
+  moveNav,
+  setRemoveTarget,
+  addGroup,
+  patchGroup,
+  removeGroup,
+  addLink,
+  patchGroupLinks,
+  rowFor,
+  unlinkFromCatalog,
+  setPicked,
+  setPickTarget,
+  open,
+  onToggle,
+}: {
+  item: HeaderNavItem;
+  /** Its place among the rows on screen — what the arrows are disabled by. */
+  index: number;
+  rowCount: number;
+  /** Every row, visible or not: the last one may not be deleted. */
+  totalRows: number;
+  labels: ShopLabels;
+  offered: OfferedAxes;
+  catalogReady: boolean;
+  updateNav: (id: string, patch: Partial<HeaderNavItem>) => void;
+  moveNav: (id: string, direction: "up" | "down") => void;
+  setRemoveTarget: (item: HeaderNavItem) => void;
+  addGroup: (navId: string) => void;
+  patchGroup: (navId: string, groupId: string, patch: Partial<MegaMenuGroup>) => void;
+  removeGroup: (navId: string, groupId: string) => void;
+  addLink: (navId: string, groupId: string) => void;
+  patchGroupLinks: (
+    navId: string,
+    groupId: string,
+    change: (links: MegaMenuLinkItem[]) => MegaMenuLinkItem[],
+  ) => void;
+  rowFor: (ref: MenuLinkRef) => MenuAxisRow | undefined;
+  unlinkFromCatalog: (navId: string, groupId: string, linkId: string) => void;
+  setPicked: (picks: MenuLinkRef[]) => void;
+  setPickTarget: (target: { navId: string; groupId: string }) => void;
+  /** Whether this row's settings are showing. */
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+      <div className="rounded-xl border border-border p-3">
+        {/*
+          THE ROW, IN ONE LINE.
+
+          Six rows carried seventeen controls each — a hundred and two on one
+          screen, in a column half the page wide. That count is also the
+          evidence that nobody had ever reached the menu: one group on any row
+          would have pushed it past a hundred and two.
+
+          The name stays an editable box, because it is the one thing typed
+          per row and it is what makes the list readable. Everything else that
+          is SET shows as a quiet word beside it, so the shop can tell six
+          rows apart without opening any of them.
+        */}
+        <div className="flex items-center gap-2">
+            <Switch
+              checked={item.isVisible}
+              onCheckedChange={(checked) =>
+                updateNav(item.id, { isVisible: checked })
+              }
+              aria-label={`Show ${item.label || "link"} in header`}
+            />
+        {/*
+          `size={1}` because an input's default `size=20` is its min-content
+          width — it refuses to shrink, and the row wrapped into three lines
+          with the name box alone on the first.
+        */}
+        <Input
+          size={1}
+          className="min-w-0 flex-1 sm:max-w-[18rem]"
+          value={item.label}
+          onChange={(e) => updateNav(item.id, { label: e.target.value })}
+          placeholder="Name this row"
+          aria-label={`Nav link ${index + 1} label`}
+        />
+          {/*
+            HIDDEN ON A PHONE, where there is no room for it beside the name —
+            and every word of it is repeated inside the panel, so nothing is
+            only here.
+          */}
+          <span className="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
+            {/*
+              WHAT THIS ROW DOES, from what is stored and nothing else.
+
+              The warning comes first and is not behind the disclosure: it is
+              the one message that tells a shop its row will not appear on the
+              site at all, and a shop that has to open a panel to find that out
+              will not find it.
+            */}
+            {navRowOpensNothing(item) ? (
+              <span className="truncate text-xs font-medium text-destructive">
+                Opens a menu only — and it has no menu yet, so this row will not
+                appear in your header
+              </span>
+            ) : (
+              <span className="truncate text-xs text-muted-foreground">
+                {menuDraws(item.menu)
+                  ? `opens a menu · ${(item.menu ?? []).length} column${(item.menu ?? []).length === 1 ? "" : "s"}, ${(item.menu ?? []).reduce((count, group) => count + group.links.length, 0)} links`
+                  : item.href}
+              </span>
+            )}
+            {/*
+              ONLY WHAT IS SET. A chip for an empty field would be this screen
+              telling the shop about a decision it has not made — and hiding a
+              stored value is how a shop comes to believe a field is gone while
+              the database still holds it.
+            */}
+            {item.badge?.trim() ? (
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {item.badge}
+              </span>
+            ) : null}
+            {item.icon ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">{item.icon}</span>
+            ) : null}
+            {item.highlight ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">Highlighted</span>
+            ) : null}
+            {item.dividerBefore ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">Divider</span>
+            ) : null}
+          </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={index === 0}
+              onClick={() => moveNav(item.id, "up")}
+              aria-label="Move up"
+            >
+              <ArrowUp className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={index === rowCount - 1}
+              onClick={() => moveNav(item.id, "down")}
+              aria-label="Move down"
+            >
+              <ArrowDown className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setRemoveTarget(item)}
+              disabled={totalRows <= 1}
+              aria-label="Remove link"
+            >
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          {/*
+            ONE DISCLOSURE, NOT TWO. Two levels of hiding is the confusion this
+            change exists to remove: one press, then everything this row can be.
+          */}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={`nav-panel-${item.id}`}
+            aria-label={`Open settings for ${item.label || "this link"}`}
+          >
+            <ChevronDown
+              className={cn("size-4 transition-transform", open && "rotate-180")}
+            />
+          </Button>
+        </div>
+        {open ? (
+          <div id={`nav-panel-${item.id}`} className="mt-3 space-y-3 border-t border-border pt-3">
+            {/* WHAT THIS ROW IS — before where it goes, because it decides that. */}
+            {/*
+              THE ROW GOES NOWHERE — IT JUST OPENS.
+
+              A reference header's category rows are not pages: CAKES
+              is the thing that opens the cake menu. Beside Highlight
+              and Divider because it is the same kind of decision about
+              the same row, and `checked || undefined` like both of
+              them so an untouched row stores nothing at all.
+
+              The address above is KEPT, not cleared — switch this back
+              off and the row's own page is still there.
+            */}
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={Boolean(item.menuOnly)}
+                onCheckedChange={(checked) =>
+                  updateNav(item.id, { menuOnly: checked || undefined })
+                }
+                aria-label={`${item.label || "This link"} only opens its menu`}
+              />
+              This one only opens its menu — no page of its own
+            </label>
+          {/*
+            THE ROW'S OWN DESTINATION, PICKED OR TYPED.
+
+            The picker below takes the URLs out of a row's MENU and
+            left them in the row itself, which is the half that can
+            still 404: there is no /store/occasions index, and the
+            listing page parses only `category` and `q` — so a typed
+            `?occasion=birthday` is a silently unfiltered grid.
+
+            The box stays, because a row may point at a page, at the
+            contact form or off the site entirely. The dropdown is
+            for the three lists this software can address correctly.
+          */}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {/*
+              GREYED, NOT HIDDEN. Under this switch the address is kept
+              and reused, so showing it unusable is the accurate
+              rendering of "stored, not used" — hiding a stored value is
+              how a shop comes to believe a field is gone while the
+              database still holds it.
+            */}
+            <Input
+              value={item.href}
+              onChange={(e) => updateNav(item.id, { href: e.target.value })}
+              placeholder="/store/..."
+              disabled={Boolean(item.menuOnly)}
+              aria-label={`Nav link ${index + 1} URL`}
+            />
+            <select
+              className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
+              value=""
+              disabled={!catalogReady || Boolean(item.menuOnly)}
+              onChange={(e) => {
+                if (e.target.value) updateNav(item.id, { href: e.target.value });
+              }}
+              aria-label={`Nav link ${index + 1} destination`}
+            >
+              <option value="">Or pick a page…</option>
+              {(
+                [
+                  ["category", labels.categoryWordPlural, offered.categories],
+                  ["occasion", labels.occasionWordPlural, offered.occasions],
+                  ["collection", labels.collectionWordPlural, offered.collections],
+                ] as const
+              ).map(([axis, heading, rows]) =>
+                rows.length > 0 ? (
+                  <optgroup key={axis} label={heading}>
+                    {rows.map((row) => (
+                      <option key={row.id} value={routeForAxis(axis, row.slug)}>
+                        {row.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null,
+              )}
+            </select>
+          </div>
+          {/*
+            THIS ROW'S OWN MEGA MENU.
+
+            A row with no groups stays a plain link — which is every
+            row today, and is why nothing changes for a shop that
+            never opens this. Add one group and the row becomes a
+            menu: its own headings, its own links, its own order.
+
+            The Collections row is the exception worth knowing: left
+            with no groups it keeps drawing the shop's categories and
+            occasions, as it always has. Adding groups here replaces
+            that with what you write.
+          */}
+          <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                {navRowOpensNothing(item)
+                  ? "Opens a menu only — but there is no menu yet, so this row will not appear in your header. Add a group below."
+                  : (item.menu ?? []).length === 0
+                    ? "Drop-down menu — none yet, so this is a plain link"
+                    : `Drop-down menu — ${(item.menu ?? []).length} group${(item.menu ?? []).length === 1 ? "" : "s"}`}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => addGroup(item.id)}>
+                <Plus className="size-3.5" />
+                Add group
+              </Button>
+            </div>
+
+            {(item.menu ?? []).map((group) => (
+              <div key={group.id} className="space-y-2 rounded-lg bg-muted/40 p-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={group.heading}
+                    onChange={(e) =>
+                      patchGroup(item.id, group.id, { heading: e.target.value })
+                    }
+                    placeholder="Group heading"
+                    aria-label={`${item.label} group heading`}
+                  />
+                  <Switch
+                    checked={group.isVisible}
+                    onCheckedChange={(checked) =>
+                      patchGroup(item.id, group.id, { isVisible: checked })
+                    }
+                    aria-label={`Show ${group.heading || "group"}`}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeGroup(item.id, group.id)}
+                    aria-label={`Remove ${group.heading || "group"}`}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+
+                {group.links.map((link, linkIndex) => {
+                  /*
+                    A PICKED LINK HAS NO BOXES TO TYPE IN.
+
+                    Its label and its address are rebuilt from the
+                    live catalogue row on every render, so an input
+                    here would be a box that silently discards what
+                    is typed into it. What the shop gets instead is
+                    what the link WILL say, and one button to give up
+                    the pointer and type after all.
+                  */
+                  const ref = link.ref;
+                  if (ref) {
+                    const row = rowFor(ref);
+                    return (
+                      <div key={link.id} className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-sm font-medium">
+                            {row ? row.name : link.label}
+                          </span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {row
+                              ? routeForAxis(ref.axis, row.slug)
+                              : "No longer in the catalog — this link is not shown on the site"}
+                          </span>
+                        </div>
+                        <Input
+                          size={1}
+                          className="max-w-[7rem]"
+                          value={link.badge ?? ""}
+                          onChange={(e) =>
+                            patchGroupLinks(item.id, group.id, (links) =>
+                              links.map((entry) =>
+                                entry.id === link.id
+                                  ? { ...entry, badge: e.target.value || undefined }
+                                  : entry,
+                              ),
+                            )
+                          }
+                          placeholder="Badge"
+                          aria-label={`${group.heading} catalog link ${linkIndex + 1} badge`}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => unlinkFromCatalog(item.id, group.id, link.id)}
+                        >
+                          Type it instead
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() =>
+                            patchGroupLinks(item.id, group.id, (links) =>
+                              links.filter((entry) => entry.id !== link.id),
+                            )
+                          }
+                          aria-label={`Remove ${row ? row.name : link.label || "link"}`}
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                    );
+                  }
+                  return (
+                  <div key={link.id} className="flex items-center gap-2">
+                    <Input
+                      value={link.label}
+                      onChange={(e) =>
+                        patchGroupLinks(item.id, group.id, (links) =>
+                          links.map((entry) =>
+                            entry.id === link.id
+                              ? { ...entry, label: e.target.value }
+                              : entry,
+                          ),
+                        )
+                      }
+                      placeholder="Label"
+                      aria-label={`${group.heading} link ${linkIndex + 1} label`}
+                    />
+                    <Input
+                      value={link.href}
+                      onChange={(e) =>
+                        patchGroupLinks(item.id, group.id, (links) =>
+                          links.map((entry) =>
+                            entry.id === link.id
+                              ? { ...entry, href: e.target.value }
+                              : entry,
+                          ),
+                        )
+                      }
+                      placeholder="/store/collections/..."
+                      aria-label={`${group.heading} link ${linkIndex + 1} URL`}
+                    />
+                    {/*
+                      THE WORD BESIDE A LINK.
+
+                      `badge` has existed on a menu link in the type,
+                      the validator and BOTH renderers since the menu
+                      did, with no box anywhere to type it in — a field
+                      only a hand-edited document could ever set. The
+                      four layers were all there; the fifth nobody
+                      counts is a control.
+
+                      This is also the whole of a reference header's
+                      little coloured tick, done in a way that carries
+                      its own meaning: a mark cannot say WHY it is
+                      there and a screen reader never receives it,
+                      while a word the shop chose reaches everybody,
+                      in the shop's own brand colour.
+
+                      `size={1}` on this repo's recorded lesson about
+                      inputs in a shared row, and a max width so the
+                      two fields that matter keep theirs.
+                    */}
+                    <Input
+                      size={1}
+                      className="max-w-[7rem]"
+                      value={link.badge ?? ""}
+                      onChange={(e) =>
+                        patchGroupLinks(item.id, group.id, (links) =>
+                          links.map((entry) =>
+                            entry.id === link.id
+                              ? { ...entry, badge: e.target.value || undefined }
+                              : entry,
+                          ),
+                        )
+                      }
+                      placeholder="Badge"
+                      aria-label={`${group.heading} link ${linkIndex + 1} badge`}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        patchGroupLinks(item.id, group.id, (links) =>
+                          links.filter((entry) => entry.id !== link.id),
+                        )
+                      }
+                      aria-label={`Remove ${link.label || "link"}`}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                  );
+                })}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => addLink(item.id, group.id)}
+                  >
+                    <Plus className="size-3.5" />
+                    Add link
+                  </Button>
+                  {/*
+                    THE DOOR THIS MENU NEVER HAD.
+
+                    Every piece of a per-row menu has been here since
+                    it shipped — the type, the validator, both
+                    renderers — and it is empty on every row of every
+                    shop, because filling it meant hand-typing a label
+                    and an address per link. Ticking boxes is the
+                    difference between a feature and a feature nobody
+                    uses.
+
+                    Disabled until the catalogue has actually
+                    arrived: before that the only rows to offer are
+                    the shipped demo ones, and a link picked from
+                    those points at a row this shop does not have.
+                  */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!catalogReady}
+                    onClick={() => {
+                      setPicked([]);
+                      setPickTarget({ navId: item.id, groupId: group.id });
+                    }}
+                  >
+                    <Link2 className="size-3.5" />
+                    Pick from catalog
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+            {/* Last, because it matters least — and the line above reports it. */}
+          {/*
+            WHAT MAKES ONE ROW STAND OUT FROM THE OTHERS.
+
+            The reference header leads with EXPRESS in the brand
+            colour and ends with a promoted "2 Hour Delivery Gifts"
+            behind a divider, with a van icon. All four are the
+            shop's call — emphasis on everything is emphasis on
+            nothing, so which row gets it is not a developer's
+            decision.
+
+            Every field is optional and inert when unset, so a row
+            nobody touches renders exactly as it always has.
+          */}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input
+              value={item.badge ?? ""}
+              onChange={(e) =>
+                updateNav(item.id, { badge: e.target.value || undefined })
+              }
+              placeholder="Badge (optional) — New, 2 Hour"
+              aria-label={`Nav link ${index + 1} badge`}
+            />
+            <select
+              className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
+              value={item.icon ?? ""}
+              onChange={(e) =>
+                updateNav(item.id, { icon: e.target.value || undefined })
+              }
+              aria-label={`Nav link ${index + 1} icon`}
+            >
+              <option value="">No icon</option>
+              {Object.keys(NAV_ICONS).map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={Boolean(item.highlight)}
+                onCheckedChange={(checked) =>
+                  updateNav(item.id, { highlight: checked || undefined })
+                }
+                aria-label={`Highlight ${item.label || "link"}`}
+              />
+              Highlight in your brand colour
+            </label>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={Boolean(item.dividerBefore)}
+                onCheckedChange={(checked) =>
+                  updateNav(item.id, { dividerBefore: checked || undefined })
+                }
+                aria-label={`Divider before ${item.label || "link"}`}
+              />
+              Separate it from the row before
+            </label>
+          </div>
+          </div>
+        ) : null}
+      </div>
+  );
+}
+
 export function HeaderAdminPage() {
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same
@@ -114,6 +723,21 @@ export function HeaderAdminPage() {
     ensureHydrated: ensureSiteLayoutHydrated,
   });
   const [removeTarget, setRemoveTarget] = useState<HeaderNavItem | null>(null);
+
+  /**
+   * WHICH ROWS ARE SHOWING THEIR SETTINGS.
+   *
+   * All closed to begin with — the whole point is that the page opens as a
+   * readable list rather than a wall. Several may be open at once: a shop
+   * comparing two rows should not have one slam shut, and the page stays short
+   * because the default is closed.
+   *
+   * Keyed by ID and never by index. `reorderHeaderNav` rewrites `sortOrder`,
+   * so an index key would leave the open panel attached to whichever row moved
+   * into that position. And not in localStorage: which panel is open is not a
+   * preference, it is where somebody is looking right now.
+   */
+  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
 
   /**
    * THE THREE LISTS, AND WHY THEY START EMPTY.
@@ -273,6 +897,50 @@ export function HeaderAdminPage() {
         },
       ],
     }));
+  }
+
+  /**
+   * A ROW THAT IS A MENU, IN ONE PRESS.
+   *
+   * Getting to "CAKES, and hovering it drops down my cake categories" took nine
+   * actions — add a link, find it, open it, switch on "only opens its menu",
+   * add a group, then the picker. Four of those are this screen's vocabulary
+   * rather than the shop's.
+   *
+   * It writes ONLY what the button said: the row opens a menu, and it has one
+   * empty column to fill. The NAME is left blank on purpose — it is the shop's
+   * own word and this software may not choose one — and the row opens so the
+   * box is in front of them rather than somewhere down the list.
+   *
+   * It deliberately does NOT open the picker. The catalogue lists are empty
+   * until hydration lands, so a dialog opened here would be a blank one on
+   * exactly the cold load this change exists to shorten.
+   */
+  function addMenuRow() {
+    const navId = `nav-${Date.now()}`;
+    setSettings((prev) => ({
+      ...prev,
+      nav: [
+        ...prev.nav,
+        {
+          id: navId,
+          label: "",
+          href: "/store",
+          isVisible: true,
+          /*
+            AFTER EVERY ROW THERE IS, not `length + 1`. The stored orders are
+            whatever the shop has dragged them into — this header has rows at
+            1, 2, 6, 7, 8 and 9 — so counting the rows lands the new one in the
+            middle of the list it was just added to the end of.
+          */
+          sortOrder:
+            prev.nav.reduce((highest, row) => Math.max(highest, row.sortOrder ?? 0), 0) + 1,
+          menuOnly: true,
+          menu: [{ id: `grp-${Date.now()}`, heading: "", sortOrder: 1, isVisible: true, links: [] }],
+        },
+      ],
+    }));
+    setOpenRows((prev) => ({ ...prev, [navId]: true }));
   }
 
   /**
@@ -516,209 +1184,42 @@ export function HeaderAdminPage() {
       resetDescription="Replace current header settings with the default demo navigation."
     >
       <SettingsHydrationNotice hydration={hydration} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Branding &amp; actions</CardTitle>
-            <CardDescription>Logo badge and primary CTA shown in the navbar.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="logo-letter">Logo letter</Label>
-              <Input
-                id="logo-letter"
-                maxLength={2}
-                value={settings.logoLetter}
-                onChange={(e) =>
-                  setSettings((prev) => ({ ...prev, logoLetter: e.target.value }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Show search</p>
-                {/*
-                  It said "Search icon on desktop navbar" for a control that
-                  is a search BOX, from tablet width up, with an icon on
-                  phones. Three things wrong in seven words, on the screen
-                  whose job is to explain the switch.
-                */}
-                <p className="text-xs text-muted-foreground">
-                  Search box in the storefront header.
-                </p>
-              </div>
-              <Switch
-                checked={settings.showSearch}
-                onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, showSearch: checked }))
-                }
-                aria-label="Show search"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="search-placeholder">Search placeholder</Label>
-              <Input
-                id="search-placeholder"
-                value={settings.searchPlaceholder ?? ""}
-                onChange={(e) =>
-                  setSettings((prev) => ({ ...prev, searchPlaceholder: e.target.value }))
-                }
-                disabled={!settings.showSearch}
-                /*
-                  DELIBERATELY NOT AN EXAMPLE. The reference header's line
-                  reads "Search 5000+ flowers, cakes, gifts etc" — a claim
-                  about the size of a catalogue that only this shop knows,
-                  and prefilling anything like it here is this software
-                  putting a number in the shop's mouth. Blank falls back to
-                  the shop's own plural noun.
-                */
-                placeholder="Optional"
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave blank to use your own product wording.
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Show CTA button</p>
-                <p className="text-xs text-muted-foreground">
-                  A button beside the cart, for whatever you want asked first.
-                </p>
-              </div>
-              <Switch
-                checked={settings.showCta}
-                onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, showCta: checked }))
-                }
-                aria-label="Show CTA button"
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Show promo strip</p>
-                <p className="text-xs text-muted-foreground">
-                  Your active banners, above the header. They also appear in the
-                  homepage&rsquo;s Promo Banner section.
-                </p>
-              </div>
-              <Switch
-                checked={settings.showBannerStrip ?? true}
-                onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, showBannerStrip: checked }))
-                }
-                aria-label="Show promo strip"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cta-label">CTA label</Label>
-              <Input
-                id="cta-label"
-                value={settings.ctaLabel}
-                onChange={(e) => setSettings((prev) => ({ ...prev, ctaLabel: e.target.value }))}
-                disabled={!settings.showCta}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cta-href">CTA link</Label>
-              <Input
-                id="cta-href"
-                value={settings.ctaHref}
-                onChange={(e) => setSettings((prev) => ({ ...prev, ctaHref: e.target.value }))}
-                disabled={!settings.showCta}
-                placeholder="/store/contact"
-              />
-            </div>
-          </CardContent>
-        </Card>
+      {/*
+        THE NAV ROWS ARE THE PAGE, SO THEY GO FIRST AND TAKE THE WIDTH.
 
-        {/*
-          THE TOP ROW — Help, Track Order, whatever the shop keeps within
-          reach. Empty by default, and an empty list renders no row at all.
-        */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <CardTitle className="text-base">Top row</CardTitle>
-              <CardDescription>
-                The thin row above your logo. Leave it empty and it does not appear.
-              </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={addUtilityItem}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="size-4" />
-              Add link
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Switch
-                checked={Boolean(settings.showCurrencyNote)}
-                onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, showCurrencyNote: checked }))
-                }
-                aria-label="Show the currency"
-              />
-              Show which currency your prices are in
-            </label>
-            {(settings.utilityNav ?? []).length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No links yet — the row is hidden.
-              </p>
-            ) : (
-              (settings.utilityNav ?? []).map((item, index) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <Input
-                    value={item.label}
-                    onChange={(e) => updateUtility(item.id, { label: e.target.value })}
-                    placeholder="Label"
-                    aria-label={`Top row link ${index + 1} label`}
-                  />
-                  <Input
-                    value={item.href}
-                    onChange={(e) => updateUtility(item.id, { href: e.target.value })}
-                    placeholder="/store/..."
-                    aria-label={`Top row link ${index + 1} URL`}
-                  />
-                  <Switch
-                    checked={item.isVisible}
-                    onCheckedChange={(checked) =>
-                      updateUtility(item.id, { isVisible: checked })
-                    }
-                    aria-label={`Show ${item.label || "link"}`}
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => removeUtility(item.id)}
-                    aria-label={`Remove ${item.label || "link"}`}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+        Three cards in one two-column grid auto-placed as Branding, Top row,
+        then Navigation links wrapping to row 2 column 1 — so the rows this
+        screen exists to edit had half the width while the cell beside the
+        near-empty Top row card stayed blank. Measured at 1440px, where the
+        shell puts no max-width on the content.
 
+        Moved in the DOM rather than reordered with `order-first`: a CSS
+        reorder leaves a keyboard user tabbing Branding, Top row, then Nav
+        while seeing Nav first, and an `lg:` prefix would do nothing at all
+        at phone and tablet width — where the nav editor would still be last.
+      */}
+      <div className="space-y-4">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <CardTitle className="text-base">Navigation links</CardTitle>
               <CardDescription>Links shown in the storefront header menu.</CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={addNavItem}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="size-4" />
-              Add link
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button size="sm" variant="outline" onClick={addNavItem}>
+                <Plus className="size-4" />
+                Add link
+              </Button>
+              {/*
+                THE ONE A SHOP BUILDING A HEADER ACTUALLY WANTS. A plain link is
+                a row that goes somewhere; this is a row that OPENS something,
+                and it arrives with the column already there to fill.
+              */}
+              <Button size="sm" variant="bakery" onClick={addMenuRow}>
+                <Plus className="size-4" />
+                Add a drop-down
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {sortedNav.length === 0 ? (
@@ -735,456 +1236,219 @@ export function HeaderAdminPage() {
               />
             ) : (
               sortedNav.map((item, index) => (
-                <div key={item.id} className="space-y-2 rounded-xl border border-border p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={item.isVisible}
-                        onCheckedChange={(checked) =>
-                          updateNav(item.id, { isVisible: checked })
-                        }
-                        aria-label={`Show ${item.label || "link"} in header`}
-                      />
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        {item.isVisible ? (
-                          <>
-                            <Eye className="size-3.5" />
-                            Visible
-                          </>
-                        ) : (
-                          <>
-                            <EyeOff className="size-3.5" />
-                            Hidden
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={index === 0}
-                        onClick={() => moveNav(item.id, "up")}
-                        aria-label="Move up"
-                      >
-                        <ArrowUp className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={index === sortedNav.length - 1}
-                        onClick={() => moveNav(item.id, "down")}
-                        aria-label="Move down"
-                      >
-                        <ArrowDown className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setRemoveTarget(item)}
-                        disabled={settings.nav.length <= 1}
-                        aria-label="Remove link"
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Input
-                    value={item.label}
-                    onChange={(e) => updateNav(item.id, { label: e.target.value })}
-                    placeholder="Label"
-                    aria-label={`Nav link ${index + 1} label`}
-                  />
-                  {/*
-                    THE ROW'S OWN DESTINATION, PICKED OR TYPED.
-
-                    The picker below takes the URLs out of a row's MENU and
-                    left them in the row itself, which is the half that can
-                    still 404: there is no /store/occasions index, and the
-                    listing page parses only `category` and `q` — so a typed
-                    `?occasion=birthday` is a silently unfiltered grid.
-
-                    The box stays, because a row may point at a page, at the
-                    contact form or off the site entirely. The dropdown is
-                    for the three lists this software can address correctly.
-                  */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {/*
-                      GREYED, NOT HIDDEN. Under this switch the address is kept
-                      and reused, so showing it unusable is the accurate
-                      rendering of "stored, not used" — hiding a stored value is
-                      how a shop comes to believe a field is gone while the
-                      database still holds it.
-                    */}
-                    <Input
-                      value={item.href}
-                      onChange={(e) => updateNav(item.id, { href: e.target.value })}
-                      placeholder="/store/..."
-                      disabled={Boolean(item.menuOnly)}
-                      aria-label={`Nav link ${index + 1} URL`}
-                    />
-                    <select
-                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
-                      value=""
-                      disabled={!catalogReady || Boolean(item.menuOnly)}
-                      onChange={(e) => {
-                        if (e.target.value) updateNav(item.id, { href: e.target.value });
-                      }}
-                      aria-label={`Nav link ${index + 1} destination`}
-                    >
-                      <option value="">Or pick a page…</option>
-                      {(
-                        [
-                          ["category", labels.categoryWordPlural, offered.categories],
-                          ["occasion", labels.occasionWordPlural, offered.occasions],
-                          ["collection", labels.collectionWordPlural, offered.collections],
-                        ] as const
-                      ).map(([axis, heading, rows]) =>
-                        rows.length > 0 ? (
-                          <optgroup key={axis} label={heading}>
-                            {rows.map((row) => (
-                              <option key={row.id} value={routeForAxis(axis, row.slug)}>
-                                {row.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null,
-                      )}
-                    </select>
-                  </div>
-
-                  {/*
-                    WHAT MAKES ONE ROW STAND OUT FROM THE OTHERS.
-
-                    The reference header leads with EXPRESS in the brand
-                    colour and ends with a promoted "2 Hour Delivery Gifts"
-                    behind a divider, with a van icon. All four are the
-                    shop's call — emphasis on everything is emphasis on
-                    nothing, so which row gets it is not a developer's
-                    decision.
-
-                    Every field is optional and inert when unset, so a row
-                    nobody touches renders exactly as it always has.
-                  */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      value={item.badge ?? ""}
-                      onChange={(e) =>
-                        updateNav(item.id, { badge: e.target.value || undefined })
-                      }
-                      placeholder="Badge (optional) — New, 2 Hour"
-                      aria-label={`Nav link ${index + 1} badge`}
-                    />
-                    <select
-                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none"
-                      value={item.icon ?? ""}
-                      onChange={(e) =>
-                        updateNav(item.id, { icon: e.target.value || undefined })
-                      }
-                      aria-label={`Nav link ${index + 1} icon`}
-                    >
-                      <option value="">No icon</option>
-                      {Object.keys(NAV_ICONS).map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Switch
-                        checked={Boolean(item.highlight)}
-                        onCheckedChange={(checked) =>
-                          updateNav(item.id, { highlight: checked || undefined })
-                        }
-                        aria-label={`Highlight ${item.label || "link"}`}
-                      />
-                      Highlight in your brand colour
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Switch
-                        checked={Boolean(item.dividerBefore)}
-                        onCheckedChange={(checked) =>
-                          updateNav(item.id, { dividerBefore: checked || undefined })
-                        }
-                        aria-label={`Divider before ${item.label || "link"}`}
-                      />
-                      Separate it from the row before
-                    </label>
-                    {/*
-                      THE ROW GOES NOWHERE — IT JUST OPENS.
-
-                      A reference header's category rows are not pages: CAKES
-                      is the thing that opens the cake menu. Beside Highlight
-                      and Divider because it is the same kind of decision about
-                      the same row, and `checked || undefined` like both of
-                      them so an untouched row stores nothing at all.
-
-                      The address above is KEPT, not cleared — switch this back
-                      off and the row's own page is still there.
-                    */}
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Switch
-                        checked={Boolean(item.menuOnly)}
-                        onCheckedChange={(checked) =>
-                          updateNav(item.id, { menuOnly: checked || undefined })
-                        }
-                        aria-label={`${item.label || "This link"} only opens its menu`}
-                      />
-                      This one only opens its menu — no page of its own
-                    </label>
-                  </div>
-
-                  {/*
-                    THIS ROW'S OWN MEGA MENU.
-
-                    A row with no groups stays a plain link — which is every
-                    row today, and is why nothing changes for a shop that
-                    never opens this. Add one group and the row becomes a
-                    menu: its own headings, its own links, its own order.
-
-                    The Collections row is the exception worth knowing: left
-                    with no groups it keeps drawing the shop's categories and
-                    occasions, as it always has. Adding groups here replaces
-                    that with what you write.
-                  */}
-                  <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {navRowOpensNothing(item)
-                          ? "Opens a menu only — but there is no menu yet, so this row will not appear in your header. Add a group below."
-                          : (item.menu ?? []).length === 0
-                            ? "Drop-down menu — none yet, so this is a plain link"
-                            : `Drop-down menu — ${(item.menu ?? []).length} group${(item.menu ?? []).length === 1 ? "" : "s"}`}
-                      </p>
-                      <Button size="sm" variant="outline" onClick={() => addGroup(item.id)}>
-                        <Plus className="size-3.5" />
-                        Add group
-                      </Button>
-                    </div>
-
-                    {(item.menu ?? []).map((group) => (
-                      <div key={group.id} className="space-y-2 rounded-lg bg-muted/40 p-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={group.heading}
-                            onChange={(e) =>
-                              patchGroup(item.id, group.id, { heading: e.target.value })
-                            }
-                            placeholder="Group heading"
-                            aria-label={`${item.label} group heading`}
-                          />
-                          <Switch
-                            checked={group.isVisible}
-                            onCheckedChange={(checked) =>
-                              patchGroup(item.id, group.id, { isVisible: checked })
-                            }
-                            aria-label={`Show ${group.heading || "group"}`}
-                          />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeGroup(item.id, group.id)}
-                            aria-label={`Remove ${group.heading || "group"}`}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
-                        </div>
-
-                        {group.links.map((link, linkIndex) => {
-                          /*
-                            A PICKED LINK HAS NO BOXES TO TYPE IN.
-
-                            Its label and its address are rebuilt from the
-                            live catalogue row on every render, so an input
-                            here would be a box that silently discards what
-                            is typed into it. What the shop gets instead is
-                            what the link WILL say, and one button to give up
-                            the pointer and type after all.
-                          */
-                          const ref = link.ref;
-                          if (ref) {
-                            const row = rowFor(ref);
-                            return (
-                              <div key={link.id} className="flex items-center gap-2">
-                                <div className="flex min-w-0 flex-1 flex-col">
-                                  <span className="truncate text-sm font-medium">
-                                    {row ? row.name : link.label}
-                                  </span>
-                                  <span className="truncate text-xs text-muted-foreground">
-                                    {row
-                                      ? routeForAxis(ref.axis, row.slug)
-                                      : "No longer in the catalog — this link is not shown on the site"}
-                                  </span>
-                                </div>
-                                <Input
-                                  size={1}
-                                  className="max-w-[7rem]"
-                                  value={link.badge ?? ""}
-                                  onChange={(e) =>
-                                    patchGroupLinks(item.id, group.id, (links) =>
-                                      links.map((entry) =>
-                                        entry.id === link.id
-                                          ? { ...entry, badge: e.target.value || undefined }
-                                          : entry,
-                                      ),
-                                    )
-                                  }
-                                  placeholder="Badge"
-                                  aria-label={`${group.heading} catalog link ${linkIndex + 1} badge`}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => unlinkFromCatalog(item.id, group.id, link.id)}
-                                >
-                                  Type it instead
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    patchGroupLinks(item.id, group.id, (links) =>
-                                      links.filter((entry) => entry.id !== link.id),
-                                    )
-                                  }
-                                  aria-label={`Remove ${row ? row.name : link.label || "link"}`}
-                                >
-                                  <Trash2 className="size-4 text-destructive" />
-                                </Button>
-                              </div>
-                            );
-                          }
-                          return (
-                          <div key={link.id} className="flex items-center gap-2">
-                            <Input
-                              value={link.label}
-                              onChange={(e) =>
-                                patchGroupLinks(item.id, group.id, (links) =>
-                                  links.map((entry) =>
-                                    entry.id === link.id
-                                      ? { ...entry, label: e.target.value }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                              placeholder="Label"
-                              aria-label={`${group.heading} link ${linkIndex + 1} label`}
-                            />
-                            <Input
-                              value={link.href}
-                              onChange={(e) =>
-                                patchGroupLinks(item.id, group.id, (links) =>
-                                  links.map((entry) =>
-                                    entry.id === link.id
-                                      ? { ...entry, href: e.target.value }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                              placeholder="/store/collections/..."
-                              aria-label={`${group.heading} link ${linkIndex + 1} URL`}
-                            />
-                            {/*
-                              THE WORD BESIDE A LINK.
-
-                              `badge` has existed on a menu link in the type,
-                              the validator and BOTH renderers since the menu
-                              did, with no box anywhere to type it in — a field
-                              only a hand-edited document could ever set. The
-                              four layers were all there; the fifth nobody
-                              counts is a control.
-
-                              This is also the whole of a reference header's
-                              little coloured tick, done in a way that carries
-                              its own meaning: a mark cannot say WHY it is
-                              there and a screen reader never receives it,
-                              while a word the shop chose reaches everybody,
-                              in the shop's own brand colour.
-
-                              `size={1}` on this repo's recorded lesson about
-                              inputs in a shared row, and a max width so the
-                              two fields that matter keep theirs.
-                            */}
-                            <Input
-                              size={1}
-                              className="max-w-[7rem]"
-                              value={link.badge ?? ""}
-                              onChange={(e) =>
-                                patchGroupLinks(item.id, group.id, (links) =>
-                                  links.map((entry) =>
-                                    entry.id === link.id
-                                      ? { ...entry, badge: e.target.value || undefined }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                              placeholder="Badge"
-                              aria-label={`${group.heading} link ${linkIndex + 1} badge`}
-                            />
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() =>
-                                patchGroupLinks(item.id, group.id, (links) =>
-                                  links.filter((entry) => entry.id !== link.id),
-                                )
-                              }
-                              aria-label={`Remove ${link.label || "link"}`}
-                            >
-                              <Trash2 className="size-4 text-destructive" />
-                            </Button>
-                          </div>
-                          );
-                        })}
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => addLink(item.id, group.id)}
-                          >
-                            <Plus className="size-3.5" />
-                            Add link
-                          </Button>
-                          {/*
-                            THE DOOR THIS MENU NEVER HAD.
-
-                            Every piece of a per-row menu has been here since
-                            it shipped — the type, the validator, both
-                            renderers — and it is empty on every row of every
-                            shop, because filling it meant hand-typing a label
-                            and an address per link. Ticking boxes is the
-                            difference between a feature and a feature nobody
-                            uses.
-
-                            Disabled until the catalogue has actually
-                            arrived: before that the only rows to offer are
-                            the shipped demo ones, and a link picked from
-                            those points at a row this shop does not have.
-                          */}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={!catalogReady}
-                            onClick={() => {
-                              setPicked([]);
-                              setPickTarget({ navId: item.id, groupId: group.id });
-                            }}
-                          >
-                            <Link2 className="size-3.5" />
-                            Pick from catalog
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <NavRowCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  rowCount={sortedNav.length}
+                  totalRows={settings.nav.length}
+                  labels={labels}
+                  offered={offered}
+                  catalogReady={catalogReady}
+                  updateNav={updateNav}
+                  moveNav={moveNav}
+                  setRemoveTarget={setRemoveTarget}
+                  addGroup={addGroup}
+                  patchGroup={patchGroup}
+                  removeGroup={removeGroup}
+                  addLink={addLink}
+                  patchGroupLinks={patchGroupLinks}
+                  rowFor={rowFor}
+                  unlinkFromCatalog={unlinkFromCatalog}
+                  setPicked={setPicked}
+                  setPickTarget={setPickTarget}
+                  open={Boolean(openRows[item.id])}
+                  onToggle={() =>
+                    setOpenRows((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                  }
+                />
               ))
             )}
           </CardContent>
         </Card>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">Branding &amp; actions</CardTitle>
+              <CardDescription>Logo badge and primary CTA shown in the navbar.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="logo-letter">Logo letter</Label>
+                <Input
+                  id="logo-letter"
+                  maxLength={2}
+                  value={settings.logoLetter}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, logoLetter: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Show search</p>
+                  {/*
+                    It said "Search icon on desktop navbar" for a control that
+                    is a search BOX, from tablet width up, with an icon on
+                    phones. Three things wrong in seven words, on the screen
+                    whose job is to explain the switch.
+                  */}
+                  <p className="text-xs text-muted-foreground">
+                    Search box in the storefront header.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.showSearch}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, showSearch: checked }))
+                  }
+                  aria-label="Show search"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="search-placeholder">Search placeholder</Label>
+                <Input
+                  id="search-placeholder"
+                  value={settings.searchPlaceholder ?? ""}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, searchPlaceholder: e.target.value }))
+                  }
+                  disabled={!settings.showSearch}
+                  /*
+                    DELIBERATELY NOT AN EXAMPLE. The reference header's line
+                    reads "Search 5000+ flowers, cakes, gifts etc" — a claim
+                    about the size of a catalogue that only this shop knows,
+                    and prefilling anything like it here is this software
+                    putting a number in the shop's mouth. Blank falls back to
+                    the shop's own plural noun.
+                  */
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to use your own product wording.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Show CTA button</p>
+                  <p className="text-xs text-muted-foreground">
+                    A button beside the cart, for whatever you want asked first.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.showCta}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, showCta: checked }))
+                  }
+                  aria-label="Show CTA button"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Show promo strip</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your active banners, above the header. They also appear in the
+                    homepage&rsquo;s Promo Banner section.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.showBannerStrip ?? true}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, showBannerStrip: checked }))
+                  }
+                  aria-label="Show promo strip"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cta-label">CTA label</Label>
+                <Input
+                  id="cta-label"
+                  value={settings.ctaLabel}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, ctaLabel: e.target.value }))}
+                  disabled={!settings.showCta}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cta-href">CTA link</Label>
+                <Input
+                  id="cta-href"
+                  value={settings.ctaHref}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, ctaHref: e.target.value }))}
+                  disabled={!settings.showCta}
+                  placeholder="/store/contact"
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle className="text-base">Top row</CardTitle>
+                <CardDescription>
+                  The thin row above your logo. Leave it empty and it does not appear.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={addUtilityItem}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="size-4" />
+                Add link
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  checked={Boolean(settings.showCurrencyNote)}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, showCurrencyNote: checked }))
+                  }
+                  aria-label="Show the currency"
+                />
+                Show which currency your prices are in
+              </label>
+              {(settings.utilityNav ?? []).length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No links yet — the row is hidden.
+                </p>
+              ) : (
+                (settings.utilityNav ?? []).map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    <Input
+                      value={item.label}
+                      onChange={(e) => updateUtility(item.id, { label: e.target.value })}
+                      placeholder="Label"
+                      aria-label={`Top row link ${index + 1} label`}
+                    />
+                    <Input
+                      value={item.href}
+                      onChange={(e) => updateUtility(item.id, { href: e.target.value })}
+                      placeholder="/store/..."
+                      aria-label={`Top row link ${index + 1} URL`}
+                    />
+                    <Switch
+                      checked={item.isVisible}
+                      onCheckedChange={(checked) =>
+                        updateUtility(item.id, { isVisible: checked })
+                      }
+                      aria-label={`Show ${item.label || "link"}`}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeUtility(item.id)}
+                      aria-label={`Remove ${item.label || "link"}`}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/*
