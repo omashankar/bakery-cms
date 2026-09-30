@@ -20,7 +20,7 @@ import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 
 
 async function addToCart(page: Page, slug: string) {
-  await page.goto(`/store/cakes/${slug}`);
+  await page.goto(`/store/p/${slug}`);
   await page.getByRole("button", { name: /add to cart/i }).first().click();
 }
 
@@ -74,7 +74,7 @@ test.describe("a coupon that stops qualifying", () => {
     // that still qualified and a test that failed for the wrong reason.
     const dearRow = page
       .locator("div.rounded-xl")
-      .filter({ has: page.locator(`a[href="/store/cakes/${dear!.slug}"]`) });
+      .filter({ has: page.locator(`a[href="/store/p/${dear!.slug}"]`) });
     await expect(dearRow, "the cart row could not be identified unambiguously").toHaveCount(1);
     await dearRow.getByRole("button", { name: /remove item/i }).click();
 

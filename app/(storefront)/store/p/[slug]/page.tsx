@@ -79,7 +79,15 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const alreadyBranded =
     !!typed && !!siteName && typed.toLowerCase().endsWith(siteName.trim().toLowerCase());
 
-  const path = cake.slug ? `/store/cakes/${cake.slug}` : "";
+  /*
+    THROUGH THE BUILDER, not a literal.
+
+    It spelled `/store/cakes/${slug}` by hand, so when the product route
+    moved to /store/p/ this went on naming the OLD address — and a canonical
+    pointing at a redirect tells a search engine the page it is looking at is
+    not the real one. The builder is the single place that knows.
+  */
+  const path = cake.slug ? routes.store.product(cake.slug) : "";
   /**
    * ABSOLUTE, like every other route on this site.
    *

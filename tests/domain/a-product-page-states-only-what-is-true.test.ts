@@ -45,7 +45,7 @@ vi.mock("@/apps/website/lib/product-details", async (importOriginal) => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
-  usePathname: () => "/store/cakes/x",
+  usePathname: () => "/store/p/x",
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -1476,7 +1476,7 @@ describe("the product description says what the shop wrote, once", () => {
      * no prop, no second settings read, and nothing to arrive a beat late.
      */
     const route = readFileSync(
-      join(process.cwd(), "app/(storefront)/store/cakes/[slug]/page.tsx"),
+      join(process.cwd(), "app/(storefront)/store/p/[slug]/page.tsx"),
       "utf8",
     );
 

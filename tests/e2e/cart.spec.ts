@@ -10,7 +10,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function addFirstProduct(page: Page) {
   await page.goto("/store");
-  const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
+  const firstProduct = page.locator('a[href^="/store/p/"]').first();
   await expect(firstProduct).toBeVisible();
   const href = await firstProduct.getAttribute("href");
   await page.goto(href!);

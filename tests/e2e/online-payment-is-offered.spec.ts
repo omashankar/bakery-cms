@@ -36,7 +36,7 @@ test.describe("paying online", () => {
     await signInAsCustomer(page, customerEmail);
 
     await page.goto("/store");
-    const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
+    const firstProduct = page.locator('a[href^="/store/p/"]').first();
     await expect(firstProduct).toBeVisible();
     const href = await firstProduct.getAttribute("href");
     expect(href, "the storefront lists no product to open").toBeTruthy();

@@ -100,7 +100,7 @@ test.describe("a shared device", () => {
     asha = await probeEmail("asha");
     await signInAsCustomer(page, asha);
     await page.goto("/store");
-    const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
+    const firstProduct = page.locator('a[href^="/store/p/"]').first();
     await expect(firstProduct).toBeVisible();
     await page.goto((await firstProduct.getAttribute("href"))!);
     await page.getByRole("button", { name: /add to cart/i }).first().click();

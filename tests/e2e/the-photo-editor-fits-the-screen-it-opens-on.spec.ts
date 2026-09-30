@@ -23,7 +23,7 @@ async function aPhotoProduct(page: import("@playwright/test").Page) {
   await page.waitForTimeout(1800);
   const hrefs = await page.evaluate(() => [
     ...new Set(
-      [...document.querySelectorAll('a[href^="/store/cakes/"]')].map((a) =>
+      [...document.querySelectorAll('a[href^="/store/p/"]')].map((a) =>
         a.getAttribute("href"),
       ),
     ),
@@ -48,7 +48,20 @@ test("the photo editor fits, and the frame is the biggest thing on it", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const href = await aPhotoProduct(page);
+  /*
+    IT SKIPPED ITSELF, and the report then read "this shop sells no product
+    that prints a photograph" — a sentence about the SHOP, produced by a bug
+    in the test. This shop has photo cakes.
+
+    A skip is right for a shop that genuinely sells none. It is the wrong
+    answer to a selector that stopped matching, which is what happened when
+    the product address moved. So the search has to have LOOKED first.
+  */
   if (!href) {
+    const anyProduct = await page.evaluate(
+      () => document.querySelectorAll(String.raw`a[href^="/store/p/"]`).length,
+    );
+    expect(anyProduct, "no product links at all — the selector is dead").toBeGreaterThan(0);
     test.skip(true, "this shop sells no product that prints a photograph");
     return;
   }
@@ -117,7 +130,20 @@ test("and its frame shows the shape before a photograph is chosen", async ({ pag
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const href = await aPhotoProduct(page);
+  /*
+    IT SKIPPED ITSELF, and the report then read "this shop sells no product
+    that prints a photograph" — a sentence about the SHOP, produced by a bug
+    in the test. This shop has photo cakes.
+
+    A skip is right for a shop that genuinely sells none. It is the wrong
+    answer to a selector that stopped matching, which is what happened when
+    the product address moved. So the search has to have LOOKED first.
+  */
   if (!href) {
+    const anyProduct = await page.evaluate(
+      () => document.querySelectorAll(String.raw`a[href^="/store/p/"]`).length,
+    );
+    expect(anyProduct, "no product links at all — the selector is dead").toBeGreaterThan(0);
     test.skip(true, "this shop sells no product that prints a photograph");
     return;
   }
@@ -171,7 +197,20 @@ test("and the answer sits at the foot of the panel it was decided in", async ({ 
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const href = await aPhotoProduct(page);
+  /*
+    IT SKIPPED ITSELF, and the report then read "this shop sells no product
+    that prints a photograph" — a sentence about the SHOP, produced by a bug
+    in the test. This shop has photo cakes.
+
+    A skip is right for a shop that genuinely sells none. It is the wrong
+    answer to a selector that stopped matching, which is what happened when
+    the product address moved. So the search has to have LOOKED first.
+  */
   if (!href) {
+    const anyProduct = await page.evaluate(
+      () => document.querySelectorAll(String.raw`a[href^="/store/p/"]`).length,
+    );
+    expect(anyProduct, "no product links at all — the selector is dead").toBeGreaterThan(0);
     test.skip(true, "this shop sells no product that prints a photograph");
     return;
   }

@@ -50,7 +50,7 @@ const group = (over: Partial<MegaMenuGroup> = {}): MegaMenuGroup => ({
 const row = (over: Partial<HeaderNavItem> = {}): HeaderNavItem => ({
   id: "nav-1",
   label: "Cakes",
-  href: "/store/cakes",
+  href: "/store/gifts",
   isVisible: true,
   sortOrder: 1,
   ...over,
@@ -132,12 +132,12 @@ describe("the stored shape", () => {
       screen to say why. Backup restore posts a hand-editable file here.
     */
     const ok = headerSchema.safeParse(
-      header([{ id: "n1", label: "Cakes", href: "/store/cakes", menuOnly: true }]),
+      header([{ id: "n1", label: "Cakes", href: "/store/gifts", menuOnly: true }]),
     );
     expect(ok.success).toBe(true);
 
     const bad = headerSchema.safeParse(
-      header([{ id: "n1", label: "Cakes", href: "/store/cakes", menuOnly: "yes" }]),
+      header([{ id: "n1", label: "Cakes", href: "/store/gifts", menuOnly: "yes" }]),
     );
     expect(bad.success, "a string was stored as the flag").toBe(false);
   });
@@ -245,7 +245,7 @@ describe("the trigger a customer actually gets", () => {
     return container;
   }
 
-  const PROPS = { isActive: false, groups: [group()], href: "/store/cakes", label: "Cakes" };
+  const PROPS = { isActive: false, groups: [group()], href: "/store/gifts", label: "Cakes" };
 
   it("is a button, and its destination is nowhere on the page", async () => {
     /*
@@ -264,7 +264,7 @@ describe("the trigger a customer actually gets", () => {
       "button",
     );
     expect(
-      el.querySelector('a[href="/store/cakes"]'),
+      el.querySelector('a[href="/store/gifts"]'),
       "the row still offers the destination it says it does not have",
     ).toBeNull();
   });
@@ -280,7 +280,7 @@ describe("the trigger a customer actually gets", () => {
     const trigger = el.querySelector("[data-mega-trigger]");
     expect(trigger, "the trigger lost its marker").not.toBeNull();
     expect(trigger!.tagName).toBe("A");
-    expect(trigger!.getAttribute("href")).toBe("/store/cakes");
+    expect(trigger!.getAttribute("href")).toBe("/store/gifts");
   });
 
   it("says the same word either way", async () => {

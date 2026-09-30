@@ -49,7 +49,7 @@ test.describe("paying for real, on a test key", () => {
     await signInAsCustomer(page, customerEmail);
 
     await page.goto("/store");
-    const href = await page.locator('a[href^="/store/cakes/"]').first().getAttribute("href");
+    const href = await page.locator('a[href^="/store/p/"]').first().getAttribute("href");
     expect(href, "the storefront lists no product to buy").toBeTruthy();
     await page.goto(href!);
     await page.getByRole("button", { name: /add to cart/i }).first().click();

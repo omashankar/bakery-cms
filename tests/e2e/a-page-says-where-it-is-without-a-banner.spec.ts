@@ -147,7 +147,7 @@ test("and a product still shows its name, even though its heading does not", asy
   await page.goto("/store/collections");
   await page.waitForTimeout(1800);
   const href = await page.evaluate(
-    () => document.querySelector('a[href^="/store/cakes/"]')?.getAttribute("href") ?? "",
+    () => document.querySelector('a[href^="/store/p/"]')?.getAttribute("href") ?? "",
   );
   expect(href, "this shop has no product to open").not.toBe("");
 

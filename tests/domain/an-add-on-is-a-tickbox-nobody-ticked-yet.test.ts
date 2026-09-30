@@ -28,7 +28,7 @@ import { getCartItems } from "@/features/cart/lib/cart";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
-  usePathname: () => "/store/cakes/x",
+  usePathname: () => "/store/p/x",
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/features/reviews/lib/reviews-api", () => ({

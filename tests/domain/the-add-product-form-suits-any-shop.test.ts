@@ -188,7 +188,7 @@ describe("the meta title follows a rename", () => {
   });
 
   it("and the route still falls back to the name", () => {
-    const route = code("app/(storefront)/store/cakes/[slug]/page.tsx");
+    const route = code("app/(storefront)/store/p/[slug]/page.tsx");
 
     expect(route).toMatch(/typed \|\| cake\.name/);
   });

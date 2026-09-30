@@ -48,7 +48,7 @@ test.describe("browsing a category", () => {
     // that says it has cakes and shows none.
     await expect(page.getByRole("heading", { name: /wedding/i }).first()).toBeVisible();
 
-    const cards = page.locator('a[href^="/store/cakes/"]');
+    const cards = page.locator('a[href^="/store/p/"]');
     await expect(cards.first(), "the wedding cakes were filtered off their own page").toBeVisible();
 
     /*
@@ -136,7 +136,7 @@ test.describe("browsing a category", () => {
   test("still filters when the slider is moved down", async ({ page }) => {
     const productsWord = await shopProductsWord();
     await page.goto("/store/collections/wedding");
-    await expect(page.locator('a[href^="/store/cakes/"]').first()).toBeVisible();
+    await expect(page.locator('a[href^="/store/p/"]').first()).toBeVisible();
 
     /*
       THE BAND, not the slider. Same question: does choosing a price actually
@@ -146,7 +146,7 @@ test.describe("browsing a category", () => {
       the slider did not, which is why that version passed or failed for
       reasons unrelated to filtering.
     */
-    const before = await page.locator('a[href^="/store/cakes/"]').count();
+    const before = await page.locator('a[href^="/store/p/"]').count();
     expect(before, "no products to narrow").toBeGreaterThan(1);
 
     /*
@@ -165,7 +165,7 @@ test.describe("browsing a category", () => {
     await price.selectOption("0");
     await expect(price, "the price control did not actually move").toHaveValue("0");
 
-    const after = await page.locator('a[href^="/store/cakes/"]').count();
+    const after = await page.locator('a[href^="/store/p/"]').count();
     expect(after, "choosing a price band changed nothing").toBeLessThan(before);
 
     // Nothing costs nothing, so this genuinely empties the page — and the page

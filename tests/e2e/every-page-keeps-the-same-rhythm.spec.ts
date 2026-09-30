@@ -37,7 +37,7 @@ async function aProduct(page: import("@playwright/test").Page) {
   await page.goto("/store/collections");
   await page.waitForTimeout(1800);
   const href = await page.evaluate(
-    () => document.querySelector('a[href^="/store/cakes/"]')?.getAttribute("href") ?? null,
+    () => document.querySelector('a[href^="/store/p/"]')?.getAttribute("href") ?? null,
   );
   return href;
 }
@@ -47,7 +47,19 @@ test("every page starts right under its trail, not a screen below it", async ({ 
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const product = await aProduct(page);
-  const all: [string, string][] = product ? [...PAGES, ["a product", product]] : [...PAGES];
+  /*
+    A DEAD SELECTOR USED TO SHORTEN THE LIST INSTEAD OF FAILING.
+
+    `product ? [...PAGES, …] : [...PAGES]` dropped the product page and the
+    case went green having never looked at it. Not hypothetical: the product
+    address moved from /store/cakes/ to /store/p/, and this selector was one
+    of the things that had to move with it — silently, without this line.
+
+    This shop publishes 29 products. Finding none means the grid, the card or
+    the address changed, and that is the news.
+  */
+  expect(product, "no product link on the shop-all page — the selector is dead").toBeTruthy();
+  const all: [string, string][] = [...PAGES, ["a product", product!]];
 
   const tooFar: string[] = [];
   const sideways: string[] = [];
@@ -96,7 +108,19 @@ test("and a heading means the same thing on all of them", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const product = await aProduct(page);
-  const all: [string, string][] = product ? [...PAGES, ["a product", product]] : [...PAGES];
+  /*
+    A DEAD SELECTOR USED TO SHORTEN THE LIST INSTEAD OF FAILING.
+
+    `product ? [...PAGES, …] : [...PAGES]` dropped the product page and the
+    case went green having never looked at it. Not hypothetical: the product
+    address moved from /store/cakes/ to /store/p/, and this selector was one
+    of the things that had to move with it — silently, without this line.
+
+    This shop publishes 29 products. Finding none means the grid, the card or
+    the address changed, and that is the news.
+  */
+  expect(product, "no product link on the shop-all page — the selector is dead").toBeTruthy();
+  const all: [string, string][] = [...PAGES, ["a product", product!]];
 
   const seen = new Map<string, string[]>();
   for (const [name, path] of all) {

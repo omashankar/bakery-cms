@@ -54,7 +54,7 @@ test("is absent until the visitor has looked at something, then fills", async ({
   const opened = await page.evaluate(() =>
     [
       ...new Set(
-        [...document.querySelectorAll('a[href^="/store/cakes/"]')].map((a) =>
+        [...document.querySelectorAll('a[href^="/store/p/"]')].map((a) =>
           a.getAttribute("href"),
         ),
       ),
@@ -118,7 +118,7 @@ test("and is drawn like every other product row on the page", async ({ page }) =
   const opened = await page.evaluate(() =>
     [
       ...new Set(
-        [...document.querySelectorAll('a[href^="/store/cakes/"]')].map((a) =>
+        [...document.querySelectorAll('a[href^="/store/p/"]')].map((a) =>
           a.getAttribute("href"),
         ),
       ),

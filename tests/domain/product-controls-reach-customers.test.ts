@@ -44,7 +44,7 @@ function stripComments(source: string): string {
  * `seo.metaTitle` all existed; nothing in app/ read any of them.
  */
 describe("each cake ships its own metadata", () => {
-  const source = read("app/(storefront)/store/cakes/[slug]/page.tsx");
+  const source = read("app/(storefront)/store/p/[slug]/page.tsx");
   const code = stripComments(source);
 
   it("generates metadata per route instead of exporting a fixed object", () => {

@@ -45,7 +45,7 @@ async function search(page: import("@playwright/test").Page, term: string) {
       url: location.pathname + location.search,
       line: line ?? "",
       total: match ? Number(match[2]) : -1,
-      names: [...document.querySelectorAll('a[href^="/store/cakes/"]')]
+      names: [...document.querySelectorAll('a[href^="/store/p/"]')]
         .map((card) => (card.textContent ?? "").toLowerCase())
         .filter(Boolean),
     };

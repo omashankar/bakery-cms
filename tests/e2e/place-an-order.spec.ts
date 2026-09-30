@@ -43,7 +43,7 @@ test.describe("a customer placing an order", () => {
     await page.goto("/store");
     await expect(page).toHaveTitle(/./);
 
-    const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
+    const firstProduct = page.locator('a[href^="/store/p/"]').first();
     await expect(firstProduct).toBeVisible();
     const href = await firstProduct.getAttribute("href");
     expect(href, "the storefront lists no product to open").toBeTruthy();

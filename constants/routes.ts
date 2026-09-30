@@ -46,7 +46,36 @@ export const routes = {
      * move: every link written before today still works.
      */
     occasion: (slug: string) => `/store/occasions/${slug}`,
-    cake: (slug: string) => `/store/cakes/${slug}`,
+    /**
+     * A PRODUCT'S OWN ADDRESS — and it stopped saying "cakes".
+     *
+     * This shop is going to sell flowers, plants, gifts, chocolates, fashion,
+     * mobiles, electronics, beauty, home, toys and sports. A bouquet at
+     * /store/cakes/red-roses is a CMS telling a customer what trade its shop
+     * is in, and getting it wrong.
+     *
+     * FLAT, not /store/<department>/<category>/<slug>. Three of this shop's
+     * 29 products are filed under TWO categories each — Black Forest Supreme
+     * is under Chocolate Cakes AND Cream Cakes — so a nested address has to
+     * pick one, and it changes the day the shop re-files the product. An
+     * address that moves when somebody tidies the catalogue is an address
+     * nobody can link to.
+     *
+     * The old one still resolves: see the 307 in next.config.ts. Temporary,
+     * because a browser caches a permanent redirect more or less for ever and
+     * this shape is one a deployment might reasonably revisit.
+     *
+     * The FOLDER moved too — app/(storefront)/store/p/[slug] — because a
+     * route's path is its directory. `loading.tsx` moved with it; leaving it
+     * behind is a page that silently loses its skeleton.
+     */
+    product: (slug: string) => `/store/p/${slug}`,
+    /**
+     * @deprecated The old name, kept so nothing breaks mid-rename. Points at
+     * the new address — it was never the folder name that mattered to a
+     * caller, only where the link goes.
+     */
+    cake: (slug: string) => `/store/p/${slug}`,
 
 
     contact: "/store/contact",

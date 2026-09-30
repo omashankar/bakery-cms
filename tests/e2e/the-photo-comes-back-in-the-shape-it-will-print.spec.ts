@@ -77,7 +77,7 @@ async function photoProducts(page: import("@playwright/test").Page) {
   await page.waitForTimeout(1800);
   const hrefs = await page.evaluate(() => [
     ...new Set(
-      [...document.querySelectorAll('a[href^="/store/cakes/"]')].map((a) => a.getAttribute("href")),
+      [...document.querySelectorAll('a[href^="/store/p/"]')].map((a) => a.getAttribute("href")),
     ),
   ]);
 

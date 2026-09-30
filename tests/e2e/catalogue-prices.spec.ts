@@ -48,7 +48,7 @@ test.describe("what a catalogue card says a cake costs", () => {
       }, 0);
     const expected = Number(withPaidDefault!.price) + surcharge;
 
-    await page.goto(`/store/cakes/${withPaidDefault!.slug}`);
+    await page.goto(`/store/p/${withPaidDefault!.slug}`);
     const pagePrice = rupees(await page.getByText(/₹/).first().textContent());
     expect(pagePrice, "the product page is not charging the default surcharge").toBe(expected);
 
@@ -75,7 +75,7 @@ test.describe("what a catalogue card says a cake costs", () => {
       .updateOne({ _id: target!._id }, { $set: { stockStatus: "out_of_stock" } });
 
     try {
-      await page.goto(`/store/cakes/${target!.slug}`);
+      await page.goto(`/store/p/${target!.slug}`);
       // The product page has refused this since it was written.
       await expect(page.getByRole("button", { name: /out of stock/i }).first()).toBeVisible();
 

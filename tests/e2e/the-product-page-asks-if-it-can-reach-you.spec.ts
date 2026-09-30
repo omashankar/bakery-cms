@@ -39,7 +39,7 @@ async function aProduct(page: import("@playwright/test").Page) {
   await page.goto("/store/collections");
   await page.waitForTimeout(1800);
   const href = await page.evaluate(
-    () => document.querySelector('a[href^="/store/cakes/"]')?.getAttribute("href") ?? "",
+    () => document.querySelector('a[href^="/store/p/"]')?.getAttribute("href") ?? "",
   );
   expect(href, "this shop has no product to open").not.toBe("");
   return href;

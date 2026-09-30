@@ -149,7 +149,7 @@ describe("where a review photo is seen", () => {
   it("appears with the review on the product page", async () => {
     vi.doMock("next/navigation", () => ({
       useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
-      usePathname: () => "/store/cakes/x",
+      usePathname: () => "/store/p/x",
       useSearchParams: () => new URLSearchParams(),
     }));
     vi.doMock("@/features/reviews/lib/reviews-api", () => ({
