@@ -234,6 +234,7 @@ describe("the server resolves against the very lists it publishes", () => {
     */
     mockChrome([ROW({ id: "l1", label: "Premium", href: "/x", ref: { axis: "category", id: "cat-premium" } })], {
       getStorefrontCategories: async () => [{ id: "cat-premium", name: "Premium", slug: "premium" }],
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [
         { id: "col-premium", name: "Premium Picks", slug: "premium", productIds: ["p1"] },
@@ -250,6 +251,7 @@ describe("the server resolves against the very lists it publishes", () => {
   it("does not offer a group the shop emptied", async () => {
     mockChrome([ROW({ id: "l2", label: "Edit", href: "/x", ref: { axis: "collection", id: "col-empty" } })], {
       getStorefrontCategories: async () => [],
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [
         { id: "col-empty", name: "Empty Edit", slug: "empty-edit", productIds: [] },
@@ -274,6 +276,7 @@ describe("the server resolves against the very lists it publishes", () => {
       ],
       {
         getStorefrontCategories: async () => [],
+        getStorefrontDepartments: async () => [],
         getStorefrontOccasions: async () => [{ id: "oc-birthday", name: "Birthday", slug: "birthday" }],
         getStorefrontCollections: async () => [],
       },

@@ -187,7 +187,22 @@ export async function getStorefrontCollections(): Promise<
  * ids, not the rows behind them.
  */
 export async function getStorefrontDepartments(): Promise<
-  { id: string; name: string; slug: string; description?: string; image?: string; categoryIds: string[] }[]
+  /*
+    `sortOrder` is DECLARED, not just spread. `offeredRows` has already put
+    these rows in the shop's order, and a caller re-running that rule over a
+    list with the field stripped gets the right answer only because the sort
+    is stable on equal keys — which is a fact about the sort, not a promise
+    this reader made. The header does re-run it on the client.
+  */
+  {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    image?: string;
+    sortOrder?: number;
+    categoryIds: string[];
+  }[]
 > {
   try {
     const catalog = await getCatalog();

@@ -319,3 +319,76 @@ export function departmentFor<
     (row) => (row.categoryIds ?? []).includes(categoryId) && (row.categoryIds ?? []).length > 0,
   );
 }
+
+/**
+ * THE CATEGORY LIST, CUT INTO THE KINDS OF THING THE SHOP SELLS.
+ *
+ * A shop selling cakes and flowers and gifts has one category list with all
+ * three kinds of thing in it, and a menu that draws it flat reads as one long
+ * alphabet: Anniversary, Bouquets, Chocolate, Cupcakes, Roses. The customer
+ * cannot see where cakes stop and flowers start.
+ *
+ * So the column is SECTIONED, and the section headings are the shop's own
+ * departments. The panel stays three columns wide — this adds sub-headings
+ * inside the first column, not a fourth column, which is why no width map
+ * changes with it.
+ *
+ * TWO RULES DECIDE THE RESULT, and both matter more than they look:
+ *
+ *   - A SHOP WITH NO DEPARTMENTS GETS ONE UNHEADED SECTION holding everything,
+ *     which draws as the same flat list. Every shop is in that
+ *     state on the day this ships, including this one, so the no-department
+ *     answer is the one that must not move.
+ *
+ *   - WHICH DEPARTMENT A CATEGORY BELONGS TO IS ASKED THROUGH `departmentFor`
+ *     and not decided again here. A category claimed by two departments
+ *     appears once, under the first in the shop's order.
+ *
+ *     THE POINT OF ROUTING IT THERE is that the storefront will have to name a
+ *     category's department in more than one place — the trail above a product
+ *     is the next one — and two rules would let the menu file Roses under
+ *     Flowers while the trail said Gifts, each looking right in its own file.
+ *     As of this writing NOTHING ELSE CALLS IT: the trail names no department
+ *     yet, so this is the first caller and not the second. That is the reason
+ *     to route through it now rather than after there are two answers to
+ *     reconcile.
+ *
+ * Anything no department claims comes LAST in an unheaded section, rather than
+ * being dropped: a shop mid-way through filing its catalogue would otherwise
+ * watch categories vanish from its own menu as it created the first department.
+ *
+ * AND THAT LAST SECTION IS HOW THE NO-DEPARTMENT ANSWER IS PRODUCED — there is
+ * no separate early return for it, and two were deleted from here. With no
+ * department to claim anything, everything is unclaimed, so the leftover
+ * section IS the flat list, in the order it arrived. The early returns computed
+ * the same array by a second route, which meant the case every shop is in ran
+ * through code no other case touched and no mutation could tell apart.
+ */
+export function categorySections<
+  C extends { id: string },
+  D extends { name: string; slug?: string; isActive?: boolean; sortOrder?: number; categoryIds?: string[] },
+>(
+  categories: readonly C[],
+  departments: readonly D[] | undefined,
+): { heading: string; categories: C[] }[] {
+  const rows = offeredRows(departments ?? []);
+
+  const filed = new Map<string, C[]>();
+  const loose: C[] = [];
+  for (const category of categories) {
+    const owner = departmentFor(rows, category.id);
+    if (!owner) {
+      loose.push(category);
+      continue;
+    }
+    const held = filed.get(owner.name);
+    if (held) held.push(category);
+    else filed.set(owner.name, [category]);
+  }
+
+  const sections = rows
+    .map((row) => ({ heading: row.name, categories: filed.get(row.name) ?? [] }))
+    .filter((section) => section.categories.length > 0);
+  if (loose.length > 0) sections.push({ heading: "", categories: loose });
+  return sections;
+}

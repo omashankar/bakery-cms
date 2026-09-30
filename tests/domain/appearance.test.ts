@@ -301,6 +301,7 @@ describe("the customer's first paint", () => {
       // distinguishing itself FROM. This mock replaces the module, so every
       // export the chrome reaches for has to be here; the count went from two
       // to three when the menu gained its collections column.
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [],
     }));

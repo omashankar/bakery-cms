@@ -7,6 +7,7 @@ import type { MegaMenuGroup } from "@/types/site-layout";
 import { navIcon } from "@/config/nav-icons";
 import { routes } from "@/constants/routes";
 import { groupDraws } from "@/features/site-layout/lib/menu-links";
+import { categorySections } from "@/features/catalog/lib/catalog-utils";
 import { SafeImage } from "@/components/shared/safe-image";
 
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -64,6 +65,22 @@ export interface ShopCollection {
 }
 
 /**
+ * ONE KIND OF THING THE SHOP SELLS, as the server resolved it.
+ *
+ * `categoryIds` is the whole content of a department, so it travels.
+ * `sortOrder` and `slug` travel because `offeredRows` orders by the one
+ * and drops a row missing the other, and the sectioning asks that rule again
+ * here on the client.
+ */
+export interface ShopDepartment {
+  id: string;
+  name: string;
+  slug: string;
+  sortOrder?: number;
+  categoryIds: string[];
+}
+
+/**
  * The nouns this menu heads its columns with — see StorefrontChrome.menuWords.
  *
  * A structural type and not `ResolvedLabels`, so `useBusinessLabels()` still
@@ -100,6 +117,13 @@ interface MegaMenuProps {
    * already does.
    */
   collections?: ShopCollection[];
+  /**
+   * WHAT KIND OF THING each of those categories IS.
+   *
+   * Absent or empty — every shop today — leaves the category column exactly
+   * as it was: one unheaded list. See `categorySections`.
+   */
+  departments?: ShopDepartment[];
   /**
    * The shop's own nouns, resolved on the SERVER.
    *
@@ -283,6 +307,7 @@ export function MegaMenu({
   categories: shopCategories,
   occasions: shopOccasions,
   collections: shopCollections,
+  departments: shopDepartments,
   words: serverWords,
   groups,
   href = routes.store.collections,
@@ -294,12 +319,35 @@ export function MegaMenu({
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
   const fallbackCategories = useFallbackCategories();
-  const categories = shopCategories?.length
-    ? shopCategories.map((category) => ({
-        label: category.name,
-        href: routes.store.collection(category.slug),
+  /*
+    THE CATEGORY COLUMN, CUT INTO THE KINDS OF THING THE SHOP SELLS.
+
+    One flat list over a shop selling cakes AND flowers AND gifts reads as one
+    alphabet — Anniversary, Bouquets, Chocolate, Cupcakes, Roses — and a
+    customer cannot see where one kind of thing stops and the next starts. The
+    sections are the shop's own departments, as sub-headings INSIDE this
+    column: the panel stays three columns wide and no width map moves.
+
+    ASKED of `categorySections` rather than decided here. The storefront
+    will have to name a category's department elsewhere too — the trail above a
+    product is the next place — and a second rule written out in this file
+    would let the menu file Roses under Flowers while that trail said Gifts,
+    each looking right on its own. The trail does not name one yet, so this is
+    the first caller of that rule, not the second.
+
+    A SHOP WITH NO DEPARTMENTS — every shop the day this ships, including this
+    one — gets ONE unheaded section holding everything, which renders as the
+    flat list did. That is the answer that must not move.
+  */
+  const categorySets = shopCategories?.length
+    ? categorySections(shopCategories, shopDepartments).map((section) => ({
+        heading: section.heading,
+        links: section.categories.map((category) => ({
+          label: category.name,
+          href: routes.store.collection(category.slug),
+        })),
       }))
-    : fallbackCategories;
+    : [{ heading: "", links: fallbackCategories }];
   const occasions = (shopOccasions ?? []).map((occasion) => ({
     label: occasion.name,
     // Its OWN page now. This was `routes.store.collection(occasion.slug)`,
@@ -539,18 +587,37 @@ export function MegaMenu({
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Shop by {words.categoryWord}
               </p>
-              <ul className="space-y-2">
-                {categories.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className="block rounded-md px-2 py-1.5 text-sm text-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {categorySets.map((section, index) => (
+                <div
+                  key={section.heading || `unfiled-${index}`}
+                  className={index > 0 ? "mt-4" : undefined}
+                >
+                  {/*
+                    A BLANK HEADING DRAWS NOTHING, not an empty line — the same
+                    rule the shop's authored groups above follow, and it is what
+                    makes the no-department case the flat list again. Two
+                    sections reach this blank: a shop with no departments at
+                    all, and whatever no department has claimed yet.
+                  */}
+                  {section.heading.trim() ? (
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                      {section.heading}
+                    </p>
+                  ) : null}
+                  <ul className="space-y-2">
+                    {section.links.map((item) => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className="block rounded-md px-2 py-1.5 text-sm text-foreground transition-premium hover:bg-cream-100 hover:text-bakery-700"
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
             {/* Hidden entirely when the shop keeps no occasions — a heading
                 over an empty list reads as something that failed to load. */}
@@ -654,6 +721,7 @@ export function MobileShopLinks({
   categories: shopCategories,
   occasions: shopOccasions,
   collections: shopCollections,
+  departments: shopDepartments,
   words: serverWords,
   groups,
 }: {
@@ -663,6 +731,8 @@ export function MobileShopLinks({
   occasions?: ShopOccasion[];
   /** The same third axis the desktop draws — see MegaMenu. */
   collections?: ShopCollection[];
+  /** What kind of thing each category is, from the same field — see MegaMenu. */
+  departments?: ShopDepartment[];
   /** The same nouns, from the same chrome field — see MegaMenu. */
   words?: MenuWords;
   /** The shop's own columns, when it wrote any — see MegaMenu. */
@@ -670,12 +740,35 @@ export function MobileShopLinks({
 }) {
   const authored = drawableGroups(groups);
   const fallbackCategories = useFallbackCategories();
-  const categories = shopCategories?.length
-    ? shopCategories.map((category) => ({
-        label: category.name,
-        href: routes.store.collection(category.slug),
+  /*
+    THE CATEGORY COLUMN, CUT INTO THE KINDS OF THING THE SHOP SELLS.
+
+    One flat list over a shop selling cakes AND flowers AND gifts reads as one
+    alphabet — Anniversary, Bouquets, Chocolate, Cupcakes, Roses — and a
+    customer cannot see where one kind of thing stops and the next starts. The
+    sections are the shop's own departments, as sub-headings INSIDE this
+    column: the panel stays three columns wide and no width map moves.
+
+    ASKED of `categorySections` rather than decided here. The storefront
+    will have to name a category's department elsewhere too — the trail above a
+    product is the next place — and a second rule written out in this file
+    would let the menu file Roses under Flowers while that trail said Gifts,
+    each looking right on its own. The trail does not name one yet, so this is
+    the first caller of that rule, not the second.
+
+    A SHOP WITH NO DEPARTMENTS — every shop the day this ships, including this
+    one — gets ONE unheaded section holding everything, which renders as the
+    flat list did. That is the answer that must not move.
+  */
+  const categorySets = shopCategories?.length
+    ? categorySections(shopCategories, shopDepartments).map((section) => ({
+        heading: section.heading,
+        links: section.categories.map((category) => ({
+          label: category.name,
+          href: routes.store.collection(category.slug),
+        })),
       }))
-    : fallbackCategories;
+    : [{ heading: "", links: fallbackCategories }];
   /**
    * The same occasions the desktop menu shows.
    *
@@ -760,15 +853,29 @@ export function MobileShopLinks({
       <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Shop by {words.categoryWord}
       </p>
-      {categories.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onNavigate}
-          className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
-        >
-          {item.label}
-        </Link>
+      {/* THE SAME SECTIONS THE DESKTOP DRAWS. A phone has one column, so a
+          department is a sub-heading with its categories under it — the same
+          shape the authored groups already take here. A fix that lands on one
+          of these two renderers and not the other is a defect this component
+          has shipped twice. */}
+      {categorySets.map((section, index) => (
+        <div key={section.heading || `unfiled-${index}`}>
+          {section.heading.trim() ? (
+            <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              {section.heading}
+            </p>
+          ) : null}
+          {section.links.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-cream-100"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
       ))}
       {occasions.length > 0 ? (
         <>

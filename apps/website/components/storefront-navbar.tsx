@@ -1152,6 +1152,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   categories={chrome.categories}
                   occasions={chrome.occasions}
                   collections={chrome.collections}
+                  departments={chrome.departments}
                   words={chrome.menuWords}
                   menuOnly={item.menuOnly}
                   isActive={isActive}
@@ -1332,6 +1333,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 categories={chrome.categories}
                 occasions={chrome.occasions}
                 collections={chrome.collections}
+                departments={chrome.departments}
                 words={chrome.menuWords}
                 onNavigate={() => setMobileOpen(false)}
               />

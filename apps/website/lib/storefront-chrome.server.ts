@@ -5,6 +5,7 @@ import { getPublicZones } from "@/features/commerce/server/commerce.service";
 import {
   getStorefrontCategories,
   getStorefrontCollections,
+  getStorefrontDepartments,
   getStorefrontOccasions,
 } from "./storefront-categories.server";
 import { resolveLabels, type ResolvedLabels } from "@/config/business-labels";
@@ -54,6 +55,27 @@ export interface StorefrontChrome {
    * NAME AND SLUG ONLY, never the stored row — see the projection below.
    */
   collections: { id: string; name: string; slug: string }[];
+  /**
+   * THE KIND OF THING each of those categories IS — the shop's departments.
+   *
+   * A shop selling cakes and flowers and gifts keeps one category list with
+   * all three kinds of thing in it, and a menu drawing it flat reads as one
+   * alphabet: Anniversary, Bouquets, Chocolate, Cupcakes, Roses. These are
+   * the section headings that cut it up.
+   *
+   * FREE, for the same reason the collections above are: `getCatalog` is
+   * `cache()`d and the reads beside this one have already taken it, so this
+   * is another caller of one memoised document rather than another round trip.
+   *
+   * PROJECTED, never spread — the same rule as the collections. The stored
+   * row also carries `description` and `image`, which this object would
+   * then send across the RSC wire into a client navbar on cart and checkout
+   * to render nothing. `categoryIds` DOES travel, because which categories
+   * a department holds is the whole content of it; `slug` and `sortOrder`
+   * travel because `offeredRows` drops a row with no slug and orders by the
+   * other, and the menu asks that rule again on the client.
+   */
+  departments: { id: string; name: string; slug: string; sortOrder?: number; categoryIds: string[] }[];
   /**
    * THE NOUNS THE MENU HEADS ITS COLUMNS WITH.
    *
@@ -183,6 +205,12 @@ function fallbackChrome(): StorefrontChrome {
     // Same rule as the two lists above: a menu into a catalogue we cannot
     // read is a menu of links to empty grids.
     collections: [],
+    /*
+      And with no departments the category column draws ONE unheaded section
+      holding everything, which is exactly the flat list this path used to
+      draw. Nothing about this page changes when the read fails.
+    */
+    departments: [],
     // Neutral wording, never blank. An empty noun renders a bare "Shop by"
     // over the one row this path still draws.
     menuWords: menuWordsFrom(resolveLabels()),
@@ -236,6 +264,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       categories,
       occasions,
       collectionRows,
+      departmentRows,
       hasDeliveryZones,
     ] =
       await Promise.all([
@@ -252,6 +281,9 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         // concurrent callers are one document read — which is the whole
         // reason a third column costs nothing on the checkout page.
         getStorefrontCollections(),
+        // The fourth axis, still in the SAME round trip and for the same
+        // reason: one memoised document answers all four.
+        getStorefrontDepartments(),
         // And this one too, for the same reason.
         hasActiveDeliveryZones(),
       ]);
@@ -323,6 +355,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       categories,
       occasions,
       collections: collectionRows,
+      departments: departmentRows,
     });
 
     /*
@@ -393,6 +426,18 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         id,
         name: groupName,
         slug,
+      })),
+      /*
+        PROJECTED for the reason the type above records: the stored row's
+        `description` and `image` would cross the wire to a client navbar
+        that has nothing to draw them with.
+      */
+      departments: offered.departments.map(({ id, name: kind, slug, sortOrder, categoryIds }) => ({
+        id,
+        name: kind,
+        slug,
+        sortOrder,
+        categoryIds,
       })),
       menuWords: menuWordsFrom(labels),
       hasDeliveryZones,

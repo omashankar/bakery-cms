@@ -131,6 +131,7 @@ describe("the server decides which groups are offered at all", () => {
     mockTheRest();
     vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
       getStorefrontCategories: async () => [],
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [
         { id: "c1", name: "Empty Edit", slug: "empty-edit", productIds: [] },
@@ -154,6 +155,7 @@ describe("the server decides which groups are offered at all", () => {
     mockTheRest();
     vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
       getStorefrontCategories: async () => [],
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [
         {
@@ -192,6 +194,7 @@ describe("the server decides which groups are offered at all", () => {
         { id: "cat1", name: "Premium", slug: "premium" },
         { id: "cat2", name: "Cupcakes", slug: "cupcakes" },
       ],
+      getStorefrontDepartments: async () => [],
       getStorefrontOccasions: async () => [],
       getStorefrontCollections: async () => [
         { id: "col1", name: "Premium Picks", slug: "premium", productIds: ["p1"] },
