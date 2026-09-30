@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import type {
   ProductCategory,
   ProductCollection,
+  ProductDepartment,
   ProductOccasion,
 } from "@/types/product";
 import type { CatalogTab } from "@/types/catalog";
@@ -29,11 +30,15 @@ import {
   createCategory,
   createCollection,
   createOccasion,
+  CATALOG_UPDATED_EVENT,
+  createDepartment,
   getCategories,
   getCollections,
+  getDepartments,
   getOccasions,
   updateCategory,
   updateCollection,
+  updateDepartment,
   updateOccasion,
 } from "@/features/catalog/lib/catalog-repository";
 import { loadProducts } from "@/features/products/lib/products-repository";
@@ -97,6 +102,9 @@ export function CatalogFormDialog({
   const [isActive, setIsActive] = useState(true);
   /** Collections only — ORDERED, because the order is the curation. */
   const [productIds, setProductIds] = useState<string[]>([]);
+  /* The categories filed under this department — see ProductDepartment. */
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
@@ -133,6 +141,17 @@ export function CatalogFormDialog({
         setDescription(item.description ?? "");
         setImage(item.image ?? "");
         setIsActive(item.isActive !== false);
+      }
+    } else if (tab === "departments") {
+      const item = getDepartments().find((entry) => entry.id === itemId);
+      if (item) {
+        setName(item.name);
+        setSlug(item.slug);
+        setHeadline(item.headline ?? "");
+        setDescription(item.description ?? "");
+        setImage(item.image ?? "");
+        setIsActive(item.isActive !== false);
+        setCategoryIds(item.categoryIds ?? []);
       }
     } else if (tab === "collections") {
       const item = getCollections().find((entry) => entry.id === itemId);
@@ -209,6 +228,28 @@ export function CatalogFormDialog({
         reportWrite(persisted, "Category created");
       }
 
+    } else if (tab === "departments") {
+      const payload: Omit<ProductDepartment, "id" | "createdAt" | "updatedAt"> = {
+        name: name.trim(),
+        slug: finalSlug,
+        headline: headline.trim() || undefined,
+        description: description.trim() || undefined,
+        image: image.trim() || undefined,
+        isActive,
+        /*
+          Sent whatever it holds, including empty — a shop names the
+          department first and files things under it second. The storefront
+          simply does not offer an empty one.
+        */
+        categoryIds,
+      };
+      if (isEdit && itemId) {
+        const { persisted } = await updateDepartment(itemId, payload);
+        reportWrite(persisted, `${labels.departmentWord} updated`);
+      } else {
+        const { persisted } = await createDepartment(payload);
+        reportWrite(persisted, `${labels.departmentWord} created`);
+      }
     } else if (tab === "collections") {
       const payload: Omit<ProductCollection, "id" | "createdAt" | "updatedAt"> = {
         name: name.trim(),
@@ -251,6 +292,7 @@ export function CatalogFormDialog({
   }
 
   const titles: Record<CatalogTab, string> = {
+    departments: labels.departmentWord,
     categories: labels.categoryWord,
     occasions: labels.occasionWord,
     collections: labels.collectionWord,
@@ -272,6 +314,50 @@ export function CatalogFormDialog({
       )
       .sort((a, b) => Number(b.status === "published") - Number(a.status === "published"));
   }, [productSearch]);
+
+  /**
+   * THE SHOP'S OWN CATEGORIES, and never the shipped demo ones.
+   *
+   * `getCategories()` reads the browser's catalogue cache, and that cache
+   * answers with `defaultCatalogStore` until the server's copy has been read
+   * into it. This dialog is mounted with the page — before hydration — so a
+   * memo keyed on the search box alone captured the SEED and never looked
+   * again: measured, it offered Cupcakes and Custom Cakes to a shop that has
+   * neither, while its seven real categories were on the page behind it.
+   *
+   * Held in state, filled when the dialog opens, and refilled on the
+   * catalogue's own event so a category created in another tab appears here.
+   */
+  const [allCategories, setAllCategories] = useState<ProductCategory[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const sync = () => setAllCategories(getCategories());
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+  }, [open]);
+
+  /**
+   * Hidden rows are INCLUDED — a shop that switched one off and is now filing
+   * it under a department is about to switch it back on, and leaving it out of
+   * the list makes the tick that is already there look lost.
+   */
+  const pickableCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    return allCategories
+      .filter(
+        (row) =>
+          !query ||
+          row.name.toLowerCase().includes(query) ||
+          row.slug.toLowerCase().includes(query),
+      )
+      .sort(
+        (a, b) =>
+          (a.sortOrder ?? Number.POSITIVE_INFINITY) -
+          (b.sortOrder ?? Number.POSITIVE_INFINITY),
+      );
+  }, [allCategories, categorySearch]);
 
   /**
    * Ticking APPENDS, so the order of the list is the order they were chosen.
@@ -412,6 +498,63 @@ export function CatalogFormDialog({
             a search box; a shop with twelve would have to page through three
             screens to build one row.
           */}
+          {tab === "departments" ? (
+            <div className="space-y-2">
+              <Label htmlFor="department-categories">
+                {labels.categoryWordPlural} in this {labels.departmentWord.toLowerCase()}
+              </Label>
+              <Input
+                id="department-categories"
+                placeholder={`Search ${labels.categoryWordPlural.toLowerCase()}…`}
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+              />
+              {/*
+                A CATEGORY MAY BE IN MORE THAN ONE. That is the whole reason
+                membership lives here rather than as a parent pointer — Roses
+                belongs under Flowers and under Gifts — so nothing here stops
+                a category already filed elsewhere from being ticked again.
+              */}
+              <p className="text-xs text-muted-foreground">
+                {categoryIds.length === 0
+                  ? `Nothing filed yet — this ${labels.departmentWord.toLowerCase()} will not appear on the site.`
+                  : `${categoryIds.length} filed. A ${labels.categoryWord.toLowerCase()} can be in more than one.`}
+              </p>
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                {pickableCategories.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    Nothing matches that search.
+                  </p>
+                ) : (
+                  pickableCategories.map((row) => (
+                    <label
+                      key={row.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    >
+                      <Checkbox
+                        checked={categoryIds.includes(row.id)}
+                        onCheckedChange={(checked) =>
+                          setCategoryIds((prev) =>
+                            checked === true
+                              ? [...prev, row.id]
+                              : prev.filter((id) => id !== row.id),
+                          )
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                      {/* Hidden rows are shown rather than filtered out, for
+                          the reason the draft product beside it is: hiding a
+                          row makes a tick look lost. */}
+                      {row.isActive === false ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">hidden</span>
+                      ) : null}
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+
           {tab === "collections" ? (
             <div className="space-y-2">
               <Label htmlFor="collection-products">

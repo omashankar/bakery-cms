@@ -55,6 +55,7 @@ describe("the Catalog no longer keeps a list of flavours", () => {
      * section was added.
      */
     expect([...CATALOG_SECTIONS]).toEqual([
+      "departments",
       "categories",
       "occasions",
       "collections",
@@ -76,6 +77,7 @@ describe("the Catalog no longer keeps a list of flavours", () => {
     expect(Object.keys(catalogSectionSchemas).sort()).toEqual([
       "categories",
       "collections",
+      "departments",
       "occasions",
     ]);
     expect(Object.hasOwn(catalogSectionSchemas, "flavours")).toBe(false);
@@ -90,6 +92,7 @@ describe("the Catalog no longer keeps a list of flavours", () => {
     expect(Object.keys(store).sort()).toEqual([
       "categories",
       "collections",
+      "departments",
       "occasions",
       "updatedAt",
     ]);

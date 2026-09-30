@@ -174,3 +174,35 @@ export async function getStorefrontCollections(): Promise<
 }
 
 
+
+/**
+ * The shop's DEPARTMENTS — the kind of thing, above the category.
+ *
+ * Same shape as the three readers above, and free for the same reason:
+ * `getCatalog` is `cache()`d, so a fourth caller in one request is a fourth
+ * read of one document already in hand.
+ *
+ * `categoryIds` travels because the caller has to know what is filed under
+ * each one — that is the whole content of a department. It is a short list of
+ * ids, not the rows behind them.
+ */
+export async function getStorefrontDepartments(): Promise<
+  { id: string; name: string; slug: string; description?: string; image?: string; categoryIds: string[] }[]
+> {
+  try {
+    const catalog = await getCatalog();
+    const rows = (catalog.departments ?? []) as {
+      id: string;
+      name: string;
+      slug: string;
+      description?: string;
+      image?: string;
+      categoryIds?: string[];
+      isActive?: boolean;
+      sortOrder?: number;
+    }[];
+    return offeredRows(rows).map((row) => ({ ...row, categoryIds: row.categoryIds ?? [] }));
+  } catch {
+    return [];
+  }
+}

@@ -24,6 +24,12 @@ const SECTION_DEFAULTS = catalogSectionDefaults;
 
 function toCatalog(json: Record<string, unknown>) {
   return {
+    /*
+      `?? []` for the same reason as collections below: a shop with no
+      departments has none, and inventing CAKES or FLOWERS would be this
+      software deciding what its trade is.
+    */
+    departments: json.departments ?? [],
     categories: json.categories ?? [],
     occasions: json.occasions ?? [],
     // `?? []` and not a default list: a shop with no collections has none,

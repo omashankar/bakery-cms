@@ -27,6 +27,7 @@ import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
   deleteCollections,
+  deleteDepartments,
   deleteOccasions,
   moveCatalogRow,
   loadCatalogStore,
@@ -45,6 +46,7 @@ import { CatalogFormDialog } from "./catalog-form-dialog";
 import { useBusinessLabels, type ShopLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_STORE: CatalogStore = {
+  departments: [],
   categories: [],
   occasions: [],
   collections: [],
@@ -71,6 +73,8 @@ function tabsFor(labels: ShopLabels): Array<{
   singular: string;
 }> {
   return [
+    /* FIRST, because it is the level above the rest. */
+    { id: "departments", label: labels.departmentWordPlural, singular: labels.departmentWord },
     { id: "categories", label: labels.categoryWordPlural, singular: labels.categoryWord },
     { id: "occasions", label: labels.occasionWordPlural, singular: labels.occasionWord },
     { id: "collections", label: labels.collectionWordPlural, singular: labels.collectionWord },
@@ -82,6 +86,7 @@ function tabBarFor(
   labels: ShopLabels,
 ): Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> {
   return [
+  { id: "departments", label: labels.departmentWordPlural },
   { id: "categories", label: labels.categoryWordPlural },
   { id: "occasions", label: labels.occasionWordPlural },
   { id: "collections", label: labels.collectionWordPlural },
@@ -175,6 +180,7 @@ export function CatalogAdminPage() {
       isActive?: boolean;
       sortOrder?: number;
     }[] = {
+      departments: store.departments,
       categories: store.categories,
       occasions: store.occasions,
       collections: store.collections,
@@ -227,6 +233,7 @@ export function CatalogAdminPage() {
   );
 
   const counts: Record<CatalogTab, number> = {
+    departments: store.departments.length,
     categories: store.categories.length,
     occasions: store.occasions.length,
     collections: store.collections.length,
@@ -343,6 +350,7 @@ export function CatalogAdminPage() {
       whichever list the else happened to name.
     */
     const removers: Record<CatalogTab, (ids: string[]) => Promise<WriteResult<number>>> = {
+      departments: deleteDepartments,
       categories: deleteCategories,
       occasions: deleteOccasions,
       collections: deleteCollections,

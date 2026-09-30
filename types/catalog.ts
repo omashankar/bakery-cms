@@ -1,6 +1,7 @@
 import type {
   ProductCategory,
   ProductCollection,
+  ProductDepartment,
   ProductOccasion,
 } from "./product";
 
@@ -25,10 +26,12 @@ import type {
 */
 
 export interface CatalogStore {
+  /* The kind of thing, above the category — see ProductDepartment. */
+  departments: ProductDepartment[];
   categories: ProductCategory[];
   occasions: ProductOccasion[];
   collections: ProductCollection[];
   updatedAt: string;
 }
 
-export type CatalogTab = "categories" | "occasions" | "collections";
+export type CatalogTab = "departments" | "categories" | "occasions" | "collections";

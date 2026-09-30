@@ -394,6 +394,42 @@ export interface ProductOccasion extends CatalogRow {
  * when a product is deleted. That is tolerated and filtered on read, the same
  * way `product-mapper` already tolerates a deleted category id.
  */
+/**
+ * A DEPARTMENT — the kind of thing, above the category that says which kind.
+ *
+ * CAKES, FLOWERS, MOBILES. The catalogue had three FLAT lists and no way to
+ * say that Chocolate Cakes sits under CAKES and Smartphones under MOBILES, so
+ * a shop selling a dozen kinds of thing had one undifferentiated pile of
+ * categories.
+ *
+ * MEMBERSHIP LIVES HERE, not on the product and not as a parent pointer.
+ *
+ * NOT `parentId` on CatalogRow: one parent cannot say that Roses belongs
+ * under FLOWERS and under GIFTS, and a shop that named both in one sentence
+ * is exactly where that is normal. `offeredRows` and `offeredAxes` also hand
+ * every row back flat, so eight readers would start mixing a department into
+ * the category list with no error anywhere.
+ *
+ * NOT `departmentId` on the product: that is the shape `cakeCount` had, and the
+ * note where it was removed is a few lines below. It would also put the
+ * header on a product read to draw its own menu, which is the one line the
+ * chrome exists to hold — it renders on cart and checkout.
+ *
+ * So: ids, here, exactly as `ProductCollection` already holds `productIds`. The
+ * cost is the same one that docblock states — a dangling id when a category
+ * is deleted — tolerated and filtered on read.
+ */
+export interface ProductDepartment extends CatalogRow {
+  description?: string;
+  image?: string;
+  /**
+   * The categories filed under this department, in the shop's own order.
+   *
+   * A category may appear in more than one. That is the point, and it is what
+   * a parent pointer could not express.
+   */
+  categoryIds: string[];
+}
 export interface ProductCollection extends CatalogRow {
   description?: string;
   image?: string;

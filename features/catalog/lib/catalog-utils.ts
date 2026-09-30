@@ -2,6 +2,7 @@ import { categories } from "@/constants/landing-data";
 import type {
   ProductCategory,
   ProductCollection,
+  ProductDepartment,
   ProductOccasion,
 } from "@/types/product";
 import type { CatalogStore } from "@/types/catalog";
@@ -77,6 +78,19 @@ export const defaultOccasions: ProductOccasion[] = [
 export const defaultCollections: ProductCollection[] = [];
 
 /**
+ * EMPTY, and for the same reason as the line above.
+ *
+ * A department is a decision about what a shop SELLS. Shipping CAKES and
+ * FLOWERS and MOBILES would be this software telling a shop what its trade
+ * is, and then heading its storefront with departments nobody created and
+ * nothing is filed under.
+ *
+ * It is what `Reset defaults` restores too, which is the other reason it must
+ * be empty: resetting departments should clear them, not conjure some.
+ */
+export const defaultDepartments: ProductDepartment[] = [];
+
+/**
  * What `Reset defaults` restores, PER SECTION.
  *
  * Lives here rather than inside the service so it can be checked against the
@@ -86,12 +100,14 @@ export const defaultCollections: ProductCollection[] = [];
  * repo has been bitten by more than once.
  */
 export const catalogSectionDefaults: Record<string, unknown> = {
+  departments: defaultDepartments,
   categories: defaultCategories,
   occasions: defaultOccasions,
   collections: defaultCollections,
 };
 
 export const defaultCatalogStore: CatalogStore = {
+  departments: defaultDepartments,
   categories: defaultCategories,
   occasions: defaultOccasions,
   collections: defaultCollections,
@@ -242,11 +258,22 @@ export function offeredAxes<
   C extends { slug?: string; isActive?: boolean; sortOrder?: number },
   O extends { slug?: string; isActive?: boolean; sortOrder?: number },
   L extends { slug?: string; isActive?: boolean; sortOrder?: number; productIds?: string[] },
+  D extends { slug?: string; isActive?: boolean; sortOrder?: number; categoryIds?: string[] } = {
+    slug?: string;
+    isActive?: boolean;
+    sortOrder?: number;
+    categoryIds?: string[];
+  },
 >(input: {
   categories: readonly C[];
   occasions: readonly O[];
   collections: readonly L[];
-}): { categories: C[]; occasions: O[]; collections: L[] } {
+  /*
+    OPTIONAL, so every existing caller keeps compiling and keeps behaving.
+    A shop with no departments is exactly where this one is today.
+  */
+  departments?: readonly D[];
+}): { categories: C[]; occasions: O[]; collections: L[]; departments: D[] } {
   const collections = offeredRows(input.collections).filter(
     (row) => (row.productIds ?? []).length > 0,
   );
@@ -256,5 +283,39 @@ export function offeredAxes<
     categories: offeredRows(input.categories).filter((row) => !claimed.has(row.slug)),
     occasions: offeredRows(input.occasions),
     collections,
+    /*
+      A DEPARTMENT WITH NOTHING FILED UNDER IT IS NOT OFFERED — the same rule
+      as the empty collection above, and answered the same way, from ids
+      already in hand rather than by reading a single product.
+    */
+    departments: offeredRows(input.departments ?? []).filter(
+      (row) => (row.categoryIds ?? []).length > 0,
+    ),
   };
+}
+
+/**
+ * WHICH DEPARTMENT A CATEGORY SITS UNDER, when the shop has said.
+ *
+ * A category may be filed under more than one — Roses under Flowers and under
+ * Gifts — and that is the whole reason membership lives on the department
+ * rather than as a parent pointer. So this has to CHOOSE, and the choice must
+ * be the shop's rather than ours.
+ *
+ * It is the first department in the shop's own order that holds this category.
+ * `offeredRows` sorts by `sortOrder` BEFORE it dedupes, so "first" means the
+ * one the shop put first, not the one it happened to create first — and
+ * re-ordering the Departments tab changes the answer, which is the only
+ * control over it a shop should need.
+ *
+ * `undefined` when nothing holds it, which is every category today. A trail
+ * with no department in it is the trail as it was.
+ */
+export function departmentFor<
+  D extends { slug?: string; isActive?: boolean; sortOrder?: number; categoryIds?: string[] },
+>(departments: readonly D[], categoryId: string | undefined): D | undefined {
+  if (!categoryId) return undefined;
+  return offeredRows(departments).find(
+    (row) => (row.categoryIds ?? []).includes(categoryId) && (row.categoryIds ?? []).length > 0,
+  );
 }

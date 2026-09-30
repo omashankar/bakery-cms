@@ -99,16 +99,20 @@ describe("the phrase a listing page is headed with", () => {
 
     // A box to type it in — the layer this repo has forgotten before.
     expect(dialog, "there is no control for it").toContain('id="catalog-headline"');
-    // All three payload builders, or it saves on some tabs and not others.
+    /*
+      EVERY payload builder, or it saves on some tabs and not others. Four
+      since departments arrived, and the count is the point: a fifth tab that
+      forgets the headline turns this red rather than shipping half-wired.
+    */
     expect(
       (dialog.match(/headline: headline\.trim\(\) \|\| undefined/g) ?? []).length,
       "a tab saves everything except the headline",
-    ).toBe(3);
+    ).toBe(4);
     // And loaded back on edit, or the second save wipes it.
     expect(
       (dialog.match(/setHeadline\(item\.headline \?\? ""\)/g) ?? []).length,
       "an edit loads the row without its headline, so saving clears it",
-    ).toBe(3);
+    ).toBe(4);
 
     // No seeded phrase anywhere.
     expect(dialog, "a phrase ships in the admin").not.toMatch(

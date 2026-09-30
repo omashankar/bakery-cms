@@ -298,6 +298,14 @@ export const labelOverridesSchema = z.object({
   occasionWordPlural: z.string().trim().optional(),
   collectionWord: z.string().trim().optional(),
   collectionWordPlural: z.string().trim().optional(),
+  /*
+    DECLARED, because this schema has no `.passthrough()` — the comment above
+    says so deliberately. A word typed in the type and missing here is stripped
+    on write while the API answers 200, and the shop's own noun silently never
+    saves.
+  */
+  departmentWord: z.string().trim().optional(),
+  departmentWordPlural: z.string().trim().optional(),
 });
 
 /** section name -> its schema, used by the controller to validate PUT bodies. */

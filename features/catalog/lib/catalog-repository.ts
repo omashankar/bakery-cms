@@ -2,6 +2,7 @@ import { safeSetItem } from "@/lib/safe-storage";
 import type {
   ProductCategory,
   ProductCollection,
+  ProductDepartment,
   ProductOccasion,
 } from "@/types/product";
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
@@ -11,6 +12,7 @@ import {
   defaultCatalogStore,
   defaultCategories,
   defaultCollections,
+  defaultDepartments,
   defaultOccasions,
 } from "./catalog-utils";
 import {
@@ -63,6 +65,12 @@ function persist(store: CatalogStore): void {
 
 function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
   return {
+    /*
+      A document written before departments existed has no such key, so this
+      falls through to the empty default — which is also what a shop that has
+      never opened the tab should have.
+    */
+    departments: partial.departments ?? defaultDepartments,
     categories: partial.categories ?? defaultCategories,
     occasions: partial.occasions ?? defaultOccasions,
     collections: partial.collections ?? defaultCollections,
@@ -133,6 +141,10 @@ export function getOccasions(): ProductOccasion[] {
 
 export function getCollections(): ProductCollection[] {
   return loadCatalogStore().collections;
+}
+
+export function getDepartments(): ProductDepartment[] {
+  return loadCatalogStore().departments;
 }
 
 /*
@@ -336,6 +348,56 @@ export async function deleteCollections(ids: string[]): Promise<WriteResult<numb
   const next = store.collections.filter((item) => !ids.includes(item.id));
   const { persisted } = await updateStore(store, { collections: next });
   return { value: persisted ? store.collections.length - next.length : 0, persisted };
+}
+
+export async function createDepartment(
+  data: Omit<ProductDepartment, "id" | "createdAt" | "updatedAt">,
+): Promise<WriteResult<ProductDepartment | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const item: ProductDepartment = {
+    ...data,
+    id: newId("dept"),
+    slug: data.slug || slugify(data.name),
+    /*
+      Never undefined. The storefront maps over this, and an absent array
+      would throw on a department created and not yet filled — which is
+      every department, for the minute between naming it and filing
+      something under it.
+    */
+    categoryIds: data.categoryIds ?? [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  const { persisted } = await updateStore(store, {
+    departments: [...store.departments, item],
+  });
+  return { value: item, persisted };
+}
+
+export async function updateDepartment(
+  id: string,
+  patch: Partial<ProductDepartment>,
+): Promise<WriteResult<ProductDepartment | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const index = store.departments.findIndex((item) => item.id === id);
+  if (index < 0) return { value: null, persisted: false };
+  const next = [...store.departments];
+  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
+  const { persisted } = await updateStore(store, { departments: next });
+  return { value: next[index], persisted };
+}
+
+export async function deleteDepartments(ids: string[]): Promise<WriteResult<number>> {
+  const store = await hydratedStore();
+  if (!store) return { value: 0, persisted: false };
+
+  const next = store.departments.filter((item) => !ids.includes(item.id));
+  const { persisted } = await updateStore(store, { departments: next });
+  return { value: persisted ? store.departments.length - next.length : 0, persisted };
 }
 
 /**

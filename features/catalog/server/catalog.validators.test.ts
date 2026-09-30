@@ -45,10 +45,16 @@ describe("catalog validators", () => {
      * deliberate decision fails here — this case had to be edited to admit
      * collections, and that edit is the decision.
      */
-    expect(CATALOG_SECTIONS.sort()).toEqual(["categories", "collections", "occasions"]);
+    expect(CATALOG_SECTIONS.sort()).toEqual([
+      "categories",
+      "collections",
+      "departments",
+      "occasions",
+    ]);
     expect(Object.keys(catalogSectionSchemas).sort()).toEqual([
       "categories",
       "collections",
+      "departments",
       "occasions",
     ]);
   });

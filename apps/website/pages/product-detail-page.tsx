@@ -151,6 +151,13 @@ interface ProductDetailPageProps {
    * rather than one that leads somewhere empty.
    */
   categoryCrumb?: { label: string; href: string };
+  /**
+   * The department that category sits under, when the shop has filed it.
+   *
+   * No `href`: a department has no page of its own yet. A crumb is a promise
+   * that a page exists, so this one is a word and not a link until it is true.
+   */
+  departmentCrumb?: { label: string };
 }
 
 export function ProductDetailPage({
@@ -160,6 +167,7 @@ export function ProductDetailPage({
   related: relatedFromServer,
   catalog,
   categoryCrumb,
+  departmentCrumb,
 }: ProductDetailPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
@@ -965,7 +973,11 @@ export function ProductDetailPage({
           trail is then Home › this cake, which is true. A crumb is a promise
           that a page exists.
         */
-        breadcrumbs={[...(categoryCrumb ? [categoryCrumb] : []), { label: cake.name }]}
+        breadcrumbs={[
+          ...(departmentCrumb ? [departmentCrumb] : []),
+          ...(categoryCrumb ? [categoryCrumb] : []),
+          { label: cake.name },
+        ]}
       />
 
       {/*

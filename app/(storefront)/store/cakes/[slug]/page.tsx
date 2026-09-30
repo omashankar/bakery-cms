@@ -4,9 +4,10 @@ import { ProductDetailPage } from "@/apps/website";
 import {
   getStorefrontCategories,
   getStorefrontCollections,
+  getStorefrontDepartments,
   getStorefrontOccasions,
 } from "@/apps/website/lib/storefront-categories.server";
-import { offeredAxes } from "@/features/catalog/lib/catalog-utils";
+import { departmentFor, offeredAxes } from "@/features/catalog/lib/catalog-utils";
 import { routes } from "@/constants/routes";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
@@ -144,7 +145,8 @@ export default async function Page(props: PageProps) {
   // Fetched on the server, so the first paint already carries real catalogue
   // data — previously this ran against localStorage, which the server does not
   // have, so SSR rendered seed data and the client swapped it on hydration.
-  const [cake, catalog, { modules }, categories, occasions, collections] = await Promise.all([
+  const [cake, catalog, { modules }, categories, occasions, collections, departments] =
+    await Promise.all([
     getStorefrontProductBySlug(slug),
     getStorefrontProductCards(),
     /**
@@ -172,6 +174,7 @@ export default async function Page(props: PageProps) {
     getStorefrontCategories(),
     getStorefrontOccasions(),
     getStorefrontCollections(),
+    getStorefrontDepartments(),
   ]);
 
   if (!cake) {
@@ -190,7 +193,7 @@ export default async function Page(props: PageProps) {
     a collection has taken resolves to nothing and the trail is simply
     Home › this cake. A crumb is a promise that a page is there.
   */
-  const offered = offeredAxes({ categories, occasions, collections });
+  const offered = offeredAxes({ categories, occasions, collections, departments });
   const primaryId = cake.categoryIds?.[0];
   const row =
     (primaryId ? offered.categories.find((entry) => entry.id === primaryId) : undefined) ??
@@ -205,6 +208,19 @@ export default async function Page(props: PageProps) {
       catalog={catalog}
       categoryCrumb={
         row ? { label: row.name, href: routes.store.collection(row.slug) } : undefined
+      }
+      /*
+        NO HREF. A department has no page of its own yet, and a crumb that
+        links nowhere is worse than one that does not link — so it reads as
+        where you are and waits for the page to exist.
+      */
+      departmentCrumb={
+        row
+          ? (() => {
+              const dept = departmentFor(offered.departments, row.id);
+              return dept ? { label: dept.name } : undefined;
+            })()
+          : undefined
       }
     />
   );

@@ -56,6 +56,15 @@ export interface BusinessLabels {
   occasionWordPlural: string;
   collectionWord: string;
   collectionWordPlural: string;
+  /*
+    THE KIND OF THING, above the category that says which kind.
+
+    A gift shop may call these Departments, a supermarket Aisles, a bookshop
+    Sections. Neutral by default, like every other word here — the shop types
+    its own or keeps this one.
+  */
+  departmentWord: string;
+  departmentWordPlural: string;
   /**
    * The catalog icon in the admin sidebar and empty states.
    *
@@ -79,6 +88,8 @@ export const DEFAULT_LABELS: BusinessLabels = {
   occasionWordPlural: "Occasions",
   collectionWord: "Collection",
   collectionWordPlural: "Collections",
+  departmentWord: "Department",
+  departmentWordPlural: "Departments",
   productIcon: Package,
 };
 
@@ -187,6 +198,8 @@ export interface ResolvedLabels {
   occasionWordPlural: string;
   collectionWord: string;
   collectionWordPlural: string;
+  departmentWord: string;
+  departmentWordPlural: string;
 }
 
 /**
@@ -227,6 +240,8 @@ export function resolveLabels(
     occasionWordPlural: overrides.occasionWordPlural?.trim() || base.occasionWordPlural,
     collectionWord: overrides.collectionWord?.trim() || base.collectionWord,
     collectionWordPlural: overrides.collectionWordPlural?.trim() || base.collectionWordPlural,
+    departmentWord: overrides.departmentWord?.trim() || base.departmentWord,
+    departmentWordPlural: overrides.departmentWordPlural?.trim() || base.departmentWordPlural,
   };
 }
 

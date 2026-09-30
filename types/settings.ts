@@ -300,6 +300,8 @@ export interface LabelOverrides {
   occasionWordPlural?: string;
   collectionWord?: string;
   collectionWordPlural?: string;
+  departmentWord?: string;
+  departmentWordPlural?: string;
   /**
    * The title over the whole product description block.
    *

@@ -73,7 +73,31 @@ export const collectionsSchema = z.array(
   }),
 );
 
+/**
+ * A department holds the categories filed under it.
+ *
+ * `categoryIds` defaults to `[]` rather than being required, for the reason the
+ * collection above gives: an owner names the department first and fills it
+ * second, and a write that 400s on an empty one would make the screen unable
+ * to save the row it just asked them to name.
+ *
+ * Ids and not slugs. A slug is what a shop edits when it rewrites a page's
+ * address, and this has to survive that.
+ */
+export const departmentsSchema = z.array(
+  catalogRow.extend({
+    description: z.string().optional(),
+    image: z.string().optional(),
+    categoryIds: z.array(z.string()).default([]),
+  }),
+);
+
 export const catalogSectionSchemas = {
+  /*
+    FIRST, because it is the level above the rest and this object's key
+    order is what the Catalog screen's tabs are built from.
+  */
+  departments: departmentsSchema,
   categories: categoriesSchema,
   occasions: occasionsSchema,
   collections: collectionsSchema,

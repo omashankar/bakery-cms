@@ -28,6 +28,7 @@ const catalogSchema = new mongoose.Schema({
    * on — the failure this repo has hit four times.
    */
   collections: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  departments: { type: [mongoose.Schema.Types.Mixed], default: [] },
 });
 
 applyBaseTransform(catalogSchema);
