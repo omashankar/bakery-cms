@@ -106,7 +106,12 @@ describe("the category list, cut into the kinds of thing", () => {
       first department — and it would have no way to tell that from a bug.
     */
     const sections = categorySections(ALL, [CAKES]);
-    expect(sections.at(-1)).toEqual({ heading: "", categories: [rose, mug] });
+    /*
+      THE WHOLE OBJECT, not just its categories — which is what caught `id`
+      being added to the shape. The leftover section has no department, so its
+      id is empty and the renderers fall back to the index for a key.
+    */
+    expect(sections.at(-1)).toEqual({ id: "", heading: "", categories: [rose, mug] });
   });
 
   it("files a category claimed twice ONCE, and where the shared rule says", () => {
@@ -125,6 +130,68 @@ describe("the category list, cut into the kinds of thing", () => {
 
     const times = sections.flatMap((s) => s.categories).filter((c) => c.id === rose.id).length;
     expect(times, "the same category was offered under two headings").toBe(1);
+  });
+
+  it("keeps two departments with the SAME NAME apart", () => {
+    /*
+      THE DEFECT THIS FUNCTION SHIPPED WITH, and the reason the bucket is keyed
+      by id. Keyed by `name`, two departments called "Gifts" shared one bucket
+      and then both read the whole of it back — measured on the shipped code:
+
+        [{"h":"Gifts","c":["Roses","Mugs"]},{"h":"Gifts","c":["Roses","Mugs"]}]
+        each category appears: {"Roses":2,"Mugs":2}
+
+      REACHABLE, not theoretical. The admin's only uniqueness check is
+      `findSlugClash`, which is about the SLUG — nothing anywhere constrains a
+      department's name, and backup restore posts a hand-editable document to
+      that endpoint. A shop with a typo-duplicate, or one restoring a backup,
+      saw its whole category list twice under one heading twice.
+    */
+    const left = { ...CAKES, id: "d-one", name: "Gifts", slug: "gifts", categoryIds: [cake.id] };
+    const right = { ...CAKES, id: "d-two", name: "Gifts", slug: "gifts-2", categoryIds: [rose.id] };
+    const sections = categorySections(ALL, [left, right]);
+
+    expect(headings(sections)).toEqual(["Gifts", "Gifts", ""]);
+    expect(named(sections)).toEqual([["Cupcakes"], ["Roses"], ["Chocolate", "Mugs"]]);
+
+    const flat = sections.flatMap((s) => s.categories);
+    for (const category of ALL) {
+      const times = flat.filter((c) => c.id === category.id).length;
+      expect(times, `${category.name} is offered ${times} times`).toBe(1);
+    }
+
+    /*
+      AND THE SECTION CARRIES SOMETHING UNIQUE TO KEY ON. On the heading, those
+      two sections both keyed "Gifts".
+    */
+    const keys = sections.map((section, index) => section.id || `unfiled-${index}`);
+    expect(new Set(keys).size, `the sections share a key: ${JSON.stringify(keys)}`).toBe(
+      keys.length,
+    );
+  });
+
+  it("and both renderers key on it, which only the source can show", () => {
+    /*
+      THIS ONE IS A SOURCE CHECK ON PURPOSE, and it is worth saying why rather
+      than implying a behavioural guard exists.
+
+      A colliding React key does NOT change a first mount: measured — two
+      departments both named "Gifts" keyed on the heading still rendered
+      "Roses" and "Mugs" once each with both headings present. React warns and
+      draws both; what it breaks is RECONCILIATION, when a later render reuses
+      the wrong subtree. No single mount reddens that, and the mutation proved
+      it: keying on the heading again left the fourteen cases above green.
+
+      So the key is pinned where it can be seen. Both renderers, counted —
+      this component has shipped a fix on the desktop and not the phone before,
+      and the phone is the screen this shop's customers use.
+    */
+    const menu = code("components/storefront/mega-menu.tsx");
+    expect(
+      menu.match(/key=\{section\.id \|\| `unfiled-\$\{index\}`\}/g) ?? [],
+      "a renderer keys its sections on something that can repeat",
+    ).toHaveLength(2);
+    expect(menu, "a renderer still keys on the heading").not.toMatch(/key=\{section\.heading/);
   });
 
   it("and a switched-off department files nothing", () => {

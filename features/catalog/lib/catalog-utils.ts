@@ -366,13 +366,25 @@ export function departmentFor<
  */
 export function categorySections<
   C extends { id: string },
-  D extends { name: string; slug?: string; isActive?: boolean; sortOrder?: number; categoryIds?: string[] },
+  D extends { id: string; name: string; slug?: string; isActive?: boolean; sortOrder?: number; categoryIds?: string[] },
 >(
   categories: readonly C[],
   departments: readonly D[] | undefined,
-): { heading: string; categories: C[] }[] {
+): { id: string; heading: string; categories: C[] }[] {
   const rows = offeredRows(departments ?? []);
 
+  /*
+    KEYED BY ID, AND IT HAS TO BE. Keyed by `name`, two departments called
+    "Gifts" shared one bucket and then both read the whole of it back —
+    measured on the first version of this function:
+
+      [{"h":"Gifts","c":["Roses","Mugs"]},{"h":"Gifts","c":["Roses","Mugs"]}]
+      each category appears: {"Roses":2,"Mugs":2}
+
+    Reachable, not theoretical: the admin's only uniqueness check is
+    `findSlugClash`, which is about the SLUG. Nothing constrains a
+    department's name, and backup restore posts a hand-editable document.
+  */
   const filed = new Map<string, C[]>();
   const loose: C[] = [];
   for (const category of categories) {
@@ -381,14 +393,21 @@ export function categorySections<
       loose.push(category);
       continue;
     }
-    const held = filed.get(owner.name);
+    const held = filed.get(owner.id);
     if (held) held.push(category);
-    else filed.set(owner.name, [category]);
+    else filed.set(owner.id, [category]);
   }
 
+  /*
+    THE ID TRAVELS OUT TOO, so a renderer has a key that cannot collide. Keyed
+    on the heading, those same two "Gifts" sections produced the React keys
+    `["Gifts", "Gifts", …]` — and React silently keeps the first subtree for
+    both. The leftover section has no department, so its id is empty and the
+    renderers fall back to its index.
+  */
   const sections = rows
-    .map((row) => ({ heading: row.name, categories: filed.get(row.name) ?? [] }))
+    .map((row) => ({ id: row.id, heading: row.name, categories: filed.get(row.id) ?? [] }))
     .filter((section) => section.categories.length > 0);
-  if (loose.length > 0) sections.push({ heading: "", categories: loose });
+  if (loose.length > 0) sections.push({ id: "", heading: "", categories: loose });
   return sections;
 }

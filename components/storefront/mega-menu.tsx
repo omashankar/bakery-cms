@@ -351,13 +351,14 @@ export function MegaMenu({
   */
   const categorySets = shopCategories?.length
     ? categorySections(shopCategories, shopDepartments).map((section) => ({
+        id: section.id,
         heading: section.heading,
         links: section.categories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         })),
       }))
-    : [{ heading: "", links: fallbackCategories }];
+    : [{ id: "", heading: "", links: fallbackCategories }];
   const occasions = (shopOccasions ?? []).map((occasion) => ({
     label: occasion.name,
     // Its OWN page now. This was `routes.store.collection(occasion.slug)`,
@@ -621,7 +622,7 @@ export function MegaMenu({
               </p>
               {categorySets.map((section, index) => (
                 <div
-                  key={section.heading || `unfiled-${index}`}
+                  key={section.id || `unfiled-${index}`}
                   className={index > 0 ? "mt-4" : undefined}
                 >
                   {/*
@@ -794,13 +795,14 @@ export function MobileShopLinks({
   */
   const categorySets = shopCategories?.length
     ? categorySections(shopCategories, shopDepartments).map((section) => ({
+        id: section.id,
         heading: section.heading,
         links: section.categories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         })),
       }))
-    : [{ heading: "", links: fallbackCategories }];
+    : [{ id: "", heading: "", links: fallbackCategories }];
   /**
    * The same occasions the desktop menu shows.
    *
@@ -891,7 +893,7 @@ export function MobileShopLinks({
           of these two renderers and not the other is a defect this component
           has shipped twice. */}
       {categorySets.map((section, index) => (
-        <div key={section.heading || `unfiled-${index}`}>
+        <div key={section.id || `unfiled-${index}`}>
           {section.heading.trim() ? (
             <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
               {section.heading}
