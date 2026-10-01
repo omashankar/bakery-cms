@@ -246,35 +246,60 @@ describe("the menu panel's own edges", () => {
     expect(panelShape(3, true).width).toContain("40rem");
   });
 
-  it("and hangs from whichever edge keeps it on screen", () => {
+  it("and slides by a measured amount rather than picking an edge", () => {
+    /**
+     * IT USED TO CHOOSE AN EDGE, AND AN EDGE IS NOT ENOUGH.
+     *
+     * This case pinned `align === "right" ? "right-0" : "left-0"` against
+     * `index >= Math.floor(bandRows.length / 2)`. Measured at 1024px, row 3
+     * starts at x=396 and NEITHER edge fits a 640px panel — some edge fits only
+     * once the window is `2P - w` wide, about 1141px. And once the band wraps,
+     * index stops tracking x: rows 7 and 8 restart at the left margin on a
+     * second line while their index climbs, which put row 7's panel 487px off
+     * the side of the window.
+     *
+     * The panel hangs from ONE edge now and slides by a measured number of
+     * pixels. The arithmetic and its cases are in
+     * a-menu-opens-where-the-window-is.test.ts; what belongs here is that the
+     * band is still the thing that measures it.
+     */
     const menu = code(MENU);
-    expect(menu).toMatch(/align === "right" \? "right-0" : "left-0"/);
+    expect(menu, "the panel lost its anchor edge").toContain("left-0");
+    expect(menu, "the panel has nothing to slide by").toContain("ml-[var(--mega-shift)]");
 
     const band = bandOf(code(NAVBAR));
-    expect(band, "every panel still hangs from the left").toContain("align={align}");
-    expect(band).toMatch(/index >= Math\.floor\(bandRows\.length \/ 2\)/);
+    expect(band, "the band still counts its way to an edge").not.toMatch(
+      /index >= Math\.floor\(bandRows\.length \/ 2\)/,
+    );
+    expect(code(NAVBAR), "nothing measures the panel").toContain('setProperty("--mega-shift"');
   });
 
-  it("and a short band opens its menu under its own trigger", () => {
+  it("and the row count has no say in it at all", () => {
     /**
-     * THE ONE THAT WAS BROKEN WHILE THE CASE ABOVE STAYED GREEN.
+     * THE SHAPE OF EVERY BUG THIS LINE HAS HAD.
      *
-     * `index >= floor(n/2)` assumed a full band. Home is not in the band, so
-     * a shop with Home and Collections visible has one row: `0 >= floor(1/2)`
-     * is true, its only menu is anchored `right-0` to a trigger near the left
-     * edge, and the panel opens off-screen to the LEFT. Measured on this
-     * shop's own storefront before the fix — left edge at -469px, 469 of
-     * 640px unreachable.
+     * First `index >= floor(n/2)` right-anchored a ONE-row band's only menu —
+     * `0 >= floor(1/2)` is true — and its panel opened at -469px, 469 of 640px
+     * unreachable. The fix was `bandRows.length >= 6 &&`, which made the short
+     * band correct and left the LONG one wrong: at six rows, row 3 went to
+     * [-123, 517].
      *
-     * Nothing caught it because off-screen LEFT adds nothing to
-     * `scrollWidth` in LTR, so even the guard that exists to catch a panel
-     * leaving the window could not see it. This is the source half; the
-     * browser half is tests/e2e/a-menu-opens-inside-the-window.spec.ts.
+     * Both versions were counting. So what is pinned now is that no count
+     * remains: not the threshold, not the midpoint, not the length.
+     *
+     * Nothing caught either one because off-screen LEFT adds nothing to
+     * `scrollWidth` in LTR — even the guard that exists to catch a panel
+     * leaving the window could not see it. The browser half is
+     * tests/e2e/a-menu-opens-inside-the-window.spec.ts, and it is blind to this
+     * for a different reason: the shop has three rows, and no test may write
+     * nav rows to its live database.
      */
-    const band = bandOf(code(NAVBAR));
-    expect(band, "a one-row band right-anchors its only panel again").toMatch(
-      /bandRows\.length >= 6 &&/,
+    const navbar = code(NAVBAR);
+    expect(navbar, "a row-count threshold decides the position again").not.toMatch(
+      /bandRows\.length >= \d/,
     );
+    expect(navbar, "an align prop is passed to a menu again").not.toContain("align={align}");
+    expect(code(MENU), "the panel switches edges again").not.toContain("right-0");
   });
 });
 

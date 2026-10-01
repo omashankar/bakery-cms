@@ -22,7 +22,7 @@ import { GuestMenu } from "@/apps/website/account/components/guest-menu";
 import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
-import { navRowOpensNothing } from "@/features/site-layout/lib/menu-links";
+import { navRowOpensNothing, panelShift } from "@/features/site-layout/lib/menu-links";
 import { getWishlistCount } from "@/apps/website/lib/wishlist";
 import {
   getCustomerDisplayName,
@@ -598,6 +598,107 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
+  /**
+   * WHERE EACH MEGA PANEL ACTUALLY OPENS — measured, not guessed from an index.
+   *
+   * The panel hangs `absolute left-0` off its own row. Which edge it hung from
+   * used to come from the row's position in the array, and that cannot answer
+   * the question: measured at 1024px, row 3 starts at x=396 and NEITHER edge
+   * fits a 640px panel, and rows 7 and 8 wrap onto a second line back at x=32
+   * while their index keeps climbing — which put row 7's panel 487px off the
+   * side of the window. Off-screen LEFT adds nothing to `scrollWidth` in LTR,
+   * so no guard in this repo ever went red for any of it.
+   *
+   * NOTHING HERE IS REACT STATE, for the reason the scroll effect above gives
+   * at length: this component is twelve hundred lines and draws up to eleven
+   * menu subtrees, and a resize must not re-render it. The number is written
+   * straight onto the node as `--mega-shift`, which the panel's
+   * `ml-[var(--mega-shift)]` picks up. Exactly the mechanism `data-collapsed`
+   * already uses.
+   *
+   * BY DOM AND NOT BY REF, deliberately. One observer for the whole band rather
+   * than one per row, and it reaches any panel in the band — which is what lets
+   * a browser probe clone rows into the band and measure where panel 4 would
+   * open, without writing a single nav row to the shop's live database.
+   *
+   * SAFE TO RUN LATE. The panel is `invisible` until hover, so the frame
+   * before the first measurement is a frame nobody can see — and the server's
+   * `[--mega-shift:0px]` is already the right answer for every row that does
+   * not overflow, which on this shop is all of them. A correct shop does not
+   * move after hydration.
+   *
+   * The band is `hidden lg:grid` and `lg` is 1024px, so below that there is no
+   * band, no panel and nothing to measure; `getBoundingClientRect` on a
+   * `display: none` subtree returns zeroes, which is why a zero-width panel is
+   * skipped rather than clamped to the gutter.
+   */
+  useEffect(() => {
+    const band = navBandRef.current;
+    if (!band) return;
+
+    let frame = 0;
+    const place = () => {
+      frame = 0;
+      for (const panel of band.querySelectorAll<HTMLElement>("[data-mega-panel]")) {
+        /*
+          The wrapper the panel is positioned AGAINST — `.group relative`, its
+          own parent. Not the flex item above it: that one is `nowrap` and
+          holds the divider too, so its left edge is not where `left-0`
+          resolves.
+        */
+        const wrapper = panel.parentElement;
+        if (!wrapper) continue;
+        const panelWidth = panel.offsetWidth;
+        /* No band at this width, or not laid out yet. Leave the default. */
+        if (panelWidth === 0) continue;
+        const shift = panelShift({
+          triggerLeft: wrapper.getBoundingClientRect().left,
+          panelWidth,
+          clientWidth: document.documentElement.clientWidth,
+        });
+        wrapper.style.setProperty("--mega-shift", `${shift}px`);
+      }
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(place);
+    };
+
+    schedule();
+    /*
+      A ResizeObserver ON THE BAND rather than a window resize listener alone.
+      It covers what resize does not: the band WRAPPING onto a second line, a
+      web font landing and changing every label's width, a shop editing its own
+      nav, and the band collapsing and coming back on scroll. Resize is kept as
+      well, because the window can change width without the band's own box
+      changing at all — a 640px panel at 1440px needs no shift and the same
+      panel at 1024px needs 28px, while the band is 960px in both.
+    */
+    const observer = new ResizeObserver(schedule);
+    observer.observe(band);
+    /*
+      AND EVERY ROW WRAPPER, because the band's own box can stay still while the
+      rows inside it move. The band is full-width with a height set by its line
+      count, so rows that change width WITHOUT changing the number of lines —
+      a shop renaming a row, a web font landing — leave it exactly the size it
+      was and the shifts would go stale. Measured: nine rows fit one line at
+      1440px and the band did not resize at all.
+
+      One callback re-measures EVERY panel, so a row that only moved because a
+      neighbour grew is covered by the neighbour's own entry. At most eleven
+      observations, which is what the band holds.
+    */
+    for (const panel of band.querySelectorAll<HTMLElement>("[data-mega-panel]")) {
+      if (panel.parentElement) observer.observe(panel.parentElement);
+    }
+    window.addEventListener("resize", schedule);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [bandRows.length]);
+
   return (
     <>
     <header
@@ -1097,41 +1198,26 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           const isActive =
             pathname === item.href ||
             (item.href !== routes.store.home && pathname.startsWith(item.href));
-          /**
-           * WHICH EDGE THE PANEL HANGS FROM.
-           *
-           * `index >= floor(n/2)` assumed the band was FULL of rows, and it is
-           * wrong in the opposite direction for a short one. Home is not in
-           * the band, so a shop with Home and Collections visible has
-           * `bandRows.length === 1`: `0 >= floor(1/2)` is true, its one menu
-           * is anchored `right-0` to a trigger whose right edge is about 170px
-           * from the left of the window, and the rest of the panel sits
-           * off-screen to the LEFT — unreachable. Measured on this shop before
-           * the fix: left edge at -469px, so 469 of 640px were gone.
-           *
-           * Off-screen LEFT adds nothing to `scrollWidth` in LTR, which is why
-           * no guard in this repo ever went red for it, including the one that
-           * exists to catch a panel leaving the window.
-           *
-           * Right-anchoring is only safe once the trigger's RIGHT edge is at
-           * least a panel's width along the band. With rows at about 110px and
-           * a panel of 27rem or less — see `panelShape`; 40rem is the
-           * three-column case and is the one this arithmetic does not cover —
-           * that is the fourth row onwards, which `floor(n/2)` reaches from six
-           * rows up. Below six, every panel opens under its own trigger, where
-           * it belongs.
-           *
-           * Still decided from position rather than measured, because measuring
-           * means reading layout during render. Note the interaction with
-           * `flex-wrap` above: once the band wraps, `index` stops tracking x at
-           * all and a row at the head of the second line can still be
-           * right-anchored. That is the residual, and it is written down rather
-           * than fixed because the band does not wrap until about nine rows.
-           */
-          const align =
-            bandRows.length >= 6 && index >= Math.floor(bandRows.length / 2)
-              ? "right"
-              : "left";
+          /*
+            NOTHING HERE DECIDES WHERE THE PANEL OPENS ANY MORE.
+
+            This was `const align = bandRows.length >= 6 && index >=
+            Math.floor(bandRows.length / 2) ? "right" : "left"`, and the
+            comment above it ran to twenty lines explaining which cases it got
+            wrong. It got them wrong because the question is geometric and
+            `index` is not geometry: once the band WRAPS, index keeps climbing
+            while x goes back to the left margin. Measured at 1024px, rows 7
+            and 8 restart at x=32 and x=175 on a second line and the predicate
+            still called them right-anchored, putting row 7's panel 487px off
+            the side of the window.
+
+            And no edge choice at all can be right at 1024: a 640px panel needs
+            the window to be 2P - w wide — about 1141px — for every row to have
+            SOME safe edge. Row 3, at x=396, has neither.
+
+            It is measured in `useEffect` below, after layout, and delivered as
+            a CSS custom property. See `panelShift`.
+          */
           const divider = item.dividerBefore && index > 0 ? (
             /* A divider before the FIRST row separates it from nothing. */
             <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
@@ -1159,7 +1245,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   highlight={item.highlight}
                   icon={item.icon}
                   badge={item.badge}
-                  align={align}
                 />
               </div>
             );
@@ -1194,7 +1279,6 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   highlight={item.highlight}
                   icon={item.icon}
                   badge={item.badge}
-                  align={align}
                 />
               </div>
             );

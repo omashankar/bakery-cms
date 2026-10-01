@@ -156,3 +156,80 @@ export function resolveNavMenus(
     };
   });
 }
+
+/**
+ * HOW FAR TO PULL A MEGA PANEL LEFT SO IT OPENS INSIDE THE WINDOW.
+ *
+ * The panel hangs `absolute left-0` off its nav row, and which edge it hung
+ * from used to be chosen from the row's INDEX:
+ *
+ *   bandRows.length >= 6 && index >= Math.floor(bandRows.length / 2)
+ *     ? "right" : "left"
+ *
+ * That cannot be right, and it is not a near miss. Measured in a browser at
+ * 1024px — the narrowest width the band exists at, since it is `hidden lg:grid`
+ * and `lg` is 1024 — with the band's rows cloned so the real flex layout placed
+ * them:
+ *
+ *   row 3 starts at x=396 and is 139 wide. A 640px panel anchored LEFT ends at
+ *   1036, 12px past the window. Anchored RIGHT it starts at -105. NEITHER EDGE
+ *   FITS. Every position has some safe edge only when the window is at least
+ *   2P - w wide, which for P=640 w=139 is 1141px. So at 1024 there is a band of
+ *   x values with no answer at all, and row 3 is in it.
+ *
+ *   rows 7 and 8 WRAP onto a second line and restart at x=32 and x=175 — their
+ *   trigger tops measured 131 against 95 for the first line. `index` keeps
+ *   climbing while x goes back to the left margin, so the predicate called them
+ *   right-anchored and put row 7's panel at [-487, 153]: 487px off-screen.
+ *
+ * THIS SHOP HAS THREE BAND ROWS, so none of that is on screen today. The FOURTH
+ * row a shop adds is the one that breaks, and the shop's plan is to add rows for
+ * each kind of thing it sells.
+ *
+ * SO IT IS MEASURED, AND IT IS ONE NUMBER rather than a choice of two edges.
+ * `0` is "exactly where `left-0` puts it", which is what every row on a correct
+ * shop gets and therefore what the server renders. A row that would overflow
+ * gets a negative number: the panel slides left by just enough and no further,
+ * so it stays under its own trigger as much as the window allows. The left case,
+ * the right case and the band with no safe edge are all this one expression.
+ *
+ * WHAT IT DOES NOT DO: it does not move the panel vertically, and it must not.
+ * The panel is a child of its own row's wrapper, so `top-full` follows a wrapped
+ * row down to the second line on its own — measured at 163 against 127. Hanging
+ * the panel off the BAND instead, which is the obvious way to get a wider panel,
+ * is what breaks that: `top-full` would then resolve against the wrapping flex
+ * row and every second-line row would open 36px above its own trigger.
+ *
+ * `gutter` defaults to 16 because the panel's own width is already capped at
+ * `calc(100vw - 2rem)` — 1rem each side. The number is not invented here; it is
+ * read off the cap that has always been on the element.
+ */
+export function panelShift(input: {
+  /** Viewport x of the row wrapper the panel is positioned against. */
+  triggerLeft: number;
+  /** The panel's own measured width, after its `min()` cap has applied. */
+  panelWidth: number;
+  /** `document.documentElement.clientWidth` — never `window.innerWidth`. */
+  clientWidth: number;
+  /** Breathing room at each edge. Defaults to the panel's own 1rem cap. */
+  gutter?: number;
+}): number {
+  const gutter = input.gutter ?? 16;
+  const lowest = gutter;
+  const highest = input.clientWidth - gutter - input.panelWidth;
+  /*
+    `Math.max(lowest, highest)` and not `highest` alone: a panel wider than the
+    window leaves nothing to clamp into and would invert the bounds, returning a
+    shift that pushes the panel off the LEFT instead. Its own `min(..., 100vw -
+    2rem)` cap means that cannot happen through this component — which is
+    exactly why the guard belongs here rather than being assumed away, since the
+    cap lives in a different file and a map of class strings.
+  */
+  const want = Math.min(Math.max(input.triggerLeft, lowest), Math.max(lowest, highest));
+  /*
+    Rounded, because the value is written into a CSS pixel length and a
+    sub-pixel string re-triggers a style recalculation on every measure for a
+    move nobody can see.
+  */
+  return Math.round(want - input.triggerLeft);
+}

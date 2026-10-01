@@ -165,15 +165,21 @@ interface MegaMenuProps {
   highlight?: boolean;
   icon?: string;
   badge?: string;
-  /**
-   * Which edge of the trigger the panel hangs from.
-   *
-   * The panel is 640px and was always `left-0`. The band appears at lg,
-   * where the content column is 960px — so any trigger more than 320px
-   * along, which is the fourth row of a seven-row nav, pushed the panel past
-   * the window and gave the whole storefront a horizontal scrollbar.
-   */
-  align?: "left" | "right";
+  /*
+    THERE IS NO `align` PROP ANY MORE, and it is worth saying so here because
+    this is where a reader will look for it.
+
+    It was `"left" | "right"`, chosen in storefront-navbar from the row's
+    INDEX. Index cannot answer this: measured at 1024px, row 3 starts at x=396
+    and NEITHER edge fits a 640px panel, and rows 7 and 8 wrap onto a second
+    line back at x=32 while their index keeps climbing — which put row 7's
+    panel 487px off the side of the window.
+
+    The panel now hangs from `left-0` always and slides by a MEASURED number
+    of pixels, delivered as `--mega-shift` on the row wrapper. See
+    `panelShift` in features/site-layout/lib/menu-links.ts for the arithmetic
+    and the measurements, and the effect in storefront-navbar that writes it.
+  */
   /**
    * THE ROW HAS NO DESTINATION OF ITS OWN — it exists to open this menu.
    *
@@ -224,10 +230,15 @@ function rowIcon(name?: string) {
  * not know what was in it.
  *
  * THREE COLUMNS IS THE CEILING AND 40rem IS ITS WIDTH — exactly the 640px this
- * has always been, so no shop's panel gets WIDER than it is today. That is
- * deliberate: `align` in storefront-navbar picks an edge from the trigger's
- * position, and it was measured against this envelope. A fourth group wraps
- * onto a second row, which is what `auto-fit` already did at this width.
+ * has always been, so no shop's panel gets WIDER than it is today. A fourth
+ * group wraps onto a second row, which is what `auto-fit` already did at this
+ * width.
+ *
+ * The ceiling is no longer load-bearing for whether the panel stays on screen:
+ * `panelShift` measures the panel it is actually given. It still matters for
+ * whether the panel is READABLE — at 1024px a 40rem panel already has to slide
+ * 28px to clear the window at row 3, and a wider one would slide further from
+ * the row it belongs to until it stopped looking attached to it.
  *
  * STATIC CLASS STRINGS, not a template literal: Tailwind extracts class names
  * by reading the source, so `w-[min(${rem}rem,…)]` compiles to no CSS at all.
@@ -314,7 +325,6 @@ export function MegaMenu({
   highlight,
   icon,
   badge,
-  align = "left",
   menuOnly,
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
@@ -447,7 +457,17 @@ export function MegaMenu({
     </>
   );
   return (
-    <div className="group relative">
+    /*
+      `[--mega-shift:0px]` IS THE SERVER'S ANSWER AND MOST SHOPS' FINAL ONE.
+
+      Declared as a class rather than left undefined so the panel's
+      `ml-[var(--mega-shift)]` resolves to zero on the very first paint and
+      before any JavaScript runs — which is byte-identical to the `left-0`
+      this always was. The effect that measures only ever writes a value on a
+      row that would otherwise overflow, so a correct shop does not shift
+      after hydration.
+    */
+    <div className="group relative [--mega-shift:0px]">
       {menuOnly ? (
         /*
           A BUTTON, BECAUSE THIS ROW GOES NOWHERE.
@@ -520,7 +540,19 @@ export function MegaMenu({
           */
           "pointer-events-none invisible absolute top-full z-50 pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100",
           width,
-          align === "right" ? "right-0" : "left-0"
+          /*
+            ONE EDGE AND A MEASURED SLIDE, not a choice of two edges.
+
+            `ml-[var(--mega-shift)]` is a STATIC class string — Tailwind reads
+            class names as text, so a computed `ml-[${n}px]` would compile to
+            no CSS at all and the panel would never move. The number arrives
+            through the custom property, which CSS can take at any value.
+
+            Margin and not `left`, because `left-0` is what the panel falls
+            back to with no JavaScript, and a margin composes with it instead
+            of fighting it.
+          */
+          "left-0 ml-[var(--mega-shift)]"
         )}
       >
         <div className="overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm">
