@@ -37,6 +37,13 @@ const SCANNED = [
   "features/uploads/server",
   "features/payments/registry",
   "features/media/lib",
+  /*
+    ADDED 2026-10-01. Nineteen trade words lived in `features/seo/lib` — page
+    titles, descriptions and keyword lists that every shop is BORN with and
+    that Google reads first. A ratchet built to stop the 191st surface could
+    not see any of them.
+  */
+  "features/seo",
   "app",
   "lib/admin-breadcrumbs.ts",
   /**
