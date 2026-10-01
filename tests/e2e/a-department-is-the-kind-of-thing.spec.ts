@@ -260,3 +260,199 @@ test("and the shop's header cuts its category list by them", async ({ page }) =>
     ).toBe(categories.length);
   }
 });
+
+/**
+ * AND THE TRAIL ABOVE A PRODUCT NAMES IT TOO.
+ *
+ * `app/(storefront)/store/p/[slug]/page.tsx` asks `departmentFor` and hands the
+ * answer down as `departmentCrumb`, so the trail reads
+ *
+ *   Home › <department> › <category> › <this product>
+ *
+ * That wiring has never been SEEN. It cannot be: this shop keeps no
+ * departments, so every product's trail is Home › category › product and the
+ * middle crumb this exists for is unreachable. It shipped against unit cases
+ * over the rule and a type that admits the prop — neither of which can tell
+ * the prop being dropped on the floor from the prop arriving.
+ *
+ * THE DEPARTMENT IS A WORD, NOT A LINK, and that is asserted rather than
+ * assumed: a department has no page of its own, and a crumb is a promise that
+ * one exists. The category beside it IS a link, which is what makes "not a
+ * link" a decision instead of a trail that forgot to link anything.
+ *
+ * AND IT PROVES THE TWO SURFACES AGREE. The menu files a category under
+ * `departmentFor`'s answer and so does this; the same probe department is read
+ * by both, so a rule written out twice would show up here as a trail naming one
+ * department and a menu heading naming another.
+ */
+test("and the trail above a product names the department too", async ({ page }) => {
+  test.setTimeout(240_000);
+  const db = await connect();
+  const stores = db.collection("catalogs");
+
+  const before = await stores.findOne({});
+  const departmentsBefore = (before?.departments ?? []) as { id: string }[];
+  const categories = (before?.categories ?? []) as { id: string; name: string; slug: string }[];
+
+  /*
+    A PRODUCT THE SHOP ACTUALLY PUBLISHES, and the category its own
+    `categoryIds[0]` names — the route resolves the crumb by id and primary
+    first, so picking any other category here would prove nothing about what it
+    does.
+  */
+  const product = (await db.collection("products").findOne({
+    isPublished: { $ne: false },
+    categoryIds: { $exists: true, $ne: [] },
+  })) as { slug: string; name: string; categoryIds: string[] } | null;
+  expect(product, "no published product is filed under a category").not.toBeNull();
+
+  const category = categories.find((row) => row.id === product!.categoryIds[0]);
+  expect(category, "the product's primary category is not in the catalogue").toBeTruthy();
+
+  const probe = {
+    id: "probe-dept-trail",
+    name: "Probe Kind",
+    slug: "probe-kind",
+    sortOrder: 0,
+    isActive: true,
+    categoryIds: [category!.id],
+  };
+
+  try {
+    await stores.updateOne(
+      { _id: before!._id },
+      { $set: { departments: [...departmentsBefore, probe] } },
+    );
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(`/store/p/${product!.slug}`);
+    await page.waitForLoadState("networkidle");
+
+    const trail = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Breadcrumb"]');
+      if (!nav) return null;
+      return {
+        /* innerText, not textContent: the page's RSC payload is in the DOM. */
+        words: (nav as HTMLElement).innerText
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+        linked: [...nav.querySelectorAll("a")].map((node) => ({
+          label: (node.textContent ?? "").trim(),
+          href: node.getAttribute("href"),
+        })),
+      };
+    });
+    expect(trail, "the product page has no breadcrumb").not.toBeNull();
+
+    const joined = trail!.words.join(" / ");
+
+    /* THE DEPARTMENT IS THERE, between Home and the category. */
+    const at = trail!.words.indexOf(probe.name);
+    expect(at, `the department is not in the trail: ${joined}`).toBeGreaterThan(-1);
+    expect(trail!.words.indexOf("Home"), `Home is not first: ${joined}`).toBe(0);
+    expect(at, `the department does not follow Home: ${joined}`).toBe(1);
+    expect(
+      trail!.words.indexOf(category!.name),
+      `the category does not follow the department: ${joined}`,
+    ).toBe(2);
+
+    /* AND THE PRODUCT IS LAST, which is the crumb a customer is standing on. */
+    expect(trail!.words.at(-1), `the product is not the last crumb: ${joined}`).toBe(
+      product!.name,
+    );
+    expect(trail!.words, `the trail is not four deep: ${joined}`).toHaveLength(4);
+
+    /*
+      AND IT IS A WORD, NOT A LINK — while the category beside it is a link, so
+      this is a decision and not a trail that linked nothing.
+    */
+    expect(
+      trail!.linked.map((entry) => entry.label),
+      `the department is a link, and it has no page: ${JSON.stringify(trail!.linked)}`,
+    ).not.toContain(probe.name);
+    expect(
+      trail!.linked.find((entry) => entry.label === category!.name)?.href,
+      "the category crumb is not a link to its own page",
+    ).toBe(`/store/collections/${category!.slug}`);
+
+    /*
+      AND THE STEP THE CUSTOMER TAKES FROM HERE KEEPS IT.
+
+      Clicking that category crumb — the one just asserted to be a link —
+      opened a page whose trail was `Home › Roses`. The department vanished on
+      the step taken to reach it, so a product page and the page it links to
+      described the shop differently.
+
+      Same probe department, read through the same `departmentFor`: a rule
+      written out twice would show up here as two different words for one
+      category.
+    */
+    await page.goto(`/store/collections/${category!.slug}`);
+    await page.waitForLoadState("networkidle");
+
+    const listing = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Breadcrumb"]');
+      if (!nav) return null;
+      return {
+        words: (nav as HTMLElement).innerText
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+        linked: [...nav.querySelectorAll("a")].map((node) => (node.textContent ?? "").trim()),
+      };
+    });
+    expect(listing, "the category page has no breadcrumb").not.toBeNull();
+
+    const listingTrail = listing!.words.join(" / ");
+    expect(listing!.words, `the category page's trail is not three deep: ${listingTrail}`).toEqual(
+      ["Home", probe.name, category!.name],
+    );
+    expect(
+      listing!.linked,
+      `the department is a link on the category page: ${listingTrail}`,
+    ).not.toContain(probe.name);
+
+    /*
+      AND A COLLECTION'S PAGE DOES NOT GAIN ONE.
+
+      A collection is not filed under a department, and this page is reached by
+      three different kinds of row at one address — the route resolves
+      collection first. The crumb is suppressed in TWO places on purpose: the
+      route only resolves it for the category case, and the page draws it only
+      when the heading IS that category. Either alone would be enough today;
+      together they mean a change to one cannot produce `Home › Flowers ›
+      Premium Collection`, which is a sentence about a shop that is not true.
+    */
+    const group = (before?.collections ?? []) as { name: string; slug: string }[];
+    if (group.length > 0) {
+      await page.goto(`/store/collections/${group[0].slug}`);
+      await page.waitForLoadState("networkidle");
+      const asGroup = await page.evaluate(() => {
+        const nav = document.querySelector('nav[aria-label="Breadcrumb"]');
+        return nav
+          ? (nav as HTMLElement).innerText
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+          : null;
+      });
+      expect(asGroup, `a collection page gained a department: ${JSON.stringify(asGroup)}`).toEqual([
+        "Home",
+        group[0].name,
+      ]);
+    }
+  } finally {
+    const doc = await stores.findOne({});
+    const kept = ((doc?.departments ?? []) as { id: string }[]).filter(
+      (row) => row.id !== probe.id,
+    );
+    await stores.updateOne({ _id: doc!._id }, { $set: { departments: kept } });
+
+    const final = await stores.findOne({});
+    expect(
+      ((final?.departments ?? []) as { id: string }[]).length,
+      "the probe left its department behind",
+    ).toBe(departmentsBefore.length);
+  }
+});

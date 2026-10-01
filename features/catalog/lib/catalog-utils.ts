@@ -344,14 +344,16 @@ export function departmentFor<
  *     and not decided again here. A category claimed by two departments
  *     appears once, under the first in the shop's order.
  *
- *     THE POINT OF ROUTING IT THERE is that the storefront will have to name a
- *     category's department in more than one place — the trail above a product
- *     is the next one — and two rules would let the menu file Roses under
- *     Flowers while the trail said Gifts, each looking right in its own file.
- *     As of this writing NOTHING ELSE CALLS IT: the trail names no department
- *     yet, so this is the first caller and not the second. That is the reason
- *     to route through it now rather than after there are two answers to
- *     reconcile.
+ *     TWO SURFACES ASK THIS QUESTION TODAY, which is the whole reason it has
+ *     one answer. The other is the trail above a product:
+ *     `app/(storefront)/store/p/[slug]/page.tsx` calls `departmentFor` for
+ *     its `departmentCrumb`. Written out twice, the menu could file Roses
+ *     under Flowers while the trail above the page said Gifts, and each would
+ *     look right in its own file.
+ *
+ *     Worth knowing if you go looking: that caller is under `app/`, not
+ *     `apps/`. A grep across apps/, components/, features/, lib/ and tests/
+ *     finds no caller at all and reads as though this rule were unused.
  *
  * Anything no department claims comes LAST in an unheaded section, rather than
  * being dropped: a shop mid-way through filing its catalogue would otherwise

@@ -172,6 +172,15 @@ interface CollectionsPageProps {
     headline?: string;
     description?: string;
   };
+  /**
+   * The department this category sits under, when the shop has filed it.
+   *
+   * No `href`: a department has no page of its own yet, and a crumb is a
+   * promise that a page exists. The trail above a product carries the same
+   * word on the same terms — see `departmentCrumb` there — and both get it
+   * from `departmentFor`, so the two cannot disagree about one category.
+   */
+  departmentCrumb?: { label: string };
 }
 
 export function CollectionsPage({
@@ -181,6 +190,7 @@ export function CollectionsPage({
   categories: categoriesFromShop,
   collection,
   occasion,
+  departmentCrumb,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
   /**
@@ -433,9 +443,27 @@ export function CollectionsPage({
           is named `collectionsTitle` rather than "Collections" because a shop
           that renamed that page should not read a word it never wrote.
         */
+        /*
+          AND THE DEPARTMENT ABOVE IT, so this page says what the product page
+          said. A product read `Home › Flowers › Roses › Bouquet`; clicking
+          Roses — a crumb in that very trail — opened this page reading
+          `Home › Roses`, and the department vanished on the step taken to
+          reach it.
+
+          `heading === activeCategory` AND NOT just `departmentCrumb`. The
+          route resolves the crumb for the category case, but `heading` is
+          `collection ?? occasion ?? activeCategory` and is resolved HERE — so
+          a route that ever passed the crumb alongside a collection, or a page
+          whose pills do not hold the category the route found, would read
+          `Home › Flowers › All products`. One place decides what the trail is
+          about, and it is the place that decides what the heading is.
+        */
         breadcrumbs={
           heading
-            ? [{ label: heading.name }]
+            ? [
+                ...(departmentCrumb && heading === activeCategory ? [departmentCrumb] : []),
+                { label: heading.name },
+              ]
             : [{ label: labels.collectionsTitle }]
         }
       />

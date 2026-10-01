@@ -16,16 +16,18 @@
  *     no-department answer is the one that must not move: one unheaded section
  *     holding everything, drawing the same list of links in the same order.
  *
- *   - WHICH DEPARTMENT HOLDS A CATEGORY is asked of `departmentFor`, which
- *     is where the answer has to stay: the storefront will name a category's
- *     department in more than one place, the trail above a product being the
- *     next, and decided twice the menu could file Roses under Flowers while
- *     that trail said Gifts — each looking right in its own file. That is the
- *     shape of nearly every defect this menu has had.
+ *   - WHICH DEPARTMENT HOLDS A CATEGORY is asked of `departmentFor`, and TWO
+ *     SURFACES ASK IT: this menu, and the trail above a product, which gets
+ *     its `departmentCrumb` from the same function in
+ *     `app/(storefront)/store/p/[slug]/page.tsx`. Decided twice, the menu
+ *     could file Roses under Flowers while the trail said Gifts — each looking
+ *     right in its own file. That is the shape of nearly every defect this
+ *     menu has had.
  *
- *     THE TRAIL DOES NOT NAME ONE YET. This is that rule's first caller, so
- *     the case below pins the menu against the rule rather than against a
- *     second screen that does not exist.
+ *     So the case below pins the menu against the RULE rather than against the
+ *     trail's output: one assertion over a shared function is what keeps the
+ *     two from drifting, and a test that read the other screen's answer would
+ *     pass with both of them wrong together.
  */
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";

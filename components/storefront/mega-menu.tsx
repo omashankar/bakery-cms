@@ -338,12 +338,11 @@ export function MegaMenu({
     sections are the shop's own departments, as sub-headings INSIDE this
     column: the panel stays three columns wide and no width map moves.
 
-    ASKED of `categorySections` rather than decided here. The storefront
-    will have to name a category's department elsewhere too — the trail above a
-    product is the next place — and a second rule written out in this file
-    would let the menu file Roses under Flowers while that trail said Gifts,
-    each looking right on its own. The trail does not name one yet, so this is
-    the first caller of that rule, not the second.
+    ASKED of `categorySections` rather than decided here. The TRAIL above a
+    product already names a category's department from the same rule — see
+    `departmentCrumb` in app/(storefront)/store/p/[slug]/page.tsx — so a
+    second rule written out in this file would let the menu file Roses under
+    Flowers while the trail said Gifts, each looking right on its own.
 
     A SHOP WITH NO DEPARTMENTS — every shop the day this ships, including this
     one — gets ONE unheaded section holding everything, which renders as the
@@ -782,12 +781,11 @@ export function MobileShopLinks({
     sections are the shop's own departments, as sub-headings INSIDE this
     column: the panel stays three columns wide and no width map moves.
 
-    ASKED of `categorySections` rather than decided here. The storefront
-    will have to name a category's department elsewhere too — the trail above a
-    product is the next place — and a second rule written out in this file
-    would let the menu file Roses under Flowers while that trail said Gifts,
-    each looking right on its own. The trail does not name one yet, so this is
-    the first caller of that rule, not the second.
+    ASKED of `categorySections` rather than decided here. The TRAIL above a
+    product already names a category's department from the same rule — see
+    `departmentCrumb` in app/(storefront)/store/p/[slug]/page.tsx — so a
+    second rule written out in this file would let the menu file Roses under
+    Flowers while the trail said Gifts, each looking right on its own.
 
     A SHOP WITH NO DEPARTMENTS — every shop the day this ships, including this
     one — gets ONE unheaded section holding everything, which renders as the

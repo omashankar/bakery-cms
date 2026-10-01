@@ -4,8 +4,10 @@ import { getStorefrontProductCards } from "@/features/products/data/products-ser
 import {
   getStorefrontCategories,
   getStorefrontCollections,
+  getStorefrontDepartments,
   getStorefrontOccasions,
 } from "@/apps/website/lib/storefront-categories.server";
+import { departmentFor, offeredAxes } from "@/features/catalog/lib/catalog-utils";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 
 interface PageProps {
@@ -61,12 +63,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function Page({ params }: PageProps) {
-  const [{ slug }, catalog, categories, collections, occasions] = await Promise.all([
+  const [{ slug }, catalog, categories, collections, occasions, departments] = await Promise.all([
     params,
     getStorefrontProductCards(),
     getStorefrontCategories(),
     getStorefrontCollections(),
     getStorefrontOccasions(),
+    /*
+      FREE. `getCatalog` is `cache()`d and the three reads above have already
+      taken it, so this is a fourth caller of one memoised document rather than
+      a fourth round trip.
+    */
+    getStorefrontDepartments(),
   ]);
 
   // Resolved here rather than in the page, so the client component receives a
@@ -86,9 +94,28 @@ export default async function Page({ params }: PageProps) {
   const occasion =
     collection || category ? undefined : occasions.find((item) => item.slug === slug);
 
+  /*
+    THE DEPARTMENT THIS CATEGORY SITS UNDER — the same question the trail above
+    a product asks, through the same `departmentFor`, so the two screens cannot
+    name different ones for the same category.
+
+    ONLY WHEN THE CATEGORY IS WHAT THIS PAGE IS. A collection wins the address
+    above, and a collection is not filed under a department; an occasion only
+    answers for a slug no category claims. So the crumb is resolved for the
+    category case and the page checks the same thing again before drawing it.
+
+    NO HREF, exactly as on the product page: a department has no page of its
+    own, and a crumb is a promise that one exists.
+  */
+  const departmentOfCategory =
+    !collection && category
+      ? departmentFor(offeredAxes({ categories, occasions, collections, departments }).departments, category.id)
+      : undefined;
+
   return (
     <CollectionsPage
       categorySlug={slug}
+      departmentCrumb={departmentOfCategory ? { label: departmentOfCategory.name } : undefined}
       catalog={catalog}
       categories={categories}
       collection={
