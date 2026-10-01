@@ -7,7 +7,6 @@ import {
   socialLinks,
 } from "@/constants/landing-data";
 import type {
-  BusinessType,
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
@@ -27,27 +26,6 @@ function nowIso(): string {
 }
 
 
-/**
- * The trades offered in Settings → General, and the ONLY list of them.
- *
- * Ordered as a shop owner would scan it, with `other` last because it is the
- * default and the honest answer for anyone selling a mix. Adding a row here is
- * adding a wording preset in `BUSINESS_TYPE_LABELS` and nothing else — if a row
- * ever starts deciding behaviour, the field has become the thing it was deleted
- * for being.
- */
-export const businessTypeOptions: { value: BusinessType; label: string }[] = [
-  { value: "bakery", label: "Bakery" },
-  { value: "sweet-shop", label: "Sweet shop" },
-  { value: "flower-shop", label: "Flower shop" },
-  { value: "gift-shop", label: "Gift shop" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "grocery", label: "Grocery" },
-  { value: "fashion", label: "Fashion" },
-  { value: "electronics", label: "Electronics" },
-  { value: "pharmacy", label: "Pharmacy" },
-  { value: "other", label: "Something else" },
-];
 export const defaultGeneralSettings: GeneralSettings = {
   siteName: brandInfo.name,
   siteTagline: brandInfo.tagline,
@@ -68,7 +46,6 @@ export const defaultGeneralSettings: GeneralSettings = {
    * Defaulting to `"bakery"` would have this software decide what every new
    * shop sells, which is the reason the enum was deleted the first time.
    */
-  businessType: "other",
 };
 
 /**

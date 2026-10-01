@@ -13,10 +13,9 @@ import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { BusinessType, GeneralSettings, LabelOverrides } from "@/types/settings";
+import type { GeneralSettings, LabelOverrides } from "@/types/settings";
 import { describeWordingProblems, guessPlural } from "@/config/business-labels";
 import {
-  businessTypeOptions,
   currencyOptions,
   defaultGeneralSettings,
   isSafeAssetUrl,
@@ -250,46 +249,30 @@ export function GeneralSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/*
-              THE BUSINESS TYPE, AND WHAT IT IS AND IS NOT.
+              THE BUSINESS TYPE SELECT STOOD HERE, TWICE, AND IS GONE.
 
-              This select was deleted once. It restricted nothing — audited: the
-              only thing it gated was the Wedding Builder — it had to grow a row
-              every time a shop was a trade nobody had listed, and a shop
-              selling cakes AND chargers AND flowers had no honest answer to
-              give it. The wording boxes below replaced it.
+              It restricted nothing — audited both times: the only thing it
+              ever gated was the Wedding Builder, and that gate did not come
+              back with it. It had to grow a row every time a shop was a
+              trade nobody had listed, and a shop selling cakes AND chargers
+              AND flowers had no honest answer to give it.
 
-              It is back because a shop has an identity and a new owner should
-              not start from a blank page. The condition it came back on is the
-              one that made it worth deleting: IT SETS DEFAULTS AND RESTRICTS
-              NOTHING. Nothing gates a product, a category, a page or a feature
-              on this value, and the Wedding gate deliberately did not come back
-              with it.
+              The second time it came back to spare a new owner a blank page:
+              pick Flower shop, get Bouquet/Flowers pre-filled. The shop that
+              owns this deployment asked for it to go anyway, and the reason
+              is the label: "What kind of shop is this?" reads as
+              configuration, while all it did was fill four boxes that are
+              right there underneath. A control that looks like it decides
+              something and does not is worse than one fewer control.
 
-              Which is why it sits directly above the wording boxes rather than
-              anywhere else on this screen: the type fills them in, and the shop
-              overrules it by typing. A florist that sells cakes at Christmas
-              picks "Flower shop" and types whatever it likes underneath.
+              WHAT IT COST: a florist now types Bouquet and Flowers itself.
+              WHAT IT WAS COSTING: changing that dropdown silently rewrote
+              the storefront's wording, with nothing on this screen moving,
+              because blank boxes mean "use the layer underneath".
+
+              The boxes below are the whole mechanism now: blank is the
+              neutral default, typed wins.
             */}
-            <div className="space-y-2">
-              <Label htmlFor="businessType">What kind of shop is this?</Label>
-              <AdminSelect
-                id="businessType"
-                value={settings.businessType}
-                onChange={(e) =>
-                  edit((prev) => ({ ...prev, businessType: e.target.value as BusinessType }))
-                }
-              >
-                {businessTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </AdminSelect>
-              <p className="text-xs text-muted-foreground">
-                Sets the starting wording below. It does not limit what you can sell — every
-                shop can list anything, whichever type it picks.
-              </p>
-            </div>
 
 
             <div className="grid gap-4 sm:grid-cols-2">

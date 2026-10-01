@@ -3,7 +3,6 @@ import type {
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
-  BusinessType,
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
@@ -412,21 +411,6 @@ export function getLabelSettings(): LabelOverrides {
   return loadSettings().labelOverrides ?? {};
 }
 
-/**
- * The shop's trade, for wording only.
- *
- * Read beside `getLabelSettings` because `resolveLabels` layers the two: what
- * the shop typed, over what its trade suggests, over neutral. Falls back to
- * `"other"` — which resolves to exactly the neutral wording — so a settings
- * document written while the field did not exist needs no special case.
- *
- * NOTHING ELSE MAY READ THIS. It picks default words. It does not decide what a
- * shop is allowed to sell, list, show or switch on — that restriction is the
- * reason the field was deleted once, and it is not coming back with it.
- */
-export function getBusinessType(): BusinessType {
-  return loadSettings().general?.businessType ?? "other";
-}
 
 export function getActivityLog(): ActivityLog[] {
   return loadSettings().activity;

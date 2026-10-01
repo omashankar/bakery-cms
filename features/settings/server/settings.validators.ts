@@ -49,26 +49,16 @@ export const generalSchema = z.object({
   favicon: assetUrl,
   timezone: z.enum(timezoneValues, "Unknown timezone"),
   currency: z.enum(currencyValues, "Unknown currency"),
-  /**
-   * A closed list, because it keys a preset table — an unknown value would
-   * resolve to no preset and silently fall back to neutral wording.
-   * `.catch` rather than a hard refusal so a document written before the
-   * field returned still reads, rather than failing the whole settings load.
-   */
-  businessType: z
-    .enum([
-      "bakery",
-      "sweet-shop",
-      "flower-shop",
-      "restaurant",
-      "gift-shop",
-      "grocery",
-      "fashion",
-      "electronics",
-      "pharmacy",
-      "other",
-    ])
-    .catch("other"),
+  /*
+    THERE IS NO `businessType` HERE ANY MORE, and this note is load-bearing.
+
+    It was an enum with `.catch("other")`, which RE-CREATED the field on every
+    read. A `z.object` strips keys it does not declare, so a document that
+    still carries one parses fine and simply loses it on the next save — which
+    is why removing this needed no migration. Do not tighten this object to
+    reject unknown keys without migrating first: every settings document
+    written before today still has the field at rest.
+  */
 });
 
 export const contactSchema = z.object({

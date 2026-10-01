@@ -4,7 +4,6 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
-  getBusinessType,
   getLabelSettings,
 } from "@/features/settings/lib/settings-repository";
 import {
@@ -75,13 +74,6 @@ export function getStorefrontContactInfo() {
 export function getStorefrontBusinessHours() {
   const contact = getContactSettings();
   return chosenList(contact.businessHours, businessHours, hoursIdentity);
-}
-
-export function getStorefrontBusinessLabels(): BusinessLabels {
-  // The shop's own words over the preset — the same resolution the server does
-  // and the admin hook does. This read the preset alone, so the collections
-  // heading a shop had renamed still said "Our Collections".
-  return { ...getBusinessLabels(), ...resolveLabels(getLabelSettings(), getBusinessType()) };
 }
 
 

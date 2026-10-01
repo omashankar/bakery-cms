@@ -8,7 +8,6 @@ import {
   type BusinessLabels,
 } from "@/config/business-labels";
 import {
-  getBusinessType,
   getLabelSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
@@ -41,18 +40,18 @@ export function useBusinessLabels(): ShopLabels {
     /**
      * The shop's OWN words, over the neutral defaults.
      *
-     * This resolved from `businessType` alone and threw away the overrides the
-     * server had already layered on — so `labelOverrides` was inert, and a shop
-     * that wanted "Bouquet" got "Cake" whatever it typed. Wiring it had to come
-     * BEFORE the enum was deleted, or the sidebar and products list would have
-     * quietly reverted to "Cakes" with nothing able to override them.
+     * This once resolved from `businessType` ALONE and threw away the
+     * overrides the server had already layered on — so `labelOverrides` was
+     * inert, and a shop that wanted "Bouquet" got "Cake" whatever it typed.
+     * The trade preset is gone entirely now, so what a shop typed is the only
+     * thing above the neutral floor.
      *
      * `resolveLabels` is the single place a blank means "use the default".
      */
     const sync = () => {
       setLabels({
         ...getBusinessLabels(),
-        ...resolveLabels(getLabelSettings(), getBusinessType()),
+        ...resolveLabels(getLabelSettings()),
       });
     };
     sync();

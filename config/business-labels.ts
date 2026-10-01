@@ -1,26 +1,27 @@
 import { Package, type LucideIcon } from "lucide-react";
-import type { BusinessType, LabelOverrides } from "@/types/settings";
+import type { LabelOverrides } from "@/types/settings";
 
 /**
  * The product-noun wording a shop shows its customers.
  *
- * This was a `Record<BusinessType, BusinessLabels>` — ten trades, each with its
- * own nouns, keyed off a closed enum in Settings. The enum decided nothing else
- * (it gated only the Wedding Builder), it had to be extended every time a shop
- * turned out to be a trade nobody had listed, and a shop selling cakes AND
- * chargers AND flowers had no honest value to pick.
+ * This was a `Record<BusinessType, BusinessLabels>` — ten trades, each with
+ * its own nouns, keyed off a closed enum in Settings. The enum decided
+ * nothing else, it had to be extended every time a shop turned out to be a
+ * trade nobody had listed, and a shop selling cakes AND chargers AND flowers
+ * had no honest value to pick. It was cut down to a wording preset, and now
+ * it is gone: the shop that owns this deployment asked for it, because a
+ * control labelled "What kind of shop is this?" reads as configuration and
+ * only ever pre-filled four words.
  *
- * The type is back, on one condition: it picks DEFAULTS and restricts nothing.
- * So there are three layers here, not one. `DEFAULT_LABELS` is the neutral
- * floor — a default that says "Cake" is the same bug in one row instead of
- * ten, so the floor never does. `BUSINESS_TYPE_LABELS` sits on it as a
- * starting point per trade. And `labelOverrides` — what the shop actually
- * typed — wins over both, which is what keeps a shop selling cakes AND
- * chargers AND flowers able to say so.
+ * TWO LAYERS, not three. `DEFAULT_LABELS` is the neutral floor — a default
+ * that says "Cake" is the same bug in one row instead of ten, so the floor
+ * never does. And `labelOverrides` — what the shop actually typed — wins over
+ * it, which is what keeps a shop selling cakes AND chargers AND flowers able
+ * to say so.
  *
- * Scope is still intentionally small: public headings plus the singular/plural
- * product noun. Routes, folders, components and database collections are never
- * renamed from here.
+ * Scope is still intentionally small: public headings plus the
+ * singular/plural product noun. Routes, folders, components and database
+ * collections are never renamed from here.
  */
 export interface BusinessLabels {
   /** Heading on the storefront collections / shop-all page (no category selected). */
@@ -93,92 +94,6 @@ export const DEFAULT_LABELS: BusinessLabels = {
   productIcon: Package,
 };
 
-/**
- * The wording each business type STARTS a shop on.
- *
- * These lived in `settings-utils.ts` as migration input only, kept so that
- * deleting the enum would not change what a running shop called its own
- * products on the day the change deployed. They are live presets again — the
- * business type is back — and they belong here, with the rest of the wording.
- *
- * A preset is a STARTING POINT, never an answer. Every one of these is
- * overridden the moment a shop types its own, and `"other"` matches
- * `DEFAULT_LABELS`, so a shop that has not chosen is where it always was.
- *
- * Adding a trade here is adding wording. It is not, and must never become, a
- * place where a trade gets different behaviour.
- */
-export const BUSINESS_TYPE_LABELS: Record<BusinessType, LabelOverrides> = {
-  bakery: {
-    collectionsTitle: "Our Collections",
-    collectionsSubtitle: "Browse premium cakes by category, flavour, and occasion.",
-    productWord: "Cake",
-    productWordPlural: "Cakes",
-  },
-  "sweet-shop": {
-    collectionsTitle: "Our Sweets",
-    collectionsSubtitle: "Browse our sweets and confections by category and occasion.",
-    productWord: "Sweet",
-    productWordPlural: "Sweets",
-  },
-  "flower-shop": {
-    collectionsTitle: "Our Flowers",
-    collectionsSubtitle: "Browse fresh flowers and arrangements by category and occasion.",
-    productWord: "Bouquet",
-    productWordPlural: "Flowers",
-  },
-  restaurant: {
-    collectionsTitle: "Our Menu",
-    collectionsSubtitle: "Browse our menu by category.",
-    productWord: "Dish",
-    productWordPlural: "Dishes",
-  },
-  "gift-shop": {
-    collectionsTitle: "Our Gifts",
-    collectionsSubtitle: "Browse gifts by category and occasion.",
-    productWord: "Gift",
-    productWordPlural: "Gifts",
-  },
-  grocery: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse groceries and essentials by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  fashion: {
-    collectionsTitle: "Our Collection",
-    collectionsSubtitle: "Browse the latest styles by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  electronics: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse electronics and gadgets by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  pharmacy: {
-    collectionsTitle: "Our Products",
-    collectionsSubtitle: "Browse health and wellness products by category.",
-    productWord: "Product",
-    productWordPlural: "Products",
-  },
-  /**
-   * EMPTY, and it has to be.
-   *
-   * "Something else" is a shop that has not named a trade, which is exactly the
-   * neutral case — so it contributes no preset and `DEFAULT_LABELS` stands.
-   *
-   * It held its own four strings while it was migration input, and they were
-   * close to the defaults but not equal: "Our Products" against "Our
-   * Collections", "Browse our products by category." against "Browse everything
-   * we sell by category.". `"other"` is the default for every shop that has
-   * never touched this field, so carrying those across would have renamed the
-   * collections heading of every existing shop on the day the type came back —
-   * the same harm, in reverse, that deleting the enum was careful to avoid.
-   */
-  other: {},
-};
 
 /** The wording in force before a shop has said anything. */
 export function getBusinessLabels(): BusinessLabels {
@@ -213,20 +128,27 @@ export interface ResolvedLabels {
  * both sides need it: the server ships the result as `settings.labels`, and
  * `useBusinessLabels` resolves the same way in the browser.
  */
-export function resolveLabels(
-  overrides: LabelOverrides = {},
-  /**
-   * Optional, and the two-layer fallback is the whole point.
-   *
-   * What the shop TYPED wins over what its trade suggests, which wins over the
-   * neutral default. Optional because a caller that has no settings in reach
-   * still gets sensible wording rather than a required argument it would have
-   * to invent.
-   */
-  businessType?: BusinessType,
-): ResolvedLabels {
-  const preset = businessType ? BUSINESS_TYPE_LABELS[businessType] : undefined;
-  const base: BusinessLabels = preset ? { ...DEFAULT_LABELS, ...preset } : DEFAULT_LABELS;
+/**
+ * TWO LAYERS NOW, NOT THREE — what the shop TYPED, over the neutral default.
+ *
+ * The middle layer was a trade preset picked from a "What kind of shop is
+ * this?" dropdown, and the shop asked for it to go. It decided nothing else:
+ * it gated no feature, and its own docblock already recorded that it "had to
+ * be extended every time a shop turned out to be a trade nobody had listed"
+ * and that a shop selling cakes AND chargers AND flowers "had no honest value
+ * to pick".
+ *
+ * NOTHING THIS DEPLOYMENT RENDERS MOVED. Its stored type was `"other"`, whose
+ * preset was the empty object — so `DEFAULT_LABELS` already stood. Verified
+ * against the live settings document before the change, not assumed.
+ *
+ * What a shop loses is a shortcut on its first day: a florist used to get
+ * Bouquet/Flowers pre-filled and now types them. What it stops being able to
+ * do is change its whole storefront's wording from a dropdown that showed no
+ * sign of having done so.
+ */
+export function resolveLabels(overrides: LabelOverrides = {}): ResolvedLabels {
+  const base = DEFAULT_LABELS;
   const productWord = overrides.productWord?.trim() || base.productWord;
   return {
     collectionsTitle: overrides.collectionsTitle?.trim() || base.collectionsTitle,

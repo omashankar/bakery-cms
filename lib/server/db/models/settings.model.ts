@@ -24,9 +24,12 @@ const generalSchema = new mongoose.Schema(
     favicon: String,
     timezone: String,
     currency: String,
-    // Declared, or Mongoose drops it on write and the select reverts on
-    // every load. See the note on `deliveryTiers` below.
-    businessType: { type: String, default: "other" },
+    /*
+      `businessType` WAS DECLARED HERE and had to go in the same commit as the
+      Zod key. Apart, the two break in opposite directions: the path alone
+      keeps Mongoose handing the field back and its `default: "other"`
+      re-creating it, while the key alone drops a value the schema still reads.
+    */
   },
   sub,
 );

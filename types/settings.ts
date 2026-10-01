@@ -10,33 +10,6 @@ export interface ThemeSettings {
   customCss?: string;
 }
 
-/**
- * What kind of shop this is. Required, and it RESTRICTS NOTHING.
- *
- * The field was deleted once, for a reason worth keeping in view: as a closed
- * enum it had to be extended every time a shop turned out to be a trade nobody
- * had listed, and a shop selling cakes AND chargers AND flowers had no honest
- * value to pick. It is back because a shop still has an identity and a new
- * owner should not start from a blank page — but on the explicit condition
- * that it decides DEFAULTS and nothing else.
- *
- * So, permanently: nothing may gate a product, a category, a page or a feature
- * on this value. It picks the starting wording, and the shop overrides any of
- * it in `labelOverrides` whenever it likes. `"other"` is the default and its
- * wording is the neutral one, so declaring a type is a choice a shop makes
- * rather than one this software makes for it.
- */
-export type BusinessType =
-  | "bakery"
-  | "sweet-shop"
-  | "flower-shop"
-  | "restaurant"
-  | "gift-shop"
-  | "grocery"
-  | "fashion"
-  | "electronics"
-  | "pharmacy"
-  | "other";
 
 export interface GeneralSettings {
   siteName: string;
@@ -46,8 +19,6 @@ export interface GeneralSettings {
   favicon: string;
   timezone: string;
   currency: string;
-  /** See `BusinessType`. Required; sets default wording; restricts nothing. */
-  businessType: BusinessType;
 }
 
 export interface BusinessHoursEntry {

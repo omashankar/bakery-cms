@@ -138,60 +138,88 @@ describe("the pre-paint script", () => {
 
 describe("a shop keeps the wording its trade gave it", () => {
   /**
-   * This block used to pin a MIGRATION.
+   * THIS BLOCK HAS NOW PINNED THREE DIFFERENT MECHANISMS FOR ONE PROPERTY.
    *
-   * When the business-type enum was deleted, a repair rule read the stored
-   * `general.businessType`, copied that trade's wording into `labelOverrides`,
-   * and dropped the field — so a bakery kept reading "Cakes" on merge day
-   * rather than silently becoming "Products". These cases held it to that.
+   * First a MIGRATION: when the business-type enum was deleted, a repair read
+   * the stored `general.businessType`, copied that trade's wording into
+   * `labelOverrides` and dropped the field — so a bakery kept reading "Cakes"
+   * on merge day rather than silently becoming "Products".
    *
-   * The field is a live setting again, so the repair had to go: running on the
-   * singleton read, it would have deleted the owner's choice moments after
-   * they made it. The PROPERTY it protected is unchanged and is what these
-   * cases check now — only the mechanism moved, from a one-shot copy into
-   * `resolveLabels`, which layers the trade's preset under whatever the shop
-   * has typed.
+   * Then a LAYER: the field came back as a live setting, the repair had to go
+   * (running on the singleton read, it deleted the owner's choice moments
+   * after they made it), and `resolveLabels` layered the trade's preset under
+   * whatever the shop had typed.
+   *
+   * Now NEITHER. The shop that owns this deployment asked for the control to
+   * go: it gated nothing, and a dropdown labelled "What kind of shop is
+   * this?" reads as configuration while all it did was pre-fill four boxes.
+   *
+   * THE PROPERTY IS THE SAME THROUGHOUT and is what these cases check: a shop
+   * reads its OWN words, and a shop that has typed none reads neutral ones —
+   * never another trade's. Only the thing in the middle keeps moving.
+   *
+   * NOTHING THIS DEPLOYMENT RENDERS MOVED when the layer went. Its stored
+   * type was `"other"`, whose preset was `{}`, so `DEFAULT_LABELS` already
+   * stood — verified against the live settings document, not assumed.
    */
-  it("reads its trade's wording with nothing of its own typed", () => {
-    const labels = resolveLabels({}, "bakery");
+  it("reads the shop's own words, whatever it typed", () => {
+    expect(
+      resolveLabels({ productWord: "Gateau", productWordPlural: "Gateaux" }),
+    ).toMatchObject({ productWord: "Gateau", productWordPlural: "Gateaux" });
 
-    expect(labels).toMatchObject({
-      productWord: "Cake",
-      productWordPlural: "Cakes",
-      collectionsTitle: "Our Collections",
-      collectionsSubtitle: "Browse premium cakes by category, flavour, and occasion.",
-    });
+    /* A florist and a phone shop, through the same one rule. */
+    expect(resolveLabels({ productWord: "Bouquet" })).toMatchObject({ productWord: "Bouquet" });
+    expect(resolveLabels({ categoryWord: "Brand" })).toMatchObject({ categoryWord: "Brand" });
+
+    /*
+      THE HEADING TOO, AND WITH A VALUE THAT IS NOT THE DEFAULT.
+
+      A mutation found this gap: hardcoding `collectionsTitle: base.collectionsTitle`
+      — throwing the override away entirely — passed every wording spec in the
+      suite. This shop STORES "Our Collections", which is exactly the neutral
+      default, so every fixture built from it reads the same whether the
+      override is honoured or ignored. The fixture has to be a word the
+      default is not.
+    */
+    expect(resolveLabels({ collectionsTitle: "Our Shelf" }).collectionsTitle).toBe("Our Shelf");
+    expect(resolveLabels({ collectionsSubtitle: "Pick a shelf." }).collectionsSubtitle).toBe(
+      "Pick a shelf.",
+    );
   });
 
-  it("uses the wording that business type actually had, not the bakery's", () => {
-    expect(resolveLabels({}, "flower-shop")).toMatchObject({
-      productWord: "Bouquet",
-      productWordPlural: "Flowers",
-    });
+  it("and neutral ones when it has typed none — never another trade's", () => {
+    /*
+      THE HALF THE MIGRATION EXISTED TO PROTECT. A shop that has said nothing
+      must not be told what it sells. "Cake" here would be the bug every
+      version of this mechanism was built to avoid.
+    */
+    const labels = resolveLabels({});
+    expect(labels.productWord).toBe("Product");
+    expect(labels.productWordPlural).toBe("Products");
+    expect(labels.categoryWord).toBe("Category");
+    expect(labels.collectionsTitle).toBe("Our Collections");
+
+    /* And a blank string counts as having typed nothing, not as a word. */
+    expect(resolveLabels({ productWord: "   " }).productWord).toBe("Product");
   });
 
-  it("never overrules wording the shop has already chosen", () => {
-    // The whole point of the layering: a bakery that sells gateaux says so.
-    expect(resolveLabels({ productWord: "Gateau" }, "bakery")).toMatchObject({
-      productWord: "Gateau",
-      // and the rest of the trade's wording still stands underneath
-      productWordPlural: "Cakes",
-    });
-  });
+  /*
+    NO CASE PINS THE SIGNATURE, and that is deliberate rather than an
+    oversight. `resolveLabels(overrides, businessType)` took a trade second;
+    TYPESCRIPT is what refuses a caller reaching for it now, and it did —
+    removing the parameter produced exactly five compile errors, one per
+    production call site. A runtime check adds nothing a build does not
+    already stop, and the first one written here asserted
+    `resolveLabels.length === 1`, which is 0 for a function with a default
+    parameter — a case about JavaScript trivia rather than about this shop.
+  */
 
-  it("falls back to neutral for a shop that has not said", () => {
-    // `"other"` and "no type at all" must agree, or a shop that has not
-    // chosen reads differently on the server than in the browser.
-    expect(resolveLabels({}, "other")).toMatchObject({ productWord: "Product" });
-    expect(resolveLabels({})).toMatchObject({ productWord: "Product" });
-  });
-
-  it("and NOTHING deletes the business type on a read", () => {
+  it("and no settings repair touches a document on a read", () => {
     /**
-     * The repair that used to `$unset` this field ran on the singleton read
-     * that every server render funnels through. Left in place once the field
-     * went live, an owner would pick their shop type, be told it saved, and
-     * find it gone on the very next page load.
+     * The repair that used to `$unset` the trade ran on the singleton read
+     * every server render funnels through. It is gone, and it must not come
+     * back for the removal either: a stored `businessType` is stripped by the
+     * Zod object on the next ordinary save, which needs no repair at all.
      */
     const repairs = planSettingsRepairs({
       general: { businessType: "bakery" },
