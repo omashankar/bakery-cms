@@ -19,7 +19,10 @@ import {
   catalogSectionDefaults,
   defaultCatalogStore,
   departmentFor,
+  findSlugClash,
   offeredAxes,
+  offeredRows,
+  slugPeers,
 } from "@/features/catalog/lib/catalog-utils";
 import {
   CATALOG_SECTIONS,
@@ -231,6 +234,101 @@ describe("the document has somewhere to put it", () => {
     expect(model).toMatch(/^\s*departments: \{ type: \[mongoose\.Schema\.Types\.Mixed\]/m);
     expect(model, "the schema was made lax, which would hide the next dropped field").not.toMatch(
       /strict:\s*false/,
+    );
+  });
+});
+
+describe("what a new slug has to be unique against", () => {
+  /**
+   * A DEPARTMENT WAS CHECKED AGAINST EVERY LIST EXCEPT ITS OWN.
+   *
+   * `existingSlugs` in the Catalog dialog returned
+   * `[...getCategories(), ...getCollections()]` for every tab that is not
+   * `occasions` — departments reached that fall-through. Both directions of
+   * that were live on this shop:
+   *
+   *   - TWO DEPARTMENTS AT ONE SLUG SAVED WITHOUT A WORD. The create form
+   *     derives the slug from the name, so typing "Gifts" twice produces
+   *     `gifts` twice. `offeredRows` then dedupes by slug and keeps the
+   *     FIRST, so the second department never drew its heading, its categories
+   *     fell into the unheaded leftover block beside the genuinely unfiled
+   *     ones, and the product trail lost its department too — `departmentFor`
+   *     runs the same dedupe.
+   *
+   *   - AND A DEPARTMENT WAS REFUSED AN ADDRESS NOTHING SERVES. This shop has
+   *     a category called Pastries, so naming a department "Pastries" was
+   *     refused with "already used by Pastries" for a slug no route resolves.
+   *     There is no /store/departments/<slug> page: the menu draws a department
+   *     as a heading and the trail as a word, both deliberately unlinked.
+   *
+   * The rule is `slugPeers` now, beside `findSlugClash` and the `offeredRows`
+   * dedupe that gives a duplicate slug its teeth — because the cost of one is
+   * paid three files from where the check was written.
+   */
+  const lists = {
+    categories: [{ id: "c1", name: "Pastries", slug: "pastries" }],
+    occasions: [{ id: "o1", name: "Birthday", slug: "birthday" }],
+    collections: [{ id: "l1", name: "Premium", slug: "premium" }],
+    departments: [{ id: "d1", name: "Gifts", slug: "gifts" }],
+  };
+
+  it("checks a department against departments, and nothing else", () => {
+    const peers = slugPeers("departments", lists);
+    expect(peers.map((row) => row.slug)).toEqual(["gifts"]);
+
+    /* The half that saved silently. */
+    expect(
+      findSlugClash(peers, "gifts")?.name,
+      "a second department at one slug is still accepted",
+    ).toBe("Gifts");
+
+    /* The half that refused an address nothing serves. */
+    expect(
+      findSlugClash(peers, "pastries"),
+      "a department is still refused a category's slug",
+    ).toBeUndefined();
+  });
+
+  it("and the storefront is what makes that necessary", () => {
+    /*
+      NOT A STYLE RULE. Two departments at one slug, through the real
+      `offeredRows`: one comes back. So the admin accepting both is the admin
+      accepting a row the storefront throws away.
+    */
+    const twice = [
+      { id: "d1", name: "Gifts", slug: "gifts", sortOrder: 0, categoryIds: ["c1"] },
+      { id: "d2", name: "Gifts", slug: "gifts", sortOrder: 1, categoryIds: ["c2"] },
+    ];
+    expect(offeredRows(twice).map((row) => row.id)).toEqual(["d1"]);
+    expect(departmentFor(twice, "c2"), "the dropped department still files its category").toBeUndefined();
+  });
+
+  it("leaves the three lists that already had a rule exactly as they were", () => {
+    /*
+      THE REGRESSION THIS COULD HAVE BEEN. An occasion is unique among
+      occasions — checking it against categories answered "already used by
+      Birthday" for a slug it had held all along. A category and a collection
+      share /store/collections/<slug>, so they are checked against each other.
+    */
+    expect(slugPeers("occasions", lists).map((row) => row.slug)).toEqual(["birthday"]);
+    expect(slugPeers("categories", lists).map((row) => row.slug)).toEqual([
+      "pastries",
+      "premium",
+    ]);
+    expect(slugPeers("collections", lists).map((row) => row.slug)).toEqual([
+      "pastries",
+      "premium",
+    ]);
+  });
+
+  it("and the admin asks the shared rule rather than spelling it again", () => {
+    const dialog = readFileSync(
+      join(process.cwd(), "apps/admin/catalog/components/catalog-form-dialog.tsx"),
+      "utf8",
+    );
+    expect(dialog, "the dialog does not use the shared rule").toContain("slugPeers(tab, {");
+    expect(dialog, "the rule is written out again beside the shared one").not.toMatch(
+      /tab === "departments"\)\s*return/,
     );
   });
 });

@@ -31,7 +31,7 @@
  */
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -58,6 +58,14 @@ const CAKES = {
   categoryIds: [cake.id, choc.id],
 };
 const FLOWERS = { id: "d-flo", name: "Flowers", slug: "flowers", sortOrder: 1, categoryIds: [rose.id] };
+
+/* The nouns a panel heads its columns with, for the render cases below. */
+const WORDS_FOR_SHAPE = {
+  productWordPlural: "Products",
+  categoryWord: "Category",
+  occasionWord: "Occasion",
+  collectionWord: "Collection",
+};
 
 const headings = (sections: { heading: string }[]) => sections.map((s) => s.heading);
 const named = (sections: { categories: { name: string }[] }[]) =>
@@ -226,14 +234,77 @@ describe("what the server sends and what the header does with it", () => {
     expect(chrome, "the shared rule never sees the fourth list").toMatch(
       /offeredAxes\(\{[\s\S]{0,200}departments: departmentRows/,
     );
+  });
+
+  it("and the stored row does NOT cross the RSC wire whole", async () => {
     /*
-      PROJECTED, not spread. The stored row carries `description` and `image`,
-      and this object crosses the RSC wire into a client navbar on cart and
-      checkout, where neither is drawn.
+      RUN, NOT GREPPED — and this one is not hypothetical.
+
+      The first version of this was `not.toMatch(/departments:
+      offered\.departments,/)`, which names ONE spelling of the mistake. While
+      this change was being reviewed, an agent replaced the projection with
+      `departments: [...offered.departments]` and left it in the working tree.
+      The whole stored row was crossing the wire and the guard was green; it
+      was caught by reading `git diff`, which is not a test.
+
+      The object reaches a CLIENT navbar on every storefront and /account
+      route, cart and checkout among them. `description` and `image` are
+      drawn by nothing there, and one shop's department images are the kind of
+      payload that turns up as a slow checkout months later.
     */
-    expect(chrome, "the stored row is spread whole onto the wire").not.toMatch(
-      /departments: offered\.departments,/,
-    );
+    vi.resetModules();
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getSettings: async () => ({ general: {}, contact: {}, social: [] }),
+    }));
+    vi.doMock("@/features/site-layout/server/site-layout.service", () => ({
+      getSiteLayout: async () => ({}),
+    }));
+    vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
+      getStorefrontCategories: async () => [{ id: "c1", name: "Roses", slug: "roses" }],
+      getStorefrontOccasions: async () => [],
+      getStorefrontCollections: async () => [],
+      getStorefrontDepartments: async () => [
+        {
+          id: "d1",
+          name: "Flowers",
+          slug: "flowers",
+          sortOrder: 0,
+          categoryIds: ["c1"],
+          /* The two fields the wire must not carry. */
+          description: "a paragraph the navbar draws nowhere",
+          image: "/uploads/a-photograph-the-navbar-draws-nowhere.jpg",
+        },
+      ],
+    }));
+
+    const { getStorefrontChrome } = await import("@/apps/website/lib/storefront-chrome.server");
+    const chrome = await getStorefrontChrome();
+
+    expect(chrome.departments).toHaveLength(1);
+    /*
+      THE WHOLE KEY SET, not two `toBeUndefined`s. A spread carries whatever
+      the stored row happens to hold, so naming the fields to exclude is the
+      same enumeration problem the regex had — this names what is ALLOWED.
+    */
+    expect(Object.keys(chrome.departments[0]).sort()).toEqual([
+      "categoryIds",
+      "id",
+      "name",
+      "slug",
+      "sortOrder",
+    ]);
+    expect(chrome.departments[0]).toEqual({
+      id: "d1",
+      name: "Flowers",
+      slug: "flowers",
+      sortOrder: 0,
+      categoryIds: ["c1"],
+    });
+
+    vi.doUnmock("@/features/settings/server/settings.service");
+    vi.doUnmock("@/features/site-layout/server/site-layout.service");
+    vi.doUnmock("@/apps/website/lib/storefront-categories.server");
+    vi.resetModules();
   });
 
   it("and BOTH renderers ask the shared rule, neither spelling it again", () => {
@@ -253,20 +324,49 @@ describe("what the server sends and what the header does with it", () => {
 });
 
 describe("the panel does not change shape for this", () => {
-  it("the category column is still one column", () => {
+  it("draws the same panel with departments as without", async () => {
     /*
       THE WHOLE REASON THIS IS SUB-HEADINGS. A fourth column needs a panel
-      wider than 40rem, and a wider panel cannot hang off a nav row and stay
-      on screen — measured: at 1024px a row starting at 396px has no edge that
-      fits a 640px panel. Departments were made to fit the panel there is.
+      wider than 40rem, and a wider panel cannot hang off a nav row and stay on
+      screen — measured: at 1024px a row starting at 396px has no edge that
+      fits even a 640px panel. Departments were made to fit the panel there is.
+
+      MEASURED FROM THE RENDER, because the source check here could not fail.
+      It was `expect(menu.slice(at, at + 200)).not.toContain("departments")`
+      over the window around `taxonomyColumns` — and in that window the list is
+      spelled `shopDepartments`, which does not contain the lower-case string
+      it looked for. A `taxonomyColumns` that counted departments would have
+      passed it. The companion regex was worse: `PANEL_WIDTH` is keyed by rem,
+      so `4: "w-[min(` names a key that could never exist.
+
+      So the panel's own class list is compared, with departments and without.
+      That covers the width map, the column count and the card together, and it
+      cannot be satisfied by how anything is spelled.
     */
-    const menu = code("components/storefront/mega-menu.tsx");
-    const at = menu.indexOf("const taxonomyColumns =");
-    expect(at, "the column count moved").toBeGreaterThan(-1);
-    expect(menu.slice(at, at + 200), "a department now widens the panel").not.toContain(
-      "departments",
-    );
-    expect(menu, "a fourth column was added to the width map").not.toMatch(/\b4: "w-\[min\(/);
+    const { MegaMenu } = await import("@/components/storefront/mega-menu");
+
+    const panelClassFor = async (props: Record<string, unknown>) => {
+      const host = document.createElement("div");
+      document.body.append(host);
+      const root = createRoot(host);
+      await act(async () => {
+        root.render(createElement(MegaMenu as never, props as never));
+      });
+      const panel = host.querySelector("[data-mega-panel]");
+      const className = panel?.className ?? "";
+      act(() => root.unmount());
+      host.remove();
+      return className;
+    };
+
+    const base = { categories: ALL, words: WORDS_FOR_SHAPE, label: "Shop" };
+    const without = await panelClassFor(base);
+    const with1 = await panelClassFor({ ...base, departments: [CAKES] });
+    const with2 = await panelClassFor({ ...base, departments: [CAKES, FLOWERS] });
+
+    expect(without, "no panel rendered to compare").toContain("absolute");
+    expect(with1, "one department changed the panel's shape").toBe(without);
+    expect(with2, "two departments changed the panel's shape").toBe(without);
   });
 });
 

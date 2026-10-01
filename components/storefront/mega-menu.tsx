@@ -891,7 +891,18 @@ export function MobileShopLinks({
           of these two renderers and not the other is a defect this component
           has shipped twice. */}
       {categorySets.map((section, index) => (
-        <div key={section.id || `unfiled-${index}`}>
+        /*
+          `space-y-1` BECAUSE THE WRAPPER ATE IT.
+
+          These links were direct children of the drawer's `space-y-1`, so each
+          sat 4px from the next. Sectioning them put a `div` in between, which
+          took the 4px for itself: measured on this shop at 390px, the seven
+          category rows came out 0px apart while every occasion and collection
+          row below them kept its 4px. One list flush and the rest not is not a
+          department feature — it is every shop's phone drawer today, since
+          none of them has a department.
+        */
+        <div key={section.id || `unfiled-${index}`} className="space-y-1">
           {section.heading.trim() ? (
             <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
               {section.heading}

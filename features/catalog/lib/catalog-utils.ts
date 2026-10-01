@@ -127,6 +127,45 @@ export const defaultCatalogStore: CatalogStore = {
  * A pure function rather than a check inside the dialog, so the rule can be
  * tested without rendering a modal.
  */
+/**
+ * WHICH ROWS A NEW SLUG HAS TO BE UNIQUE AGAINST.
+ *
+ * The rule follows the ADDRESS. A category and a collection share
+ * /store/collections/<slug> — the route resolves the collection first — so
+ * they are checked against each other. An occasion has its own page at
+ * /store/occasions/<slug>, so it only has to be unique among occasions;
+ * checking it against categories used to answer "already used by Birthday"
+ * for a slug it had held all along.
+ *
+ * A DEPARTMENT HAS NO ADDRESS AT ALL and is still checked against departments.
+ * Not to protect a page — there is no /store/departments/<slug> — but because
+ * `offeredRows` dedupes by slug and KEEPS THE FIRST, so a second department
+ * at one slug is dropped from the storefront without a word: its heading never
+ * draws, its categories fall into the unheaded leftover block, and the product
+ * trail loses its department too, since `departmentFor` runs the same dedupe.
+ * The one thing the admin must never do is accept what the storefront drops.
+ *
+ * THIS LIVED IN THE ADMIN DIALOG, and that is where it went wrong: the
+ * department tab fell through to `[...categories, ...collections]`, so two
+ * departments at one slug saved silently while a department named after an
+ * existing category was refused an address nothing serves. The cost of a
+ * duplicate slug is paid in `offeredRows`, three files away, so the rule
+ * belongs next to it.
+ */
+export function slugPeers<T extends { id: string; name: string; slug: string }>(
+  tab: "departments" | "categories" | "occasions" | "collections",
+  lists: {
+    categories: readonly T[];
+    occasions: readonly T[];
+    collections: readonly T[];
+    departments: readonly T[];
+  },
+): T[] {
+  if (tab === "occasions") return [...lists.occasions];
+  if (tab === "departments") return [...lists.departments];
+  return [...lists.categories, ...lists.collections];
+}
+
 export function findSlugClash<T extends { id: string; name: string; slug: string }>(
   rows: readonly T[],
   slug: string,

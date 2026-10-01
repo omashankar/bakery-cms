@@ -25,7 +25,7 @@ import type {
 } from "@/types/product";
 import type { CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
-import { findSlugClash } from "@/features/catalog/lib/catalog-utils";
+import { findSlugClash, slugPeers } from "@/features/catalog/lib/catalog-utils";
 import {
   createCategory,
   createCollection,
@@ -64,10 +64,41 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
  * So the rule follows the addresses. Categories and collections still share
  * one — the collections route resolves a collection first, then a category —
  * and an occasion now only has to be unique among occasions.
+ *
+ * A DEPARTMENT WAS CHECKED AGAINST EVERY LIST EXCEPT ITS OWN, because it
+ * reached this function's fall-through. Both halves of that were live:
+ *
+ *   - Two departments at one slug saved without a word. The create form
+ *     derives the slug from the name, so typing "Gifts" twice produces
+ *     `gifts` twice — and `offeredRows` dedupes by slug and keeps the FIRST,
+ *     so the second vanished from the storefront and its categories fell into
+ *     the unheaded leftover block beside the genuinely unfiled ones. The
+ *     product trail lost its department as well: `departmentFor` runs the same
+ *     dedupe.
+ *   - And a department was refused an address nothing serves. This shop has a
+ *     category called Pastries, so a department named "Pastries" was refused
+ *     with "already used by Pastries" — for a slug no route resolves. There is
+ *     no /store/departments/<slug> page; the menu draws a department as a
+ *     heading and the trail as a word, both deliberately unlinked.
+ *
+ * So a department is unique among DEPARTMENTS. Not because it has an address
+ * to protect — it has none — but because the storefront's own rule throws the
+ * loser away, and the one thing this screen must never do is accept something
+ * the storefront will drop.
  */
 function existingSlugs(tab: CatalogTab): { id: string; name: string; slug: string }[] {
-  if (tab === "occasions") return getOccasions();
-  return [...getCategories(), ...getCollections()];
+  /*
+    THE RULE ITSELF IS IN `slugPeers`, beside `findSlugClash` and the
+    `offeredRows` dedupe that gives a duplicate slug its teeth. It used to be
+    written out here, and that is how the department tab came to be checked
+    against categories and collections and never against departments.
+  */
+  return slugPeers(tab, {
+    categories: getCategories(),
+    occasions: getOccasions(),
+    collections: getCollections(),
+    departments: getDepartments(),
+  });
 }
 
 interface CatalogFormDialogProps {
