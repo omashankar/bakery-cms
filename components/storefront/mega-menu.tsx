@@ -351,13 +351,20 @@ export function MegaMenu({
   const categorySets = shopCategories?.length
     ? categorySections(shopCategories, shopDepartments).map((section) => ({
         id: section.id,
+        /*
+          THE DEPARTMENT'S OWN ADDRESS, so its sub-heading can open it. Empty
+          for the leftover section, which has no department — and a heading
+          with no address stays a word, which is what it was everywhere until
+          the page existed.
+        */
+        href: section.slug ? routes.store.department(section.slug) : "",
         heading: section.heading,
         links: section.categories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         })),
       }))
-    : [{ id: "", heading: "", links: fallbackCategories }];
+    : [{ id: "", href: "", heading: "", links: fallbackCategories }];
   const occasions = (shopOccasions ?? []).map((occasion) => ({
     label: occasion.name,
     // Its OWN page now. This was `routes.store.collection(occasion.slug)`,
@@ -631,10 +638,33 @@ export function MegaMenu({
                     sections reach this blank: a shop with no departments at
                     all, and whatever no department has claimed yet.
                   */}
+                  {/*
+                    A LINK WHEN THERE IS SOMEWHERE TO GO, and the same word
+                    either way. The department had no page, so this was a
+                    heading; it has one now, and a customer who wants
+                    everything in Flowers should not have to pick a category
+                    first.
+
+                    Still a plain word for the leftover section, which has no
+                    department to open — and still nothing at all when the
+                    heading is blank, which is every shop with no departments.
+
+                    The hover is the one its own links use (`hover:text-bakery-700`),
+                    not a new one.
+                  */}
                   {section.heading.trim() ? (
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-                      {section.heading}
-                    </p>
+                    section.href ? (
+                      <Link
+                        href={section.href}
+                        className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-premium hover:text-bakery-700"
+                      >
+                        {section.heading}
+                      </Link>
+                    ) : (
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                        {section.heading}
+                      </p>
+                    )
                   ) : null}
                   <ul className="space-y-2">
                     {section.links.map((item) => (
@@ -794,13 +824,20 @@ export function MobileShopLinks({
   const categorySets = shopCategories?.length
     ? categorySections(shopCategories, shopDepartments).map((section) => ({
         id: section.id,
+        /*
+          THE DEPARTMENT'S OWN ADDRESS, so its sub-heading can open it. Empty
+          for the leftover section, which has no department — and a heading
+          with no address stays a word, which is what it was everywhere until
+          the page existed.
+        */
+        href: section.slug ? routes.store.department(section.slug) : "",
         heading: section.heading,
         links: section.categories.map((category) => ({
           label: category.name,
           href: routes.store.collection(category.slug),
         })),
       }))
-    : [{ id: "", heading: "", links: fallbackCategories }];
+    : [{ id: "", href: "", heading: "", links: fallbackCategories }];
   /**
    * The same occasions the desktop menu shows.
    *
@@ -903,10 +940,21 @@ export function MobileShopLinks({
           none of them has a department.
         */
         <div key={section.id || `unfiled-${index}`} className="space-y-1">
+          {/* The same link the desktop draws — see the note there. */}
           {section.heading.trim() ? (
-            <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-              {section.heading}
-            </p>
+            section.href ? (
+              <Link
+                href={section.href}
+                onClick={onNavigate}
+                className="block px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-premium hover:text-bakery-700"
+              >
+                {section.heading}
+              </Link>
+            ) : (
+              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                {section.heading}
+              </p>
+            )
           ) : null}
           {section.links.map((item) => (
             <Link

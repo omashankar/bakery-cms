@@ -199,8 +199,25 @@ test("and the shop's header cuts its category list by them", async ({ page }) =>
       const panel = document.querySelector("[data-mega-panel]");
       if (!panel) return null;
       return {
-        headings: [...panel.querySelectorAll("p")].map((node) => (node.textContent ?? "").trim()),
+        /*
+          `p` AND the heading-shaped `a`, because a department sub-heading is a
+          LINK to its own page now — it was a `<p>` until that page existed.
+          Reading only `p` is how this case went red when the link landed,
+          which is the right way round: a heading that stopped being drawn and
+          a heading that became a link look identical to a narrower selector.
+        */
+        headings: [...panel.querySelectorAll("p, a")]
+          .filter(
+            (node) => node.tagName === "P" || node.className.includes("uppercase tracking-wider"),
+          )
+          .map((node) => (node.textContent ?? "").trim()),
         links: [...panel.querySelectorAll("a")].map((node) => (node.textContent ?? "").trim()),
+        departmentHrefs: [...panel.querySelectorAll('a[href^="/store/departments/"]')].map(
+          (node) => ({
+            label: (node.textContent ?? "").trim(),
+            href: node.getAttribute("href"),
+          }),
+        ),
       };
     });
     expect(seen, "the header has no mega panel to read").not.toBeNull();
@@ -225,6 +242,21 @@ test("and the shop's header cuts its category list by them", async ({ page }) =>
       seen!.headings.indexOf("Probe Kind A"),
       "the sections came out in the order the rows were stored",
     ).toBeLessThan(seen!.headings.indexOf("Probe Kind B"));
+
+    /*
+      AND EACH HEADING OPENS ITS OWN DEPARTMENT. A customer who wants
+      everything in one kind of thing should not have to pick a category first,
+      and the pairing is asserted — not just that two links exist — because a
+      heading pointing at the OTHER department's page is the mistake a shared
+      index would make.
+    */
+    expect(
+      seen!.departmentHrefs,
+      "the headings do not open their own departments",
+    ).toEqual([
+      { label: "Probe Kind A", href: "/store/departments/probe-kind-a" },
+      { label: "Probe Kind B", href: "/store/departments/probe-kind-b" },
+    ]);
 
     /*
       AND NO BLANK HEADING. The categories these two do not claim become an
@@ -364,13 +396,18 @@ test("and the trail above a product names the department too", async ({ page }) 
     expect(trail!.words, `the trail is not four deep: ${joined}`).toHaveLength(4);
 
     /*
-      AND IT IS A WORD, NOT A LINK — while the category beside it is a link, so
-      this is a decision and not a trail that linked nothing.
+      AND IT LINKS TO THE DEPARTMENT'S OWN PAGE.
+
+      This asserted the opposite — that the department is a word and NOT a link
+      — with the reason written beside it: a crumb is a promise that a page
+      exists, and there was no `/store/departments/<slug>`. There is now, so
+      the promise is kept rather than avoided. The case failed on the change,
+      which is what it was for.
     */
     expect(
-      trail!.linked.map((entry) => entry.label),
-      `the department is a link, and it has no page: ${JSON.stringify(trail!.linked)}`,
-    ).not.toContain(probe.name);
+      trail!.linked.find((entry) => entry.label === probe.name)?.href,
+      `the department crumb does not open its page: ${JSON.stringify(trail!.linked)}`,
+    ).toBe(`/store/departments/${probe.slug}`);
     expect(
       trail!.linked.find((entry) => entry.label === category!.name)?.href,
       "the category crumb is not a link to its own page",
@@ -410,8 +447,8 @@ test("and the trail above a product names the department too", async ({ page }) 
     );
     expect(
       listing!.linked,
-      `the department is a link on the category page: ${listingTrail}`,
-    ).not.toContain(probe.name);
+      `the department does not link on the category page: ${listingTrail}`,
+    ).toContain(probe.name);
 
     /*
       AND A COLLECTION'S PAGE DOES NOT GAIN ONE.
@@ -442,6 +479,182 @@ test("and the trail above a product names the department too", async ({ page }) 
         group[0].name,
       ]);
     }
+  } finally {
+    const doc = await stores.findOne({});
+    const kept = ((doc?.departments ?? []) as { id: string }[]).filter(
+      (row) => row.id !== probe.id,
+    );
+    await stores.updateOne({ _id: doc!._id }, { $set: { departments: kept } });
+
+    const final = await stores.findOne({});
+    expect(
+      ((final?.departments ?? []) as { id: string }[]).length,
+      "the probe left its department behind",
+    ).toBe(departmentsBefore.length);
+  }
+});
+
+/**
+ * AND THE DEPARTMENT HAS A PAGE A CUSTOMER CAN OPEN.
+ *
+ * Three surfaces named a department and none of them led anywhere: the menu
+ * drew it as a heading, the trail above a product as a plain word, and both
+ * carried a comment saying a crumb is a promise that a page exists and this
+ * one did not. So the one axis that answers "what sort of shop is this" was
+ * the only one with no address.
+ *
+ * COMPARED AGAINST THE APP, NOT AGAINST MONGO. The first version of this read
+ * products with `isPublished: { $ne: false }` and demanded the grid match —
+ * wrong field, since `getStorefrontProductCards` filters
+ * `status === "published"`. It failed on a product the shop does not serve
+ * being absent from a page that was right. Reading the database for a set a
+ * page must match means re-implementing the app's own ideas of published, in
+ * stock and offered, and getting any one of them wrong fails correct code.
+ *
+ * So the probe department holds EXACTLY ONE category, and its page must equal
+ * that category's own page product for product. Both sides come from the same
+ * reader, the same filters and the same 24-per-page slice, so the only thing
+ * the comparison can be sensitive to is the thing under test.
+ *
+ * AND IT IS NOT THE WHOLE CATALOGUE, which is the way this could go wrong
+ * quietly: a department is two steps from a product, so a page that listed
+ * everything under the department's name would look perfectly reasonable.
+ */
+test("and a department has a page of its own", async ({ page }) => {
+  test.setTimeout(240_000);
+  const db = await connect();
+  const stores = db.collection("catalogs");
+
+  const before = await stores.findOne({});
+  const departmentsBefore = (before?.departments ?? []) as { id: string }[];
+  const categories = (before?.categories ?? []) as { id: string; name: string; slug: string }[];
+  expect(categories.length, "no categories to file").toBeGreaterThan(0);
+
+  /* The product slugs a page lists, deduped — a card can appear in more than
+     one rail. */
+  const listed = async (url: string) => {
+    await page.goto(url);
+    await page.waitForLoadState("networkidle");
+    return page.evaluate(() => [
+      ...new Set(
+        [...document.querySelectorAll('a[href^="/store/p/"]')].map((node) =>
+          (node.getAttribute("href") ?? "").replace("/store/p/", ""),
+        ),
+      ),
+    ]);
+  };
+
+  /* A category the shop actually lists products under, as the shop lists them. */
+  let held: { id: string; name: string; slug: string } | undefined;
+  let inCategory: string[] = [];
+  for (const row of categories) {
+    const found = await listed(`/store/collections/${row.slug}`);
+    if (found.length > 0) {
+      held = row;
+      inCategory = found;
+      break;
+    }
+  }
+  expect(held, "no category lists a single product").toBeTruthy();
+
+  const wholeShop = await listed("/store/collections");
+  expect(
+    wholeShop.length,
+    "the shop-all page lists no more than this one category, so nothing could be excluded",
+  ).toBeGreaterThan(inCategory.length);
+
+  const probe = {
+    id: "probe-dept-page",
+    name: "Probe Kind",
+    slug: "probe-kind",
+    sortOrder: 0,
+    isActive: true,
+    categoryIds: [held!.id],
+  };
+
+  try {
+    await stores.updateOne(
+      { _id: before!._id },
+      { $set: { departments: [...departmentsBefore, probe] } },
+    );
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const inDepartment = await listed(`/store/departments/${probe.slug}`);
+
+    const seen = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Breadcrumb"]');
+      return {
+        /* innerText, not textContent: the page's RSC payload is in the DOM. */
+        trail: nav
+          ? (nav as HTMLElement).innerText
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+          : null,
+        title: document.title,
+      };
+    });
+
+    /* THE PAGE IS THERE, headed and trailed in the shop's own word. */
+    expect(seen.trail, "the department page has no breadcrumb").toEqual(["Home", probe.name]);
+    expect(seen.title, "the tab is not named after the department").toContain(probe.name);
+
+    /* AND ITS GRID IS THE ONE CATEGORY IT HOLDS — exactly. */
+    expect([...inDepartment].sort(), `the department's grid is not its category's`).toEqual(
+      [...inCategory].sort(),
+    );
+    expect(
+      inDepartment.length,
+      "the department page lists the whole shop",
+    ).toBeLessThan(wholeShop.length);
+
+    /*
+      AND A DEPARTMENT WITH NOTHING FILED UNDER IT GETS NO PAGE.
+
+      `offeredAxes` drops a department whose `categoryIds` is empty, so this
+      address falls through to the plain listing exactly as an unknown slug
+      does. That is the right answer and not an oversight: a page headed
+      "Flowers" over the whole catalogue is a claim about the shop that is not
+      true, and the shop has not said what is in Flowers yet.
+    */
+    await stores.updateOne(
+      { _id: before!._id },
+      {
+        $set: {
+          departments: [...departmentsBefore, { ...probe, categoryIds: [] }],
+        },
+      },
+    );
+    await page.goto(`/store/departments/${probe.slug}`);
+    await page.waitForLoadState("networkidle");
+    const emptied = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Breadcrumb"]');
+      return nav ? (nav as HTMLElement).innerText.trim() : null;
+    });
+    expect(
+      emptied,
+      `an empty department was given a page of its own: ${emptied}`,
+    ).not.toContain(probe.name);
+
+    /* Put the filled one back for the crumb check below. */
+    await stores.updateOne(
+      { _id: before!._id },
+      { $set: { departments: [...departmentsBefore, probe] } },
+    );
+
+    /* AND THE PRODUCT'S OWN TRAIL LINKS BACK TO IT. */
+    await page.goto(`/store/p/${inCategory[0]}`);
+    await page.waitForLoadState("networkidle");
+    const crumb = await page.evaluate(() =>
+      [...document.querySelectorAll('nav[aria-label="Breadcrumb"] a')].map((node) => ({
+        label: (node.textContent ?? "").trim(),
+        href: node.getAttribute("href"),
+      })),
+    );
+    expect(
+      crumb.find((entry) => entry.label === probe.name)?.href,
+      `the product trail does not link the department: ${JSON.stringify(crumb)}`,
+    ).toBe(`/store/departments/${probe.slug}`);
   } finally {
     const doc = await stores.findOne({});
     const kept = ((doc?.departments ?? []) as { id: string }[]).filter(

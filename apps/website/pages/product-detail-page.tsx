@@ -154,10 +154,18 @@ interface ProductDetailPageProps {
   /**
    * The department that category sits under, when the shop has filed it.
    *
-   * No `href`: a department has no page of its own yet. A crumb is a promise
-   * that a page exists, so this one is a word and not a link until it is true.
+   * IT IS A LINK NOW. This read "No `href`: a department has no page of its
+   * own yet. A crumb is a promise that a page exists, so this one is a word
+   * and not a link until it is true." It is true: `/store/departments/<slug>`
+   * lists every product in the department's categories.
+   *
+   * `href` stays OPTIONAL rather than required, and not out of caution — the
+   * trail is drawn by StorePageHeader, which renders a crumb with no href as
+   * plain text, and that is still the right answer for a department whose
+   * slug the shared rule is not offering. A required href would make the
+   * caller invent one.
    */
-  departmentCrumb?: { label: string };
+  departmentCrumb?: { label: string; href?: string };
 }
 
 export function ProductDetailPage({

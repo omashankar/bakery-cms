@@ -47,6 +47,22 @@ export const routes = {
      */
     occasion: (slug: string) => `/store/occasions/${slug}`,
     /**
+     * A DEPARTMENT'S OWN PAGE.
+     *
+     * The kind of thing a shop sells — Cakes, Flowers, Gifts — holding the
+     * categories it filed under it. It had no address at all: the header drew
+     * it as a heading and the trail above a product as a plain word, both
+     * carrying a comment that a crumb is a promise a page exists and this one
+     * did not. It does now.
+     *
+     * A SIBLING of the occasion page, not a parent of the category one. A
+     * category keeps `/store/collections/<slug>` — where every pill, menu row
+     * and card links — because nesting it would move 29 products' addresses
+     * the day a shop re-files one, which is the reasoning the flat product
+     * address above already records.
+     */
+    department: (slug: string) => `/store/departments/${slug}`,
+    /**
      * A PRODUCT'S OWN ADDRESS — and it stopped saying "cakes".
      *
      * This shop is going to sell flowers, plants, gifts, chocolates, fashion,

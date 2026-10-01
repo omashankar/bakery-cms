@@ -10,6 +10,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   filterProductsByCategory,
   productsInCollection,
+  productsInDepartment,
   productsTaggedForOccasion,
 } from "@/features/products/lib/product-catalog";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -175,12 +176,37 @@ interface CollectionsPageProps {
   /**
    * The department this category sits under, when the shop has filed it.
    *
-   * No `href`: a department has no page of its own yet, and a crumb is a
-   * promise that a page exists. The trail above a product carries the same
-   * word on the same terms — see `departmentCrumb` there — and both get it
-   * from `departmentFor`, so the two cannot disagree about one category.
+   * A LINK, at `/store/departments/<slug>`. Both this and the trail above a
+   * product get the word AND the address from `departmentFor` plus
+   * `routes.store.department`, so one category cannot be filed under two
+   * different departments or point at two different pages.
    */
-  departmentCrumb?: { label: string };
+  departmentCrumb?: { label: string; href?: string };
+  /**
+   * THE DEPARTMENT this URL resolved to, when it resolved to one.
+   *
+   * A fourth source for the same listing engine, on the footing the occasion
+   * note above describes. What makes it different from the other three is
+   * that its membership is TWO steps away: a department holds categories and
+   * a category holds products, so the ids it carries are CATEGORY ids and the
+   * grid is `productsInDepartment` over them.
+   *
+   * It is not a parent of the category page. A category keeps its own
+   * address; this is a sibling door, the way `/store/occasions/<slug>` is.
+   */
+  department?: {
+    name: string;
+    slug: string;
+    /*
+      The shop's own phrase for this page, when it wrote one. On CatalogRow,
+      so a category, an occasion, a collection and a department all carry it
+      and the listing page cannot head two of the four.
+    */
+    headline?: string;
+    description?: string;
+    /* CATEGORY ids, not product ids — see the note above. */
+    categoryIds: string[];
+  };
 }
 
 export function CollectionsPage({
@@ -190,6 +216,7 @@ export function CollectionsPage({
   categories: categoriesFromShop,
   collection,
   occasion,
+  department,
   departmentCrumb,
 }: CollectionsPageProps) {
   const categorySlug = categorySlugProp ?? "";
@@ -232,8 +259,15 @@ export function CollectionsPage({
       this page is to show what the shop tagged for this occasion.
     */
     if (occasion) return productsTaggedForOccasion(catalog, occasion.slug);
+    /*
+      A DEPARTMENT IS TWO STEPS from a product: it holds categories and they
+      hold products. So this is the one source that cannot be a name match or
+      an id list of products — it is every product in any of its categories,
+      matched by category id, which both the stored row and the card carry.
+    */
+    if (department) return productsInDepartment(catalog, department.categoryIds);
     return filterProductsByCategory(catalog, categorySlug || undefined, categoryPills);
-  }, [catalog, categorySlug, categoryPills, collection, occasion]);
+  }, [catalog, categorySlug, categoryPills, collection, occasion, department]);
 
   const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
   /**
@@ -243,7 +277,7 @@ export function CollectionsPage({
    * used to key off `activeCategory` independently — four places to forget.
    * A collection comes first because the route resolves it first.
    */
-  const heading = collection ?? occasion ?? activeCategory;
+  const heading = collection ?? occasion ?? department ?? activeCategory;
   /**
    * The top of the price slider, from the shop's OWN catalogue.
    *

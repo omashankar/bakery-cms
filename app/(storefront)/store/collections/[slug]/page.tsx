@@ -8,6 +8,7 @@ import {
   getStorefrontOccasions,
 } from "@/apps/website/lib/storefront-categories.server";
 import { departmentFor, offeredAxes } from "@/features/catalog/lib/catalog-utils";
+import { routes } from "@/constants/routes";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 
 interface PageProps {
@@ -104,8 +105,8 @@ export default async function Page({ params }: PageProps) {
     answers for a slug no category claims. So the crumb is resolved for the
     category case and the page checks the same thing again before drawing it.
 
-    NO HREF, exactly as on the product page: a department has no page of its
-    own, and a crumb is a promise that one exists.
+    AND IT LINKS, exactly as on the product page: both read the word and the
+    address off the same rule, so one category cannot point at two pages.
   */
   const departmentOfCategory =
     !collection && category
@@ -115,7 +116,14 @@ export default async function Page({ params }: PageProps) {
   return (
     <CollectionsPage
       categorySlug={slug}
-      departmentCrumb={departmentOfCategory ? { label: departmentOfCategory.name } : undefined}
+      departmentCrumb={
+        departmentOfCategory
+          ? {
+              label: departmentOfCategory.name,
+              href: routes.store.department(departmentOfCategory.slug),
+            }
+          : undefined
+      }
       catalog={catalog}
       categories={categories}
       collection={

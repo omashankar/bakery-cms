@@ -118,10 +118,13 @@ describe("the category list, cut into the kinds of thing", () => {
     const sections = categorySections(ALL, [CAKES]);
     /*
       THE WHOLE OBJECT, not just its categories — which is what caught `id`
-      being added to the shape. The leftover section has no department, so its
-      id is empty and the renderers fall back to the index for a key.
+      and then `slug` being added to the shape.
+
+      The leftover section has no department: no id, so the renderers fall back
+      to the index for a key, and no slug, so its heading stays a word rather
+      than becoming a link to a page that is not about it.
     */
-    expect(sections.at(-1)).toEqual({ id: "", heading: "", categories: [rose, mug] });
+    expect(sections.at(-1)).toEqual({ id: "", slug: "", heading: "", categories: [rose, mug] });
   });
 
   it("files a category claimed twice ONCE, and where the shared rule says", () => {
@@ -202,6 +205,20 @@ describe("the category list, cut into the kinds of thing", () => {
       "a renderer keys its sections on something that can repeat",
     ).toHaveLength(2);
     expect(menu, "a renderer still keys on the heading").not.toMatch(/key=\{section\.heading/);
+  });
+
+  it("hands out each department's own address", () => {
+    /*
+      THE MENU LINKS ITS SUB-HEADINGS NOW, so the section has to carry the slug
+      the department is addressable at — and it must be the department's own,
+      not the first one's or the category's.
+    */
+    const sections = categorySections(ALL, [FLOWERS, CAKES]);
+    expect(sections.map((section) => section.slug)).toEqual(["cakes", "flowers", ""]);
+    expect(
+      sections.map((section) => section.id),
+      "the id and the slug came from different rows",
+    ).toEqual(["d-cake", "d-flo", ""]);
   });
 
   it("and a switched-off department files nothing", () => {
@@ -404,9 +421,19 @@ describe("what a customer actually sees", () => {
   };
   const PROPS = { categories: ALL, words: WORDS, label: "Shop" };
 
-  /* Every heading the panel draws, in the order it draws them. */
+  /*
+    EVERY HEADING THE PANEL DRAWS, in the order it draws them.
+
+    `p` AND `a`, because a department sub-heading is a LINK to its own page —
+    it was a `<p>` until that page existed. Reading only `p` is how both mount
+    cases went red when the link landed, which is the right way round: a
+    heading that stopped being drawn and a heading that became a link look the
+    same to a narrower selector.
+  */
   const drawnHeadings = (el: HTMLElement) =>
-    [...el.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "");
+    [...el.querySelectorAll("p, a")]
+      .filter((node) => node.tagName === "P" || node.className.includes("uppercase"))
+      .map((node) => node.textContent?.trim() ?? "");
 
   for (const which of ["MegaMenu", "MobileShopLinks"] as const) {
     it(`${which} draws the sub-headings, each category once`, async () => {
@@ -418,6 +445,18 @@ describe("what a customer actually sees", () => {
       expect(shown).toContain("Flowers");
       /* Under the column's own heading, not instead of it. */
       expect(shown.indexOf("Shop by Category")).toBeLessThan(shown.indexOf("Cakes"));
+
+      /*
+        AND THE DEPARTMENT HEADING OPENS THE DEPARTMENT. A customer who wants
+        everything in Flowers should not have to pick a category first — and
+        this is the assertion that would have caught the heading being drawn as
+        a plain word after the page existed, which is what it was for an hour.
+      */
+      for (const dept of [CAKES, FLOWERS]) {
+        const link = el.querySelector(`a[href="/store/departments/${dept.slug}"]`);
+        expect(link, `the ${dept.name} heading does not open its own page`).not.toBeNull();
+        expect(link!.textContent?.trim()).toBe(dept.name);
+      }
 
       for (const category of ALL) {
         const links = el.querySelectorAll(`a[href="/store/collections/${category.slug}"]`);
@@ -436,6 +475,15 @@ describe("what a customer actually sees", () => {
       const el = await mount(mod[which], PROPS);
 
       expect(drawnHeadings(el).filter((text) => text === "")).toHaveLength(0);
+      /*
+        AND NOTHING POINTS AT A DEPARTMENT PAGE. With no departments there is
+        no section heading, so there is nothing to link — a stray link here
+        would be a promise about a page this shop does not have.
+      */
+      expect(
+        el.querySelector('a[href^="/store/departments/"]'),
+        "a shop with no departments drew a link to one",
+      ).toBeNull();
       for (const category of ALL) {
         expect(
           el.querySelectorAll(`a[href="/store/collections/${category.slug}"]`).length,

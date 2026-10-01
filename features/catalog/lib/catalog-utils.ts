@@ -411,7 +411,7 @@ export function categorySections<
 >(
   categories: readonly C[],
   departments: readonly D[] | undefined,
-): { id: string; heading: string; categories: C[] }[] {
+): { id: string; slug: string; heading: string; categories: C[] }[] {
   const rows = offeredRows(departments ?? []);
 
   /*
@@ -446,9 +446,24 @@ export function categorySections<
     both. The leftover section has no department, so its id is empty and the
     renderers fall back to its index.
   */
+  /*
+    THE SLUG TRAVELS TOO, so the menu can link a sub-heading at the
+    department's own page. `offeredRows` has already dropped any row without
+    one — a row with no slug is not addressable and never reaches here — so
+    the `?? ""` is for the type, not for a case.
+
+    The leftover section has no department, so it has neither id nor slug and
+    its heading stays a word. That is not a gap: there is nothing for it to be
+    a link to.
+  */
   const sections = rows
-    .map((row) => ({ id: row.id, heading: row.name, categories: filed.get(row.id) ?? [] }))
+    .map((row) => ({
+      id: row.id,
+      slug: row.slug ?? "",
+      heading: row.name,
+      categories: filed.get(row.id) ?? [],
+    }))
     .filter((section) => section.categories.length > 0);
-  if (loose.length > 0) sections.push({ id: "", heading: "", categories: loose });
+  if (loose.length > 0) sections.push({ id: "", slug: "", heading: "", categories: loose });
   return sections;
 }

@@ -148,6 +148,41 @@ export function productsInCollection(
 }
 
 /**
+ * EVERYTHING IN ONE DEPARTMENT — every product in any of its categories.
+ *
+ * A department holds CATEGORIES, not products, so this is the one axis whose
+ * membership is two steps away: the shop files Roses and Bouquets under
+ * Flowers, and a product is in Flowers because it is in one of those.
+ *
+ * MATCHED BY ID, where the other three match by slugified name. That is not
+ * an inconsistency to tidy up later — it is the only thing available and the
+ * only thing correct. A department's stored row holds `categoryIds`, and a
+ * card carries `categoryIds` too, so the two compare directly. The others
+ * match by name because a card carries occasion and category NAMES while the
+ * route carries a slug, and this shop's "Birthday Cakes" lives at `/birthday`
+ * — neither comparison works without the taxonomy list in hand.
+ *
+ * EVERY category a product is filed under, not just its primary. Three of
+ * this shop's 29 products are in two categories each; one filed under Roses
+ * and under Hampers belongs on both departments' pages, and reading
+ * `categoryIds[0]` would drop it from whichever the shop did not put first.
+ *
+ * The catalogue's own order survives — this filters, it does not rank. A
+ * department is not a curated list, so there is no owner's order to preserve
+ * the way `productsInCollection` has.
+ */
+export function productsInDepartment(
+  catalog: readonly LandingProduct[],
+  categoryIds: readonly string[],
+): LandingProduct[] {
+  /* No categories filed is an empty department, and an empty grid is honest. */
+  if (categoryIds.length === 0) return [];
+  const wanted = new Set(categoryIds);
+  return catalog.filter((product) =>
+    (product.categoryIds ?? []).some((id) => wanted.has(id)),
+  );
+}
+/**
  * The products a shop TAGGED for one occasion, and nothing else.
  *
  * This is the whole of what an occasion means, and it used to be folded into

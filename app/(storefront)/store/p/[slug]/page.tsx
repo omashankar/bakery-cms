@@ -218,15 +218,22 @@ export default async function Page(props: PageProps) {
         row ? { label: row.name, href: routes.store.collection(row.slug) } : undefined
       }
       /*
-        NO HREF. A department has no page of its own yet, and a crumb that
-        links nowhere is worse than one that does not link — so it reads as
-        where you are and waits for the page to exist.
+        AND IT LINKS NOW. This carried a note that a department has no page of
+        its own and a crumb that links nowhere is worse than one that does not
+        link — so it read as where you are and waited. `routes.store.department`
+        is that page.
+
+        Still through the OFFERED list: a department the shared rule is not
+        showing has no page to open either, and the crumb is then absent
+        rather than a link to an empty grid.
       */
       departmentCrumb={
         row
           ? (() => {
               const dept = departmentFor(offered.departments, row.id);
-              return dept ? { label: dept.name } : undefined;
+              return dept
+                ? { label: dept.name, href: routes.store.department(dept.slug) }
+                : undefined;
             })()
           : undefined
       }
