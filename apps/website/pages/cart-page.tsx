@@ -338,7 +338,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
             // The cart lives in this browser, so the server has nothing to
             // render. Mirror the real layout rather than showing one grey slab,
             // so the page does not visibly jump when the data arrives.
-            <div className="grid gap-8 lg:grid-cols-[1fr_320px]" aria-hidden>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-hidden>
               <div className="space-y-4">
                 {[0, 1].map((row) => (
                   <div
@@ -397,7 +397,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
               */}
               <CheckoutProgress currentStep={0} className="mx-auto max-w-2xl" />
 
-              <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
                 <div className="space-y-4">
                   {items.map((item) => (

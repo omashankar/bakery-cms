@@ -42,6 +42,39 @@ async function aProduct(page: import("@playwright/test").Page) {
   return href;
 }
 
+/**
+ * PUT SOMETHING IN THE CART FIRST.
+ *
+ * This sweep has always visited /store/cart, and has always visited it
+ * EMPTY — so the one page in the shop whose contents come from the browser
+ * was the one page measured with nothing in it. An empty cart has no item
+ * rows, no price panel and no full-width button, which is to say none of
+ * the things that can be too wide. It missed the cart scrolling sideways by
+ * 89px at 390 and 119px at 360.
+ *
+ * The cart lives in this browser context, so one add covers every width and
+ * every page that follows.
+ */
+async function putSomethingInTheCart(page: import("@playwright/test").Page, product: string) {
+  await page.goto(product);
+  await page.waitForTimeout(1800);
+  await page.getByRole("button", { name: /add to cart/i }).first().click();
+  await page.waitForTimeout(1200);
+  /*
+    PROVED BY OPENING THE CART, not by a badge in the header.
+    The first version waited for a link named /cart/i, and the header has no
+    such thing — the control there is a button labelled "Shopping cart" — so
+    the helper timed out and took the whole sweep red with it. The cart page
+    saying it is empty is the one signal that cannot be misread.
+  */
+  await page.goto("/store/cart");
+  await page.waitForTimeout(1800);
+  await expect(
+    page.getByText(/your cart is empty/i),
+    "nothing was added — the sweep would measure an empty cart again",
+  ).toHaveCount(0);
+}
+
 test("every page starts right under its trail, not a screen below it", async ({ page }) => {
   test.setTimeout(420_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -59,12 +92,18 @@ test("every page starts right under its trail, not a screen below it", async ({ 
     the address changed, and that is the news.
   */
   expect(product, "no product link on the shop-all page — the selector is dead").toBeTruthy();
+  await putSomethingInTheCart(page, product!);
   const all: [string, string][] = [...PAGES, ["a product", product!]];
 
   const tooFar: string[] = [];
   const sideways: string[] = [];
 
-  for (const width of [390, 768, 1440]) {
+  /*
+    360 AS WELL. It is the narrowest width in common use among this shop's
+    customers, and the cart overflowed by 119px there against 89px at 390 —
+    a page that merely fits at 390 does not necessarily fit at 360.
+  */
+  for (const width of [360, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
 
     for (const [name, path] of all) {
@@ -78,7 +117,14 @@ test("every page starts right under its trail, not a screen below it", async ({ 
         return {
           hasTrail: Boolean(crumb),
           pad: section ? Math.round(parseFloat(getComputedStyle(section).paddingTop)) : null,
-          overflow: document.documentElement.scrollWidth - window.innerWidth,
+          /*
+            clientWidth, NEVER window.innerWidth. The second counts the
+            scrollbar, so it reports every overflow about 15px smaller than
+            it is and anything narrower than that as none at all. The same
+            note is on a-menu-opens-inside-the-window.spec.ts, and this line
+            was doing the thing it warns about.
+          */
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         };
       });
 
