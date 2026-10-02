@@ -46,67 +46,18 @@ describe("every band a shop can add can actually be drawn", () => {
   });
 });
 
-describe("the block of prose at the foot of the page", () => {
-  const entry = HOMEPAGE_SECTION_REGISTRY.find((s) => s.type === "seo-prose");
+/*
+  THE PROSE BAND’S BLOCK STOOD HERE and went with the section.
 
-  it("exists, because every storefront of this kind carries one", () => {
-    expect(entry, "the prose band is gone from the registry").toBeTruthy();
-  });
+  `seo-prose` was one of nine the shop asked to have deleted outright, not
+  just hidden from the picker. Its cases pinned real things — that it ships
+  empty, that it draws nothing when nothing is written, that it folds — and
+  all three were about a component that no longer exists.
 
-  it("ships with nothing written in it", () => {
-    /*
-      `blocks: "[]"`, not a paragraph about cakes. The shop writes this or it
-      does not appear — there is no third answer that is honest.
-    */
-    expect(entry!.defaultContent.blocks).toBe("[]");
-    expect(entry!.defaultContent.title).toBe("");
-    expect(entry!.defaultContent.overline).toBe("");
-  });
-
-  it("gives the shop a heading and a body for each paragraph", () => {
-    const field = entry!.fields.find((f) => f.key === "blocks");
-    expect(field?.type).toBe("list");
-    expect(field?.itemFields?.map((f) => f.key).sort()).toEqual(["body", "heading"]);
-  });
-
-  it("draws nothing at all when nothing is written", () => {
-    // Not an empty band with a heading over it: nothing.
-    const renderer = codeOf(read(RENDERER));
-    const body = renderer.slice(
-      renderer.indexOf("function SeoProseSection("),
-      renderer.indexOf("function BlogCardsSection("),
-    );
-
-    expect(body, "SeoProseSection is gone").not.toBe("");
-    expect(body).toContain("if (blocks.length === 0) return null;");
-  });
-
-  it("folds the rest away, and shows no control when there is nothing to fold", () => {
-    /**
-     * Left open this is most of the page's height for the part of it read
-     * least. One paragraph stands and the rest is behind a control — and with
-     * a single paragraph there is no control, because one that reveals
-     * nothing is worse than none.
-     */
-    const renderer = codeOf(read(RENDERER));
-    const body = renderer.slice(
-      renderer.indexOf("function SeoProseSection("),
-      renderer.indexOf("function BlogCardsSection("),
-    );
-
-    expect(body).toContain("blocks.slice(0, 1)");
-    expect(body).toContain("blocks.length > 1 ?");
-    expect(body, "the toggle does not say whether it is open").toContain("aria-expanded={open}");
-    /*
-      The shell makes the whole band a select target in the builder, so
-      without this an admin pressing the toggle selects the section and never
-      sees the text open.
-    */
-    expect(body, "the toggle lets the builder's select swallow the press").toContain(
-      "event.stopPropagation();",
-    );
-  });
-});
+  The two blocks left are deliberately kept: the renderer-coverage check
+  above is worth MORE after a deletion like this, because it is what catches
+  a registry entry whose renderer went; and the articles row below survives.
+*/
 
 describe("the row of the shop's own articles", () => {
   const entry = HOMEPAGE_SECTION_REGISTRY.find((s) => s.type === "blog-cards");

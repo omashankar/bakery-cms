@@ -31,7 +31,13 @@ const code = (path: string) =>
 const RENDERERS = [
   {
     file: "features/cms-sections/homepage-section-renderer.tsx",
-    sections: ["TestimonialsSection", "WhyUsSection", "GallerySection", "OffersSection"],
+    /*
+      `GallerySection` stood third here and was deleted with eight others.
+      `TileGridSection` takes its place: it is the surviving band that draws
+      a grid of the shop’s own pictures, and the property is the same — an
+      empty list draws nothing, not a heading over a gap.
+    */
+    sections: ["TestimonialsSection", "WhyUsSection", "TileGridSection", "OffersSection"],
   },
 
 ];

@@ -52,31 +52,40 @@ describe("every surface that shows photographs", () => {
     }
   });
 
-  it("renders nothing rather than someone else's work", () => {
+  it("renders nothing rather than a heading over an empty grid", () => {
     /**
-     * Pinned to each SECTION's own body.
+     * PINNED TO EACH SECTION'S OWN BODY, which is the whole point.
      *
      * Counting the guards file-wide was already satisfied by two that predate
-     * this work (Menu Strip and Why Choose Us), so both gallery guards could be
+     * this work (Menu Strip and Why Choose Us), so a band's guard could be
      * deleted — restoring a heading over an empty grid — with this test, named
      * for exactly that, still green.
+     *
+     * THE TWO IT WAS WRITTEN FOR ARE GONE. `GallerySection` and
+     * `InstagramSection` were deleted with seven others. The property is not
+     * about them: it is about any band that holds the shop's photographs, and
+     * these seven do — every entry in the registry with an image column.
+     *
+     * Two spellings, because the strip counts first: `banners.length === 0`
+     * and `count === 0` are the same guard.
      */
     const homepage = stripComments(read(SURFACES[0]));
 
-
-    const sections = [
-      { body: bodyOf(homepage, "GallerySection"), key: "images", where: "the homepage gallery" },
-      { body: bodyOf(homepage, "InstagramSection"), key: "posts", where: "the Instagram strip" },
-
+    const HOLDS_PHOTOS = [
+      "OurMenuSection",
+      "TileGridSection",
+      "BlogCardsSection",
+      "BannerGridSection",
+      "CategoryPriceCardsSection",
+      "BannerStripSection",
+      "WhyUsSection",
     ];
 
-    for (const { body, key, where } of sections) {
-      expect(body, `${where} no longer reads the shop's own "${key}"`).toContain(
-        `photoRows(c, "${key}")`,
-      );
-      expect(body, `${where} renders a heading over an empty grid`).toMatch(
-        /if \(\w+\.length === 0\) return null;/,
-      );
+    for (const component of HOLDS_PHOTOS) {
+      expect(
+        bodyOf(homepage, component),
+        `${component} draws a heading over an empty list`,
+      ).toMatch(/if \(\w+(?:\.length)? === 0\) return null;/);
     }
   });
 
@@ -110,15 +119,28 @@ describe("the builder", () => {
         .map((field) => ({ section: entry.type, field })),
     );
 
-  it("offers a photo picker on every gallery section", () => {
-    const all = listFieldsOf(HOMEPAGE_SECTION_REGISTRY);
+  it("offers a photo picker on every section that holds photographs", () => {
+    /*
+      `wedding-gallery` stood here until the wedding builder was removed, then
+      `gallery` and `instagram` until those two were deleted. Naming sections
+      that keep disappearing is how this case kept needing repair — so it asks
+      the REGISTRY which bands hold photographs and checks each of those.
 
-    // `wedding-gallery` stood here until the wedding builder was removed.
-    for (const section of ["gallery", "instagram"]) {
-      const match = all.find((entry) => entry.section === section);
-      expect(match, `${section} has no list field to upload photos into`).toBeTruthy();
+      A FLOOR, because "every section in an empty list" is true of nothing.
+    */
+    const all = listFieldsOf(HOMEPAGE_SECTION_REGISTRY);
+    const holdPhotos = all.filter((entry) =>
+      entry.field.itemFields?.some((column) => column.isImage),
+    );
+
+    expect(
+      holdPhotos.length,
+      "no section in the registry holds photographs at all",
+    ).toBeGreaterThan(3);
+
+    for (const { section, field } of holdPhotos) {
       expect(
-        match!.field.itemFields?.some((column) => column.isImage),
+        field.itemFields?.some((column) => column.isImage),
         `${section}'s list has no image column`,
       ).toBe(true);
     }

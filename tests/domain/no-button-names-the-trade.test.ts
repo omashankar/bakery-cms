@@ -71,19 +71,39 @@ function everyField(fields: SectionFieldDef[]): SectionFieldDef[] {
   return fields.flatMap((field) => [field, ...everyField(field.itemFields ?? [])]);
 }
 describe("no button on the homepage names the trade", () => {
-  it("reads the fallbacks it claims to read", () => {
-    // The scan above is string surgery. If it silently found nothing, every
-    // case below would pass on an empty list — which is the failure mode this
-    // whole file exists to prevent.
+  it("has no hardcoded button wording left to get wrong", () => {
+    /*
+      THIS CASE USED TO DEMAND THE OPPOSITE, and the change is the news.
+
+      The scan looks for `contentString(c, "ctaLabel", "…")` — a button label
+      read with a literal behind it — and existed because finding NOTHING
+      would make the case below pass on an empty list. It was a floor under
+      string surgery.
+
+      Every section that carried one is now deleted: the call to action, the
+      store locator, the newsletter and the promo banner. The survivors read
+      `contentString(c, "ctaLabel")` with nothing behind it, so a button a
+      shop has not named draws no button rather than one this CMS wrote.
+
+      So zero is the answer, and asserting it keeps the scan honest in the
+      other direction: if a literal comes back, this fails and the case below
+      starts meaning something again.
+    */
     const found = hardcodedFallbacks();
 
-    expect(found.length, "the ctaLabel fallback scan found nothing").toBeGreaterThan(0);
-    for (const { label } of found) {
-      expect(label.trim(), "a fallback came back empty").not.toBe("");
-    }
+    expect(
+      found.map((entry) => entry.label),
+      "a section hardcodes a button label again — the case below now applies",
+    ).toEqual([]);
   });
 
   it("not in the wording the page falls back to", () => {
+    /*
+      EMPTY TODAY, and kept for that reason. There is no hardcoded button
+      wording left — the case above pins that — so this loop runs over nothing
+      and proves nothing right now. It is the ratchet that fires the moment a
+      literal comes back carrying a trade word.
+    */
     for (const { label } of hardcodedFallbacks()) {
       expect(tradesIn(label), `the fallback ${JSON.stringify(label)} names a trade`).toEqual([]);
     }

@@ -67,7 +67,7 @@ describe("a section heading with nothing in it", () => {
     }
   });
 
-  it("which is what four shipped section types were relying on", () => {
+  it("which is what three shipped section types were relying on", () => {
     /**
      * Named rather than counted: the point is that these are deliberate blanks,
      * chosen because a default title would be a claim about a band whose
@@ -79,7 +79,8 @@ describe("a section heading with nothing in it", () => {
     ).map((entry) => entry.type);
 
     expect(blank).toEqual(
-      expect.arrayContaining(["tabbed-rail", "promo-collage", "tile-grid", "category-rail"]),
+      /* `promo-collage` was a fourth and was deleted with the eight beside it. */
+      expect.arrayContaining(["tabbed-rail", "tile-grid", "category-rail"]),
     );
   });
 });

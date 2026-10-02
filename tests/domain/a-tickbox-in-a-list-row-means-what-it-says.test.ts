@@ -68,13 +68,23 @@ describe("reading a tickbox back out of a list row", () => {
 });
 
 describe("the two ends of that tickbox", () => {
-  it("the promo band reads its flag through rowFlag, not through the string", () => {
+  it("the band with a wide row reads its flag through rowFlag, not the string", () => {
+    /*
+      THE PROMO COLLAGE WAS THIS CASE'S SUBJECT and was deleted with eight
+      others. The property is not about that band: a stored tickbox
+      round-trips as the STRING "false", which is truthy, so any row that
+      reads one directly is the bug. The banner grid has the surviving wide
+      row, and the pattern below still names the old spelling so the bug
+      cannot come back under its old name either.
+    */
     const renderer = codeOf(read(RENDERER));
 
-    expect(renderer, "the wide card reads a string as a flag again").not.toMatch(
-      /[^w]card\.wide \?/,
+    expect(renderer, "a wide row reads a string as a flag again").not.toMatch(
+      /[^w](?:card|banner)\.wide \?/,
     );
-    expect(renderer).toContain('rowFlag(card.wide) ? "sm:col-span-2" : ""');
+    expect(renderer, "the wide row no longer goes through rowFlag").toContain(
+      "rowFlag(banner.wide)",
+    );
   });
 
   it("the builder draws a boolean column as a control, not a text box", () => {

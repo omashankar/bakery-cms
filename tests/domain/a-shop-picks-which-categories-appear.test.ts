@@ -36,7 +36,17 @@ const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 const codeOf = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
-const PICKERS = ["categories", "our-menu"];
+/*
+  ONE BAND NOW, AND THAT IS THE FIX RATHER THAN A LOSS.
+
+  This was `["categories", "our-menu"]` — the two bands whose overlap is the
+  complaint this file was written for. `categories` was deleted outright, so
+  the same categories cannot be drawn twice any more.
+
+  Kept as a list rather than collapsed to a constant: a second band that draws
+  categories is exactly the thing that should arrive here with the others.
+*/
+const PICKERS = ["our-menu"];
 
 function bodyOf(name: string): string {
   const src = codeOf(read(RENDERER));
@@ -47,7 +57,7 @@ function bodyOf(name: string): string {
 }
 
 describe("a shop picks which categories appear", () => {
-  it("is offered on BOTH bands that draw categories, not just the one reported", () => {
+  it("is offered on every band that draws categories", () => {
     for (const type of PICKERS) {
       const entry = HOMEPAGE_SECTION_REGISTRY.find((s) => s.type === type);
       expect(entry, `${type} is gone from the registry`).toBeTruthy();
@@ -83,13 +93,14 @@ describe("a shop picks which categories appear", () => {
     }
   });
 
-  it("and both bands resolve their picks the same way", () => {
+  it("and every band resolves its picks through the shared rule", () => {
     /*
-      THE COMPLAINT THAT STARTED THIS was the same categories drawn twice.
-      Fixing one band and leaving the other is the half-done shape of that
-      complaint, and it reads as finished.
+      THE COMPLAINT THAT STARTED THIS was the same categories drawn twice, and
+      fixing one band while leaving the other is the half-done shape of it.
+      `CategoriesSection` stood beside this one until it was deleted; the loop
+      stays a loop so the next band to draw categories lands in it.
     */
-    for (const name of ["CategoriesSection", "OurMenuSection"]) {
+    for (const name of ["OurMenuSection"]) {
       const body = bodyOf(name);
       expect(body, `${name} does not read its own list`).toContain(
         'parseListField(c, "picks")',
@@ -151,14 +162,12 @@ describe("a shop picks which categories appear", () => {
     );
   });
 
-  it("and the tile counts in the shop's own word", () => {
-    // It said "cakes" for every shop running this CMS. This one has set
-    // "products" in its settings and the tile was ignoring it.
-    const body = bodyOf("CategoriesSection");
+  /*
+    A CASE FOR THE TILE'S COUNT STOOD HERE and went with the tile.
 
-    expect(body.includes("} cakes"), "the tile names the trade again").toBe(false);
-    expect(body, "the tile does not use the shop's word").toContain(
-      "labels.productWordPlural.toLowerCase()",
-    );
-  });
+    `CategoriesSection` drew "N cakes" under each category — the trade named
+    for every shop running this CMS — and the case pinned it to the shop's own
+    word instead. The surviving band draws no count at all, so there is nothing
+    left for it to name wrongly. The wording ratchet covers the file either way.
+  */
 });

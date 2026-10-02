@@ -29,9 +29,6 @@ export type SectionBackground =
 export type HomepageSectionType =
   | "hero"
   | "our-menu"
-  | "promo-banner"
-  | "categories"
-  | "store-locator"
   | "featured-cakes"
   | "trending"
   | "best-sellers"
@@ -60,7 +57,6 @@ export type HomepageSectionType =
    * shape more than once on the same page.
    */
   | "tabbed-rail"
-  | "promo-collage"
   /**
    * A grid of labelled, linked picture tiles.
    *
@@ -99,20 +95,9 @@ export type HomepageSectionType =
   | "seasonal"
   | "why-us"
   | "testimonials"
-  | "gallery"
-  | "instagram"
   | "faq"
-  | "newsletter"
-  /**
-   * The block of prose at the foot of a shop's homepage.
-   *
-   * Every storefront of this kind carries one, and it is the shop's own
-   * writing about what it sells — not a band this CMS can fill in.
-   */
-  | "seo-prose"
   /** A row of the shop's own articles, linked out. */
-  | "blog-cards"
-  | "cta";
+  | "blog-cards";
 
 /**
  * Which half of the picture the words sit in.

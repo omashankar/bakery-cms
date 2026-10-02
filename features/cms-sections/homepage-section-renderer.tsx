@@ -4,26 +4,19 @@ import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { SafeImage } from "@/components/shared/safe-image";
 import {
-  ArrowRight,
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
-  Camera,
   Clock,
   Heart,
-  Mail,
-  MapPin,
-  Phone,
   Quote,
-  Send,
-  Store,
   Tag,
   Truck,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader, sectionHeaderDraws } from "@/components/shared/section-header";
 import { RatingStars } from "@/components/shared/rating-stars";
-import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
+import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import {
   Accordion,
   AccordionContent,
@@ -32,24 +25,20 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type {
   LandingCategory,
   LandingOffer,
   LandingProduct,
 } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { selectActiveHeroBanners } from "@/features/content/lib/banners-utils";
 import {
   countdownCells,
   countdownParts,
 } from "@/features/orders/lib/delivery-date";
 import type { Banner } from "@/types/media";
 import {
-  limitRows,
   parseHeroSlides,
   parseListField,
-  photoRows,
   BANNER_STRIP_MAX,
   renderableRows,
   rowFlag,
@@ -79,9 +68,6 @@ import type { HomepageSectionInstance, SectionBackground, SectionAlign
 import type { FaqItem, Testimonial } from "@/types/content";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isSafeSocialUrl } from "@/features/settings/lib/settings-utils";
-import { toast } from "sonner";
-import { addNewsletterSubscriber } from "@/features/inquiries/lib/newsletter-repository";
 import { formatCurrency } from "@/utils/format";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
@@ -237,18 +223,6 @@ function contentNumber(
 ): number {
   const value = content[key];
   return typeof value === "number" ? value : Number(value) || fallback;
-}
-
-function contentBoolean(
-  content: HomepageSectionInstance["content"],
-  key: string,
-  fallback = false
-): boolean {
-  const value = content[key];
-  if (typeof value === "boolean") return value;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return fallback;
 }
 
 function SectionShell({
@@ -805,195 +779,6 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
           </Link>
         ))}
       </div>
-    </SectionShell>
-  );
-}
-
-/**
- * Where to find the shop.
- *
- * This section used to be entirely fictional. A pincode box waited 600ms and
- * toasted "Stores found — showing outlets near <whatever they typed>" having
- * searched nothing, beside three hardcoded Mumbai outlets at fixed distances of
- * 1.2 / 3.5 / 6.8 km. A customer in Delhi was told three shops in Mumbai were
- * around the corner. The NewsletterSection further down this same file was fixed
- * for exactly this — a form that said "Subscribed!" and wrote nothing — and the
- * fix stopped at that form.
- *
- * There is no outlet list in this CMS to search: Settings → Contact holds one
- * address, one phone and one set of opening hours. So this shows those, and the
- * search that never happened is gone.
- */
-function StoreLocatorSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const location = props.storeLocation ?? null;
-
-  // The heading, description and button label are the admin's own words, shown
-  // as typed. An earlier attempt here swapped the shipped copy at render time,
-  // which meant an admin who deliberately typed "Find a Store Near You" saw
-  // something else on the storefront — and saw it differ from their own editor
-  // field two inches away in the builder preview. The seeded wording is fixed
-  // where it belongs, in the registry defaults, so new sections and resets get
-  // honest copy and existing content stays the admin's.
-  const title = contentString(c, "title");
-  const buttonLabel = contentString(c, "buttonLabel", "Get Directions");
-
-  // Nothing to show means nothing to show. Rendering the heading alone left a
-  // shop advertising "Find a Store Near You" above an empty panel — the seeded
-  // copy is still in most stored layouts, so on a shop that has not filled in
-  // its address that heading is the last thing that should survive. The builder
-  // says why instead, so the admin is not left guessing.
-  if (!location) {
-    if (!props.interactive) return null;
-    return (
-      <SectionShell {...props}>
-        <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground sm:p-8">
-          This section shows your shop&apos;s address and opening hours from
-          Settings → Contact. Until you set a real address there it stays hidden
-          on the live homepage — the shipped example address is in Mumbai.
-        </div>
-      </SectionShell>
-    );
-  }
-
-  return (
-    <SectionShell {...props}>
-      <div className="grid gap-8 rounded-2xl border border-border bg-card p-6 sm:p-8 lg:grid-cols-2 lg:items-center lg:gap-12">
-        <div className="space-y-5">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
-            <MapPin className="size-5" />
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
-              {contentString(c, "overline")}
-            </p>
-            <h2 className="font-heading text-xl font-bold sm:text-2xl">{title}</h2>
-          </div>
-          <Button
-            variant="bakery"
-            className="h-11"
-            render={<a href={location.mapUrl} target="_blank" rel="noopener noreferrer" />}
-          >
-            <MapPin className="size-4" />
-            {buttonLabel}
-          </Button>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-start gap-3 rounded-xl border border-border bg-cream-100 p-4">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-card text-bakery-700">
-              <Store className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-medium text-foreground">{location.address}</p>
-              {location.phone ? (
-                <a
-                  href={`tel:${location.phone.replace(/\s+/g, "")}`}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                >
-                  <Phone className="size-3" />
-                  {location.phone}
-                </a>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Only the shop's own hours. The three shipped rows are dropped as a
-              set upstream — printing seeded opening times is a claim about when
-              a stranger can turn up at the door. */}
-          {location.hours.length > 0 ? (
-            <div className="rounded-xl border border-border bg-cream-100 p-4">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Clock className="size-3.5 text-bakery-700" />
-                Opening hours
-              </p>
-              <dl className="space-y-1">
-                {location.hours.map((entry) => (
-                  <div key={entry.day} className="flex justify-between gap-3 text-xs">
-                    <dt className="text-muted-foreground">{entry.day}</dt>
-                    <dd className="font-medium text-foreground">{entry.hours}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </SectionShell>
-  );
-}
-
-function CategoriesSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const labels = useBusinessLabels();
-  const hasHeading = sectionHeaderDraws(
-    contentString(c, "overline"),
-    contentString(c, "title"),
-  );
-  const align = sectionAlignOf(c, "center");
-  const maxCount = contentNumber(c, "maxCount", 6);
-  const picks = renderableRows(parseListField(c, "picks"));
-  const items = categoriesForBand(picks, props, maxCount);
-
-  return (
-    <SectionShell {...props} noReveal>
-      <ScrollReveal>
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          align={align}
-        />
-      </ScrollReveal>
-      {/*
-        SIX ACROSS, not three.
-
-        At three columns in a 1440px column each tile was 464px wide, so a
-        4:3 picture of a category was 348px tall — larger than the product
-        photographs further down the page, for a link whose whole content is
-        a name and a count. Six categories then took two rows and 1,018px.
-
-        The storefront this is drawn from draws the same thing at about
-        200px: a row of small pictures you scan, not six posters.
-      */}
-      <StaggerReveal className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6")}>
-        {items.map((category) => (
-          <Link
-            key={category.id}
-            href={routes.store.collection(category.slug)}
-            // Same resting lift as the product cards below; a row of tiles
-            // and a row of cards on one page should not be drawn two ways.
-            className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm"
-          >
-            <div className="relative aspect-[4/3] bg-muted">
-              {category.image ? (
-                <OptimizedImage
-                  src={category.image}
-                  alt={category.name}
-                  fill
-                  className="object-cover"
-                  /*
-                    The tile is a sixth of the column now, not a third — a
-                    300px hint asked every browser for roughly twice the
-                    picture it draws, six times over, above the fold.
-                  */
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
-                />
-              ) : null}
-            </div>
-            <div className="p-3">
-              <p className="truncate text-sm font-medium">{category.name}</p>
-              {/*
-                THE SHOP'S OWN WORD. This said `cakes` for every shop running
-                this CMS — the same fault the headings and the buttons on this
-                page were cleaned of.
-              */}
-              <p className="text-xs text-muted-foreground">
-                {category.count} {labels.productWordPlural.toLowerCase()}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </StaggerReveal>
     </SectionShell>
   );
 }
@@ -1580,98 +1365,6 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function PromoCollageSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const hasHeading = sectionHeaderDraws(
-    contentString(c, "overline"),
-    contentString(c, "title"),
-  );
-  const align = sectionAlignOf(c, "center");
-  const cards = renderableRows(parseListField(c, "cards"));
-
-  if (cards.length === 0) return null;
-
-  return (
-    <SectionShell {...props}>
-      <SectionHeader
-        overline={contentString(c, "overline")}
-        title={contentString(c, "title")}
-        align={align}
-      />
-      {/*
-        `auto-rows-fr` so a wide card and the small ones beside it line up,
-        and a wide card spans two columns rather than being a different
-        component — the reference's three-wide-then-five-small band is one
-        grid, not two.
-      */}
-      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 auto-rows-fr sm:grid-cols-2 lg:grid-cols-4")}>
-        {cards.map((card, index) => {
-          const body = (
-            <>
-              {card.image ? (
-                /*
-                  `flex-1` WITH A FLOOR, not a fixed ratio.
-
-                  `auto-rows-fr` above makes every card in a row as tall as
-                  the tallest — and a wide card's 16:9 picture at double
-                  width is much taller than its neighbours'. At a fixed
-                  ratio the small cards kept their own short picture and
-                  grew a band of white underneath it instead, which is what
-                  the browser showed. Letting the picture grow into the
-                  space fills the card rather than padding it.
-                */
-                <div className="relative min-h-44 flex-1 overflow-hidden bg-muted">
-                  {/*
-                    SafeImage, not next/image: these URLs are admin-typed on
-                    any host, and an un-listed host throws the render of the
-                    whole homepage.
-                  */}
-                  <SafeImage src={card.image} alt={card.title ?? ""} />
-                </div>
-              ) : null}
-              <div className="p-4">
-                {card.title ? (
-                  <p className="font-heading font-semibold">{card.title}</p>
-                ) : null}
-                {card.subtitle ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{card.subtitle}</p>
-                ) : null}
-                {card.ctaLabel ? (
-                  <span className="mt-3 inline-flex text-sm font-medium text-bakery-700">
-                    {card.ctaLabel}
-                  </span>
-                ) : null}
-              </div>
-            </>
-          );
-
-          const className = cn(
-            "flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
-            // A card with no link is still a card: a banner can be artwork
-            // rather than a destination.
-            /*
-              `rowFlag`, not the value itself. A row's values are all strings
-              by the time they reach here, so an UNTICKED box arrived as the
-              string "false" and spanned two columns.
-            */
-            rowFlag(card.wide) ? "sm:col-span-2" : "",
-          );
-
-          return card.href ? (
-            <Link key={`${card.title}-${index}`} href={card.href} className={className}>
-              {body}
-            </Link>
-          ) : (
-            <div key={`${card.title}-${index}`} className={className}>
-              {body}
-            </div>
-          );
-        })}
-      </div>
-    </SectionShell>
-  );
-}
-
 /**
  * A grid of labelled, linked picture tiles the shop writes itself.
  *
@@ -1680,71 +1373,6 @@ function PromoCollageSection(props: HomepageSectionRendererProps) {
  * catalogue category, which is why `CategoriesSection` cannot express them:
  * that one is driven by the taxonomy and can only point at a category page.
  */
-/**
- * THE SHOP'S OWN WRITING, folded away until somebody wants it.
- *
- * A storefront of this kind carries a long block of prose at the foot of the
- * homepage. Left open it is most of the page's height for the part of it
- * that is read least, so the first paragraph stands and the rest is behind a
- * control — which is what the layout this is drawn from does too.
- *
- * The toggle is NOT rendered when there is only one paragraph: a control
- * that reveals nothing is worse than no control.
- */
-function SeoProseSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const align = sectionAlignOf(c, "left");
-  const blocks = renderableRows(parseListField(c, "blocks"));
-  const [open, setOpen] = useState(false);
-
-  if (blocks.length === 0) return null;
-
-  const shown = open ? blocks : blocks.slice(0, 1);
-
-  return (
-    <SectionShell {...props}>
-      <SectionHeader
-        overline={contentString(c, "overline")}
-        title={contentString(c, "title")}
-        className="mb-4"
-        align={align}
-      />
-      <div className="space-y-4">
-        {shown.map((block, index) => (
-          <div key={`${block.heading}-${index}`} className="space-y-1.5">
-            {block.heading ? (
-              <h3 className="text-sm font-semibold text-foreground">{block.heading}</h3>
-            ) : null}
-            {block.body ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {block.body}
-              </p>
-            ) : null}
-          </div>
-        ))}
-      </div>
-      {blocks.length > 1 ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            /*
-              The shell makes the whole band a select target in the builder,
-              so without this an admin pressing Read more selects the section
-              and never sees the text open.
-            */
-            event.stopPropagation();
-            setOpen((value) => !value);
-          }}
-          className="mt-4 text-sm font-semibold text-bakery-700 underline-offset-4"
-          aria-expanded={open}
-        >
-          {open ? "Show less" : "Read more"}
-        </button>
-      ) : null}
-    </SectionShell>
-  );
-}
-
 /** A row of the shop's own articles. Empty is not a band. */
 function BlogCardsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
@@ -3096,93 +2724,6 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function GallerySection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const hasHeading = sectionHeaderDraws(
-    contentString(c, "overline"),
-    contentString(c, "title"),
-  );
-  const align = sectionAlignOf(c, "center");
-  /**
-   * The shop's own photographs, or no grid.
-   *
-   * This rendered `galleryImages` — twelve stock Unsplash photos of somebody
-   * else's cakes — as this shop's work, on every install, with no field to
-   * change them. A customer choosing a bakery by its photographs was choosing
-   * on someone else's.
-   */
-  const photos = limitRows(photoRows(c, "images"), contentNumber(c, "maxCount", 8));
-  if (photos.length === 0) return null;
-  return (
-    <SectionShell {...props} noReveal>
-      <ScrollReveal>
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          align={align}
-        />
-      </ScrollReveal>
-      <StaggerReveal className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4")}>
-        {photos.map((photo, index) => {
-          const src = photo.image;
-          // An untouched column is "" from the editor, not undefined, so `??`
-          // could never fire and the object literal was always truthy: every
-          // tile shipped alt="" and an empty white pill on hover.
-          const title = photo.title?.trim() ?? "";
-          const tag = photo.tag?.trim() ?? "";
-          return (
-            <figure
-              key={`${src}-${index}`}
-              className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
-            >
-              <OptimizedImage
-                src={src}
-                alt={title || `Gallery ${index + 1}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              />
-              {/* Shown, not revealed. This was invisible until a pointer
-                  touched it, which is a caption a phone never saw at all. The
-                  scrim is permanent now so the words stay readable. */}
-              {title || tag ? (
-                <figcaption className="absolute inset-0 flex flex-col justify-end bg-bakery-950/45 p-3">
-                  {tag ? (
-                    <span className="w-fit rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-bakery-800 uppercase">
-                      {tag}
-                    </span>
-                  ) : null}
-                  {title ? (
-                    <span className="mt-1.5 font-heading text-sm font-semibold text-white">
-                      {title}
-                    </span>
-                  ) : null}
-                </figcaption>
-              ) : null}
-            </figure>
-          );
-        })}
-      </StaggerReveal>
-      {/*
-        ONLY WHEN THERE IS SOMEWHERE TO GO.
-
-        This fell back to /store/gallery, and that page is gone — so without
-        the guard the band draws a button to a 404. A shop that wants a
-        view-all here gives it a link; until then there is no button, which
-        is what every other rail on the page already does.
-      */}
-      {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
-        <ScrollReveal className="mt-8 text-center">
-          <Button variant="outline" render={<Link href={contentString(c, "ctaHref")} />}>
-            {contentString(c, "ctaLabel")}
-            <ArrowRight className="size-4" />
-          </Button>
-        </ScrollReveal>
-      ) : null}
-    </SectionShell>
-  );
-}
-
 function FaqSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const hasHeading = sectionHeaderDraws(
@@ -3223,102 +2764,6 @@ function FaqSection(props: HomepageSectionRendererProps) {
             ))}
           </Accordion>
         </ScrollReveal>
-      </div>
-    </SectionShell>
-  );
-}
-
-function CtaSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const card = (
-    <div
-      className={cn(
-        "rounded-2xl border border-border bg-cream-100 px-6 py-10 text-center sm:px-10",
-        props.embedded ? "flex h-full flex-col justify-center" : "mx-auto max-w-3xl"
-      )}
-    >
-      <p className="text-xs font-semibold tracking-widest text-bakery-700 uppercase">
-        {contentString(c, "overline")}
-      </p>
-      <h2 className="mt-3 font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
-
-      <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-        <Button render={<Link href={contentString(c, "ctaHref", routes.store.contact)} />}>
-          {contentString(c, "ctaLabel", "Contact us")}
-          <ArrowRight className="size-4" />
-        </Button>
-        {contentBoolean(c, "showPhone", true) && contentString(c, "phone") ? (
-          <Button variant="outline" render={<a href={`tel:${contentString(c, "phone")}`} />}>
-            <Phone className="size-4" />
-            {contentString(c, "phone")}
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-
-  if (props.embedded) return card;
-  return <SectionShell {...props}>{card}</SectionShell>;
-}
-
-function PromoBannerSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const hasHeading = sectionHeaderDraws(
-    contentString(c, "overline"),
-    contentString(c, "title"),
-  );
-  const align = sectionAlignOf(c, "center");
-  const maxCount = contentNumber(c, "maxCount", 2);
-  /**
-   * The list is SELECTED here, not trusted from the caller.
-   *
-   * Both mounts pass `banners`, and they were passing different things. The
-   * storefront pre-selects on the server (`selectActiveHeroBanners(raw,
-   * "homepage")`, store-home-page.tsx) so the RSC payload carries only what a
-   * visitor may see. The builder fetches GET /api/content/banners, which hands
-   * staff the RAW stored array, and passed it straight in — so the preview that
-   * calls itself "the same light sections as live store" rendered banners that
-   * were switched off, expired, scheduled, scoped to Collections, or positioned
-   * sidebar/popup, in stored order (newest first) rather than by priority. With
-   * maxCount 2 that decided WHICH two tiles appeared, and the admin published a
-   * homepage they had never seen.
-   *
-   * The server pass stays: it is the TRANSPORT filter, so unpublished content
-   * does not cross the wire. This is the RENDER filter, and running it twice is
-   * a no-op — the same rule testimonials and FAQs already follow above.
-   */
-  const banners = selectActiveHeroBanners(props.banners ?? [], "homepage").slice(0, maxCount);
-
-  return (
-    <SectionShell {...props}>
-      <SectionHeader
-        overline={contentString(c, "overline")}
-        title={contentString(c, "title")}
-        align={align}
-      />
-      <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-2")}>
-        {banners.map((banner) => (
-          <Link
-            key={banner.id}
-            href={banner.link ?? contentString(c, "ctaHref", routes.store.collections)}
-            className="group relative overflow-hidden rounded-2xl border border-border"
-          >
-            <div className="relative aspect-[21/9] bg-muted">
-              <OptimizedImage src={banner.image} alt={banner.title} fill className="object-cover" sizes="50vw" />
-              {/* The scrim stays — the words above it sit on a photograph and
-                  need it to be readable. What went is its darkening under the
-                  pointer, which was decoration. */}
-              <div className="absolute inset-0 bg-bakery-950/35" />
-              <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
-                <p className="text-sm font-medium">{banner.title}</p>
-                <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide">
-                  {contentString(c, "ctaLabel", "Shop now")}
-                  <ArrowRight className="size-3.5" />
-                </span>
-              </div>
-            </div>
-          </Link>
-        ))}
       </div>
     </SectionShell>
   );
@@ -3518,180 +2963,6 @@ function OffersSection(props: HomepageSectionRendererProps) {
   );
 }
 
-function InstagramSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const hasHeading = sectionHeaderDraws(
-    contentString(c, "overline"),
-    contentString(c, "title"),
-  );
-  const align = sectionAlignOf(c, "center");
-  const maxCount = contentNumber(c, "maxCount", 6);
-  /**
-   * The shop's own posts, or no strip.
-   *
-   * This rendered six stock photos as though they were the shop's feed — under
-   * a heading naming the shop's REAL handle, with every tile linking to that
-   * profile. So it invited a customer to a feed that looked nothing like the
-   * pictures above it. There is no Instagram API here; these are photos the
-   * shop uploads, and without them the section does not appear.
-   */
-  const posts = limitRows(photoRows(c, "posts"), maxCount);
-  if (posts.length === 0) return null;
-  // The section's own content wins when the admin has set it in the builder;
-  // otherwise the shop's real Instagram from Settings → Social. The shipped
-  // placeholders count as "not set" — they were seeded, not chosen, and a shop
-  // that has configured its own profile should not keep advertising the demo
-  // account across seven links and a "Follow @…" button.
-  // The LEGACY value, kept verbatim on purpose. This is not a seed — the current
-  // seed sets no handle at all. Its only job is to RECOGNISE the handle stored
-  // on every homepage created before that change, so the shop's real profile
-  // outranks it. Renaming it to something neutral silently disabled the
-  // suppression and let the old handle win again, which is the opposite of what
-  // this constant is for. It goes when no install still carries the value.
-  const LEGACY_SEED_HANDLE = "monginisofficial";
-  const SEED_URL = "https://instagram.com";
-  const contentHandle = contentString(c, "instagramHandle");
-  const contentUrl = contentString(c, "instagramUrl");
-  const configured = props.instagram ?? null;
-
-  // No final fallback to a handle: with nothing stored and nothing configured
-  // this stays empty, and the section below renders no "Follow @…" button
-  // rather than advertising an account that does not exist.
-  const handle =
-    (contentHandle && contentHandle !== LEGACY_SEED_HANDLE ? contentHandle : "") ||
-    configured?.handle ||
-    "";
-
-  // Seven anchors below render this. It is builder-editable content, so it is
-  // admin-typed text reaching an `href` exactly like `social[].href` was —
-  // `javascript:` here is script execution on the homepage. Anything that is not
-  // an http(s) URL falls back rather than being rendered.
-  const preferredUrl =
-    (contentUrl && contentUrl !== SEED_URL ? contentUrl : "") || configured?.url || contentUrl;
-  const profileUrl = isSafeSocialUrl(preferredUrl) ? preferredUrl : SEED_URL;
-
-  return (
-    <SectionShell {...props} noReveal>
-      <ScrollReveal>
-        <SectionHeader
-          overline={contentString(c, "overline")}
-          title={contentString(c, "title")}
-          // The legacy copy reads "@<legacy handle> — daily inspiration…", and
-          /*
-            THE SHOP'S OWN HANDLE, and nothing else.
-
-            This read the section's Description with the handle as a
-            fallback, and rewrote a seeded account name inside it. The
-            Description box is gone from every section now, so a stored line
-            here would render with nowhere to edit it — and what belongs
-            under this heading was never prose anyway. Dropped entirely when
-            there is no handle, rather than left as a bare "@".
-          */
-          description={handle ? `@${handle}` : ""}
-          align={align}
-        />
-      </ScrollReveal>
-      <StaggerReveal className={cn(hasHeading && "mt-8", "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6")}>
-        {posts.map((post, index) => (
-          <a
-            key={`${post.image}-${index}`}
-            href={profileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative block aspect-square overflow-hidden rounded-2xl border border-border bg-cream-100"
-            aria-label={handle ? `View @${handle} on Instagram` : "View our Instagram"}
-          >
-            <OptimizedImage
-              src={post.image}
-              alt=""
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-            />
-          </a>
-        ))}
-      </StaggerReveal>
-      {/* No handle means no account to follow. The button used to fall back to
-          the seeded handle, so a shop with no Instagram invited its customers
-          to follow somebody else's. */}
-      {handle ? (
-        <ScrollReveal className="mt-8 text-center">
-          <Button variant="outline" render={<a href={profileUrl} target="_blank" rel="noopener noreferrer" />}>
-            <Camera className="size-4" />
-            Follow @{handle}
-          </Button>
-        </ScrollReveal>
-      ) : null}
-    </SectionShell>
-  );
-}
-
-function NewsletterSection(props: HomepageSectionRendererProps) {
-  const c = props.section.content;
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!email.trim()) return;
-    setLoading(true);
-
-    // This form used to wait 600ms and say "Subscribed!" without writing
-    // anything anywhere. Nobody was subscribed, and nobody could tell.
-    const { persisted } = await addNewsletterSubscriber(email, "Homepage");
-    setLoading(false);
-
-    if (!persisted) {
-      // Keep the address in the box so one tap retries it.
-      toast.error("We couldn't sign you up", {
-        description: "Please check your connection and try again.",
-      });
-      return;
-    }
-
-    toast.success("Subscribed!", {
-      description: "You'll receive our sweetest updates.",
-    });
-    setEmail("");
-  };
-
-  const card = (
-    <div
-      className={cn(
-        "rounded-2xl border border-border bg-cream-100 px-6 py-10 text-center sm:px-10",
-        props.embedded ? "flex h-full flex-col justify-center" : "mx-auto max-w-3xl"
-      )}
-    >
-      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-card border border-border text-bakery-700">
-        <Mail className="size-5" />
-      </div>
-      <h2 className="font-heading text-xl font-bold sm:text-2xl">{contentString(c, "title")}</h2>
-
-      <form onSubmit={handleSubmit} className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row">
-        <Input
-          type="email"
-          aria-label="Email address"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-          className="h-10 flex-1 bg-card"
-        />
-        <Button type="submit" variant="bakery" disabled={loading} className="h-10 shrink-0">
-          <Send className="size-4" />
-          {loading ? "Subscribing..." : contentString(c, "buttonLabel", "Subscribe")}
-        </Button>
-      </form>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {contentString(c, "disclaimer", "No spam. Unsubscribe anytime.")}
-      </p>
-    </div>
-  );
-
-  if (props.embedded) return card;
-  return <SectionShell {...props}>{card}</SectionShell>;
-}
-
 export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
   const railFor = (source: HomepageProductSource, maxCount: number) =>
     props.rails?.[source]?.slice(0, maxCount) ?? getHomepageProducts(source, maxCount);
@@ -3713,12 +2984,6 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <HeroSection {...props} />;
     case "our-menu":
       return <OurMenuSection {...props} />;
-    case "store-locator":
-      return <StoreLocatorSection {...props} />;
-    case "promo-banner":
-      return <PromoBannerSection {...props} />;
-    case "categories":
-      return <CategoriesSection {...props} />;
     case "featured-cakes":
       return (
         <ProductGridSection
@@ -3764,8 +3029,6 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       );
     case "tabbed-rail":
       return <TabbedRailSection {...props} />;
-    case "promo-collage":
-      return <PromoCollageSection {...props} />;
     case "banner-grid":
       return <BannerGridSection {...props} />;
     case "banner-strip":
@@ -3776,8 +3039,6 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <CategoryPriceCardsSection {...props} />;
     case "tile-grid":
       return <TileGridSection {...props} />;
-    case "seo-prose":
-      return <SeoProseSection {...props} />;
     case "blog-cards":
       return <BlogCardsSection {...props} />;
     case "recently-viewed":
@@ -3814,16 +3075,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <WhyUsSection {...props} />;
     case "testimonials":
       return <TestimonialsSection {...props} />;
-    case "gallery":
-      return <GallerySection {...props} />;
-    case "instagram":
-      return <InstagramSection {...props} />;
     case "faq":
       return <FaqSection {...props} />;
-    case "newsletter":
-      return <NewsletterSection {...props} />;
-    case "cta":
-      return <CtaSection {...props} />;
     default:
       return null;
   }

@@ -42,26 +42,16 @@ const offered = ADDABLE_SECTION_REGISTRY;
 /**
  * EVERY SECTION THE PICKER DOES NOT OFFER, written out.
  *
- * Two are bakery slugs frozen into the section type, kept because published
- * layouts carry them. The other nine the shop looked at and turned down.
+ * Nine more were here and are now DELETED outright — registry entry, renderer
+ * and component — so they cannot be hidden, only absent. These two remain
+ * hidden rather than deleted: they are slugs frozen into the section type and
+ * published layouts carry them.
  *
  * Spelled out rather than derived from the flag, so that marking one more
  * entry `notOffered` fails here until somebody adds it to this list — which
  * is the point. Hiding a row from a shop should be a decision, not a diff.
  */
-const DROPPED = [
-  "categories",
-  "cta",
-  "eggless",
-  "gallery",
-  "instagram",
-  "newsletter",
-  "photo-cakes",
-  "promo-banner",
-  "promo-collage",
-  "seo-prose",
-  "store-locator"
-] as const;
+const DROPPED = ["eggless", "photo-cakes"] as const;
 
 const WORDS = { productWord: "product", productWordPlural: "products" };
 
@@ -103,10 +93,11 @@ describe("the list a shop is offered", () => {
   it("and offers everything else", () => {
     /*
       A COUNT, so that hiding a row by accident is as loud as offering one.
-      Measured in the browser: the dialog drew 29 rows, then 27, now 18.
+      Measured in the browser: 29 rows, then 27 once two were hidden, now 18 —
+      the same 18, because the nine hidden in between are deleted outright.
     */
-    expect(HOMEPAGE_SECTION_REGISTRY).toHaveLength(29);
-    expect(offered).toHaveLength(29 - DROPPED.length);
+    expect(HOMEPAGE_SECTION_REGISTRY).toHaveLength(20);
+    expect(offered).toHaveLength(20 - DROPPED.length);
     expect(
       HOMEPAGE_SECTION_REGISTRY.filter((entry) => entry.notOffered)
         .map((entry) => entry.type)

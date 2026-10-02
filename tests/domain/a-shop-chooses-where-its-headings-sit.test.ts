@@ -41,15 +41,23 @@ const codeOf = (source: string) =>
  * agreeing with the thing under test is not a check.
  */
 const LEFT = [
-  "tabbed-rail", "seo-prose", "banner-grid", "banner-strip",
+  /* `seo-prose` stood second here until it was deleted. */
+  "tabbed-rail", "banner-grid", "banner-strip",
   "featured-cakes", "trending", "best-sellers", "category-rail",
   "photo-cakes", "eggless", "seasonal",
   // The band that draws what a browser has looked at, added later.
   "recently-viewed",
 ];
 
-/** The four that draw their heading themselves and are not in scope. */
-const NO_CONTROL = ["hero", "store-locator", "newsletter", "cta"];
+/**
+ * The two with no heading of their own to place.
+ *
+ * It read `["hero", "store-locator", "newsletter", "cta"]` and the last three
+ * are deleted. It was also INCOMPLETE: `same-day-countdown` has no align
+ * control either and was never listed — the hard count beside it was carrying
+ * that gap. Measured against the registry rather than remembered.
+ */
+const NO_CONTROL = ["hero", "same-day-countdown"];
 
 describe("a shop chooses where its headings sit", () => {
   it("offers the choice on every section that has a heading of its own", () => {
@@ -57,17 +65,20 @@ describe("a shop chooses where its headings sit", () => {
       entry.fields.some((f) => f.key === "align"),
     ).map((entry) => entry.type);
 
-    expect(withControl.length, "the control is on the wrong number of sections").toBe(24);
+    /* 20 section types, less the two above. Measured, not adjusted to pass. */
+    expect(withControl.length, "the control is on the wrong number of sections").toBe(18);
     for (const type of LEFT) {
       expect(withControl, `${type} cannot choose`).toContain(type);
     }
     for (const type of NO_CONTROL) {
       /*
         NOT OFFERED, and each for its own reason. `hero` has no section
-        heading at all; store-locator, newsletter and cta draw their own
-        <h2> inside a card whose `text-center` also centres the buttons and
-        the form under it, so a heading control there would either do nothing
-        or move things nobody asked to move.
+        heading at all, and `same-day-countdown` draws its own line inside a
+        band whose layout a heading control could not move.
+
+        Three more stood here — store-locator, newsletter and cta — each
+        drawing its own <h2> inside a card whose `text-center` also centred
+        the buttons and the form under it. All three are deleted.
       */
       expect(withControl, `${type} has a control that cannot work`).not.toContain(type);
     }
@@ -153,9 +164,13 @@ describe("a shop chooses where its headings sit", () => {
     const src = codeOf(read(RENDERER));
     const calls = [...src.matchAll(/sectionAlignOf\(c, "(left|center)"\)/g)].map((m) => m[1]);
 
-    expect(calls.length, "the fallbacks have moved or gone").toBeGreaterThanOrEqual(18);
-    expect(calls.filter((v) => v === "left").length, "the left-hand sections").toBe(6);
-    expect(calls.filter((v) => v === "center").length, "the centred sections").toBe(13);
+    /*
+      Was 18 / 6 / 13. Nine sections went, and with them one left-hand
+      fallback and five centred ones.
+    */
+    expect(calls.length, "the fallbacks have moved or gone").toBeGreaterThanOrEqual(13);
+    expect(calls.filter((v) => v === "left").length, "the left-hand sections").toBe(5);
+    expect(calls.filter((v) => v === "center").length, "the centred sections").toBe(8);
   });
 
   it("draws a mirror when it centres a heading that shares its row", () => {
