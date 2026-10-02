@@ -831,15 +831,27 @@ describe("bands a shop can switch off", () => {
   it("and the promo strip above the header, which drew the same banners twice", () => {
     /**
      * The homepage's Promo Banner section draws the same list, so on the page
-     * most customers land on, a shop's offer appeared above the logo AND in
-     * the page. The strip also mounts after hydration and pushes everything
-     * below it down as it arrives.
+     * most customers land on, a shop's offer appears above the logo AND in
+     * the page. That is the reason for the switch, and it still stands.
+     *
+     * THE SECOND REASON THIS USED TO GIVE IS FIXED, and saying so is the
+     * point of this note. The strip "mounts after hydration and pushes
+     * everything below it down as it arrives" — it did, by 52px, on every
+     * page, about 450ms after the page had painted. Measured on the
+     * production build, that was most of CLS 0.306 on the homepage.
+     *
+     * It takes its banners from the server now, so the bar is in the HTML
+     * and there is nothing to push. Hence the prop in the match below: a
+     * bare `<StorefrontBannerStrip />` would mean the read had gone back to
+     * the browser.
      */
     const defaults = read("features/site-layout/lib/header-utils.ts");
     expect(defaults).toContain("showBannerStrip: true");
 
     const shell = read("layouts/storefront-layout.tsx");
-    expect(shell).toMatch(/\{chrome\.showBannerStrip \? <StorefrontBannerStrip \/> : null\}/);
+    expect(shell).toMatch(
+      /\{chrome\.showBannerStrip \? <StorefrontBannerStrip live=\{bannerStrip\} \/> : null\}/,
+    );
   });
 
   it("and a stored string cannot turn that switch back on by being truthy", () => {
