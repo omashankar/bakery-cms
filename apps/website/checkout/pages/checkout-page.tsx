@@ -969,6 +969,17 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     if (!slotWithTier.date?.trim()) {
       setSlotError("Choose a delivery date");
+      /*
+        AND TAKE THEM TO IT. The message lands beside the date field, which
+        is most of a screen above the button on a phone — so without this
+        the button simply looks broken. Focusing scrolls it into view, which
+        is the half that was missing.
+
+        `getElementById` is right here: the shared Input puts the id on the
+        real control. The consent box one step later needs a ref instead,
+        because Base UI puts its id on a hidden tabindex="-1" input.
+      */
+      document.getElementById("deliveryDate")?.focus();
       return;
     }
 
@@ -982,6 +993,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      */
     const needsWindow = deliveryTiers.length > 0 ? windowsForTier.length > 0 : true;
     if (needsWindow && !slotWithTier.timeSlot?.trim()) {
+      document.getElementById("deliveryTime")?.focus();
       setSlotError(
         deliveryTiers.length > 0
           ? "Choose a delivery time for this option"

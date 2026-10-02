@@ -201,6 +201,49 @@ describe("and the screen shows it", () => {
   });
 });
 
+describe("the step before it refuses the same way", () => {
+  const src = read(CHECKOUT);
+  const handler = from(src, "const onPersonalizeContinue = () => {");
+
+  it("takes the customer to the field that refused", () => {
+    /*
+      THE MESSAGE WAS ALREADY RIGHT; THE JOURNEY TO IT WAS MISSING.
+      "Choose a delivery date" lands beside the date field, which on a phone
+      is most of a screen above the button that was just pressed and is not
+      necessarily on screen at all — so the button read as broken. Focusing
+      the field scrolls it into view, which is the half that was absent.
+
+      Measured at 390 after: the alert appears, focus is on the date input,
+      and the input is inside the viewport.
+    */
+    const upToWindow = handler.slice(0, handler.indexOf("const needsWindow"));
+    expect(upToWindow, "a missing date no longer takes the customer to the date").toContain(
+      'document.getElementById("deliveryDate")?.focus()',
+    );
+    expect(handler.slice(0, 2600), "a missing window no longer takes the customer to it").toContain(
+      'document.getElementById("deliveryTime")?.focus()',
+    );
+  });
+
+  it("and by id, which is right for these two and wrong for the consent box", () => {
+    /*
+      THE DIFFERENCE IS THE COMPONENT, not a style choice. The shared Input
+      and the native select put the id on the control a customer can focus.
+      Base UI's Checkbox puts it on a hidden `tabindex="-1"` input and keeps
+      the focusable element to itself — which is why the consent box needs a
+      ref and these do not, and why the first attempt at that one silently
+      focused nothing.
+    */
+    expect(src, "the delivery date stopped being a plain input").toMatch(
+      /<Input\s+id="deliveryDate"/,
+    );
+    const terms = from(src, "const onPlaceOrder = async () => {").slice(0, 1200);
+    expect(terms, "the consent box went back to being focused by id").not.toContain(
+      'getElementById("acceptTerms")',
+    );
+  });
+});
+
 describe("the way back out of the payment step", () => {
   /*
     COMMENTS STRIPPED, and the first run of this file is why. The fix's own
