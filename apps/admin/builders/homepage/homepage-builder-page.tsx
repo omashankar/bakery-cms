@@ -30,7 +30,7 @@ import {
   createSectionInstance,
   getRegistryEntry,
   resolveRegistryEntry,
-  HOMEPAGE_SECTION_REGISTRY,
+  ADDABLE_SECTION_REGISTRY,
 } from "@/constants/section-registry";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 import type { HomepageSectionRendererProps } from "@/features/cms-sections/homepage-section-renderer";
@@ -137,9 +137,20 @@ export function HomepageBuilderPage() {
     },
     [labels, optionSources],
   );
+  /**
+   * WHAT THE "ADD SECTION" DIALOG OFFERS — which is not the whole registry.
+   *
+   * Two entries are `legacy`: `photo-cakes` and `eggless`, bakery slugs
+   * frozen into the section type and kept because layouts already published
+   * carry them. A florist read them in the list of things to add.
+   *
+   * ONLY THIS LIST IS FILTERED. `resolveEntry` above goes through
+   * `getRegistryEntry`, which searches the whole registry, so a section
+   * already on a page still resolves its fields and keeps its editor.
+   */
   const registry = useMemo(
     () =>
-      HOMEPAGE_SECTION_REGISTRY.map((entry) =>
+      ADDABLE_SECTION_REGISTRY.map((entry) =>
         resolveRegistryEntry(entry, labels, optionSources),
       ),
     [labels, optionSources],

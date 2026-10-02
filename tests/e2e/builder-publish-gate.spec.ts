@@ -69,3 +69,58 @@ for (const builder of BUILDERS) {
     await expect(page.getByRole("button", { name: /^publish/i })).toBeEnabled();
   });
 }
+
+/**
+ * AND THE ADD LIST IS NOT THE WHOLE REGISTRY.
+ *
+ * Two entries are `legacy`: `photo-cakes` and `eggless`, bakery slugs frozen
+ * into the section type and kept because layouts already published carry them
+ * — this shop’s homepage has one. The reason for keeping them covers
+ * RENDERING; it never covered offering them, and a florist opening this dialog
+ * read "Photo Cakes" and "Eggless Cakes" among the things it could build its
+ * page from.
+ *
+ * ONLY A BROWSER CAN SETTLE THIS ONE. The unit guard beside it imports the
+ * same `ADDABLE_SECTION_REGISTRY` the builder does, so it cannot see the
+ * builder naming the OTHER constant — a mutation proved exactly that. What
+ * the dialog actually drew is the only answer to that question.
+ */
+test("the Add section dialog offers no legacy bakery rows", async ({ page }) => {
+  test.setTimeout(300_000);
+  await adminSession(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto("/admin/builders/homepage");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(5000);
+
+  await page.getByRole("button", { name: /add section/i }).first().click();
+  await page.getByText("Add homepage section").waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(1200);
+
+  const offered = await page.evaluate(() => {
+    const dialog = [...document.querySelectorAll('[role="dialog"]')].find((node) =>
+      (node.textContent ?? "").includes("Add homepage section"),
+    );
+    if (!dialog) return null;
+    return [...dialog.querySelectorAll("button")]
+      .map((node) => (node.textContent ?? "").trim())
+      .filter((text) => text && !/^(cancel|close)$/i.test(text));
+  });
+
+  expect(offered, "the Add section dialog never opened").not.toBeNull();
+  /* A FLOOR. An empty list would satisfy every `not.toContain` below. */
+  expect(offered!.length, "the dialog offered nothing at all").toBeGreaterThan(20);
+
+  expect(offered, "a florist is offered Photo Cakes").not.toContain("Photo Cakes");
+  expect(offered, "a florist is offered Eggless Cakes").not.toContain("Eggless Cakes");
+
+  /*
+    AND NO ROW SHOUTS IN LOWER CASE. `{Products}` returned the shop’s plural
+    as typed, so this shop — whose plural is "products" — read "products by
+    category" at the head of a Title Case list.
+  */
+  expect(
+    offered!.filter((text) => /^[a-z]/.test(text)),
+    "a row in a Title Case list starts in lower case",
+  ).toEqual([]);
+});

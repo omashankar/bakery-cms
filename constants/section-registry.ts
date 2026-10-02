@@ -28,10 +28,28 @@ import type {
  * `defaultContent` is deliberately NOT resolved. That is the page copy a shop
  * then edits and stores; substituting into it would rewrite text an admin owns.
  */
+/**
+ * THE SHOP'S WORD, STARTING A LABEL.
+ *
+ * `{Products}` returned the plural AS TYPED, which read as a bug the moment a
+ * shop typed its own word in lower case: "products by category" at the head
+ * of a picker whose every other row is Title Case. The token pair is
+ * `{Products}` and `{products}`, and the lower one calls `.toLowerCase()`
+ * outright — so the upper one was always meant to be the capitalised half.
+ *
+ * ONLY WHEN THE WHOLE WORD IS LOWER CASE. A shop selling iPhones types
+ * "iPhones", and upper-casing the first letter unconditionally gives
+ * "IPhones" — a worse answer than the one being fixed. A word that already
+ * carries a capital anywhere is a word the shop has cased deliberately.
+ */
+function startsALabel(word: string): string {
+  if (word !== word.toLowerCase()) return word;
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
 const LABEL_TOKENS = {
-  "{Products}": (l: RegistryLabels) => l.productWordPlural,
+  "{Products}": (l: RegistryLabels) => startsALabel(l.productWordPlural),
   "{products}": (l: RegistryLabels) => l.productWordPlural.toLowerCase(),
-  "{Product}": (l: RegistryLabels) => l.productWord,
+  "{Product}": (l: RegistryLabels) => startsALabel(l.productWord),
   "{product}": (l: RegistryLabels) => l.productWord.toLowerCase(),
 } as const;
 
@@ -114,6 +132,23 @@ export function resolveRegistryEntry<T extends HomepageSectionRegistryEntry>(
 export interface HomepageSectionRegistryEntry {
   type: HomepageSectionType;
   label: string;
+  /**
+   * NOT OFFERED TO A SHOP, but still rendered and still editable.
+   *
+   * `photo-cakes` and `eggless` are bakery slugs frozen into the section type
+   * — the renderer says so where it dispatches them — and they stay because
+   * layouts already published carry them. This shop's homepage has one.
+   *
+   * The reason they were kept covers RENDERING. It never covered offering
+   * them: a florist opening Add section read "Photo Cakes" and "Eggless Cakes"
+   * among the things it could build its page from. `category-rail` is what a
+   * shop adds instead, and it picks the category from the shop's own list.
+   *
+   * So this flag hides them from the picker ONLY. `getRegistryEntry` searches
+   * the whole registry, which is what the builder resolves an existing
+   * section's fields through, so a published one keeps its editor.
+   */
+  legacy?: true;
   icon: string;
   defaultBackground: SectionBackground;
   defaultContent: Record<string, string | number | boolean>;
@@ -1543,6 +1578,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "photo-cakes",
+    legacy: true,
     label: "Photo Cakes",
     icon: "Camera",
     defaultBackground: "white",
@@ -1583,6 +1619,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "eggless",
+    legacy: true,
     label: "Eggless Cakes",
     icon: "Leaf",
     defaultBackground: "cream",
@@ -1981,6 +2018,21 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
 ];
+
+/**
+ * WHAT A SHOP IS OFFERED IN "Add section" — not the whole registry.
+ *
+ * Exported so the builder and its guard share ONE definition. Written out in
+ * the builder instead, a test can only re-implement the same filter and then
+ * passes whatever the builder actually does.
+ *
+ * The registry itself keeps every entry: `getRegistryEntry` searches all of
+ * them, and that is how the builder resolves the fields of a section already
+ * on a page. Filter there instead and a published `photo-cakes` row loses its
+ * editor.
+ */
+export const ADDABLE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] =
+  HOMEPAGE_SECTION_REGISTRY.filter((entry) => !entry.legacy);
 
 export function getRegistryEntry(
   type: HomepageSectionType
