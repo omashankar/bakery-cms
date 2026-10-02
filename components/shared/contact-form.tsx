@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { createInquiryFromForm } from "@/features/inquiries/lib/inquiries-repository";
@@ -110,12 +111,32 @@ export function ContactForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="message">Message</Label>
-        <textarea
+        {/*
+          THE SHARED COMPONENT, NOT A HAND-WRITTEN BOX.
+
+          This was a raw `<textarea>` carrying its own classes, and it had
+          drifted from the Inputs above it in five ways. One of them cost
+          a customer the rest of their visit: `text-sm` renders at 14px on
+          a phone, and iOS Safari zooms the page when a focused field's
+          text is under 16px — then leaves it zoomed after the blur. This
+          is the last field before Send. The shared component is
+          `text-base md:text-sm`: 16px on a phone, 14px on a desktop,
+          which is what every other field here already did.
+
+          The other four were quieter: `rounded-xl` against the Inputs'
+          `rounded-lg`, `px-3` against `px-2.5`, no placeholder colour,
+          and no disabled or `aria-invalid` styling at all — so a
+          validation failure on this field would have shown nothing while
+          the fields above it turned red.
+
+          `min-h-32` is kept so the box is the size it is today.
+        */}
+        <Textarea
           id="message"
           name="message"
           required
           placeholder="Tell us about your order or requirement..."
-          className="min-h-32 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="min-h-32"
         />
       </div>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
