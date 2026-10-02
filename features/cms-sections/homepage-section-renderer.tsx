@@ -2,7 +2,6 @@
 
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
-import { SafeImage } from "@/components/shared/safe-image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -1402,7 +1401,13 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
           const body = (
             <>
               <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-                <SafeImage src={post.image ?? ""} alt={post.title ?? ""} />
+                <OptimizedImage
+                  src={post.image ?? ""}
+                  alt={post.title ?? ""}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                />
               </div>
               <div className="space-y-1.5 p-4">
                 {post.meta ? (
@@ -1542,7 +1547,18 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
                 : "aspect-[2/3] lg:col-span-3",
           );
           const picture = (
-            <SafeImage
+            <OptimizedImage
+              fill
+              className="object-cover"
+              /*
+                THE TWO TILE SHAPES ASK FOR DIFFERENT PICTURES, and one
+                `sizes` for both would over-fetch for every narrow one. The
+                grid is `lg:grid-cols-15` with the wide tile at `col-span-5`
+                and the narrow at `col-span-3` — 34vw and 20vw of a 1376px
+                column, which is the 445px and 259px measured on this shop.
+                Below lg the grid is two across.
+              */
+              sizes={wide ? "(min-width: 1024px) 34vw, 50vw" : "(min-width: 1024px) 20vw, 50vw"}
               src={banner.image ?? ""}
               /*
                 The words are pixels inside the picture, so the alt text is
@@ -1708,7 +1724,13 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
                   shows through a picture with no background of its own, and
                   what fills the card while one loads or if none was set.
                 */}
-                <SafeImage src={item.image} alt="" />
+                <OptimizedImage
+                  src={item.image}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 25vw, 50vw"
+                />
               </div>
               <div className="px-2 py-3 text-center">
                 {name ? (
@@ -1937,7 +1959,9 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
           const alt = banner.label ?? "";
           const picture = (
             <>
-              <SafeImage
+              <OptimizedImage
+                fill
+                sizes="100vw"
                 src={phone || banner.image || ""}
                 alt={alt}
                 className={cn(
@@ -1952,10 +1976,12 @@ function BannerStripSection(props: HomepageSectionRendererProps) {
                 here has seen is worse than silence. It goes on BOTH, and
                 only one of the two is ever displayed.
               */}
-              <SafeImage
+              <OptimizedImage
                 src={banner.image ?? ""}
                 alt={alt}
-                className="hidden lg:block"
+                fill
+                sizes="100vw"
+                className="hidden lg:block object-cover"
               />
             </>
           );
@@ -2481,7 +2507,18 @@ function TileGridSection(props: HomepageSectionRendererProps) {
                     : "aspect-square rounded-xl",
                 )}
               >
-                <SafeImage src={tile.image ?? ""} alt={tile.label ?? ""} />
+                <OptimizedImage
+                  src={tile.image ?? ""}
+                  alt={tile.label ?? ""}
+                  fill
+                  className="object-cover"
+                  /*
+                    The shop chooses 4, 5 or 6 across at lg. 25vw is the
+                    WIDEST of those, so a six-across row asks for a little
+                    more than it paints — the other way round is a soft tile.
+                  */
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                />
               </div>
               {tile.label ? (
                 <p
@@ -2620,7 +2657,17 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
                 strip ? "size-[4.25rem]" : "mb-4 size-14",
               )}
             >
-              <SafeImage src={picture} alt="" />
+              <OptimizedImage
+                src={picture}
+                alt=""
+                fill
+                className="object-cover"
+                /*
+                  68px painted at 390, 768 and 1440 alike — it is a fixed tile,
+                  not a fraction of the page. It was fetching the full file.
+                */
+                sizes="72px"
+              />
             </span>
           ) : null;
 
