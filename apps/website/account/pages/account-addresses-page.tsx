@@ -137,7 +137,7 @@ export function AccountAddressesPage() {
       title="Saved Addresses"
       breadcrumbs={[{ label: "Addresses" }]}
     >
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           {addresses.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-cream-50 p-8 text-center">

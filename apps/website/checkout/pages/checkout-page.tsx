@@ -1376,7 +1376,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
             className="mb-8"
           />
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
               {step === 1 ? (
                 <div className="rounded-xl border border-border bg-card p-6 shadow-sm">

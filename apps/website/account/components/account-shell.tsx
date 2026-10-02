@@ -60,7 +60,7 @@ export function AccountShell({ title, breadcrumbs = [], children }: AccountShell
             </div>
           ) : null}
 
-          <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="hidden lg:block">
               <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                 <AccountNav />
