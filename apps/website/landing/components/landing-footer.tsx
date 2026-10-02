@@ -157,8 +157,54 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                 {contactInfo.email ? (
                   <li className="flex items-center gap-2">
                     <Mail className="size-4 shrink-0 text-bakery-700" />
-                    <a href={`mailto:${contactInfo.email}`} className="break-all hover:text-foreground">
-                      {contactInfo.email}
+                    {/*
+                      BREAKS AT THE @, not mid-word.
+
+                      `break-all` alone breaks wherever the line runs out:
+                      this shop’s address came out as "sumanom7014106@gmai" /
+                      "l.com". It needs 230px on one line and the footer gives
+                      each of its four columns about 170px, so it genuinely has
+                      to wrap — the question is only where.
+
+                      A `<wbr>` after the @ offers that point, and the
+                      floor under it had to change too. `break-all` declares
+                      EVERY character a break opportunity, so one more at the
+                      @ is a duplicate rather than a preference: the first
+                      line stayed "sumanom7014106@gmai" with the wbr sitting
+                      in the markup.
+
+                      `wrap-anywhere` is a LAST-RESORT opportunity — taken
+                      only when the line would otherwise overflow — so the @
+                      wins wherever the local part fits, and a local part too
+                      long for the column still breaks rather than escaping
+                      it. Measured in the footer's narrowest four-column
+                      layouts, spill past the column against a 32px gutter:
+
+                        viewport        wrap-break-word     wrap-anywhere
+                        1024            30px / 68px         0 / 0
+                        1200             2px / 39px         0 / 0
+                        1280               0 / 26px         0 / 0
+                        1440                  0 / 0         0 / 0
+
+                      The second number of each pair is a longer address than
+                      this shop's. `wrap-break-word` keeps the @ by letting
+                      the line run out of its column; at 1024 it cleared the
+                      gutter by 2px for the address this shop happens to have,
+                      and overran by 36px for one a little longer. From 1280
+                      up, where the local part fits, `wrap-anywhere` takes
+                      the @ as well — it gives up the @ only where keeping it
+                      would mean overflowing.
+                    */}
+                    <a href={`mailto:${contactInfo.email}`} className="wrap-anywhere hover:text-foreground">
+                      {contactInfo.email.includes("@") ? (
+                        <>
+                          {contactInfo.email.slice(0, contactInfo.email.indexOf("@") + 1)}
+                          <wbr />
+                          {contactInfo.email.slice(contactInfo.email.indexOf("@") + 1)}
+                        </>
+                      ) : (
+                        contactInfo.email
+                      )}
                     </a>
                   </li>
                 ) : null}
