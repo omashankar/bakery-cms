@@ -231,6 +231,25 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const [giftWrap, setGiftWrap] = useState(false);
   const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(EMPTY_DELIVERY_SLOT);
   const [slotError, setSlotError] = useState<string | null>(null);
+  /**
+   * Why "Place order" refused, when it refused because of the consent box.
+   *
+   * Beside `slotError` because it is the same thing: a refusal the customer
+   * has to be able to read. The alternative — disabling the button — is what
+   * was here, and it could not work: `components/ui/button.tsx` carries
+   * `disabled:pointer-events-none`, so the `title` that was supposed to
+   * explain the grey button was never reachable by a pointer on any device.
+   */
+  const [termsError, setTermsError] = useState<string | null>(null);
+  /**
+   * The VISIBLE consent box, for moving focus to when it refuses.
+   *
+   * Not `getElementById("acceptTerms")`: Base UI puts that id on the hidden
+   * input it renders for form submission, and that input is
+   * `tabindex="-1"`. Focusing it moves focus nowhere a customer can see —
+   * measured, and the first version of this did exactly that.
+   */
+  const termsBoxRef = useRef<HTMLButtonElement>(null);
   const [slotOptions, setSlotOptions] = useState<string[]>([]);
   /**
    * Held as an id, so the price is always the shop's.
@@ -1145,6 +1164,25 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   };
 
   const onPlaceOrder = async () => {
+    /*
+      THE CONSENT TICK IS ENFORCED HERE, NOT BY GREYING THE BUTTON.
+
+      It has to be enforced somewhere: the order records `termsAcceptedAt`
+      from this flag, so an enabled button with an unticked box would store
+      an order with no consent behind it. Refusing here is the same shape as
+      the delivery slot's refusal above, and unlike a disabled button it can
+      say why.
+
+      First, before the minimum-order check and before the cart is priced —
+      there is no point asking the server what the order costs when it is
+      not going to be placed.
+    */
+    if (!termsAccepted) {
+      setTermsError("Accept the terms above to continue");
+      termsBoxRef.current?.focus();
+      return;
+    }
+
     if (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue) {
       toast.error(`Minimum order value is ${formatCurrency(commerce.minOrderValue)}`);
       return;
@@ -2135,8 +2173,16 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       */}
                       <Checkbox
                         id="acceptTerms"
+                        ref={termsBoxRef}
                         checked={termsAccepted}
-                        onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                        aria-invalid={Boolean(termsError)}
+                        aria-describedby={termsError ? "acceptTermsError" : undefined}
+                        /* Cleared on the tick, or the red line outlives the
+                           correction that answered it. */
+                        onCheckedChange={(checked) => {
+                          setTermsAccepted(checked === true);
+                          if (checked === true) setTermsError(null);
+                        }}
                       />
                       <span>
                         {commerce.checkoutTerms || (
@@ -2153,24 +2199,59 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         )}
                       </span>
                     </label>
+                    {termsError ? (
+                      <p
+                        id="acceptTermsError"
+                        role="alert"
+                        className="mt-2 text-center text-xs text-destructive"
+                      >
+                        {termsError}
+                      </p>
+                    ) : null}
 
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                      {/*
+                        PLAIN "BACK", like the step before it.
+
+                        This said "Back to payment" while sitting ON the
+                        payment screen, and went to Personalize. Two wrong
+                        turns in one label: it named the step the buyer was
+                        already standing on, and it moved them away from the
+                        payment choices they were trying to reach.
+
+                        Only the first step names its destination — "Back to
+                        cart" — because that one leaves the checkout route.
+                        The inner steps say "Back", which is what the
+                        Personalize step's own button already says.
+                      */}
                       <Button variant="outline" onClick={() => goToStep(2)}>
-                        Back to payment
+                        Back
                       </Button>
                       <Button
                         variant="bakery"
                         onClick={onPlaceOrder}
+                        /*
+                          EVERY REASON LEFT HERE IS ONE THE CUSTOMER CAN SEE.
+
+                          `placing` shows a spinner in this button,
+                          `cartBlocked` draws the CartIssuesAlert above, and
+                          the minimum-order clause draws the amber alert above
+                          it. Each greys the button and each says why, on the
+                          screen, without a pointer.
+
+                          `!termsAccepted` used to be in this list and is not
+                          any more. It is the one gate with nothing visible
+                          behind it — the `title` meant to explain it could
+                          never fire, because a disabled button has
+                          `pointer-events-none`. It is enforced in
+                          `onPlaceOrder` instead, which can put the reason
+                          under the box it is about.
+                        */
                         disabled={
                           placing ||
                           cartBlocked ||
-                          // The tick above means something now, so it gates the
-                          // button. `title` because a disabled control that
-                          // does not say why is the worst kind.
-                          !termsAccepted ||
                           (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
                         }
-                        title={!termsAccepted ? "Accept the terms above to continue" : undefined}
                       >
                         {placing ? <Loader2 className="size-4 animate-spin" /> : null}
                         {placing ? (

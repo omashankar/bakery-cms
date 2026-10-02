@@ -154,14 +154,33 @@ describe("the occasion is the shop's own word", () => {
 describe("the terms tick is a control, not a caption", () => {
   const page = read("apps/website/checkout/pages/checkout-page.tsx");
 
-  it("gates the button that takes the money", () => {
+  it("stops the press that takes the money", () => {
     /**
      * It was a centred grey sentence saying agreement had already happened by
      * virtue of pressing the button beside it. Nothing was ticked and nothing
      * was recorded.
+     *
+     * THIS USED TO ASSERT `"!termsAccepted ||"`, an operand in the
+     * place-order button's `disabled={…}`, and that spelling was the
+     * trouble. The button arrived grey with the only stated reason in a
+     * `title` — which can never render, because the shared button class
+     * carries `disabled:pointer-events-none` and a disabled button receives
+     * no hover on any device. A buyer who had filled in an address, a slot
+     * and a payment method met a dead control and no explanation.
+     *
+     * The tick is enforced in `onPlaceOrder` instead, which can put the
+     * reason under the box it is about. The claim this case makes is
+     * unchanged — the tick is a control, and the order cannot be placed
+     * without it — so only the place it looks has moved.
+     *
+     * The visible half of that refusal has its own file:
+     * tests/domain/the-last-button-says-why-it-refused.test.ts.
      */
-    expect(page).toContain("!termsAccepted ||");
-    expect(page).toContain("Accept the terms above to continue");
+    const handler = page.slice(page.indexOf("const onPlaceOrder = async () => {"));
+    expect(handler, "nothing stops a press with the box unticked").toContain("if (!termsAccepted) {");
+    expect(handler.slice(0, 1200), "the refusal lost its words").toContain(
+      "Accept the terms above to continue",
+    );
   });
 
   it("records when, not that a page once contained the words", () => {
