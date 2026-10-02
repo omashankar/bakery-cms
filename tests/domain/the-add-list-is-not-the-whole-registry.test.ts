@@ -39,42 +39,80 @@ import {
 */
 const offered = ADDABLE_SECTION_REGISTRY;
 
+/**
+ * EVERY SECTION THE PICKER DOES NOT OFFER, written out.
+ *
+ * Two are bakery slugs frozen into the section type, kept because published
+ * layouts carry them. The other nine the shop looked at and turned down.
+ *
+ * Spelled out rather than derived from the flag, so that marking one more
+ * entry `notOffered` fails here until somebody adds it to this list — which
+ * is the point. Hiding a row from a shop should be a decision, not a diff.
+ */
+const DROPPED = [
+  "categories",
+  "cta",
+  "eggless",
+  "gallery",
+  "instagram",
+  "newsletter",
+  "photo-cakes",
+  "promo-banner",
+  "promo-collage",
+  "seo-prose",
+  "store-locator"
+] as const;
+
 const WORDS = { productWord: "product", productWordPlural: "products" };
 
 describe("the list a shop is offered", () => {
-  it("leaves out the legacy bakery sections", () => {
+  it("leaves out every section marked not-offered", () => {
     const names = offered.map((entry) => entry.type);
-    expect(names, "a florist is offered Photo Cakes").not.toContain("photo-cakes");
-    expect(names, "a florist is offered Eggless Cakes").not.toContain("eggless");
+    for (const type of DROPPED) {
+      expect(names, `"${type}" is still offered in Add section`).not.toContain(type);
+    }
   });
 
   it("but the registry still HAS them, or a published page loses its editor", () => {
     /*
-      THE HALF THAT MAKES THE OTHER HALF SAFE. Filtering the add list is
-      correct; filtering the registry would be a different change entirely —
-      this shop's homepage carries a `photo-cakes` section, and the builder
-      resolves an existing section's fields through `getRegistryEntry`, which
-      searches the WHOLE registry. Drop them from there and that section
-      renders with no editor behind it.
+      THE HALF THAT MAKES THE OTHER HALF SAFE, and the live document says why.
+
+      This shop's homepage carries a `photo-cakes` section. None of the other
+      ten is on the page — checked, draft and published both — but ALL of them
+      are in its twenty saved REVISIONS, and the builder can restore one. The
+      builder resolves an existing section's fields through
+      `getRegistryEntry`, which searches the whole registry, so a restored
+      revision keeps its editor. Filter there instead and it renders with
+      nothing behind it.
+
+      AND EACH CARRIES ITS REASON. A bare flag would not have survived the
+      second use: two of these are frozen bakery slugs kept for published
+      layouts, the rest are sections the shop turned down, and only one of
+      those two groups would ever come back.
     */
-    for (const type of ["photo-cakes", "eggless"] as const) {
-      const entry = getRegistryEntry(type);
+    for (const type of DROPPED) {
+      const entry = getRegistryEntry(type as never);
       expect(entry, `${type} is gone from the registry, not just from the picker`).toBeTruthy();
-      expect(entry!.legacy, `${type} is no longer marked legacy`).toBe(true);
+      expect(
+        (entry!.notOffered ?? "").trim(),
+        `${type} is hidden with no reason written down`,
+      ).not.toBe("");
     }
   });
 
   it("and offers everything else", () => {
     /*
       A COUNT, so that hiding a row by accident is as loud as offering one.
-      Measured in the browser: the dialog drew 29 rows before and 27 after.
+      Measured in the browser: the dialog drew 29 rows, then 27, now 18.
     */
     expect(HOMEPAGE_SECTION_REGISTRY).toHaveLength(29);
-    expect(offered).toHaveLength(27);
+    expect(offered).toHaveLength(29 - DROPPED.length);
     expect(
-      HOMEPAGE_SECTION_REGISTRY.filter((entry) => entry.legacy).map((entry) => entry.type).sort(),
-      "something new was marked legacy and quietly stopped being offered",
-    ).toEqual(["eggless", "photo-cakes"]);
+      HOMEPAGE_SECTION_REGISTRY.filter((entry) => entry.notOffered)
+        .map((entry) => entry.type)
+        .sort(),
+      "something was hidden from the picker without being listed here",
+    ).toEqual([...DROPPED].sort());
   });
 });
 

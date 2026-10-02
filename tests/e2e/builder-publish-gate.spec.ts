@@ -108,11 +108,31 @@ test("the Add section dialog offers no legacy bakery rows", async ({ page }) => 
   });
 
   expect(offered, "the Add section dialog never opened").not.toBeNull();
-  /* A FLOOR. An empty list would satisfy every `not.toContain` below. */
-  expect(offered!.length, "the dialog offered nothing at all").toBeGreaterThan(20);
+  /*
+    A FLOOR. An empty list would satisfy every `not.toContain` below.
 
-  expect(offered, "a florist is offered Photo Cakes").not.toContain("Photo Cakes");
-  expect(offered, "a florist is offered Eggless Cakes").not.toContain("Eggless Cakes");
+    Kept loose on purpose: the exact count is pinned in
+    the-add-list-is-not-the-whole-registry.test.ts, where changing it is one
+    line next to the list that explains it. A hard number here would break on
+    every deliberate change and teach nobody anything.
+  */
+  expect(offered!.length, "the dialog offered nothing at all").toBeGreaterThan(10);
+
+  for (const label of [
+    "Photo Cakes",
+    "Eggless Cakes",
+    "Promo Banner",
+    "Promo cards",
+    "About what you sell",
+    "Featured Categories",
+    "Gallery",
+    "Instagram Gallery",
+    "Store Locator",
+    "Newsletter",
+    "Call to Action",
+  ]) {
+    expect(offered, `the picker still offers "${label}"`).not.toContain(label);
+  }
 
   /*
     AND NO ROW SHOUTS IN LOWER CASE. `{Products}` returned the shop’s plural

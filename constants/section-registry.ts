@@ -133,22 +133,21 @@ export interface HomepageSectionRegistryEntry {
   type: HomepageSectionType;
   label: string;
   /**
-   * NOT OFFERED TO A SHOP, but still rendered and still editable.
+   * WHY THIS SECTION IS NOT OFFERED IN "Add section". Absent means offered.
    *
-   * `photo-cakes` and `eggless` are bakery slugs frozen into the section type
-   * — the renderer says so where it dispatches them — and they stay because
-   * layouts already published carry them. This shop's homepage has one.
+   * It hides the row from the PICKER and nothing else. The registry keeps
+   * every entry, because `getRegistryEntry` searches all of it and that is how
+   * the builder resolves the fields of a section already on a page — or on a
+   * revision somebody restores from History. Filter the registry instead and
+   * those sections render with no editor behind them.
    *
-   * The reason they were kept covers RENDERING. It never covered offering
-   * them: a florist opening Add section read "Photo Cakes" and "Eggless Cakes"
-   * among the things it could build its page from. `category-rail` is what a
-   * shop adds instead, and it picks the category from the shop's own list.
-   *
-   * So this flag hides them from the picker ONLY. `getRegistryEntry` searches
-   * the whole registry, which is what the builder resolves an existing
-   * section's fields through, so a published one keeps its editor.
+   * A STRING RATHER THAN A FLAG, because there are two different reasons and a
+   * boolean hides that. Two entries are bakery slugs frozen into the section
+   * type, kept because published layouts carry them. The rest are sections the
+   * shop looked at and did not want offered. Both end up off the list; only
+   * one of them would ever come back.
    */
-  legacy?: true;
+  notOffered?: string;
   icon: string;
   defaultBackground: SectionBackground;
   defaultContent: Record<string, string | number | boolean>;
@@ -517,6 +516,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "promo-banner",
+    notOffered: "the shop asked for it off the picker",
     label: "Promo Banner",
     icon: "Tag",
     defaultBackground: "cream",
@@ -669,6 +669,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       made yet, and an empty list renders no band at all.
     */
     type: "promo-collage",
+    notOffered: "the shop asked for it off the picker",
     label: "Promo cards",
     icon: "LayoutGrid",
     defaultBackground: "white",
@@ -810,6 +811,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       what the shop sells, let alone what it would want to say about it.
     */
     type: "seo-prose",
+    notOffered: "the shop asked for it off the picker",
     label: "About what you sell",
     icon: "Text",
     defaultBackground: "cream",
@@ -1262,6 +1264,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "categories",
+    notOffered: "the shop asked for it off the picker",
     label: "Featured Categories",
     icon: "LayoutGrid",
     defaultBackground: "cream",
@@ -1578,7 +1581,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "photo-cakes",
-    legacy: true,
+    notOffered: "a trade-specific slug frozen into the section type, kept because published layouts carry it",
     label: "Photo Cakes",
     icon: "Camera",
     defaultBackground: "white",
@@ -1619,7 +1622,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "eggless",
-    legacy: true,
+    notOffered: "a trade-specific slug frozen into the section type, kept because published layouts carry it",
     label: "Eggless Cakes",
     icon: "Leaf",
     defaultBackground: "cream",
@@ -1818,6 +1821,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "gallery",
+    notOffered: "the shop asked for it off the picker",
     label: "Gallery",
     icon: "Images",
     defaultBackground: "white",
@@ -1892,6 +1896,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "instagram",
+    notOffered: "the shop asked for it off the picker",
     label: "Instagram Gallery",
     icon: "Camera",
     defaultBackground: "cream",
@@ -1952,6 +1957,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "store-locator",
+    notOffered: "the shop asked for it off the picker",
     label: "Store Locator",
     icon: "MapPin",
     defaultBackground: "cream",
@@ -1974,6 +1980,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "newsletter",
+    notOffered: "the shop asked for it off the picker",
     label: "Newsletter",
     icon: "Mail",
     defaultBackground: "white",
@@ -1992,6 +1999,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
   },
   {
     type: "cta",
+    notOffered: "the shop asked for it off the picker",
     label: "Call to Action",
     icon: "Megaphone",
     defaultBackground: "white",
@@ -2032,7 +2040,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
  * editor.
  */
 export const ADDABLE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] =
-  HOMEPAGE_SECTION_REGISTRY.filter((entry) => !entry.legacy);
+  HOMEPAGE_SECTION_REGISTRY.filter((entry) => !entry.notOffered);
 
 export function getRegistryEntry(
   type: HomepageSectionType
