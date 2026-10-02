@@ -24,7 +24,6 @@ import {
 import { openRazorpayCheckout } from "@/apps/website/checkout/lib/razorpay";
 import { getEnabledCheckoutMethods } from "@/features/payments/lib/resolve-methods";
 import { PaymentMethodList } from "@/apps/website/checkout/payments/payment-method-list";
-import { SecurityBadges } from "@/features/payments/components/security-badges";
 import {
   ProcessingState,
   type PaymentUIState,
@@ -89,7 +88,6 @@ import {
   getCartItems,
   getCartPreferences,
   subscribeToCart,
-  updateCartPreferences,
 } from "@/features/cart/lib/cart";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 import { Button } from "@/components/ui/button";
@@ -1440,7 +1438,16 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     Where should we deliver your order?
                   </p>
 
+                  {/*
+                    AN ID, so the Continue button can live in the sidebar.
+
+                    That button is a submit, and a submit outside its form
+                    does nothing at all — silently. `form="…"` is the
+                    attribute that reconnects them, and it keeps the
+                    validation this form already runs.
+                  */}
                   <form
+                    id="checkoutAddressForm"
                     className="mt-6 space-y-4"
                     onSubmit={handleSubmit(onDeliverySubmit)}
                   >
@@ -1515,7 +1522,22 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
-                      <div className="space-y-2">
+                      {/*
+                        BOTH COLUMNS, and the blank cell goes with it.
+
+                        This was one column, which gave the longest value
+                        anyone types here the narrow half — the signed-in
+                        address overflowed its box while "Phone" beside it
+                        used a third of its own — and pushed "Alternate
+                        phone" onto a row by itself with an empty half
+                        beside it, which reads as a field that failed to
+                        load.
+
+                        Widening this drops the two phone numbers onto one
+                        row together, which is where they belong, and leaves
+                        no cell empty.
+                      */}
+                      <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="email">Email</Label>
                         <Input
                           id="email"
@@ -1751,14 +1773,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
                     <CartIssuesAlert issues={cartIssues} />
 
-                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
-                      <Button variant="outline" render={<Link href={routes.store.cart} />}>
-                        Back to cart
-                      </Button>
-                      <Button type="submit" variant="bakery" disabled={cartBlocked}>
-                        Continue
-                      </Button>
-                    </div>
                   </form>
                 </div>
               ) : null}
@@ -2026,18 +2040,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     </div>
                   </div>
 
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                    <Button variant="outline" onClick={() => goToStep(1)}>
-                      Back
-                    </Button>
-                    <Button
-                      variant="bakery"
-                      onClick={onPersonalizeContinue}
-                      disabled={cartBlocked}
-                    >
-                      Continue to payment
-                    </Button>
-                  </div>
                 </div>
               ) : null}
 
@@ -2065,9 +2067,21 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       />
                     </div>
 
-                    <div className="mt-5 border-t border-border pt-5">
-                      <SecurityBadges />
-                    </div>
+                    {/*
+                      THREE BADGES WENT FROM HERE, and nothing replaced them.
+
+                      They read "256-bit SSL / Encrypted", "Secure Checkout /
+                      Verified" and "PCI-DSS Ready / Compliant". None was the
+                      shop's to say — the last is a card-industry compliance
+                      claim, the second names no verifier, and the component
+                      that drew them said so itself: "Placeholders — no live
+                      attestation."
+
+                      A softer reassurance in their place would be the same
+                      offence in quieter words. The payment card above
+                      already names Razorpay, which is a fact about who
+                      handles the payment and is the shop's to state.
+                    */}
                   </div>
 
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -2161,6 +2175,44 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </p>
                     ) : null}
 
+                  </div>
+
+                </div>
+              ) : null}
+            </div>
+
+            <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+              <OrderSummaryPanel
+                items={serverItems ?? items}
+                totals={totals}
+                giftWrapLabel={commerce.giftWrapLabel}
+              />
+
+              {/*
+                THE WAY ON, IN THE SAME CORNER ON EVERY STEP.
+
+                It used to be three different buttons in three different
+                places: 83x32 on Address, 161x32 on Personalize, 153x32 on
+                Payment, each tucked under a long form in the wide column
+                while the total sat over here. On a phone that meant
+                scrolling past the money to find the button, and on every
+                step it meant looking somewhere new for the same thing.
+
+                Directly under the totals, full width, so the amount and
+                the control that commits to it are read together. 48px
+                tall because this is the control the page exists for and
+                the shared button's 32 is under every touch-target floor.
+                The way back is 44 and sits underneath rather than beside,
+                so the two never compete for one corner.
+
+                The consent box is here, not in the review card, for one
+                hard reason: the refusal it raises renders beside the box,
+                and a box in the other column would put the explanation
+                half a screen away from the press that caused it.
+              */}
+              <div className="space-y-3">
+                {step === 3 ? (
+                  <div className="rounded-xl border border-border bg-card p-4">
                     {/*
                       A CONTROL, not a caption.
 
@@ -2220,108 +2272,136 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         {termsError}
                       </p>
                     ) : null}
-
-                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                      {/*
-                        PLAIN "BACK", like the step before it.
-
-                        This said "Back to payment" while sitting ON the
-                        payment screen, and went to Personalize. Two wrong
-                        turns in one label: it named the step the buyer was
-                        already standing on, and it moved them away from the
-                        payment choices they were trying to reach.
-
-                        Only the first step names its destination — "Back to
-                        cart" — because that one leaves the checkout route.
-                        The inner steps say "Back", which is what the
-                        Personalize step's own button already says.
-                      */}
-                      <Button variant="outline" onClick={() => goToStep(2)}>
-                        Back
-                      </Button>
-                      <Button
-                        variant="bakery"
-                        onClick={onPlaceOrder}
-                        /*
-                          EVERY REASON LEFT HERE IS ONE THE CUSTOMER CAN SEE.
-
-                          `placing` shows a spinner in this button,
-                          `cartBlocked` draws the CartIssuesAlert above, and
-                          the minimum-order clause draws the amber alert above
-                          it. Each greys the button and each says why, on the
-                          screen, without a pointer.
-
-                          `!termsAccepted` used to be in this list and is not
-                          any more. It is the one gate with nothing visible
-                          behind it — the `title` meant to explain it could
-                          never fire, because a disabled button has
-                          `pointer-events-none`. It is enforced in
-                          `onPlaceOrder` instead, which can put the reason
-                          under the box it is about.
-                        */
-                        disabled={
-                          placing ||
-                          cartBlocked ||
-                          (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
-                        }
-                      >
-                        {placing ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {placing ? (
-                          paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
-                        ) : paymentMethod === "razorpay" ? (
-                          <>Pay {formatCurrency(totals.total)}</>
-                        ) : (
-                          <>Place order · {formatCurrency(totals.total)}</>
-                        )}
-                      </Button>
-                    </div>
                   </div>
+                ) : null}
 
-                </div>
-              ) : null}
-            </div>
+                {step === 1 ? (
+                  <Button
+                    type="submit"
+                    form="checkoutAddressForm"
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    disabled={cartBlocked}
+                  >
+                    Continue
+                  </Button>
+                ) : null}
 
-            <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
-              <OrderSummaryPanel
-                items={serverItems ?? items}
-                totals={totals}
-                giftWrapLabel={commerce.giftWrapLabel}
-              />
-              {commerce.giftWrapEnabled ? (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4">
-                  <Checkbox
-                    checked={giftWrap}
-                    onCheckedChange={(checked) => {
-                      const next = checked === true;
-                      setGiftWrap(next);
-                      updateCartPreferences({ giftWrap: next });
-                    }}
-                  />
-                  <span className="text-sm">
-                    <span className="font-medium">{commerce.giftWrapLabel}</span>
-                    <span className="block text-muted-foreground">
-                      Adds {formatCurrency(commerce.giftWrapFee)} to your order
-                    </span>
-                  </span>
-                </label>
-              ) : null}
+                {step === 2 ? (
+                  <Button
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    onClick={onPersonalizeContinue}
+                    disabled={cartBlocked}
+                  >
+                    Continue to payment
+                  </Button>
+                ) : null}
 
-              <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-3 text-sm font-medium">Have a coupon?</p>
-                  <CouponInput
-                    cart={couponLines}
-                    applied={coupon}
-                    lapsedReason={couponLapsedReason}
-                    onApply={(next) => {
-                      setCoupon(next);
-                      persistDraft({ coupon: next });
-                    }}
-                    onRemove={() => {
-                      setCoupon(undefined);
-                      persistDraft({ coupon: undefined });
-                    }}
-                  />
+                {step === 3 ? (
+                  <Button
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    onClick={onPlaceOrder}
+                    /*
+                      EVERY REASON LEFT HERE IS ONE THE CUSTOMER CAN SEE.
+
+                      `placing` shows a spinner in this button,
+                      `cartBlocked` draws the CartIssuesAlert, and the
+                      minimum-order clause draws its own alert. Each greys
+                      the button and each says why, on the screen, without
+                      a pointer.
+
+                      `!termsAccepted` used to be in this list and is not
+                      any more — it is the one gate with nothing visible
+                      behind it, and it is enforced in `onPlaceOrder`,
+                      which can put the reason under the box it is about.
+                    */
+                    disabled={
+                      placing ||
+                      cartBlocked ||
+                      (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
+                    }
+                  >
+                    {placing ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {placing ? (
+                      paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
+                    ) : paymentMethod === "razorpay" ? (
+                      <>Pay {formatCurrency(totals.total)}</>
+                    ) : (
+                      <>Place order · {formatCurrency(totals.total)}</>
+                    )}
+                  </Button>
+                ) : null}
+
+                {/*
+                  THE WAY BACK, under the way on, never beside it.
+
+                  Only the first step names where it goes — "Back to cart"
+                  — because that one leaves the checkout route. The inner
+                  steps say "Back".
+                */}
+                {step === 1 ? (
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full"
+                    render={<Link href={routes.store.cart} />}
+                  >
+                    Back to cart
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full"
+                    onClick={() => goToStep((step - 1) as 1 | 2)}
+                  >
+                    Back
+                  </Button>
+                )}
               </div>
+              {/*
+                THE GIFT WRAP TICK AND THE COUPON BOX WERE HERE, AND ARE ON
+                THE CART.
+
+                The cart's "Order extras" card carries the wrap, and its
+                sidebar carries "Have a coupon?". Drawing both again put two
+                fresh decisions directly under the button that moves the
+                purchase on — on Address, again on Personalize, again on
+                Payment — which is the opposite of what that corner is for.
+
+                Nothing is lost by taking them out. An applied coupon still
+                shows as its own Discount line in the price panel on every
+                step, the wrap still shows in the totals when it is on, and
+                "Edit cart" sits in that panel's header on every step.
+
+                ONE BRANCH OF THE COUPON BOX STAYS, and it is not a prompt.
+                `couponLapsedReason` had exactly one consumer — the box
+                that just went — and CouponInput's own comment says what
+                losing it costs: "The discount is already gone from the
+                totals; this is the only thing on the page that admits it."
+                Without it, a code that stops applying part-way through
+                makes the total go UP with nothing explaining why.
+
+                So it renders only when a coupon is applied AND has lapsed,
+                which is the amber notice and nothing else. A working
+                coupon shows as a Discount line in the panel and nowhere
+                else; a dead one is reported.
+              */}
+              {coupon && couponLapsedReason ? (
+                <CouponInput
+                  cart={couponLines}
+                  applied={coupon}
+                  lapsedReason={couponLapsedReason}
+                  onApply={(next) => {
+                    setCoupon(next);
+                    persistDraft({ coupon: next });
+                  }}
+                  onRemove={() => {
+                    setCoupon(undefined);
+                    persistDraft({ coupon: undefined });
+                  }}
+                />
+              ) : null}
               {!getCustomerSession() ? (
                 <p className="text-center text-xs text-muted-foreground">
                   Have an account?{" "}

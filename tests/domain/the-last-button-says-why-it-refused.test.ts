@@ -270,9 +270,17 @@ describe("the way back out of the payment step", () => {
     /*
       Only the first step names its destination — "Back to cart" — because
       that one leaves the checkout route. The inner steps say "Back".
+
+      ONE BUTTON SERVES BOTH INNER STEPS NOW. This used to count two
+      `>Back<` because each step rendered its own; the action block in the
+      sidebar renders one and sends it to `step - 1`. So the count is not
+      the claim — the pairing is: the first step names the route it leaves,
+      and the step the buyer is on does not.
     */
     expect(src, "the first step stopped naming the route it leaves for").toContain("Back to cart");
-    const backs = [...src.matchAll(/>\s*Back\s*</g)];
-    expect(backs.length, "the two inner steps no longer share one back label").toBeGreaterThanOrEqual(2);
+    expect(src, "the inner steps stopped saying plain Back").toMatch(/>\s*Back\s*</);
+    expect(src, "the back button no longer walks back one step").toContain(
+      "goToStep((step - 1) as 1 | 2)",
+    );
   });
 });

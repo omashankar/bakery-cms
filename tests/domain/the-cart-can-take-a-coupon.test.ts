@@ -263,7 +263,21 @@ describe("the bar that follows the customer down the page", () => {
 
     const view = render();
     const bar = view.querySelector(".fixed.inset-x-0.bottom-0");
-    expect(bar?.textContent).toContain("Proceed to checkout");
+    /*
+      EITHER NAME, because this case renders a signed-OUT cart and the
+      button tells the truth about what it does. Signed in it goes to the
+      checkout and says "Proceed to checkout"; signed out it opens a dialog
+      headed "Sign in" and says "Sign in to checkout". It used to say
+      "Proceed to checkout" in both states with a padlock as the only hint,
+      and the padlock means "256-bit SSL" two screens later.
+
+      What this case is about is that the bar carries the total and A way
+      forward — not which of the two states the fixture happens to be in.
+    */
+    expect(
+      bar?.textContent,
+      "the sticky bar has no way forward in it",
+    ).toMatch(/Proceed to checkout|Sign in to checkout/);
     // The SAME number the summary panel shows — delivery, tax and charges
     // included — not the subtotal. Two totals on one screen is the bug this
     // bar would otherwise introduce.

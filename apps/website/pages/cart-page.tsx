@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Bookmark,
   Heart,
-  Lock,
   Pencil,
   ShieldCheck,
   ShoppingBag,
@@ -700,18 +699,33 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                     You save {formatCurrency(savings)} on this order
                   </p>
                 ) : null}
+                {/*
+                  THE SAME CONTROL, THE SAME SIZE, AS THE THREE STEPS AFTER
+                  THIS ONE — 48px and full width, directly under the totals.
+                  It was 32px, which is under every touch-target floor and
+                  the one place in the purchase where the way on was a
+                  different size from everywhere else.
+
+                  AND IT SAYS WHAT IT DOES. Signed out, this opens a dialog
+                  headed "Sign in" while the label still reads "Proceed to
+                  checkout" — the only hint being a padlock, which the
+                  payment step two screens later uses to mean "256-bit SSL".
+                  One glyph, two meanings, in one flow. Sign-in before
+                  checkout is the shop's decision and stays; the button
+                  naming it is the button describing itself, not a claim
+                  about the shop. The padlock goes with the ambiguity.
+                */}
                 <Button
-                  className="w-full"
+                  className="h-12 w-full text-base"
                   variant="bakery"
                   {...(signedIn
                     ? { render: <Link href={routes.store.checkout} /> }
                     : { onClick: () => openCustomerAuthModal("phone") })}
                 >
-                  {signedIn ? null : <Lock className="size-4" />}
-                  Proceed to checkout
+                  {signedIn ? "Proceed to checkout" : "Sign in to checkout"}
                 </Button>
                 <Button
-                  className="w-full"
+                  className="h-11 w-full"
                   variant="outline"
                   render={<Link href={routes.store.collections} />}
                 >
@@ -775,15 +789,16 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 </p>
               ) : null}
             </div>
+            {/* The bar and the panel are the same control; they say and
+                measure the same thing. */}
             <Button
-              className="flex-1"
+              className="h-12 flex-1 text-base"
               variant="bakery"
               {...(signedIn
                 ? { render: <Link href={routes.store.checkout} /> }
                 : { onClick: () => openCustomerAuthModal("phone") })}
             >
-              {signedIn ? null : <Lock className="size-4" />}
-              Proceed to checkout
+              {signedIn ? "Proceed to checkout" : "Sign in to checkout"}
             </Button>
           </div>
         </div>
