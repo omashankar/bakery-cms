@@ -131,10 +131,20 @@ const paymentOptions: {
  * Every optional one takes `?? ""` so an older saved record yields a string
  * rather than flipping its input to uncontrolled.
  */
-function toCheckoutAddress(saved: SavedAddress): CheckoutAddress {
+/**
+ * A saved destination, as this form's values — WITH THE ACCOUNT'S EMAIL.
+ *
+ * It used to carry `saved.email`, and the address book stores an email per
+ * address, so choosing a different saved destination silently changed which
+ * account the order belonged to. The order list is found by matching the
+ * session's email against the order's `address.email`
+ * (order.repository.ts, findByCustomerEmail), so that was a destination
+ * picker quietly reassigning the buyer's own order history.
+ */
+function toCheckoutAddress(saved: SavedAddress, accountEmail: string): CheckoutAddress {
   return {
     fullName: saved.fullName,
-    email: saved.email,
+    email: accountEmail,
     phone: saved.phone,
     addressLine1: saved.addressLine1,
     addressLine2: saved.addressLine2 ?? "",
@@ -239,6 +249,19 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    * explain the grey button was never reachable by a pointer on any device.
    */
   const [termsError, setTermsError] = useState<string | null>(null);
+  /**
+   * WHO THE ORDER BELONGS TO.
+   *
+   * Held rather than read inline, because `getCustomerSession()` reads the
+   * browser and a render-time call would differ between the server's HTML
+   * and the first client render. Set from the same session the draft is
+   * restored with, below.
+   *
+   * It matters because "My orders" matches this against each order's
+   * `address.email` (order.repository.ts, findByCustomerEmail), so it is
+   * the key the buyer's own history is found by — not a contact detail.
+   */
+  const [accountEmail, setAccountEmail] = useState("");
   /**
    * The VISIBLE consent box, for moving focus to when it refuses.
    *
@@ -483,6 +506,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     const draft = getCheckoutDraft();
     const session = getCustomerSession();
+    setAccountEmail(session?.email ?? "");
 
     /**
      * `reset` REPLACES the value set, so this literal is the whole form — a
@@ -492,7 +516,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      */
     reset({
       fullName: draft.address.fullName || session?.name || "",
-      email: draft.address.email || session?.email || "",
+      /*
+        THE SESSION FIRST, not the draft. This read the draft before the
+        session, so a recipient's address typed before this fix would
+        survive it — and the order list is found by matching the session's
+        email against the order's. The draft may hold a destination; it
+        does not get to hold an identity.
+      */
+      email: session?.email || draft.address.email || "",
       phone: draft.address.phone || session?.phone || "",
       addressLine1: draft.address.addressLine1,
       addressLine2: draft.address.addressLine2,
@@ -514,7 +545,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     const preferred = draftHasAddress ? null : getDefaultAddress();
     if (preferred) {
       setAddressChoice(preferred.id);
-      reset(toCheckoutAddress(preferred));
+      reset(toCheckoutAddress(preferred, session?.email ?? ""));
     } else if (draftHasAddress) {
       const matching = addresses.find((entry) => isSameAddress(entry, draft.address));
       setAddressChoice(matching?.id ?? "new");
@@ -1451,6 +1482,29 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     className="mt-6 space-y-4"
                     onSubmit={handleSubmit(onDeliverySubmit)}
                   >
+                    {/*
+                      WHO THE ORDER BELONGS TO — shown, not asked.
+
+                      The order list matches the session's email against the
+                      order's `address.email`, so this value is the key the
+                      buyer's own history is found by, not a contact detail.
+                      As an input inside a card headed "New delivery
+                      address", under "Where should we deliver your order?",
+                      it invited a gift sender to type the RECIPIENT's — and
+                      one keystroke put the order somewhere they could never
+                      find it.
+
+                      Checkout is sign-in gated, so the account email always
+                      exists. It is read back here, above the destination
+                      and outside it, and the registration stays mounted so
+                      the value still reaches the order.
+                    */}
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-border bg-cream-50 px-4 py-3 text-sm">
+                      <span className="text-muted-foreground">Ordering as</span>
+                      <span className="font-medium break-all">{accountEmail}</span>
+                    </div>
+                    <input type="hidden" {...register("email")} />
+
                     <DeliveryAddressPicker
                       addresses={savedAddresses}
                       selectedId={addressChoice === "new" ? null : addressChoice}
@@ -1458,13 +1512,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         setAddressChoice(address.id);
                         setEditingAddressId(null);
                         setShowAddressForm(false);
-                        reset(toCheckoutAddress(address));
+                        reset(toCheckoutAddress(address, accountEmail));
                       }}
                       onEdit={(address) => {
                         setAddressChoice(address.id);
                         setEditingAddressId(address.id);
                         setShowAddressForm(true);
-                        reset(toCheckoutAddress(address));
+                        reset(toCheckoutAddress(address, accountEmail));
                       }}
                       onAddNew={() => {
                         setAddressChoice("new");
@@ -1501,7 +1555,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                   savedAddresses[0];
                                 if (fallback) {
                                   setAddressChoice(fallback.id);
-                                  reset(toCheckoutAddress(fallback));
+                                  reset(toCheckoutAddress(fallback, accountEmail));
                                 }
                               }}
                             >
@@ -1523,39 +1577,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         ) : null}
                       </div>
                       {/*
-                        BOTH COLUMNS, and the blank cell goes with it.
-
-                        This was one column, which gave the longest value
-                        anyone types here the narrow half — the signed-in
-                        address overflowed its box while "Phone" beside it
-                        used a third of its own — and pushed "Alternate
-                        phone" onto a row by itself with an empty half
-                        beside it, which reads as a field that failed to
-                        load.
-
-                        Widening this drops the two phone numbers onto one
-                        row together, which is where they belong, and leaves
-                        no cell empty.
+                        THE EMAIL INPUT WAS HERE. It is read-only text above
+                        the picker now — see the note there. Phone keeps the
+                        first column and "Alternate phone" the second, which
+                        is where the two numbers belong.
                       */}
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          {...register("email", {
-                            required: "Email is required",
-                            pattern: {
-                              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                              message: "Enter a valid email",
-                            },
-                          })}
-                        />
-                        {formState.errors.email ? (
-                          <p role="alert" className="text-xs text-destructive">
-                            {formState.errors.email.message}
-                          </p>
-                        ) : null}
-                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
                         <Input
@@ -1741,7 +1767,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                   savedAddresses[0];
                                 if (fallback) {
                                   setAddressChoice(fallback.id);
-                                  reset(toCheckoutAddress(fallback));
+                                  reset(toCheckoutAddress(fallback, accountEmail));
                                 }
                               }}
                             >
