@@ -22,8 +22,23 @@ import { getActiveLocale } from "@/features/settings/lib/active-locale";
  * — while everything that is easy to get wrong is in here: the null-first
  * pass, the shop's timezone, the tick, the teardown and the clear.
  */
-export function useSameDayCountdown(closesAt: string | undefined): string | null {
-  const [timeLeft, setTimeLeft] = useState<string | null>(null);
+export function useSameDayCountdown(
+  closesAt: string | undefined,
+  /**
+   * What the server already worked out, so the band is in the HTML.
+   *
+   * Without it this starts at null on both passes, so the band is absent
+   * from the server's render and appears about 900ms later — 292px of it,
+   * pushing the homepage down. Measured: CLS 0.152 at 390.
+   *
+   * It arrives as a PROP, serialized in the payload, which is why seeding
+   * state with it cannot cause a hydration mismatch: the server's render
+   * and the browser's first render read the same string. The effect below
+   * still owns every value after the first.
+   */
+  initial?: string | null,
+): string | null {
+  const [timeLeft, setTimeLeft] = useState<string | null>(initial ?? null);
 
   useEffect(() => {
     const at = (closesAt ?? "").trim();

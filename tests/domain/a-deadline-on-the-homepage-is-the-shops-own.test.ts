@@ -112,15 +112,40 @@ describe("the band on the page", () => {
   });
 
   it("never reads a clock during render", () => {
+    /*
+      THE CLAIM IS THE SAME; THE FIRST VALUE NOW ARRIVES AS A PROP.
+
+      The band used to be absent from the served HTML — the hook started at
+      null and filled in from an effect, so 292px of it appeared about
+      900ms later and pushed the homepage down (CLS 0.152 at 390). The
+      server works the first countdown out now, from the settings document
+      it was already reading, and sends it.
+
+      That is still not "reading a clock during render": nothing here calls
+      one. The value crosses as data, so the server's render and the
+      browser's first render use the identical string and there is nothing
+      to hydrate differently.
+
+      The hazard this case was written against was a module-state locale
+      read on the SSR pass — the shape active-locale.ts warns about — and
+      nothing below calls `getActiveLocale`. The two assertions that carry
+      that weight are kept: no clock in the hook before its effect, and now
+      no clock in the band under any name.
+    */
     const body = band();
-    expect(body).toContain("useSameDayCountdown(cutoff)");
+    expect(body).toContain("useSameDayCountdown(cutoff, props.trust?.sameDayTimeLeft)");
     expect(body).not.toContain("new Date(");
+    expect(body, "the band reads the shop clock itself").not.toContain("shopClockNow");
 
     const hook = code("hooks/use-same-day-countdown.ts");
-    expect(hook).toContain("useState<string | null>(null)");
+    expect(hook).toContain("useState<string | null>(initial ?? null)");
     expect(
       hook.slice(0, hook.indexOf("useEffect")).includes("timeLeftToday"),
       "a server-rendered clock",
+    ).toBe(false);
+    expect(
+      hook.includes("getActiveLocale()") && hook.indexOf("getActiveLocale()") < hook.indexOf("useEffect"),
+      "the locale is read during render again",
     ).toBe(false);
   });
 
@@ -142,8 +167,18 @@ describe("the band on the page", () => {
   });
 
   it("and the server decides by the rule, not by copying the setting", () => {
+    /*
+      THE CALL IS HOISTED NOW, because the countdown sent beside it needs
+      the same value and two calls to `sameDayCutoffFor` is how the two
+      drift apart. So the case asserts the RULE — that the cutoff goes
+      through that function and never straight off `commerce` — rather
+      than the line it used to sit on.
+    */
     const source = code("apps/website/lib/storefront-trust.server.ts");
-    expect(source).toContain("sameDayCutoff: sameDayCutoffFor(");
+    expect(source, "the cutoff stopped going through the rule").toMatch(
+      /const cutoff = sameDayCutoffFor\(/,
+    );
+    expect(source, "the field stopped using it").toContain("sameDayCutoff: cutoff,");
     expect(source).not.toMatch(/sameDayCutoff:\s*commerce/);
   });
 });

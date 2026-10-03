@@ -197,6 +197,29 @@ export interface HomepageSectionRendererProps {
      * cached before this field existed comes without it.
      */
     sameDayCutoff: string;
+    /**
+     * How long is left today, as the band would read it at the moment the
+     * server rendered — or null when there is no window, or it has closed.
+     *
+     * THE BAND USED TO ARRIVE 900ms LATE. Its hook starts at null and fills
+     * in from an effect, so 292px of it appeared after the page had painted
+     * and pushed the homepage down: CLS 0.152 at 390, against a 0.1 budget.
+     * Seeding the hook from this makes the band part of the HTML.
+     *
+     * It is a PROP, not a second reading of the clock, and that is what
+     * keeps hydration quiet: the server’s render and the browser’s first
+     * render use the identical string.
+     *
+     * ANOTHER HAND-WRITTEN COPY of a field on `StorefrontTrust` — see the
+     * note on `sameDayCutoff` above for why this file cannot import it, and
+     * why the two are edited together.
+     *
+     * OPTIONAL, for the same reason the note above gives: this object also
+     * arrives as JSON from the builder’s preview endpoint, and a response
+     * cached before this field existed comes without it. Absent simply means
+     * the band fills in from the browser, as it did before.
+     */
+    sameDayTimeLeft?: string | null;
     rating: { count: number; average: number } | null;
   } | null;
   selected?: boolean;
@@ -2134,7 +2157,9 @@ function SameDayCountdownSection(props: HomepageSectionRendererProps) {
     re-render all nine once a second. After a `return null` it would be a
     conditional hook, which is a different bug from the one being avoided.
   */
-  const parts = countdownParts(useSameDayCountdown(cutoff));
+  const parts = countdownParts(
+    useSameDayCountdown(cutoff, props.trust?.sameDayTimeLeft),
+  );
 
   if (!parts || !headline) {
     if (!props.interactive) return null;
