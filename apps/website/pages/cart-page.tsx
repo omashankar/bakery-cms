@@ -13,6 +13,10 @@ import {
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DELIVERY_LOCATION_UPDATED_EVENT,
+  readDeliveryLocation,
+} from "@/features/commerce/lib/delivery-location";
 import { EmptyState } from "@/components/shared/empty-state";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
@@ -268,6 +272,30 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   const promise = loaded ? getDeliveryPromise() : "";
   const freeDeliveryOver = loaded ? getFreeDeliveryThreshold() : 0;
 
+  /**
+   * THE PINCODE THE BUYER ALREADY GAVE THE HEADER.
+   *
+   * Without it the cart prices delivery with no address — no zone can
+   * match, so it uses the flat fallback — while the checkout one click
+   * later prices it against the zone. On a basket under the free-delivery
+   * threshold that moves the Delivery row and the Total while the buyer is
+   * typing their address, with only a zone name in small text to explain
+   * it.
+   *
+   * Read on mount rather than during render, because `readDeliveryLocation`
+   * reads the browser and a render-time call would differ between the
+   * server's HTML and the first client render. The header's button
+   * announces every change on `DELIVERY_LOCATION_UPDATED_EVENT`, and that
+   * button is in the header on this page.
+   */
+  const [deliveryPincode, setDeliveryPincode] = useState("");
+  useEffect(() => {
+    const sync = () => setDeliveryPincode(readDeliveryLocation()?.pincode ?? "");
+    sync();
+    window.addEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
+  }, []);
+
   const totals = useMemo(    () =>
       calculateCartTotals({
         items,
@@ -275,9 +303,12 @@ export function CartPage({ catalog = [] }: CartPageProps) {
         // worth when it was applied.
         discount: validCoupon?.discountAmount ?? 0,
         giftWrap: preferences.giftWrap,
+        // The same basis the checkout uses, so the Delivery row does not
+        // move between the two screens.
+        deliveryAddress: deliveryPincode ? { pincode: deliveryPincode } : undefined,
         commerceOverride: commerce,
       }),
-    [items, validCoupon?.discountAmount, preferences.giftWrap, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, commerce]
   );
 
   const recentlyViewed = useMemo(

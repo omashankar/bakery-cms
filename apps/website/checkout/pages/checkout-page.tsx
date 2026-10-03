@@ -1568,6 +1568,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="fullName">Full name</Label>
                         <Input
                           id="fullName"
+                          aria-required
                           {...register("fullName", { required: "Name is required" })}
                         />
                         {formState.errors.fullName ? (
@@ -1586,6 +1587,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="phone">Phone</Label>
                         <Input
                           id="phone"
+                          aria-required
                           type="tel"
                           {...register("phone", {
                             required: "Phone is required",
@@ -1612,6 +1614,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="addressLine1">Address line 1</Label>
                         <Input
                           id="addressLine1"
+                          aria-required
                           {...register("addressLine1", { required: "Address is required" })}
                         />
                         {formState.errors.addressLine1 ? (
@@ -1642,6 +1645,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="city">City</Label>
                         <Input
                           id="city"
+                          aria-required
                           {...register("city", { required: "City is required" })}
                         />
                         {formState.errors.city ? (
@@ -1654,6 +1658,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="state">State</Label>
                         <Input
                           id="state"
+                          aria-required
                           {...register("state", { required: "State is required" })}
                         />
                         {formState.errors.state ? (
@@ -1666,6 +1671,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="pincode">PIN code</Label>
                         <Input
                           id="pincode"
+                          aria-required
                           {...register("pincode", {
                             required: "PIN code is required",
                             pattern: { value: /^\d{6}$/, message: "Enter 6-digit PIN" },
@@ -1700,7 +1706,21 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
-                        <Label>Save this as</Label>
+                        {/*
+                          "(optional)", because it is — `addressLabel`
+                          falls back to "Home" wherever it is read, and the
+                          note above lists it among the fields that do not
+                          count.
+
+                          This form marks the optional ones rather than the
+                          required ones, which works only while the marking
+                          is complete. This was the exception: the one
+                          unmarked control that reads as mandatory, sitting
+                          between fields that genuinely are. A buyer who
+                          tested the inference here would learn the wrong
+                          lesson and stop trusting it everywhere else.
+                        */}
+                        <Label>Save this as (optional)</Label>
                         {/*
                           What the customer calls the place. It used to be the
                           city name, stamped on without asking — so somebody
@@ -1880,6 +1900,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="deliveryDate">Delivery date</Label>
                         <Input
                           id="deliveryDate"
+                          aria-required
                           type="date"
                           min={earliestDeliveryDate}
                           value={deliverySlot.date}
@@ -1901,6 +1922,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="deliveryTime">Delivery time</Label>
                         <select
                           id="deliveryTime"
+                          aria-required
                           value={deliverySlot.timeSlot}
                           aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
                           onChange={(event) => {
@@ -1999,10 +2021,28 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-medium">Who it is from</p>
-                            <p className="text-xs text-muted-foreground">
-                              We will use these to reach you about this order.
-                            </p>
+                            {/*
+                              "(optional)", like the two labels above it.
+
+                              These prefill from the account, and the
+                              sign-in modal asks for a name as optional —
+                              so a customer who skipped that box arrives
+                              here with nothing, which is the common case.
+                              Unmarked, the empty state read as a field
+                              they had failed to fill.
+                            */}
+                            <p className="text-sm font-medium">Who it is from (optional)</p>
+                            {/*
+                              AND THE PROMISE ONLY WHEN THERE IS SOMETHING
+                              TO PROMISE ABOUT. "We will use these to reach
+                              you" sat above a box reading "Not set", which
+                              is a sentence contradicting the line under it.
+                            */}
+                            {personalisationSender ? (
+                              <p className="text-xs text-muted-foreground">
+                                We will use these to reach you about this order.
+                              </p>
+                            ) : null}
                           </div>
                           <Button
                             type="button"
@@ -2057,8 +2097,18 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           <span>
                             Keep it a surprise
                             <span className="block text-xs text-muted-foreground">
-                              Your name and number stay off what the recipient sees. The
-                              shop still has them, because it has to be able to reach you.
+                              {/*
+                                THE FIRST SENTENCE IS ALWAYS TRUE — it
+                                describes what this tick does. The second
+                                is a claim about values the shop holds, so
+                                it waits until there are some; over an
+                                empty box it contradicted the "Not set"
+                                three lines above.
+                              */}
+                              Your name and number stay off what the recipient sees.
+                              {personalisationSender
+                                ? " The shop still has them, because it has to be able to reach you."
+                                : null}
                             </span>
                           </span>
                         </label>
