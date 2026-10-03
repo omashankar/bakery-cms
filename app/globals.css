@@ -597,3 +597,36 @@ html[data-mod-shape="0"] [data-gate-shape],
 html[data-mod-photo="0"] [data-gate-photo] {
   display: none !important;
 }
+
+/*
+ * A FIELD A FINGER CAN TAP WITHOUT THE PAGE ZOOMING.
+ *
+ * iOS Safari zooms whenever a focused field's text is under 16px, and does
+ * not zoom back out when the field is blurred — so one tap on a 14px box
+ * leaves the shopper on a magnified, sideways-scrolling page for the rest
+ * of the visit.
+ *
+ * The shared Input and Textarea are `text-base md:text-sm`: 16px below the
+ * md breakpoint and 14px above it. md is 768px, which is an iPad in
+ * portrait; in landscape it is 1024. Measured, seventy fields across the
+ * storefront were under 16px from 768 up.
+ *
+ * THE TRIGGER IS THE POINTER, NOT THE WIDTH, which is why this is not a
+ * breakpoint: no width rule catches a tablet in landscape without also
+ * catching a laptop. A mouse-driven screen is untouched at every width.
+ *
+ * `max(1rem, 1em)` rather than a flat 16px — `1em` is the inherited size,
+ * so a field deliberately set larger keeps its size and only the too-small
+ * ones are lifted.
+ *
+ * UNLAYERED on purpose: Tailwind's utilities sit in a cascade layer, and
+ * unlayered CSS beats a layer regardless of specificity, so this wins over
+ * `.text-sm` without `!important`.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: max(1rem, 1em);
+  }
+}

@@ -1592,7 +1592,21 @@ export function ProductDetailPage({
                 */}
                 <div className="flex flex-wrap items-center justify-end gap-4 lg:hidden">
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={handleWishlist}>
+                    {/*
+                      44px, a step under the buy button's 48.
+
+                      It was the shared default, 32px — under every touch
+                      floor — while its desktop twin is `h-14 w-14`. The
+                      cart pairs a 48px primary with a 44px outline directly
+                      beneath it; this is that pair. No `text-base`, so the
+                      primary stays visibly the primary.
+                    */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      onClick={handleWishlist}
+                    >
                       <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
                       Wishlist
                     </Button>
@@ -2110,9 +2124,24 @@ export function ProductDetailPage({
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-4 lg:hidden">
         <div className="mx-auto flex max-w-lg gap-3">
+          {/*
+            THE SAME SIZE AS THE CART'S OWN PHONE BAR, which is 48px.
+
+            This was `className="flex-1"` with no size, so it took the
+            shared button's default — 32px — while the desktop version of
+            the same control a few hundred lines up is `h-14`, 56px. The
+            breakpoints had it backwards: a mouse got 56px of target and a
+            thumb got 32, on the one control the storefront exists to
+            deliver, in a fixed bar at the bottom edge of the screen where a
+            thumb is least precise.
+
+            `h-12 flex-1 text-base` is copied from cart-page.tsx's bar, not
+            chosen — a shopper meets both bars in one purchase and they
+            should be one control.
+          */}
           <Button
             variant="bakery"
-            className="flex-1"
+            className="h-12 flex-1 text-base"
             disabled={isOutOfStock}
             onClick={() => handleAddToCart(false)}
           >

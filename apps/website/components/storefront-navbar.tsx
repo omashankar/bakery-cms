@@ -914,7 +914,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 aria-activedescendant={
                   activeRow >= 0 ? `${suggestListId}-${activeRow}` : undefined
                 }
-                className="h-11 w-full rounded-lg border border-input bg-cream-50 pl-11 pr-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-11 w-full rounded-lg border border-input bg-cream-50 pl-11 pr-3 text-base outline-none md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
 
               {/*

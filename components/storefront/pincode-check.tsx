@@ -185,7 +185,7 @@ export function PincodeCheck({ className }: { className?: string }) {
             above, where the track was already wider than 332.
           */
           size={1}
-          className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground"
+          className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground"
         />
         {/*
           A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
