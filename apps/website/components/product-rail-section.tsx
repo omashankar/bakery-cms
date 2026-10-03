@@ -42,7 +42,10 @@ export function ProductRailSection({
           </Button>
         ) : null}
       </ScrollReveal>
-      <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Two across from the base — see the note on the product page's
+          recommendations. The base gap drops to 16px because 24 was written
+          for one stacked column and costs each of two cards 6px at 360. */}
+      <StaggerReveal className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         {cakes.map((cake) => (
           <ProductCard key={cake.id} cake={cake} />
         ))}

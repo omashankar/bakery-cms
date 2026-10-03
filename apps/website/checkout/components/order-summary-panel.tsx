@@ -106,7 +106,9 @@ export function OrderSummaryPanel({
               ) : null}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">
+              {/* Two lines, not an ellipsis. In the 320px aside this was
+                  cutting the name of the thing being bought. */}
+              <p className="line-clamp-2 font-medium">
                 {item.quantity} × {item.name}
               </p>
               {/*
@@ -116,9 +118,14 @@ export function OrderSummaryPanel({
                 flavour only — no shape, and none of the shop's own option
                 groups — so the last screen before paying, and the only one after,
                 both omitted what the customer had chosen.
+
+                AND THEY ARE NOT CUT OFF. This line carried `truncate`, which
+                in the 320px aside reduced it to "Size: 0.5 kg · Egg
+                preferen…" — unreadable at 1440 and readable at 768, which
+                is the wrong way round. Two lines instead of one ellipsis.
               */}
               {cartLineChoices(item).length > 0 ? (
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="line-clamp-2 text-xs text-muted-foreground">
                   {cartLineChoices(item).join(" · ")}
                 </p>
               ) : null}

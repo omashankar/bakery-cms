@@ -1025,7 +1025,21 @@ export function ProductDetailPage({
               the sticky header's 50 and the phone's fixed cart bar at 40 —
               this has to rise above one column, not above the shop.
             */}
-            <div className="lg:sticky lg:top-24 lg:z-20">
+            {/*
+              CAPPED BELOW lg, so the price is not pushed off a tablet.
+
+              This page is one column until 1024, so at 768 the gallery took
+              the full width and the price, the size chips and Add to cart
+              all sat below the fold. Splitting into two columns at `md`
+              would be worse: ~340px each shrinks the gallery to the size it
+              already has on a 390px phone, and squeezes the buying controls
+              under the 384px cap set deliberately further down this file.
+
+              416px is the gallery's share at lg, so this is the width it
+              was designed at — it simply stops growing past it while the
+              page is still one column.
+            */}
+            <div className="sm:max-w-[26rem] lg:max-w-none lg:sticky lg:top-24 lg:z-20">
               <ProductGallery
                 images={galleryImages}
                 productName={cake.name}
@@ -2102,7 +2116,11 @@ export function ProductDetailPage({
                   View all
                 </Button>
               </ScrollReveal>
-              <StaggerReveal className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Two across from the base, like the listing pages. It was
+                  `sm:grid-cols-2`, so below 640 there was no column count
+                  and four cards became four full-width rows — four and a
+                  half extra screens at the foot of a phone. */}
+              <StaggerReveal className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
                 {related.map((item) => (
                   <ProductCard key={item.id} cake={item} />
                 ))}
