@@ -1244,8 +1244,27 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
             className="mb-4"
           />
         )}
-        <div className="flex items-end justify-between gap-x-4 border-b border-border sm:gap-x-6">
-          <div className="flex min-w-0 flex-col items-start gap-y-2 sm:flex-row sm:items-end sm:gap-x-5 sm:gap-y-0">
+        {/*
+          THE TAB STRIP GETS THE WHOLE LINE ON A PHONE.
+
+          Measured at 390: the band's content is 325px and the VIEW ALL
+          pill took x=265..357, leaving the scrolling strip 219px with the
+          tabs clipped at a hard edge. Two of three tabs were cut in half.
+
+          `flex-wrap` with the strip as the last line is all it takes. The
+          border stays exactly where it is — the row's bottom edge is still
+          directly under the tabs, so the folder-tab invariant above and
+          the active tab's `-mb-px` are untouched.
+
+          The inner wrapper is gone because the header and the strip have
+          to be able to land on different lines; its `sm:gap-x-5` is folded
+          in here, which also makes the two gaps on that line agree.
+
+          `ml-auto` on the link rather than `justify-between`: the header
+          renders nothing for a blank title, and with two children
+          `justify-between` would then throw the pill to the left.
+        */}
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-border sm:flex-nowrap sm:gap-x-5 sm:gap-y-0">
             {align === "left" ? (
               <SectionHeader
                 overline={contentString(c, "overline")}
@@ -1290,7 +1309,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               be inside the clip and the negative margin puts the strip back
               where it was, so the tabs still stand on the rule.
             */}
-            <div className="no-scrollbar -mb-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2 sm:w-auto">
+            <div className="no-scrollbar order-last -mb-2 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2 sm:order-none sm:w-auto">
               {tabs.map((tab, index) => (
                 <button
                   key={`${tab.label}-${index}`}
@@ -1322,8 +1341,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
                 </button>
               ))}
             </div>
-          </div>
-          <div className="shrink-0 pb-2.5">
+          <div className="ml-auto shrink-0 pb-2.5">
             <ViewAllLink href={railCtaHref} label={railCtaLabel} on={props.section.background} />
           </div>
         </div>
