@@ -23,7 +23,15 @@ function PaginationContent({
   return (
     <ul
       data-slot="pagination-content"
-      className={cn("flex items-center gap-0.5", className)}
+      /*
+        gap-1.5, because 44px targets 2px apart are worse than 32px ones:
+        the bigger boxes touch. flex-wrap is the backstop — a long page
+        window becomes two centred lines at 360 instead of pushing the
+        document sideways. No justify- here: alignment belongs to the nav
+        above, and this list has to keep inheriting it or admin's
+        right-aligned rows jump left.
+      */
+      className={cn("flex flex-wrap items-center gap-1.5", className)}
       {...props}
     />
   )
@@ -48,7 +56,21 @@ function PaginationLink({
     <Button
       variant={isActive ? "outline" : "ghost"}
       size={size}
-      className={cn(className)}
+      /*
+        A 44px FLOOR, ahead of the caller's className so it can still be
+        overridden.
+
+        Measured at 360 and 390, the storefront's listing drew four 32px
+        destinations 2px apart. A CSS minimum beats the variant's fixed
+        h-8/size-8 without replacing it, so the ghost rectangle grows and
+        the radius, the tokens and the hover stay exactly as they were.
+
+        The shop's other pager, components/shared/list-pagination.tsx,
+        avoids the problem differently — it hides the numbers below sm and
+        shows "1 / 2". That is an admin-table choice; the storefront wants
+        its page numbers, so it gets bigger ones.
+      */
+      className={cn("min-h-11 min-w-11", className)}
       nativeButton={false}
       render={
         <a
@@ -107,7 +129,9 @@ function PaginationEllipsis({
       aria-hidden
       data-slot="pagination-ellipsis"
       className={cn(
-        "flex size-8 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
+        /* size-11 to match the targets either side; still aria-hidden
+           and still not a control. */
+        "flex size-11 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
