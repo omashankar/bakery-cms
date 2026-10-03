@@ -21,6 +21,23 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductCardProps {
   cake: LandingProduct;
+  /**
+   * Preload this card's photo, for the few that are on screen at once.
+   *
+   * Measured on the production build on a mid-range phone over slow 4G:
+   * the LCP element on the listing and on a category is a card photo, at
+   * 2752ms and 2608ms against a 2.5s budget. They are ordinary lazy
+   * images, so the browser does not learn it needs the first one until it
+   * has parsed and laid out the grid; on a slow connection that discovery
+   * is most of the gap.
+   *
+   * THE CALLER DECIDES, because only the caller knows which cards are
+   * first — this same component draws the wishlist, the search grid and
+   * the rails, where nothing should be preloaded at all. Preloading more
+   * than the first row makes it worse, not better: the extra requests
+   * compete with the one that actually decides LCP.
+   */
+  priority?: boolean;
   variant?: "default" | "tall";
   className?: string;
   /**
@@ -47,6 +64,7 @@ interface ProductCardProps {
 
 export function ProductCard({
   cake,
+  priority,
   variant = "default",
   className,
   showWishlist = true,
@@ -121,6 +139,7 @@ export function ProductCard({
             src={cake.image}
             alt={cake.name}
             fill
+            priority={priority}
             /*
               THE GRID CHANGED, so this had to. It claimed 25vw from 1024 up
               where the grid was three across, and 50vw below 640 where the

@@ -772,8 +772,20 @@ export function CollectionsPage({
                   */
                   className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-4"
                 >
-                  {paginated.map((cake) => (
-                    <ProductCard key={cake.id} cake={cake} />
+                  {/*
+                    THE FIRST ROW IS PRELOADED. On a slow phone the LCP
+                    element on this page is a card photo, and it was
+                    arriving at 2752ms against a 2.5s budget because an
+                    ordinary lazy image is not discovered until the grid
+                    has been laid out.
+
+                    Four, because the grid is two across on a phone and
+                    four at xl, so four is the first visible row at every
+                    width. More would compete with the one that decides
+                    LCP and make it slower.
+                  */}
+                  {paginated.map((cake, index) => (
+                    <ProductCard key={cake.id} cake={cake} priority={index < 4} />
                   ))}
                 </StaggerReveal>
               )}
